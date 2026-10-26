@@ -159,6 +159,8 @@ case "${1:-}" in
   -h|--help) usage; exit 0 ;;
 esac
 
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-marker-lib.sh
 . "$SCRIPT_DIR/fm-marker-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
@@ -408,7 +410,7 @@ if [ "$KIND" != secondmate ] && { [ -e "$BRIEF_INCLUDE_FILE" ] || [ -L "$BRIEF_I
   [ -n "$(printf '%s' "$BRIEF_INCLUDE_BODY" | tr -d '[:space:]')" ] || BRIEF_INCLUDE_BODY=
 fi
 
-_bi="${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/brief-inherit/bin/fm-brief-inherit-lib.sh"
+_bi=$(fm_addon_path "${FM_HOME:-$SCRIPT_DIR/..}" brief-inherit/bin/fm-brief-inherit-lib.sh)
 # shellcheck disable=SC1090 # The optional add-on source is installed outside this repository.
 [ ! -f "$_bi" ] || { . "$_bi" && fm_brief_inherit_shared "$CONFIG" "$KIND"; }
 

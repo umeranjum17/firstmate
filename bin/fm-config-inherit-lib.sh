@@ -73,6 +73,8 @@
 # reconciled by the ordinary remote sync/update path before the transfer
 # succeeds; there is no separate allowlist version negotiation.
 #
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-startup-memory-budget-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-startup-memory-budget-lib.sh"
 # shellcheck source=bin/fm-role-lib.sh
@@ -88,7 +90,7 @@ FM_SHARED_CAPTAIN_MODE="444"
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
 FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
-_bi="${FM_ADDONS_DIR:-${FM_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/fm-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && fm_brief_inherit_config; }
+_bi=$(fm_addon_path "${FM_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}" brief-inherit/bin/fm-brief-inherit-lib.sh); [ ! -f "$_bi" ] || { . "$_bi" && fm_brief_inherit_config; }
 
 # firstmate-role additionally carries a proof-of-state receipt: a scoped role
 # grant (or its recorded absence) authorizes a secondmate home only while

@@ -22,13 +22,16 @@
 #   fm-secondmate-report.sh done abcdef0123456789 "audit clean"
 #   fm-secondmate-report.sh --doc done abcdef0123456789 data/x/report.md "see report"
 #
-# An optional firstmate-addons status-wait-check add-on (${FM_ADDONS_DIR:-<home>/projects/firstmate-addons}/status-wait-check/status-wait-check)
+# An optional addons/status-wait-check add-on (resolved through bin/fm-addons-dir-lib.sh: the in-repo
+# addons/ first, then the pre-fold clone at <home>/projects/firstmate-addons)
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
 set -eu
 
 CALLER_FM_HOME=${FM_HOME:-}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-pending-reply-lib.sh
 . "$SCRIPT_DIR/fm-pending-reply-lib.sh"
 # shellcheck source=bin/fm-parent-channel-lib.sh
@@ -38,7 +41,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   || { echo "error: the question rule needs $SCRIPT_DIR/fm-question-lib.sh beside this script" >&2; exit 1; }
 
 fm_secondmate_report_status_blocked_wait() {  # <verb> <text>
-  local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-wait-check/status-wait-check"
+  local hook
+  hook=$(fm_addons_dir "$CALLER_FM_HOME")/status-wait-check/status-wait-check
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?

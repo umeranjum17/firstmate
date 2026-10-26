@@ -70,7 +70,7 @@ bash install-all.sh --dry-run "$FM_HOME"   # every command it would run, writing
 bash install-all.sh "$FM_HOME"
 ```
 
-It runs `route-change` after `pipeline-quota-failover` from the same clone, as that add-on requires, and `owner-guard/install-scan.sh` once the guards are in. An add-on with no installer (a dormant copy, a fork-hook seam, or a hand-wired one like `merge-card`) is listed at the end with where its setup lives, and nothing is invented for it. `--dry-run` goes to every installer; each one writes nothing.
+It runs `route-change` after `pipeline-quota-failover` from the same clone, as that add-on requires, and `owner-guard/install-scan.sh` once the guards are in. A second run over the same home succeeds and changes nothing: the two pairs that share a hook file (`git-identity` with `pane-titles`, `owner-guard` with `owner-rules`) keep a chain that already runs them instead of refusing the other side's re-chain, so repeating the install is how you repair it after editing a home by hand. An add-on with no installer (a dormant copy, a fork-hook seam, or a hand-wired one like `merge-card`) is listed at the end with where its setup lives, and nothing is invented for it. `--dry-run` goes to every installer; each one writes nothing.
 `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
 
 The delete, kill and read guards put their Claude hook in `~/.claude` and in every Claude account folder listed in the account pool's registry (`~/.muxr/plans/accounts-v1.json`), since a worker started with `CLAUDE_CONFIG_DIR` reads only that folder's settings: rerun them after adding an account.
