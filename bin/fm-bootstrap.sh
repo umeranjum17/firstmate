@@ -176,6 +176,8 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+# shellcheck source=bin/fm-pin-lib.sh disable=SC1091
+. "$SCRIPT_DIR/fm-pin-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh disable=SC1091
@@ -837,15 +839,22 @@ secondmate_handoff_detect() {
 }
 
 install_cmd() {
+  local spec
   case "$1" in
     tmux|node|git|gh|curl|jq|orca|zellij) echo "brew install $1  # or the platform's package manager" ;;
     cmux) echo "brew install --cask cmux  # or see https://cmux.com" ;;
     treehouse) echo "curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh" ;;
     no-mistakes) echo "curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh" ;;
-    gh-axi|chrome-devtools-axi|lavish-axi) echo "npm install -g $1 && $1 setup hooks" ;;
-    tasks-axi|quota-axi) echo "npm install -g $1" ;;
-    learn-from-mistakes) echo "npm install -g learn-from-mistakes-axi && ln -sf learn-from-mistakes-axi \"\$(dirname \"\$(command -v learn-from-mistakes-axi)\")/learn-from-mistakes\"" ;;
-    *) return 1 ;;
+    learn-from-mistakes) echo "npm install -g $(fm_pin_npm learn-from-mistakes) && ln -sf learn-from-mistakes-axi \"\$(dirname \"\$(command -v learn-from-mistakes-axi)\")/learn-from-mistakes\"" ;;
+    *)
+      # Every npm tool installs the exact build its toolchain.versions row names, so this
+      # command and the installer cannot disagree about a version.
+      spec=$(fm_pin_npm "$1") || return 1
+      case "$1" in
+        gh-axi|chrome-devtools-axi|lavish-axi) echo "npm install -g $spec && $1 setup hooks" ;;
+        *) echo "npm install -g $spec" ;;
+      esac
+      ;;
   esac
 }
 
@@ -879,7 +888,10 @@ if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
   BACKEND_TOOLS=""
 fi
 TOOLS="$BACKEND_TOOLS $COMMON_TOOLS"
-NO_MISTAKES_MIN=1.46.0
+# Every floor below is read from its toolchain.versions row, so a bump moves installation, detection and
+# this diagnostic together. The one floor not read from that table is LAVISH_AXI_BOARD_MIN: it accepts an
+# older build for legacy boards, which is a compatibility fact rather than a version we install.
+NO_MISTAKES_MIN=$(fm_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # AXI-FAMILY FLOOR POLICY. Every axi-family floor is the CURRENT LATEST published
 # version of that tool, captain-bumped periodically to keep the whole fleet on the
 # newest axi tools. It is NOT the minimum feature-introduced version. These floors
@@ -887,9 +899,9 @@ NO_MISTAKES_MIN=1.46.0
 # earliest release that happens to satisfy some depended-on behavior. The
 # tasks-axi feature probes are an independent defense-in-depth concern, not part
 # of its floor.
-GH_AXI_MIN=0.1.29
-LEARN_FROM_MISTAKES_AXI_MIN=0.2.0
-LAVISH_AXI_MIN=0.1.80
+GH_AXI_MIN=$(fm_pin_version gh-axi) || GH_AXI_MIN=0.0.0
+LEARN_FROM_MISTAKES_AXI_MIN=$(fm_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
+LAVISH_AXI_MIN=$(fm_pin_version lavish-axi) || LAVISH_AXI_MIN=0.0.0
 LAVISH_AXI_BOARD_MIN=0.1.77
 
 treehouse_supports_lease() {
@@ -1372,9 +1384,20 @@ if [ "${1:-}" = "lavish-reply-compatible" ]; then
   exit 2
 fi
 
+if [ "${1:-}" = "version" ]; then
+  # The one owner of version parsing, so the installer never carries its own copy.
+  parts=$(tool_version_parts "${2:?usage: fm-bootstrap.sh version <tool>}") || exit 1
+  printf '%s\n' "${parts// /.}"
+  exit 0
+fi
+
 if [ "${1:-}" = "install" ]; then
   shift
   [ $# -gt 0 ] || { echo "usage: fm-bootstrap.sh install <tool>..." >&2; exit 1; }
+  # Installs stay user-local and need no sudo: a package-manager prefix the user owns, and the tool
+  # callable in this same shell straight after its install. An explicit NPM_CONFIG_PREFIX wins.
+  export NPM_CONFIG_PREFIX=${NPM_CONFIG_PREFIX:-$HOME/.local}
+  export PATH=$NPM_CONFIG_PREFIX/bin:$PATH
   for t in "$@"; do
     if ! cmd=$(install_cmd "$t"); then
       instructions=$(manual_install_url "$t") || { echo "error: unknown tool $t" >&2; exit 1; }
@@ -1383,7 +1406,7 @@ if [ "${1:-}" = "install" ]; then
     fi
     cmd=${cmd%%  #*}
     echo "installing $t: $cmd"
-    eval "$cmd"
+    eval "$cmd" || { echo "error: installing $t failed: $cmd" >&2; exit 1; }
   done
   exit 0
 fi
