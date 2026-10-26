@@ -166,12 +166,13 @@ def publish(ok, why):
         cand = subprocess.run(['git', '-C', repo, 'rev-parse', '--verify', 'HEAD^{commit}'], capture_output=True, text=True, timeout=60).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         cand = ''
-    if ok:
+    prior = None
+    if ok:  # a standing PASS for this same candidate keeps its fuller evidence; a FAIL is superseded
         try:
-            cur = json.load(open(f'{home}/state/{task}.run-receipt.json'))
+            prior = json.load(open(f'{home}/state/{task}.run-receipt.json'))
         except (OSError, ValueError):
-            cur = None
-        if isinstance(cur, dict) and cand and cur.get('verdict') == 'PASS' and cur.get('head') == cand:
+            prior = None
+        if isinstance(prior, dict) and cand and prior.get('verdict') == 'PASS' and prior.get('head') == cand:
             print('checks-lint: receipt: this candidate already holds a PASS receipt')
             return
     with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as t:
@@ -180,8 +181,9 @@ def publish(ok, why):
         r = subprocess.run([f"{os.environ.get('FM_ADDONS_DIR') or ROOT}/receipts/bin/fm-run-receipt.sh", task, 'PASS' if ok else 'FAIL', t.name, repo],
                            env={**os.environ, 'FM_HOME': home}, capture_output=True, text=True, timeout=60)
         if r.returncode == 0:
-            print('checks-lint: receipt PASS published for this candidate, superseding an earlier FAIL' if ok
-                  else 'checks-lint: receipt FAIL published: the merge is refused until a newer PASS receipt')
+            superseded = isinstance(prior, dict) and prior.get('verdict') == 'FAIL'
+            print('checks-lint: receipt PASS published' + (', superseding the earlier FAIL receipt' if superseded else '')
+                  if ok else 'checks-lint: receipt FAIL published: the merge is refused until a newer PASS receipt')
         else:
             print(f'checks-lint: receipt not {"published" if ok else "revoked"}: ' + (r.stderr.strip() or '?')[-200:])
     except subprocess.TimeoutExpired:
