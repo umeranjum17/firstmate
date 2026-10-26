@@ -36,8 +36,9 @@ chain_state() {  # chain_state: every chain file's content digest, in a fixed or
     "$home/config/merge-gate" \
     "$home/config/merge-gate.pre-owner-rules" \
     "$home/config/merge-gate.pre-owner-guard"; do
-    [ -e "$f" ] && printf '%s %s\n' "$(sha256sum <"$f" | cut -d' ' -f1)" "${f#"$tmp"/}"
+    if [ -e "$f" ]; then printf '%s %s\n' "$(sha256sum <"$f" | cut -d' ' -f1)" "${f#"$tmp"/}"; fi
   done
+  return 0
 }
 
 install_pairs one
@@ -46,26 +47,44 @@ chain_after_two=$(chain_state)
 install_pairs three
 
 [ "$(chain_state)" = "$chain_after_two" ] || {
-  printf 'not ok - the third run changed the hook chains:\n' >&2
+  printf 'not ok - a repeat install changed the hook chains:\n' >&2
   diff <(printf '%s\n' "$chain_after_two") <(chain_state) >&2 || true
   exit 1
 }
-printf 'ok - a repeated install succeeds and settles the two shared hook files\n'
+printf 'ok - a repeat install succeeds and settles the two shared hook files\n'
 
-# Both sides of each pair still run: pane-titles' shim execs the launcher, and the owner-rules gate is
-# reachable from whatever head the merge gate chains.
-grep -q 'fm-pane-titles/launch-env-hook' "$home/config/launch-env-hook" ||
-  { printf 'not ok - the launch-env hook no longer runs pane-titles\n' >&2; exit 1; }
+# A repeat install adds no files either: the backup a chained hook earns is kept once, not once per run.
+count_backups() { local n=0 f; for f in "$home/config"/launch-env-hook.bak-git-identity-*; do [ -e "$f" ] && n=$((n + 1)); done; printf '%s\n' "$n"; }
+backups=$(count_backups)
+install_pairs four
+[ "$(count_backups)" -eq "$backups" ] ||
+  { printf 'not ok - a repeat install added another hook backup\n' >&2; exit 1; }
+printf 'ok - a repeat install adds no hook backup\n'
+
+# Both sides of each pair still run: pane-titles' shim execs the launcher, and walking the merge gate's
+# chained prev= links reaches both gates without ever revisiting a file. A repeat install that re-chained a
+# gate already in the chain would close a loop here, and the merge gate would exec itself forever.
+if ! grep -q 'fm-pane-titles/launch-env-hook' "$home/config/launch-env-hook"; then
+  printf 'not ok - the launch-env hook no longer runs pane-titles\n' >&2
+  exit 1
+fi
 gate=$home/config/merge-gate
+seen=' '
+found_guard=0 found_rules=0
 depth=0
 while [ -e "$gate" ] && [ "$depth" -lt 8 ]; do
-  grep -q 'fm-owner-rules-gate.sh' "$gate" && break
+  case $seen in
+    *" $gate "*) printf 'not ok - the merge gate chains back to %s: it would exec itself forever\n' "$gate" >&2; exit 1 ;;
+  esac
+  seen="$seen$gate "
+  if grep -q 'fm-owner-guard' "$gate"; then found_guard=1; fi
+  if grep -q 'fm-owner-rules-gate.sh' "$gate"; then found_rules=1; fi
   gate=$(sed -n 's/^prev=//p' "$gate" | head -1)
   [ -n "$gate" ] || break
   depth=$((depth + 1))
 done
-grep -q 'fm-owner-rules-gate.sh' "$gate" 2>/dev/null ||
-  { printf 'not ok - the merge gate no longer runs the owner-rules gate\n' >&2; exit 1; }
-printf 'ok - both sides of each shared hook file still run after the repeated installs\n'
+[ "$found_guard" -eq 1 ] && [ "$found_rules" -eq 1 ] ||
+  { printf 'not ok - the merge gate lost a side (owner-guard=%s owner-rules=%s)\n' "$found_guard" "$found_rules" >&2; exit 1; }
+printf 'ok - both sides of each shared hook file still run, and the merge gate chain has no loop\n'
 
 printf '%s\n' "PASS install-all re-install is a no-op"

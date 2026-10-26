@@ -32,8 +32,16 @@ HOOKS='applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit
 post-commit pre-rebase post-checkout post-merge pre-push post-rewrite pre-auto-gc sendemail-validate'
 HOOK=$FMH/config/launch-env-hook
 SHIM=$(printf '#!/usr/bin/env bash\nexec %q env-file "$@"\n' "$DEST/git-identity")
+# Back up a hook that is not already ours, once per distinct hook: another add-on (pane-titles) re-chains the
+# shim every install, so a repeat run would otherwise pile up identical copies instead of being a no-op.
 BAK=
-[ ! -e "$HOOK" ] || [ "$(cat "$HOOK")" = "$SHIM" ] || BAK=$HOOK.bak-git-identity-$(date +%s)
+if [ -e "$HOOK" ] && [ "$(cat "$HOOK")" != "$SHIM" ]; then
+  hook_text=$(cat "$HOOK")
+  for prior in "$HOOK".bak-git-identity-*; do
+    [ -f "$prior" ] && [ "$(cat "$prior")" = "$hook_text" ] && { BAK=$prior; break; }
+  done
+  [ -n "$BAK" ] || BAK=$HOOK.bak-git-identity-$(date +%s)
+fi
 grep -q launch-env-hook "$FMH/bin/fm-spawn.sh" 2>/dev/null ||
   echo "note: $FMH/bin/fm-spawn.sh does not run config/launch-env-hook yet; lanes stay unguarded until it does"
 
@@ -59,7 +67,7 @@ for name in $HOOKS; do
   printf '#!/usr/bin/env bash\nexec %q hook %s "$@"\n' "$DEST/git-identity" "$name" >"$DEST/hooks/$name"
   chmod 555 "$DEST/hooks/$name"
 done
-[ -z "$BAK" ] || { cp -p "$HOOK" "$BAK"; echo "backed up: $BAK"; }
+[ -z "$BAK" ] || [ -f "$BAK" ] || { cp -p "$HOOK" "$BAK"; echo "backed up: $BAK"; }
 printf '%s\n' "$SHIM" >"$HOOK"
 chmod 700 "$HOOK"
 echo "installed: $HOOK -> $DEST/git-identity (lanes commit and push as $NAME <$EMAIL>)"
