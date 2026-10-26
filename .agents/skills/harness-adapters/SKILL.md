@@ -2,7 +2,7 @@
 name: harness-adapters
 description: >-
   Agent-only reference for Juggernaut harness operations.
-  Use before spawning or recovering an operator or secondmate, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter.
+  Use before spawning or recovering an operator or Squad Lead, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter.
   Contains verified facts for claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, gemini, muse, rovo, omp, agy, and devin.
 user-invocable: false
 metadata:
@@ -24,7 +24,7 @@ Operational paths keep the context named by their owner: `config/` and active-ho
 
 ## Non-negotiable safety
 
-Never dispatch an operator or secondmate on an unverified adapter.
+Never dispatch an operator or Squad Lead on an unverified adapter.
 If `config/crew-harness` or `config/secondmate-harness` names one, tell the captain under `../../../AGENTS.md` section 9 that the requested worker runtime is not verified, use Juggernaut's own verified runtime for current work, and ask only whether to verify the requested runtime for future work.
 Do not pause current work for that choice.
 
@@ -35,7 +35,7 @@ For recovery and control, use the exact `harness=` in `state/<id>.meta`; never i
 Deliver lifecycle actions only through `../../../bin/fm-control.sh <task-id> interrupt|exit|relaunch`.
 Never type an interrupt key or exit command through `fm-send`, where routing-marked lifecycle text becomes chat.
 Trust handling is complete only when inspection proves the target started processing its instructions; delivery success alone is not proof.
-Muse, Gemini, AGY, and Devin are verified only for operator and scout work, never a secondmate or primary.
+Muse, Gemini, AGY, and Devin are verified only for operator and Recon work, never a Squad Lead or primary.
 
 ## Detection
 
@@ -45,7 +45,7 @@ Only `FM_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_A
 omp publishes no marker of its own; `FM_OMP_HARNESS=omp` is Juggernaut's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
 `../../../bin/fm-spawn.sh` owns worker marker establishment, while the README launch command owns the signed-primary boundary.
 `../../../bin/fm-harness.sh crew` resolves `config/crew-harness`, where absent or `default` means Juggernaut's own harness.
-`../../../bin/fm-harness.sh secondmate <id>` resolves the mate-specific profile under [`configuration`](../../../docs/configuration.md#choose-the-secondmate-harness).
+`../../../bin/fm-harness.sh secondmate <id>` resolves the mate-specific profile under [`configuration`](../../../docs/configuration.md#choose-the-squad-lead-harness).
 `../../../bin/fm-spawn.sh` re-resolves on every spawn, and an explicit per-spawn argument wins for that spawn.
 A new adapter's verified marker and command name must land in `../../../bin/fm-harness.sh`.
 

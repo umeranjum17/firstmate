@@ -1,7 +1,7 @@
 # Rovo CLI
 
 Verified 2026-09-02 on Rovo CLI 202609.1.2 for operator/scout work only.
-Not verified, and not naturally verifiable, as a secondmate or primary: rovo has no turn-end hook and no primary supervision protocol, the same gap that scopes muse to operator/scout.
+Not verified, and not naturally verifiable, as a Squad Lead or primary: rovo has no turn-end hook and no primary supervision protocol, the same gap that scopes muse to operator/scout.
 
 ## Operating facts
 
@@ -50,8 +50,8 @@ It does not block the launch-then-send gates: readiness leads with the `Welcome 
 
 ## Interrupt: confirmed under real tmux
 
-The original verification scout (`fm-rovo-smoke-s1`, PTY smoke) observed a single Escape print `Agent cancelled` during a running tool call.
-A follow-up live check under real tmux 3.6a - an isolated `tmux -L <private-socket>` session/window, not the shared fleet session - reproduced the scout's exact finding: a single Escape sent during a genuine mid-flight bash tool call printed `Agent cancelled` in the captured pane.
+The original verification Recon (`fm-rovo-smoke-s1`, PTY smoke) observed a single Escape print `Agent cancelled` during a running tool call.
+A follow-up live check under real tmux 3.6a - an isolated `tmux -L <private-socket>` session/window, not the shared fleet session - reproduced the Recon's exact finding: a single Escape sent during a genuine mid-flight bash tool call printed `Agent cancelled` in the captured pane.
 The launch-then-send live guard (`../../../../tests/fm-rovo-signals-live-e2e.test.sh`) now reproduces it over a raw PTY too: an earlier single fixed-timer Escape landed unreliably (the interrupt instant is timing-sensitive over a bare PTY), so the guard sends Escape across the live tool-call window until the cancel renders - a deterministic way to reproduce a timing-sensitive interrupt, and confirmed to print `Agent cancelled` every run.
 Escape is the interrupt key and is what `fm_control_interrupt_key` returns.
 `fm_control_interrupt_ack_source` still records `none` for rovo - the same conservative choice already made for claude/codex/grok/kimi/cursor, a control-plane fact independent of whether the render happens to appear - so the control plane sends the key and lets its own postcondition, not a parsed string, decide whether the agent actually stopped.
@@ -67,7 +67,7 @@ Treat the ~1h access-token lifetime as an ordinary operational fact, not a non-n
 
 rovo's skill loader rejects every Juggernaut skill: `Invalid skill definition in .../SKILL.md: 'metadata -> internal': Input should be a valid string`, because Juggernaut's `metadata.internal` is a boolean and rovo's schema wants a string.
 This blocks `/no-mistakes` and every other Juggernaut skill invocation inside a rovo worker until Juggernaut's `SKILL.md` frontmatter is made rovo-compatible (a separate, deferred follow-up - it touches every skill file and the installer contract, per `../../firstmate-coding-guidelines/SKILL.md`).
-A `no-mistakes`-mode rovo ship operator is blocked by this gap; a rovo scout, which invokes no skill, is unaffected.
+A `no-mistakes`-mode rovo ship operator is blocked by this gap; a rovo Recon, which invokes no skill, is unaffected.
 
 ## ACP as a future upgrade
 

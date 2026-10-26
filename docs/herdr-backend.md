@@ -50,7 +50,7 @@ Select Herdr in any of these ways:
 - `FM_BACKEND=herdr` for one launch.
 - An explicit request to Juggernaut.
 
-A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
+A remote Squad Lead agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
 
 Herdr is also auto-detected when the primary runs natively under `HERDR_ENV=1` and is not inside tmux.
 A tmux pane nested inside Herdr resolves to tmux because the innermost multiplexer wins.
@@ -96,15 +96,15 @@ Removing or upgrading the shadowing client is the durable fix.
 
 ## Watching and task containers
 
-The ordinary topology puts one task tab per endpoint in the exact workspace of the Juggernaut or secondmate that launches it.
+The ordinary topology puts one task tab per endpoint in the exact workspace of the Juggernaut or Squad Lead that launches it.
 When the launcher has no Herdr workspace to inherit, the adapter maintains one durable home-labeled workspace instead.
 
 | Home | Workspace label |
 | --- | --- |
 | Primary | `firstmate` |
-| Secondmate | `2ndmate-<secondmate-id>`, derived from its validated `.fm-secondmate-home` marker |
+| Squad Lead | `2ndmate-<secondmate-id>`, derived from its validated `.fm-secondmate-home` marker |
 
-A secondmate launched by the primary receives a narrowly scoped home override during container creation.
+A Squad Lead launched by the primary receives a narrowly scoped home override during container creation.
 
 ### Watching tasks
 
@@ -122,13 +122,13 @@ Later task creation does not intentionally steal focus.
 Herdr does not enforce workspace or tab label uniqueness, so a label can never decide where a worker goes.
 
 Herdr 0.7.5 exports `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_SESSION`, `HERDR_SOCKET_PATH`, `HERDR_TAB_ID`, and `HERDR_WORKSPACE_ID` into every process it manages a pane for.
-A Juggernaut or secondmate agent's own commands inherit them.
+A Juggernaut or Squad Lead agent's own commands inherit them.
 Older injection shapes are unverified, so a claimed launcher pane without the injected socket identity cannot be trusted.
 
-With presentation spaces disabled, an operator or scout is created in the exact workspace that identity currently resolves to.
+With presentation spaces disabled, an operator or Recon is created in the exact workspace that identity currently resolves to.
 That workspace is read live from Herdr rather than from the injected snapshot, so the worker always appears beside the agent that launched it.
 Duplicate labels elsewhere in the session are irrelevant, and the globally focused workspace is never the target.
-A `--secondmate` launch is the deliberate exception: it stands up that secondmate home's own workspace instead of joining the launcher's.
+A `--secondmate` launch is the deliberate exception: it stands up that Squad Lead home's own workspace instead of joining the launcher's.
 
 ### Unresolvable launcher identity
 
@@ -150,7 +150,7 @@ Two workspaces sharing it are an unresolvable placement and refuse rather than a
 Avoid naming a personal workspace `firstmate` or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
 
-An older secondmate workspace using `firstmate-<id>` is not migrated automatically.
+An older Squad Lead workspace using `firstmate-<id>` is not migrated automatically.
 Rename it manually before expecting new tasks or recovery to use it.
 
 ### Recovery and existing tasks
@@ -165,7 +165,7 @@ Closing its last tab can remove the workspace, and the next spawn recreates it.
 
 ## Presentation spaces
 
-Each new operator or scout is placed in a disposable one-task workspace by default, on Herdr 0.8.0 and newer.
+Each new operator or Recon is placed in a disposable one-task workspace by default, on Herdr 0.8.0 and newer.
 This section calls that one-task workspace the projection.
 Without the projection, tasks use the ordinary flat layout described under [Watching and task containers](#watching-and-task-containers).
 
@@ -231,15 +231,15 @@ So cleanup for a projection that already exists always runs and never strands a 
 Upgrading Herdr to 0.8.0 or newer is the fix.
 Writing `off` is the immediate mitigation for a home that cannot upgrade yet.
 
-### Secondmate homes
+### Squad Lead homes
 
-The setting is inherited into secondmate homes through the normal configuration-convergence owner.
+The setting is inherited into Squad Lead homes through the normal configuration-convergence owner.
 The default needs no special convergence.
-The primary's absent file and the secondmate's absent file both mean the same unconfigured default.
-So leaving the file absent converges a secondmate to that same default rather than turning it off.
+The primary's absent file and the Squad Lead's absent file both mean the same unconfigured default.
+So leaving the file absent converges a Squad Lead to that same default rather than turning it off.
 Only an explicit primary `off` propagates the opt-out.
 
-A secondmate agent itself always stays in its ordinary parent workspace; only children launched by that home are eligible.
+A Squad Lead agent itself always stays in its ordinary parent workspace; only children launched by that home are eligible.
 An unconverged opt-out keeps the default projection in that home until convergence.
 
 ### Presentation journal
@@ -347,7 +347,7 @@ Ordinary non-projected task removal:
 Task cleanup acquires that session lock before the task's isolated copy is returned.
 So a contended lock refuses up front while the copy, every durable record, and the endpoint are all intact for a plain rerun.
 
-Forced secondmate cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
+Forced Squad Lead cleanup recursively preflights every Herdr child endpoint and acquires every affected named-session lock before mutating any child.
 It then retains each child's durable identity unless that exact pane returns structured not-found after its close.
 
 ### When task records are erased
@@ -401,7 +401,7 @@ A live or unknown recorded or token-matched endpoint refuses duplicate launch, a
 
 Locked session start has one narrower cleanup for a restored projected child that is no longer current task state.
 It runs only when the current home has at least one ordinary presentation journal, and it considers only that home.
-A primary never recursively sweeps a secondmate home.
+A primary never recursively sweeps a Squad Lead home.
 
 Discovery starts from the exact current `└ <concise-task> · p:<22-character-token>` grammar, but a title or token alone is never mutation authority.
 A candidate must meet all of these conditions:
@@ -462,7 +462,7 @@ Any of these preserves the candidate and lets session startup continue with at m
   Every earlier degradation on the fresh projected-create path (no session server, contended presentation lock, absent or ambiguous parent) still warns and continues flat.
 - Recovery of an existing presentation journal refuses by default when the shared presentation lock is contended, rather than falling back flat.
   Pass `fm-spawn.sh --herdr-resume-lock-wait` to opt that recovery into waiting for the lock instead, so concurrent recoveries can serialize.
-  The flag applies to a fresh ship or scout spawn that recovers a journal.
+  The flag applies to a fresh ship or Recon spawn that recovers a journal.
   The multi-task path forwards the flag to each per-pair spawn.
   `fm-spawn.sh --relaunch` and `--secondmate` take no exact-resume presentation-order lock, so the flag has no effect there.
   Dead-owner reclaim still stops the wait when a holder crashed.
@@ -471,7 +471,7 @@ Any of these preserves the candidate and lets session startup continue with at m
 - Missing or ambiguous restart bindings fall back to the ordinary home workspace while the old projection remains untouched.
 - Crashes, lost responses, failed exact-pane cleanup, or human renames can leave quarantined spaces.
   Session start removes only the exact home-local, uniquely journal-correlated, childless idle-shell shape above.
-- Spaces have no cross-home cleanup path, and a secondmate child can clean up only from its exact home.
+- Spaces have no cross-home cleanup path, and a Squad Lead child can clean up only from its exact home.
 - Every stale-looking space outside that narrow startup proof still requires manual cleanup in Herdr's UI after human inspection.
 - Regaining a dedicated space after degradation requires stopping the flat task, manually checking the stale projection, and clearing its journal before a genuinely fresh launch.
 - The visible token is only a restart-stable correlator and never substitutes for the exact binding.
@@ -730,9 +730,9 @@ The process-level proof only decides whether that registration is backed by a ru
 `tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 
-The session-start sweep and the watcher's dedicated secondmate liveness tick use this probe.
-Idle secondmates remain exempt from stale-pane escalation.
-[Secondmate endpoint recovery](architecture.md) owns the shared supervision mechanism.
+The session-start sweep and the watcher's dedicated Squad Lead liveness tick use this probe.
+Idle Squad Leads remain exempt from stale-pane escalation.
+[Squad Lead endpoint recovery](architecture.md) owns the shared supervision mechanism.
 
 ## Agent status authority and relaunch
 
@@ -759,7 +759,7 @@ The Herdr adapter subscribes before reconciling current levels, buffers edges du
 
 The watcher maps the pane back to the task and skips these (the optional wait-timers add-on applies its own native-evidence admission and active-hold policy on top when installed):
 
-- Secondmate endpoints.
+- Squad Lead endpoints.
 - Declared `paused:` waits, because the worker's declared wait already accounts for its quiet.
   It is left to the watcher's own bounded pause cadence.
 - Verified `captain-held` transfers.
