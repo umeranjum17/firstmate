@@ -37,8 +37,8 @@ if [ ! -d "$home" ]; then
 fi
 export FM_HOME=$home
 
-# name:kind, in a working order (route-change reads pipeline-quota-failover's installed wrapper; the guards come
-# before anything that chains to them; the home-wide account pool comes before the checks that read it).
+# name:kind, in a working order: route-change reads pipeline-quota-failover's wrapper, guards precede anything that
+# chains to them, and the account pool precedes the checks that read it.
 #   plain       install.sh [--dry-run]
 #   home        install.sh [--dry-run] <fm-home>
 #   env         FM_HOME=<fm-home> install.sh [--dry-run]

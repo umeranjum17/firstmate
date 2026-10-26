@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# A re-install must be a no-op, not an error. Two add-on pairs share one hook file - git-identity and
-# pane-titles chain config/launch-env-hook, owner-guard and owner-rules chain config/merge-gate - and each
-# pair used to refuse the other side's re-chain on the second run. This runs the real installers three
-# times over one throwaway home and proves every run succeeds, the chain settles, and no side stops running.
+# A re-install is a no-op, not an error: two add-on pairs share one hook file and each used to refuse the other's
+# re-chain. Real installers, three runs, one throwaway home: every run succeeds, the chain settles, both sides run.
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
