@@ -777,7 +777,7 @@ The host memory guard reads available memory, swap, host-wide pressure, and the 
 Admission and interrupts classify by `app.slice` pressure and available memory; host-wide pressure never does.
 Pressure is the share of time some process waited on memory, judged as the lower of its 10-second and 60-second averages (sustained pressure), so a spike below the alert level does not hold launches while pressure held for about a minute does.
 A 10-second average at or above the alert level alone holds new launches at once (`WAIT`) but never alerts or interrupts a task, so a fast ramp is not held back by the slower average.
-Capped heavy-job slices such as `fm.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
+Capped heavy-job slices such as `jg.slice` are not read, so their thrash holds agent launches only when it also stalls the agents.
 Host-wide pressure stays in the summary as context and never holds admission, wakes Main, or interrupts a task.
 Unreadable `app.slice` pressure is reported as not judged: pressure then holds nothing and interrupts nothing, while available memory still applies.
 It classifies measurable memory as `OK`, `WAIT` (new agents should wait), or `ALERT`, and names the largest consumers by owning task; unavailable measurements read `UNKNOWN`.

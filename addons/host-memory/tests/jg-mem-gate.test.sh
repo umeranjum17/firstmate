@@ -91,7 +91,7 @@ CHILD
   KEEP=env-ok PIDFILE="$T/child.pid" "$G" "$T/scope-child" <"$T/input" >"$T/scope.out" 2>"$T/scope.err" & gate_pid=$!
   for _ in $(seq 1 100); do [ -s "$T/child.pid" ] && break; sleep 0.05; done
   child=$(cat "$T/child.pid" 2>/dev/null || true)
-  if [ -n "$child" ] && grep -Fq '/fm.slice/jg-heavy.slice/' "/proc/$child/cgroup"; then placed=1; else placed=0; fi
+  if [ -n "$child" ] && grep -Fq '/jg.slice/jg-heavy.slice/' "/proc/$child/cgroup"; then placed=1; else placed=0; fi
   wait "$gate_pid"; rc=$?
   if [ "$placed" = 1 ] && [ "$rc" = 23 ] && grep -qx 'echo:stdin-ok' "$T/scope.out" && grep -qx "context:$PWD:env-ok" "$T/scope.out"; then
     echo 'PASS real scope placement, stdin/stdout and exit status'

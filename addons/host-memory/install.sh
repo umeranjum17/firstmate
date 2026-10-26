@@ -39,7 +39,7 @@ for pair in "$SERVICE|$service_content" "$TIMER|$timer_content"; do
   elif [ "$DRY" -eq 1 ]; then echo "would write: $f"
   else printf '%s\n' "$content" >"$f"; echo "wrote: $f"; fi
 done
-for f in "$CONFIG/fm.slice.d/50-jg-heavy-weight.conf" "$CONFIG/jg-heavy.slice.d/50-jg-heavy-weight.conf"; do
+for f in "$CONFIG/jg.slice.d/50-jg-heavy-weight.conf" "$CONFIG/jg-heavy.slice.d/50-jg-heavy-weight.conf"; do
   if [ -f "$f" ] && cmp -s "$f" <(printf '[Slice]\nCPUWeight=20\nIOWeight=20\n'); then echo "unchanged: $f"
   elif [ "$DRY" -eq 1 ]; then echo "would write: $f"
   else mkdir -p "${f%/*}"; printf '[Slice]\nCPUWeight=20\nIOWeight=20\n' >"$f"; echo "wrote: $f"; fi

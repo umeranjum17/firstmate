@@ -18,7 +18,7 @@ if [ "$DRY" -eq 0 ]; then systemctl --user disable --now jg-heavy-adopt.timer >/
 [ ! -e "$adopt" ] || { echo "remove: $adopt"; [ "$DRY" -eq 1 ] || rm -f -- "$adopt"; }
 [ ! -e "$cpu_state" ] || { echo "remove: $cpu_state"; [ "$DRY" -eq 1 ] || rm -f -- "$cpu_state"; }
 [ ! -e "$f" ] || { echo "remove: $f"; [ "$DRY" -eq 1 ] || rm -f -- "$f"; }
-for d in "$config/fm.slice.d" "$config/jg-heavy.slice.d"; do
+for d in "$config/jg.slice.d" "$config/jg-heavy.slice.d"; do
   dropin=$d/50-jg-heavy-weight.conf
   if [ -e "$dropin" ]; then
     echo "remove: $dropin"

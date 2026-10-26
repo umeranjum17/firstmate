@@ -238,8 +238,8 @@ test_cgroup_pressure() {
   assert_contains "$out" 'host 2%, app.slice 24%' "host and app.slice are both visible"
   # A capped sibling slice thrashing (jg-heavy at its swap cap) is contained by design:
   # it must not reach the verdict while app.slice is calm.
-  mkdir -p "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/fm.slice/jg-heavy.slice"
-  printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/fm.slice/jg-heavy.slice/memory.pressure"
+  mkdir -p "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/jg.slice/jg-heavy.slice"
+  printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/jg.slice/jg-heavy.slice/memory.pressure"
   printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
   fake_host "$case/proc" 40 2
   out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?

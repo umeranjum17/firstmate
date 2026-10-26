@@ -77,7 +77,7 @@ Run the CI ShellCheck and syntax steps plus the other `host-memory/tests` script
 
 The installer deploys `bin/jg-heavy-adopt.sh` and enables a 20-second user timer. It retains the existing memory/process-name rule and also moves a process using more than 2 CPU-seconds during the prior interval, plus its descendants, into the heavy scope. Herdr, no-mistakes and agent CLI processes are excluded; descendant expansion stops at each excluded process, while a CPU-heavy child can still move on its own. The threshold is below the 14-30 CPU-seconds measured per worker in the bounded 64-worker reproduction, which drove Herdr run-delay to 54-121 ms/s and CPU PSI `some avg10` to 66%; the integration test uses fixture proc/cgroup trees. Main must replace `juggernaut/config/jg-heavy-adopt.sh` with a shim to the installed copy or update the unit's `ExecStart` to `${XDG_DATA_HOME:-$HOME/.local/share}/jg-host-memory/jg-heavy-adopt.sh`.
 
-The installer gives `fm.slice` and `jg-heavy.slice` CPUWeight=20 with user drop-ins, so heavy scopes are weighted against sibling `app.slice`.
+The installer gives `jg.slice` and `jg-heavy.slice` CPUWeight=20 with user drop-ins, so heavy scopes are weighted against sibling `app.slice`.
 IOWeight=20 only works when the user manager delegates `io`; this host delegates no `io` controller and its NVMe uses the `none` scheduler.
 
 The emulator and Gradle caps look past known wrappers to the real program:
