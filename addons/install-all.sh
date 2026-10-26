@@ -58,6 +58,7 @@ plan=(
   claude-accounts:home-nodry
   quota-axi-pool:plain
   git-identity:home
+  repo-guard:plain
   fleet-flow:plain
   fleet-pulse:home
   fleet-stall:env
