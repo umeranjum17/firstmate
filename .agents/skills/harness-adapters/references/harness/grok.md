@@ -78,7 +78,7 @@ The spawn installs guarded global `fm-turn-end.json` and `fm-turn-end.sh`.
 They act only when workspace `.fm-grok-turnend` matches the registry under `~/.grok/hooks/fm-turn-end.d/`, then touch the task's `state/<id>.turn-ended` through always-set `GROK_WORKSPACE_ROOT`, which equals the worktree.
 This stays outside the worktree, needs no trust grant, and writes only Juggernaut files.
 `../../../bin/fm-teardown.sh` removes the gitignored pointer before pooling.
-Secondmates skip it because idle is healthy and ordinary stale-pane detection does not apply.
+Squad Leads skip it because idle is healthy and ordinary stale-pane detection does not apply.
 
 ## Primary integration
 

@@ -2,14 +2,14 @@
 
 Audience: maintainer verification.
 
-This record supports seven active guarantees for promised public replies made through the myfirstmate relay:
+This record supports seven active guarantees for promised public replies made through the myOverwatch relay:
 
 1. A promised final reply survives compaction and restart, reconciles from disk alone, and lands in the original thread exactly once.
 2. A home that never opted into the relay pays nothing for any of it.
 3. Delivering a final does not close the public loop: the registration is retained as `state=delivered` until `retire --reason`, session start surfaces an `open-loop` line, and `rechain` can bind follow-on work to the same thread.
 4. A first registration with no registry lock already held succeeds under stock macOS Bash 3.2 with `set -u`.
-5. A public loop whose work lives in a REMOTE secondmate home retires when readable remote state proves no link exists, or after readable and writable remote state clears the matching bound legacy Relay link; unreadable state, a non-writable matching link, an identity mismatch, a metadata lock it cannot acquire within its bound, or unconfirmed completion retains the loop instead of hanging, and `--force` still covers only the unresolved obligation.
-6. Work bound to a REMOTE secondmate home can report its typed terminal result: the instructions name paths that exist on the worker's own machine, the owning home collects results for open registrations over that route, an unreachable route fails loudly, an empty reachable route is a healthy no-op, and a non-open registration is skipped without contact.
+5. A public loop whose work lives in a REMOTE Squad Lead home retires when readable remote state proves no link exists, or after readable and writable remote state clears the matching bound legacy Relay link; unreadable state, a non-writable matching link, an identity mismatch, a metadata lock it cannot acquire within its bound, or unconfirmed completion retains the loop instead of hanging, and `--force` still covers only the unresolved obligation.
+6. Work bound to a REMOTE Squad Lead home can report its typed terminal result: the instructions name paths that exist on the worker's own machine, the owning home collects results for open registrations over that route, an unreachable route fails loudly, an empty reachable route is a healthy no-op, and a non-open registration is skipped without contact.
 7. Work that ends failed or parked remains deliverable when its promised final expected a merged pull request, so the original thread receives the honest failed outcome exactly once instead of retaining an undeliverable promise.
 
 [`docs/configuration.md`](../configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, [`docs/architecture.md`](../architecture.md#optional-relay) owns the mechanism boundary, and `tasks-axi public-followup --help` owns the typed obligation schema.
@@ -106,7 +106,7 @@ ok - staging requires the matching secondmate firstmate home
 ```
 
 The restart case is the end-to-end proof of guarantee 1.
-It reproduces the stranded state first (work bound, no reconciled terminal result, delivery refused with "still waiting on its bound work" and zero posts), then has a secondmate-shaped child report a typed `pr-merged` result, deletes the drained inbox payload, reconciles from disk, and asserts exactly one `connector/followup` call carrying the original `request_id`, a validated `posted` receipt, and a Done obligation.
+It reproduces the stranded state first (work bound, no reconciled terminal result, delivery refused with "still waiting on its bound work" and zero posts), then has a Squad-Lead-shaped child report a typed `pr-merged` result, deletes the drained inbox payload, reconciles from disk, and asserts exactly one `connector/followup` call carrying the original `request_id`, a validated `posted` receipt, and a Done obligation.
 
 The focused tasks-axi 0.2.6 regression is the proof of guarantee 7:
 
@@ -130,7 +130,7 @@ A pre-change on-disk record (no `state=`, no `request_context_b64`) is an open l
 The stock macOS Bash lane in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) sets `FM_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32` and runs `tests/fm-public-followup.test.sh` through real `/bin/bash` 3.2, proving the first `register` path is safe when its registry lock list starts empty.
 
 The eight remote-route cases are the proof of guarantee 5.
-A remote secondmate home exists only on its own machine, so its registration records no local path, and every close that must first clear the bound legacy Relay link had nothing local to act on.
+A remote Squad Lead home exists only on its own machine, so its registration records no local path, and every close that must first clear the bound legacy Relay link had nothing local to act on.
 The first case pins that empty recorded path so it cannot go vacuous, then drives `deliver` and `retire` end to end and asserts the matching link inside the remote home is actually gone and the retirement receipt is written.
 The second case shows `--force` still governs only the unresolved-obligation refusal: a plain `retire` of an unresolved remote loop is still refused with the remote link untouched, while a forced one closes and clears it.
 The reassignment case replaces a delivered loop's route with a remote home whose reused work ID carries another Relay request and asserts that retirement retains the registration and leaves the replacement link untouched.
