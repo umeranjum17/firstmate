@@ -160,6 +160,9 @@ jobs:
       # Fixture home, merge gate and patterns, a local bare repo standing in for GitHub and a stub gh: nothing real is touched.
       - name: Owner guard merge gate test
         run: bash owner-guard/tests/owner-guard-merge.test.sh
+      # Fixture fork clone, throwaway HOME and stub gh/gh-axi that only record argv: nothing real is touched.
+      - name: Repo guard test
+        run: bash repo-guard/tests/repo-guard.test.sh
       # Sentinel user install proves the uninstaller journey cannot escape its temporary HOME/XDG paths.
       - name: Owner guard uninstall isolation test
         run: bash owner-guard/tests/uninstall-isolation.test.sh
