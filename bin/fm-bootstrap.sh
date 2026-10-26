@@ -1399,9 +1399,15 @@ if [ "${1:-}" = "install" ]; then
   export NPM_CONFIG_PREFIX=${NPM_CONFIG_PREFIX:-$HOME/.local}
   export PATH=$NPM_CONFIG_PREFIX/bin:$PATH
   for t in "$@"; do
-    if ! cmd=$(install_cmd "$t"); then
-      instructions=$(manual_install_url "$t") || { echo "error: unknown tool $t" >&2; exit 1; }
+    # Manual guidance is checked before the install command, because a tool with manual
+    # instructions has no row in toolchain.versions: probing install_cmd first would surface
+    # the pin table's refusal ahead of the guidance the user actually needs.
+    if instructions=$(manual_install_url "$t"); then
       echo "error: $t requires manual installation (instructions: $instructions)" >&2
+      exit 1
+    fi
+    if ! cmd=$(install_cmd "$t"); then
+      echo "error: unknown tool $t" >&2
       exit 1
     fi
     cmd=${cmd%%  #*}
