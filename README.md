@@ -36,7 +36,7 @@ You can run one coding agent easily. But the moment you want three missions runn
 
 Juggernaut flips the model. You talk to a single agent — the **Overwatch** — and it runs the squad for you: spawning autonomous operators in a visible session backend, giving each a clean copy of the repository, supervising them to the objective, and handing you finished PRs, approved local merges, or standalone recon reports.
 
-For larger fleets, you can opt in to persistent secondmates: second mates that are still ordinary direct reports, but run from their own isolated Juggernaut homes on this machine or another SSH-reachable host.
+For larger fleets, you can opt in to persistent Squad Leads: operators that are still ordinary direct reports, but run from their own isolated Juggernaut homes on this machine or another SSH-reachable host.
 
 > Juggernaut is not a model, not a harness, not a skill, not an MCP server, and not a CLI. It is an **agent distro** for running a squad of agents.
 
@@ -66,7 +66,7 @@ An agent distro is a portable directory of instructions, skills, tooling, polici
 
 ### Scale and reach
 
-- **Optional secondmates** — opt in to persistent second mates in isolated Juggernaut homes with their own `FM_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
+- **Optional Squad Leads** — opt in to persistent Squad Leads in isolated Juggernaut homes with their own `FM_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
 - **Optional Relay** — opt in with one local `.env` pairing token so Juggernaut can answer public X and Discord mentions through the same lifecycle as chat, acknowledge spawned work, and post up to three public-safe follow-ups within seven days; dry-run previews would-be replies locally.
 
 Full detail on every feature lives in [docs/architecture.md](docs/architecture.md).
@@ -101,6 +101,10 @@ Every mission follows the same delivery path:
 5. **Merge** - only inside the authority you gave that project.
 
 The **review board** carries decisions, evidence, and proof back to you. Your answer returns to the Operator that asked, so the mission continues without a pasted transcript. A verified result is an **objective secured**. The mission is complete only when its agreed finish line is met.
+
+Squad Leads can also run as persistent homes, local or remote. Dispatch settings decide which tool handles which mission, and Relay lets the same squad answer public mentions.
+
+Full architecture - supervision, isolated work copies, Squad Leads, project modes, Relay, fleet sync, and self-update - is in [docs/architecture.md](docs/architecture.md).
 
 <p align="center"><img src="assets/brand/rule-ember.svg" width="72" alt=""></p>
 
@@ -192,7 +196,7 @@ Juggernaut ships these user-invocable built-in skills. Claude and Grok use the s
 - **`/quiet`** — keep routine wakes off main while you stay and chat; `/quiet off` ends it.
 - **`/ahoy`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
 - **`/bearings`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.
-- **`/updatefirstmate`** — guardedly update Juggernaut and its secondmates, then restart live mates on the target commit.
+- **`/updatefirstmate`** — guardedly update Juggernaut and its Squad Leads, then restart live mates on the target commit.
 - **`/stow`** — sweep the session for uncaptured durable knowledge and report what is safe to reset.
 
 Bearings invocation examples:
@@ -217,6 +221,34 @@ Juggernaut's skills live in two separate places with different audiences:
 The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The board and the fleet dashboard are part of Juggernaut; the rest are separate packages.
 
 Every screen below is a real capture from the tool's own current or most recent build, at desktop and phone width, in light and dark. The projects, names, and work shown are demo data. A terminal screen is the tool's own output.
+
+<details>
+<summary><strong>Install the three tools</strong></summary>
+
+```sh
+# done-done
+npx skills add umeranjum17/done-done-axi --skill done-done -g -a claude-code -y
+npm install -g --allow-git=all github:umeranjum17/done-done-axi
+cat "$(npm root -g)/done-done-axi/integrations/firstmate/brief-include.md" >> "$FM_HOME/config/brief-include.md"
+cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$FM_HOME/config/merge-gate"
+
+# sign-off
+npx skills add umeranjum17/sign-off --skill sign-off-axi
+
+# learn-from-mistakes
+npx skills add umeranjum17/learn-from-mistakes --skill lfm-retro
+```
+
+Run the `cat >>` line once: each run appends the brief include again, duplicating it in every brief.
+
+- `config/brief-include.md` is appended to every ship and recon brief, so every operator proves its change with done-done ([details](docs/configuration.md#home-brief-include-configbrief-includemd)).
+- `config/merge-gate` is enforced by the merge-card add-on when it is installed; without the add-on, core does not check it. The gate runs `done-done check` against the mission's PR, or its `data/<task-id>/checks.md` when there is no PR, with the default-branch rules, then `receipt --verify <head>`. A nonzero exit refuses the merge and shows its output. Run `git fetch origin` first, since the gate reads local origin refs.
+
+**sign-off** raises a card on the sign-off board for every mission held in a home where it is armed. Run `bin/fm-procevent-signoff.sh arm` once in a home; arm each Squad Lead home the same way, and your click comes back to Juggernaut as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)). The adapter needs `sign-off-axi` on your PATH; open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
+
+**learn-from-mistakes** needs no Juggernaut hook. Point it at the records your fleet already keeps, such as a defect log or failed pipeline steps, and it counts the causes that keep coming back and proposes changes that cite the real records.
+
+</details>
 
 ### The review board: answer on the go
 
@@ -351,10 +383,10 @@ Two notes on what the screens show:
 
 ### Architecture and configuration
 
-- [docs/architecture.md](docs/architecture.md) — maintainer architecture for the squad, supervision, worktrees, secondmates, and project modes.
+- [docs/architecture.md](docs/architecture.md) — maintainer architecture for the squad, supervision, worktrees, Squad Leads, and project modes.
 - [docs/configuration.md](docs/configuration.md) — environment variables, `FM_HOME`, runtime backend selection, optional Relay and its X and Discord setup steps, trusted external process-event adapter setup, the files you set, and harness support.
 - [docs/extension-bindings.md](docs/extension-bindings.md) — maintainer architecture for the narrow trusted external `process-event-adapter/1` package, binding, handshake, and evidence boundary.
-- [docs/remote-secondmates.md](docs/remote-secondmates.md) — current setup, routing, transfer, recovery, and safety behavior for whole-home remote second mates.
+- [docs/remote-secondmates.md](docs/remote-secondmates.md) — current setup, routing, transfer, recovery, and safety behavior for whole-home remote Squad Leads.
 - [docs/calm.md](docs/calm.md) — current `/calm` behavior on Pi and Claude Code and its supported presentation limits.
 - [docs/voice-relay.md](docs/voice-relay.md) — the optional spoken interface: setup on both machines, measured round-trip cost, what a spoken answer may read, and what this build does not do yet.
 - [docs/fleet-ledger.md](docs/fleet-ledger.md) — the opt-in activity ledger outside tools can read to follow a home's missions, and its record contract.
@@ -367,7 +399,6 @@ Two notes on what the screens show:
 - [docs/zellij-backend.md](docs/zellij-backend.md) — current setup and limits for the experimental Zellij backend.
 - [docs/orca-backend.md](docs/orca-backend.md) — current setup and limits for the experimental Orca backend.
 - [docs/cmux-backend.md](docs/cmux-backend.md) — current setup, socket security, and limits for the experimental cmux backend.
-- [docs/codex-app-backend.md](docs/codex-app-backend.md) — the current blocked Codex App backend boundary and rollout contract.
 
 ### Verification and integrations
 

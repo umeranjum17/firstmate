@@ -4,6 +4,10 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# The pinned floor comes from the table, so the fake version follows a bump.
+# shellcheck source=bin/fm-pin-lib.sh
+. "$FM_ROOT/bin/fm-pin-lib.sh"
+export QUOTA_AXI_VERSION=${QUOTA_AXI_VERSION:-$(fm_pin_version quota-axi)}
 BIN="$FM_ROOT/bin"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-procevent-quota.XXXXXX")
 FAKEBIN="$LAB/fakebin"

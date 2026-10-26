@@ -1,9 +1,9 @@
-# Remote second mates
+# Remote Squad Leads
 
-This page covers how to set up, provision, run, and retire a second mate whose Juggernaut home lives on another host.
-It is for operators who run a remote second mate and for anyone checking its transport and safety behavior.
+This page covers how to set up, provision, run, and retire a Squad Lead whose Juggernaut home lives on another host.
+It is for operators who run a remote Squad Lead and for anyone checking its transport and safety behavior.
 
-Remote second mates place a whole persistent Juggernaut home on another SSH-reachable host.
+Remote Squad Leads place a whole persistent Juggernaut home on another SSH-reachable host.
 The primary still owns routing and supervision, while the remote home owns its own projects, backlog, and workers.
 Juggernaut does not support placing an individual worker remotely or failing a remote route over to a local replacement.
 
@@ -14,22 +14,22 @@ Juggernaut does not support placing an individual worker remotely or failing a r
 | Prepare the primary and the remote host | [Prerequisites](#prerequisites) and [non-interactive tool contract](#non-interactive-tool-contract) |
 | Check whether a host is ready, or repair it | [Readiness, repair, and the human steps](#readiness-repair-and-the-human-steps) |
 | Create the route and the remote home | [Provision a route](#provision-a-route) |
-| Launch, recover, message, and read a remote second mate | [Normal operation](#normal-operation) |
+| Launch, recover, message, and read a remote Squad Lead | [Normal operation](#normal-operation) |
 | Move queued work to the remote home | [Backlog handoff](#backlog-handoff) |
 | Push configuration, relaunch, update, or retire | [Sync, update, and retirement](#sync-update-and-retirement) |
 | Run the tests or a real-host smoke test | [Verification](#verification) |
 
 ## Where the remote agent runs
 
-The remote second-mate agent itself always runs on the [Herdr backend](herdr-backend.md) in the shared `fm-remote` session.
+The remote Squad Lead agent itself always runs on the [Herdr backend](herdr-backend.md) in the shared `fm-remote` session.
 Every path that provisions or launches one refuses a host that is not ready for it.
 
 - `fm-remote` is reserved for remote fleet work and must not be used for personal work.
-- The user's interactive Herdr session remains `default` and is not a remote-secondmate prerequisite.
+- The user's interactive Herdr session remains `default` and is not a remote Squad Lead prerequisite.
 - Herdr's remote-session server belongs to the host's own GUI login session rather than to the SSH connection.
   As a result, the agent's endpoint survives every disconnection the primary's supervision depends on.
-- Local second mates are unaffected and keep their ordinary backend and session selection.
-  So do the workers a remote second mate supervises inside its own home.
+- Local Squad Leads are unaffected and keep their ordinary backend and session selection.
+  So do the workers a remote Squad Lead supervises inside its own home.
 
 ## Prerequisites
 
@@ -128,7 +128,7 @@ It never touches a worker whose checkout still exists.
 ### What the remote account must provide
 
 - The remote account must provide the required toolchain, the selected worker runtime, the selected session backend, and credentials that work on that host.
-- A [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account) for the second mate or its workers lives in the remote home's own configuration on that host.
+- A [worker account pin](configuration.md#worker-account-pin-configclaude-account-configpi-account) for the Squad Lead or its workers lives in the remote home's own configuration on that host.
 - The origin URL named for each project must be reachable from the remote account, because projects are cloned on that host rather than copied from the primary.
 
 ## Non-interactive tool contract
@@ -214,7 +214,7 @@ chmod +x ~/.local/bin/tasks-axi
 
 ## Readiness, repair, and the human steps
 
-`bin/fm-remote-doctor.sh` is the single owner of what "ready for a remote second mate" means.
+`bin/fm-remote-doctor.sh` is the single owner of what "ready for a remote Squad Lead" means.
 
 ### Check a host
 
@@ -299,7 +299,7 @@ The guard's header owns the decision table, and [`bin/fm-remote-herdr-owner-lib.
 Its limits:
 
 - It never installs packages or overwrites a non-Juggernaut file at a reserved wrapper path.
-- The dedicated Herdr launch agent owns only the remote-secondmate `fm-remote` server.
+- The dedicated Herdr launch agent owns only the remote Squad Lead `fm-remote` server.
   It does not inspect, rewrite, start, stop, or require the user's interactive `default` session or its `dev.firstmate.herdr` launch agent.
 - It re-derives every check from the host afterwards, so what it prints is the state after the repair rather than the intent of one.
 
@@ -325,7 +325,7 @@ A file at `~/.local/bin/fm-remote-entrypoint.sh` that is not Juggernaut's own sy
 
 ## Provision a route
 
-1. Create and fill the normal secondmate charter first.
+1. Create and fill the normal Squad Lead charter first.
 2. Then run:
 
 ```sh
@@ -335,7 +335,7 @@ bin/fm-remote-home-seed.sh <id> <ssh-alias> <remote-root> <remote-home> {<projec
 | Argument | Meaning |
 | --- | --- |
 | `<remote-root>` | The remote Juggernaut code clone that supplies tracked scripts. |
-| `<remote-home>` | A separate absolute path for the persistent secondmate home that must not overlap the code root. |
+| `<remote-home>` | A separate absolute path for the persistent Squad Lead home that must not overlap the code root. |
 
 ### Project origins
 
@@ -378,7 +378,7 @@ The seed takes these steps:
 
 It does not copy project trees or the primary process environment.
 In the primary home, its durable registration effects are limited to that route and the charter brief under `data/<id>`.
-Launch records are created only when the secondmate is launched.
+Launch records are created only when the Squad Lead is launched.
 
 ### The seed's readiness gate
 
@@ -407,7 +407,7 @@ The promised-public-reply subsystem is same-filesystem by construction, so a rem
 
 ### Local and remote routes together
 
-Local secondmates keep the existing route form and need no migration.
+Local Squad Leads keep the existing route form and need no migration.
 A fleet may contain local and remote routes together.
 Use `bin/fm-home-seed.sh validate` to validate either form.
 
@@ -415,7 +415,7 @@ Use `bin/fm-home-seed.sh validate` to validate either form.
 
 ### Launch or recover
 
-Launch or recover the remote second mate with the same command used for a local route:
+Launch or recover the remote Squad Lead with the same command used for a local route:
 
 ```sh
 bin/fm-spawn.sh <id> --secondmate
@@ -423,12 +423,12 @@ bin/fm-spawn.sh <id> --secondmate
 
 The primary then takes these steps:
 
-1. It resolves the verified secondmate harness and optional model and effort.
+1. It resolves the verified Squad Lead harness and optional model and effort.
 2. It runs the same readiness gate the seed runs.
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `fm-remote`.
 
-All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+All remote Squad Leads on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
 
 ### Refused and unsupported launches
 
@@ -436,12 +436,12 @@ All remote secondmates on one host share `fm-remote` and retain separate `2ndmat
 - An existing remote endpoint recorded in another Herdr session, including `default`, is classified as unverified and left untouched.
   Launch, liveness recovery, control, and retirement refuse it until an operator explicitly migrates it, instead of attempting a live cutover.
 - A launch after a host has drifted out of readiness fails with the doctor's own gap text instead of leaving a half-created endpoint.
-- Raw launch commands are not accepted for remote secondmates.
-- Backends that already refuse secondmate launch, currently Orca and cmux, remain unsupported on the remote host.
+- Raw launch commands are not accepted for remote Squad Leads.
+- Backends that already refuse Squad Lead launch, currently Orca and cmux, remain unsupported on the remote host.
 
 ### Liveness recovery
 
-Startup liveness recovery relaunches a dead or missing remote second mate through this same command.
+Startup liveness recovery relaunches a dead or missing remote Squad Lead through this same command.
 So recovery passes the same readiness gate rather than a weaker one.
 
 The watcher's liveness tick applies the identical rule during ordinary supervision through the shared `bin/fm-secondmate-liveness-lib.sh`:
@@ -501,7 +501,7 @@ A fire-and-forget record, such as a reconcile ask, gets its single retry ring on
 
 ### Remote reads
 
-`fm-peek.sh` and `fm-crew-state.sh` route remote-secondmate reads to the endpoint's host instead of consulting local worktree or backend state.
+`fm-peek.sh` and `fm-crew-state.sh` route remote Squad Lead reads to the endpoint's host instead of consulting local worktree or backend state.
 An unreachable or unreadable remote read is unknown, not evidence that the endpoint is dead.
 
 ### Replies and the parent channel
@@ -605,7 +605,7 @@ Semantic callers preserve the route or pending request:
 - An operation that is not idempotent requires same-host reconciliation rather than a blind resend.
 - An unconfirmed steer may be retried only through the correlation-preserving command described above.
 
-An unavailable remote home is projected as unknown and is never replaced by a local second mate.
+An unavailable remote home is projected as unknown and is never replaced by a local Squad Lead.
 
 ## Backlog handoff
 
@@ -632,20 +632,20 @@ There is no two-phase journal and no additional tasks-axi release requirement.
 Locked startup convergence and `bin/fm-config-push.sh` transfer only the declared inherited-material allowlist.
 Changed live routes receive a marked instruction to re-read the transferred files.
 The primary records that remote nudge before delivery and retries it during locked startup convergence after a failed send.
-Local secondmates retain their generation-specific local pointer contract.
+Local Squad Leads retain their generation-specific local pointer contract.
 Remote transfers do not copy those primary-local instruction paths.
 
-### Relaunch a live remote second mate
+### Relaunch a live remote Squad Lead
 
-A live remote second mate is restarted with `relaunch`, which runs the ordinary [control plane](agent-control.md) on that host.
+A live remote Squad Lead is restarted with `relaunch`, which runs the ordinary [control plane](agent-control.md) on that host.
 The endpoint record there was written by a host-local launch and carries no remote placement.
 So the transaction, its checkpoint, and its postconditions are the local ones.
 
 The primary passes `<harness> <model|default|-> <effort|default|->` explicitly, using `default` when an axis has no parent pin.
-It passes them explicitly because neither the global `config/secondmate-harness` nor the per-mate `config/secondmates/<id>/harness` pin is inherited into a second mate's home, and any such file on that host belongs to a different home.
+It passes them explicitly because neither the global `config/secondmate-harness` nor the per-mate `config/secondmates/<id>/harness` pin is inherited into a Squad Lead's home, and any such file on that host belongs to a different home.
 Letting the far side re-resolve it would silently move the mate onto another runtime.
 SSH exit 255 leaves completion unknown and the route preserved, exactly as every other verb here.
-Move a live remote second mate onto a newly pinned harness, model, or effort with [`bin/fm-remote-secondmate-relaunch.sh`](../bin/fm-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `fm-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
+Move a live remote Squad Lead onto a newly pinned harness, model, or effort with [`bin/fm-remote-secondmate-relaunch.sh`](../bin/fm-remote-secondmate-relaunch.sh) rather than calling `relaunch` through `fm-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.
 
 ### Juggernaut code convergence
 
@@ -657,9 +657,9 @@ A completed sync reports which watched instruction paths its advance changed.
 The primary needs that fact because it cannot diff a checkout it cannot read.
 It uses the fact to decide whether the running remote agent must be replaced to actually reload.
 
-### Retire a remote second mate
+### Retire a remote Squad Lead
 
-Retire a remote second mate with the normal guarded command:
+Retire a remote Squad Lead with the normal guarded command:
 
 ```sh
 bin/fm-teardown.sh <id>
@@ -672,15 +672,15 @@ It refuses while any of these holds:
 - The primary has an unfinished backlog outbox.
 - A routed reply remains unresolved.
 
-It closes only the retiring secondmate's panes or `2ndmate-<id>` workspace in `fm-remote`.
-It never stops the shared session or removes a sibling secondmate's workspace or panes.
+It closes only the retiring Squad Lead's panes or `2ndmate-<id>` workspace in `fm-remote`.
+It never stops the shared session or removes a sibling Squad Lead's workspace or panes.
 SSH exit 255 preserves both the route and local records because completion is unknown.
-`--force` remains the explicit discard path and requires the same captain authority as local secondmate discard.
+`--force` remains the explicit discard path and requires the same captain authority as local Squad Lead discard.
 
 No generic remote delete or write surface exists:
 
 - Remote writes are confined to inherited allowlist files and backlog handoff scratch files.
-- Remote home removal is reachable only through guarded secondmate retirement.
+- Remote home removal is reachable only through guarded Squad Lead retirement.
 
 ## Verification
 
@@ -771,7 +771,7 @@ For a real-host smoke test:
 
 1. Provision a disposable remote account and project.
 2. Run the doctor and its repair against that account.
-3. Launch the second mate.
+3. Launch the Squad Lead.
 4. Send one marked request.
 5. Verify its correlated reply and structured fleet projection.
 6. Simulate an unreachable host to confirm unknown-without-failover behavior.

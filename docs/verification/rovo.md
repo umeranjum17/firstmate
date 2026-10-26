@@ -12,8 +12,8 @@ The skill tree rooted at [`.agents/skills/harness-adapters/SKILL.md`](../../.age
 | Binary | `~/.local/bin/rovo`, a bash wrapper that execs a PyArmor-obfuscated PyInstaller bundle under `~/.local/share/rovo/active/` |
 | Platform | macOS arm64 (Darwin 25.6.0) |
 
-An earlier scout task (`fm-rovo-smoke-s1`) established the baseline empirical facts through a hand-written PTY VT emulator, no adapter code, and no dispatchable wiring.
-This task landed the executable owners against those facts and re-verified the load-bearing ones live, including two facts the scout could not test (auth refresh under an expired access token, and a mid-tool-call Escape).
+An earlier Recon task (`fm-rovo-smoke-s1`) established the baseline empirical facts through a hand-written PTY VT emulator, no adapter code, and no dispatchable wiring.
+This task landed the executable owners against those facts and re-verified the load-bearing ones live, including two facts the Recon could not test (auth refresh under an expired access token, and a mid-tool-call Escape).
 Every command below ran unsandboxed, because rovo's OAuth credentials live in the macOS keychain, which a sandboxed shell cannot read.
 
 ## Detection
@@ -51,7 +51,7 @@ so it can only gate a bare (no-message) launch, and this adapter always delivers
 
 Bare `rovo run --yolo`, driven over a raw PTY, was confirmed to: render the `Welcome to Rovo!` readiness banner; accept the typed pointer and act on it (a brief instructing a real `sleep 25` bash tool call drove the `Rovo is thinking` busy line); accept a mid-tool-call Escape that printed `Agent cancelled` (see the interrupt section); and exit cleanly on `/exit` with the `Run rovo --restore <id> to resume your conversation` hint. `tests/fm-rovo-signals-live-e2e.test.sh` is that end-to-end guard.
 
-`tests/fm-rovo-harness.test.sh` pins the portable half against a stateful fake `tmux` and a fake `rovo` binary (no real network or credentials): the launch command is bare (`run --yolo`, no positional brief, no `--startup-receipt`); the pointer typed after readiness is exactly `Read the brief at <absolute-path> and follow it exactly.`; delivery confirms via the context-percentage or echoed-pointer signal; a never-ready fake screen fails the spawn loudly; a dropped-submit fake screen fails the spawn loudly; and the model/effort flags, marker-clearing, missing-binary refusal before any pane exists, and crew/scout-only secondmate refusal all hold.
+`tests/fm-rovo-harness.test.sh` pins the portable half against a stateful fake `tmux` and a fake `rovo` binary (no real network or credentials): the launch command is bare (`run --yolo`, no positional brief, no `--startup-receipt`); the pointer typed after readiness is exactly `Read the brief at <absolute-path> and follow it exactly.`; delivery confirms via the context-percentage or echoed-pointer signal; a never-ready fake screen fails the spawn loudly; a dropped-submit fake screen fails the spawn loudly; and the model/effort flags, marker-clearing, missing-binary refusal before any pane exists, and operator/Recon-only Squad Lead refusal all hold.
 
 ## Busy state: the "Rovo is thinking" fallback
 
@@ -85,8 +85,8 @@ It does not block readiness: readiness leads with the `Welcome to Rovo!` banner,
 
 ## Interrupt: confirmed under real tmux
 
-The `fm-rovo-smoke-s1` scout report recorded a single Escape printing `Agent cancelled` during a running tool call, using its own hand-rolled PTY VT emulator.
-A follow-up live check under real tmux 3.6a reproduced the scout's exact finding: a single Escape sent during a genuine mid-flight bash tool call printed `Agent cancelled` in the captured pane, in an isolated `tmux -L <private-socket>` session/window, not the shared fleet session.
+The `fm-rovo-smoke-s1` Recon report recorded a single Escape printing `Agent cancelled` during a running tool call, using its own hand-rolled PTY VT emulator.
+A follow-up live check under real tmux 3.6a reproduced the Recon's exact finding: a single Escape sent during a genuine mid-flight bash tool call printed `Agent cancelled` in the captured pane, in an isolated `tmux -L <private-socket>` session/window, not the shared fleet session.
 The launch-then-send live guard (`tests/fm-rovo-signals-live-e2e.test.sh`) also reproduces it over a raw PTY. A single fixed-timer Escape had landed unreliably there - the exact instant the interrupt is delivered is timing-sensitive over a bare PTY, so one fixed Escape can fall between states - so the guard now sends Escape across the live `sleep 25` tool-call window until the cancel renders. That reproduced `Agent cancelled` on every run (it consistently landed within the first few attempts, ~8s into the tool call); a session that never rendered the cancel would exhaust every attempt and fail.
 The session was never wedged: `/exit` still exited cleanly with the `Run rovo --restore <id> to resume your conversation` hint immediately after the Escape.
 `bin/fm-control-lib.sh` records rovo's `fm_control_interrupt_ack_source` as `none`, the same conservative choice already made for claude, codex, grok, kimi, and cursor - a control-plane fact independent of whether the render happens to appear, because a rendered acknowledgement is not something the control plane depends on for any of those adapters.
@@ -217,7 +217,7 @@ This is recorded as a known Herdr-side integration gap rather than a Juggernaut 
 
 rovo's skill loader rejects every Juggernaut skill because `metadata.internal` is a boolean in Juggernaut's frontmatter and rovo's schema wants a string.
 This blocks `/no-mistakes` and every other Juggernaut skill invocation inside a rovo worker until Juggernaut's `SKILL.md` frontmatter is made rovo-compatible, a separate deferred follow-up that touches every skill file and the installer contract (`.agents/skills/firstmate-coding-guidelines/SKILL.md`).
-A `no-mistakes`-mode rovo ship operator is blocked by this gap; a rovo scout, which invokes no skill, is unaffected.
+A `no-mistakes`-mode rovo ship operator is blocked by this gap; a rovo Recon, which invokes no skill, is unaffected.
 
 ## quota-axi provider mapping: not established
 

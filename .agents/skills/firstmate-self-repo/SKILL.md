@@ -52,7 +52,7 @@ The gate is code, not memory: `bin/fm-role-lib.sh`'s `fm_role_gate_self_publish`
 
 - `bin/fm-brief.sh --project <dir>` refuses to scaffold a publishing ship brief the home cannot authorize.
 - `bin/fm-spawn.sh` refuses to launch a ship task on this repository without a maintainer scope or matching task consent, and refuses a brief whose `upstream-consent=` disagrees with the flag.
-- `bin/fm-promote.sh` applies the same gate to scout promotion so the in-place path grants no more than a fresh spawn.
+- `bin/fm-promote.sh` applies the same gate to Recon promotion so the in-place path grants no more than a fresh spawn.
 - `local-only` publishes nothing, so it never needs authority and never takes consent.
 
 An authorized contribution then flows through the task's normal delivery contract - usually no-mistakes - like any other project; the grant answers only "may this publish", never "how".
@@ -65,7 +65,7 @@ Never work around a refusal by pointing the task at a second checkout, fork, or 
 `/updatefirstmate` and every guarded sync pull **from** upstream, which is consumption, not publication, and stays allowed for every role.
 The boundary covers only traffic that writes to the upstream repository.
 
-## Secondmates
+## Squad Leads
 
 Follow the [role inheritance and receipt limits](../../../docs/configuration.md#juggernaut-role-configfirstmate-role); supported propagation must never grant a child a role the primary does not resolve.
 Deliberately forged local records are outside this accidental-publication safeguard, not a provenance guarantee.
