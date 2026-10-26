@@ -44,6 +44,7 @@
 
 # The pin table (toolchain.versions) owns this floor. The literal below is only the degraded value for a
 # copy of this lib running outside the repo, such as a test fixture; the repo's own path always reads the row.
+# shellcheck source=bin/fm-pin-lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pin-lib.sh" 2>/dev/null || true
 FM_TASKS_AXI_MIN=$(fm_pin_version tasks-axi 2>/dev/null) || FM_TASKS_AXI_MIN=0.2.6
 

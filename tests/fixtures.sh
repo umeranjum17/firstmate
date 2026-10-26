@@ -23,12 +23,18 @@ if [ -n "${FM_TEST_FIXTURES_SOURCED:-}" ]; then
 fi
 FM_TEST_FIXTURES_SOURCED=1
 
-# Production floor lives in bin/fm-bootstrap.sh (NO_MISTAKES_MIN). Keep this
-# equal to that floor so a bump is one constant here plus that production pin.
-export FM_TEST_NO_MISTAKES_VERSION=1.46.0
+# Fixture version defaults derive from toolchain.versions, the one pin table, so a bump
+# moves these fakes with the floor they are checked against instead of leaving a stale copy.
+# Override a single case with the FM_FAKE_* variable rather than editing a stub body.
+FM_TEST_FIXTURES_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+# shellcheck source=bin/fm-pin-lib.sh
+. "$FM_TEST_FIXTURES_ROOT/bin/fm-pin-lib.sh"
+FM_TEST_NO_MISTAKES_VERSION=$(fm_pin_version no-mistakes 2>/dev/null) || FM_TEST_NO_MISTAKES_VERSION=1.46.0
+export FM_TEST_NO_MISTAKES_VERSION
 export FM_TEST_NO_MISTAKES_FAKE_VERSION="no-mistakes version v${FM_TEST_NO_MISTAKES_VERSION} (fake)"
 export FM_TEST_NO_MISTAKES_FAKE_VERSION_TS="${FM_TEST_NO_MISTAKES_FAKE_VERSION} 2026-06-27T00:02:18Z"
-export FM_TEST_GH_AXI_VERSION=0.1.29
+FM_TEST_GH_AXI_VERSION=$(fm_pin_version gh-axi 2>/dev/null) || FM_TEST_GH_AXI_VERSION=0.1.44
+export FM_TEST_GH_AXI_VERSION
 
 # --- fake no-mistakes -------------------------------------------------------
 
