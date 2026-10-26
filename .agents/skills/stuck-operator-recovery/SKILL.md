@@ -25,7 +25,7 @@ The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 ## Session-start reconciliation for a dead ordinary direct report
 
 This procedure covers ordinary `kind=ship` and `kind=scout` direct reports.
-Load `squad-lead-provisioning` instead for `kind=squad lead` recovery.
+Load `squad-lead-provisioning` instead for `kind=squad_lead` recovery.
 
 For a REMOTE Squad Lead, `jg-crew-state` and `jg-peek` read the actual remote endpoint over `jg-on.sh`, and `jg-send` reports a delivered-with-pending-confirmation steer as delivered (their headers own the contracts); an `unknown-remote` read or unreachable-host failure means the remote state could not be read, never that the mate is dead or the send failed.
 Recover a genuinely stuck remote mate only through `bin/jg-spawn.sh <id> --squad-lead`, never raw herdr pane close/kill surgery, which strands the endpoint binding.

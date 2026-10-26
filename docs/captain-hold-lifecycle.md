@@ -393,7 +393,7 @@ Three accepted limits remain deliberate:
 
 - A remote or Squad Lead hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
 - A rare concurrent answer-close and re-hold race can leave the newly re-held task without its age basis.
-- Cross-home summaries remain bounded by `JG_SNAPSHOT_SQUAD LEAD_DECISIONS` and `JG_SNAPSHOT_SQUAD LEAD_QUEUED`.
+- Cross-home summaries remain bounded by `JG_SNAPSHOT_SQUAD_LEAD_DECISIONS` and `JG_SNAPSHOT_SQUAD_LEAD_QUEUED`.
   A remote deferred hold beyond those bounds is not exported, so it can be neither gated nor revealed.
 
 Re-holding through the wrapper with `--until` remains the durable fix rather than relying on the projection safety net.

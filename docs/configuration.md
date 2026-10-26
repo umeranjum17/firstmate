@@ -12,7 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [model allow-lists](#model-allow-lists-configmodel-allow-listjson), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and [launch environment hook](#launch-environment-hook-configlaunch-env-hook) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [startup memory budget](#startup-memory-budget-configstartup-memory-budget), and [host memory guard](#host-memory-guard-confighost-memory) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
-| Persistent Squad Leads | [Squad Lead routes](#squad-lead-routes-datasquad leadsmd) |
+| Persistent Squad Leads | [Squad Lead routes](#squad-lead-routes-datasquad_leadsmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
 ## JG_HOME
@@ -690,7 +690,7 @@ Portable shard evidence and coverage rules are in [jg-test-portable-shards.md](j
 
 ## Captain Preferences (data/captain.md / data/captain-shared.md)
 
-Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad leads.md`.
+Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad_leads.md`.
 Before changing it, inspect the current file and curate the matching bullet in place under the internal [`stow` skill's](../.agents/skills/stow/SKILL.md) tiering and archive contract; add a new bullet only for a genuinely new durable preference.
 
 Shared captain preferences that apply across Squad Lead domains live only in the primary home's optional `data/captain-shared.md`.
@@ -756,7 +756,7 @@ Registering it is a reason to watch on the same terms as the [watched-tool check
 Use `bin/jg-startup-growth-check.sh disarm` to remove the check and its local report record.
 
 The check evaluates at most once per day and stays silent when nothing meaningful changed.
-A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/squad leads.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
+A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/squad_leads.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
 `bin/jg-startup-memory-budget.sh` remains the sole owner of the budget total and its verdict, so the check never re-derives either: when that owner annotates an overrun caused by the primary-owned `data/captain-shared.md` alone, a Squad Lead home is not woken about an overrun it cannot act on.
 A Squad Lead home is likewise not notified about per-file growth of that same primary-owned `data/captain-shared.md`, which it receives read-only; the growth is still observed and recorded, and a primary home reports it normally.
 Those tracked bytes are code and instruction-surface size, not prompt-memory cost.
@@ -831,9 +831,9 @@ Only the file's presence is read, so its contents are ignored; remove it to retu
 
 The skill text owns the marker spelling, the tick order, and the reinforcement rule.
 
-## Squad Lead routes (data/squad leads.md)
+## Squad Lead routes (data/squad_leads.md)
 
-Persistent Squad Lead routes live locally in `data/squad leads.md`.
+Persistent Squad Lead routes live locally in `data/squad_leads.md`.
 The concise single-line route contract is owned by the [`squad-lead-provisioning` skill](../.agents/skills/squad-lead-provisioning/SKILL.md#routing-table), including the parser-compatible fields, one-sentence summary requirement, `home:` pointer to the seeded charter, and limit on extra registry prose.
 
 ### Remote routes and validation
@@ -864,7 +864,7 @@ Squad Lead routes cover `no-mistakes` and `direct-PR` projects; `local-only` pro
 For `no-mistakes` projects, seeding initializes only projects newly cloned into a Squad Lead home and refuses to mutate a preexisting clone that is not already initialized.
 
 After creating a Squad Lead, move existing main-backlog queued items that you have judged in-scope with `jg-backlog-handoff.sh <squad-lead-id> <item-key>...`; it refuses In flight, Done, or non-Squad-Lead homes, and its [script header](../bin/jg-backlog-handoff.sh) owns route-specific wake outcomes and retries.
-Set `JG_SQUAD LEAD_CHARTER` to seed from inline charter text when no filled charter brief exists; set `JG_SQUAD LEAD_SCOPE` when the routing scope should differ from the charter text.
+Set `JG_SQUAD_LEAD_CHARTER` to seed from inline charter text when no filled charter brief exists; set `JG_SQUAD_LEAD_SCOPE` when the routing scope should differ from the charter text.
 
 The seeded home's `data/charter.md` owns the standard Squad Lead lifecycle and escalation contract; the route file points to it through the existing `home:` field instead of adding another pointer.
 
@@ -935,10 +935,10 @@ The first non-empty, non-comment line is parsed as `<harness> [<model>] [<effort
 A bare `<harness>` preserves the previous behavior: harness only, with no model or effort launch flag.
 When the harness token is absent or `default`, Squad Lead launch falls back through `config/crew-harness` and then the primary's own harness, and no model or effort is read from that file.
 
-For an individual registered Squad Lead, the primary may keep a complete pin in `config/squad leads/<id>/harness`, beside the global file and never inside the Squad Lead's home.
+For an individual registered Squad Lead, the primary may keep a complete pin in `config/squad_leads/<id>/harness`, beside the global file and never inside the Squad Lead's home.
 Its first non-empty, non-comment line must contain exactly `<harness> <model> <effort>`, with a verified Squad Lead harness, a concrete model, and a supported effort (`low`, `medium`, `high`, `xhigh`, `max`, or native `ultra`).
 An empty, unreadable, or malformed per-mate pin is an error naming that file, never permission to use the global default.
-For example, `config/squad leads/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
+For example, `config/squad_leads/design/harness` containing `claude claude-opus-5-5 high` keeps that lead's profile independent of the global setting.
 
 `jg-harness.sh squad lead <id>`, `squad-lead-model <id>`, and `squad-lead-effort <id>` are the single resolver: per-mate pin, then the unchanged global file, then the existing static harness fallback.
 Without an id these commands retain their global behavior; `config/crew-harness` remains a bare adapter-name file.
@@ -956,7 +956,7 @@ When `config/crew-dispatch.json` exists, operator and Recon spawns require an ex
 The inherited-local-material contract is owned by [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md); its harness-relevant consequence is that a Squad Lead's own operators use the primary's dispatch profiles and static harness value.
 Those inherited values are defaults and rules only; `jg-spawn` still permits a consciously chosen explicit runtime outside the config.
 
-`config/squad-lead-harness` and `config/squad leads/<id>/harness` pins are not inherited because Squad Leads do not launch Squad Leads.
+`config/squad-lead-harness` and `config/squad_leads/<id>/harness` pins are not inherited because Squad Leads do not launch Squad Leads.
 
 ### Installed hooks and launch details
 
@@ -1594,10 +1594,10 @@ The same deferred network stage performs guarded tracked-file sync and propagate
 Local routes use direct guarded filesystem operations, while remote routes delegate sync and allowlisted transfer through their configured SSH host without probing any unconfigured fleet.
 A tracked-file fast-forward that fails on the home's own orphaned `index.lock` signature is retried once after the shared lock-staleness proof clears the lock, while an unproven lock or any other failure keeps the skip.
 
-- It emits `SQUAD LEAD_SYNC:` only when a home was skipped for an actionable sync reason, inheritance failed, or a divergent shared captain-preference copy was quarantined.
+- It emits `SQUAD_LEAD_SYNC:` only when a home was skipped for an actionable sync reason, inheritance failed, or a divergent shared captain-preference copy was quarantined.
 - When a running home advances and its loaded instruction surface (`AGENTS.md`, `bin/`, or `.agents/skills/`) changed, bootstrap sends the re-read nudge itself through the stable `jg-<id>` selector and reports the exact completed send as `BOOTSTRAP_INFO:`.
-- If that send fails, bootstrap keeps an idempotent retry marker and emits `NUDGE_SQUAD LEADS:` with the failure reason.
-- The same bootstrap run emits `SQUAD LEAD_LIVENESS:` only when a registered Squad Lead is skipped or its relaunch fails; already-live and successfully relaunched Squad Leads are handled silently.
+- If that send fails, bootstrap keeps an idempotent retry marker and emits `NUDGE_SQUAD_LEADS:` with the failure reason.
+- The same bootstrap run emits `SQUAD_LEAD_LIVENESS:` only when a registered Squad Lead is skipped or its relaunch fails; already-live and successfully relaunched Squad Leads are handled silently.
 
 **Push inherited configuration during a session**
 
@@ -1607,7 +1607,7 @@ It uses the same live Squad Lead discovery and propagation helper as bootstrap; 
 - When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `squad-lead-provisioning` for the single contract owner.
-- That live discovery starts from `state/*.meta` records with `kind=squad lead`; `data/squad leads.md` only backfills `home=` for older or incomplete meta records.
+- That live discovery starts from `state/*.meta` records with `kind=squad_lead`; `data/squad_leads.md` only backfills `home=` for older or incomplete meta records.
 - Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures.
 
 ## Forge selection (data/projects.md forge= token)
@@ -2679,14 +2679,14 @@ JG_CLASSIFY_PAUSED_VERB=paused     # leading declared-wait status verb; bin/jg-c
 JG_STALE_ESCALATE_SECS=240         # no-activity seconds before a provably-working stale pane escalates (docs/architecture.md owns activity absorption and validation-execution rechecks), unless that pane's own worker declared a wait that has not elapsed, or, where config/wedge-defer-parked-gate arms it, that pane's crew is parked at a validation gate awaiting the supervisor's decision on it that the crew raised under that run's key and nobody has answered yet, either of which takes the JG_PAUSE_RESURFACE_SECS recheck below instead; stale panes whose crew is not provably working surface immediately unless admitted directly to the declared-wait cadence, while a live idle declared wait still surfaces once before that cadence bounds repeats; at that same escalation moment a recovery-grade agent-state probe (docs/architecture.md owns that dead-record contract) reports a pane whose endpoint is proven `dead` or `missing` once and stops re-escalating it while it stays that way
 JG_BUSY_TURN_MAX_SECS=3600         # maximum age without activity (busy_turn_over_age in bin/jg-watch.sh owns marker selection), before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait, an attended verified captain-held transfer, or - where config/wedge-defer-parked-gate arms it - a validation gate of the crew's own awaiting the supervisor's still-unanswered decision takes the JG_PAUSE_RESURFACE_SECS recheck below instead
 JG_PAUSE_RESURFACE_SECS=14400      # four hours between bounded rechecks of a declared external wait or verified captain-held transfer, and between repeated new-hash stale alarms for an ordinary crew task with an open backlog captain call; a structured until time can make an external-wait recheck occur sooner but cannot extend this bound; this includes a live idle pane after its first inconclusive stale wake, a provably-working pane whose own unelapsed declared wait or, where config/wedge-defer-parked-gate arms it, unanswered supervisor-owed validation gate defers its JG_STALE_ESCALATE_SECS escalation, and a live busy pane past JG_BUSY_TURN_MAX_SECS, while the away-mode daemon uses the same setting and ages its window against the crew's own latest status line rather than pane busy state; a captain-held transfer is never rechecked while the away-posture record exists, while an armed validation gate awaiting the supervisor's decision keeps this recheck in either posture; an idle `paused:` claim contradicted by a parked run the worker never escalated wakes once per run state instead of taking this cadence (docs/architecture.md owns the contract)
-JG_SQUAD LEAD_WAKE_STALL_SECS=180  # no-progress interval for foreign squad lead queues (docs/architecture.md) and local queue reminders (docs/watcher-continuity.md "Durable queue and turn-end backstop"); zero or invalid values use 180
+JG_SQUAD_LEAD_WAKE_STALL_SECS=180  # no-progress interval for foreign squad lead queues (docs/architecture.md) and local queue reminders (docs/watcher-continuity.md "Durable queue and turn-end backstop"); zero or invalid values use 180
 JG_HOST_MEMORY_SECS=10          # independent sampler cadence; see Host memory guard above
 JG_HOST_MEMORY_PROC=             # fixture proc root; see Host memory guard above
 JG_HOST_MEMORY_CGROUP_ROOT=      # fixture cgroup root; see Host memory guard above
-JG_SQUAD LEAD_LIVENESS_SECS=60   # seconds between watcher probes of each registered squad lead's recorded endpoint through bin/jg-squad-lead-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded jg-spawn.sh --squad-lead path and emits exactly one check wake per relaunch; zero or invalid values use 60
-JG_SQUAD LEAD_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
-JG_SQUAD LEAD_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.squad-lead-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
-JG_SQUAD LEAD_LIVENESS_WINDOW_SECS=3600   # relaunch-bound window; bin/jg-squad-lead-liveness-lib.sh owns ledger counting, including failures before admission; zero or invalid values use 3600
+JG_SQUAD_LEAD_LIVENESS_SECS=60   # seconds between watcher probes of each registered squad lead's recorded endpoint through bin/jg-squad-lead-liveness-lib.sh, which relaunches only a positively `dead` or `missing` endpoint through the ordinary guarded jg-spawn.sh --squad-lead path and emits exactly one check wake per relaunch; zero or invalid values use 60
+JG_SQUAD_LEAD_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
+JG_SQUAD_LEAD_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.squad-lead-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
+JG_SQUAD_LEAD_LIVENESS_WINDOW_SECS=3600   # relaunch-bound window; bin/jg-squad-lead-liveness-lib.sh owns ledger counting, including failures before admission; zero or invalid values use 3600
 JG_WEDGE_DEMAND_INSPECT_COUNT=3    # consecutive provably-working stale escalations on the same unchanged pane before demand-deep-inspection is added
 JG_WORKTREE_WRITE_PRUNE='.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'   # directory names the wedge detector's task-worktree write probe skips; the default keeps .git out so a supervisor's own read-only git command can never look like crew progress; set it to the empty string to prune nothing, which widens the probe to the whole depth-bounded tree rather than disabling it
 JG_WORKTREE_WRITE_MAXDEPTH=6       # depth that same probe walks below the recorded worktree; it runs only at the moment a wedge escalation would otherwise fire, never on every poll; no probe knob applies to a squad lead, whose recorded worktree is a provisioned home the probe skips entirely

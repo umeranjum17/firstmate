@@ -197,7 +197,7 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SQUAD LEAD_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
+The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SQUAD_LEAD_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
 Its observation timer survives watcher replacement, resets when the oldest row changes or a reminder is delivered, and clears when no actionable row remains, giving each handling successor time to establish continuity.
 A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `JG_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
 Declared external-wait stale rows are excluded and retain their existing pause cadence.

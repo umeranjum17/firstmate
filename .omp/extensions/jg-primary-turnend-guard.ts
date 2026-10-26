@@ -34,13 +34,13 @@ import { fileURLToPath } from "node:url";
 // Shared with the Pi extensions; the owner resolves bin/jg-operational-input.sh
 // relative to its own location, which is this same repository root.
 import {
+  classifyJuggernautCurrentOperationalText,
+  encodeJuggernautOperationalInput,
+} from "../../.pi/extensions/lib/jg-operational-input.ts";
 // jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for (const [_jgOld, _jgVal] of Object.entries(process.env))
   if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
     process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
-  classifyJuggernautCurrentOperationalText,
-  encodeJuggernautOperationalInput,
-} from "../../.pi/extensions/lib/jg-operational-input.ts";
 
 // The omp extension API surface this file uses, declared locally: omp ships no
 // separately installable type package and is a Pi fork whose event names match

@@ -371,7 +371,7 @@ So each of these projects is refused rather than provisioned:
 
 The seed takes these steps:
 
-1. It records `host:`, `root:`, and `home:` in `data/squad leads.md`.
+1. It records `host:`, `root:`, and `home:` in `data/squad_leads.md`.
 2. It gates the host on readiness.
 3. It sends a bounded manifest.
 4. It lets the remote host clone its own Juggernaut home and project origins.
@@ -622,7 +622,7 @@ For a remote route, the handoff takes these steps:
 3. `jg-backlog-receive.sh` atomically ingests every destination-absent key (a key the remote backlog does not already hold) under the remote backlog's own lock.
 
 The [`bin/jg-backlog-handoff.sh`](../bin/jg-backlog-handoff.sh) header owns remote outbox release after receipt and stable wake-correlation retry behavior.
-Bootstrap retries pending outboxes and wakes, and emits `SQUAD LEAD_HANDOFF:` only when an outbox remains.
+Bootstrap retries pending outboxes and wakes, and emits `SQUAD_LEAD_HANDOFF:` only when an outbox remains.
 There is no two-phase journal and no additional tasks-axi release requirement.
 
 ## Sync, update, and retirement
@@ -642,7 +642,7 @@ The endpoint record there was written by a host-local launch and carries no remo
 So the transaction, its checkpoint, and its postconditions are the local ones.
 
 The primary passes `<harness> <model|default|-> <effort|default|->` explicitly, using `default` when an axis has no parent pin.
-It passes them explicitly because neither the global `config/squad-lead-harness` nor the per-mate `config/squad leads/<id>/harness` pin is inherited into a Squad Lead's home, and any such file on that host belongs to a different home.
+It passes them explicitly because neither the global `config/squad-lead-harness` nor the per-mate `config/squad_leads/<id>/harness` pin is inherited into a Squad Lead's home, and any such file on that host belongs to a different home.
 Letting the far side re-resolve it would silently move the mate onto another runtime.
 SSH exit 255 leaves completion unknown and the route preserved, exactly as every other verb here.
 Move a live remote Squad Lead onto a newly pinned harness, model, or effort with [`bin/jg-remote-squad-lead-relaunch.sh`](../bin/jg-remote-squad-lead-relaunch.sh) rather than calling `relaunch` through `jg-on.sh` directly: the host-local relaunch it drives can only rewrite the host's own endpoint record, so this wrapper reads the confirmed identity back from that record afterward and republishes the primary's own route metadata to match, the same way launch already records a fresh route.

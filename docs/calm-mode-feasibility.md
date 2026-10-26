@@ -868,7 +868,7 @@ ok - Claude Code 2.1.283 (Claude Code) resumes the transcript with Calm's hidden
 ok - Claude Code 2.1.283 (Claude Code) with Calm off shows the supervision notes: the session-start anchor for an unprocessed captain outcome, a sailboat for a new routine outcome, an anchor for a new captain outcome, and the latch-trip note, skipping processed and silent outcomes, moving no store marker, never reaching the model, and on resume showing each anchor once
 ```
 
-## 2026-09-28 Claude Code 2.1.284 supervision-note label and the fm plugin name
+## 2026-09-28 Claude Code 2.1.284 supervision-note label and the jg plugin name
 
 The label in front of each supervision note is Claude Code's, not the mod's, so the plugin is named `fm` to keep it short.
 

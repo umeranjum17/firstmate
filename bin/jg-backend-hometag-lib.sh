@@ -26,8 +26,6 @@
 # an accepted limitation, no worse than the existing fact that a task's
 # recorded absolute worktree path does not survive a move either.
 
-JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER=".jg-squad-lead-home"
-
 jg_backend_hometag() {
   local marker id prefix root hash
   marker=$(jg_compat_marker "$JG_HOME")

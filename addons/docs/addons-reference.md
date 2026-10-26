@@ -76,7 +76,7 @@ codex-guard/install.sh
 JG_HOME="$JG_HOME" fleet-stall/install.sh
 JG_HOME="$JG_HOME" owner-guard/install-scan.sh
 JG_HOME="$JG_HOME" zai-quota-check/install.sh
-quota-failover/install.sh --all "$JG_HOME"   # also each active local squad lead home in data/squad leads.md
+quota-failover/install.sh --all "$JG_HOME"   # also each active local squad lead home in data/squad_leads.md
 ```
 
 `route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
@@ -283,7 +283,7 @@ A worker left with no live route also gets one failed line on the home's parent 
 
 It needs `quota-axi`, `jq`, `flock` and the harness command of each dispatch route on `PATH`.
 
-`quota-failover/install.sh [--dry-run] [--all] [--list] <jg-home>` copies the watcher (with the parked-homes reader and the account-pool Claude environment it sources beside it) to `~/.local/share/jg-quota-failover`, points the home's `state/quota-failover-watch.check.sh` at it through an exec shim (a different check there is backed up first) and registers it. `--all` does the same for every active home: the given home and each local squad lead home its `data/squad leads.md` lists, minus the ones `config/parked-homes` parks; a remote home is skipped and named, and a home that cannot register fails the run. `--list` prints the homes it would reach. `quota-failover/uninstall.sh [--all] <jg-home>` retires the check from the same homes.
+`quota-failover/install.sh [--dry-run] [--all] [--list] <jg-home>` copies the watcher (with the parked-homes reader and the account-pool Claude environment it sources beside it) to `~/.local/share/jg-quota-failover`, points the home's `state/quota-failover-watch.check.sh` at it through an exec shim (a different check there is backed up first) and registers it. `--all` does the same for every active home: the given home and each local squad lead home its `data/squad_leads.md` lists, minus the ones `config/parked-homes` parks; a remote home is skipped and named, and a home that cannot register fails the run. `--list` prints the homes it would reach. `quota-failover/uninstall.sh [--all] <jg-home>` retires the check from the same homes.
 `QUOTA_FAILOVER_MAX_AGE` (default `10m`) is the oldest quota reading it trusts.
 
 Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to end against a fixture home (stub juggernaut libs in its `bin/`, stub `quota-axi` and `opencode` on `PATH`): a lead on a route that answers every one-line test with a provider 429, and a screen-stopped worker on a second dead route ranked first in the dispatch rules. It asserts both move to the live candidate, the dead routes are passed over and dropped from `crew-dispatch.json`, and a second pass with the routes answering again restores them and moves nothing. Five more passes add pool workers: with the switch file present a Claude worker moves to the next account with no route move, a Claude worker with no next account takes the route move, and OpenCode's Go-tier and Codex workers only rest and wake; with the file gone a Claude worker only rests and wakes, once across two passes and again when the same account stops a new incarnation, and a pool rest that fails still wakes the home, once; a pool worker wedged with a clean screen loses its route to the pinned probe's verdict, and the stop's changed label re-fires nothing.
@@ -322,7 +322,7 @@ Otherwise it backs up each file it changes as `<file>.bak-route-change-<stamp>` 
 - `config/crew-dispatch.json`: in the default and every rule, the route leads the non-Claude profiles; Claude and Opus entries keep their place and an Opus-only rule is left alone.
   A list that already holds the route, as `<route>` or `<provider>/<route>` on any harness, moves that entry; any other list gets a pi profile for it.
 - the gate: `agent` and `agent_config.pi.model` in `~/.no-mistakes/config.yaml` (or `$NM_CONFIG`), edited by key name and checked so no other key changes; only route names are printed.
-- the lead pins `config/squad-lead-harness` and `config/squad leads/*/harness`, except pins on Claude or Opus.
+- the lead pins `config/squad-lead-harness` and `config/squad_leads/*/harness`, except pins on Claude or Opus.
 
 Then it sends one real request through pi on the route, the way the gate calls it; when that fails it restores every backup and prints the cause.
 `--dry-run` runs the quota check, prints the planned edits and writes nothing.

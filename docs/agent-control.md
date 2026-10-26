@@ -3,7 +3,7 @@
 Juggernaut talks to a running agent two ways, and they are not the same channel.
 
 The **data plane** is [`bin/jg-send.sh`](../bin/jg-send.sh): conversational text for the agent to read.
-For a `kind=squad lead` target it always prepends the from-juggernaut routing marker, because a Squad Lead is itself a Juggernaut and its reply must come back through the status path rather than a chat nobody reads.
+For a `kind=squad_lead` target it always prepends the from-juggernaut routing marker, because a Squad Lead is itself a Juggernaut and its reply must come back through the status path rather than a chat nobody reads.
 
 The **control plane** is [`bin/jg-control.sh`](../bin/jg-control.sh): allowlisted lifecycle verbs addressed to an exact task id.
 
@@ -69,7 +69,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
 
 1. **Resolve the profile.**
    An explicit `--harness`, `--model`, or `--effort` wins.
-   Otherwise a `kind=squad lead` task re-resolves its durable profile through `jg-harness.sh` with its id, under the [per-mate pin and global fallback contract](configuration.md#choose-the-squad-lead-harness), before stopping the agent.
+   Otherwise a `kind=squad_lead` task re-resolves its durable profile through `jg-harness.sh` with its id, under the [per-mate pin and global fallback contract](configuration.md#choose-the-squad-lead-harness), before stopping the agent.
    A ship or Recon keeps the harness already recorded for it, because that harness comes from Juggernaut's dispatch-profile judgment at intake and must not be silently re-read from configuration.
    A recorded raw-command basename that differs from its resolved adapter cannot reproduce the command actually running, so relaunch refuses before the checkpoint unless the caller passes an explicit `--harness` to choose the replacement runtime deliberately.
    A harness change resets model and effort unless they are named too, because a model chosen for one adapter does not transfer to another.
@@ -79,7 +79,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    Ship and Recon replacements also pass the [worker tool exclusion checks](configuration.md#worker-tool-exclusions-configcrew-exclude-tools) at this step.
 2. **Safe checkpoint.**
    The recorded worktree must exist and be a worktree root; its head and dirty state are recorded.
-   For a `kind=squad lead` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
+   For a `kind=squad_lead` task, the home's identity marker must match and its child records must be readable, so a relaunch can never strand child work behind an unreadable home.
    A Squad Lead's own operators run in their own endpoints and outlive its relaunch; the relaunched Squad Lead reconciles them from its home's durable records at startup.
 3. **Record the note.**
    A ship or Recon relaunch requires `--note`, because the replacement inherits the local copy but none of the conversation; the note is appended to the instructions it reads.

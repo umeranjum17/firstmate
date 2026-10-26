@@ -171,9 +171,9 @@ Deferring the sweeps changed only when they run, not what they conclude.
 The deferred worker's published report was byte-identical to the three sweep lines the blocking baseline printed, on the same fixture:
 
 ```text
-SQUAD LEAD_LIVENESS: squad lead ios: skipped: remote host unavailable or endpoint state unknown; route preserved on remote-mac
-SQUAD LEAD_SYNC: squad lead ios: skipped: remote tracked-file sync failed on remote-mac:
-SQUAD LEAD_SYNC: squad lead ios: skipped: remote inheritance failed on remote-mac:
+SQUAD_LEAD_LIVENESS: squad lead ios: skipped: remote host unavailable or endpoint state unknown; route preserved on remote-mac
+SQUAD_LEAD_SYNC: squad lead ios: skipped: remote tracked-file sync failed on remote-mac:
+SQUAD_LEAD_SYNC: squad lead ios: skipped: remote inheritance failed on remote-mac:
 ```
 
 The unreachable route was preserved rather than relaunched in both runs, and the result surfaced durably as a queued `check: startup-network` wake once the worker finished.

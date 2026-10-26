@@ -5,14 +5,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
-for (const [_jgOld, _jgVal] of Object.entries(process.env))
-  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
-    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
   classifyJuggernautCurrentOperationalText,
   encodeJuggernautOperationalInput,
   juggernautShellInvocation,
 } from "./lib/jg-operational-input.ts";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 let guardFollowupActive = false;
 

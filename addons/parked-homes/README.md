@@ -24,7 +24,7 @@ A missing file parks nothing; an unparked home behaves exactly as before.
 
 ## Home-id resolution
 
-A task meta belongs to a parked home only when its `kind=squad lead`. A local
+A task meta belongs to a parked home only when its `kind=squad_lead`. A local
 squad lead's `home=` path carries `.jg-squad-lead-home` with the id; a remote
 squad lead's home lives on its host, so the recorded task id stands in.
 Operator and lead lanes are never parked, whatever their task id spells.

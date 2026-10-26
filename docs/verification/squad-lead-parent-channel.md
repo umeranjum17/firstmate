@@ -10,7 +10,7 @@ This run predates emission-time stamping, so each published line below is the pa
 Date: 2026-09-03.
 Tree: this change's branch on macOS with tmux 3.6a, bash 3.2 as `/bin/bash`, and the repo's own scripts.
 Fixture: two isolated homes under a scratch directory, `$P` (parent) and `$M` (mate), with `config/backend` set to `tmux` in both.
-The mate home carries `.jg-squad-lead-home` (`mate`) and a local `.jg-squad-lead-parent` binding to `$P`; the parent home carries `state/mate.meta` (`kind=squad lead`, `home=$M`).
+The mate home carries `.jg-squad-lead-home` (`mate`) and a local `.jg-squad-lead-parent` binding to `$P`; the parent home carries `state/mate.meta` (`kind=squad_lead`, `home=$M`).
 The mate's child task `child` is a real tmux pane (`fmlive:jg-child`) recorded in `$M/state/child.meta` with `mode=no-mistakes` and `yolo=off`; the mate itself is a second real pane (`fmlive:jg-mate`).
 Both homes run the real `bin/jg-watch.sh` (`JG_POLL=2`), re-armed after every wake through `bin/jg-wake-drain.sh` acknowledgement, exactly as fleet supervision re-arms a watcher after a handled turn.
 No agent harness and no model runs anywhere in the fixture.

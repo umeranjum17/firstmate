@@ -27,7 +27,7 @@ config/crew-dispatch.json  optional operator dispatch profiles; LOCAL, gitignore
 config/project-capacity  optional per-machine count of workers each named project admits at once, read from the root home by every local home; LOCAL, gitignored; see docs/configuration.md "Project capacity"
 config/crew-exclude-tools  optional list of tool names hidden from this home's ship and scout workers; LOCAL, gitignored, and not inherited; a runtime that cannot hide tools refuses the launch rather than ignoring it; see docs/configuration.md "Worker tool exclusions"
 config/squad-lead-harness  global squad lead launch default; LOCAL, gitignored, not inherited; docs/configuration.md "Choose the squad lead harness" owns the schema and fallback
-config/squad leads/<id>/harness  per-mate launch pin; LOCAL, gitignored, not inherited; same configuration contract
+config/squad_leads/<id>/harness  per-mate launch pin; LOCAL, gitignored, not inherited; same configuration contract
 config/backlog-backend  backlog backend override; LOCAL, gitignored; absent or "tasks-axi" = the configured tasks-axi backend, "manual" = force routine backlog updates to hand-editing; inherited by squad lead homes (section 10)
 config/backend  runtime session-provider backend override for new tasks; LOCAL, gitignored; absent = falls through to runtime auto-detection (the runtime Juggernaut itself is executing inside), then tmux; tmux is the verified reference backend (docs/tmux-backend.md), herdr has its own required CI lane (docs/herdr-backend.md), while zellij, orca, and cmux remain experimental with no dedicated real-backend CI lane (docs/zellij-backend.md, docs/orca-backend.md, docs/cmux-backend.md) - herdr and cmux can also be selected by runtime auto-detection, zellij and orca never are (always explicit), and codex-app is not accepted; see docs/codex-app-backend.md; inherited by squad lead homes under the primary-authoritative contract in squad-lead-provisioning
 config/calm     Calm presentation preference shared by the Pi extension and the Claude Code mod; LOCAL, gitignored, and not inherited; see docs/configuration.md "Calm preference"
@@ -57,8 +57,8 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   captain-shared.md  main-authoritative shared captain preferences propagated read-only to squad lead homes; LOCAL, gitignored, owned by squad-lead-provisioning
   learnings.md       fleet-local operational facts and gotchas; LOCAL, gitignored; dated, evidence-backed, curated, and updated with inspect-then-update - rewrite and prune rather than append forever, the same contract as captain.md; created lazily, absent until this home has a learning to store
   projects.md        thin fleet navigation registry recording each project's standing delivery posture and optional ship-branch prefix; juggernaut-private, parsed by jg-project-mode.sh (section 6)
-  squad leads.md      local and remote squad lead routing table; Juggernaut-private, maintained by the squad lead seed helpers (section 6)
-  <id>/brief.md      per-task operator brief, or per-squad-lead charter brief when kind=squad lead
+  squad_leads.md      local and remote squad lead routing table; Juggernaut-private, maintained by the squad lead seed helpers (section 6)
+  <id>/brief.md      per-task operator brief, or per-squad-lead charter brief when kind=squad_lead
   <id>/report.md     scout task deliverable, written by the operator; survives teardown
   pipeline-spend.jsonl  optional per-task no-mistakes pipeline spend, written only when config/pipeline-spend is present; bin/jg-pipeline-spend.sh owns the schema
 projects/            cloned repos; gitignored; read-only except under hard rule 1's concrete captain-approved project operation exception

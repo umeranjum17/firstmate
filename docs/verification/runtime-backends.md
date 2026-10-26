@@ -690,7 +690,7 @@ It spawns those harnesses through the real `bin/jg-spawn.sh --squad-lead` path o
 
 The live guard is `tests/jg-squad-lead-busy-contract-live-e2e.test.sh`.
 It runs by default wherever tmux is installed.
-`JG_SQUAD LEAD_BUSY_LIVE=1` forces an absent binary to fail rather than skip.
+`JG_SQUAD_LEAD_BUSY_LIVE=1` forces an absent binary to fail rather than skip.
 The spawn pane is a sleeper, so the launch brief is never delivered to a model.
 Each installed armed harness is then started for real, with no prompt and no keystrokes.
 

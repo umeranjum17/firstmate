@@ -66,7 +66,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-arm-command-policy.mjs` | Semantic owner of the watcher-arm PreToolUse policy (docs/arm-pretool-check.md)   |
 | `jg-subagent-pretool-check.sh` | Primary-home delegation-shape PreToolUse guard (docs/subagent-guard.md) |
 | `jg-supervision-instructions.sh` | Render the session-start primary-harness supervision block or the one-line repair instruction |
-| `jg-home-seed.sh`        | Transactionally provision a local Squad Lead home and maintain `data/squad leads.md` |
+| `jg-home-seed.sh`        | Transactionally provision a local Squad Lead home and maintain `data/squad_leads.md` |
 | `jg-remote-home-seed.sh` | Register and provision a whole Squad Lead home on an SSH-reachable host              |
 | `jg-remote-readiness-lib.sh` | Shared remote Squad Lead readiness gate: check and, when needed, repair then re-check through `jg-remote-doctor.sh` |
 | [`jg-project-origin-lib.sh`](../bin/jg-project-origin-lib.sh) | Accepted origin-form owner shared by both remote provisioning boundaries |
