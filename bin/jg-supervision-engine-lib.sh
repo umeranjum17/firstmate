@@ -42,23 +42,23 @@
 # process group of its own. docs/supervision-host.md "Engines" owns the
 # verified engine facts each argument list below is built from.
 #
-# Test seams: FM_SUPERVISION_ENGINE_CLAUDE_BIN names the claude executable
+# Test seams: JG_SUPERVISION_ENGINE_CLAUDE_BIN names the claude executable
 # (default: claude on PATH), so a hermetic test can run a stub engine through
-# the real argument construction. FM_TEST_HARNESS pins the primary harness
-# jg_supervision_host_primary reports when FM_TEST_SEAM=1 and its value is a
+# the real argument construction. JG_TEST_HARNESS pins the primary harness
+# jg_supervision_host_primary reports when JG_TEST_SEAM=1 and its value is a
 # known harness token; otherwise detection remains real (tests/lib.sh arms
 # the marker for isolated suites).
 
-FM_SUPERVISION_ENGINES_VERIFIED='claude'
+JG_SUPERVISION_ENGINES_VERIFIED='claude'
 
 # jg_supervision_host_primary: print the primary harness the home gate judges
 # (bin/jg-harness.sh, whose supervision-branch pin names the primary inside an
 # engine turn), or "unknown".
 jg_supervision_host_primary() {
-  if [ "${FM_TEST_SEAM:-}" = 1 ]; then
-    case "${FM_TEST_HARNESS:-}" in
+  if [ "${JG_TEST_SEAM:-}" = 1 ]; then
+    case "${JG_TEST_HARNESS:-}" in
       claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin | unknown)
-        printf '%s\n' "$FM_TEST_HARNESS"
+        printf '%s\n' "$JG_TEST_HARNESS"
         return
         ;;
     esac
@@ -79,7 +79,7 @@ jg_supervision_host_enabled() {
 }
 
 jg_supervision_engine_verified() {  # <engine>
-  case " $FM_SUPERVISION_ENGINES_VERIFIED " in
+  case " $JG_SUPERVISION_ENGINES_VERIFIED " in
     *" ${1:-} "*) return 0 ;;
   esac
   return 1
@@ -95,15 +95,15 @@ jg_supervision_engine_default_model() {  # <engine>
 # jg_supervision_host_config <config-dir> <primary-harness>
 # Returns 1 when the home does not run the host (jg_supervision_host_enabled).
 # Otherwise returns 0 and sets
-# FM_SUPERVISION_ENGINE and FM_SUPERVISION_ENGINE_MODEL for a usable engine, or
-# leaves both empty and sets FM_SUPERVISION_ENGINE_PROBLEM to one plain
+# JG_SUPERVISION_ENGINE and JG_SUPERVISION_ENGINE_MODEL for a usable engine, or
+# leaves both empty and sets JG_SUPERVISION_ENGINE_PROBLEM to one plain
 # sentence naming why this home has no engine.
 # shellcheck disable=SC2034 # Output globals, read by the sourcing caller.
 jg_supervision_host_config() {
   local config=$1 primary=${2:-} line engine model extra
-  FM_SUPERVISION_ENGINE=''
-  FM_SUPERVISION_ENGINE_MODEL=''
-  FM_SUPERVISION_ENGINE_PROBLEM=''
+  JG_SUPERVISION_ENGINE=''
+  JG_SUPERVISION_ENGINE_MODEL=''
+  JG_SUPERVISION_ENGINE_PROBLEM=''
   jg_supervision_host_enabled "$config" "$primary" || return 1
   line=
   [ ! -f "$config/supervision-host" ] \
@@ -113,20 +113,20 @@ jg_supervision_host_config() {
 $line
 EOF
   if [ -n "$extra" ]; then
-    FM_SUPERVISION_ENGINE_PROBLEM="config/supervision-host holds more than '<engine> [<model>]'"
+    JG_SUPERVISION_ENGINE_PROBLEM="config/supervision-host holds more than '<engine> [<model>]'"
     return 0
   fi
   case "$engine" in
     ''|default)
       engine=$primary
       if ! jg_supervision_engine_verified "$engine"; then
-        FM_SUPERVISION_ENGINE_PROBLEM="the primary harness '${primary:-unknown}' has no verified supervision engine"
+        JG_SUPERVISION_ENGINE_PROBLEM="the primary harness '${primary:-unknown}' has no verified supervision engine"
         return 0
       fi
       ;;
     *)
       if ! jg_supervision_engine_verified "$engine"; then
-        FM_SUPERVISION_ENGINE_PROBLEM="config/supervision-host names '$engine', which is not a verified supervision engine (verified: $FM_SUPERVISION_ENGINES_VERIFIED)"
+        JG_SUPERVISION_ENGINE_PROBLEM="config/supervision-host names '$engine', which is not a verified supervision engine (verified: $JG_SUPERVISION_ENGINES_VERIFIED)"
         return 0
       fi
       ;;
@@ -134,40 +134,40 @@ EOF
   case "$model" in
     '') model=$(jg_supervision_engine_default_model "$engine") || model= ;;
     *[!A-Za-z0-9._:/@-]*)
-      FM_SUPERVISION_ENGINE_PROBLEM="config/supervision-host names a malformed engine model '$model'"
+      JG_SUPERVISION_ENGINE_PROBLEM="config/supervision-host names a malformed engine model '$model'"
       return 0
       ;;
   esac
-  FM_SUPERVISION_ENGINE=$engine
-  FM_SUPERVISION_ENGINE_MODEL=$model
+  JG_SUPERVISION_ENGINE=$engine
+  JG_SUPERVISION_ENGINE_MODEL=$model
   return 0
 }
 
 # jg_supervision_host_attended_ready <config-dir> <primary-harness>
 # 0 when the attended host's configured engine, executable, node, jq, turn
 # bound (perl, timeout, or gtimeout), and primary's mirror writer are ready;
-# otherwise 1, with FM_SUPERVISION_HOST_UNREADY naming why. The host's
+# otherwise 1, with JG_SUPERVISION_HOST_UNREADY naming why. The host's
 # attended acceptor runs it on every attended close; the mirror's contents are
 # checked later, by the feed that renders the wake.
 jg_supervision_host_attended_ready() {
-  FM_SUPERVISION_HOST_UNREADY=
+  JG_SUPERVISION_HOST_UNREADY=
   if ! jg_supervision_host_config "$1" "$2"; then
-    FM_SUPERVISION_HOST_UNREADY="the home does not run the supervision host"
-  elif [ -z "$FM_SUPERVISION_ENGINE" ]; then
-    FM_SUPERVISION_HOST_UNREADY="no supervision engine"
-  elif ! jg_supervision_engine_bin "$FM_SUPERVISION_ENGINE" >/dev/null 2>&1; then
-    FM_SUPERVISION_HOST_UNREADY="the $FM_SUPERVISION_ENGINE engine executable is missing"
+    JG_SUPERVISION_HOST_UNREADY="the home does not run the supervision host"
+  elif [ -z "$JG_SUPERVISION_ENGINE" ]; then
+    JG_SUPERVISION_HOST_UNREADY="no supervision engine"
+  elif ! jg_supervision_engine_bin "$JG_SUPERVISION_ENGINE" >/dev/null 2>&1; then
+    JG_SUPERVISION_HOST_UNREADY="the $JG_SUPERVISION_ENGINE engine executable is missing"
   elif ! command -v node >/dev/null 2>&1; then
-    FM_SUPERVISION_HOST_UNREADY="node is missing"
+    JG_SUPERVISION_HOST_UNREADY="node is missing"
   elif ! command -v jq >/dev/null 2>&1; then
-    FM_SUPERVISION_HOST_UNREADY="jq is missing"
+    JG_SUPERVISION_HOST_UNREADY="jq is missing"
   elif ! command -v perl >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1 \
     && ! command -v gtimeout >/dev/null 2>&1; then
-    FM_SUPERVISION_HOST_UNREADY="none of perl, timeout, or gtimeout can bound the engine turn"
+    JG_SUPERVISION_HOST_UNREADY="none of perl, timeout, or gtimeout can bound the engine turn"
   elif ! "$(dirname "${BASH_SOURCE[0]}")/jg-host-mirror.sh" verified "$2"; then
-    FM_SUPERVISION_HOST_UNREADY="no verified dialog mirror for $2"
+    JG_SUPERVISION_HOST_UNREADY="no verified dialog mirror for $2"
   fi
-  [ -z "$FM_SUPERVISION_HOST_UNREADY" ]
+  [ -z "$JG_SUPERVISION_HOST_UNREADY" ]
 }
 
 # jg_supervision_host_outcomes_drained <config-dir>: 0 when main processes the
@@ -207,13 +207,13 @@ jg_supervision_host_main_key() {
 jg_supervision_host_health_key() {
   local key
   key=$(jg_supervision_host_main_key "$1") || return 1
-  printf '%s|%s|%s\n' "$key" "$FM_SUPERVISION_ENGINE" "$FM_SUPERVISION_ENGINE_MODEL"
+  printf '%s|%s|%s\n' "$key" "$JG_SUPERVISION_ENGINE" "$JG_SUPERVISION_ENGINE_MODEL"
 }
 
 # The latch's first cooldown in seconds: the host's initial trip sets it, and
 # each failed probe after that doubles it.
 # shellcheck disable=SC2034 # Shared with the sourcing host and return brief.
-FM_SUPERVISION_HOST_COOLDOWN=300
+JG_SUPERVISION_HOST_COOLDOWN=300
 
 # jg_supervision_host_paused_until <state-dir>: while that latch holds, from
 # the trip until a probe succeeds, print the epoch from which the next wake
@@ -242,7 +242,7 @@ jg_supervision_engine_bin() {
   local bin
   case "$1" in
     claude)
-      bin=${FM_SUPERVISION_ENGINE_CLAUDE_BIN:-}
+      bin=${JG_SUPERVISION_ENGINE_CLAUDE_BIN:-}
       [ -n "$bin" ] || bin=$(command -v claude 2>/dev/null || true)
       ;;
     *) bin= ;;
@@ -332,7 +332,7 @@ _jg_engine_reap() {
 # jg_supervision_engine_turn <engine> <model> <prompt-file> <message-file>
 #     <session-id> <new|resume> <timeout-seconds> <result-file> <error-file>
 #     [<pid-file>]
-# Runs one bounded engine turn from $FM_ROOT and returns the engine's exit
+# Runs one bounded engine turn from $JG_ROOT and returns the engine's exit
 # status (124 or 137 when the bound was hit, 127 when the engine could not
 # run). <result-file> receives the engine's machine-readable result and
 # <error-file> its diagnostics. While the turn runs, <pid-file> (when given)
@@ -344,7 +344,7 @@ jg_supervision_engine_turn() {
   local -a args
   bin=$(jg_supervision_engine_bin "$engine" 2>"$errors") || return 127
   case "$timeout" in ''|0*|*[!0-9]*) timeout=1200 ;; esac
-  grace=${FM_SUPERVISION_ENGINE_GRACE:-30}
+  grace=${JG_SUPERVISION_ENGINE_GRACE:-30}
   case "$grace" in ''|0*|*[!0-9]*) grace=30 ;; esac
   case "$engine" in
     claude)
@@ -354,8 +354,8 @@ jg_supervision_engine_turn() {
       args=(-p "$(cat "$message")" --safe-mode --system-prompt-file "$prompt"
         --tools Bash,Read --permission-mode dontAsk --allowedTools Bash Read
         --model "$model" --output-format json)
-      root_phys=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || root_phys=$FM_ROOT
-      home_phys=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || home_phys=$FM_HOME
+      root_phys=$(cd "$JG_ROOT" 2>/dev/null && pwd -P) || root_phys=$JG_ROOT
+      home_phys=$(cd "$JG_HOME" 2>/dev/null && pwd -P) || home_phys=$JG_HOME
       state_phys=$(cd "$STATE" 2>/dev/null && pwd -P) || state_phys=$STATE
       # Claude path-checks direct file reads against its working directories,
       # so a home or state directory outside the code root is added.
@@ -377,7 +377,7 @@ jg_supervision_engine_turn() {
   esac
   ledger=$(mktemp "$STATE/.supervision-host-descendants.XXXXXX") || return 127
   (
-    cd "$FM_ROOT" || exit 127
+    cd "$JG_ROOT" || exit 127
     jg_exec_timed "$timeout" "$grace" "$bin" "${args[@]}"
   ) </dev/null >"$result" 2>"$errors" &
   watched=$!

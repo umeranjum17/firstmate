@@ -53,11 +53,11 @@ Options:
   --local                run the relay as a local child process instead. This is
                          how the relay path is measured without a laptop.
   --relay <path>         path to jg-voice-relay.py on the desktop, or set
-                         $FM_VOICE_RELAY. Required: this file carries no default,
+                         $JG_VOICE_RELAY. Required: this file carries no default,
                          because one operator's home directory is not a path to
                          hand anybody else.
   --relay-python <path>  interpreter that has aws-sdk-bedrock-runtime installed.
-                         default $FM_VOICE_PYTHON or python3
+                         default $JG_VOICE_PYTHON or python3
   --relay-arg <arg>      extra argument for the relay, repeatable. Write it
                          joined with an equals sign, --relay-arg=--scope
                          --relay-arg=counts, or the leading dashes are read as
@@ -1290,11 +1290,11 @@ def parse_args(argv):
         description=__doc__.splitlines()[0])
     parser.add_argument("--host")
     parser.add_argument("--local", action="store_true")
-    parser.add_argument("--relay", default=os.environ.get("FM_VOICE_RELAY"),
+    parser.add_argument("--relay", default=os.environ.get("JG_VOICE_RELAY"),
                         help="path to jg-voice-relay.py on the desktop; required, "
-                             "and FM_VOICE_RELAY sets it for a whole shell")
+                             "and JG_VOICE_RELAY sets it for a whole shell")
     parser.add_argument("--relay-python",
-                        default=os.environ.get("FM_VOICE_PYTHON", "python3"))
+                        default=os.environ.get("JG_VOICE_PYTHON", "python3"))
     parser.add_argument("--relay-arg", action="append")
     parser.add_argument("--listen", choices=LISTEN_MODES, default=PUSH_TO_TALK,
                         help="push-to-talk is the default and the only mode that "
@@ -1323,7 +1323,7 @@ def parse_args(argv):
     if not options.relay:
         parser.error(
             "say where the relay is: --relay <path to jg-voice-relay.py on the "
-            "desktop>, or set FM_VOICE_RELAY")
+            "desktop>, or set JG_VOICE_RELAY")
     if options.runs < 1:
         parser.error("--runs must be at least 1")
     if options.listen == OPEN_MIC and options.in_file:

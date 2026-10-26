@@ -35,7 +35,7 @@
 # request onto the existing record (bin/jg-task-inbox-lib.sh), so after a lost
 # transport (ssh exit 255, completion unknown) jg-send retries the same leg
 # once itself. For an ordinary reply-bearing request, a later re-run is
-# idempotent only through the printed FM_PENDING_REPLY_EXISTING_CORR=<corr>
+# idempotent only through the printed JG_PENDING_REPLY_EXISTING_CORR=<corr>
 # command: it preserves the same correlation, body, and record, while a plain
 # re-run mints a new correlation and delivers a separate record. An explicit
 # fire-and-forget request instead retries with its same caller-supplied delivery
@@ -73,8 +73,8 @@
 # failure); any other nonzero = the send failed and nothing may be assumed
 # delivered. Submission dispatches through the target's recorded backend; the
 # tmux adapter shares its composer/submit core with the away-mode daemon via
-# bin/jg-tmux-lib.sh. Tune with FM_SEND_RETRIES (default 3; agy typed targets
-# default to 20 for agy's late busy render) / FM_SEND_SLEEP (0.4). Slash
+# bin/jg-tmux-lib.sh. Tune with JG_SEND_RETRIES (default 3; agy typed targets
+# default to 20 for agy's late busy render) / JG_SEND_SLEEP (0.4). Slash
 # commands, and codex `$...` skill invocations resolved through harness meta,
 # get a longer pre-Enter settle so completion popups do not swallow Enter.
 # A remote secondmate target has no typed text plane at all:
@@ -115,7 +115,7 @@
 # inspect (it can no longer reconcile or escalate on its own). Only a
 # failed enqueue discards the expectation. On the typed plane an unconfirmed submit (exit 3) keeps
 # it armed rather than dropping it, and only a proven send failure discards it.
-# Set FM_PENDING_REPLY_EXISTING_CORR=<id> when re-sending a recovery request
+# Set JG_PENDING_REPLY_EXISTING_CORR=<id> when re-sending a recovery request
 # for an already-open expectation so a second record is not created. Direct
 # unmarked captain input never creates one. A marked secondmate instruction
 # sent with --fire-and-forget <16-hex-delivery-id> uses the same inbox transport
@@ -134,10 +134,10 @@
 # deduplicates the same request onto the same record - and a still-lost
 # transport exits nonzero while preserving a reply-bearing marked request's
 # expectation, since the record may have landed. Its error prints the exact
-# FM_PENDING_REPLY_EXISTING_CORR=<id> resend command that preserves the body
+# JG_PENDING_REPLY_EXISTING_CORR=<id> resend command that preserves the body
 # and makes a later remote enqueue deduplicate onto that same record. An
 # unconfirmed fire-and-forget request exits 3 and names the same delivery id to
-# retry. Every remote transport attempt is bounded by FM_SEND_REMOTE_BUDGET
+# retry. Every remote transport attempt is bounded by JG_SEND_REMOTE_BUDGET
 # seconds (default 30, and any override must be a positive integer): a bound
 # hit is completion-unknown and exits through this same unconfirmed contract
 # instead of waiting out a busy remote queue.
@@ -145,8 +145,8 @@
 # doorbell surfaces through the parent's pending-reply recovery and escalation,
 # whose recovery request re-rings the remote doorbell when it is enqueued;
 # fire-and-forget delivery deliberately arms neither mechanism. Internal
-# semantic callers may set FM_SEND_EXPECTED_SPAWN_GEN or
-# FM_SEND_EXPECTED_REMOTE_HOST to require that sampled identity to still match
+# semantic callers may set JG_SEND_EXPECTED_SPAWN_GEN or
+# JG_SEND_EXPECTED_REMOTE_HOST to require that sampled identity to still match
 # during the final locked remote-route validation; unset or empty guards do not
 # change ordinary sends.
 #
@@ -206,7 +206,7 @@
 # refused with --key, with an explicit backend target (no task ledger in this
 # home), and with an empty message.
 #
-# After a successful TYPED-plane submit jg-send pauses FM_SEND_SETTLE seconds
+# After a successful TYPED-plane submit jg-send pauses JG_SEND_SETTLE seconds
 # (default 1, 0 disables) before returning: submit confirmation only proves the
 # text was accepted, but the harness needs a beat to spin up the turn before its
 # busy footer appears, so an immediate peek would otherwise see the stale idle
@@ -215,9 +215,9 @@
 # path do not pay it.
 set -eu
 
-FM_SEND_ORIGINAL_ARGS=("$@")
+JG_SEND_ORIGINAL_ARGS=("$@")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # shellcheck source=bin/jg-gate-refuse-lib.sh
 . "$SCRIPT_DIR/jg-gate-refuse-lib.sh"
@@ -225,18 +225,18 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # a crewmate (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
 
-if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
-  echo "error: FM_HOME is not set; jg-send refuses to resolve targets without an explicit firstmate home" >&2
+if [ -z "${JG_HOME+x}" ] || [ -z "${JG_HOME:-}" ]; then
+  echo "error: JG_HOME is not set; jg-send refuses to resolve targets without an explicit firstmate home" >&2
   exit 1
 fi
 
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-if [ ! -d "$FM_HOME" ]; then
-  echo "error: FM_HOME '$FM_HOME' is not a directory; jg-send cannot resolve this home's state" >&2
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+if [ ! -d "$JG_HOME" ]; then
+  echo "error: JG_HOME '$JG_HOME' is not a directory; jg-send cannot resolve this home's state" >&2
   exit 1
 fi
 if [ ! -d "$STATE" ]; then
-  echo "error: state dir '$STATE' is missing; jg-send cannot resolve targets for FM_HOME '$FM_HOME'" >&2
+  echo "error: state dir '$STATE' is missing; jg-send cannot resolve targets for JG_HOME '$JG_HOME'" >&2
   exit 1
 fi
 
@@ -259,7 +259,7 @@ fi
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 
-FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/jg-guard.sh" || true
+JG_GUARD_CONTINUE_LINE='This is a supervision warning only; the requested message WILL still be sent.' "$SCRIPT_DIR/jg-guard.sh" || true
 
 jg_send_id_from_meta() { # <meta-file>
   local base
@@ -307,10 +307,10 @@ jg_send_record_interrupt() { # <key>
   [ -f "$STATE/$id.busy-gen" ] || return 0
   gen=$(jg_meta_get "$TARGET_META" busy_gen)
   if [ -n "$gen" ]; then
-    "$FM_ROOT/bin/jg-busy-event.sh" apply "$STATE" "$id" idle \
+    "$JG_ROOT/bin/jg-busy-event.sh" apply "$STATE" "$id" idle \
       --gen "$gen" --source jg-interrupt --event interrupt
   else
-    "$FM_ROOT/bin/jg-busy-event.sh" apply "$STATE" "$id" idle \
+    "$JG_ROOT/bin/jg-busy-event.sh" apply "$STATE" "$id" idle \
       --current-gen --source jg-interrupt --event interrupt
   fi || {
     echo "error: key '$key' reached $T, but the Claude interrupt state could not be recorded for $id" >&2
@@ -565,7 +565,7 @@ RESOLVE_STATUS_FILE=
 # longer owns also keeps the common path free of any backlog read.
 RESOLVE_STATUS_KEYS=
 RESOLVE_HOLD_KEYS=
-RESOLVE_CLOSE_MAX=$FM_LINE_CAP_DEFAULT
+RESOLVE_CLOSE_MAX=$JG_LINE_CAP_DEFAULT
 
 # Resolve a --resolve-key key that the status log no longer owns to the
 # captain-held task that carries it: the key as a task id itself (the collapsed
@@ -577,7 +577,7 @@ jg_send_hold_resolved_id() { # <task-id> <decision-key>
   local show id state hold_kind
   command -v tasks-axi >/dev/null 2>&1 || return 1
   for id in "$2" "$1-decision-$2"; do
-    show=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" show "$id" --full 2>/dev/null) || continue
+    show=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" show "$id" --full 2>/dev/null) || continue
     state=$(printf '%s\n' "$show" | sed -n 's/^  state: //p' | head -1)
     hold_kind=$(printf '%s\n' "$show" | sed -n 's/^  hold_kind: //p' | head -1)
     [ "$state" != "done" ] || continue
@@ -672,7 +672,7 @@ if [ -n "$RESOLVE_KEYS" ]; then
   # append stamps each line with its emission time. Reserve that stamp's width
   # here so the probe below measures the same bytes the writer will produce and
   # the close record stays inside the cap this refusal cites.
-  RESOLVE_CLOSE_MAX=$((FM_LINE_CAP_DEFAULT - $(status_stamp_width)))
+  RESOLVE_CLOSE_MAX=$((JG_LINE_CAP_DEFAULT - $(status_stamp_width)))
   [ "$RESOLVE_CLOSE_MAX" -ge 0 ] || RESOLVE_CLOSE_MAX=0
   resolve_excerpt=$(printf '%s' "$*" | tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
   for k in $RESOLVE_STATUS_KEYS; do
@@ -683,9 +683,9 @@ if [ -n "$RESOLVE_KEYS" ]; then
     fi
     probe_line="resolved [key=$k]: $probe"
     jg_cap_line_var "$probe_line" "$RESOLVE_CLOSE_MAX"
-    probe_key=$(_jg_decision_key "$FM_LINE_CAP_LINE") || probe_key=
-    if [ "$(status_line_verb "$FM_LINE_CAP_LINE")" != resolved ] || [ "$probe_key" != "$k" ]; then
-      echo "error: --resolve-key cannot close a decision key of length ${#k}: its ${#probe_line}-character close record exceeds the $FM_LINE_CAP_DEFAULT-character status-line cap, and truncation would remove the structural key delimiter. Refusing rather than writing an ineffective close; nothing was sent." >&2
+    probe_key=$(_jg_decision_key "$JG_LINE_CAP_LINE") || probe_key=
+    if [ "$(status_line_verb "$JG_LINE_CAP_LINE")" != resolved ] || [ "$probe_key" != "$k" ]; then
+      echo "error: --resolve-key cannot close a decision key of length ${#k}: its ${#probe_line}-character close record exceeds the $JG_LINE_CAP_DEFAULT-character status-line cap, and truncation would remove the structural key delimiter. Refusing rather than writing an ineffective close; nothing was sent." >&2
       exit 1
     fi
   done
@@ -709,7 +709,7 @@ jg_send_close_resolved_keys() { # <answer-text>
   for k in $RESOLVE_STATUS_KEYS; do
     close_note=$(jg_send_resolve_close_note "$k" "$note")
     jg_cap_line_var "resolved [key=$k]: $close_note" "$RESOLVE_CLOSE_MAX"
-    close_lines+=("$FM_LINE_CAP_LINE")
+    close_lines+=("$JG_LINE_CAP_LINE")
   done
   [ "${#close_lines[@]}" -gt 0 ] || return 0
   append_rc=0
@@ -778,14 +778,14 @@ if [ "${1:-}" = "--key" ]; then
   key=$2
   semantic_key=$(jg_send_normalize_key "$key")
   if [ "$TARGET_BACKEND" = remote ]; then
-    FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
-    case "$FM_SEND_REMOTE_BUDGET" in
+    JG_SEND_REMOTE_BUDGET=${JG_SEND_REMOTE_BUDGET:-30}
+    case "$JG_SEND_REMOTE_BUDGET" in
     '' | *[!0-9]* | 0)
-      echo "error: FM_SEND_REMOTE_BUDGET must be a positive integer: $FM_SEND_REMOTE_BUDGET" >&2
+      echo "error: JG_SEND_REMOTE_BUDGET must be a positive integer: $JG_SEND_REMOTE_BUDGET" >&2
       exit 1
       ;;
     esac
-    if ! jg_run_timed "$FM_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
+    if ! jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
       jg-remote-secondmate-control.sh key "$TARGET_REMOTE_ID" "$key" </dev/null; then
       echo "error: key '$key' not sent to remote secondmate $TARGET_REMOTE_ID; completion may be unknown" >&2
       exit 1
@@ -803,10 +803,10 @@ else
     exit 1
   fi
   if [ "$TARGET_BACKEND" = remote ]; then
-    FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
-    case "$FM_SEND_REMOTE_BUDGET" in
+    JG_SEND_REMOTE_BUDGET=${JG_SEND_REMOTE_BUDGET:-30}
+    case "$JG_SEND_REMOTE_BUDGET" in
     '' | *[!0-9]* | 0)
-      echo "error: FM_SEND_REMOTE_BUDGET must be a positive integer: $FM_SEND_REMOTE_BUDGET" >&2
+      echo "error: JG_SEND_REMOTE_BUDGET must be a positive integer: $JG_SEND_REMOTE_BUDGET" >&2
       exit 1
       ;;
     esac
@@ -816,16 +816,16 @@ else
   RESOLVE_ANSWER_TEXT=$MESSAGE
   if [ "$MARK_FROM_FIRSTMATE" = 1 ] && [ -n "$FIRE_AND_FORGET_ID" ]; then
     jg_message_mark_from_firstmate "$MESSAGE" MESSAGE
-    MESSAGE="${FM_FROMFIRST_MARK}delivery=${FIRE_AND_FORGET_ID} ${MESSAGE#"$FM_FROMFIRST_MARK"}"
-    FM_SEND_IDEMPOTENT=1
+    MESSAGE="${JG_FROMFIRST_MARK}delivery=${FIRE_AND_FORGET_ID} ${MESSAGE#"$JG_FROMFIRST_MARK"}"
+    JG_SEND_IDEMPOTENT=1
   elif [ "$MARK_FROM_FIRSTMATE" = 1 ]; then
     # Reuse an existing correlation id for recovery resends; otherwise create a
     # durable parent expectation before delivery. Transport success never
     # resolves that expectation (see jg-pending-reply-lib.sh).
     existing_corr_explicit=0
-    if [ "${FM_PENDING_REPLY_EXISTING_CORR+x}" = x ]; then
+    if [ "${JG_PENDING_REPLY_EXISTING_CORR+x}" = x ]; then
       existing_corr_explicit=1
-      existing_corr=$FM_PENDING_REPLY_EXISTING_CORR
+      existing_corr=$JG_PENDING_REPLY_EXISTING_CORR
     else
       existing_corr=$(jg_pending_reply_extract_corr "$MESSAGE")
     fi
@@ -841,7 +841,7 @@ else
         echo "error: cannot create pending-reply expectation without a resolvable secondmate task id" >&2
         exit 1
       fi
-      PENDING_REPLY_CORR=$(jg_pending_reply_create "$FM_HOME" "$STATE" "$TARGET_TASK_ID" "$MESSAGE") ||
+      PENDING_REPLY_CORR=$(jg_pending_reply_create "$JG_HOME" "$STATE" "$TARGET_TASK_ID" "$MESSAGE") ||
         {
           echo "error: failed to create parent pending-reply expectation for $TARGET_TASK_ID" >&2
           exit 1
@@ -901,7 +901,7 @@ else
     # 255 is safe by that idempotence; a still-lost transport preserves a
     # reply-bearing request's expectation, while fire-and-forget reports the
     # delivery id that must be reused, because the record may have landed.
-    # Every transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds
+    # Every transport attempt is bounded by JG_SEND_REMOTE_BUDGET seconds
     # (default 30, overridable) so a busy remote queue cannot hold this send
     # open indefinitely; a bound hit exits through the same
     # unconfirmed-delivery contract.
@@ -922,10 +922,10 @@ else
       CURRENT_REMOTE_SPAWN_GEN=$(jg_meta_get "$TARGET_META" spawn_gen)
     fi
     if [ "$CURRENT_REMOTE_ID" != "$TARGET_REMOTE_ID" ] ||
-      { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
-        [ "$CURRENT_REMOTE_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
-      { [ -n "${FM_SEND_EXPECTED_REMOTE_HOST:-}" ] &&
-        [ "$CURRENT_REMOTE_HOST" != "$FM_SEND_EXPECTED_REMOTE_HOST" ]; } ||
+      { [ -n "${JG_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
+        [ "$CURRENT_REMOTE_SPAWN_GEN" != "$JG_SEND_EXPECTED_SPAWN_GEN" ]; } ||
+      { [ -n "${JG_SEND_EXPECTED_REMOTE_HOST:-}" ] &&
+        [ "$CURRENT_REMOTE_HOST" != "$JG_SEND_EXPECTED_REMOTE_HOST" ]; } ||
       [ -z "$CURRENT_REMOTE_HOST" ] ||
       [ "$CURRENT_REMOTE_HOST" != "$TARGET_REMOTE_HOST" ]; then
       jg_lock_release "$REMOTE_META_LOCK"
@@ -939,21 +939,21 @@ else
     remote_completion_unknown=0
     REMOTE_SEND_ARGS=("$TARGET_REMOTE_ID" "$MESSAGE")
     [ -z "$FIRE_AND_FORGET_ID" ] || REMOTE_SEND_ARGS+=(fire-and-forget)
-    # Each transport attempt is bounded by FM_SEND_REMOTE_BUDGET seconds.
+    # Each transport attempt is bounded by JG_SEND_REMOTE_BUDGET seconds.
     # jg_run_timed's 124 means the attempt was killed at the bound with remote
     # completion unknown - the enqueue may have landed - so it exits through
     # the same unconfirmed-delivery contract as a lost transport, without a
     # retry that would only wait out the same busy remote queue again. (A
     # remote job's own timeout also relays as 124; treating it as unconfirmed
     # stays safe because the remote enqueue deduplicates.)
-    jg_run_timed "$FM_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
+    jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
       jg-remote-secondmate-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
     if [ "$remote_rc" -eq 124 ]; then
       remote_completion_unknown=1
     elif [ "$remote_rc" -eq 255 ]; then
       remote_completion_unknown=1
       remote_rc=0
-      jg_run_timed "$FM_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
+      jg_run_timed "$JG_SEND_REMOTE_BUDGET" "$SCRIPT_DIR/jg-on.sh" "$TARGET_REMOTE_ID" \
         jg-remote-secondmate-control.sh send "${REMOTE_SEND_ARGS[@]}" </dev/null || remote_rc=$?
     fi
     jg_lock_release "$REMOTE_META_LOCK"
@@ -968,18 +968,18 @@ else
       if [ "$remote_rc" -eq 255 ]; then
         echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (transport lost twice; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       elif [ "$remote_rc" -eq 124 ]; then
-        echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (the remote transport did not complete within its ${FM_SEND_REMOTE_BUDGET}s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
+        echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (the remote transport did not complete within its ${JG_SEND_REMOTE_BUDGET}s budget; remote completion unknown). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       else
         echo "error: steer to remote secondmate $TARGET_REMOTE_ID is unconfirmed (the first transport attempt had unknown completion and the retry failed). Only the correlation-reusing resend below is idempotent and lands on the same remote inbox record:" >&2
       fi
-      resend_home=$(cd "$FM_HOME" 2>/dev/null && pwd) || resend_home=$FM_HOME
-      printf 'FM_HOME=%q ' "$resend_home" >&2
-      if [ "${FM_STATE_OVERRIDE+x}" = x ]; then
+      resend_home=$(cd "$JG_HOME" 2>/dev/null && pwd) || resend_home=$JG_HOME
+      printf 'JG_HOME=%q ' "$resend_home" >&2
+      if [ "${JG_STATE_OVERRIDE+x}" = x ]; then
         resend_state=$(cd "$STATE" 2>/dev/null && pwd) || resend_state=$STATE
-        printf 'FM_STATE_OVERRIDE=%q ' "$resend_state" >&2
+        printf 'JG_STATE_OVERRIDE=%q ' "$resend_state" >&2
       fi
-      printf 'FM_PENDING_REPLY_EXISTING_CORR=%q %q' "$PENDING_REPLY_CORR" "$SCRIPT_DIR/jg-send.sh" >&2
-      for resend_arg in "${FM_SEND_ORIGINAL_ARGS[@]}"; do
+      printf 'JG_PENDING_REPLY_EXISTING_CORR=%q %q' "$PENDING_REPLY_CORR" "$SCRIPT_DIR/jg-send.sh" >&2
+      for resend_arg in "${JG_SEND_ORIGINAL_ARGS[@]}"; do
         printf ' %q' "$resend_arg" >&2
       done
       printf '\n' >&2
@@ -1030,8 +1030,8 @@ else
     fi
     if [ "$CURRENT_INBOX_TARGET" != "$T" ] ||
       [ "$CURRENT_INBOX_BACKEND" != "$TARGET_BACKEND" ] ||
-      { [ -n "${FM_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
-        [ "$CURRENT_INBOX_SPAWN_GEN" != "$FM_SEND_EXPECTED_SPAWN_GEN" ]; } ||
+      { [ -n "${JG_SEND_EXPECTED_SPAWN_GEN:-}" ] &&
+        [ "$CURRENT_INBOX_SPAWN_GEN" != "$JG_SEND_EXPECTED_SPAWN_GEN" ]; } ||
       [ -n "$(jg_meta_get "$TARGET_META" remote_host)" ]; then
       jg_lock_release "$INBOX_META_LOCK"
       if [ "$PENDING_REPLY_CREATED" = 1 ] && [ -n "$PENDING_REPLY_CORR" ]; then
@@ -1040,7 +1040,7 @@ else
       echo "error: steer not sent to $INBOX_TASK_ID: the task retired or changed endpoint during target resolution" >&2
       exit 1
     fi
-    if [ "${FM_SEND_IDEMPOTENT:-0}" = 1 ]; then
+    if [ "${JG_SEND_IDEMPOTENT:-0}" = 1 ]; then
       INBOX_RECORD=$(jg_task_inbox_write_idempotent "$STATE" "$INBOX_TASK_ID" "$MESSAGE" \
         "${FIRE_AND_FORGET_ID:+fire-and-forget}") || inbox_write_rc=$?
     else
@@ -1092,7 +1092,7 @@ else
     jg_task_inbox_ring "$TARGET_BACKEND" "$T" "$INBOX_RECORD" "$EXPECTED_LABEL" || ring_rc=$?
     ring_retry="the watcher will re-ring"
     if [ -n "$FIRE_AND_FORGET_ID" ] \
-      && [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/wait-no-turns" ]; then
+      && [ -e "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/wait-no-turns" ]; then
       case "$ring_rc" in
       1|2)
         if jg_task_inbox_mark_retry "$STATE" "$INBOX_TASK_ID" "$INBOX_RECORD"; then
@@ -1105,7 +1105,7 @@ else
     fi
     case "$ring_rc" in
     1) echo "jg-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry. To ring now, submit the pending text with 'jg-send.sh $INBOX_TASK_ID --key Enter' (or clear the composer); the next ring then lands." >&2 ;;
-    2) echo "jg-send: doorbell did not reach $T${FM_TASK_INBOX_RING_REASON:+ ($FM_TASK_INBOX_RING_REASON)}; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
+    2) echo "jg-send: doorbell did not reach $T${JG_TASK_INBOX_RING_REASON:+ ($JG_TASK_INBOX_RING_REASON)}; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
     3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
     exit 0
@@ -1134,13 +1134,13 @@ else
   # endpoint was reported exit-1 non-delivery for a message that landed and
   # ran, inviting a duplicate resend. agy typed targets get a longer default
   # budget (~8s at the default cadence, twice the worst measured render); an
-  # explicit FM_SEND_RETRIES still wins, and every other harness keeps the
+  # explicit JG_SEND_RETRIES still wins, and every other harness keeps the
   # shared 3-retry default untouched.
   case "$TARGET_HARNESS" in
-    agy) retries=${FM_SEND_RETRIES:-20} ;;
-    *) retries=${FM_SEND_RETRIES:-3} ;;
+    agy) retries=${JG_SEND_RETRIES:-20} ;;
+    *) retries=${JG_SEND_RETRIES:-3} ;;
   esac
-  sleep_s=${FM_SEND_SLEEP:-0.4}
+  sleep_s=${JG_SEND_SLEEP:-0.4}
   # Type once, submit, verify. Only exact empty confirms delivery; every other
   # verdict preserves the loud refusal boundary. Only LOCAL targets reach this
   # block: remote text rides the inbox leg above, and remote --key exits
@@ -1213,7 +1213,7 @@ else
   # Submit landed with exact empty. Confirmation only proves the text was
   # accepted; the harness still needs a beat to spin up the
   # turn before its busy footer shows. Pause so an immediate peek catches the
-  # crewmate actually working instead of the stale idle pane. FM_SEND_SETTLE=0
+  # crewmate actually working instead of the stale idle pane. JG_SEND_SETTLE=0
   # disables it. Scoped to this path only, never the shared submit core.
-  [ "${FM_SEND_SETTLE:-1}" = 0 ] || sleep "${FM_SEND_SETTLE:-1}"
+  [ "${JG_SEND_SETTLE:-1}" = 0 ] || sleep "${JG_SEND_SETTLE:-1}"
 fi

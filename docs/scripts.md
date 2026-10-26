@@ -52,7 +52,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-install-herdr.sh`    | Install CI's exact-version Herdr pin with official asset URL, SHA-256, and protocol checks |
 | `jg-install-treehouse.sh`| Install CI's exact-version Treehouse pin for real-Herdr E2E that needs spawn worktrees |
 | `jg-herdr-ci-cleanup.sh` | Snapshot and tear down only job-owned `jg-lab-*` sessions in the Herdr CI lane       |
-| `jg-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `FM_TASK_ID` marks a task worker |
+| `jg-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `JG_TASK_ID` marks a task worker |
 | `jg-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `jg-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `jg-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |

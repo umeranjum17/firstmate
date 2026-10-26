@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # One memory sampler per home, started/restarted/stopped by jg-watch.sh.
 # The home-scoped .host-memory-sampler.pid stores PID and process identity.
-# Samples every FM_HOST_MEMORY_SECS (default 10) independently of supervision;
+# Samples every JG_HOST_MEMORY_SECS (default 10) independently of supervision;
 # each ALERT episode attempts one owned-task interrupt and queues a durable wake.
 # Sourced by the watcher for lifecycle functions; executable as run HOME STATE CONFIG.
 
@@ -16,9 +25,9 @@ jg_memory_sampler_matches() {
   [ "$current" = "$identity" ] || return 1
   case "$current" in
     *cmdline-hex=*)
-      suffix=$(printf '%s\0' "$MEMORY_SAMPLER_PATH" run "$FM_HOME" "$STATE" "$CONFIG" | od -An -v -tx1 | tr -d '[:space:]')
+      suffix=$(printf '%s\0' "$MEMORY_SAMPLER_PATH" run "$JG_HOME" "$STATE" "$CONFIG" | od -An -v -tx1 | tr -d '[:space:]')
       case "$current" in *"$suffix") ;; *) return 1 ;; esac ;;
-    *) case "$current" in *"$MEMORY_SAMPLER_PATH run $FM_HOME $STATE $CONFIG") ;; *) return 1 ;; esac ;;
+    *) case "$current" in *"$MEMORY_SAMPLER_PATH run $JG_HOME $STATE $CONFIG") ;; *) return 1 ;; esac ;;
   esac
   MEMORY_SAMPLER_PID=$pid
 }
@@ -26,9 +35,9 @@ jg_memory_sampler_matches() {
 jg_memory_sampler_ensure() {
   local i=0
   jg_memory_sampler_matches && return 0
-  env FM_HOST_MEMORY_FORK_BIN="${SAMPLER_DIR:-${SCRIPT_DIR:-${MEMORY_SAMPLER_PATH%/*}}}" \
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
-    "$MEMORY_SAMPLER_PATH" run "$FM_HOME" "$STATE" "$CONFIG" \
+  env JG_HOST_MEMORY_FORK_BIN="${SAMPLER_DIR:-${SCRIPT_DIR:-${MEMORY_SAMPLER_PATH%/*}}}" \
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_CONFIG_OVERRIDE="$CONFIG" \
+    "$MEMORY_SAMPLER_PATH" run "$JG_HOME" "$STATE" "$CONFIG" \
     </dev/null >> "$STATE/.host-memory-sampler.log" 2>&1 &
   while [ "$i" -lt 30 ]; do
     jg_memory_sampler_matches && return 0
@@ -46,7 +55,7 @@ jg_memory_sampler_stop() {
 
 jg_memory_sampler_interrupt() {
   local task=$1 action result
-  if result=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SAMPLER_DIR/jg-control.sh" "$task" interrupt 2>&1); then
+  if result=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SAMPLER_DIR/jg-control.sh" "$task" interrupt 2>&1); then
     action="automatically interrupted task $task: $result"
   else
     action="automatic interrupt failed for task $task: $result"
@@ -56,17 +65,17 @@ jg_memory_sampler_interrupt() {
 
 jg_memory_sampler_tick() {
   local out d meta home root child_state task reason action epoch stop=0 latch="$STATE/.host-memory-alerted"
-  local -a dirs=(--state-dir "$FM_HOME" "$STATE")
-  jg_local_firstmate_state_dirs "$STATE" 2>/dev/null || FM_LOCAL_FIRSTMATE_STATES=("$STATE")
-  if root=$(jg_firstmate_root_home "$FM_HOME") && [ ! "$root" -ef "$FM_HOME" ]; then
+  local -a dirs=(--state-dir "$JG_HOME" "$STATE")
+  jg_local_firstmate_state_dirs "$STATE" 2>/dev/null || JG_LOCAL_FIRSTMATE_STATES=("$STATE")
+  if root=$(jg_firstmate_root_home "$JG_HOME") && [ ! "$root" -ef "$JG_HOME" ]; then
     dirs+=(--state-dir "$root" "$root/state")
   fi
-  for d in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for d in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$d"/*.meta; do
       [ "$(jg_meta_get "$meta" kind)" = secondmate ] || continue
       home=$(jg_meta_get "$meta" home)
-      [ -n "$home" ] && [ ! "$home" -ef "$FM_HOME" ] || continue
-      for child_state in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+      [ -n "$home" ] && [ ! "$home" -ef "$JG_HOME" ] || continue
+      for child_state in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
         [ "$child_state" -ef "$home/state" ] || continue
         dirs+=(--state-dir "$home" "$child_state")
       done
@@ -91,7 +100,7 @@ jg_memory_sampler_tick() {
     *) action="automatic interrupt attempted: task $task" ;;
   esac
   epoch=$(date +%s)
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 0
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 0
   trap 'stop=1' HUP INT TERM
   if jg_wake_append_locked check host-memory "$reason; $action" \
     && printf '%s\t%s\t%s\n' "$epoch" "$task" "$reason; $action" >> "$STATE/host-memory-interrupts.tsv" \
@@ -103,7 +112,7 @@ jg_memory_sampler_tick() {
     esac
   fi
   rm -f "$latch.$$"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   trap 'exit 0' HUP INT TERM
   [ "$stop" -eq 0 ] || exit 0
 }
@@ -118,10 +127,10 @@ jg_memory_sampler_cleanup() {
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   set -u
   [ "$#" -eq 4 ] && [ "$1" = run ] || exit 2
-  FM_HOME=$2 STATE=$3 CONFIG=$4
+  JG_HOME=$2 STATE=$3 CONFIG=$4
   [ -d "$STATE" ] || exit 1
   # Libraries, control and (until the admission slice moves) guard stay in the fork.
-  SAMPLER_DIR=${FM_HOST_MEMORY_FORK_BIN:-${MEMORY_SAMPLER_PATH%/*}}
+  SAMPLER_DIR=${JG_HOST_MEMORY_FORK_BIN:-${MEMORY_SAMPLER_PATH%/*}}
   # shellcheck source=bin/jg-wake-lib.sh
   . "$SAMPLER_DIR/jg-wake-lib.sh"
   # shellcheck source=bin/jg-backend.sh
@@ -131,11 +140,11 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   trap 'exit 0' HUP INT TERM
   identity=$(jg_pid_identity "$$") || exit 1
   registered=0
-  secs=${FM_HOST_MEMORY_SECS:-}
+  secs=${JG_HOST_MEMORY_SECS:-}
   case "$secs" in ''|*[!0-9]*|0) secs=10 ;; esac
-  while [ -d "$FM_HOME" ] && [ -d "$STATE" ] && [ -d "$SAMPLER_DIR" ]; do
+  while [ -d "$JG_HOME" ] && [ -d "$STATE" ] && [ -d "$SAMPLER_DIR" ]; do
     watcher=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
-    if ! jg_pid_alive "$watcher" || ! jg_watcher_lock_matches_pid "$STATE" "$SAMPLER_DIR/jg-watch.sh" "$watcher" "$FM_HOME"; then
+    if ! jg_pid_alive "$watcher" || ! jg_watcher_lock_matches_pid "$STATE" "$SAMPLER_DIR/jg-watch.sh" "$watcher" "$JG_HOME"; then
       break
     fi
     start=$(date +%s)

@@ -5,8 +5,8 @@
 # The steering inbox's one behavioral assumption is that a real worker agent
 # follows the constant self-describing doorbell line: list the inbox, read and
 # act on its records in numeric order, then mv each into handled/. The
-# doorbell names the inbox as "$FM_TASK_INBOX", so each worker is launched the
-# way bin/jg-spawn.sh launches it, with FM_TASK_INBOX exported to its home's
+# doorbell names the inbox as "$JG_TASK_INBOX", so each worker is launched the
+# way bin/jg-spawn.sh launches it, with JG_TASK_INBOX exported to its home's
 # state/<task>.inbox, and receives no brief at all: it must resolve the inbox
 # from the doorbell plus its own environment. A stub can only confirm the
 # assumption already written into the stub, so per
@@ -16,13 +16,13 @@
 # ACT on the instruction (create a named file) and ACKNOWLEDGE it (the mv into
 # handled/), failing loudly with the harness name and version.
 #
-# Run explicitly with FM_SEND_INBOX_LIVE_E2E=1. This test spends a small
+# Run explicitly with JG_SEND_INBOX_LIVE_E2E=1. This test spends a small
 # number of real model tokens per installed harness (one short turn each) -
 # authorized by the harness-dependent-checks rule. An absent harness is
 # reported explicitly and skipped; a run that verified nothing fails rather
 # than passing vacuously. Restrict with
-# FM_SEND_INBOX_LIVE_HARNESSES="claude codex ..." when needed, and tune the
-# per-harness wait with FM_SEND_INBOX_LIVE_TIMEOUT (seconds, default 240).
+# JG_SEND_INBOX_LIVE_HARNESSES="claude codex ..." when needed, and tune the
+# per-harness wait with JG_SEND_INBOX_LIVE_TIMEOUT (seconds, default 240).
 # Record the dated per-harness result in
 # docs/verification/runtime-backends.md ("Steering-inbox doorbell").
 #
@@ -36,7 +36,7 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-jg_live_gate opt-in FM_SEND_INBOX_LIVE_E2E tmux
+jg_live_gate opt-in JG_SEND_INBOX_LIVE_E2E tmux
 
 unset NO_MISTAKES_GATE
 
@@ -44,7 +44,7 @@ SOCKET="jg-inbox-live-$$"
 SESSION="inboxlive"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-inbox-live.XXXXXX")
 LAB=$(cd "$LAB" && pwd)
-TIMEOUT=${FM_SEND_INBOX_LIVE_TIMEOUT:-240}
+TIMEOUT=${JG_SEND_INBOX_LIVE_TIMEOUT:-240}
 CHECKED=0
 FAILED=0
 
@@ -134,7 +134,7 @@ check_harness_doorbell() {  # <name>
   task="live-$name"
   acted="$LAB/acted-$name"
   tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win" -c "$ROOT" \
-    -- bash -lc "export FM_TASK_INBOX=$(printf '%q' "$home/state/$task.inbox"); $cmd" \
+    -- bash -lc "export JG_TASK_INBOX=$(printf '%q' "$home/state/$task.inbox"); $cmd" \
     || { FAILED=1; printf 'not ok - %s (%s): could not launch in the isolated tmux server\n' "$name" "$version" >&2; return 0; }
   wait_ready "$win"; ready_rc=$?
   if [ "$ready_rc" -eq 1 ]; then
@@ -146,7 +146,7 @@ check_harness_doorbell() {  # <name>
   fi
   [ "$ready_rc" -eq 0 ] || note "$name ($version): idle composer never classified empty; proceeding as production does (advisory check skips only on pending)"
   printf 'window=%s:%s\nkind=ship\nharness=%s\n' "$SESSION" "$win" "$name" > "$home/state/$task.meta"
-  if ! FM_HOME="$home" FM_ROOT_OVERRIDE="$home" "$ROOT/bin/jg-send.sh" "$task" \
+  if ! JG_HOME="$home" JG_ROOT_OVERRIDE="$home" "$ROOT/bin/jg-send.sh" "$task" \
     "Firstmate live check: run exactly this shell command now: touch $acted - then follow the mv instruction you were given for this message. Reply with one short line." \
     >/dev/null 2>&1; then
     FAILED=1
@@ -188,7 +188,7 @@ check_harness_doorbell() {  # <name>
   tmux -L "$SOCKET" kill-window -t "$SESSION:$win" 2>/dev/null || true
 }
 
-HARNESSES=${FM_SEND_INBOX_LIVE_HARNESSES:-'claude codex opencode pi grok kimi muse'}
+HARNESSES=${JG_SEND_INBOX_LIVE_HARNESSES:-'claude codex opencode pi grok kimi muse'}
 for h in $HARNESSES; do
   if command -v "$h" >/dev/null 2>&1; then
     check_harness_doorbell "$h"

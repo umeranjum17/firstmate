@@ -27,9 +27,9 @@
 # home are never parked, whatever their task id spells.
 
 jg_parked_homes_file() {
-  # FM_CONFIG_OVERRIDE is the config directory itself (the fork-wide override
-  # convention); FM_HOME is the home, so its config lives at $FM_HOME/config.
-  printf '%s\n' "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/parked-homes"
+  # JG_CONFIG_OVERRIDE is the config directory itself (the fork-wide override
+  # convention); JG_HOME is the home, so its config lives at $JG_HOME/config.
+  printf '%s\n' "${JG_CONFIG_OVERRIDE:-${JG_HOME:-}/config}/parked-homes"
 }
 
 jg_parked_home() {  # <id> -> 0 when parked

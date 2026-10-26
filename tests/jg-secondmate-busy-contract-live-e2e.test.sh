@@ -21,7 +21,7 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-jg_live_gate default-on FM_SECONDMATE_BUSY_LIVE tmux
+jg_live_gate default-on JG_SECONDMATE_BUSY_LIVE tmux
 
 # shellcheck source=bin/jg-busy-lib.sh
 . "$ROOT/bin/jg-busy-lib.sh"
@@ -101,11 +101,11 @@ spawn_mate() {  # <case> <id> <harness> <sleeper-dir> <shim-dir>
   mkdir -p "$case_dir" "$user_home"
   jg_test_spawn_home "$primary" "$harness"
   seed_home "$sm" "$id"
-  FM_BACKEND=tmux FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$primary" \
+  JG_BACKEND=tmux JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$primary" \
     HOME="$user_home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$primary/state" FM_DATA_OVERRIDE="$primary/data" \
-    FM_PROJECTS_OVERRIDE="$primary/projects" FM_CONFIG_OVERRIDE="$primary/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_STATE_OVERRIDE="$primary/state" JG_DATA_OVERRIDE="$primary/data" \
+    JG_PROJECTS_OVERRIDE="$primary/projects" JG_CONFIG_OVERRIDE="$primary/config" \
+    JG_SPAWN_NO_GUARD=1 \
     env -u TMUX -u TMUX_PANE \
     PATH="$sleeper:$shim:$PATH" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$sm" "$harness" --secondmate
@@ -128,7 +128,7 @@ real_harness_stays_up() {  # <harness> <version> <case> <id> <bin>
       ;;
     omp)
       "$REAL_TMUX" -L "$SOCKET" new-window -d -t firstmate: -n "live-$harness" -c "$sm" -- \
-        env -u CLAUDECODE -u PI_CODING_AGENT FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 \
+        env -u CLAUDECODE -u PI_CODING_AGENT JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 \
         "$bin" --auto-approve --cwd "$sm" -e "$state/$id.omp-ext.ts" \
         || fail "$harness $version: could not start the real binary"
       ;;

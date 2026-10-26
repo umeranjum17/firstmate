@@ -169,7 +169,7 @@ esac
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || exit 0
 ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P) || exit 0
-ACTIVE_HOME=${FM_HOME:-$ROOT}
+ACTIVE_HOME=${JG_HOME:-$ROOT}
 POLICY="$ROOT/bin/jg-arm-command-policy.mjs"
 
 command -v node >/dev/null 2>&1 || exit 0

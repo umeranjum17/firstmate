@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End to end: install into a throwaway HOME against a fixture home built from an upstream Firstmate checkout's bin/,
 # then drive the installed hook entrypoint. Usage: delete-guard.test.sh <firstmate-checkout> [git-ref, default HEAD]
 # shellcheck disable=SC2016 # the cases are literal commands, never expanded here
 set -euo pipefail
-unset FM_TASK_ID FM_TASK_INBOX FM_HOME
+unset JG_TASK_ID JG_TASK_INBOX JG_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 T=$(mktemp -d)
 trap 'rm -rf -- "$T"' EXIT
@@ -53,7 +62,7 @@ allowed=(  'rm -rf ./build' 'rm -rf node_modules' 'd=$(mktemp -d); rm -rf -- "$d
   'd=$(mktemp -d -p /tmp/x 2>/dev/null); rm -rf -- "$d"' 'd="$(mktemp -d -p /tmp/x || mktemp -d)"; rm -rf "$d"'
   $'d=$(mktemp -d -p /tmp/x 2>/dev/null || mktemp -d)\ncd "$d" && make\nrm -rf -- "$d"'
   'export T=$(mktemp -d); rm -rf -- "$T"' 'local -r d=$(mktemp -d); rm -rf "$d"' 'declare -x T=~/.cache/x; rm -rf "$T"'
-  $'export T=$(mktemp -d --tmpdir=/dev/shm ljg-wt-XXXXXX); export LFM_HOME=$T/home PROJ=$T/proj; mkdir -p $LFM_HOME $PROJ; git init -q $PROJ; node bin/learn-from-mistakes-axi.mjs init --no-skill --dir $PROJ --agent claude --model m --judge-agent codex --judge-model m2 >/tmp/init-out.txt 2>&1; echo "exit=$?"; awk \'{ if (length($0)>100) print FILENAME" "FNR" ("length($0)"): "$0 }\' $LFM_HOME/config.yaml $PROJ/.learn-from-mistakes.yaml; echo "CONFIG-CHECK-DONE"; cat /tmp/init-out.txt; echo "---json---"; node bin/learn-from-mistakes-axi.mjs init --json --dir $PROJ 2>&1 | head -5; rm -rf -- "$T"'
+  $'export T=$(mktemp -d --tmpdir=/dev/shm ljg-wt-XXXXXX); export LJG_HOME=$T/home PROJ=$T/proj; mkdir -p $LJG_HOME $PROJ; git init -q $PROJ; node bin/learn-from-mistakes-axi.mjs init --no-skill --dir $PROJ --agent claude --model m --judge-agent codex --judge-model m2 >/tmp/init-out.txt 2>&1; echo "exit=$?"; awk \'{ if (length($0)>100) print FILENAME" "FNR" ("length($0)"): "$0 }\' $LJG_HOME/config.yaml $PROJ/.learn-from-mistakes.yaml; echo "CONFIG-CHECK-DONE"; cat /tmp/init-out.txt; echo "---json---"; node bin/learn-from-mistakes-axi.mjs init --json --dir $PROJ 2>&1 | head -5; rm -rf -- "$T"'
   $'d=$(mktemp -d); REPO=/repo; CLI=$REPO/bin/cli.mjs; FAKE=$REPO/test/fake-agent/claude\nmkdir -p "$d/fakes" "$d/home" "$d/p"\nln -s "$FAKE" "$d/fakes/claude"; ln -s "$FAKE" "$d/fakes/codex"\nprintf \'agent: claude\\njudge_agent: codex\\n\' > "$d/home/config.yaml"\ncp "$REPO/examples/defects.md" "$d/p/"\nprintf \'\\n## %s\\n\\n- [tests] Fixture tests failed: EXAMPLE_FIXTURES was unset.\\n- [tests] They failed again for the same reason.\\n\' "$(date -Is)" >> "$d/p/defects.md"\nHOME="$d/home" node "$CLI" retro --project "$d/p" || true\nrm -rf -- "$d"'
   'd=$(mktemp -d ${X}/a.XXXX); rm -rf "$d"'
   $'cd /home/you/.no-mistakes/worktrees/example-review-base && grep -n \'^ROOT=\' bin/jg-test-run.sh && d=$(mktemp -d "$PWD/.review-base-XXXX") && mkdir -p "$d/bin" "$d/tests" && git show 5758e52046f49dcc7297a2f0952cfa1bbdf969b0:bin/jg-test-run.sh > "$d/bin/jg-test-run.sh" && chmod +x "$d/bin/jg-test-run.sh" && git archive 5758e52046f49dcc7297a2f0952cfa1bbdf969b0 tests | tar -x -C "$d" && (cd "$d" && bash bin/jg-test-run.sh --check-coverage; echo "base rc=$?") ; rm -rf -- "$d"')
@@ -71,14 +80,14 @@ check() { HOME=/home/fixture/users/user-014 "$@"; }
   && ok "check counts blocks from agents in temp folders without a wake" || no "temp-folder blocks: $(cat "$T/fm/state/delete-guard.counted")"
 [ -z "$(check "$T/fm/state/delete-guard.check.sh")" ] && ok "check quiet with nothing new" || no "check repeats old lines"
 
-FM_TASK_ID=t1 FM_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf ~' || true
+JG_TASK_ID=t1 JG_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf ~' || true
 grep -q 'delete-guard' "$T/fm/state/.wake-queue" 2>/dev/null && no "first block woke at once" || ok "first block waits for the check"
-FM_TASK_ID=t1 FM_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf "$HOME"' || true
+JG_TASK_ID=t1 JG_TASK_INBOX="$T/lead/state/t1.inbox" hookrun /w 'rm -rf "$HOME"' || true
 grep -q "delete guard REPEAT: task t1 tried 2 .*home $T/lead," "$T/fm/state/.wake-queue" && ok "repeat queues an immediate wake" || no "no repeat wake"
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/lead" '.task == "t1" and .home == $h and .cwd == "/w" and .runtime == "claude"' >/dev/null && ok "log line names home, task, cwd, runtime" || no "log line fields"
-FM_TASK_ID=t2 FM_TASK_INBOX="$T/lead/state/t2.inbox" hookrun "$T/fm/state" 'rm -rf ~' || true # cwd's firstmate home wins over an inherited inbox home
+JG_TASK_ID=t2 JG_TASK_INBOX="$T/lead/state/t2.inbox" hookrun "$T/fm/state" 'rm -rf ~' || true # cwd's firstmate home wins over an inherited inbox home
 jq -e --arg h "$T/fm" '.task == "t2" and .home == $h' <(tail -n1 "$T/fm/state/delete-guard.log") >/dev/null && ok "home is the firstmate home of cwd, not an inherited inbox" || no "cwd home lost to inbox"
-FM_HOME=/elsewhere hookrun "$T/fm/state" 'rm -rf ~' || true # a lead with an inherited FM_HOME, working in its own home
+JG_HOME=/elsewhere hookrun "$T/fm/state" 'rm -rf ~' || true # a lead with an inherited JG_HOME, working in its own home
 tail -n1 "$T/fm/state/delete-guard.log" | jq -e --arg h "$T/fm" '.home == $h and .task == ""' >/dev/null && ok "no-task block logs the home holding cwd" || no "home from cwd"
 out=$(check "$T/fm/state/delete-guard.check.sh")
 case "$out" in "delete guard blocked 1 recursive delete(s)"*"task t1 (claude, home $T/lead, cwd /w, "*"/home/fixture/users/user-014: rm -rf ~") ok "check wakes on a literal home target, not on its repeat or temp-folder blocks" ;; *) no "check output: $out" ;; esac

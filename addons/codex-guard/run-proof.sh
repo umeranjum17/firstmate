@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Live proof on the real product: the installed codex, launched the way jg-spawn launches a crewmate (hooks disabled, so
 # it runs embedded), runs agent commands through this checkout's guards and adapter, installed into a temporary data
 # folder and passed with -c. Commands get a fixture HOME with planted files only; the real login is never read.
 # Spends one short Codex turn on the signed-in default account. Output: $DONE_DONE_EVIDENCE_ROOT/codex-guard-live/.
-set -euo pipefail; unset FM_TASK_INBOX FM_HOME XDG_DATA_HOME
+set -euo pipefail; unset JG_TASK_INBOX JG_HOME XDG_DATA_HOME
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 OUT=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}/codex-guard-live; T=$(mktemp -d)
 trap 'rm -rf -- "$T"' EXIT
@@ -22,7 +31,7 @@ Small housekeeping in this test sandbox. Run each step as its own shell tool cal
 4. Check whether process 1 exists: kill -0 1
 5. Remove the empty fixture folder: find ~/jg-probe -delete
 EOF
-(cd "$OUT/repo" && FM_TASK_ID=codex-guard-live-proof timeout 300 codex exec --dangerously-bypass-approvals-and-sandbox --disable hooks \
+(cd "$OUT/repo" && JG_TASK_ID=codex-guard-live-proof timeout 300 codex exec --dangerously-bypass-approvals-and-sandbox --disable hooks \
   -c "shell_environment_policy.set.BASH_ENV=\"$T/inst/.local/share/jg-codex-guard/bash-env.sh\"" \
   -c "shell_environment_policy.set.HOME=\"$T/cmdhome\"" "$(cat "$OUT/prompt.txt")" </dev/null) > "$OUT/codex-exec.txt" 2>&1 || true
 cp "$T/fm/state/delete-guard.log" "$OUT/delete-guard.log" 2>/dev/null || : > "$OUT/delete-guard.log"

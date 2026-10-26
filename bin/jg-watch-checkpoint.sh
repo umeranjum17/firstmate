@@ -12,7 +12,7 @@
 # returns only when main is needed (its header owns the output read here).
 # While an away record state/.afk-contract exists (never quiet mode's, whose
 # captain is present: bin/jg-afk-contract.sh mode), the bound is
-# raised to FM_CODEX_WATCH_CHECKPOINT_AWAY (default 3600) when that is longer,
+# raised to JG_CODEX_WATCH_CHECKPOINT_AWAY (default 3600) when that is longer,
 # so a parked main is not woken every few minutes; an engine turn that starts
 # before the bound may finish after it. A close that carries a wake or a
 # "supervision-host:" line other than the park boundary passes through as a
@@ -21,11 +21,11 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-SECONDS_ARG=${FM_CODEX_WATCH_CHECKPOINT:-180}
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+SECONDS_ARG=${JG_CODEX_WATCH_CHECKPOINT:-180}
 
 usage() {
   cat <<'EOF'
@@ -68,7 +68,7 @@ esac
 # A checkpoint is neither an ordinary watcher start nor an Option B handling
 # successor. It keeps an announced recovery episode stable while preserving the
 # watcher's ordinary recovery of a generation that becomes pending.
-export FM_WATCH_FOREGROUND_CHECKPOINT=1
+export JG_WATCH_FOREGROUND_CHECKPOINT=1
 
 OUT=$(mktemp "${TMPDIR:-/tmp}/jg-watch-checkpoint.out.XXXXXX") || exit 1
 ERR=$(mktemp "${TMPDIR:-/tmp}/jg-watch-checkpoint.err.XXXXXX") || {
@@ -117,7 +117,7 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
   local seconds=$1 signal=$2 kill_after=$3 cleanup_lock_bound
   shift 3
   if [ "$kill_after" -gt 0 ]; then
-    cleanup_lock_bound=${FM_WATCHER_CLEANUP_LOCK_BOUND:-2}
+    cleanup_lock_bound=${JG_WATCHER_CLEANUP_LOCK_BOUND:-2}
     case "$cleanup_lock_bound" in
       ''|*[!0-9]*) cleanup_lock_bound=2 ;;
       *) cleanup_lock_bound=$((10#$cleanup_lock_bound)) ;;
@@ -152,17 +152,17 @@ positive_or() {  # <value> <default>
 if jg_supervision_host_enabled "$CONFIG" codex; then
   BOUND=$SECONDS_ARG
   if [ -f "$STATE/.afk-contract" ] \
-    && [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
-    AWAY_BOUND=$(positive_or "${FM_CODEX_WATCH_CHECKPOINT_AWAY:-}" 3600)
+    && [ "$(JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
+    AWAY_BOUND=$(positive_or "${JG_CODEX_WATCH_CHECKPOINT_AWAY:-}" 3600)
     [ "$AWAY_BOUND" -le "$BOUND" ] 2>/dev/null || BOUND=$AWAY_BOUND
   fi
   # The host's park boundary stays below the 28800-second registration.
   [ "$BOUND" -lt 27000 ] 2>/dev/null || BOUND=27000
-  LIMIT=$(( BOUND + $(positive_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200) + $(positive_or "${FM_SUPERVISION_ENGINE_GRACE:-}" 30) ))
+  LIMIT=$(( BOUND + $(positive_or "${JG_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200) + $(positive_or "${JG_SUPERVISION_ENGINE_GRACE:-}" 30) ))
   set +e
   # The host ends its own park; the outer bound only catches a host that
   # outlived every one of its own bounds.
-  FM_SUPERVISION_HOST_PRIMARY=codex FM_SUPERVISION_HOST_PARK_SECONDS=$BOUND FM_SUPERVISION_HOST_PARK_LIMIT=$LIMIT \
+  JG_SUPERVISION_HOST_PRIMARY=codex JG_SUPERVISION_HOST_PARK_SECONDS=$BOUND JG_SUPERVISION_HOST_PARK_LIMIT=$LIMIT \
     run_bounded $((LIMIT + 120)) TERM 0 "$SCRIPT_DIR/jg-supervision-host.sh" park >"$OUT" 2>"$ERR"
   RC=$?
   set -e

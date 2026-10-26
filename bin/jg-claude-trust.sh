@@ -123,7 +123,7 @@
 # own validate_spawn_worktree would not catch that case first: it compares the
 # worktree root against the primary and never compares common dirs, so an
 # independent clone passes it. Close this on a box that has Orca through the live
-# opt-in guard family (FM_*_LIVE_E2E=1) and record the result in
+# opt-in guard family (JG_*_LIVE_E2E=1) and record the result in
 # docs/verification/runtime-backends.md, rather than assuming the shape here.
 #
 # SECONDMATE-HOME MODE. A secondmate home is a whole firstmate instance rather
@@ -394,7 +394,7 @@ if [ "$MODE" = worktree ]; then
       || refuse "project '$PROJ_REAL' is a linked worktree whose primary checkout could not be resolved"
   fi
 elif [ "$MODE" = lab-home ]; then
-  LAB_MARKER="$TARGET_REAL/$FM_GATE_LAB_MARKER"
+  LAB_MARKER="$TARGET_REAL/$JG_GATE_LAB_MARKER"
   [ ! -L "$LAB_MARKER" ] || refuse "'$LAB_MARKER' is a symlink; a lab home carries the marker as a regular file"
   if ! { [ -f "$LAB_MARKER" ] && [ -O "$LAB_MARKER" ] && jg_gate_lab_home "$TARGET_REAL"; }; then
     refuse "'$TARGET_REAL' carries no lab-home marker owned by this user, so it is not a disposable lab home"

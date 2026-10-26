@@ -47,7 +47,7 @@ make_stub() {  # <case-dir>
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=$JG_FAKE_DIR
 case "${1:-}" in
   send-keys)
     shift
@@ -238,9 +238,9 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
 # run_update_in_case <case-dir>: the real /updatefirstmate mechanics over that world.
 run_update_in_case() {
   local dir=$1
-  env PATH="$dir/fakebin:$PATH" FM_FAKE_DIR="$dir/fake" \
-    FM_ROOT_OVERRIDE="$dir/fmrepo" FM_HOME="$dir/home" \
-    FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
+  env PATH="$dir/fakebin:$PATH" JG_FAKE_DIR="$dir/fake" \
+    JG_ROOT_OVERRIDE="$dir/fmrepo" JG_HOME="$dir/home" \
+    JG_SSH_BIN="${JG_TEST_SSH_BIN:-ssh}" \
     "$ROOT/bin/jg-update.sh" 2>/dev/null
 }
 
@@ -253,11 +253,11 @@ arm_answer() {
 
 run_restart() {  # <case-dir> <args...>
   local dir=$1; shift
-  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
-    FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_PERSIST_POLL=1 \
-    FM_SECONDMATE_PERSIST_WAIT="${FM_TEST_PERSIST_WAIT:-30}" \
-    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
-    FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
+  env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
+    JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_PERSIST_POLL=1 \
+    JG_SECONDMATE_PERSIST_WAIT="${JG_TEST_PERSIST_WAIT:-30}" \
+    JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
+    JG_SSH_BIN="${JG_TEST_SSH_BIN:-ssh}" \
     "$RESTART" "$@" 2>&1
 }
 
@@ -267,7 +267,7 @@ test_persist_gates_and_asks_only_for_open_records() {
   dir=$(new_case gate)
   add_local_mate "$dir" sm1
   # No answer armed: the mate never confirms its open work is written down.
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" jg-sm1); rc=$?
+  out=$(JG_TEST_PERSIST_WAIT=0 run_restart "$dir" jg-sm1); rc=$?
 
   expect_code 3 "$rc" "an unconfirmed persist is a fallback, not a success"$'\n'"$out"
   assert_contains "$out" "nudged: sm1:" "an unconfirmed persist must fall back to the re-read message"
@@ -326,7 +326,7 @@ test_arrived_answer_precedes_deadline_check() {
   add_local_mate "$dir" sm1
   arm_answer "$dir" sm1
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(JG_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
 
   expect_code 0 "$rc" "an answer delivered with the request must beat the deadline check"$'\n'"$out"
   assert_contains "$out" "restarted: sm1" "the arrived persist answer was ignored at the deadline"
@@ -349,10 +349,10 @@ set -u
 /bin/mv "$@" || exit $?
 target=${!#}
 case "$target" in
-  "${FM_FAKE_DIR%/fake}"/home/state/pending-replies/*)
-    if [ ! -e "$FM_FAKE_DIR/answer-after-scan" ] \
+  "${JG_FAKE_DIR%/fake}"/home/state/pending-replies/*)
+    if [ ! -e "$JG_FAKE_DIR/answer-after-scan" ] \
       && grep -q '^parent_status_scan_signature=.' "$target"; then
-      : > "$FM_FAKE_DIR/answer-after-scan"
+      : > "$JG_FAKE_DIR/answer-after-scan"
       corr=${target##*/}
       status=$(sed -n 's/^parent_status=//p' "$target")
       printf 'done [corr=%s]: open records written down\n' "$corr" >> "$status"
@@ -362,7 +362,7 @@ esac
 SH
   chmod +x "$dir/fakebin/mv"
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(JG_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
 
   expect_code 0 "$rc" "an answer already on disk at the timeout decision must release the gate"$'\n'"$out"
   assert_contains "$out" "restarted: sm1" "the reply that raced the timeout was ignored"
@@ -473,26 +473,26 @@ argv_b64=$4
 decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | base64 -D; }
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
-printf '%s\n' "${rargs[*]}" >> "$FM_FAKE_SSH_LOG"
-case "${FM_FAKE_SSH_MODE:-ok}" in
+printf '%s\n' "${rargs[*]}" >> "$JG_FAKE_SSH_LOG"
+case "${JG_FAKE_SSH_MODE:-ok}" in
   unreachable) exit 255 ;;
 esac
 case "${rargs[1]:-}" in
   send)
     # Model the live remote mate: act on the instruction and report back on the
     # parent channel, carrying the correlation token the request embedded.
-    if [ -n "${FM_FAKE_ANSWER_STATUS:-}" ]; then
+    if [ -n "${JG_FAKE_ANSWER_STATUS:-}" ]; then
       corr=$(printf '%s' "${rargs[3]:-}" | grep -oE 'corr=[0-9a-f]{16}' | head -1)
       [ -z "$corr" ] || printf 'done [%s]: open records written down\n' "$corr" \
-        >> "$FM_FAKE_ANSWER_STATUS"
+        >> "$JG_FAKE_ANSWER_STATUS"
     fi
     ;;
   relaunch)
-    case "${FM_FAKE_SSH_MODE:-ok}" in
+    case "${JG_FAKE_SSH_MODE:-ok}" in
       slow-relaunch)
-        : > "$FM_FAKE_DIR/remote-relaunch-start"
+        : > "$JG_FAKE_DIR/remote-relaunch-start"
         /bin/sleep 2
-        : > "$FM_FAKE_DIR/remote-relaunch-end"
+        : > "$JG_FAKE_DIR/remote-relaunch-end"
         ;;
     esac
     printf 'relaunched %s harness=%s from=claude model=%s effort=%s backend=herdr endpoint=jg-remote:2ndmate-%s worktree=/srv/fm\n' \
@@ -510,16 +510,16 @@ exit 0
 SH
   chmod +x "$fb/fake-ssh"
   : > "$dir/ssh.log"
-  export FM_FAKE_SSH_LOG="$dir/ssh.log"
-  export FM_FAKE_SSH_MODE="$mode"
-  export FM_TEST_SSH_BIN="$fb/fake-ssh"
+  export JG_FAKE_SSH_LOG="$dir/ssh.log"
+  export JG_FAKE_SSH_MODE="$mode"
+  export JG_TEST_SSH_BIN="$fb/fake-ssh"
 }
 
 test_remote_mate_restarts_over_the_transport_hop() {
   local dir out rc relaunch_line
   dir=$(new_case remote)
   setup_remote_case "$dir" sm2 ok
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
   # The parent's own pin is what the replacement must run on; the remote home's
   # copy of config/secondmate-harness is a different home's file.
   printf 'pi global-model medium\n' > "$dir/home/config/secondmate-harness"
@@ -527,7 +527,7 @@ test_remote_mate_restarts_over_the_transport_hop() {
   printf 'codex big-model high\n' > "$dir/home/config/secondmates/sm2/harness"
 
   out=$(run_restart "$dir" jg-sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
+  unset JG_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "a remote mate should restart over its transport hop"$'\n'"$out"
   assert_contains "$out" "restarted: sm2 on remote-mac (codex)" \
@@ -594,10 +594,10 @@ test_native_ultra_restart_keeps_local_and_remote_profiles() {
 
   dir=$(new_case native-remote)
   setup_remote_case "$dir" sm2 ok
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
+  export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm2.status"
   printf 'pi-signed codex-native/gpt-6-astra ultra\n' > "$dir/home/config/secondmate-harness"
   out=$(run_restart "$dir" sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
+  unset JG_FAKE_ANSWER_STATUS
   expect_code 0 "$rc" "native remote restart failed: $out"
   relaunch_line=$(grep '^jg-remote-secondmate-control.sh relaunch' "$dir/ssh.log" | head -1)
   [ "$relaunch_line" = "jg-remote-secondmate-control.sh relaunch sm2 pi-signed codex-native/gpt-6-astra ultra" ] \
@@ -631,7 +631,7 @@ printf 'done [corr=$corr]: unrelated request answered\n' >> "$state/sm1.status"
 SH
   chmod +x "$dir/fake/on-doorbell"
 
-  out=$(FM_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
+  out=$(JG_TEST_PERSIST_WAIT=0 run_restart "$dir" sm1); rc=$?
 
   expect_code 3 "$rc" "an unrelated concurrent answer must not release the persist gate"$'\n'"$out"
   assert_not_contains "$out" "restarted: sm1" "the unrelated answer authorized a restart"
@@ -647,7 +647,7 @@ test_persist_waits_are_polled_together() {
   add_local_mate "$dir" sm2
   arm_answer "$dir" sm2
 
-  out=$(FM_TEST_PERSIST_WAIT=3 run_restart "$dir" sm1 sm2); rc=$?
+  out=$(JG_TEST_PERSIST_WAIT=3 run_restart "$dir" sm1 sm2); rc=$?
 
   expect_code 3 "$rc" "the unanswered mate should fall back after the confirmed mate restarts"$'\n'"$out"
   exit_line=$(grep -n '^/exit$' "$dir/fake/literal" | head -1 | cut -d: -f1)
@@ -667,7 +667,7 @@ test_answered_mate_waits_for_an_empty_composer() {
   # the turn that wrote its answer; jg-control would refuse its exit then.
   printf '3' > "$dir/fake/unknown-reads"
 
-  out=$(FM_SECONDMATE_IDLE_WAIT=30 run_restart "$dir" sm1); rc=$?
+  out=$(JG_SECONDMATE_IDLE_WAIT=30 run_restart "$dir" sm1); rc=$?
 
   expect_code 0 "$rc" "a mate whose composer reads empty within the bound should restart"$'\n'"$out"
   assert_contains "$out" "restarted: sm1" "the mate was not restarted once its composer read empty"
@@ -679,7 +679,7 @@ test_answered_mate_waits_for_an_empty_composer() {
   arm_answer "$dir" sm1
   printf '100000' > "$dir/fake/unknown-reads"
 
-  out=$(FM_SECONDMATE_IDLE_WAIT=2 run_restart "$dir" sm1); rc=$?
+  out=$(JG_SECONDMATE_IDLE_WAIT=2 run_restart "$dir" sm1); rc=$?
 
   expect_code 3 "$rc" "a mate still busy at the bound must not be reported as restarted"$'\n'"$out"
   assert_contains "$out" "nudged: sm1:" "a mate still busy at the bound must get the re-read message"
@@ -717,11 +717,11 @@ test_relaunches_do_not_block_persist_polling() {
   add_local_mate "$dir" sm2
   printf -- '- sm2 - local domain (home: %s; scope: things; projects: p; added 2026-09-03)\n' \
     "$dir/sm2-home" >> "$dir/home/data/secondmates.md"
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
+  export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   arm_answer "$dir" sm2
 
-  out=$(FM_TEST_PERSIST_WAIT=5 run_restart "$dir" sm1 sm2); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
+  out=$(JG_TEST_PERSIST_WAIT=5 run_restart "$dir" sm1 sm2); rc=$?
+  unset JG_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "both confirmed mates should restart independently"$'\n'"$out"
   assert_present "$dir/fake/local-relaunch-during-remote" \
@@ -738,7 +738,7 @@ test_unpublished_worker_result_is_accounted_for() {
   local dir out rc_file driver i result_dir
   dir=$(new_case worker-result)
   setup_remote_case "$dir" sm1 slow-relaunch
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
+  export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   out="$dir/restart.out"
   rc_file="$dir/restart.rc"
 
@@ -765,7 +765,7 @@ test_unpublished_worker_result_is_accounted_for() {
     fail "a terminated restart worker left the parent hung"
   fi
   wait "$driver" 2>/dev/null || true
-  unset FM_FAKE_ANSWER_STATUS
+  unset JG_FAKE_ANSWER_STATUS
 
   [ "$(cat "$rc_file")" = 3 ] || fail "an unpublished worker result did not fail as accounted"
   assert_contains "$(cat "$out")" "restart worker exited before publishing an outcome" \
@@ -780,16 +780,16 @@ test_result_published_while_reaping_is_honored() {
   local dir out rc
   dir=$(new_case result-race)
   setup_remote_case "$dir" sm1 slow-relaunch
-  export FM_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
+  export JG_FAKE_ANSWER_STATUS="$dir/home/state/sm1.status"
   cat > "$dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-if [ -e "$FM_FAKE_DIR/remote-relaunch-start" ] && [ ! -e "$FM_FAKE_DIR/result-race-injected" ]; then
-  result=$(find "$FM_HOME/state" -maxdepth 2 -name '0.result' -print -quit)
+if [ -e "$JG_FAKE_DIR/remote-relaunch-start" ] && [ ! -e "$JG_FAKE_DIR/result-race-injected" ]; then
+  result=$(find "$JG_HOME/state" -maxdepth 2 -name '0.result' -print -quit)
   if [ -z "$result" ]; then
-    result_dir=$(find "$FM_HOME/state" -maxdepth 1 -type d -name '.secondmate-restart.*' -print -quit)
+    result_dir=$(find "$JG_HOME/state" -maxdepth 1 -type d -name '.secondmate-restart.*' -print -quit)
     if [ -n "$result_dir" ]; then
       printf 'restarted: sm1 on remote-mac (claude)\n' > "$result_dir/0.result"
-      : > "$FM_FAKE_DIR/result-race-injected"
+      : > "$JG_FAKE_DIR/result-race-injected"
       printf 'Z\n'
       exit 0
     fi
@@ -800,7 +800,7 @@ SH
   chmod +x "$dir/fakebin/ps"
 
   out=$(run_restart "$dir" sm1); rc=$?
-  unset FM_FAKE_ANSWER_STATUS
+  unset JG_FAKE_ANSWER_STATUS
 
   expect_code 0 "$rc" "a result published while the worker is reaped must remain authoritative"$'\n'"$out"
   assert_contains "$out" "restarted: sm1 on remote-mac (claude)" \

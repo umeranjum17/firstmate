@@ -11,10 +11,10 @@
 # actually exited. It fails naming the harness and version rather than
 # degrading quietly.
 #
-# Run explicitly with FM_HERDR_SUBMIT_CONFIRM_LIVE=1 after a Herdr or Claude
+# Run explicitly with JG_HERDR_SUBMIT_CONFIRM_LIVE=1 after a Herdr or Claude
 # upgrade, and before trusting a refreshed docs/verification/runtime-backends.md
 # "Herdr submit confirmation" entry.
-# FM_HERDR_EXIT_CONFIRM_ONLY=1 selects a token-free control guard instead:
+# JG_HERDR_EXIT_CONFIRM_ONLY=1 selects a token-free control guard instead:
 # direct Bash background work exercises submitted and already-open exit modals
 # through real jg-control. It never approves trust or changes permission mode.
 # Every Herdr call, including adapter calls, is routed through bin/jg-herdr-lab.sh.
@@ -29,13 +29,13 @@ LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-if [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
-  jg_live_gate default-on FM_HERDR_SUBMIT_CONFIRM_LIVE herdr jq claude
+if [ "${JG_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
+  jg_live_gate default-on JG_HERDR_SUBMIT_CONFIRM_LIVE herdr jq claude
 else
-  jg_live_gate opt-in FM_HERDR_SUBMIT_CONFIRM_LIVE herdr jq claude
+  jg_live_gate opt-in JG_HERDR_SUBMIT_CONFIRM_LIVE herdr jq claude
 fi
 
-[ -x "$LAB_HELPER" ] || fail "FM_HERDR_SUBMIT_CONFIRM_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
+[ -x "$LAB_HELPER" ] || fail "JG_HERDR_SUBMIT_CONFIRM_LIVE=1 but the Herdr lab helper is not executable at $LAB_HELPER"
 
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"
@@ -76,7 +76,7 @@ EOF
 chmod +x "$FAKEBIN/herdr"
 
 "$LAB_HELPER" provision "$SESSION" || fail "could not provision the isolated Herdr lab"
-if [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
+if [ "${JG_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
   "$LAB_HELPER" viewer start "$SESSION" || fail "could not attach owned lab viewer for styled composer proof"
 fi
 export PATH="$FAKEBIN:$ORIGINAL_PATH"
@@ -94,7 +94,7 @@ VERSION=$(PATH="$ORIGINAL_PATH" claude --version 2>/dev/null | head -1 || printf
 HERDR_VER=$(PATH="$ORIGINAL_PATH" herdr --version 2>/dev/null | head -1 || printf 'herdr-unknown')
 
 CLAUDE_LAUNCH="claude --name ultracode --settings '{\"feedbackDrafts\":\"off\"}'"
-if [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" != 1 ]; then
+if [ "${JG_HERDR_EXIT_CONFIRM_ONLY:-0}" != 1 ]; then
   CLAUDE_LAUNCH="CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}'"
 fi
 lab pane run "$PANE" "$CLAUDE_LAUNCH" >/dev/null \
@@ -119,7 +119,7 @@ while [ "$i" -lt 60 ]; do
       # keep waiting for a real idle composer; the accepted dialog stays in the
       # viewport. The prompt preselects "No, exit", so move to "Yes" before
       # confirming; a bare Enter quits Claude.
-      [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" != 1 ] \
+      [ "${JG_HERDR_EXIT_CONFIRM_ONLY:-0}" != 1 ] \
         || fail "Claude Code ($VERSION): workspace trust is not granted; token-free guard refuses to approve it"
       if [ "$trusted" = 0 ]; then
         trusted=1
@@ -136,7 +136,7 @@ done
 # Token-free lifecycle mode uses Claude's direct Bash composer, never a model
 # prompt, and never changes approval or trust settings. It exercises both a
 # newly submitted /exit and a modal left open by a prior attempt.
-if [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
+if [ "${JG_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
   LAB_HOME="$TMP_ROOT/control-home"
   mkdir -p "$LAB_HOME/state" "$LAB_HOME/data/labexit"
   {
@@ -192,7 +192,7 @@ if [ "${FM_HERDR_EXIT_CONFIRM_ONLY:-0}" = 1 ]; then
       done
       [ "$supported" = 1 ] || fail "Claude Code ($VERSION): expected exact stop dialog never rendered; viewport: $screen"
     fi
-    out=$(FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$LAB_HOME" FM_CONTROL_EXIT_WAIT=10 "$ROOT/bin/jg-control.sh" labexit exit 2>&1) \
+    out=$(JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LAB_HOME" JG_CONTROL_EXIT_WAIT=10 "$ROOT/bin/jg-control.sh" labexit exit 2>&1) \
       || fail "Claude Code ($VERSION) on $HERDR_VER: $scenario control exit failed: $out"
     [ "$(jg_backend_herdr_agent_state "$TARGET")" = dead ] \
       || fail "Claude Code ($VERSION): $scenario exit did not prove agent gone"
@@ -292,4 +292,4 @@ done
   || fail "Claude Code ($VERSION) on $HERDR_VER: the /exit submission reported '$verdict' but the agent never exited"
 pass "live Herdr submit confirm: Claude Code ($VERSION) on $HERDR_VER proves and submits a typed /exit behind its command popup"
 
-[ "$CHECKED" -gt 0 ] || fail "FM_HERDR_SUBMIT_CONFIRM_LIVE=1 checked no harness"
+[ "$CHECKED" -gt 0 ] || fail "JG_HERDR_SUBMIT_CONFIRM_LIVE=1 checked no harness"

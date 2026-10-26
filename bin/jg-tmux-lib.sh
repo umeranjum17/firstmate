@@ -21,9 +21,9 @@
 # The queued-Enter policy itself lives in jg_composer_queued_enter_verdict
 # (bin/jg-composer-lib.sh); this file supplies tmux's pane-busy primitive.
 #
-# FM_COMPOSER_IDLE_RE is interpreted by the shared classifier with its structural
+# JG_COMPOSER_IDLE_RE is interpreted by the shared classifier with its structural
 # and styling safety gates.
-# FM_BUSY_REGEX overrides the rendered delivery-busy matching used here.
+# JG_BUSY_REGEX overrides the rendered delivery-busy matching used here.
 #
 # NOT a task-state source: task busy state is owned by bin/jg-busy-lib.sh's
 # semantic contract. The matching below serves only delivery guards: the submit
@@ -45,13 +45,13 @@
 
 # The sibling directory is derived without forking dirname, because a backend
 # probe can re-source this adapter inside a subshell on every watcher cycle.
-_FM_TMUX_LIB_DIR=${BASH_SOURCE[0]%/*}
-[ "$_FM_TMUX_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_TMUX_LIB_DIR=.
+_JG_TMUX_LIB_DIR=${BASH_SOURCE[0]%/*}
+[ "$_JG_TMUX_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_TMUX_LIB_DIR=.
 # shellcheck source=bin/jg-composer-lib.sh
-. "${_FM_TMUX_LIB_DIR:-/}/jg-composer-lib.sh"
+. "${_JG_TMUX_LIB_DIR:-/}/jg-composer-lib.sh"
 # shellcheck source=bin/jg-cursor-lib.sh
-. "${_FM_TMUX_LIB_DIR:-/}/jg-cursor-lib.sh"
-unset _FM_TMUX_LIB_DIR
+. "${_JG_TMUX_LIB_DIR:-/}/jg-cursor-lib.sh"
+unset _JG_TMUX_LIB_DIR
 
 
 # jg_tmux_strip_ghost: thin adapter over the shared, fleet-wide ghost extractor

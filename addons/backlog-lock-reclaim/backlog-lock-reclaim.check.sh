@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # backlog-lock-reclaim watcher check: reclaims <jg-home>/data/backlog.md.lock when it is a 0-byte file older than
-# FM_BACKLOG_LOCK_SAFE_AGE_S seconds (default 60, above tasks-axi's 30 s stale mark) and no process has it open.
+# JG_BACKLOG_LOCK_SAFE_AGE_S seconds (default 60, above tasks-axi's 30 s stale mark) and no process has it open.
 # A tasks-axi writer that dies between creating the lock and writing its token leaves exactly that file, and tasks-axi
 # never reclaims a lock, so every later backlog write fails LOCKED. Prints one wake line per reclaim and nothing
 # otherwise; each reclaim is logged with its path and age to state/backlog-lock-reclaim.log. Usage: check.sh <jg-home>
@@ -10,7 +19,7 @@
 # cannot read counts as a holder, so it is never reclaimed under.
 set -u
 FMH=${1:?usage: check.sh <jg-home>}
-SAFE_AGE_S=${FM_BACKLOG_LOCK_SAFE_AGE_S:-60}
+SAFE_AGE_S=${JG_BACKLOG_LOCK_SAFE_AGE_S:-60}
 DATA=$(cd "$FMH/data" 2>/dev/null && pwd -P) || exit 0
 LOCK=$DATA/backlog.md.lock
 [ -f "$LOCK" ] && [ ! -L "$LOCK" ] || exit 0

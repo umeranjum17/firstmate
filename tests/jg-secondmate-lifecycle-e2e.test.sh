@@ -28,7 +28,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/secondmate-helpers.sh"
 
 TMP_ROOT=$(jg_test_tmproot jg-secondmate-lifecycle)
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 HOME_DIR="$TMP_ROOT/main home"
 SUB="$TMP_ROOT/design-home"
@@ -63,14 +63,14 @@ EOF
 
   # A filled charter brief whose routing scope differs from the charter summary,
   # so the registry must read the scope from the brief, not invent a generic one.
-  FM_SECONDMATE_SCOPE='customer onboarding from brief' \
+  JG_SECONDMATE_SCOPE='customer onboarding from brief' \
     scaffold_secondmate_charter "$HOME_DIR" design 'customer onboarding charter' alpha beta gamma \
     || fail "filled secondmate charter scaffold failed"
 }
 
 phase_seed() {
   local out
-  out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" \
+  out=$(PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" \
     "$ROOT/bin/jg-home-seed.sh" design "$SUB" alpha beta gamma) \
     || fail "seed failed"
   SUB_ABS=$(cd "$SUB" && pwd -P)
@@ -101,19 +101,19 @@ phase_seed() {
   assert_no_grep 'owns:' "$HOME_DIR/data/secondmates.md" "registry used the legacy owns field"
 
   # Delivery modes preserved in the subhome registry; validation passes.
-  [ "$(FM_HOME="$SUB" "$ROOT/bin/jg-project-mode.sh" alpha)" = "direct-PR on" ] \
+  [ "$(JG_HOME="$SUB" "$ROOT/bin/jg-project-mode.sh" alpha)" = "direct-PR on" ] \
     || fail "alpha delivery mode not preserved in the subhome"
-  [ "$(FM_HOME="$SUB" "$ROOT/bin/jg-project-mode.sh" beta)" = "direct-PR off" ] \
+  [ "$(JG_HOME="$SUB" "$ROOT/bin/jg-project-mode.sh" beta)" = "direct-PR off" ] \
     || fail "beta delivery mode not preserved in the subhome"
-  FM_HOME="$HOME_DIR" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation failed after seed"
+  JG_HOME="$HOME_DIR" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation failed after seed"
 
   pass "seed: registry scope+projects, charter copied, clones+origins, no-mistakes init in subhome only"
 }
 
 phase_spawn() {
   : > "$LOG"
-  PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_CONFIG_OVERRIDE="$HOME_DIR/parent-config" \
-    FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_CONFIG_OVERRIDE="$HOME_DIR/parent-config" \
+    JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-spawn.sh" design "$SUB" codex --secondmate >/dev/null \
     || fail "secondmate spawn failed"
 
@@ -123,9 +123,9 @@ phase_spawn() {
   assert_grep 'projects=alpha, beta, gamma' "$meta" "spawn meta did not record the project list"
   # Launch ran in the subhome, with the persistent charter and cleared overrides,
   # and never ran a project-style treehouse get.
-  assert_grep "FM_HOME='$SUB_ABS'" "$LOG" "secondmate launch did not set FM_HOME to the subhome"
-  assert_grep 'FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE=' "$LOG" "launch did not clear operational overrides"
-  assert_grep 'FM_CONFIG_OVERRIDE=' "$LOG" "launch did not clear the config override"
+  assert_grep "JG_HOME='$SUB_ABS'" "$LOG" "secondmate launch did not set JG_HOME to the subhome"
+  assert_grep 'JG_ROOT_OVERRIDE= JG_STATE_OVERRIDE= JG_DATA_OVERRIDE= JG_PROJECTS_OVERRIDE=' "$LOG" "launch did not clear operational overrides"
+  assert_grep 'JG_CONFIG_OVERRIDE=' "$LOG" "launch did not clear the config override"
   assert_grep "$SUB_ABS/data/charter.md" "$LOG" "launch did not use the persistent charter"
   assert_no_grep 'notify=' "$LOG" "secondmate codex launch included the parent turn-end notify hook"
   assert_no_grep 'turn-ended' "$LOG" "secondmate codex launch referenced a parent turn-ended signal"
@@ -139,9 +139,9 @@ phase_send() {
   # The meta window (firstmate:jg-design) must win over a foreign same-named
   # window returned by list-windows. Include the recorded endpoint in the fake
   # inventory so the recovery-grade liveness check can verify it exists.
-  PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_WINDOW="firstmate:jg-design
+  PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_WINDOW="firstmate:jg-design
 other-session:jg-design" \
-    FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+    JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-send.sh" jg-design 'route this work' >/dev/null 2>&1 \
     || fail "jg-send failed for a bare firstmate window with home metadata"
   # design is a kind=secondmate target, so the durable inbox record carries the
@@ -178,8 +178,8 @@ phase_handoff() {
 - [x] old-task - shipped thing - local main (merged 2026-06-19)
 EOF
   local out before
-  out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" \
-    FM_FAKE_TMUX_CAPTURE="$PANE" \
+  out=$(PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" \
+    JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-backlog-handoff.sh" design feat-x feat-y) \
     || fail "handoff failed for in-scope items"
   assert_contains "$out" "handed off 2 item(s) to design" "handoff did not report the moved items"
@@ -196,8 +196,8 @@ EOF
 
   # Idempotent: a second handoff neither errors nor duplicates, and leaves main alone.
   before=$(cat "$HOME_DIR/data/backlog.md")
-  PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" \
-    FM_FAKE_TMUX_CAPTURE="$PANE" \
+  PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" \
+    JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-backlog-handoff.sh" design feat-x feat-y >/dev/null 2>&1 \
     || fail "idempotent re-run failed"
   [ "$(grep -cF -- '- [ ] feat-x - add feature x (repo: alpha)' "$SUB/data/backlog.md")" -eq 1 ] \
@@ -210,7 +210,7 @@ phase_recovery() {
   # Simulate a restart: drop the live meta, then respawn from the registry +
   # persistent home (no explicit home argument).
   rm -f "$HOME_DIR/state/design.meta"
-  PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-spawn.sh" design "echo relaunch" --secondmate >/dev/null 2>&1 \
     || fail "recovery respawn failed"
   local meta="$HOME_DIR/state/design.meta"
@@ -222,13 +222,13 @@ phase_recovery() {
 
 phase_teardown() {
   local teardown_out corr rec leftover leftover_rec other_corr
-  corr=$(FM_HOME="$HOME_DIR" bash -c '
+  corr=$(JG_HOME="$HOME_DIR" bash -c '
     . "$1"
     jg_pending_reply_create "$2" "$2/state" design "New routed work is in your backlog."
   ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$HOME_DIR") \
     || fail "could not seed receiver wake retirement state"
   rec="$HOME_DIR/state/pending-replies/$corr"
-  leftover=$(FM_HOME="$HOME_DIR" bash -c '
+  leftover=$(JG_HOME="$HOME_DIR" bash -c '
     . "$1"
     jg_pending_reply_create "$2" "$2/state" design "Earlier routed ask that already resolved."
   ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$HOME_DIR") \
@@ -237,7 +237,7 @@ phase_teardown() {
   # Settle every parent pending-reply for this mate (earlier send/handoff
   # phases leave open records) so non-forced retirement mirrors a clean
   # captain-approved close rather than hitting the unresolved-reply refuse.
-  FM_HOME="$HOME_DIR" bash -c '
+  JG_HOME="$HOME_DIR" bash -c '
     . "$1"
     state="$2/state"
     for rec in "$state/pending-replies"/*; do
@@ -252,7 +252,7 @@ phase_teardown() {
   printf 'task_id=design\nphase=resolved\n' > "$TMP_ROOT/external-pending/escape"
   mv "$HOME_DIR/state/pending-replies" "$HOME_DIR/state/pending-replies.safe"
   ln -s "$TMP_ROOT/external-pending" "$HOME_DIR/state/pending-replies"
-  if PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  if PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-teardown.sh" design >/dev/null 2>&1; then
     fail "local retirement accepted a symlinked pending-replies directory"
   fi
@@ -269,7 +269,7 @@ phase_teardown() {
   touch "$TMP_ROOT/escape/pwned"
   printf 'task_id=design\nphase=resolved\ncorr_id=../../../../../escape/pwned\n' \
     > "$HOME_DIR/state/pending-replies/aaaaaaaaaaaaaaaa"
-  if PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  if PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-teardown.sh" design >/dev/null 2>&1; then
     fail "local retirement accepted a pending-reply with unsafe corr_id"
   fi
@@ -287,7 +287,7 @@ phase_teardown() {
   : > "$HOME_DIR/state/pending-replies/.delivery-confirmed-$other_corr"
   printf 'task_id=design\nphase=resolved\ncorr_id=%s\n' "$other_corr" \
     > "$HOME_DIR/state/pending-replies/aaaaaaaaaaaaaaaa"
-  if PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  if PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-teardown.sh" design >/dev/null 2>&1; then
     fail "local retirement accepted a pending-reply with mismatched corr_id"
   fi
@@ -306,7 +306,7 @@ phase_teardown() {
   printf '%s\tattempt\n' "$(date +%s)" > "$HOME_DIR/state/.secondmate-relaunch-design"
   printf '%s\tdead\n' "$(date +%s)" > "$HOME_DIR/state/.secondmate-relaunch-bound-design"
   : > "$LOG"
-  teardown_out=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
+  teardown_out=$(PATH="$FAKEBIN:$PATH" JG_HOME="$HOME_DIR" JG_FAKE_TMUX_LOG="$LOG" JG_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/jg-teardown.sh" design 2>&1) \
     || fail "teardown failed for the empty secondmate home: $teardown_out"
   printf '%s\n' "$teardown_out" | grep -F 'Backlog:' >/dev/null \

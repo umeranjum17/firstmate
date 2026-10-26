@@ -21,7 +21,7 @@ mkdir -p "$PARENT/data" "$PARENT/state" "$REMOTE/state" "$REMOTE/data/reply" "$C
 # tests/jg-remote-job-orphan-reap.test.sh pins. Stop the whole worker tree.
 cleanup() {
   local worker_pid=''
-  FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
     "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
     worker_pid=$(cat "$TMP_ROOT/remote-jobs/worker.pid")
@@ -49,28 +49,28 @@ while [ "$#" -gt 0 ]; do
     *) exit 90 ;;
   esac
 done
-if [ -n "${FM_REMOTE_REPLY_POLL_LOG:-}" ]; then
-  printf 'x\n' >> "$FM_REMOTE_REPLY_POLL_LOG"
+if [ -n "${JG_REMOTE_REPLY_POLL_LOG:-}" ]; then
+  printf 'x\n' >> "$JG_REMOTE_REPLY_POLL_LOG"
 fi
-[ "${FM_REMOTE_REPLY_FAIL_READ:-}" != 1 ] || exit 255
+[ "${JG_REMOTE_REPLY_FAIL_READ:-}" != 1 ] || exit 255
 host=$1
 entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 remote_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_REMOTE_REPLY_WAIT_SECONDS="${FM_REMOTE_REPLY_WAIT_SECONDS:-10}" \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_REMOTE_REPLY_WAIT_SECONDS="${JG_REMOTE_REPLY_WAIT_SECONDS:-10}" \
   "$@"
 }
 
@@ -134,13 +134,13 @@ delta_cadence_case() {
   empty_hash=$(sha256_file "$log")
   cat > "$dir/bin/sleep" <<'SH'
 #!/bin/bash
-printf '%s\n' "$1" >> "$FM_DELTA_SLEEP_LOG"
-printf 'cadence-delivered\n' >> "$FM_DELTA_APPEND_LOG"
+printf '%s\n' "$1" >> "$JG_DELTA_SLEEP_LOG"
+printf 'cadence-delivered\n' >> "$JG_DELTA_APPEND_LOG"
 exec /bin/sleep "$@"
 SH
   chmod +x "$dir/bin/sleep"
-  FM_HOME="$dir/home" PATH="$dir/bin:$PATH" FM_REMOTE_DELTA_POLL_SECONDS="$override" \
-    FM_DELTA_SLEEP_LOG="$dir/sleeps" FM_DELTA_APPEND_LOG="$log" \
+  JG_HOME="$dir/home" PATH="$dir/bin:$PATH" JG_REMOTE_DELTA_POLL_SECONDS="$override" \
+    JG_DELTA_SLEEP_LOG="$dir/sleeps" JG_DELTA_APPEND_LOG="$log" \
     "$BASH" "$ROOT/bin/jg-remote-delta-read.sh" state/replies.status 0 "$empty_hash" 30 \
     > "$dir/result" || fail "$label delta reader failed"
   [ "$(cat "$dir/sleeps")" = "$expected" ] || fail "$label delta reader did not wait $expected seconds"
@@ -180,7 +180,7 @@ assert_grep 'done [corr=0123456789abcdef]' "$RESULT" "captured delta lost the co
 if [ -e "$PARENT/state/.wake-queue" ] && grep -q "procevent remote-reply $SID 1" "$PARENT/state/.wake-queue"; then
   fail "an autohandled remote-reply capture still published a duplicate check wake"
 fi
-FM_STATE_OVERRIDE="$PARENT/state" bash -c '
+JG_STATE_OVERRIDE="$PARENT/state" bash -c '
   . "$1/bin/jg-wake-lib.sh"
   jg_wake_signal_seen_current "$2/state" "$2/state/ios.status"
 ' _ "$ROOT" "$PARENT" && fail "the mirrored reply bytes are not visible to the watcher signal scan"
@@ -339,7 +339,7 @@ assert_grep "offset=$mirror_offset" "$PARENT/state/remote-replies/ios.cursor" \
 pass "a replayed mirrored delta is idempotent in both the stream and the cursor"
 [ "$(grep -Fc ': which base branch?' "$PARENT/state/ios.status")" -eq 2 ] \
   || fail "replaying a delta duplicated distinct timed requests"
-if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
   printf 'Remote source status records:\n'
   cat "$REMOTE/state/parent-replies.status"
   printf '\nParent status after handling and replaying generation 4:\n'
@@ -736,7 +736,7 @@ pass "source-line identity survives commit failure and cursor-loss recapture"
 # the shared open-decision fold both writers flow through refuses to let it take
 # the reserved key over.
 # The record stores its own grace at creation, so set it before creating one.
-export FM_PENDING_REPLY_GRACE_SECS=0
+export JG_PENDING_REPLY_GRACE_SECS=0
 # Answer the mate's earlier decisions and blocker first: a recovery repost waits
 # while the mate has one of its own open (tests/jg-pending-reply.test.sh).
 printf 'resolved [key=%s]: answered\n' rough-cut-version ctl default >> "$PARENT/state/ios.status"
@@ -745,7 +745,7 @@ ESCALATED_CORR=$(jg_pending_reply_create "$PARENT" "$PARENT/state" ios 'confirm 
 jg_pending_reply_mark_delivered "$PARENT/state" "$ESCALATED_CORR" \
   || fail "could not mark the escalating request delivered"
 jg_pending_reply_mark_turn_completed "$PARENT/state" "$ESCALATED_CORR" request
-FM_PENDING_REPLY_SEND_HOOK=true \
+JG_PENDING_REPLY_SEND_HOOK=true \
   jg_pending_reply_send_recovery "$PARENT/state" "$ESCALATED_CORR" \
   || fail "the one automatic recovery repost was not sent"
 jg_pending_reply_mark_turn_completed "$PARENT/state" "$ESCALATED_CORR" recovery
@@ -785,15 +785,15 @@ await_reply_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" \
 jg_pending_reply_tick "$PARENT/state" || fail "supervision tick failed"
 assert_not_contains "$(status_open_decisions "$PARENT/state/ios.status")" \
   "pending-reply-id=$ESCALATED_CORR" "the settled request still surfaces as an open decision"
-unset FM_PENDING_REPLY_GRACE_SECS
+unset JG_PENDING_REPLY_GRACE_SECS
 pass "a reply that arrives after escalation resolves it and clears the open decision"
 
 # The listener keeps one claim across empty polls and across a delta. Reconcile
 # is not involved: nothing here starts a second runner.
 stop_reply_listener || fail "the reply listener did not stop before the continuity check"
 : > "$TMP_ROOT/reply-polls"
-FM_REMOTE_REPLY_WAIT_SECONDS=1 \
-FM_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/reply-polls" \
+JG_REMOTE_REPLY_WAIT_SECONDS=1 \
+JG_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/reply-polls" \
   remote_env "$ROOT/bin/jg-procevent.sh" start "$SID" >/dev/null 2>&1 &
 wait_for "$CLAIMS/$SID.claim" || fail "continuous reply listener never claimed the source"
 HELD_PID=$(sed -n '2p' "$CLAIMS/$SID.claim")
@@ -828,7 +828,7 @@ done
 [ "$(reply_owner)" = live ] || fail "the reply listener dropped its claim after a delta"
 [ "$(sed -n '2p' "$CLAIMS/$SID.claim")" = "$HELD_PID" ] \
   || fail "the post-delta poll was a new listener"
-if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
   printf 'Continuous listener: owner=%s pid=%s polls=%s; mirrored status: ' \
     "$(reply_owner)" "$HELD_PID" "$polls"
   grep -F 'held across an empty wait' "$PARENT/state/ios.status" | tail -1
@@ -839,8 +839,8 @@ pass "a remote reply listener stays owned across empty waits and a delta"
 # A failed transport is not an empty wait: do not launch a second read under
 # the same owner, even when the launch floor is short.
 : > "$TMP_ROOT/failed-polls"
-FM_REMOTE_REPLY_FAIL_READ=1 FM_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/failed-polls" \
-  FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 \
+JG_REMOTE_REPLY_FAIL_READ=1 JG_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/failed-polls" \
+  JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 \
   remote_env "$ROOT/bin/jg-procevent.sh" start "$SID" >/dev/null 2>&1 &
 failed_reader=$!
 wait "$failed_reader" || fail "failed reader did not leave the runner"
@@ -855,7 +855,7 @@ mv "$PARENT/state/ios.status" "$TMP_ROOT/ios-status-before-failure"
 mkdir "$PARENT/state/ios.status"
 printf 'working: cannot ingest yet\n' >> "$REMOTE/state/parent-replies.status"
 failed_gen=$((GEN + 1))
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 FM_REMOTE_REPLY_WAIT_SECONDS=1 \
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 JG_REMOTE_REPLY_WAIT_SECONDS=1 \
   remote_env "$ROOT/bin/jg-procevent.sh" start "$SID" >/dev/null 2>&1 &
 failed_ingest=$!
 wait "$failed_ingest" || fail "failed ingestion did not leave the runner"
@@ -904,7 +904,7 @@ pass "a preempted reply poll reports a closed window without publishing channel 
 # That must not cost the listener: it keeps its claim and polls again, and the
 # watcher's reconcile has nothing to relaunch.
 : > "$TMP_ROOT/preempted-polls"
-FM_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/preempted-polls" FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 \
+JG_REMOTE_REPLY_POLL_LOG="$TMP_ROOT/preempted-polls" JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 \
   remote_env "$ROOT/bin/jg-procevent.sh" start "$SID" >/dev/null 2>&1 &
 PREEMPTED_RUNNER=$!
 wait_for "$CLAIMS/$SID.claim" || fail "the preempted-listener case never claimed the source"
@@ -951,12 +951,12 @@ pass "a preempted reply poll keeps its listener and reconcile launches nothing"
 # the published watermark is the window's start.
 watermark_before=$(date +%s)
 set +e
-FM_REMOTE_REPLY_WAIT_SECONDS=1 remote_env "$ADAPTER" source ios >/dev/null 2>&1
+JG_REMOTE_REPLY_WAIT_SECONDS=1 remote_env "$ADAPTER" source ios >/dev/null 2>&1
 quiet_rc=$?
 set -e
 [ "$quiet_rc" -eq 75 ] || fail "a quiet reply window exited with an unexpected status: $quiet_rc"
 watermark_after=$(date +%s)
-caught_up=$(FM_STATE_OVERRIDE="$PARENT/state" bash -c '
+caught_up=$(JG_STATE_OVERRIDE="$PARENT/state" bash -c '
   . "$1/bin/jg-pending-reply-lib.sh"
   jg_pending_reply_remote_channel_epoch "$2/state" ios
 ' _ "$ROOT" "$PARENT")
@@ -971,7 +971,7 @@ pass "a quiet reply window publishes the caught-up watermark the reply guard rea
 # append adds no bytes, the adapter acknowledges the generation, and the
 # self-announcing runner publishes nothing - the replay stays completely
 # quiet, observed through the same seen-signature gate the watcher consumes.
-FM_STATE_OVERRIDE="$PARENT/state" bash -c '
+JG_STATE_OVERRIDE="$PARENT/state" bash -c '
   . "$1/bin/jg-wake-lib.sh"
   jg_wake_status_mark_current "$2/state" "$2/state/ios.status"
 ' _ "$ROOT" "$PARENT" || fail "could not prime the seen marker for the replay leg"
@@ -992,7 +992,7 @@ cmp -s "$TMP_ROOT/ios-status-before-replay" "$PARENT/state/ios.status" \
 if [ -e "$PARENT/state/.wake-queue" ] && grep -q "procevent remote-reply $SID $GEN" "$PARENT/state/.wake-queue"; then
   fail "an already-mirrored recapture still published a check wake"
 fi
-FM_STATE_OVERRIDE="$PARENT/state" bash -c '
+JG_STATE_OVERRIDE="$PARENT/state" bash -c '
   . "$1/bin/jg-wake-lib.sh"
   jg_wake_signal_seen_current "$2/state" "$2/state/ios.status"
 ' _ "$ROOT" "$PARENT" || fail "a byte-identical recapture left unannounced status bytes behind"
@@ -1035,7 +1035,7 @@ assert_absent "$PARENT/state/remote-replies/ios.retirements" \
   "a route that has never been retired gained a retirement count"
 status_line_at_epoch "$(grep -F 'blocked [key=remote-reply-continuity-ios]' "$PARENT/state/ios.status")" >/dev/null \
   || fail "new continuity escalation has unknown emission time"
-if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
   printf '\nNew continuity escalation after ingest retry:\n'
   grep -F 'blocked [key=remote-reply-continuity-ios]' "$PARENT/state/ios.status"
 fi

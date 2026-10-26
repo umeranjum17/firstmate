@@ -92,9 +92,9 @@ jobs:
           tab_id=""
           pane_id=""
           worktree_stub="$RUNNER_TEMP/jg-herdr-worktree-stub-${GITHUB_RUN_ATTEMPT}"
-          primitive_marker="FM_WINDOWS_PRIMITIVE_${GITHUB_RUN_ID}"
-          ansi_marker="FM_WINDOWS_ANSI_${GITHUB_RUN_ID}"
-          e2e_marker="FM_WINDOWS_E2E_ACK_${GITHUB_RUN_ID}"
+          primitive_marker="JG_WINDOWS_PRIMITIVE_${GITHUB_RUN_ID}"
+          ansi_marker="JG_WINDOWS_ANSI_${GITHUB_RUN_ID}"
+          e2e_marker="JG_WINDOWS_E2E_ACK_${GITHUB_RUN_ID}"
 
           clean_detail() {
             printf '%s' "$1" | tr '\r\n|' '   ' | sed 's/[[:space:]][[:space:]]*/ /g'
@@ -189,7 +189,7 @@ jobs:
               workspace_id=$(printf '%s' "$workspace_json" | "$JQ" -r '.result.workspace.workspace_id // empty' 2>/dev/null || true)
               root_pane=$(printf '%s' "$workspace_json" | "$JQ" -r '.result.root_pane.pane_id // empty' 2>/dev/null || true)
               if [ -n "$workspace_id" ] && [ -n "$root_pane" ]; then
-                tab_json=$(herdr_call tab create --workspace "$workspace_id" --cwd "$repo_cwd" --label jg-windows-spike-task --env "FM_WINDOWS_PRIMITIVE_MARKER=$primitive_marker" --env "FM_WINDOWS_ANSI_MARKER=$ansi_marker" --env "FM_WINDOWS_E2E_MARKER=$e2e_marker" --no-focus 2>>"$details" || true)
+                tab_json=$(herdr_call tab create --workspace "$workspace_id" --cwd "$repo_cwd" --label jg-windows-spike-task --env "JG_WINDOWS_PRIMITIVE_MARKER=$primitive_marker" --env "JG_WINDOWS_ANSI_MARKER=$ansi_marker" --env "JG_WINDOWS_E2E_MARKER=$e2e_marker" --no-focus 2>>"$details" || true)
                 tab_id=$(printf '%s' "$tab_json" | "$JQ" -r '.result.tab.tab_id // empty' 2>/dev/null || true)
                 pane_id=$(printf '%s' "$tab_json" | "$JQ" -r '.result.root_pane.pane_id // empty' 2>/dev/null || true)
                 if [ -n "$tab_id" ] && [ -n "$pane_id" ]; then
@@ -211,7 +211,7 @@ jobs:
               fi
 
               if [ -n "$pane_id" ]; then
-                if herdr_call pane send-text "$pane_id" 'Write-Output $env:FM_WINDOWS_PRIMITIVE_MARKER' >>"$details" 2>&1 &&
+                if herdr_call pane send-text "$pane_id" 'Write-Output $env:JG_WINDOWS_PRIMITIVE_MARKER' >>"$details" 2>&1 &&
                   herdr_call pane send-keys "$pane_id" enter >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$primitive_marker" --timeout 10000 >>"$details" 2>&1; then
                   capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 2>>"$details" || true)
@@ -260,9 +260,9 @@ jobs:
                 event_state="$RUNNER_TEMP/jg-windows-herdr-home/state"
                 event_rc=0
                 if (
-                  export FM_ROOT_OVERRIDE="$GITHUB_WORKSPACE"
-                  export FM_HOME="$RUNNER_TEMP/jg-windows-herdr-home"
-                  export FM_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1
+                  export JG_ROOT_OVERRIDE="$GITHUB_WORKSPACE"
+                  export JG_HOME="$RUNNER_TEMP/jg-windows-herdr-home"
+                  export JG_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1
                   . "$GITHUB_WORKSPACE/bin/jg-backend.sh"
                   jg_backend_source herdr
                   jg_backend_herdr_wait_transition "$session" 3 "$event_state" "$session:$pane_id"
@@ -305,7 +305,7 @@ jobs:
                   limit 'The stubbed isolated-copy step could not be prepared.'
                 fi
 
-                ansi_command="[Console]::Write([char]27 + '[31m' + \$env:FM_WINDOWS_ANSI_MARKER + [char]27 + '[0m' + [Environment]::NewLine)"
+                ansi_command="[Console]::Write([char]27 + '[31m' + \$env:JG_WINDOWS_ANSI_MARKER + [char]27 + '[0m' + [Environment]::NewLine)"
                 if herdr_call pane run "$pane_id" "$ansi_command" >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$ansi_marker" --timeout 10000 >>"$details" 2>&1; then
                   ansi_capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 --format ansi 2>>"$details" || true)
@@ -322,7 +322,7 @@ jobs:
                   limit 'ANSI capture could not be measured.'
                 fi
 
-                if herdr_call pane send-text "$pane_id" 'Write-Output $env:FM_WINDOWS_E2E_MARKER' >>"$details" 2>&1 &&
+                if herdr_call pane send-text "$pane_id" 'Write-Output $env:JG_WINDOWS_E2E_MARKER' >>"$details" 2>&1 &&
                   herdr_call pane send-keys "$pane_id" enter >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$e2e_marker" --timeout 10000 >>"$details" 2>&1; then
                   e2e_capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 2>>"$details" || true)

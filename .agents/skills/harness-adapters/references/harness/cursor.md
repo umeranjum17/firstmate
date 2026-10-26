@@ -57,7 +57,7 @@ Teaching those backends is separate cross-harness work requiring live checks.
 
 Reverse-video placeholder remnants and Herdr half-block edges belong to `../../../bin/jg-composer-lib.sh`; without the edges a bare composer swallows the footer and idle reads pending.
 `../../../docs/verification/runtime-backends.md` owns captures.
-Refresh with `FM_HARNESS_LIVENESS_DRIFT=1 ../../../bin/jg-test-run.sh ../../../tests/jg-harness-liveness-drift-live-e2e.test.sh`.
+Refresh with `JG_HARNESS_LIVENESS_DRIFT=1 ../../../bin/jg-test-run.sh ../../../tests/jg-harness-liveness-drift-live-e2e.test.sh`.
 
 ## Worktree boundary
 

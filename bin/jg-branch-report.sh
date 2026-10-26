@@ -24,8 +24,8 @@
 # or captain"); --silent true is legal only for a routine outcome.
 # --wake defaults to the wake reason the host recorded for the turn.
 #
-# Only the branch actor of a live host turn may report: FM_SUPERVISION_ACTOR
-# must be "branch" and FM_BRANCH_REPORT_TURN must name the host's current turn
+# Only the branch actor of a live host turn may report: JG_SUPERVISION_ACTOR
+# must be "branch" and JG_BRANCH_REPORT_TURN must name the host's current turn
 # record ($STATE/.supervision-host-turn), so a report typed after its turn
 # ended, or from any other shell, is refused. Exit codes: 0 recorded, 1 the
 # store refused or failed (nothing recorded), 2 usage, 3 refused (actor, turn,
@@ -47,9 +47,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 TURN_FILE="$STATE/.supervision-host-turn"
 RECEIPTS="$STATE/.supervision-host-receipts"
 # shellcheck source=bin/jg-afk-contract.sh
@@ -91,9 +91,9 @@ if [ "$SILENT" = true ] && [ "$VERDICT" != routine ]; then
   exit 2
 fi
 
-[ "${FM_SUPERVISION_ACTOR:-}" = branch ] \
+[ "${JG_SUPERVISION_ACTOR:-}" = branch ] \
   || refuse "only the supervision branch reports outcomes; MAIN acts on them instead"
-TURN=${FM_BRANCH_REPORT_TURN:-}
+TURN=${JG_BRANCH_REPORT_TURN:-}
 case "$TURN" in
   ''|*[!A-Za-z0-9._-]*) refuse "no supervision wake is being handled by this shell" ;;
 esac

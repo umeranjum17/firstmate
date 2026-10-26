@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # pi-quota-failover route test: the real wrapper against a stub pi and a stub
 # quota-axi in a throwaway HOME, with the exact argv shape no-mistakes builds
 # (--model <m> --mode json --no-session, prompt on stdin). It pins the
@@ -79,8 +88,8 @@ chmod +x "$stub/quota-axi"
 cat >"$stub/pool-cmd" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$work/log/pool-cmd.log"
-exec env FM_HOME="$home" FM_CLAUDE_ACCOUNTS_REGISTRY="$work/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=999999 \
-  FM_ACCOUNT_POOL_REST_FLOOR=15 FM_MODEL_POOL_FLOOR=15 "$pick" "\$@"
+exec env JG_HOME="$home" JG_CLAUDE_ACCOUNTS_REGISTRY="$work/registry.json" JG_CLAUDE_ACCOUNTS_FRESH=999999 \
+  JG_ACCOUNT_POOL_REST_FLOOR=15 JG_MODEL_POOL_FLOOR=15 "$pick" "\$@"
 SH
 chmod +x "$stub/pool-cmd"
 for name in claude codex cursor opencode; do
@@ -113,9 +122,9 @@ unset CLAUDE_CONFIG_DIR
 export PI_QUOTA_FAILOVER_REAL_PI="$stub/pi" STUB_ACCOUNTS=$work/accounts
 export PI_QUOTA_FAILOVER_LOG="$log" STUB_ARGV=$work/argv STUB_QUOTA_LOG=$work/quota.log
 export PI_QUOTA_FAILOVER_MODEL_POOL=$helper
-export HOME="$home" XDG_STATE_HOME="$work/state" FM_HOME="$home"
-export FM_CLAUDE_ACCOUNTS_REGISTRY=$work/registry.json
-export FM_MODEL_POOL_FLOOR=15 FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_LOW=5 FM_CLAUDE_ACCOUNTS_FRESH=999999
+export HOME="$home" XDG_STATE_HOME="$work/state" JG_HOME="$home"
+export JG_CLAUDE_ACCOUNTS_REGISTRY=$work/registry.json
+export JG_MODEL_POOL_FLOOR=15 JG_ACCOUNT_POOL_REST_FLOOR=15 JG_CLAUDE_ACCOUNTS_LOW=5 JG_CLAUDE_ACCOUNTS_FRESH=999999
 PATH="$stub:$PATH"
 export PI_QUOTA_FAILOVER_PROBE=0
 # Empty pool path keeps the static chain for cases 1-4 (live homes must not leak in).

@@ -52,11 +52,11 @@ set -u
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG_DIR="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-DATA_DIR="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG_DIR="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+DATA_DIR="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 CHECK_ID=startup-growth
 CHECK_SHIM="$STATE/$CHECK_ID.check.sh"
 CHECK_TRUST="$STATE/$CHECK_ID.check-trust"
@@ -84,9 +84,9 @@ fail() {
 }
 
 now_epoch() {
-  case "${FM_STARTUP_GROWTH_NOW:-}" in
+  case "${JG_STARTUP_GROWTH_NOW:-}" in
     ''|*[!0-9]*) date +%s ;;
-    *) printf '%s\n' "$FM_STARTUP_GROWTH_NOW" ;;
+    *) printf '%s\n' "$JG_STARTUP_GROWTH_NOW" ;;
   esac
 }
 
@@ -97,7 +97,7 @@ MAX_LINE=1000
 ORPHAN_GRACE=3600
 ORPHAN_SWEEP_LIMIT=64
 PRIMARY_OWNED_MEMORY=
-if [ -e "$FM_HOME/.jg-secondmate-home" ] || [ -L "$FM_HOME/.jg-secondmate-home" ]; then
+if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
   PRIMARY_OWNED_MEMORY=data/captain-shared.md
 fi
 
@@ -237,7 +237,7 @@ check_due() {
 
 evaluate_budget() {
   local report line reason valid=yes budget='' total='' status='' exception=''
-  if ! report=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG_DIR" FM_DATA_OVERRIDE="$DATA_DIR" \
+  if ! report=$(JG_HOME="$JG_HOME" JG_CONFIG_OVERRIDE="$CONFIG_DIR" JG_DATA_OVERRIDE="$DATA_DIR" \
     "$BUDGET_BIN" report 2>&1); then
     reason=${report##*startup-memory-budget: }
     append_finding "startup memory budget unavailable owner=bin/jg-startup-memory-budget.sh reason=${reason//$'\n'/ }"
@@ -288,11 +288,11 @@ run_check() {
   printf '%s\n' "$RECORD_SCHEMA_LINE" > "$NEW_RECORD" || exit 1
   printf '%s\t%s\n' last_eval "$now" >> "$NEW_RECORD" || exit 1
 
-  stat_surface tracked AGENTS.md "$FM_ROOT/AGENTS.md" no
-  stat_surface tracked CLAUDE.md "$FM_ROOT/CLAUDE.md" yes
-  stat_surface tracked bin/jg-session-start.sh "$FM_ROOT/bin/jg-session-start.sh" no
-  stat_surface tracked bin/jg-bootstrap.sh "$FM_ROOT/bin/jg-bootstrap.sh" no
-  stat_surface tracked bin/jg-supervision-instructions.sh "$FM_ROOT/bin/jg-supervision-instructions.sh" no
+  stat_surface tracked AGENTS.md "$JG_ROOT/AGENTS.md" no
+  stat_surface tracked CLAUDE.md "$JG_ROOT/CLAUDE.md" yes
+  stat_surface tracked bin/jg-session-start.sh "$JG_ROOT/bin/jg-session-start.sh" no
+  stat_surface tracked bin/jg-bootstrap.sh "$JG_ROOT/bin/jg-bootstrap.sh" no
+  stat_surface tracked bin/jg-supervision-instructions.sh "$JG_ROOT/bin/jg-supervision-instructions.sh" no
   stat_surface printed-memory data/projects.md "$DATA_DIR/projects.md" yes
   stat_surface printed-memory data/secondmates.md "$DATA_DIR/secondmates.md" yes
   stat_surface memory data/captain.md "$DATA_DIR/captain.md" yes
@@ -369,14 +369,14 @@ arm_failed() {  # <message>
 arm() {
   local state_device home want
   [ -d "$STATE" ] && [ ! -L "$STATE" ] || fail "state directory is unavailable"
-  case "$FM_HOME" in
-    /*) home=$FM_HOME ;;
-    *) home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || fail "cannot resolve FM_HOME $FM_HOME" ;;
+  case "$JG_HOME" in
+    /*) home=$JG_HOME ;;
+    *) home=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || fail "cannot resolve JG_HOME $JG_HOME" ;;
   esac
   state_device=$(jg_pr_file_device "$STATE") || fail "state directory is unavailable"
   want=$(printf '%s\n' \
     '#!/usr/bin/env bash' \
-    "export FM_HOME=$(printf '%q' "$home")" \
+    "export JG_HOME=$(printf '%q' "$home")" \
     "exec $(printf '%q' "$SCRIPT_DIR/jg-startup-growth-check.sh") check")
   ARM_BACKUP=
   if [ -f "$CHECK_SHIM" ] && [ ! -L "$CHECK_SHIM" ]; then
@@ -384,7 +384,7 @@ arm() {
   fi
   trap 'arm_failed "arming was interrupted"' HUP INT TERM
   shim_write "$want" "$state_device" || arm_failed "check shim path is unavailable"
-  FM_HOME="$home" "$REGISTER_BIN" "$CHECK_ID" >/dev/null || arm_failed "could not register the check shim"
+  JG_HOME="$home" "$REGISTER_BIN" "$CHECK_ID" >/dev/null || arm_failed "could not register the check shim"
   trap - HUP INT TERM
   [ -z "$ARM_BACKUP" ] || rm -f -- "$ARM_BACKUP"
   ARM_BACKUP=

@@ -137,8 +137,8 @@ EOF
 run_pf() {  # <home> <args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
     FAKE_FOLLOWUP_CODE="${FAKE_FOLLOWUP_CODE:-200}" \
     FMX_NOW_OVERRIDE="${FMX_NOW_OVERRIDE:-$PF_TEST_NOW}" "$PF" "$@"
 }
@@ -149,8 +149,8 @@ run_pf() {  # <home> <args...>
 run_pf_sysbash() {  # <home> <args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
     FAKE_FOLLOWUP_CODE="${FAKE_FOLLOWUP_CODE:-200}" \
     FMX_NOW_OVERRIDE="${FMX_NOW_OVERRIDE:-$PF_TEST_NOW}" /bin/bash "$PF" "$@"
 }
@@ -197,7 +197,7 @@ seed_commitment() {
     > "$home/state/x-inbox/$request.json"
   chmod 700 "$home/state/x-inbox"
   chmod 600 "$home/state/x-inbox/$request.json"
-  FM_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
+  JG_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
     ". '$ROOT/bin/jg-x-lib.sh'; fmx_context_registry_set '$home/state' '$request' '$platform' 1900" \
     || fail "could not retain the private request context"
 
@@ -227,7 +227,7 @@ seed_repro_commitment() {   # <home> <obligation> <request> <work-home> <work-id
     --expires-at 2026-10-01T00:00:00Z >/dev/null || fail "add failed"
   tasks_in "$home" public-followup bind-work "$obligation" --relation-file "$home/relation.json" >/dev/null \
     || fail "bind-work failed"
-  FM_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
+  JG_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
     ". '$ROOT/bin/jg-x-lib.sh'; fmx_context_registry_set '$home/state' '$request' discord 2000" \
     || fail "context retain failed"
   run_pf "$home" register "$obligation" --relation rel-code --work-home "$work_home" \
@@ -654,8 +654,8 @@ test_typed_terminal_clear_only_removes_legacy_link() {
   printf '%s\n' 'status=working' 'x_request=req-clear' 'x_request_ts=1700000000' \
     'x_followups=2' 'x_platform=discord' 'x_reply_max_chars=1900' > "$meta"
 
-  out=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-x-followup.sh" --clear work-clear) \
+  out=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-x-followup.sh" --clear work-clear) \
     || fail "the typed terminal clear transition must succeed"
   [ "$out" = work-clear ] || fail "the clear-only transition must identify the task"
   assert_grep 'status=working' "$meta" "clear-only transition must preserve unrelated task metadata"
@@ -711,8 +711,8 @@ test_outward_delivery_stays_with_the_owning_home() {
 
   # The child home has no commitment of its own and no relay consent, so it can
   # neither deliver nor even see one.
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FAKE_CURL_LOG="$log" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" FAKE_CURL_LOG="$log" \
     expect_failure "a home without relay consent must not deliver a public reply" \
     "$PF" deliver pf-own
   assert_contains "$EXPECT_OUT" "has not opted into the myfirstmate relay" \
@@ -759,8 +759,8 @@ test_secondmate_teardown_requires_parent_binding() {
     "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "marked child teardown without a parent must refuse cleanup" \
     "$TEARDOWN" work-child
   assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
@@ -773,7 +773,7 @@ test_secondmate_teardown_requires_parent_binding() {
   printf '%s\n' mate > "$child/.jg-secondmate-home"
   printf -- '- mate - synthetic (id is legacy); preserve this (home: %s; scope: synthetic (child); semicolon remains meaningful; projects: ; added 2026-07-30)\n' \
     "$child" > "$parent/data/secondmates.md"
-  FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
+  JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
     || fail "home-seed validation rejected a punctuation-bearing operational registry record"
   registry_before=$(cat "$parent/data/secondmates.md")
   marker_before=$(cat "$child/.jg-secondmate-home")
@@ -785,9 +785,9 @@ test_secondmate_teardown_requires_parent_binding() {
   assert_absent "$child/.jg-secondmate-parent" \
     "the legacy env-only binding case must not gain a durable parent record"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
     expect_failure "marked child teardown with a valid parent must enforce the parent commitment" \
     "$TEARDOWN" work-child
   assert_contains "$EXPECT_OUT" "still owes a public reply" \
@@ -808,7 +808,7 @@ test_secondmate_teardown_requires_parent_binding() {
 # bin/jg-home-seed.sh seed now writes next to .jg-secondmate-home (jg-remote-sm-
 # cleanup-parent-binding-s1 report, section 7). Before this record existed, the
 # marked-child gate above could only ever see the parent through the launch-time
-# FM_PUBLIC_FOLLOWUP_PRIMARY_HOME env var: a restart that dropped that prefix made
+# JG_PUBLIC_FOLLOWUP_PRIMARY_HOME env var: a restart that dropped that prefix made
 # the guard silently treat an actually-active parent relay as off, which could
 # drop a real public-reply obligation without anyone noticing. Each test drives
 # the real bin/jg-teardown.sh cleanup path against a home real jg-home-seed.sh
@@ -836,22 +836,22 @@ test_local_secondmate_seed_publishes_parent_before_identity() {
 destination=${!#}
 case "$destination" in
   */.jg-secondmate-home)
-    touch "$FM_TEST_PUBLISH_ENTERED"
+    touch "$JG_TEST_PUBLISH_ENTERED"
     wait_count=0
-    while [ ! -f "$FM_TEST_PUBLISH_RELEASE" ]; do
+    while [ ! -f "$JG_TEST_PUBLISH_RELEASE" ]; do
       wait_count=$((wait_count + 1))
       [ "$wait_count" -le 3000 ] || exit 97
       sleep 0.02
     done
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
-  PATH="$fakebin:$PATH" FM_HOME="$parent" \
-    FM_SECONDMATE_CHARTER='Local publication-order regression charter.' \
-    FM_TEST_REAL_MV="$real_mv" FM_TEST_PUBLISH_ENTERED="$entered" \
-    FM_TEST_PUBLISH_RELEASE="$release" \
+  PATH="$fakebin:$PATH" JG_HOME="$parent" \
+    JG_SECONDMATE_CHARTER='Local publication-order regression charter.' \
+    JG_TEST_REAL_MV="$real_mv" JG_TEST_PUBLISH_ENTERED="$entered" \
+    JG_TEST_PUBLISH_RELEASE="$release" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects > "$manifest_out" 2>&1 &
   seed_pid=$!
   wait_count=0
@@ -876,8 +876,8 @@ test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost() {
   local parent child parent_resolved
   parent=$(make_home teardown-durable-parent)
   child="$TMP_ROOT/teardown-durable-child"
-  FM_SECONDMATE_CHARTER='Durable-record regression charter.' \
-    FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+  JG_SECONDMATE_CHARTER='Durable-record regression charter.' \
+    JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "real secondmate seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
@@ -892,11 +892,11 @@ test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost() {
     "window=firstmate:jg-work-child" "endpoint_task_id=work-child" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  # No FM_PUBLIC_FOLLOWUP_PRIMARY_HOME at all here: a restart of the secondmate
+  # No JG_PUBLIC_FOLLOWUP_PRIMARY_HOME at all here: a restart of the secondmate
   # agent that drops the launch-time prefix must still find the real parent
   # through the durable record instead of silently treating the relay as off.
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "teardown with a lost launch binding must still find the real parent" \
     "$TEARDOWN" work-child
   assert_contains "$EXPECT_OUT" "still owes a public reply" \
@@ -913,8 +913,8 @@ test_secondmate_teardown_durable_record_missing_parent_registration_still_refuse
   local parent child parent_resolved
   parent=$(make_home teardown-durable-missing-parent relay-off)
   child="$TMP_ROOT/teardown-durable-missing-child"
-  FM_SECONDMATE_CHARTER='Durable-record missing-registration regression charter.' \
-    FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+  JG_SECONDMATE_CHARTER='Durable-record missing-registration regression charter.' \
+    JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "real secondmate seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
@@ -929,8 +929,8 @@ test_secondmate_teardown_durable_record_missing_parent_registration_still_refuse
   # record naming the real parent path must not be enough on its own to bypass
   # the check; the real protection this guard exists for must survive the fix.
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "a durable local record with no parent-side registration must still refuse" \
     "$TEARDOWN" work-child
   assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
@@ -944,8 +944,8 @@ test_secondmate_teardown_durable_record_with_unknown_field_succeeds() {
   local parent parent_alias child parent_resolved rc out
   parent=$(make_home teardown-durable-clean-parent relay-off)
   child="$TMP_ROOT/teardown-durable-clean-child"
-  FM_SECONDMATE_CHARTER='Durable-record clean-cleanup regression charter.' \
-    FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+  JG_SECONDMATE_CHARTER='Durable-record clean-cleanup regression charter.' \
+    JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "real secondmate seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
@@ -964,9 +964,9 @@ test_secondmate_teardown_durable_record_with_unknown_field_succeeds() {
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   rc=0
-  out=$(PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_CONFIG_OVERRIDE="$child/config" FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent_alias" \
+  out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_CONFIG_OVERRIDE="$child/config" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent_alias" \
     "$TEARDOWN" work-clean 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "a resolved parent with no owed commitment must allow cleanup (rc=$rc): $out"
   assert_not_contains "$out" "cannot resolve the primary home" \
@@ -979,8 +979,8 @@ test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings() 
   durable_parent=$(make_home teardown-durable-conflict-recorded relay-off)
   live_parent=$(make_home teardown-durable-conflict-live relay-off)
   child="$TMP_ROOT/teardown-durable-conflict-child"
-  FM_SECONDMATE_CHARTER='Durable-record conflict regression charter.' \
-    FM_HOME="$durable_parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+  JG_SECONDMATE_CHARTER='Durable-record conflict regression charter.' \
+    JG_HOME="$durable_parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "real secondmate seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$durable_parent" && pwd -P)
@@ -995,9 +995,9 @@ test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings() 
     "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_CONFIG_OVERRIDE="$child/config" FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$live_parent" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_CONFIG_OVERRIDE="$child/config" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$live_parent" \
     expect_failure "conflicting live and durable parent bindings must refuse cleanup" \
     "$TEARDOWN" work-conflict
   assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
@@ -1012,8 +1012,8 @@ test_secondmate_teardown_rejects_unsafe_durable_parent_records() {
   for case_name in symlink invalid-route duplicate-route remote-parent-home local-parent-host; do
     parent=$(make_home "teardown-durable-$case_name-parent" relay-off)
     child="$TMP_ROOT/teardown-durable-$case_name-child"
-    FM_SECONDMATE_CHARTER='Unsafe durable-record regression charter.' \
-      FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+    JG_SECONDMATE_CHARTER='Unsafe durable-record regression charter.' \
+      JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
       || fail "real secondmate seeding failed for $case_name"
     child=$(cd "$child" && pwd -P)
     make_fake_curl "$child" >/dev/null
@@ -1044,8 +1044,8 @@ test_secondmate_teardown_rejects_unsafe_durable_parent_records() {
         ;;
     esac
 
-    PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-      FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+    PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+      JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
       expect_failure "an unsafe $case_name durable parent record must refuse cleanup" \
       "$TEARDOWN" work-child
     assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
@@ -1073,8 +1073,8 @@ test_secondmate_teardown_rejects_nul_bearing_durable_parent_record() {
   local parent child parent_resolved pre suf record
   parent=$(make_home teardown-durable-nul-parent relay-off)
   child="$TMP_ROOT/teardown-durable-nul-child"
-  FM_SECONDMATE_CHARTER='Durable-record NUL regression charter.' \
-    FM_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
+  JG_SECONDMATE_CHARTER='Durable-record NUL regression charter.' \
+    JG_HOME="$parent" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "real secondmate seeding failed"
   child=$(cd "$child" && pwd -P)
   parent_resolved=$(cd "$parent" && pwd -P)
@@ -1098,9 +1098,9 @@ test_secondmate_teardown_rejects_nul_bearing_durable_parent_record() {
     printf '%s\n' "$suf"
   } > "$record"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_CONFIG_OVERRIDE="$child/config" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_CONFIG_OVERRIDE="$child/config" \
     expect_failure "a NUL-bearing durable parent record must refuse cleanup" \
     "$TEARDOWN" work-child
   assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
@@ -1128,9 +1128,9 @@ SH
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   rc=0
-  out=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FAKE_TASKS_AXI_LOG="$tasks_log" \
+  out=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" FAKE_TASKS_AXI_LOG="$tasks_log" \
     "$TEARDOWN" work-disabled 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "relay-disabled unmarked teardown must not refuse public-followup cleanup (rc=$rc): $out"
   [ ! -s "$tasks_log" ] || fail "relay-disabled unmarked teardown must not invoke tasks-axi: $(tr '\n' ';' < "$tasks_log")"
@@ -1164,10 +1164,10 @@ SH
     "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   rc=0
-  out=$(PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_CONFIG_OVERRIDE="$child/config" \
-    FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" FAKE_TASKS_AXI_LOG="$tasks_log" \
+  out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_CONFIG_OVERRIDE="$child/config" \
+    JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" FAKE_TASKS_AXI_LOG="$tasks_log" \
     "$TEARDOWN" work-disabled 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "relay-disabled parent must allow marked-child teardown (rc=$rc): $out"
   [ ! -s "$tasks_log" ] || fail "relay-disabled parent must not invoke tasks-axi for a marked child"
@@ -1191,9 +1191,9 @@ test_secondmate_parent_binding_matches_literal_id() {
     "window=firstmate:jg-work-literal" "endpoint_task_id=work-literal" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
-    FM_CONFIG_OVERRIDE="$child/config" FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
+    JG_CONFIG_OVERRIDE="$child/config" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
     expect_failure "a near-match registry id must not satisfy a dotted parent binding" \
     "$TEARDOWN" work-literal
   assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate.id" \
@@ -1288,9 +1288,9 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
     "spawn_gen=public-followup-guard"
 
   rc=0
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task \
     > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "cleanup must refuse while a public reply is still owed"
   assert_grep "still owes a public reply" "$home/teardown.err" "the refusal must be explicit"
@@ -1301,9 +1301,9 @@ test_cleanup_refuses_while_a_public_reply_is_owed() {
   run_pf "$home" consume >/dev/null || fail "consume failed"
   FAKE_CURL_LOG="$home/curl.log" run_pf "$home" deliver pf-guard >/dev/null || fail "delivery failed"
   rc=0
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task >/dev/null 2>&1 || rc=$?
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-task >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ] || fail "cleanup must proceed once the public reply has landed (rc=$rc)"
   pass "cleanup refuses while a public reply is owed and proceeds once it has landed"
 }
@@ -1328,8 +1328,8 @@ SH
   for cmd in "consume" "pending" "guard-work main any-task" "retire anything"; do
     rc=0
     # shellcheck disable=SC2086  # each cmd is a deliberate argument list
-    out=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-      FM_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" $cmd 2>&1) || rc=$?
+    out=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+      JG_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" $cmd 2>&1) || rc=$?
     [ "$rc" -eq 0 ] || fail "'$cmd' must be a silent success in a relay-disabled home (rc=$rc)"
     [ -z "$out" ] || fail "'$cmd' must print nothing in a relay-disabled home, got: $out"
   done
@@ -1343,8 +1343,8 @@ SH
     && fail "a relay-disabled home must not grow a delivered open-loop registry"
 
   rc=0
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" active || rc=$?
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" active || rc=$?
   [ "$rc" -eq 1 ] || fail "'active' must report inactive in a relay-disabled home"
 
   [ ! -s "$tasks_log" ] \
@@ -1383,8 +1383,8 @@ SH
   for cmd in "consume" "pending" "guard-work main any-task"; do
     rc=0
     # shellcheck disable=SC2086  # each cmd is a deliberate argument list
-    out=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-      FM_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" $cmd 2>&1) || rc=$?
+    out=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+      JG_STATE_OVERRIDE="$home/state" FAKE_TASKS_AXI_LOG="$tasks_log" "$PF" $cmd 2>&1) || rc=$?
     [ "$rc" -eq 0 ] || fail "'$cmd' must be a silent success with no commitments (rc=$rc)"
     [ -z "$out" ] || fail "'$cmd' must print nothing with no commitments, got: $out"
   done
@@ -1422,30 +1422,30 @@ test_exhausted_binding_is_not_retried() {
 test_relay_poll_stays_inert_and_surfaces_once() {
   local off on out first second
   off=$(make_home poll-off relay-off)
-  out=$(PATH="$off/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$off" \
-    FM_STATE_OVERRIDE="$off/state" "$POLL" 2>&1)
+  out=$(PATH="$off/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$off" \
+    JG_STATE_OVERRIDE="$off/state" "$POLL" 2>&1)
   [ -z "$out" ] || fail "the relay poll must stay silent without a token, got: $out"
   assert_absent "$off/state/public-followup" "an inert poll must create nothing"
 
   on=$(make_home poll-on)
-  out=$(PATH="$on/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$on" \
-    FM_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
+  out=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
+    JG_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
   assert_not_contains "$out" "public-followup" \
     "a relay home with no public commitments must not mention public follow-ups"
 
   seed_commitment "$on" pf-poll req-poll discord main work-poll
-  out=$(PATH="$on/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$on" \
-    FM_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
+  out=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
+    JG_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
   assert_not_contains "$out" "public-followup" \
     "a registered commitment with no terminal result yet must not wake the poll"
 
   emit_terminal "$on" "$on" pf-poll main work-poll >/dev/null || fail "emit failed"
-  first=$(PATH="$on/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$on" \
-    FM_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
+  first=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
+    JG_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
   assert_contains "$first" "public-followup terminal results are waiting" \
     "a new terminal result must surface through the existing relay poll"
-  second=$(PATH="$on/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$on" \
-    FM_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
+  second=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
+    JG_STATE_OVERRIDE="$on/state" "$POLL" 2>&1)
   assert_not_contains "$second" "public-followup" \
     "an unchanged pending set must not wake firstmate again every cycle"
   pass "the relay poll stays inert without a token, silent with no commitments, and surfaces a new result once"
@@ -1456,17 +1456,17 @@ test_relay_poll_stays_inert_and_surfaces_once() {
 test_session_start_surfaces_only_when_owed() {
   local off on out
   off=$(make_home startup-off relay-off)
-  out=$(PATH="$off/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$off" \
-    FM_STATE_OVERRIDE="$off/state" FM_DATA_OVERRIDE="$off/data" \
-    FM_CONFIG_OVERRIDE="$off/config" "$SESSION_START" 2>&1)
+  out=$(PATH="$off/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$off" \
+    JG_STATE_OVERRIDE="$off/state" JG_DATA_OVERRIDE="$off/data" \
+    JG_CONFIG_OVERRIDE="$off/config" "$SESSION_START" 2>&1)
   assert_not_contains "$out" "Public commitments" \
     "a relay-disabled home must not gain a public-commitments section at startup"
 
   on=$(make_home startup-on)
   seed_commitment "$on" pf-start req-start discord main work-start
-  out=$(PATH="$on/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$on" \
-    FM_STATE_OVERRIDE="$on/state" FM_DATA_OVERRIDE="$on/data" \
-    FM_CONFIG_OVERRIDE="$on/config" "$SESSION_START" 2>&1)
+  out=$(PATH="$on/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$on" \
+    JG_STATE_OVERRIDE="$on/state" JG_DATA_OVERRIDE="$on/data" \
+    JG_CONFIG_OVERRIDE="$on/config" "$SESSION_START" 2>&1)
   assert_contains "$out" "Public commitments" \
     "an unresolved commitment must be surfaced at startup"
   assert_contains "$out" "unresolved pf-start state=pending-work platform=discord" \
@@ -1506,7 +1506,7 @@ test_dropped_baton_now_surfaces_open_loop() {
   local parent child log
   parent=$(make_home baton-parent)
   child="$TMP_ROOT/baton-child"
-  FM_SECONDMATE_CHARTER='Baton repro charter.' FM_HOME="$parent" \
+  JG_SECONDMATE_CHARTER='Baton repro charter.' JG_HOME="$parent" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null || fail "seed failed"
   child=$(cd "$child" && pwd -P)
   make_fake_curl "$child" >/dev/null
@@ -1532,8 +1532,8 @@ test_dropped_baton_now_surfaces_open_loop() {
     "window=firstmate:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
-  PATH="$parent/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$parent" \
-    FM_STATE_OVERRIDE="$parent/state" "$PF" guard-work secondmate:mate pi-rearm-loop-fix-r1 \
+  PATH="$parent/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$parent" \
+    JG_STATE_OVERRIDE="$parent/state" "$PF" guard-work secondmate:mate pi-rearm-loop-fix-r1 \
     || fail "guard-work unexpectedly blocked the unregistered follow-on"
 
   run_pf "$parent" pending > "$TMP_ROOT/pending.out"
@@ -1542,8 +1542,8 @@ test_dropped_baton_now_surfaces_open_loop() {
   grep -q 'request=req-pirearm' "$TMP_ROOT/pending.out" \
     || fail "the open-loop line must name the original request"
 
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" FAKE_CURL_LOG="$log" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" FAKE_CURL_LOG="$log" \
     "$TEARDOWN" pi-rearm-loop-fix-r1 > "$TMP_ROOT/td.out" 2>&1 || true
   case "$(cat "$TMP_ROOT/td.out")" in
     *"still owes a public reply"*) fail "teardown unexpectedly guarded the unregistered follow-on" ;;
@@ -1556,7 +1556,7 @@ test_control_registered_followon_is_guarded() {
   local parent child
   parent=$(make_home baton-control-parent)
   child="$TMP_ROOT/baton-control-child"
-  FM_SECONDMATE_CHARTER='Baton control charter.' FM_HOME="$parent" \
+  JG_SECONDMATE_CHARTER='Baton control charter.' JG_HOME="$parent" \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null || fail "seed failed"
   child=$(cd "$child" && pwd -P)
   make_fake_curl "$child" >/dev/null
@@ -1567,8 +1567,8 @@ test_control_registered_followon_is_guarded() {
   jg_write_meta "$child/state/pi-rearm-loop-fix-r1.meta" \
     "window=firstmate:jg-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
     "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
-  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+  PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_DATA_OVERRIDE="$child/data" \
     expect_failure "registered follow-on must be guarded" "$TEARDOWN" pi-rearm-loop-fix-r1
   assert_contains "$EXPECT_OUT" "still owes a public reply" "the guard fires only on presence"
   pass "CONTROL: the identical teardown REFUSES the moment a commitment is registered"
@@ -1800,7 +1800,7 @@ test_first_register_succeeds_with_empty_lock_list_under_bash32() {
   tasks_in "$home" public-followup bind-work pf-empty-locks \
     --relation-file "$home/relation.json" >/dev/null \
     || fail "could not bind work to the public commitment"
-  FM_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
+  JG_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
     ". '$ROOT/bin/jg-x-lib.sh'; fmx_context_registry_set '$home/state' req-empty-locks discord 1900" \
     || fail "could not retain the private request context"
 
@@ -2049,18 +2049,18 @@ test_pending_skips_concurrent_retirement() {
 
   seed_commitment "$home" pf-race-other req-race-other discord main work-race-other
 
-  FM_RACE_HOME="$home" FM_RACE_ROOT="$ROOT" bash -c '
-    . "$FM_RACE_ROOT/bin/jg-public-followup-lib.sh"
-    jg_pf_registry_lock_acquire "$FM_RACE_HOME/state" pf-race || exit 1
-    : > "$FM_RACE_HOME/lock-ready"
-    while [ ! -e "$FM_RACE_HOME/release-lock" ]; do sleep 0.02; done
+  JG_RACE_HOME="$home" JG_RACE_ROOT="$ROOT" bash -c '
+    . "$JG_RACE_ROOT/bin/jg-public-followup-lib.sh"
+    jg_pf_registry_lock_acquire "$JG_RACE_HOME/state" pf-race || exit 1
+    : > "$JG_RACE_HOME/lock-ready"
+    while [ ! -e "$JG_RACE_HOME/release-lock" ]; do sleep 0.02; done
     sleep 0.1
-    mkdir -p "$FM_RACE_HOME/state/public-followup/retired"
+    mkdir -p "$JG_RACE_HOME/state/public-followup/retired"
     printf "reason=concurrent close\nretired_at=2026-08-01T00:00:00Z\n" \
-      > "$FM_RACE_HOME/state/public-followup/retired/pf-race"
-    chmod 600 "$FM_RACE_HOME/state/public-followup/retired/pf-race"
-    rm -f "$FM_RACE_HOME/state/public-followup/registry/pf-race"
-    jg_pf_registry_lock_release "$FM_RACE_HOME/state" pf-race
+      > "$JG_RACE_HOME/state/public-followup/retired/pf-race"
+    chmod 600 "$JG_RACE_HOME/state/public-followup/retired/pf-race"
+    rm -f "$JG_RACE_HOME/state/public-followup/registry/pf-race"
+    jg_pf_registry_lock_release "$JG_RACE_HOME/state" pf-race
   ' &
   locker_pid=$!
   for _ in $(seq 1 100); do [ -e "$home/lock-ready" ] && break; sleep 0.02; done
@@ -2169,9 +2169,9 @@ test_retention_creates_no_false_teardown_refusal() {
   assert_present "$home/state/public-followup/registry/pf-retain" \
     "the delivered registration must still be present"
   rc=0
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-retain \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" ship-retain \
     > "$home/td.out" 2> "$home/td.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "teardown must proceed with a retained delivered registration (rc=$rc)"
   case "$(cat "$home/td.err")" in
@@ -2322,9 +2322,9 @@ test_x_request_teardown_warns_when_final_unposted() {
     "spawn_gen=public-followup-legacy-link" \
     "x_request=req-legacy-final"
   rc=0
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" linked-task \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" linked-task \
     > "$home/td.out" 2> "$home/td.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "legacy-link warning must not block teardown (rc=$rc)"
   assert_grep "still carries an unreconciled Relay request link (req-legacy-final) on its task record" "$home/td.err" \
@@ -2356,8 +2356,8 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
   jg_write_meta "$child/state/promote-conflict.meta" \
     "window=firstmate:jg-promote-conflict" "kind=scout"
   write_promotion_brief "$child" promote-conflict
-  out=$(PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
+  out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
     "$PROMOTE" promote-conflict --mode local-only --yolo off 2>&1) \
     || fail "promotion must not block on conflicting parent bindings: $out"
   assert_contains "$out" "promoted promote-conflict to ship" \
@@ -2371,11 +2371,11 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
   jg_write_meta "$child/state/promote-legacy.meta" \
     "window=firstmate:jg-promote-legacy" "kind=scout"
   write_promotion_brief "$child" promote-legacy
-  out=$(PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
-    FM_STATE_OVERRIDE="$child/state" FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
+  out=$(PATH="$child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$child" \
+    JG_STATE_OVERRIDE="$child/state" JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$parent" \
     "$PROMOTE" promote-legacy --mode local-only --yolo off 2>&1) \
     || fail "legacy parent recovery must not block promotion: $out"
-  assert_contains "$out" "next: FM_HOME=" \
+  assert_contains "$out" "next: JG_HOME=" \
     "a recovered legacy parent must identify the consent-holding home"
   assert_contains "$out" "--from pf-valid --work-home secondmate:mate --work-id promote-legacy" \
     "legacy parent recovery must print the rechain hint"
@@ -2388,8 +2388,8 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
   jg_write_meta "$remote_child/state/promote-remote.meta" \
     "window=firstmate:jg-promote-remote" "kind=scout"
   write_promotion_brief "$remote_child" promote-remote
-  out=$(PATH="$remote_child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$remote_child" \
-    FM_STATE_OVERRIDE="$remote_child/state" \
+  out=$(PATH="$remote_child/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$remote_child" \
+    JG_STATE_OVERRIDE="$remote_child/state" \
     "$PROMOTE" promote-remote --mode local-only --yolo off 2>&1) \
     || fail "a remote parent route must not block promotion: $out"
   assert_contains "$out" "promoted promote-remote to ship" \
@@ -2408,7 +2408,7 @@ test_secondmate_promotion_uses_teardown_parent_resolution() {
 # inbox either: the instructions it receives must name paths that exist WHERE IT
 # RUNS, and the owning home must collect the staged result over that same route.
 #
-# The transport is faked at the FM_SSH_BIN process seam and then runs the REAL
+# The transport is faked at the JG_SSH_BIN process seam and then runs the REAL
 # tracked remote entrypoint against a local "remote" checkout, so the work that
 # has to happen actually happens: no live host, no network, and no assumption
 # baked into a stub about what the far side would have done.
@@ -2455,9 +2455,9 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-case "${FM_FAKE_SSH_MODE:-normal}" in
+case "${JG_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
-  *) exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
+  *) exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
 esac
 SH
   chmod +x "$fakebin/fake-ssh"
@@ -2485,15 +2485,15 @@ EOF
 run_pf_remote() {  # <home> <args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
     FAKE_FOLLOWUP_CODE="${FAKE_FOLLOWUP_CODE:-200}" \
     FMX_NOW_OVERRIDE="${FMX_NOW_OVERRIDE:-$PF_TEST_NOW}" \
-    FM_SSH_BIN="$REMOTE_FIXTURE_SSH" \
-    FM_FAKE_SSH_MODE="${FM_FAKE_SSH_MODE:-normal}" \
-    FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_FIXTURE_ROOT/bin/jg-remote-entrypoint.sh" \
-    FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-    FM_REMOTE_JOB_STATE_ROOT="$REMOTE_FIXTURE_JOBS" \
+    JG_SSH_BIN="$REMOTE_FIXTURE_SSH" \
+    JG_FAKE_SSH_MODE="${JG_FAKE_SSH_MODE:-normal}" \
+    JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_FIXTURE_ROOT/bin/jg-remote-entrypoint.sh" \
+    JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+    JG_REMOTE_JOB_STATE_ROOT="$REMOTE_FIXTURE_JOBS" \
     "$PF" "$@"
 }
 
@@ -2501,15 +2501,15 @@ run_pf_remote_timed() {  # <seconds> <home> <args...>
   local seconds=$1 home=$2
   shift 2
   jg_run_timed "$seconds" env \
-    PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
+    PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" FAKE_CURL_LOG="${FAKE_CURL_LOG:-}" \
     FAKE_FOLLOWUP_CODE="${FAKE_FOLLOWUP_CODE:-200}" \
     FMX_NOW_OVERRIDE="${FMX_NOW_OVERRIDE:-$PF_TEST_NOW}" \
-    FM_SSH_BIN="$REMOTE_FIXTURE_SSH" \
-    FM_FAKE_SSH_MODE="${FM_FAKE_SSH_MODE:-normal}" \
-    FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_FIXTURE_ROOT/bin/jg-remote-entrypoint.sh" \
-    FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-    FM_REMOTE_JOB_STATE_ROOT="$REMOTE_FIXTURE_JOBS" \
+    JG_SSH_BIN="$REMOTE_FIXTURE_SSH" \
+    JG_FAKE_SSH_MODE="${JG_FAKE_SSH_MODE:-normal}" \
+    JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_FIXTURE_ROOT/bin/jg-remote-entrypoint.sh" \
+    JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+    JG_REMOTE_JOB_STATE_ROOT="$REMOTE_FIXTURE_JOBS" \
     "$PF" "$@"
 }
 
@@ -2581,7 +2581,7 @@ test_delivered_remote_registration_skips_offline_route() {
   mv "$registry.tmp" "$registry"
   chmod 600 "$registry"
 
-  out=$(FM_FAKE_SSH_MODE=unreachable run_pf_remote "$home" consume) \
+  out=$(JG_FAKE_SSH_MODE=unreachable run_pf_remote "$home" consume) \
     || fail "a delivered registration must not require its remote route: $out"
   [ -z "$out" ] || fail "a delivered registration must not report an unreached result: $out"
   pass "delivered remote registrations skip offline collection routes"
@@ -2805,7 +2805,7 @@ test_remote_unconfirmed_clear_is_unknown_completion() {
   jg_write_meta "$remote/state/work-unknown.meta" \
     "x_request=req-remote-unknown" "x_request_ts=1700000000" "x_followups=1"
 
-  FM_FAKE_SSH_MODE=unreachable \
+  JG_FAKE_SSH_MODE=unreachable \
     expect_failure "an unconfirmed remote clear must not close the loop" \
     run_pf_remote "$home" retire pf-remote-unknown --reason "closing" --force
   assert_contains "$EXPECT_OUT" "could not clear the legacy X link" \
@@ -2995,7 +2995,7 @@ test_remote_collection_transport_failure_is_loud() {
   remote=$(make_remote_route "$home" mini-default)
   seed_repro_commitment "$home" pf-remote-down req-remote-down secondmate:mini-default work-down
 
-  FM_FAKE_SSH_MODE=unreachable expect_failure \
+  JG_FAKE_SSH_MODE=unreachable expect_failure \
     "an unreachable work home must not pass as an empty inbox" \
     run_pf_remote "$home" consume
   assert_contains "$EXPECT_OUT" "mini-default" \
@@ -3224,7 +3224,7 @@ seed_typed_commitment() {
     --expires-at 2026-10-01T00:00:00Z >/dev/null || fail "add failed for $obligation"
   tasks_in "$home" public-followup bind-work "$obligation" --relation-file "$home/relation.json" >/dev/null \
     || fail "bind-work failed for $obligation"
-  FM_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
+  JG_HOME="$home" FMX_NOW_OVERRIDE="$PF_TEST_NOW" bash -c \
     ". '$ROOT/bin/jg-x-lib.sh'; fmx_context_registry_set '$home/state' '$request' discord 2000" \
     || fail "context retain failed for $obligation"
   run_pf "$home" register "$obligation" --relation rel-code --work-home "$work_home" \
@@ -3237,26 +3237,26 @@ seed_typed_commitment() {
 # The identity is derived exactly as the emitter derives it, so the only thing
 # under test downstream is the deliverable value. Prints the event id.
 publish_raw_event() {
-  FM_PF_TEST_DIR=$1 FM_PF_TEST_OBL=$2 FM_PF_TEST_HOME_ID=$3 FM_PF_TEST_WORK=$4 \
-    FM_PF_TEST_OUTCOME=$5 FM_PF_TEST_DELIV=$6 bash -c '
+  JG_PF_TEST_DIR=$1 JG_PF_TEST_OBL=$2 JG_PF_TEST_HOME_ID=$3 JG_PF_TEST_WORK=$4 \
+    JG_PF_TEST_OUTCOME=$5 JG_PF_TEST_DELIV=$6 bash -c '
       . "$1/bin/jg-public-followup-lib.sh"
-      d=$(printf "%s" "$FM_PF_TEST_DELIV" | jq -Sc .) || exit 1
-      id=$(jg_pf_event_id "$FM_PF_TEST_OBL" rel-code "$FM_PF_TEST_HOME_ID" \
-        "$FM_PF_TEST_WORK" 1 "$FM_PF_TEST_OUTCOME" "$d") || exit 1
-      jq -Sc -n --arg id "$id" --arg o "$FM_PF_TEST_OBL" --arg h "$FM_PF_TEST_HOME_ID" \
-        --arg w "$FM_PF_TEST_WORK" --arg t "$FM_PF_TEST_OUTCOME" --argjson d "$d" \
+      d=$(printf "%s" "$JG_PF_TEST_DELIV" | jq -Sc .) || exit 1
+      id=$(jg_pf_event_id "$JG_PF_TEST_OBL" rel-code "$JG_PF_TEST_HOME_ID" \
+        "$JG_PF_TEST_WORK" 1 "$JG_PF_TEST_OUTCOME" "$d") || exit 1
+      jq -Sc -n --arg id "$id" --arg o "$JG_PF_TEST_OBL" --arg h "$JG_PF_TEST_HOME_ID" \
+        --arg w "$JG_PF_TEST_WORK" --arg t "$JG_PF_TEST_OUTCOME" --argjson d "$d" \
         "{schema_version:1, event_id:\$id, obligation_id:\$o, relation_id:\"rel-code\",
           work_id:\$w, generation:1, source_home_id:\$h, outcome_type:\$t,
           deliverables:\$d, public_safe_outcome:\"The work finished.\",
           occurred_at:\"2026-08-21T02:00:00Z\", successor:null}" \
-        | fmx_private_artifact_publish_stdin_once "$FM_PF_TEST_DIR" "$id.json" 600 || exit 1
+        | fmx_private_artifact_publish_stdin_once "$JG_PF_TEST_DIR" "$id.json" 600 || exit 1
       printf "%s\n" "$id"
     ' _ "$ROOT"
 }
 
 run_poll() {  # <home>
-  PATH="$1/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$1" \
-    FM_STATE_OVERRIDE="$1/state" "$POLL" 2>&1
+  PATH="$1/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$1" \
+    JG_STATE_OVERRIDE="$1/state" "$POLL" 2>&1
 }
 
 # The reported failure, first part: the instructions a bound worker received
@@ -3801,8 +3801,8 @@ test_rejection_wake_survives_a_poll_that_cannot_write() {
   assert_present "$home/state/public-followup/rejection-wakes/$event_id" \
     "a refusal must queue a wake"
 
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" "$POLL" >&- 2>/dev/null || true
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" "$POLL" >&- 2>/dev/null || true
   assert_present "$home/state/public-followup/rejection-wakes/$event_id" \
     "a wake whose line could not be written must stay queued"
   assert_contains "$(run_poll "$home")" "public-followup rejected $event_id" \
@@ -3914,10 +3914,10 @@ test_a_retained_refusal_repeats_its_wake_rather_than_a_new_one() {
   pass "a refusal whose event was retained repeats its wake instead of a new one"
 }
 
-# CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2 empty-lock
+# CI's stock macOS Bash lane sets JG_TEST_ONLY to run just the bash-3.2 empty-lock
 # register regression. The rest of this file is not a 3.2 snapshot suite.
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
+if [ -n "${JG_TEST_ONLY:-}" ]; then
+  "$JG_TEST_ONLY"
   exit 0
 fi
 

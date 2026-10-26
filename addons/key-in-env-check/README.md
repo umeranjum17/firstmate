@@ -7,7 +7,7 @@ Wakes Main when any running fleet process carries a provider API key in its envi
 Every run it scans same-user processes under `/proc`, read-only:
 
 - **Names for matching.** `/proc/<pid>/environ` is split on NUL and only the variable names are matched against the pattern list. A value is never printed, logged, written, or sent on the network. The e2e test plants canary values and greps everything the check wrote.
-- **Matches names** against a pattern list: `*_API_KEY`, `*_API_TOKEN`, and `<PROVIDER>_*KEY|TOKEN|SECRET` for OPENROUTER, ANTHROPIC, OPENAI, MINIMAX, GOOGLE, GEMINI, XAI, MOONSHOT, ZAI, DEEPSEEK, MISTRAL, GROQ, COHERE, TOGETHER, FIREWORKS. Override with `FM_KEY_PATTERNS` (comma or space separated globs) or the home's `config/key-in-env-patterns`.
+- **Matches names** against a pattern list: `*_API_KEY`, `*_API_TOKEN`, and `<PROVIDER>_*KEY|TOKEN|SECRET` for OPENROUTER, ANTHROPIC, OPENAI, MINIMAX, GOOGLE, GEMINI, XAI, MOONSHOT, ZAI, DEEPSEEK, MISTRAL, GROQ, COHERE, TOGETHER, FIREWORKS. Override with `JG_KEY_PATTERNS` (comma or space separated globs) or the home's `config/key-in-env-patterns`.
 - **Attributes each hit** to a home and task: the process's cwd (or its nearest ancestor's) is matched against every home's `state/*.meta` `worktree=` record (homes: `~/firstmate` and `~/.treehouse/*/*/firstmate`); no match prints `unknown`.
 - **Names the parent still exporting it:** the parent chain is walked to the topmost ancestor that holds the same variable.
 
@@ -19,4 +19,4 @@ It never kills, signals or changes anything.
 
 ## Install and test
 
-`FM_HOME=<home> key-in-env-check/install.sh [--dry-run]` copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-key-in-env-check/` and registers `key-in-env-check` as a home watcher check. Remove with `uninstall.sh`. Test: `bash key-in-env-check/tests/key-in-env-check-e2e.sh` (uses a temp `HOME` and a fixture key file; never the real one).
+`JG_HOME=<home> key-in-env-check/install.sh [--dry-run]` copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-key-in-env-check/` and registers `key-in-env-check` as a home watcher check. Remove with `uninstall.sh`. Test: `bash key-in-env-check/tests/key-in-env-check-e2e.sh` (uses a temp `HOME` and a fixture key file; never the real one).

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Fixture proof for the daily scan: two local bare repos (one holding made-up
 # details, one clean) plus a temp patterns file. The due run returns at once
 # with no output and starts the loop detached; a later run prints the wake
@@ -11,10 +20,10 @@ SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)
 trap 'chmod -R u+w -- "$d"; rm -rf -- "$d"' EXIT
 export HOME=$d/home TMPDIR=$d GIT_CONFIG_NOSYSTEM=1
-unset FM_HOME
+unset JG_HOME
 FM=$d/fm
 mkdir -p "$HOME" "$FM/config" "$FM/state" "$FM/data" "$FM/bin"
-export FM_MAIN_HOME=$FM
+export JG_MAIN_HOME=$FM
 fails=0
 check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want: %s\n  got:  %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }

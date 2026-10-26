@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Behavior tests for bin/jg-dashboard.sh: build the pages from a small fixture
 # fleet through the real script and the real tasks-axi, with stub herdr,
 # quota-axi and device probes on PATH, then read each page's visible text
@@ -164,12 +173,12 @@ EOF
 build() {  # <home> [env...]: build with the fixture's stubs first on PATH
   local home=$1 out
   shift
-  out=$(env PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$home/stubs:$PATH" JG_HOME="$home" HOME="$home" JG_DEVICE_LOCK_DIR="$home/locks" JG_DASHBOARD_PROC="$home/proc" JG_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$home/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
 # GitHub's merges in the repositories the fleet recorded merges in, by local day beside the recorded ones: a repository
-# GitHub does not answer is named and leaves the count partial, a read lasts 30 minutes, and FM_DASHBOARD_FORGE=off skips it.
+# GitHub does not answer is named and leaves the count partial, a read lasts 30 minutes, and JG_DASHBOARD_FORGE=off skips it.
 test_forge_counts_merges_beside_the_recorded_ones() {
   local home d now
   home=$(make_home forge)
@@ -190,8 +199,8 @@ PY
   build "$home"
   [ "$(wc -l < "$home/gh.calls")" = 2 ] || fail "a forge read within 30 minutes was repeated: $(cat "$home/gh.calls")"
   has "$d/measure.html" "Merged on GitHub"
-  build "$home" FM_DASHBOARD_FORGE=off
-  jq -e '.metrics | has("landed_forge") | not' "$d/data.json" >/dev/null || fail "FM_DASHBOARD_FORGE=off still reads GitHub"
+  build "$home" JG_DASHBOARD_FORGE=off
+  jq -e '.metrics | has("landed_forge") | not' "$d/data.json" >/dev/null || fail "JG_DASHBOARD_FORGE=off still reads GitHub"
   pass "GitHub's merges sit beside the recorded ones by local day, a repository it does not answer is named, a read lasts 30 minutes"
 }
 
@@ -397,7 +406,7 @@ EOF
 printf 'MemoryCurrent=8589934592\nMemoryHigh=34359738368\nMemoryMax=40802189312\n'
 EOF
   chmod +x "$bin/adb" "$bin/pgrep" "$bin/systemctl"
-  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "In use 1" "Free 1" "Devices 1 + 1 = 2" \
     "Phone Pixel 9 Free · last used by Main 10 min ago · PHONE1 · USB" \
     "Emulator test-avd In use by Main · 10 min · emulator-5554 · 4.0 GB in use" \
@@ -411,7 +420,7 @@ EOF
   printf '#!/bin/sh\ncat "%s/adb-output"\n' "$home" > "$bin/adb"
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\n[ "$1" = "-cf" ] && { echo 0; exit 0; }\nexit 1\n' > "$bin/pgrep"
-  build "$home" FM_DASHBOARD_PROC="$proc"
+  build "$home" JG_DASHBOARD_PROC="$proc"
   has "$d/index.html" "Problem 1" "In use 1" "Free 1" "Devices 1 + 1 + 1 = 3" "Lock muxr-emu"
   jq -e '.metrics.devices.value == 3 and .metrics.connected_devices.value == 1 and .metrics.device_groups.value.action == {"Problem":1,"In use":1,"Free":1} and (.devices | length) == 3' "$d/data.json" >/dev/null || fail "offline devices or unmatched locks disappeared from JSON"
   printf '#!/bin/sh\n[ -e "%s/adb.fail" ] && { echo "error: daemon not running" >&2; exit 1; }\ncat "%s/adb-output"\n' "$home" "$home" > "$bin/adb"
@@ -419,23 +428,23 @@ EOF
   # the card and data.json alike: a 10 s spike the gate lets pass waits nobody.
   printf 'MemTotal:       67108864 kB\nMemAvailable:   20971520 kB\n' > "$proc/meminfo"
   printf 'some avg10=45.00 avg60=8.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
-  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "Memory pressure 8%"
   lacks "$d/index.html" "memory pressure, heavy jobs wait" "45%" "12%"
   jq -e '.metrics.memory_pressure.value == 8' "$d/data.json" >/dev/null || fail "data.json memory pressure is not the gate's sustained reading: $(jq -c .metrics.memory_pressure "$d/data.json")"
   printf 'some avg10=45.00 avg60=42.00 avg300=12.00 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' > "$proc/pressure/memory"
-  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "✕ 42% memory pressure, heavy jobs wait" "Memory pressure 42%"
   lacks "$d/index.html" "45%"
   rm "$proc/locks"
-  build "$home" FM_DASHBOARD_PROC="$proc"
+  build "$home" JG_DASHBOARD_PROC="$proc"
   has "$d/index.html" "Unknown 2"
   lacks "$d/index.html" "Free 1"
   jq -e '.metrics.device_groups.status == "unknown" and .metrics.device_groups.value == null and all(.devices[]; .holder == null)' "$d/data.json" >/dev/null || fail "unknown ownership exported as free capacity"
   # Each failed probe says unknown and why; nothing is guessed as zero.
   touch "$home/adb.fail" "$home/systemctl.fail"
   rm "$proc/meminfo"
-  build "$home" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "unknown - adb: error: daemon not running" \
     "Free memory unknown: $proc/meminfo: No such file or directory" "Heavy jobs unknown: Failed to connect to bus" \
     "unknown - device locks: $proc/locks: No such file or directory"
@@ -449,9 +458,9 @@ EOF
   nopath=$bin$(printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r p; do
     if [ -x "$p/adb" ]; then find "$p" -maxdepth 1 ! -name adb ! -type d -exec ln -s {} "$home/noadb/" \; 2>/dev/null; printf ':%s' "$home/noadb"
     else printf ':%s' "$p"; fi; done)
-  build "$home" PATH="$nopath" ANDROID_HOME="$home/sdk" FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" PATH="$nopath" ANDROID_HOME="$home/sdk" JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "Phone Pixel 9"
-  build "$home" PATH="$nopath" HOME="$home" ANDROID_HOME= ANDROID_SDK_ROOT= FM_DASHBOARD_PROC="$proc" FM_DEVICE_LOCK_DIR="$locks"
+  build "$home" PATH="$nopath" HOME="$home" ANDROID_HOME= ANDROID_SDK_ROOT= JG_DASHBOARD_PROC="$proc" JG_DEVICE_LOCK_DIR="$locks"
   has "$d/index.html" "unknown - adb: adb not found"
   pass "devices and machine come from read-only probes, name each holder's home, and say unknown with the reason"
 }
@@ -462,7 +471,7 @@ trap '[ -z "$SERVE_PID" ] || kill "$SERVE_PID" 2>/dev/null; jg_test_cleanup' EXI
 test_serve_answers_each_page_and_remembers_the_grouping() {
   local home url got
   home=$(make_home served)
-  PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_DEVICE_LOCK_DIR="$home/locks" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
+  PATH="$home/stubs:$PATH" JG_HOME="$home" HOME="$home" JG_DEVICE_LOCK_DIR="$home/locks" "$DASH" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
   SERVE_PID=$!
   for _ in $(seq 1 100); do
     url=$(sed -n 's/^serving //p' "$home/serve.out")
@@ -821,7 +830,7 @@ test_incomplete_lanes_and_moved_filings() {
   [ "$before" = "$after" ] || fail "moving tasks overcounted filings: $before -> $after"
   has "$d/index.html" "evidence=report.md ref:PR 22"
   lacks "$d/index.html" "evidence=/home/fixture/users/user-018" "ref:https://"
-  FM_HOME="$home" bash "$ROOT/bin/jg-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/backend.toon" || fail "backlog fixture failed"
+  JG_HOME="$home" bash "$ROOT/bin/jg-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/backend.toon" || fail "backlog fixture failed"
   printf 'backend = "beads"\n' > "$home/.tasks.toml"
   real_tasks=$(command -v tasks-axi)
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
@@ -936,7 +945,7 @@ test_unavailable_readings_and_concurrent_caches() {
   done
   home=$(make_home concurrent)
   : > "$home/data/secondmates.md"
-  FM_HOME="$home" bash "$ROOT/bin/jg-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"
+  JG_HOME="$home" bash "$ROOT/bin/jg-tasks-axi.sh" list --limit 10000 --fields held,hold_kind,hold_reason,blocked,created,closed > "$home/table"
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
   printf '#!/bin/sh\ncat "$TEST_TABLE"\ntouch "$TEST_TABLE.read"\n' > "$home/stubs/tasks-axi"
   chmod +x "$home/stubs/tasks-axi"
@@ -945,7 +954,7 @@ import fcntl, json, os, pathlib, subprocess, sys, time
 home, dash = pathlib.Path(sys.argv[1]), sys.argv[2]
 state = home / 'state/dashboard'
 original = (state / 'history.tsv').read_text()
-env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], FM_HOME=str(home), HOME=str(home), FM_DEVICE_LOCK_DIR=str(home / 'locks'), FM_DASHBOARD_PROC=str(home / 'proc'), FM_MAC_HOST='')
+env = dict(os.environ, PATH=str(home / 'stubs') + ':' + os.environ['PATH'], JG_HOME=str(home), HOME=str(home), JG_DEVICE_LOCK_DIR=str(home / 'locks'), JG_DASHBOARD_PROC=str(home / 'proc'), JG_MAC_HOST='')
 processes = []
 with (state / '.cache.lock').open('a') as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
@@ -1037,7 +1046,7 @@ test_serve_stops_when_its_code_changes() {
   local home pid url rc=0
   home=$(make_home restarted)
   mkdir -p "$home/dash" && cp "$DASH" "$home/dash/jg-dashboard.sh" && cp -r "$ROOT/bin/jg-dashboard" "$home/dash/"
-  PATH="$home/stubs:$PATH" FM_HOME="$home" HOME="$home" FM_BIN="$ROOT/bin" FM_DEVICE_LOCK_DIR="$home/locks" bash "$home/dash/jg-dashboard.sh" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
+  PATH="$home/stubs:$PATH" JG_HOME="$home" HOME="$home" JG_BIN="$ROOT/bin" JG_DEVICE_LOCK_DIR="$home/locks" bash "$home/dash/jg-dashboard.sh" serve --port 0 > "$home/serve.out" 2> "$home/serve.err" &
   pid=$!; SERVE_PID=$pid
   for _ in $(seq 1 100); do url=$(sed -n 's/^serving //p' "$home/serve.out"); [ -n "$url" ] && break; sleep 0.1; done
   [ -n "$url" ] || fail "serve never reported its address: $(cat "$home/serve.err")"

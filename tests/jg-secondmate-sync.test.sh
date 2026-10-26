@@ -44,7 +44,7 @@ set -u
 # shellcheck source=bin/jg-ff-lib.sh
 . "$ROOT/bin/jg-ff-lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 # The real lsof, captured before any test prepends a fakebin to PATH, for the
 # regression that needs genuine holder detection (same pattern as
@@ -56,7 +56,7 @@ jg_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(jg_test_tmproot jg-secondmate-sync)
 mkdir -p "$TMP_ROOT/no-addons"
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 # --- world builders --------------------------------------------------------
 
@@ -335,7 +335,7 @@ test_ff_stale_index_lock_recovery() {
   mkdir -p "$fakebin"
   lsof_shim "$fakebin" 1 # lsof: provably no holder
 
-  PATH="$fakebin:$PATH" FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
+  PATH="$fakebin:$PATH" JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = updated ] || fail "FF_STATUS: expected updated after stale-lock recovery, got '$FF_STATUS' (out: $FF_OUT)"
   assert_contains "$FF_OUT" "removed provably-stale git lock" "stale lock: recovery diagnostic missing"
@@ -351,7 +351,7 @@ test_ff_stale_index_lock_recovery() {
   : > "$lock2"
   lsof_shim "$fakebin" 0 # lsof: a live holder
 
-  PATH="$fakebin:$PATH" FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
+  PATH="$fakebin:$PATH" JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped for a live lock, got '$FF_STATUS' (out: $FF_OUT)"
   assert_contains "$FF_OUT" "secondmate sm: skipped: fast-forward failed: error: Unable to create" \
@@ -379,7 +379,7 @@ test_ff_stale_index_lock_tolerates_lsof_warnings() {
   mkdir -p "$fakebin"
   lsof_warn_no_holder "$fakebin"
 
-  PATH="$fakebin:$PATH" FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
+  PATH="$fakebin:$PATH" JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
 
   [ "$FF_STATUS" = updated ] || fail "FF_STATUS: expected updated despite lsof warnings, got '$FF_STATUS' (out: $FF_OUT)"
   assert_contains "$FF_OUT" "removed provably-stale git lock" "lsof warnings: recovery diagnostic missing"
@@ -392,7 +392,7 @@ test_ff_stale_index_lock_tolerates_lsof_warnings() {
   : > "$lock2"
   lsof_real_error "$fakebin"
 
-  PATH="$fakebin:$PATH" FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
+  PATH="$fakebin:$PATH" JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
 
   [ "$FF_STATUS" = skipped ] || fail "FF_STATUS: expected skipped on a real lsof error, got '$FF_STATUS' (out: $FF_OUT)"
   assert_contains "$FF_OUT" "not provably stale" "lsof error: refusal diagnostic missing"
@@ -423,7 +423,7 @@ test_ff_stale_index_lock_ignores_home_cwd_holder() {
   # A process with its cwd in the home - the running second mate's shape.
   ( cd "$w/sm" && exec sleep 30 ) & holder=$!
 
-  FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
+  JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm" "$base"
 
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
@@ -439,7 +439,7 @@ test_ff_stale_index_lock_ignores_home_cwd_holder() {
   : > "$lock2"
   ( exec sleep 30 9>"$lock2" ) & holder=$!
 
-  FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
+  JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 run_ff "$w/sm2" "$base"
 
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
@@ -490,7 +490,7 @@ test_sweep_nudge_requires_instruction_change() {
   bump_primary "$w" readme
   base=$(primary_head_commit "$w/main")
 
-  FM_ROOT="$w/main" FM_HOME="$w/home"
+  JG_ROOT="$w/main" JG_HOME="$w/home"
   FF_NUDGE_WINDOWS=""
   FF_SEEN_HOMES=""
   sweep_live_secondmate_metas "$w/home/state" "$base" yes >/dev/null
@@ -508,8 +508,8 @@ make_fake_toolchain() {
   fakebin="$dir/fakebin"
   mkdir -p "$fakebin"
   jg_fake_exit0 "$fakebin" node chrome-devtools-axi
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
-  jg_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -521,12 +521,12 @@ SH
   chmod +x "$fakebin/gh-axi"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-if [ -n "${FM_FAKE_TMUX_LOG:-}" ]; then
-  printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
+if [ -n "${JG_FAKE_TMUX_LOG:-}" ]; then
+  printf '%s\n' "$*" >> "$JG_FAKE_TMUX_LOG"
 fi
 case "$*" in
   list-windows*)
-    sed -n 's/^window=[^:]*://p' "${FM_HOME:?}"/state/*.meta
+    sed -n 's/^window=[^:]*://p' "${JG_HOME:?}"/state/*.meta
     exit 0
     ;;
   *display-message*'#{pane_current_command}'*) printf '%s\n' codex; exit 0 ;;
@@ -534,7 +534,7 @@ case "$*" in
   *display-message*'#{cursor_y}'*) printf '%s\n' 0; exit 0 ;;
   *capture-pane*) printf '❯\n'; exit 0 ;;
   *'send-keys'*' -l '*)
-    [ "${FM_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
     exit 0
     ;;
 esac
@@ -611,8 +611,8 @@ test_bootstrap_sweep_nudges_only_instruction_change() {
 
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   info_line=$(printf '%s\n' "$out" | grep '^BOOTSTRAP_INFO: nudged jg-sm-instr ' || true)
@@ -655,19 +655,19 @@ test_bootstrap_nudge_send_uses_state_override() {
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_STATE_OVERRIDE="$override_state" FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_STATE_OVERRIDE="$override_state" JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   assert_contains "$out" "BOOTSTRAP_INFO: nudged jg-sm-instr with" \
     "nudge send should resolve jg-sm-instr through the effective state dir"
   assert_not_contains "$out" "NUDGE_SECONDMATES:" \
-    "effective-state nudge should not fail through FM_HOME/state"
+    "effective-state nudge should not fail through JG_HOME/state"
   assert_contains "$(cat "$override_state/sm-instr.inbox/001.msg")" "[jg-from-firstmate]" \
     "effective-state nudge should still use secondmate marker metadata"
   marker="$override_state/.secondmate-nudge-pending/sm-instr.pending"
   assert_absent "$marker" "successful effective-state nudge should clear its retry marker"
-  pass "T8a bootstrap nudge send respects FM_STATE_OVERRIDE"
+  pass "T8a bootstrap nudge send respects JG_STATE_OVERRIDE"
 }
 
 test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
@@ -695,8 +695,8 @@ test_bootstrap_nudge_retry_rejects_malformed_marker_id() {
   fakebin=$(make_fake_toolchain "$w")
   log="$w/tmux.log"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate ../escape: send failed: retry marker has unsafe id" \
@@ -719,8 +719,8 @@ test_bootstrap_nudge_failure_records_retry_marker() {
   # (a keystroke failure alone no longer fails a durably enqueued nudge).
   : > "$w/home/state/sm-instr.inbox"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
@@ -742,8 +742,8 @@ test_bootstrap_nudge_retry_is_idempotent() {
   fakebin=$(make_fake_toolchain "$w")
   : > "$w/home/state/sm-instr.inbox"   # block the steer record: a real local failure
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
     "precondition: first nudge should fail"
@@ -751,14 +751,14 @@ test_bootstrap_nudge_retry_is_idempotent() {
   assert_present "$marker" "precondition: failed nudge should leave marker"
 
   rm -f "$w/home/state/sm-instr.inbox"   # unblock: the steer record can be written again
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "BOOTSTRAP_INFO: nudged jg-sm-instr with" \
     "retry should send the pending nudge once the endpoint works"
   assert_absent "$marker" "successful retry should clear the marker"
 
-  out2=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
+  out2=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   [ -z "$out2" ] || fail "idempotent retry should converge to silence, got: $out2"
   pass "T8d bootstrap nudge retry is idempotent after success"
 }
@@ -772,8 +772,8 @@ test_bootstrap_nudge_retry_refuses_changed_home() {
   fakebin=$(make_fake_toolchain "$w")
   : > "$w/home/state/sm-instr.inbox"   # block the steer record: a real local failure
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed:" \
     "precondition: first nudge should fail"
@@ -787,8 +787,8 @@ test_bootstrap_nudge_retry_refuses_changed_home() {
     sed -i "s|^home=.*|home=$other|" "$w/home/state/sm-instr.meta"
   rm -f "$w/home/state/sm-instr.meta.bak"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   assert_contains "$out" "NUDGE_SECONDMATES: secondmate sm-instr: send failed: retry target home changed" \
     "retry must not infer a nudge target outside the recorded failed home"
   assert_present "$marker" "ambiguous retry should keep marker for operator inspection"
@@ -866,7 +866,7 @@ test_nudge_retry_uses_fresh_herdr_endpoint_after_respawn() {
 #!/usr/bin/env bash
 set -u
 id=\${1:-}
-meta="\$FM_HOME/state/\$id.meta"
+meta="\$JG_HOME/state/\$id.meta"
 [ -f "\$meta" ] || exit 1
 sed -i.bak "s/^window=.*/window=$fresh/" "\$meta" 2>/dev/null || \
   sed -i "s/^window=.*/window=$fresh/" "\$meta"
@@ -882,9 +882,9 @@ SH
     pass "T8b nudge selector herdr respawn skipped without jq"
     return
   fi
-  out=$(PATH="$herdrfb:$toolchain:$BASE_PATH" HERDR_ENV=1 FM_BACKEND=herdr \
-    FM_SEND_SETTLE=0 \
-    FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$herdrfb:$toolchain:$BASE_PATH" HERDR_ENV=1 JG_BACKEND=herdr \
+    JG_SEND_SETTLE=0 \
+    JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   # The nudge now rides the durable inbox: a stale endpoint can only swallow
@@ -931,7 +931,7 @@ test_bootstrap_sweep_surfaces_skipped_home() {
   before=$(head_of "$w/sm-dirty")
 
   fakebin=$(make_fake_toolchain "$w")
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   skip_line=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate sm-dirty: skipped:' || true)
@@ -966,10 +966,10 @@ SH
   chmod +x "$fakebin/tmux"
 
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
-    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_ROOT_OVERRIDE="$w/main" JG_HOME="$w/home" \
+    JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>&1 || true
 
   [ "$(head_of "$w/sm")" = "$c2" ] \
@@ -1000,10 +1000,10 @@ SH
   chmod +x "$fakebin/tmux"
 
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" \
-    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_ROOT_OVERRIDE="$w/main" JG_HOME="$w/home" \
+    JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" sm "$w/sm" codex --secondmate >/dev/null 2>"$err" || true
 
   assert_contains "$(cat "$err")" \
@@ -1152,14 +1152,14 @@ cmd=${rargs[0]}
 [ "$cmd" != jg-remote-doctor.sh ] || exit 0
 # An older remote Firstmate copy rejects a command shape it does not know with
 # the usage status, which is exactly what a parent-targeted sync meets there.
-if [ "${FM_TEST_REMOTE_LEG_REJECT_SYNC:-0}" = 1 ] \
+if [ "${JG_TEST_REMOTE_LEG_REJECT_SYNC:-0}" = 1 ] \
   && [ "$cmd" = jg-remote-secondmate-control.sh ] && [ "${rargs[1]:-}" = sync ]; then
   printf 'Host-local lifecycle control for the remote secondmate home selected by jg-on.\n'
   exit 2
 fi
 rc=0
-env FM_HOME="$remote_home" FM_ROOT_OVERRIDE="$FM_REMOTE_CODE_ROOT" \
-  "$FM_TEST_REPO_ROOT/bin/$cmd" "${rargs[@]:1}" || rc=$?
+env JG_HOME="$remote_home" JG_ROOT_OVERRIDE="$JG_REMOTE_CODE_ROOT" \
+  "$JG_TEST_REPO_ROOT/bin/$cmd" "${rargs[@]:1}" || rc=$?
 exit "$rc"
 SH
   chmod +x "$fb/fake-ssh"
@@ -1174,7 +1174,7 @@ remote_sync() {
   local w=$1 id=$2
   shift 2
   REMOTE_SYNC_RC=0
-  REMOTE_SYNC_OUT=$(FM_HOME="$w/$id" FM_ROOT_OVERRIDE="$w/coderoot" \
+  REMOTE_SYNC_OUT=$(JG_HOME="$w/$id" JG_ROOT_OVERRIDE="$w/coderoot" \
     "$ROOT/bin/jg-remote-secondmate-control.sh" sync "$id" "$@" 2>&1) || REMOTE_SYNC_RC=$?
 }
 
@@ -1430,11 +1430,11 @@ test_bootstrap_syncs_remote_home_to_primary_commit() {
   fakebin=$(make_remote_leg_ssh_stub "$w")
   jg_fake_exit0 "$fakebin" gh treehouse tmux node
   out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_BOOTSTRAP_NETWORK=only \
-    FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
-    FM_TEST_REPO_ROOT="$ROOT" \
-    FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG='' FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_BOOTSTRAP_NETWORK=only \
+    JG_SSH_BIN="$fakebin/fake-ssh" JG_REMOTE_CODE_ROOT="$w/coderoot" \
+    JG_TEST_REPO_ROOT="$ROOT" \
+    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG='' JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1)
 
   [ "$(head_of "$w/sm")" = "$c2" ] \
@@ -1468,11 +1468,11 @@ test_bootstrap_reports_outdated_host_actionably() {
   fakebin=$(make_remote_leg_ssh_stub "$w")
   jg_fake_exit0 "$fakebin" gh treehouse tmux node
   out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_BOOTSTRAP_NETWORK=only \
-    FM_SSH_BIN="$fakebin/fake-ssh" FM_REMOTE_CODE_ROOT="$w/coderoot" \
-    FM_TEST_REPO_ROOT="$ROOT" FM_TEST_REMOTE_LEG_REJECT_SYNC=1 \
-    FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG='' FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_SEND_SETTLE=0 \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_BOOTSTRAP_NETWORK=only \
+    JG_SSH_BIN="$fakebin/fake-ssh" JG_REMOTE_CODE_ROOT="$w/coderoot" \
+    JG_TEST_REPO_ROOT="$ROOT" JG_TEST_REMOTE_LEG_REJECT_SYNC=1 \
+    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG='' JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1)
 
   assert_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped:" \
@@ -1483,7 +1483,7 @@ test_bootstrap_reports_outdated_host_actionably() {
 }
 
 # --- R9: a remote launch never re-targets the host's own Firstmate copy --------
-# The launch leg runs a host-local spawn whose FM_ROOT is that host's Firstmate
+# The launch leg runs a host-local spawn whose JG_ROOT is that host's Firstmate
 # copy. Once the parent has synced the home to ITS commit, that spawn must leave
 # the home there. The control home proves the suppressed step is otherwise live:
 # the ordinary secondmate spawn contract does move an identical home onto the
@@ -1511,17 +1511,17 @@ test_remote_launch_does_not_retarget_host_copy() {
 
   # The real launch leg, exactly as the parent invokes it after its own sync.
   launch_out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$w/launched" FM_ROOT_OVERRIDE="$w/coderoot" FM_SPAWN_NO_GUARD=1 \
+    JG_HOME="$w/launched" JG_ROOT_OVERRIDE="$w/coderoot" JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-remote-secondmate-control.sh" launch launched codex - - herdr 2>&1) || true
   [ "$(head_of "$w/launched")" = "$c1" ] \
     || fail "a remote launch moved the home onto the host's own Firstmate copy (out: $launch_out)"
 
   # Divergence control: the ordinary secondmate spawn contract DOES follow its
-  # FM_ROOT, so the suppressed step above is not vacuously absent.
+  # JG_ROOT, so the suppressed step above is not vacuously absent.
   control_out=$(PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$w/coderoot" FM_ROOT_OVERRIDE="$w/coderoot" \
-    FM_STATE_OVERRIDE="$w/control/state" FM_DATA_OVERRIDE="$w/control/data" \
-    FM_CONFIG_OVERRIDE="$w/control/config" FM_SPAWN_NO_GUARD=1 \
+    JG_HOME="$w/coderoot" JG_ROOT_OVERRIDE="$w/coderoot" \
+    JG_STATE_OVERRIDE="$w/control/state" JG_DATA_OVERRIDE="$w/control/data" \
+    JG_CONFIG_OVERRIDE="$w/control/config" JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" control "$w/control" --secondmate --harness codex --backend herdr 2>&1) || true
   [ "$(head_of "$w/control")" = "$c2" ] \
     || fail "the ordinary secondmate spawn did not follow its own checkout, so the launch case is vacuous (out: $control_out)"

@@ -6,16 +6,16 @@
 # answer, nudge or relaunch, and no config push - is add-on policy; this shim
 # only resolves that checkout and sources its reader. Every supervision
 # producer gates through the predicates it defines. When the add-on checkout
-# is absent (no FM_ADDONS_DIR, nothing at $FM_HOME/projects/firstmate-addons)
+# is absent (no JG_ADDONS_DIR, nothing at $JG_HOME/projects/firstmate-addons)
 # every predicate answers "not parked", so each gate is a no-op and behavior
 # is unchanged.
 
-_FM_PARKED_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_FM_PARKED_ADDONS="${FM_ADDONS_DIR:-${FM_HOME:-$_FM_PARKED_LIB_DIR/..}/projects/firstmate-addons}"
+_JG_PARKED_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_PARKED_ADDONS="${JG_ADDONS_DIR:-${JG_HOME:-$_JG_PARKED_LIB_DIR/..}/projects/firstmate-addons}"
 jg_parked_refuse_meta() { return 0; }
 jg_parked_skip_meta() { return 1; }
-if [ -f "$_FM_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh" ]; then
+if [ -f "$_JG_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh" ]; then
   # shellcheck source=/dev/null
   # shellcheck source=bin/jg-parked-homes-lib.sh
-  . "$_FM_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh"
+  . "$_JG_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh"
 fi

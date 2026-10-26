@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Fixture proof for the machine-wide guard: a throwaway HOME/XDG and temp
 # global gitconfig plus a home holding only made-up patterns. A plain-shell
 # leak commit is refused with file:line, a lane-env leak is refused, a
@@ -22,9 +31,9 @@ check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want:
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 ME=you@example.com
 printf '%s\n' '# fixture-only patterns' '' 'testguard-fake-surname' 'guardtest[0-9]{3}@example\.test' >"$FM/config/owner-details-patterns"
-export FM_HOME=$FM
+export JG_HOME=$FM
 GH=$d/data/jg-owner-guard/hooks
-plain() (cd "$d/plain" && env -u FM_HOME "$@")
+plain() (cd "$d/plain" && env -u JG_HOME "$@")
 
 # A previous global hooks dir, to prove chaining and restore.
 mkdir -p "$d/prevhooks"

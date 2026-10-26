@@ -52,9 +52,9 @@
 # runs it, and the authority to retire is the captain's.
 #
 # poll consumes jg-fleet-snapshot.sh --contribution-input, a local-only read,
-# and spends at most FM_CONTRIBUTIONS_BUDGET seconds on forge reads (default 20,
+# and spends at most JG_CONTRIBUTIONS_BUDGET seconds on forge reads (default 20,
 # 1..25). A configured value rides the generated check shim into watcher runs
-# and is cut down to the watcher's own per-check bound (FM_CHECK_TIMEOUT,
+# and is cut down to the watcher's own per-check bound (JG_CHECK_TIMEOUT,
 # default 30, read from the poll's environment because the watcher runs it as
 # a direct child) with a three-second margin. Every read is capped at five
 # seconds, and a read killed at that bound or at the deadline is budget
@@ -75,14 +75,14 @@
 # next URL that still has a full observation reserve; only a genuine forge
 # failure or head change records an error.
 # API failure leaves error evidence; an expired or absent observation is not
-# silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
+# silence. JG_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # A supported URL whose last good observation is merged or closed is final: it is
 # never re-read, stays fresh, and every owner's saved row converges on that
 # observation, with a stale error beside it cleared.
 # A genuine failure prints its unavailable line only when it starts an episode
 # (no prior owner has an error); a successful read ends the episode.
-# FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
-# FM_CONTRIBUTIONS_READY_LABEL selects the equivalent triage label, default
+# JG_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
+# JG_CONTRIBUTIONS_READY_LABEL selects the equivalent triage label, default
 # ready-for-pr. Labels are matched case-insensitively and exactly.
 #
 # New maintainer comments/reviews (OWNER, MEMBER, COLLABORATOR, excluding the
@@ -101,11 +101,11 @@
 # shellcheck disable=SC2016
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-$FM_ROOT}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-export FM_HOME FM_STATE_OVERRIDE="$STATE"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-$JG_ROOT}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+export JG_HOME JG_STATE_OVERRIDE="$STATE"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
@@ -117,14 +117,14 @@ fail() { printf 'jg-contributions: %s\n' "$*" >&2; exit 1; }
 usage() { sed -n '2,/^set -eu$/s/^# \{0,1\}//p' "$0"; }
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 command -v jq >/dev/null 2>&1 || fail 'jq is required to measure contribution coverage'
-NOW=${FM_CONTRIBUTIONS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+NOW=${JG_CONTRIBUTIONS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 EPOCH=$(jq -nr --arg now "$NOW" '$now | fromdateiso8601') || fail 'invalid observation clock'
-MAX_AGE=${FM_CONTRIBUTIONS_MAX_AGE:-900}
-BUDGET=${FM_CONTRIBUTIONS_BUDGET:-20}
+MAX_AGE=${JG_CONTRIBUTIONS_MAX_AGE:-900}
+BUDGET=${JG_CONTRIBUTIONS_BUDGET:-20}
 case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
 case "$BUDGET" in ''|*[!0-9]*) fail 'invalid poll budget' ;; esac
 [ "$BUDGET" -ge 1 ] && [ "$BUDGET" -le 25 ] || fail 'poll budget must be 1..25 seconds'
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
+CHECK_TIMEOUT=${JG_CHECK_TIMEOUT:-30}
 case "$CHECK_TIMEOUT" in ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;; esac
 BUDGET_CAP=$((CHECK_TIMEOUT - 3))
 [ "$BUDGET_CAP" -ge 1 ] || BUDGET_CAP=1
@@ -191,8 +191,8 @@ acquire() {
   [ -d "$STATE" ] && [ ! -L "$STATE" ] || fail 'state directory unavailable'
   [ -d "$DATA" ] && [ ! -L "$DATA" ] || fail 'data directory unavailable'
   # Keep the wake library's source-time state initialization off read-only paths.
-  FM_WAKE_QUEUE="$STATE/.wake-queue"
-  FM_WAKE_QUEUE_LOCK="$STATE/.wake-queue.lock"
+  JG_WAKE_QUEUE="$STATE/.wake-queue"
+  JG_WAKE_QUEUE_LOCK="$STATE/.wake-queue.lock"
   # shellcheck source=bin/jg-wake-lib.sh
   . "$SCRIPT_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$STATE/.contributions.lock" || fail 'observation lock unavailable'
@@ -299,7 +299,7 @@ observe() { # canonical GitHub URL -> normalized JSON
                  type:._signal,source:.html_url,head:.commit_id,
                  author:.user.login,body:(.body // "" | .[:500])}))}' > "$TMP/observation.json" || return 1
   else
-    label=${FM_CONTRIBUTIONS_READY_LABEL:-ready-for-pr}
+    label=${JG_CONTRIBUTIONS_READY_LABEL:-ready-for-pr}
     FORGE_ERR="$TMP/comments.err" forge api "repos/$part/issues/$number/comments?per_page=100" --paginate --slurp > "$TMP/comments.json" &
     local comments_pid=$!
     FORGE_ERR="$TMP/issue-events.err" forge api "repos/$part/issues/$number/events?per_page=100" --paginate --slurp > "$TMP/issue-events.json" &
@@ -331,12 +331,12 @@ publish_pending() { # task canonical-url record-file
     key=$(printf '%s\n%s\n' "$url" "$token" | shasum -a 256 | awk '{print $1}')
     emitted=0
     status=0
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
     if ! jg_wake_queued_keys_locked check | grep -Fx "contribution-$key" >/dev/null; then
       jg_wake_append_locked check "contribution-$key" "check: contributions $task $key" || status=1
       [ "$status" -ne 0 ] || emitted=1
     fi
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK" || status=1
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK" || status=1
     [ "$status" -eq 0 ] || return 1
     jq --arg token "$token" '.notified = ((.notified // []) + [$token] | unique)' "$record" > "$TMP/notified.json"
     mv "$TMP/notified.json" "$record"
@@ -467,11 +467,11 @@ arm() {
   jg_pr_regular_destination_on_device_or_absent "$STATE/contributions.check.sh" "$device" || fail 'unsafe check destination'
   staged=$(umask 077; mktemp "$STATE/.contributions-check.XXXXXX")
   shim=('#!/usr/bin/env bash'
-    "export FM_HOME=$(printf '%q' "$FM_HOME")"
-    "export FM_STATE_OVERRIDE=$(printf '%q' "$STATE")"
-    "export FM_DATA_OVERRIDE=$(printf '%q' "$DATA")")
-  if [ -n "${FM_CONTRIBUTIONS_BUDGET:-}" ]; then
-    shim+=("export FM_CONTRIBUTIONS_BUDGET=$(printf '%q' "$FM_CONTRIBUTIONS_BUDGET")")
+    "export JG_HOME=$(printf '%q' "$JG_HOME")"
+    "export JG_STATE_OVERRIDE=$(printf '%q' "$STATE")"
+    "export JG_DATA_OVERRIDE=$(printf '%q' "$DATA")")
+  if [ -n "${JG_CONTRIBUTIONS_BUDGET:-}" ]; then
+    shim+=("export JG_CONTRIBUTIONS_BUDGET=$(printf '%q' "$JG_CONTRIBUTIONS_BUDGET")")
   fi
   shim+=("exec $(printf '%q' "$SCRIPT_DIR/jg-contributions.sh") poll")
   printf '%s\n' "${shim[@]}" > "$staged"

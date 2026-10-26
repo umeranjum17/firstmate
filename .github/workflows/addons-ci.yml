@@ -23,8 +23,8 @@ jobs:
         working-directory: addons
     env:
       # Use the fork and add-ons from the exact same candidate, not a remote main.
-      FM_TEST_FORK: ${{ github.workspace }}
-      FM_CODE_ROOT: ${{ github.workspace }}
+      JG_TEST_FORK: ${{ github.workspace }}
+      JG_CODE_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:

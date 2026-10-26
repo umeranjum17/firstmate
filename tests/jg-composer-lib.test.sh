@@ -390,7 +390,7 @@ test_matrix_muse_truecolor_glyph_survives_signal_loss() {
   assert_screen "muse idle on herdr" empty "$CAPS_STYLED" "$screen"
   assert_screen "muse idle on zellij" empty "$CAPS_STYLED_NOID" "$screen"
   assert_screen "muse idle on cmux/orca" empty "$CAPS_PLAIN" "$plain"
-  out=$(FM_COMPOSER_GHOST_LUMA_MAX=200 jg_composer_classify_screen "$CAPS_STYLED" "$screen")
+  out=$(JG_COMPOSER_GHOST_LUMA_MAX=200 jg_composer_classify_screen "$CAPS_STYLED" "$screen")
   [ "$out" = empty ] || fail "muse must stay empty when the ghost strip eats its glyph (plain-row signal), got '$out'"
   pass "matrix: muse's ⟩ reads empty everywhere and survives losing the styled-glyph signal"
 }
@@ -830,7 +830,7 @@ test_matrix_pi_idle_pair_over_stale_working_registration() {
   pi_idle=$(printf 'pi\tidle'); pi_done=$(printf 'pi\tdone')
   pi_working=$(printf 'pi\tworking'); pi_blocked=$(printf 'pi\tblocked')
   none=$(printf 'zsh\t')
-  tail=$' : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your\n'
+  tail=$' : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your\n'
   tail+=$' \'writeboost.inbox\' steering inbox, read and act on each in numeric order, then\n'
   tail+=$' mv each into its handled/.\n'
   tail+=$'\n'
@@ -887,7 +887,7 @@ test_matrix_pi_stderr_notice_rows() {
   # ("composer visibly holds pending text") and every relaunch refused
   # ("not proven empty"). An Enter probe proved the editor empty both times.
   # The rule and its styling evidence live at
-  # FM_COMPOSER_PI_NOTICE_RE_DEFAULT / _jg_composer_row_is_pi_notice.
+  # JG_COMPOSER_PI_NOTICE_RE_DEFAULT / _jg_composer_row_is_pi_notice.
   local rules notice typed pi_idle pi_working out herdr_rules herdr_notice herdr_typed
   pi_idle=$(printf 'pi\tidle')
   pi_working=$(printf 'pi\tworking')
@@ -1040,7 +1040,7 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode 1.18.30 completed-turn typed composer on tmux" pending "$CAPS_TMUX" "$captured_pending" 3
   # Signal separation: with the idle pattern overridden to something that
   # cannot match, a DIM-styled hint still proves empty through the ghost strip.
-  out=$(FM_COMPOSER_IDLE_RE='^NEVER-MATCHES$' jg_composer_classify_screen "$CAPS_TMUX" "$dim_screen" 1)
+  out=$(JG_COMPOSER_IDLE_RE='^NEVER-MATCHES$' jg_composer_classify_screen "$CAPS_TMUX" "$dim_screen" 1)
   [ "$out" = empty ] || fail "a dim opencode hint must stay empty via the ghost strip alone, got '$out'"
   typed=$'┃\n┃  refactor the parser please\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high\n╹▀▀▀▀'
   assert_screen "opencode typed on tmux" pending "$CAPS_TMUX" "$typed" 1
@@ -1168,10 +1168,10 @@ test_matrix_opencode_leftbar_signals() {
   # path/usage/palette row and a bare `pockit` continuation. The bubble is
   # transcript furniture above the composer; the composer below is still empty.
   local unans_idle unans_typed
-  unans_idle=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  unans_idle=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x unanswered bubble above empty composer on herdr" empty "$CAPS_STYLED" "$unans_idle"
   assert_screen "opencode 1.18.x unanswered bubble above empty composer on cmux/orca" empty "$CAPS_PLAIN" "$unans_idle"
-  unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
+  unans_typed=$'  ┃\n  ┃  : Firstmate instruction waiting: list "$JG_TASK_INBOX"/*.msg in your \'mx-\n  ┃  pm-9b.inbox\' steering inbox, read and act on each in numeric order, then\n  ┃  mv each into its handled/.\n  ┃\n\n  ┃\n  ┃  Reply with OK.\n  ┃\n  ┃  Build · DeepSeek V4.1 Flash OpenCode Go\n'"$floor"$'\n   /home/you/.treehouse/pockit-497a78/8/   538.6K (54%) · $1.0 ctrl+p commands\n   pockit'
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on herdr" pending "$CAPS_STYLED" "$unans_typed"
   assert_screen "opencode 1.18.x typed draft under unanswered bubble on cmux/orca" unknown "$CAPS_PLAIN" "$unans_typed"
   # Live 2026-10-10 (OpenCode 1.18.25 through Herdr, the jg-model-scorecard
@@ -1716,11 +1716,11 @@ exit_picker_screen() {
 }
 
 jg_test_picker_send() {
-  printf 'Enter\n' >> "$FM_TEST_PICKER_ENTERS"
+  printf 'Enter\n' >> "$JG_TEST_PICKER_ENTERS"
 }
 
 jg_test_picker_state() {
-  jg_composer_classify_screen 'styled=1' "$FM_TEST_PICKER_SCREEN" 1
+  jg_composer_classify_screen 'styled=1' "$JG_TEST_PICKER_SCREEN" 1
 }
 
 test_background_exit_picker_stays_pending_and_blocks_retry() {
@@ -1737,28 +1737,28 @@ test_background_exit_picker_stays_pending_and_blocks_retry() {
   out=$(jg_composer_blocking_dialog "$(printf '%s\n' "$screen" '' '')"); rc=$?
   [ "$rc" -eq 0 ] || fail "blank rows below the footer should still match"
   sink=$(mktemp)
-  FM_COMPOSER_DIALOG_SINK=$sink
+  JG_COMPOSER_DIALOG_SINK=$sink
   out=$(jg_composer_classify_screen 'styled=1' "$screen" 1)
   [ "$out" = pending ] || fail "cursor on the selected row should stay pending, got '$out'"
   [ "$(cat "$sink")" = 'Claude background-task exit picker' ] || fail "classify should note the dialog, got '$(cat "$sink")'"
   out=$(jg_composer_classify_screen 'styled=1' "$screen")
   [ "$out" = pending ] || fail "a styled cursorless picker should stay pending, got '$out'"
-  unset FM_COMPOSER_DIALOG_SINK
+  unset JG_COMPOSER_DIALOG_SINK
   rm -f "$sink"
-  FM_TEST_PICKER_SCREEN=$screen
-  FM_TEST_PICKER_ENTERS=$(mktemp)
-  : > "$FM_TEST_PICKER_ENTERS"
+  JG_TEST_PICKER_SCREEN=$screen
+  JG_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$JG_TEST_PICKER_ENTERS"
   jg_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
-  sink=$FM_COMPOSER_DIALOG_SINK
+  sink=$JG_COMPOSER_DIALOG_SINK
   out=$(jg_composer_submit_retry_core jg_test_picker_send jg_test_picker_state win 3 0)
   jg_composer_dialog_sink_release
   [ ! -e "$sink" ] || fail "the release should remove a sink that prepare created"
-  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "the release should unset a sink that prepare created"
-  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  [ -z "${JG_COMPOSER_DIALOG_SINK:-}" ] || fail "the release should unset a sink that prepare created"
+  enters=$(grep -c '^Enter$' "$JG_TEST_PICKER_ENTERS" || true)
   [ "$out" = unknown ] || fail "a picker must stop the retry as unknown, got '$out'"
   [ "$enters" -eq 1 ] || fail "a picker must receive one Enter, got $enters"
-  rm -f "$FM_TEST_PICKER_ENTERS"
-  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  rm -f "$JG_TEST_PICKER_ENTERS"
+  unset JG_TEST_PICKER_SCREEN JG_TEST_PICKER_ENTERS
   pass "the Claude background-task exit picker stays pending and receives no confirming Enter"
 }
 
@@ -1803,11 +1803,11 @@ test_dialog_heading_and_footer_must_be_the_recorded_lines() {
 test_dialog_note_skips_the_match_when_no_sink_is_set() {
   local screen out rc before after
   screen=$(exit_picker_screen)
-  unset FM_COMPOSER_DIALOG_SINK
+  unset JG_COMPOSER_DIALOG_SINK
   out=$(jg_composer_note_blocking_dialog "$screen"); rc=$?
   [ "$rc" -eq 1 ] || fail "a note without a sink should return 1, got $rc"
   [ -z "$out" ] || fail "a note without a sink should print nothing, got '$out'"
-  [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ] || fail "a note without a sink must not create one"
+  [ -z "${JG_COMPOSER_DIALOG_SINK:-}" ] || fail "a note without a sink must not create one"
   out=$(jg_composer_classify_screen 'styled=1' "$screen" 1)
   [ "$out" = pending ] || fail "classify without a sink should stay pending, got '$out'"
   trap 'true' RETURN
@@ -1836,19 +1836,19 @@ test_quoted_exit_picker_text_is_not_a_dialog() {
     'Background work is running' \
     'Enter to confirm · Esc to cancel')"); rc=$?
   [ "$rc" -eq 1 ] || fail "a selected row above the heading must not match"
-  FM_TEST_PICKER_SCREEN=$screen
-  FM_TEST_PICKER_ENTERS=$(mktemp)
-  : > "$FM_TEST_PICKER_ENTERS"
+  JG_TEST_PICKER_SCREEN=$screen
+  JG_TEST_PICKER_ENTERS=$(mktemp)
+  : > "$JG_TEST_PICKER_ENTERS"
   jg_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
-  sink=$FM_COMPOSER_DIALOG_SINK
+  sink=$JG_COMPOSER_DIALOG_SINK
   out=$(jg_composer_submit_retry_core jg_test_picker_send jg_test_picker_state win 3 0)
   [ ! -s "$sink" ] || fail "quoted picker text must not be noted as a dialog, got '$(cat "$sink")'"
   jg_composer_dialog_sink_release
-  enters=$(grep -c '^Enter$' "$FM_TEST_PICKER_ENTERS" || true)
+  enters=$(grep -c '^Enter$' "$JG_TEST_PICKER_ENTERS" || true)
   [ "$out" = pending ] || fail "quoted picker text must keep the ordinary pending verdict, got '$out'"
   [ "$enters" -eq 3 ] || fail "quoted picker text must keep the ordinary Enter retries, got $enters"
-  rm -f "$FM_TEST_PICKER_ENTERS"
-  unset FM_TEST_PICKER_SCREEN FM_TEST_PICKER_ENTERS
+  rm -f "$JG_TEST_PICKER_ENTERS"
+  unset JG_TEST_PICKER_SCREEN JG_TEST_PICKER_ENTERS
   pass "picker text quoted above a normal composer is not read as a live picker"
 }
 

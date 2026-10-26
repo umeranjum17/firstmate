@@ -18,12 +18,12 @@
 set -eu
 
 # Exact pin - change only with a re-verified real-Herdr matrix.
-FM_HERDR_CI_VERSION=0.7.4
-FM_HERDR_CI_TAG="v${FM_HERDR_CI_VERSION}"
-FM_HERDR_CI_MIN_PROTOCOL=16
+JG_HERDR_CI_VERSION=0.7.4
+JG_HERDR_CI_TAG="v${JG_HERDR_CI_VERSION}"
+JG_HERDR_CI_MIN_PROTOCOL=16
 # Bounded download ceiling (bytes). The largest official 0.7.4 asset is under 20 MiB.
-FM_HERDR_CI_MAX_BYTES=25000000
-FM_HERDR_CI_REPO=ogulcancelik/herdr
+JG_HERDR_CI_MAX_BYTES=25000000
+JG_HERDR_CI_REPO=ogulcancelik/herdr
 
 die() {
   printf 'jg-install-herdr.sh: %s\n' "$*" >&2
@@ -56,14 +56,14 @@ case "${os}-${arch}" in
     ;;
 esac
 
-URL="https://github.com/${FM_HERDR_CI_REPO}/releases/download/${FM_HERDR_CI_TAG}/${ASSET}"
+URL="https://github.com/${JG_HERDR_CI_REPO}/releases/download/${JG_HERDR_CI_TAG}/${ASSET}"
 TMP=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/jg-herdr.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
 printf 'jg-install-herdr.sh: downloading %s from %s\n' "$ASSET" "$URL" >&2
 # --fail: HTTP errors; --location: follow redirects; --max-filesize: bound.
-curl -fsSL --max-filesize "$FM_HERDR_CI_MAX_BYTES" "$URL" -o "$TMP/$ASSET" \
-  || die "download failed for $URL (bounded at $FM_HERDR_CI_MAX_BYTES bytes)"
+curl -fsSL --max-filesize "$JG_HERDR_CI_MAX_BYTES" "$URL" -o "$TMP/$ASSET" \
+  || die "download failed for $URL (bounded at $JG_HERDR_CI_MAX_BYTES bytes)"
 
 if command -v sha256sum >/dev/null 2>&1; then
   ACTUAL_SHA256=$(sha256sum "$TMP/$ASSET" | awk '{print $1}')
@@ -80,8 +80,8 @@ install -m 0755 "$TMP/$ASSET" "$DESTINATION/herdr"
 
 # Post-install version and protocol gates (no floating latest).
 installed_version=$("$DESTINATION/herdr" --version 2>/dev/null | awk '{print $2; exit}')
-[ "$installed_version" = "$FM_HERDR_CI_VERSION" ] \
-  || die "installed herdr version is '${installed_version:-<empty>}', expected exact pin $FM_HERDR_CI_VERSION"
+[ "$installed_version" = "$JG_HERDR_CI_VERSION" ] \
+  || die "installed herdr version is '${installed_version:-<empty>}', expected exact pin $JG_HERDR_CI_VERSION"
 
 status=$("$DESTINATION/herdr" status --json 2>/dev/null) \
   || die "could not run 'herdr status --json' after install"
@@ -90,8 +90,8 @@ protocol=$(printf '%s' "$status" | jq -r '.client.protocol // empty' 2>/dev/null
 case "$protocol" in
   ''|*[!0-9]*) die "could not read herdr client protocol from status --json" ;;
 esac
-[ "$protocol" -ge "$FM_HERDR_CI_MIN_PROTOCOL" ] \
-  || die "herdr protocol $protocol is below the required floor $FM_HERDR_CI_MIN_PROTOCOL"
+[ "$protocol" -ge "$JG_HERDR_CI_MIN_PROTOCOL" ] \
+  || die "herdr protocol $protocol is below the required floor $JG_HERDR_CI_MIN_PROTOCOL"
 
 printf 'jg-install-herdr.sh: installed herdr %s (protocol %s) to %s\n' \
   "$installed_version" "$protocol" "$DESTINATION/herdr" >&2

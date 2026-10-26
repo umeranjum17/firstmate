@@ -15,7 +15,7 @@ jg_test_spawn_home "$HOME_DIR"
 
 # run_tool [args...]: sets CODE, OUT, and ERR from the real command.
 run_tool() {
-  FM_HOME="$HOME_DIR" "$TOOL" "$@" >"$TMP_ROOT/tool.out" 2>"$TMP_ROOT/tool.err"
+  JG_HOME="$HOME_DIR" "$TOOL" "$@" >"$TMP_ROOT/tool.out" 2>"$TMP_ROOT/tool.err"
   CODE=$?
   OUT=$(cat "$TMP_ROOT/tool.out")
   ERR=$(cat "$TMP_ROOT/tool.err")
@@ -65,7 +65,7 @@ assert_equals '' "$OUT" "an already reported model is never reported twice"
 run_tool install
 [ -f "$HOME_DIR/state/model-allowlist.check-trust" ] || fail "install must bind the check with jg-check-register.sh"
 rm -f "$HOME_DIR/state/.model-allowlist.seen"
-assert_contains "$(FM_HOME="$HOME_DIR" "$HOME_DIR/state/model-allowlist.check.sh")" 'gpt-9-nope' "the installed check reports the off-list launch through the watcher path"
+assert_contains "$(JG_HOME="$HOME_DIR" "$HOME_DIR/state/model-allowlist.check.sh")" 'gpt-9-nope' "the installed check reports the off-list launch through the watcher path"
 run_tool uninstall
 assert_absent "$HOME_DIR/state/model-allowlist.check.sh" "uninstall retires the check"
 assert_contains "$(cat "$LIST")" 'codex' "uninstall never touches the list"
@@ -81,14 +81,14 @@ jg_git_worktree "$project" "$worktree" wt-model-allowlist
 jg_test_spawn_brief "$HOME_DIR" t-refused
 jg_test_spawn_brief "$HOME_DIR" t-allowed
 : >"$launchlog"
-out=$(FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="$case_dir/pane.log" \
+out=$(JG_FAKE_LAUNCH_LOG="$launchlog" JG_FAKE_PANE_LOG="$case_dir/pane.log" \
   jg_test_run_spawn "$HOME_DIR" "$worktree" "$fakebin" t-refused "$project" --mode direct-PR --yolo off --harness codex --model codex/gpt-9-nope)
 status=$?
 expect_code 1 "$status" "an off-list spawn must be refused: $out"
 assert_contains "$out" 'codex model gpt-9-nope is not allowed (allowed: gpt-5.6-sol); allow it with bin/jg-model-allowlist.sh allow codex gpt-9-nope' "the refusal is one line naming the provider, the model and the way to allow it"
 assert_absent "$HOME_DIR/state/t-refused.meta" "a refused pick creates no task record"
 assert_equals '' "$(cat "$launchlog")" "a refused pick launches nothing"
-out=$(FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="$case_dir/pane.log" \
+out=$(JG_FAKE_LAUNCH_LOG="$launchlog" JG_FAKE_PANE_LOG="$case_dir/pane.log" \
   jg_test_run_spawn "$HOME_DIR" "$worktree" "$fakebin" t-allowed "$project" --mode direct-PR --yolo off --harness codex --model codex/gpt-5.6-sol)
 status=$?
 expect_code 0 "$status" "the same spawn with a listed model must succeed: $out"

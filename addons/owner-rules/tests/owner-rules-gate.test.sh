@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # owner-rules merge-gate e2e: the config/merge-gate that install.sh writes, run with the args jg-pr-merge.sh passes.
 # Usage: owner-rules/tests/owner-rules-gate.test.sh
 # Proves one refusal (no receipt) and one clean pass (a stubbed sealed clean done-done run at the head), plus the
@@ -33,9 +42,9 @@ STUB
 chmod +x "$work/bin/sign-off-axi"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 # shellcheck disable=SC2119,SC2120
-gate() { PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+gate() { PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data JG_HOME=$home JG_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
 main=$work/main; mkdir -p "$main/config"
-gate_inherit() { env -u FM_FLEET_BOARD PATH="$work/bin:$PATH" FM_HOME="$home" FM_MAIN_HOME="$main" "$home/config/merge-gate" lane - "$head" "$pr" 2>&1; printf 'rc=%s\n' "$?"; }
+gate_inherit() { env -u JG_FLEET_BOARD PATH="$work/bin:$PATH" JG_HOME="$home" JG_MAIN_HOME="$main" "$home/config/merge-gate" lane - "$head" "$pr" 2>&1; printf 'rc=%s\n' "$?"; }
 run=$home/data/lane/.done-done/runs/r1.json
 seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.png"],"run_id":"r1"}\n' "$1" > "$run"; }
 
@@ -48,13 +57,13 @@ is "refusal: no receipt" "$(gate)" "$REFUSAL
 rc=1"
 # The exact command that clears it, naming the ship's own copy when the gate has one.
 mkdir -p "$work/ship"
-with_wt=$(PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data FM_HOME=$home FM_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane "$work/ship" "$head" "$pr" 2>&1)
+with_wt=$(PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data JG_HOME=$home JG_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane "$work/ship" "$head" "$pr" 2>&1)
 is "refusal: no receipt names the copy to seal from" "$with_wt" "owner-rules: no passed-proof receipt for $pr: seal a clean done-done run at $head with: cd '$work/ship' && done-done run -- <the command that proves it>"
 seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
 seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
 is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
 seal "$head"
-LINT="owner-rules: no checks-lint PASS for $pr at $head; run FM_HOME=$home $work/data/jg-merge-on-green/checks-lint.sh $pr $home/data/lane then merge again"
+LINT="owner-rules: no checks-lint PASS for $pr at $head; run JG_HOME=$home $work/data/jg-merge-on-green/checks-lint.sh $pr $home/data/lane then merge again"
 is "refusal: receipt but no checks-lint row" "$(gate)" "$LINT
 rc=1"
 log=$home/data/checks-gate.log
@@ -63,10 +72,10 @@ is "refusal: lint row for another head, or failed" "$(gate | tail -1)" "rc=1"
 printf 't\t%s\t%s\tpass\tok\n' "$pr" "$head" >> "$log"
 card_refusal=$(gate)
 is "refusal: receipt and lint but missing board card" "$(printf '%s\n' "$card_refusal" | tail -1)" "rc=1"
-card_command=$(printf '%s\n' "$card_refusal" | sed -n 's|.*; post it with: FM_HOME=[^ ]* \(/[^ ]*\) post .*|\1|p')
+card_command=$(printf '%s\n' "$card_refusal" | sed -n 's|.*; post it with: JG_HOME=[^ ]* \(/[^ ]*\) post .*|\1|p')
 [ -n "$card_command" ] && [ -x "$card_command" ] && ok "card hint names an executable absolute path" || no "card hint command is not an executable absolute path: $card_command"
 # Guard gate/check script hints against bare add-on executables (a path is required in every home).
-if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(FM_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|jg-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
+if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(JG_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|jg-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
   "$addons/owner-rules" "$addons/merge-card" "$addons/merge-on-green" "$addons/owner-guard" "$addons/read-guard" "$addons/delete-guard" "$addons/kill-guard"; then
   no "bare add-on tool in gate/check hint"
 else
@@ -81,7 +90,7 @@ printf '%s\n' "$work/own-board.json" > "$home/config/fleet-board"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/own-board.json"
 is "refusal: lead board takes precedence over main board" "$(gate_inherit | tail -1)" "rc=1"
 rm -f "$home/config/fleet-board" "$main/config/fleet-board"
-expected_board="owner-rules: fleet board is not configured for $pr (set FM_FLEET_BOARD, or write its path with: echo <board.json> > $home/config/fleet-board; the main home's $main/config/fleet-board is the fallback)"
+expected_board="owner-rules: fleet board is not configured for $pr (set JG_FLEET_BOARD, or write its path with: echo <board.json> > $home/config/fleet-board; the main home's $main/config/fleet-board is the fallback)"
 is "refusal: all three board sources missing" "$(gate_inherit | tail -2)" "$expected_board
 rc=1"
 cardkey=merge-umeranjum17-firstmate-addons-pull-9

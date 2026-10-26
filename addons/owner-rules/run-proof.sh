@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
-# Real publication capture for done-done. Requires FM_PROOF_FORK=<Firstmate checkout>.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
+# Real publication capture for done-done. Requires JG_PROOF_FORK=<Firstmate checkout>.
 # Scratch is isolated and retained; no server, model, live board, or deletion here.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}
-fork=${FM_PROOF_FORK:?set FM_PROOF_FORK to a Firstmate checkout}
+fork=${JG_PROOF_FORK:?set JG_PROOF_FORK to a Firstmate checkout}
 head=$(git -C "$repo" rev-parse HEAD)
 work=$(mktemp -d /var/tmp/owner-rules-live.XXXXXX)
 export HOME=$work/user XDG_DATA_HOME=$work/data XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache
-export TMPDIR=$work/tmp SIGN_OFF_HOME=$work/board FM_HOME=$work/home FM_ADDONS_DIR=$repo
-mkdir -p "$HOME" "$TMPDIR" "$SIGN_OFF_HOME" "$FM_HOME/config" "$work/parent/state" "$FM_HOME/data/umer/.done-done/runs"
-printf 'umer\n' > "$FM_HOME/.jg-secondmate-home"
-printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$FM_HOME/.jg-secondmate-parent"
-bash "$repo/owner-rules/install.sh" "$FM_HOME" >/dev/null
+export TMPDIR=$work/tmp SIGN_OFF_HOME=$work/board JG_HOME=$work/home JG_ADDONS_DIR=$repo
+mkdir -p "$HOME" "$TMPDIR" "$SIGN_OFF_HOME" "$JG_HOME/config" "$work/parent/state" "$JG_HOME/data/umer/.done-done/runs"
+printf 'umer\n' > "$JG_HOME/.jg-secondmate-home"
+printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$work/parent" > "$JG_HOME/.jg-secondmate-parent"
+bash "$repo/owner-rules/install.sh" "$JG_HOME" >/dev/null
 board=$SIGN_OFF_HOME/decisions.json
 printf '{"schema":2,"items":[]}\n' > "$board"
 cp "$board" "$work/before.json"
 # Fixture prerequisite for merge-card's screen-free path, confined to this private board.
-jq -n --arg c "$head" '{schema:1,run_id:"fixture-only",commit:$c,dirty:false,exit:0,files:[{path:"proof.log"}]}' > "$FM_HOME/data/umer/.done-done/runs/run.json"
-printf 'screen: none\n' > "$FM_HOME/data/umer/checks.md"
+jq -n --arg c "$head" '{schema:1,run_id:"fixture-only",commit:$c,dirty:false,exit:0,files:[{path:"proof.log"}]}' > "$JG_HOME/data/umer/.done-done/runs/run.json"
+printf 'screen: none\n' > "$JG_HOME/data/umer/checks.md"
 record() { # expected exit, description, actual command...
   local expected=$1 label=$2 out rc=0; shift 2
   printf '\n%s\n$ ' "$label"
@@ -29,7 +38,7 @@ record() { # expected exit, description, actual command...
   if [ "$expected" -ne 0 ]; then [[ $out == *'use the sign-off board (sign-off-axi) instead'* ]]; fi
 }
 post() {
-  jq -n --arg claim "$1" '{verdict:"pass",check:{claim:$claim,evidence:["proof.log"]}}' > "$FM_HOME/data/umer/merge-card.json"
+  jq -n --arg claim "$1" '{verdict:"pass",check:{claim:$claim,evidence:["proof.log"]}}' > "$JG_HOME/data/umer/merge-card.json"
   record "$2" "$3" "$repo/merge-card/merge-card" post --board "$board" umer - "$head" -
 }
 {

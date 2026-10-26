@@ -27,9 +27,9 @@
 # with a non-symlink .lab-session file matching the session name.
 # Legacy <session>.xdg roots are refused pending guarded cleanup and fresh provisioning.
 # docs/herdr-backend.md#destructive-lab-safety owns the isolation boundary.
-# --isolated-xdg and FM_HERDR_LAB_ISOLATED_XDG=1 remain accepted for compatibility.
+# --isolated-xdg and JG_HERDR_LAB_ISOLATED_XDG=1 remain accepted for compatibility.
 # The fleet-state tripwire reads with the caller's HOME and XDG environment.
-# FM_HERDR_LAB_FLEET_HOME selects only the existing absolute fleet home for
+# JG_HERDR_LAB_FLEET_HOME selects only the existing absolute fleet home for
 # read-only fleet queries using its default XDG paths.
 # Session names must begin with "jg-lab-" and can never be "default".
 # The name command sanitizes the label, caps it at 16 characters, and appends
@@ -72,7 +72,7 @@ jg_herdr_lab_validate_name() { # <session>
 }
 
 jg_herdr_lab_state_dir() {
-  printf '%s' "${FM_HERDR_LAB_STATE_DIR:-${TMPDIR:-/tmp}/jg-herdr-lab-${UID}}"
+  printf '%s' "${JG_HERDR_LAB_STATE_DIR:-${TMPDIR:-/tmp}/jg-herdr-lab-${UID}}"
 }
 
 jg_herdr_lab_tripwire_path() { # <session>
@@ -194,16 +194,16 @@ jg_herdr_lab_session_list() { # <session>
 
 # Fleet observation never changes the named runtime's HOME or XDG context.
 jg_herdr_lab_fleet_session_list() ( # <session>
-  if [ "${FM_HERDR_LAB_FLEET_HOME+x}" = x ]; then
-    case "$FM_HERDR_LAB_FLEET_HOME" in
+  if [ "${JG_HERDR_LAB_FLEET_HOME+x}" = x ]; then
+    case "$JG_HERDR_LAB_FLEET_HOME" in
       /*) ;;
       *) jg_herdr_lab_error "fleet HOME must be an existing absolute directory"; return 1 ;;
     esac
-    [ -d "$FM_HERDR_LAB_FLEET_HOME" ] || {
+    [ -d "$JG_HERDR_LAB_FLEET_HOME" ] || {
       jg_herdr_lab_error "fleet HOME must be an existing absolute directory"
       return 1
     }
-    export HOME="$FM_HERDR_LAB_FLEET_HOME"
+    export HOME="$JG_HERDR_LAB_FLEET_HOME"
     unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME
   fi
   HERDR_SESSION="$1" herdr session list --json --session "$1"

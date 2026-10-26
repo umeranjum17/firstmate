@@ -111,9 +111,9 @@ pid_is_numeric() {
 start_worker() {
   local root=$1 account_home=$2 state_root=$3 pid deadline
   pid=$(
-    export FM_REMOTE_JOB_STATE_ROOT="$state_root"
-    export FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
-    export FM_REMOTE_JOB_ORPHAN_GRACE_SECONDS=1
+    export JG_REMOTE_JOB_STATE_ROOT="$state_root"
+    export JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
+    export JG_REMOTE_JOB_ORPHAN_GRACE_SECONDS=1
     # Production libraries are linted independently by jg-lint.sh.
     # shellcheck source=/dev/null
     . "$ROOT/bin/jg-remote-job-lib.sh"

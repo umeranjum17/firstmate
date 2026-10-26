@@ -15,7 +15,7 @@ Prerequisites:
 - The `orca` CLI, installed with `brew install orca`.
 - The universal harness and toolchain requirements in [`configuration.md`](configuration.md#toolchain).
 
-Select Orca with local `config/backend` containing `orca`, `FM_BACKEND=orca` for one launch, or an explicit request to Juggernaut.
+Select Orca with local `config/backend` containing `orca`, `JG_BACKEND=orca` for one launch, or an explicit request to Juggernaut.
 It is never auto-detected.
 
 Before any spawn mutates repository state, Juggernaut requires `orca status --json` to report `reachable=true` and `state="ready"`.
@@ -23,7 +23,7 @@ The first task for a project registers that repository with `orca repo add --pat
 No manual repository registration is required.
 
 Open the Orca app to watch a task's terminal.
-Routine supervision uses the recorded endpoint through `bin/jg-peek.sh <id>` and `FM_HOME=<home> bin/jg-send.sh <id> '<text>'`.
+Routine supervision uses the recorded endpoint through `bin/jg-peek.sh <id>` and `JG_HOME=<home> bin/jg-send.sh <id> '<text>'`.
 Enter and Ctrl-C are supported; Escape is not.
 
 ## Task shape and metadata

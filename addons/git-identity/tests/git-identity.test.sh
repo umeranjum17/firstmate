@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: a pooled-style lane worktree whose shared clone .git/config carries a stray identity
 # (t <t@e.c>), launched the way the fork's jg-spawn runs config/launch-env-hook, against a throwaway HOME and home.
-# With FM_ROOT set to a firstmate checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
-# as a real spawn does. Usage: [FM_ROOT=<firstmate>] git-identity/tests/git-identity.test.sh
+# With JG_ROOT set to a firstmate checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
+# as a real spawn does. Usage: [JG_ROOT=<firstmate>] git-identity/tests/git-identity.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)
@@ -72,9 +81,9 @@ lane() {
     "$FM/config/launch-env-hook" "$d/env.sh"
     # shellcheck source=/dev/null
     . "$d/env.sh"
-    if [ -n "${FM_ROOT:-}" ]; then
-      "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$d/jg-hooks" "$WT"
-      "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh" env-file "$d/jg-hooks" "$d/jg-env.sh"
+    if [ -n "${JG_ROOT:-}" ]; then
+      "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$d/jg-hooks" "$WT"
+      "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh" env-file "$d/jg-hooks" "$d/jg-env.sh"
       # shellcheck source=/dev/null
       . "$d/jg-env.sh"
     fi

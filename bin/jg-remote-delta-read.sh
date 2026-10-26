@@ -12,7 +12,7 @@
 # the source. A shortened or changed prefix returns a structured continuity-break
 # result instead of silently rebasing the cursor.
 #
-# The log is sampled every FM_REMOTE_DELTA_POLL_SECONDS (default 0.5 seconds).
+# The log is sampled every JG_REMOTE_DELTA_POLL_SECONDS (default 0.5 seconds).
 # A complete line is visible on the next sample, and the window deadline can
 # overshoot by that interval plus snapshot and scheduling work.
 # Each sample of an existing log stats it once. The first sample always runs
@@ -29,9 +29,9 @@
 # that contract.
 set -eu
 
-FM_HOME=${FM_HOME:?FM_HOME is required}
-MAX_BYTES=${FM_REMOTE_DELTA_MAX_BYTES:-65536}
-POLL_SECONDS=${FM_REMOTE_DELTA_POLL_SECONDS:-0.5}
+JG_HOME=${JG_HOME:?JG_HOME is required}
+MAX_BYTES=${JG_REMOTE_DELTA_MAX_BYTES:-65536}
+POLL_SECONDS=${JG_REMOTE_DELTA_POLL_SECONDS:-0.5}
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -120,11 +120,11 @@ resolve_log() { # <relative-path>
   case "$rel" in ''|/*|*'//'*) die "log must be a nonempty relative path" ;; esac
   case "/$rel/" in */../*|*/./*) die "log traversal is not allowed: $rel" ;; esac
   case "$rel" in *$'\n'*|*$'\r'*|*$'\t'*) die "log path contains control characters" ;; esac
-  home_real=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || die "FM_HOME is unavailable"
+  home_real=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME is unavailable"
   parent=$(dirname "$rel")
   base=$(basename "$rel")
-  parent_real=$(CDPATH='' cd -- "$FM_HOME/$parent" 2>/dev/null && pwd -P) || die "log parent is unavailable: $rel"
-  case "$parent_real" in "$home_real"|"$home_real"/*) ;; *) die "log escapes FM_HOME: $rel" ;; esac
+  parent_real=$(CDPATH='' cd -- "$JG_HOME/$parent" 2>/dev/null && pwd -P) || die "log parent is unavailable: $rel"
+  case "$parent_real" in "$home_real"|"$home_real"/*) ;; *) die "log escapes JG_HOME: $rel" ;; esac
   path="$parent_real/$base"
   if [ -e "$path" ] || [ -L "$path" ]; then
     [ -f "$path" ] && [ ! -L "$path" ] || die "log is not a non-symlink regular file: $rel"
@@ -156,8 +156,8 @@ case "$PREFIX" in *[!A-Fa-f0-9]*|'') die "prefix-sha256 must be hexadecimal" ;; 
 PREFIX=$(printf '%s' "$PREFIX" | tr 'A-F' 'a-f')
 case "$WAIT" in ''|*[!0-9]*) die "wait-seconds must be a nonnegative integer" ;; esac
 [ "$WAIT" -le 300 ] || die "wait-seconds exceeds the 300-second safety bound"
-case "$MAX_BYTES" in ''|*[!0-9]*|0) die "FM_REMOTE_DELTA_MAX_BYTES must be a positive integer" ;; esac
-[ "$MAX_BYTES" -le 1048576 ] || die "FM_REMOTE_DELTA_MAX_BYTES exceeds the safety bound"
+case "$MAX_BYTES" in ''|*[!0-9]*|0) die "JG_REMOTE_DELTA_MAX_BYTES must be a positive integer" ;; esac
+[ "$MAX_BYTES" -le 1048576 ] || die "JG_REMOTE_DELTA_MAX_BYTES exceeds the safety bound"
 
 LOG=$(resolve_log "$REL")
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-remote-delta.XXXXXX") || die "cannot create delta staging directory"

@@ -36,7 +36,7 @@
 #               conclusion is safe.
 #
 # Every step that crosses a host, plus each home's own accounting, runs under
-# one hard bound (FM_STOW_CASCADE_TIMEOUT seconds, default 60), so a slow or
+# one hard bound (JG_STOW_CASCADE_TIMEOUT seconds, default 60), so a slow or
 # unreachable home reports an exception and the sweep continues instead of
 # blocking the primary's own /stow. A local endpoint probe reads this host's
 # recorded backend in process, like every other caller of that contract.
@@ -61,10 +61,10 @@ esac
 [ "$#" -le 1 ] || { usage >&2; exit 2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 REGISTRY="$DATA/secondmates.md"
 BUDGET_CMD=jg-startup-memory-budget.sh
 SUB_HOME_MARKER="${SUB_HOME_MARKER:-.jg-secondmate-home}"
@@ -76,12 +76,12 @@ SUB_HOME_MARKER="${SUB_HOME_MARKER:-.jg-secondmate-home}"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 
-BOUND=${FM_STOW_CASCADE_TIMEOUT:-60}
+BOUND=${JG_STOW_CASCADE_TIMEOUT:-60}
 case "$BOUND" in
-  ''|*[!0-9]*) printf 'error: FM_STOW_CASCADE_TIMEOUT must be a positive integer: %s\n' "$BOUND" >&2; exit 2 ;;
+  ''|*[!0-9]*) printf 'error: JG_STOW_CASCADE_TIMEOUT must be a positive integer: %s\n' "$BOUND" >&2; exit 2 ;;
 esac
 [ "$BOUND" -gt 0 ] \
-  || { printf 'error: FM_STOW_CASCADE_TIMEOUT must be a positive integer: %s\n' "$BOUND" >&2; exit 2; }
+  || { printf 'error: JG_STOW_CASCADE_TIMEOUT must be a positive integer: %s\n' "$BOUND" >&2; exit 2; }
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 emit() { printf '%s\n' "$1"; }
@@ -161,7 +161,7 @@ resolve_remote_transport() { # <id>
   esac
 }
 
-if [ -e "$FM_HOME/$SUB_HOME_MARKER" ] || [ -L "$FM_HOME/$SUB_HOME_MARKER" ]; then
+if [ -e "$JG_HOME/$SUB_HOME_MARKER" ] || [ -L "$JG_HOME/$SUB_HOME_MARKER" ]; then
   emit 'role=secondmate'
   emit 'secondmates=0'
   emit 'reason=a secondmate home stows its own memory only and never cascades'
@@ -210,14 +210,14 @@ while IFS= read -r line || [ -n "$line" ]; do
     fi
     resolved=$VALIDATED_HOME
     emit "home=$resolved"
-    # Every FM_*_OVERRIDE is restated so a caller's own override cannot leak
+    # Every JG_*_OVERRIDE is restated so a caller's own override cannot leak
     # this home's memory files into the accounting of another home.
     run_step env \
-      FM_ROOT_OVERRIDE="$FM_ROOT" \
-      FM_HOME="$resolved" \
-      FM_STATE_OVERRIDE="$resolved/state" \
-      FM_DATA_OVERRIDE="$resolved/data" \
-      FM_CONFIG_OVERRIDE="$resolved/config" \
+      JG_ROOT_OVERRIDE="$JG_ROOT" \
+      JG_HOME="$resolved" \
+      JG_STATE_OVERRIDE="$resolved/state" \
+      JG_DATA_OVERRIDE="$resolved/data" \
+      JG_CONFIG_OVERRIDE="$resolved/config" \
       "$SCRIPT_DIR/$BUDGET_CMD" report || rc=$?
   fi
   if [ "$rc" -eq 124 ]; then

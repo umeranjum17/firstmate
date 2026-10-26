@@ -20,10 +20,10 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -53,7 +53,7 @@ scratch_path_refusal() {
   [ -d "$dir" ] || { echo "not a real directory" >&2; return 1; }
   [ -O "$dir" ] || { echo "not owned by this user" >&2; return 1; }
   dir=$(cd "$dir" && pwd -P) || return 2
-  for root in "$FM_HOME" "$FM_ROOT" "$STATE" "$DATA"; do
+  for root in "$JG_HOME" "$JG_ROOT" "$STATE" "$DATA"; do
     [ -d "$root" ] || continue
     protected=$(cd "$root" && pwd -P) || return 2
     case "$dir/" in

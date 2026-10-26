@@ -57,8 +57,8 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-TARGET_HOME=${FM_HOME:?FM_HOME is required}
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+TARGET_HOME=${JG_HOME:?JG_HOME is required}
 CONTROL_STATE="$TARGET_HOME/state/parent-route"
 CONTROL_DATA="$TARGET_HOME/data/.parent-route"
 REMOTE_HERDR_SESSION=jg-remote
@@ -97,8 +97,8 @@ remote_endpoint_load() {
     REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint metadata is invalid; refusing access until it is explicitly migrated"
     return 1
   fi
-  REMOTE_ENDPOINT_BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-  REMOTE_ENDPOINT_TARGET=$FM_BACKEND_VALIDATED_TARGET
+  REMOTE_ENDPOINT_BACKEND=$JG_BACKEND_VALIDATED_BACKEND
+  REMOTE_ENDPOINT_TARGET=$JG_BACKEND_VALIDATED_TARGET
   if [ "$REMOTE_ENDPOINT_BACKEND" != herdr ]; then
     REMOTE_ENDPOINT_ERROR="remote secondmate $id endpoint is recorded on backend '$REMOTE_ENDPOINT_BACKEND', expected 'herdr'; refusing access until it is explicitly migrated"
     return 1
@@ -205,10 +205,10 @@ cmd_launch() {
   [ "$model" = - ] || ARGS+=(--model "$model")
   [ "$effort" = - ] || ARGS+=(--effort "$effort")
   [ -z "$traceparent" ] || ARGS+=(--traceparent "$traceparent")
-  if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
-    FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
-    FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
-    FM_SKIP_SECONDMATE_SYNC=1 \
+  if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
+    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SECONDMATE_INHERIT=1 \
+    JG_SKIP_SECONDMATE_SYNC=1 \
     "$SCRIPT_DIR/jg-spawn.sh" "${ARGS[@]}" 2>&1); then
     [ -z "$out" ] || printf '%s\n' "$out" >&2
     die "remote host-local secondmate launch failed"
@@ -256,10 +256,10 @@ cmd_relaunch() {
   # the dedicated jg-remote session, and the parent already owns both convergence
   # legs, so the host-local spawn must not re-sync or re-inherit against this
   # host's own Firstmate copy.
-  HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
-    FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
-    FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
-    FM_SKIP_SECONDMATE_SYNC=1 \
+  HERDR_SESSION="$REMOTE_HERDR_SESSION" JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
+    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_SKIP_SECONDMATE_INHERIT=1 \
+    JG_SKIP_SECONDMATE_SYNC=1 \
     "$SCRIPT_DIR/jg-control.sh" "${control_args[@]}"
   # A parent tracking this route needs the identity the relaunch actually
   # produced, not the one it asked for, so it can republish its own record the
@@ -318,7 +318,7 @@ cmd_key() {
   validate_id "$id"
   validate_home "$id"
   remote_endpoint_require "$id"
-  FM_HOME="$TARGET_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$TARGET_HOME/state" \
+  JG_HOME="$TARGET_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$TARGET_HOME/state" \
     "$SCRIPT_DIR/jg-send.sh" "$REMOTE_ENDPOINT_TARGET" --key "$key"
 }
 
@@ -349,7 +349,7 @@ cmd_observe() {
 import_home_commit() { # <home> <commit>
   local home=$1 commit=$2
   if git -C "$home" cat-file -e "$commit^{commit}" 2>/dev/null; then return 0; fi
-  if git -C "$home" fetch --quiet --no-tags -- "$FM_ROOT" "$commit" 2>/dev/null \
+  if git -C "$home" fetch --quiet --no-tags -- "$JG_ROOT" "$commit" 2>/dev/null \
     && git -C "$home" cat-file -e "$commit^{commit}" 2>/dev/null; then
     return 0
   fi
@@ -370,7 +370,7 @@ cmd_sync() {
     case "$commit" in *[!0-9a-f]*) die "sync target must be a full 40-character commit id" ;; esac
     [ "${#commit}" -eq 40 ] || die "sync target must be a full 40-character commit id"
   else
-    commit=$(git -C "$FM_ROOT" rev-parse HEAD 2>/dev/null) || die "remote code root HEAD is unreadable"
+    commit=$(git -C "$JG_ROOT" rev-parse HEAD 2>/dev/null) || die "remote code root HEAD is unreadable"
   fi
   import_home_commit "$TARGET_HOME" "$commit" \
     || die "remote home could not import $commit from this host's Firstmate copy or the home's origin; run /updatefirstmate to refresh this host's copy, or push that commit first"
@@ -395,7 +395,7 @@ cmd_update() {
   local id=$1 update_out root_status
   validate_id "$id"
   validate_home "$id"
-  if ! update_out=$(FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
+  if ! update_out=$(JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
     "$SCRIPT_DIR/jg-update.sh" 2>&1); then
     [ -z "$update_out" ] || printf '%s\n' "$update_out" >&2
     die "remote code root update failed"
@@ -421,17 +421,17 @@ cmd_retire() {
   fi
   [ -z "$force" ] || [ "$force" = --force ] || usage
   remote_endpoint_require "$id"
-  FM_HOME="$TARGET_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$TARGET_HOME/state" \
-    FM_CONFIG_OVERRIDE="$TARGET_HOME/config" "$SCRIPT_DIR/jg-guard.sh" || true
+  JG_HOME="$TARGET_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$TARGET_HOME/state" \
+    JG_CONFIG_OVERRIDE="$TARGET_HOME/config" "$SCRIPT_DIR/jg-guard.sh" || true
   if [ -n "$force" ]; then
-    FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
-      FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
-      FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_TEARDOWN_GUARD_DONE=1 \
+    JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
+      JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
+      JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_TEARDOWN_GUARD_DONE=1 \
       "$SCRIPT_DIR/jg-teardown.sh" "$id" --force
   else
-    FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
-      FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
-      FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_TEARDOWN_GUARD_DONE=1 \
+    JG_HOME="$JG_ROOT" JG_ROOT_OVERRIDE="$JG_ROOT" \
+      JG_STATE_OVERRIDE="$CONTROL_STATE" JG_DATA_OVERRIDE="$CONTROL_DATA" \
+      JG_CONFIG_OVERRIDE="$TARGET_HOME/config" JG_TEARDOWN_GUARD_DONE=1 \
       "$SCRIPT_DIR/jg-teardown.sh" "$id"
   fi
 }

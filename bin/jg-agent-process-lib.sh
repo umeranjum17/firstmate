@@ -15,13 +15,13 @@
 # names below, and tests/jg-tmux-agent-liveness.test.sh plus
 # tests/jg-harness-liveness-drift-live-e2e.test.sh keep them honest.
 
-_FM_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
-[ "$_FM_AGENT_PROCESS_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_AGENT_PROCESS_LIB_DIR=.
+_JG_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
+[ "$_JG_AGENT_PROCESS_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_AGENT_PROCESS_LIB_DIR=.
 # shellcheck source=bin/jg-session-lock-lib.sh
-. "${_FM_AGENT_PROCESS_LIB_DIR:-/}/jg-session-lock-lib.sh"
+. "${_JG_AGENT_PROCESS_LIB_DIR:-/}/jg-session-lock-lib.sh"
 # shellcheck source=bin/jg-gemini-lib.sh
-. "${_FM_AGENT_PROCESS_LIB_DIR:-/}/jg-gemini-lib.sh"
-unset _FM_AGENT_PROCESS_LIB_DIR
+. "${_JG_AGENT_PROCESS_LIB_DIR:-/}/jg-gemini-lib.sh"
+unset _JG_AGENT_PROCESS_LIB_DIR
 
 # jg_agent_process_classify_name: the single owner of the process-name
 # vocabulary shared by every liveness signal - `agent` for a verified harness,

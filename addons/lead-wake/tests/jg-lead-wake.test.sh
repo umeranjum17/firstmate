@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The fork's lead-wake cases (tests/jg-watch-triage.test.sh: idle lead, lane floor, transient
 # empty, withdraw, full-but-idle; tests/jg-wake-queue.test.sh: drain ring), carried so the fork
 # can drop them. lead-wake-e2e.sh runs this from a staged fork's tests/ on the fork's wake harness,
@@ -23,13 +32,13 @@ newhome() {  # <name>: a fresh secondmate home; sets dir state fakebin out
   dir=$(make_case "$1"); state=$dir/state; fakebin=$dir/fakebin; out=$dir/watch.out
   mkdir -p "$dir/data" "$dir/config"; printf '%s\n' "$1" > "$dir/.jg-secondmate-home"
 }
-tasks() { FM_HOME="$dir" "$TASKS" "$@" >/dev/null || fail "fixture: tasks $*"; }
+tasks() { JG_HOME="$dir" "$TASKS" "$@" >/dev/null || fail "fixture: tasks $*"; }
 ack() { ack_stopped_cycle "$state" >/dev/null || fail "could not acknowledge the cycle"; }
-drained() { FM_STATE_OVERRIDE="$state" "$DRAIN" 2>/dev/null; }
+drained() { JG_STATE_OVERRIDE="$state" "$DRAIN" 2>/dev/null; }
 # wake <reason> [env...]: one watcher run exits on exactly <reason>.
 wake() {
   local want=$1 pid; shift
-  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 "$@"; pid=$!
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_HEARTBEAT=1 "$@"; pid=$!
   wait_for_exit "$pid" 100 || { reap "$pid"; fail "no wake, want: $want"; }
   grep -Fx "$want" "$out" >/dev/null || fail "want '$want', got: $(cat "$out")"
 }
@@ -37,7 +46,7 @@ wake() {
 absorbed() {
   local why=$1 pid i=0; shift
   rm -f "$state/.heartbeat-streak" "$state/.last-heartbeat"
-  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 "$@"; pid=$!
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_HEARTBEAT=1 "$@"; pid=$!
   until [ "$(cat "$state/.heartbeat-streak" 2>/dev/null || echo 0)" -ge 1 ]; do
     kill -0 "$pid" 2>/dev/null && [ "$i" -lt 200 ] || { reap "$pid"; fail "$why: $(cat "$out")"; }
     sleep 0.1; i=$((i + 1))
@@ -50,7 +59,7 @@ absorbed() {
 cycle() {
   local pid
   rm -f "$state/.last-ready-work-check"; : > "$out"
-  watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_HEARTBEAT=1 FM_WATCH_HANDLING_SUCCESSOR=1; pid=$!
+  watch_bg "$state" "$fakebin" "$out" env JG_HOME="$dir" JG_HEARTBEAT=1 JG_WATCH_HANDLING_SUCCESSOR=1; pid=$!
   wait_poll_cycle "$state" "$pid" 300 || { reap "$pid"; fail "$1: the cycle did not complete: $(cat "$out")"; }
   reap "$pid"
   [ ! -s "$out" ] || fail "$1: $(cat "$out")"
@@ -70,14 +79,14 @@ test_idle_lead() {
   absorbed "the same ready set woke the lead again"
   tasks add delta "third ready item"
   printf 'window=test:jg-busy\nkind=ship\n' > "$state/busy.meta"
-  absorbed "ready work woke a lead whose worker is working" FM_FAKE_TMUX_WINDOW=test:jg-busy FM_FAKE_CREW_STATE="$WORKING"
+  absorbed "ready work woke a lead whose worker is working" JG_FAKE_TMUX_WINDOW=test:jg-busy JG_FAKE_CREW_STATE="$WORKING"
   pass "an idle lead with ready work is woken once per ready set, and never while a worker is working"
 }
 test_lane_floor() {
   local spare='kind=secondmate\nmode=secondmate\n' want flow lanes
   newhome sm-lane-floor
   # Four panes stay open; the two spare endpoints are secondmates, which are not lanes.
-  lanes=(FM_FAKE_TMUX_WINDOWS="$(printf 'jg-busyone\njg-busytwo\njg-busythree\njg-busyfour')" FM_FAKE_CREW_STATE="$WORKING")
+  lanes=(JG_FAKE_TMUX_WINDOWS="$(printf 'jg-busyone\njg-busytwo\njg-busythree\njg-busyfour')" JG_FAKE_CREW_STATE="$WORKING")
   tasks add alpha-one "first ready item"
   printf '4\n' > "$dir/config/lane-target"
   printf 'window=test:jg-busyone\nkind=ship\n' > "$state/busyone.meta"; printf 'window=test:jg-busytwo\nkind=scout\n' > "$state/busytwo.meta"
@@ -99,7 +108,7 @@ test_lane_floor() {
   # Still holding after the resurface window, the same condition re-raises.
   printf 'window=test:jg-busythree\n%b' "$spare" > "$state/busythree.meta"; printf 'window=test:jg-busyfour\n%b' "$spare" > "$state/busyfour.meta"
   rm -f "$state/.heartbeat-streak" "$state/.last-heartbeat"; sleep 2
-  wake "$want" FM_READY_WORK_RESURFACE_SECS=1 "${lanes[@]}"; ack
+  wake "$want" JG_READY_WORK_RESURFACE_SECS=1 "${lanes[@]}"; ack
   # A malformed target is reported and falls back to the no-worker-working rule.
   printf 'four\n' > "$dir/config/lane-target"
   absorbed "a malformed lane-target read as a number and fired" "${lanes[@]}"
@@ -141,7 +150,7 @@ test_withdraw() {
   tasks unhold alpha-one
   rm -f "$state/.last-ready-work-check"
   wake "check: ready work waiting with free lane slots (0/4 open): alpha-one - start the top ready item now, or record why it waits" \
-    FM_WATCH_HANDLING_SUCCESSOR=1
+    JG_WATCH_HANDLING_SUCCESSOR=1
   ! drained | grep -F beta-two >/dev/null || fail "the drain presented a held item"
   pass "a stale ready-work row is withdrawn and the check never names a held item"
 }
@@ -152,16 +161,16 @@ test_full_idle() {
   printf '4\n' > "$dir/config/lane-target"
   for i in 1 2 3 4; do printf 'kind=ship\n' > "$state/lane$i.meta"; done
   wake "check: ready work waiting with no worker working: alpha-one - start each or record why it waits" \
-    FM_FAKE_CREW_STATE='state: blocked · source: status-log · parked on a sibling lane'
+    JG_FAKE_CREW_STATE='state: blocked · source: status-log · parked on a sibling lane'
   ack
   pass "a home with every lane slot open but no worker working is woken"
 }
 
 # leg <child-queue-the-ring-drains> <leg> <mode> [arg...]: one stall-watch leg at the fake clock.
 leg() {
-  PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" \
-    FM_FAKE_TMUX_SENT="$dir/sent" FM_FAKE_CHILD_WAKE_QUEUE=$1 FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 secondmate_stall_watch_leg "$dir" "${@:2}"
+  PATH="$fakebin:$PATH" JG_FAKE_NOW_FILE="$dir/now" JG_HOME="$dir" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$state" \
+    JG_FAKE_TMUX_SENT="$dir/sent" JG_FAKE_CHILD_WAKE_QUEUE=$1 JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 secondmate_stall_watch_leg "$dir" "${@:2}"
 }
 # A proven-idle mate with a frozen row is rung once; the steer names the row and its ack.
 test_drain_ring() {

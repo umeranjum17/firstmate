@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Provision the FM_HOME selected by the fixed remote entrypoint.
+# Provision the JG_HOME selected by the fixed remote entrypoint.
 #
 # Usage:
 #   jg-remote-home-provision.sh < manifest
@@ -24,8 +24,8 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME=${FM_HOME:?FM_HOME is required}
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME=${JG_HOME:?JG_HOME is required}
 MAX_MANIFEST_BYTES=1048576
 
 # shellcheck source=bin/jg-project-origin-lib.sh
@@ -65,7 +65,7 @@ release_provision_lock() {
   fi
 }
 restore_owned_file() { # <relative-path>
-  local rel=$1 dest="$FM_HOME/$1" backup="$TMP/before/$1"
+  local rel=$1 dest="$JG_HOME/$1" backup="$TMP/before/$1"
   if [ -f "$backup.present" ]; then
     mkdir -p "$(dirname "$dest")" || return 1
     cp -p -- "$backup" "$dest.tmp.rollback.$$" || return 1
@@ -79,16 +79,16 @@ rollback() {
   if [ "$status" -ne 0 ] && [ "$PUBLISHED" -eq 0 ]; then
     [ -z "$STAGE_HOME" ] || rm -rf -- "$STAGE_HOME"
     if [ "$CREATED_HOME" -eq 1 ]; then
-      rm -rf -- "$FM_HOME"
+      rm -rf -- "$JG_HOME"
     elif [ "$EXISTING_HOME" -eq 1 ]; then
       while IFS= read -r project; do
-        [ -n "$project" ] && rm -rf -- "$FM_HOME/projects/$project"
+        [ -n "$project" ] && rm -rf -- "$JG_HOME/projects/$project"
       done < "$CREATED_PROJECTS"
       restore_owned_file data/charter.md || true
       restore_owned_file data/projects.md || true
       restore_owned_file .jg-secondmate-home || true
       restore_owned_file .jg-secondmate-parent || true
-      [ "$CREATED_BACKLOG" -eq 0 ] || rm -f -- "$FM_HOME/data/backlog.md"
+      [ "$CREATED_BACKLOG" -eq 0 ] || rm -f -- "$JG_HOME/data/backlog.md"
     fi
   fi
   release_provision_lock
@@ -124,7 +124,7 @@ case "$COUNT" in ''|*[!0-9]*) die "manifest project count is invalid" ;; esac
 RECORDS=$(grep -c '^project=' "$TMP/manifest" 2>/dev/null || true)
 [ "$RECORDS" -eq "$COUNT" ] || die "manifest project count does not match its records"
 
-HOME_PARENT=$(dirname "$FM_HOME")
+HOME_PARENT=$(dirname "$JG_HOME")
 HOME_PARENT_REAL=$(CDPATH='' cd -- "$HOME_PARENT" 2>/dev/null && pwd -P) \
   || die "remote home parent is unavailable"
 [ "$HOME_PARENT_REAL" = "$HOME_PARENT" ] || die "remote home parent is not canonical"
@@ -138,25 +138,25 @@ else
     || die "cannot create remote provisioning lock root"
 fi
 if command -v shasum >/dev/null 2>&1; then
-  HOME_LOCK_KEY=$(printf '%s' "$FM_HOME" | shasum -a 256 | awk '{print $1}')
+  HOME_LOCK_KEY=$(printf '%s' "$JG_HOME" | shasum -a 256 | awk '{print $1}')
 elif command -v sha256sum >/dev/null 2>&1; then
-  HOME_LOCK_KEY=$(printf '%s' "$FM_HOME" | sha256sum | awk '{print $1}')
+  HOME_LOCK_KEY=$(printf '%s' "$JG_HOME" | sha256sum | awk '{print $1}')
 else
   die "no SHA-256 tool is available for provisioning serialization"
 fi
-FM_STATE_OVERRIDE="$PROVISION_LOCK_STATE"
+JG_STATE_OVERRIDE="$PROVISION_LOCK_STATE"
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 PROVISION_LOCK="$STATE/.remote-home-provision-$HOME_LOCK_KEY.lock"
 jg_lock_acquire_wait "$PROVISION_LOCK"
 PROVISION_LOCK_HELD=1
 
-if [ -e "$FM_HOME" ] || [ -L "$FM_HOME" ]; then
-  [ -d "$FM_HOME" ] && [ ! -L "$FM_HOME" ] || die "remote home exists but is not a safe directory"
-  [ -f "$FM_HOME/AGENTS.md" ] && [ ! -L "$FM_HOME/AGENTS.md" ] \
-    && [ -d "$FM_HOME/bin" ] && [ ! -L "$FM_HOME/bin" ] || die "existing remote home is not a safe Firstmate checkout"
+if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
+  [ -d "$JG_HOME" ] && [ ! -L "$JG_HOME" ] || die "remote home exists but is not a safe directory"
+  [ -f "$JG_HOME/AGENTS.md" ] && [ ! -L "$JG_HOME/AGENTS.md" ] \
+    && [ -d "$JG_HOME/bin" ] && [ ! -L "$JG_HOME/bin" ] || die "existing remote home is not a safe Firstmate checkout"
   for operational_dir in data state config projects; do
-    operational_path="$FM_HOME/$operational_dir"
+    operational_path="$JG_HOME/$operational_dir"
     if [ -e "$operational_path" ] || [ -L "$operational_path" ]; then
       [ -d "$operational_path" ] && [ ! -L "$operational_path" ] \
         || die "remote home has unsafe operational directory: $operational_dir"
@@ -164,7 +164,7 @@ if [ -e "$FM_HOME" ] || [ -L "$FM_HOME" ]; then
   done
   mkdir -p "$TMP/before/data"
   for rel in data/charter.md data/projects.md .jg-secondmate-home .jg-secondmate-parent; do
-    existing="$FM_HOME/$rel"
+    existing="$JG_HOME/$rel"
     if [ -e "$existing" ] || [ -L "$existing" ]; then
       [ -f "$existing" ] && [ ! -L "$existing" ] || die "existing remote home has unsafe owned file: $rel"
       mkdir -p "$(dirname "$TMP/before/$rel")"
@@ -173,9 +173,9 @@ if [ -e "$FM_HOME" ] || [ -L "$FM_HOME" ]; then
     fi
   done
   EXISTING_HOME=1
-  if [ -f "$FM_HOME/.jg-secondmate-home" ]; then
-    [ "$(cat "$FM_HOME/.jg-secondmate-home")" = "$ID" ] || die "existing remote home belongs to another secondmate"
-  elif find "$FM_HOME/data" "$FM_HOME/state" "$FM_HOME/projects" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+  if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
+    [ "$(cat "$JG_HOME/.jg-secondmate-home")" = "$ID" ] || die "existing remote home belongs to another secondmate"
+  elif find "$JG_HOME/data" "$JG_HOME/state" "$JG_HOME/projects" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
     die "unmarked existing remote home contains operational data"
   fi
 else
@@ -190,20 +190,20 @@ else
   # image does that copy before the destination shard directory exists, so the
   # clone dies intermittently with "failed to copy file to .../objects/xx/hash".
   # --no-local uses the normal transport and writes a pack instead.
-  git clone --no-local --quiet -- "$FM_ROOT" "$STAGE_HOME" || die "could not clone the remote Firstmate home"
+  git clone --no-local --quiet -- "$JG_ROOT" "$STAGE_HOME" || die "could not clone the remote Firstmate home"
   STAGE_SENTINEL="${STAGE_HOME##*/}.owner"
   : > "$STAGE_HOME/$STAGE_SENTINEL" || die "cannot mark the remote home staging directory"
-  mv -- "$STAGE_HOME" "$FM_HOME" || die "cannot install the remote home"
-  if [ ! -f "$FM_HOME/$STAGE_SENTINEL" ] || [ -L "$FM_HOME/$STAGE_SENTINEL" ]; then
-    STAGE_HOME="$FM_HOME/${STAGE_HOME##*/}"
+  mv -- "$STAGE_HOME" "$JG_HOME" || die "cannot install the remote home"
+  if [ ! -f "$JG_HOME/$STAGE_SENTINEL" ] || [ -L "$JG_HOME/$STAGE_SENTINEL" ]; then
+    STAGE_HOME="$JG_HOME/${STAGE_HOME##*/}"
     die "remote home appeared while it was being provisioned"
   fi
   STAGE_HOME=
   CREATED_HOME=1
-  rm -f -- "$FM_HOME/$STAGE_SENTINEL" || die "cannot clear the remote home staging sentinel"
+  rm -f -- "$JG_HOME/$STAGE_SENTINEL" || die "cannot clear the remote home staging sentinel"
 fi
 for operational_dir in data state config projects; do
-  operational_path="$FM_HOME/$operational_dir"
+  operational_path="$JG_HOME/$operational_dir"
   if [ -e "$operational_path" ] || [ -L "$operational_path" ]; then
     [ -d "$operational_path" ] && [ ! -L "$operational_path" ] \
       || die "remote home has unsafe operational directory: $operational_dir"
@@ -211,11 +211,11 @@ for operational_dir in data state config projects; do
     mkdir "$operational_path" || die "cannot create remote operational directory: $operational_dir"
   fi
 done
-if [ -e "$FM_HOME/data/backlog.md" ] || [ -L "$FM_HOME/data/backlog.md" ]; then
-  [ -f "$FM_HOME/data/backlog.md" ] && [ ! -L "$FM_HOME/data/backlog.md" ] \
+if [ -e "$JG_HOME/data/backlog.md" ] || [ -L "$JG_HOME/data/backlog.md" ]; then
+  [ -f "$JG_HOME/data/backlog.md" ] && [ ! -L "$JG_HOME/data/backlog.md" ] \
     || die "remote backlog is not a safe regular file"
 else
-  printf '## In flight\n\n## Queued\n\n## Done\n' > "$FM_HOME/data/backlog.md"
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$JG_HOME/data/backlog.md"
   CREATED_BACKLOG=1
 fi
 
@@ -247,7 +247,7 @@ EOF
   jg_project_origin_safe "$ORIGIN" || die "project $NAME origin is not an accepted clone URL: $ORIGIN"
   case "$MODE" in no-mistakes|direct-PR) ;; *) die "project $NAME has unsupported remote mode: $MODE" ;; esac
   case "$REGISTRY_LINE" in "- $NAME "*) ;; *) die "project $NAME registry line is malformed" ;; esac
-  DEST="$FM_HOME/projects/$NAME"
+  DEST="$JG_HOME/projects/$NAME"
   if [ -e "$DEST" ] || [ -L "$DEST" ]; then
     [ -d "$DEST" ] && [ ! -L "$DEST" ] && [ -d "$DEST/.git" ] \
       || die "project destination exists but is not a safe clone: $DEST"
@@ -265,21 +265,21 @@ EOF
   printf '%s\n' "$REGISTRY_LINE" >> "$PROJECT_REG"
 done < <(grep '^project=' "$TMP/manifest")
 
-cp "$TMP/charter" "$FM_HOME/data/charter.md.tmp.$$"
-chmod 600 "$FM_HOME/data/charter.md.tmp.$$"
-mv -f -- "$FM_HOME/data/charter.md.tmp.$$" "$FM_HOME/data/charter.md"
-cp "$PROJECT_REG" "$FM_HOME/data/projects.md.tmp.$$"
-mv -f -- "$FM_HOME/data/projects.md.tmp.$$" "$FM_HOME/data/projects.md"
+cp "$TMP/charter" "$JG_HOME/data/charter.md.tmp.$$"
+chmod 600 "$JG_HOME/data/charter.md.tmp.$$"
+mv -f -- "$JG_HOME/data/charter.md.tmp.$$" "$JG_HOME/data/charter.md"
+cp "$PROJECT_REG" "$JG_HOME/data/projects.md.tmp.$$"
+mv -f -- "$JG_HOME/data/projects.md.tmp.$$" "$JG_HOME/data/projects.md"
 {
   printf 'schema=jg-secondmate-parent.v1\n'
   printf 'route=remote\n'
   [ -z "$PARENT_HOST" ] || printf 'parent_host=%s\n' "$PARENT_HOST"
-} > "$FM_HOME/.jg-secondmate-parent.tmp.$$"
-mv -f -- "$FM_HOME/.jg-secondmate-parent.tmp.$$" "$FM_HOME/.jg-secondmate-parent"
-printf '%s\n' "$ID" > "$FM_HOME/.jg-secondmate-home.tmp.$$"
-mv -f -- "$FM_HOME/.jg-secondmate-home.tmp.$$" "$FM_HOME/.jg-secondmate-home"
+} > "$JG_HOME/.jg-secondmate-parent.tmp.$$"
+mv -f -- "$JG_HOME/.jg-secondmate-parent.tmp.$$" "$JG_HOME/.jg-secondmate-parent"
+printf '%s\n' "$ID" > "$JG_HOME/.jg-secondmate-home.tmp.$$"
+mv -f -- "$JG_HOME/.jg-secondmate-home.tmp.$$" "$JG_HOME/.jg-secondmate-home"
 PUBLISHED=1
 release_provision_lock
 trap - EXIT
 rm -rf -- "$TMP"
-printf 'provisioned: %s projects=%s\n' "$FM_HOME" "$COUNT"
+printf 'provisioned: %s projects=%s\n' "$JG_HOME" "$COUNT"

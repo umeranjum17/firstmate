@@ -72,7 +72,7 @@ $command_fields
 EOF
 [ "$cmd" = jg-remote-secondmate-control.sh ] || exit 93
 [ "$action" = relaunch ] || exit 94
-case "$FM_FAKE_RELAUNCH_MODE" in
+case "$JG_FAKE_RELAUNCH_MODE" in
   refuse)
     printf 'error: unverified remote secondmate harness: %s\n' "$harness" >&2
     exit 1
@@ -96,8 +96,8 @@ SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 run_relaunch() {  # <args...>
-  env FM_HOME="$HOME_DIR" FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-    FM_FAKE_RELAUNCH_MODE="${FM_FAKE_RELAUNCH_MODE:-}" \
+  env JG_HOME="$HOME_DIR" JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+    JG_FAKE_RELAUNCH_MODE="${JG_FAKE_RELAUNCH_MODE:-}" \
     "$ROOT/bin/jg-remote-secondmate-relaunch.sh" "$@" 2>&1
 }
 
@@ -125,9 +125,9 @@ pass "a successful remote relaunch republishes the parent's harness, model, and 
 
 # --- the parent records what the host confirmed, not what it was asked ------
 reset_meta
-FM_FAKE_RELAUNCH_MODE=confirm-other
+JG_FAKE_RELAUNCH_MODE=confirm-other
 OUT=$(run_relaunch ios default default default); RC=$?
-unset FM_FAKE_RELAUNCH_MODE
+unset JG_FAKE_RELAUNCH_MODE
 expect_code 0 "$RC" "a relaunch whose host resolves a different identity should succeed"$'\n'"$OUT"
 assert_grep 'harness=claude' "$HOME_DIR/state/ios.meta" \
   "the parent record should follow the host's confirmed harness"
@@ -140,9 +140,9 @@ pass "a remote relaunch records the identity the host confirmed"
 # --- a refused relaunch leaves the parent's record untouched -----------------
 reset_meta
 cp "$HOME_DIR/state/ios.meta" "$TMP/ios-before-refusal.meta"
-FM_FAKE_RELAUNCH_MODE=refuse
+JG_FAKE_RELAUNCH_MODE=refuse
 OUT=$(run_relaunch ios notaharness - -); RC=$?
-unset FM_FAKE_RELAUNCH_MODE
+unset JG_FAKE_RELAUNCH_MODE
 [ "$RC" -ne 0 ] || fail "a refused host relaunch must not be reported as successful"
 assert_contains "$OUT" "unverified remote secondmate harness" \
   "the refusal reason should reach the caller"

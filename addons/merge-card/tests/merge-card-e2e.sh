@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # merge-card e2e: the real script, a stub done-done placed earlier on PATH, and a
 # task folder holding a retained PNG and a Checks block that names it bare, as
 # PR 24's did. Like the real one, the stub resolves each evidence name against
@@ -235,8 +244,8 @@ head_c=e2ehead0000000000000000000000000000000000
 export SO_LOG=$work/so.log
 
 run_check_and_post() { # run_check_and_post <task-id> [<pr-url>] (<mode> is already exported)
-  PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check "$1" "$wt" "$head_c" "${2:--}"
-  PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" "${2:--}"
+  PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check "$1" "$wt" "$head_c" "${2:--}"
+  PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" "${2:--}"
 }
 
 checks() { # checks <task-id> <evidence>: the task folder's Checks block
@@ -268,10 +277,10 @@ if [ -f "$work/card-newer/1.png" ] && cmp -s "$work/card-newer/1.png" "$shot"; t
 # post --claim-id: the named claim reaches `done-done check` and the check re-runs over the gate's
 # record; without the flag no claim id is passed. A throwaway board keeps the earlier card out of it.
 : >"$DD_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" newer "$wt" "$head_c" - >/dev/null 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" newer "$wt" "$head_c" - >/dev/null 2>&1
 if grep -q -- '--claim-id' "$DD_LOG"; then no "claim id: none passed without the flag"; else ok "claim id: none passed without the flag"; fi
 : >"$DD_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" --claim-id fd-studio-hide-brief newer "$wt" "$head_c" - >/dev/null 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-claim.json" --claim-id fd-studio-hide-brief newer "$wt" "$head_c" - >/dev/null 2>&1
 if grep -q -- '^check .* --claim-id fd-studio-hide-brief' "$DD_LOG"; then ok "claim id: post passes it to done-done check"; else no "claim id: post passes it to done-done check: $(cat "$DD_LOG")"; fi
 
 # post --judge: the route reaches `done-done check` for that call alone, so a lane whose
@@ -279,18 +288,18 @@ if grep -q -- '^check .* --claim-id fd-studio-hide-brief' "$DD_LOG"; then ok "cl
 # fallback; without the flag done-done keeps its own configured judge. A throwaway board
 # keeps this card out of the next one.
 : >"$DD_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" newer "$wt" "$head_c" - >/dev/null 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" newer "$wt" "$head_c" - >/dev/null 2>&1
 if grep -q -- '--judge' "$DD_LOG"; then no "judge: none passed without the flag"; else ok "judge: none passed without the flag"; fi
 : >"$DD_LOG"
 SO_CAPTURE=$work/card-judge
 export SO_CAPTURE
-POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" --judge answerer:pi newer "$wt" "$head_c" - >/dev/null 2>&1
+POOL_FAIL=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-judge.json" --judge answerer:pi newer "$wt" "$head_c" - >/dev/null 2>&1
 if grep -q -- '^check .* --judge answerer:pi' "$DD_LOG"; then ok "judge: post passes the route to done-done check"; else no "judge: post passes the route to done-done check: $(cat "$DD_LOG")"; fi
 holds "judge: card still posts with a named route" "$work/card-judge/card.json"
 # gate --judge: the gate's own check carries the route too, so the merge gate judges the
 # proof with the route the caller named rather than the configured one.
 : >"$DD_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" gate --judge minimax:key newer "$wt" "$head_c" - >"$work/gate-judge.log" 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" gate --judge minimax:key newer "$wt" "$head_c" - >"$work/gate-judge.log" 2>&1
 if grep -q -- '^check .* --judge minimax:key' "$DD_LOG"; then ok "judge: gate passes the route to done-done check"; else no "judge: gate passes the route to done-done check: $(cat "$DD_LOG")"; fi
 is "judge: gate recorded the verdict" "$(jq -r .verdict "$home/data/newer/merge-card.json")" pass
 grep -q -- 'done-done check: pass' "$work/gate-judge.log" && ok "judge: gate reports the verdict" || no "judge: gate reports the verdict: $(cat "$work/gate-judge.log")"
@@ -307,7 +316,7 @@ printf 'command=%s\nstate=%s\n' "$work/bin/pool-claude" "$work/pool" >"$home/con
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-pool
 export MODE DD_LOG SO_CAPTURE
 checks pool shot.png && cp "$shot" "$home/data/pool/shot.png"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/pool-check.log" 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/pool-check.log" 2>&1
 is "pool: the check asks the pool for a claude account" "$(grep -c 'pick claude --json --state' "$DD_POOL_LOG")" 1
 is "pool: the judge runs on the picked account's folder" "$(cut -d' ' -f1 "$DD_ENV_LOG" | tail -n 1)" "dir=$POOL_FOLDER"
 is "pool: the pool's login variables are unset for it" "$(cut -d' ' -f2- "$DD_ENV_LOG" | tail -n 1)" "key= token="
@@ -317,32 +326,32 @@ is "pool: the verdict is still the check's" "$(jq -r .verdict "$home/data/pool/m
 rm -f "$home/config/account-pool"
 : >"$DD_ENV_LOG"
 : >"$DD_POOL_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check nopool "$wt" "$head_c" - >/dev/null 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check nopool "$wt" "$head_c" - >/dev/null 2>&1
 is "no pool: the pool is not asked" "$(wc -c <"$DD_POOL_LOG")" 0
 is "no pool: fallback judge starts" "$(wc -l <"$DD_ENV_LOG" | tr -d ' ')" 1
 printf 'command=%s\nstate=%s\n' "$work/bin/pool-claude" "$work/pool" >"$home/config/account-pool"
-POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/fallback.log" 2>&1
+POOL_FAIL=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/fallback.log" 2>&1
 is "reader failure: judge runs despite cached pick" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
 grep -q 'cached accounts will not be used' "$work/fallback.log" && ok "fallback reports age" || no "fallback reports age"
 rm -f "$home/state/claude-tool-pick.json"
 : >"$DD_ENV_LOG"
-POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/no-cache.log" 2>&1
+POOL_FAIL=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/no-cache.log" 2>&1
 is "reader failure without cache: judge starts" "$(wc -l <"$DD_ENV_LOG" | tr -d ' ')" 1
 grep -q 'quota reader unavailable' "$work/no-cache.log" && ok "failure reports cause" || no "failure reports cause"
 
 # A caller's explicit non-Claude route ignores even a dry pool.
 : >"$DD_POOL_LOG"
 : >"$DD_LOG"
-POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
+POOL_FAIL=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
 is "explicit non-Claude: no pool pick" "$(wc -c <"$DD_POOL_LOG")" 0
 is "explicit non-Claude: judge passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
 export ROUTE_LOG=$work/routes.log
 : >"$ROUTE_LOG"
-POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
+POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
 is "dry pool: Sol quota failure moves to Goat" "$(paste -sd, "$ROUTE_LOG")" 'openai-codex/gpt-6.1-sol,commandcode/deepseek/deepseek-v4.1-flash'
 is "dry pool: fallback verdict passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
 : >"$ROUTE_LOG"
-POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
+POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
 is "quota output: empty Codex skips to Goat" "$(cat "$ROUTE_LOG")" commandcode/deepseek/deepseek-v4.1-flash
 is "per-call config: global model unchanged" "$(python3 -c 'import os,yaml; print(yaml.safe_load(open(os.environ["DONE_DONE_HOME"]+"/config.yaml"))["judge"]["model"])')" claude-haiku-5-5
 unset ROUTE_LOG
@@ -368,16 +377,16 @@ if [ -f "$work/card-older/1.png" ] && cmp -s "$work/card-older/1.png" "$shot"; t
 # A caller's explicit non-Claude route ignores even a dry pool.
 : >"$DD_POOL_LOG"
 : >"$DD_LOG"
-POOL_FAIL=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
+POOL_FAIL=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check --judge answerer:pi pool "$wt" "$head_c" - >/dev/null 2>&1
 is "explicit non-Claude: no pool pick" "$(wc -c <"$DD_POOL_LOG")" 0
 is "explicit non-Claude: judge passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
 export ROUTE_LOG=$work/routes.log
 : >"$ROUTE_LOG"
-POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
+POOL_FAIL=1 SOL_LIMIT=1 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >"$work/routes.out" 2>&1
 is "dry pool: Sol quota failure moves to Goat" "$(paste -sd, "$ROUTE_LOG")" 'openai-codex/gpt-6.1-sol,commandcode/deepseek/deepseek-v4.1-flash'
 is "dry pool: fallback verdict passes" "$(jq -r .verdict "$home/data/pool/merge-card.json")" pass
 : >"$ROUTE_LOG"
-POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
+POOL_FAIL=1 CODEX_ROOM=0 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check pool "$wt" "$head_c" - >/dev/null 2>&1
 is "quota output: empty Codex skips to Goat" "$(cat "$ROUTE_LOG")" commandcode/deepseek/deepseek-v4.1-flash
 is "per-call config: global model unchanged" "$(python3 -c 'import os,yaml; print(yaml.safe_load(open(os.environ["DONE_DONE_HOME"]+"/config.yaml"))["judge"]["model"])')" claude-haiku-5-5
 unset ROUTE_LOG
@@ -413,11 +422,11 @@ is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.
 # A sealed clean run in done-done's own evidence root (a throwaway DONE_DONE_HOME, the real done-done) is accepted
 # for its head with no task folder run; one at another head is refused.
 if command -v done-done >/dev/null; then
-  git init -q "$home" # FM_HOME is a Firstmate checkout; done-done answers from inside a repo
+  git init -q "$home" # JG_HOME is a Firstmate checkout; done-done answers from inside a repo
   mkdir -p "$work/ddhome/evidence/app/.done-done/runs"
   jq -n --arg c "$head_c" '{schema:1, run_id:"20261020T000000Z-default0001", commit:$c, dirty:false, exit:0, files:[{path:"x/shot.png"}]}' \
     >"$work/ddhome/evidence/app/.done-done/runs/20261020T000000Z-default0001.json"
-  dd_receipt() { DONE_DONE_HOME=$work/ddhome FM_HOME=$home "$here/../merge-card" receipt norun "$1" >/dev/null 2>&1; echo $?; }
+  dd_receipt() { DONE_DONE_HOME=$work/ddhome JG_HOME=$home "$here/../merge-card" receipt norun "$1" >/dev/null 2>&1; echo $?; }
   is "default root: run at the head is accepted" "$(dd_receipt "$head_c")" 0
   is "default root: run at another head is refused" "$(dd_receipt otherhead)" 1
 else
@@ -426,7 +435,7 @@ fi
 is "failed run: card carries no receipt" "$(jq -c 'has("run")' "$work/card-failedrun/card.json")" false
 is "no run record: card carries no receipt" "$(jq -c 'has("run")' "$work/card-newer/card.json")" false
 checks gone gone.png
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check gone "$wt" "$head_c" -
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check gone "$wt" "$head_c" -
 is "gone: recorded verdict" "$(jq -r .verdict "$home/data/gone/merge-card.json")" fail
 is "gone: missing at its resolved path" "$(jq -r '.check.findings[0].why' "$home/data/gone/merge-card.json")" "$home/data/gone/gone.png: missing (ENOENT)"
 
@@ -436,12 +445,12 @@ MODE=liar DD_LOG=$work/args.log SO_CAPTURE=$work/card-liar
 export MODE DD_LOG SO_CAPTURE
 checks liar shot.png && cp "$shot" "$home/data/liar/shot.png"
 : >"$DD_LOG"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check liar "$wt" "$head_c" -
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check liar "$wt" "$head_c" -
 is "liar: verdict names the real reason" "$(jq -r .verdict "$home/data/liar/merge-card.json")" "not checked: installed done-done 0.3.1 rejects --citation-base"
 
 # No done-done on PATH at all: the verdict still names why nothing was checked.
 checks missing shot.png
-PATH="/usr/bin:/bin" FM_HOME=$home "$here/../merge-card" check missing "$wt" "$head_c" -
+PATH="/usr/bin:/bin" JG_HOME=$home "$here/../merge-card" check missing "$wt" "$head_c" -
 is "missing: verdict names the real reason" "$(jq -r .verdict "$home/data/missing/merge-card.json")" "not checked: done-done: command not found"
 
 # A gap posts nothing: no card, no sign-off call, one gap line, exit 0.
@@ -450,7 +459,7 @@ run_gap() {
   local before after out rc
   rm -rf "$2"
   before=$(wc -l < "$SO_LOG")
-  out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" - 2>&1) || rc=$?
+  out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" "$1" "$wt" "$head_c" - 2>&1) || rc=$?
   rc=${rc:-0}
   after=$(wc -l < "$SO_LOG")
   is "$1: post exits 0" "$rc" 0
@@ -493,7 +502,7 @@ jq --arg cmd 'printf captured output' '.command=$cmd | .files=[{path:"20261020T0
 jq '.check.claim="" | .check.evidence=[]' "$home/data/internal/merge-card.json" > "$work/internal-record.json" && mv "$work/internal-record.json" "$home/data/internal/merge-card.json"
 : >"$DD_LOG"
 so_before=$(wc -l < "$SO_LOG")
-out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - 2>&1); rc=$?
+out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - 2>&1); rc=$?
 is "internal: post exits 0" "$rc" 0
 case $out in *"posted text-only merge-$head_c evidence card"*) ok "internal: short text evidence card posted" ;; *) no "internal: text card confirmation missing: [$out]" ;; esac
 is "internal: sign-off called once" "$(wc -l < "$SO_LOG")" "$((so_before + 1))"
@@ -517,7 +526,7 @@ python3 -c 'print("x" * 700)' > "$home/data/longoutput/20261020T000000Z-longoutp
 jq '.files=[{path:"20261020T000000Z-longoutput0001/stdout.log"}]' "$home/data/longoutput/.done-done/runs/20261020T000000Z-longoutput0001.json" > "$work/run.json" && mv "$work/run.json" "$home/data/longoutput/.done-done/runs/20261020T000000Z-longoutput0001.json"
 SO_CAPTURE=$work/card-longoutput
 export SO_CAPTURE
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" longoutput "$wt" "$head_c" - >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" longoutput "$wt" "$head_c" - >/dev/null
 holds "long output: card captured" "$work/card-longoutput/card.json"
 is "long output: visible truncation note" "$(jq -r .about "$work/card-longoutput/card.json" | grep -c 'output truncated, full run 20261020T000000Z-longoutput0001')" 1
 is "long output: field stays within contract" "$(jq -e '.about | length <= 500' "$work/card-longoutput/card.json")" true
@@ -526,10 +535,10 @@ checks nocapture shot.png && printf 'screen: none\n' >> "$home/data/nocapture/ch
 mk_run nocapture 20261020T000000Z-nocapture0001 0
 SO_CAPTURE=$work/card-nocapture
 export SO_CAPTURE
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" nocapture "$wt" "$head_c" - >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" nocapture "$wt" "$head_c" - >/dev/null
 is "no capture: receipt-only text remains" "$(jq -r .about "$work/card-nocapture/card.json")" 'No user-visible screen; sealed done-done receipt attached.'
 so_before=$(wc -l < "$SO_LOG")
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" internal "$wt" "$head_c" - >/dev/null
 is "internal: repeat post is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
 # A claim whose Checks block cites a file outside the sealed run record is not refused whole: one line names the
@@ -542,13 +551,13 @@ mk_run handcapture 20261020T000000Z-handcapture01 0
 mkdir -p "$home/data/handcapture/handcapture"
 printf 'one proof line\n' > "$home/data/handcapture/handcapture/proof.log"
 jq '.files=[{path:"handcapture/proof.log"}]' "$home/data/handcapture/.done-done/runs/20261020T000000Z-handcapture01.json" > "$work/run.json" && mv "$work/run.json" "$home/data/handcapture/.done-done/runs/20261020T000000Z-handcapture01.json"
-out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" check handcapture "$wt" "$head_c" - 2>&1)
+out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" check handcapture "$wt" "$head_c" - 2>&1)
 case $out in *"the claim cites a file outside the sealed run record; checking it against its own capture proof.log"*) ok "hand capture: one line names the run's own capture" ;; *) no "hand capture: redirect line missing: [$out]" ;; esac
 is "hand capture: the claim is checked against the run's capture" "$(jq -r '.check.evidence[0]' "$home/data/handcapture/merge-card.json")" "$home/data/handcapture/handcapture/proof.log"
 is "hand capture: the redirected check passes" "$(jq -r .verdict "$home/data/handcapture/merge-card.json")" pass
 # The redirected card path itself is proven by the internal text card above; here the claim's own citations
 # are what matter, so the refusal for a text capture (no media) is left as it was.
-out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" handcapture "$wt" "$head_c" - 2>&1)
+out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" handcapture "$wt" "$head_c" - 2>&1)
 case $out in *"no passed proof media"*) ok "hand capture: a text capture alone still asks for a screen or screen: none" ;; *) no "hand capture: unexpected post outcome: [$out]" ;; esac
 
 # A claim no sealed run supports is still refused: no run at the head, or a run that captured no file.
@@ -556,14 +565,14 @@ MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-nosupport
 export MODE DD_LOG SO_CAPTURE
 checks nosupport cited.png && printf 'screen: none\n' >> "$home/data/nosupport/checks.md" && cp "$shot" "$home/data/nosupport/cited.png"
 rm -rf "$work/card-nosupport"
-out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" nosupport "$wt" "$head_c" - 2>&1); rc=$?
+out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" nosupport "$wt" "$head_c" - 2>&1); rc=$?
 is "no supporting run: the text-only card is refused" "$rc" 1
 case $out in *"no passed-test receipt for merge-$head_c"*"done-done run"*) ok "no supporting run: the refusal names the command that seals one" ;; *) no "no supporting run: refusal misses the seal command: [$out]" ;; esac
 if [ -e "$work/card-nosupport" ]; then no "no supporting run: no card posted"; else ok "no supporting run: no card posted"; fi
 mk_run emptycapture 20261020T000000Z-emptycapture01 0
 jq '.files=[]' "$home/data/emptycapture/.done-done/runs/20261020T000000Z-emptycapture01.json" > "$work/run.json" && mv "$work/run.json" "$home/data/emptycapture/.done-done/runs/20261020T000000Z-emptycapture01.json"
 checks emptycapture cited.png && printf 'screen: none\n' >> "$home/data/emptycapture/checks.md" && cp "$shot" "$home/data/emptycapture/cited.png"
-out=$(PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" emptycapture "$wt" "$head_c" - 2>&1); rc=$?
+out=$(PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" emptycapture "$wt" "$head_c" - 2>&1); rc=$?
 is "run without a capture: the text-only card is refused" "$rc" 1
 # A claim done-done will not tie to any run is refused on the screen path too, where no run exists to redirect to.
 MODE=handcapture SO_CAPTURE=$work/card-nosupport2
@@ -581,11 +590,11 @@ MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-dismissed
 export MODE DD_LOG SO_CAPTURE
 checks dismissed shot.png && cp "$shot" "$home/data/dismissed/shot.png"
 mk_run dismissed 20261020T000000Z-dismissed0001 0
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
 is "dismissed: card posted beside the archived one" "$(jq -r '.items[1].title' "$work/board.json")" "a stopped worker moves to the next live route"
 is "dismissed: archived card kept" "$(jq -r '.items[0] | "\(.key) \(.dismissed)"' "$work/board.json")" "$key true"
 so_before=$(wc -l < "$SO_LOG")
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" dismissed "$wt" "$head_c" - >/dev/null
 is "live same-key card is deduped" "$(wc -l < "$SO_LOG")" "$so_before"
 
 # One card per PR: a new head replaces the old card (newest proof kept), another PR gets its own, repeats dedupe.
@@ -596,21 +605,21 @@ mk_run follows 20261020T000000Z-follows0001 0
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-follows
 export MODE DD_LOG SO_CAPTURE
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
 # A card an older merge-card filed under a head-suffixed key goes with the replacement.
 jq '.items += [(.items[0] | .key += "-oldhead00000" | .run.commit = "oldhead")]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 head_c=secondhead0000000000000000000000000000000000
 mk_run follows 20261020T000000Z-follows0002 0
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
 # The real sign-off-axi refuses a --from --replace feed of evidence and a changed message under a held key (see the stub).
 is "new head: exactly one live card for the PR" "$(jq -r '[.items[] | select(.dismissed != true) | .run.run_id] | join(",")' "$work/board.json")" 20261020T000000Z-follows0002
 is "new head: old cards archived, history kept" "$(jq -r '[.items[] | select(.dismissed == true) | .run.run_id] | length' "$work/board.json")" 2
 is "new head: first card keeps the PR key" "$(jq -r '.items[0].key' "$work/board.json")" merge-o-r-pull-12
 if grep -q -- '--replace' "$SO_LOG"; then no "new head: posted through --replace"; else ok "new head: posted one at a time"; fi
 so_before=$(wc -l < "$SO_LOG")
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" "$pr" >/dev/null
 is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
 is "two PRs: two live cards" "$(jq -r '[.items[] | select(.dismissed != true) | .key | sub("-[0-9a-f]{12}$"; "")] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
 
 # A screen-free PR's card is titled with its repo and PR number.
@@ -621,7 +630,7 @@ mk_run titled 20261020T000000Z-titled0001 0
 jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 SO_CAPTURE=$work/card-titled
 export SO_CAPTURE
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
 is "internal title names repo and PR" "$(jq -r .title "$work/card-titled/card.json")" "muxr #1012: internal change passed its checks"
 GH_BODY=$work/pr-body.md
 
@@ -633,10 +642,10 @@ mk_run headdash 20261020T000000Z-headdash0001 0
 jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 SO_CAPTURE=$work/card-headdash
 export SO_CAPTURE
-out=$(GH_HEAD=$head_c PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/77 2>&1); rc=$?
+out=$(GH_HEAD=$head_c PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/77 2>&1); rc=$?
 is "head dash: post exits 0" "$rc" 0
 is "head dash: card carries the PR head's run" "$(jq -r .run.run_id "$work/card-headdash/card.json" 2>/dev/null)" 20261020T000000Z-headdash0001
-out=$(GH_HEAD="" PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/78 2>&1); rc=$?
+out=$(GH_HEAD="" PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" headdash "$wt" - https://github.com/o/r/pull/78 2>&1); rc=$?
 is "head dash: an unresolvable head fails" "$rc" 1
 case $out in *"cannot resolve the head of https://github.com/o/r/pull/78"*) ok "head dash: error names the PR" ;; *) no "head dash: error missing: [$out]" ;; esac
 GH_BODY=$work/pr-body.md
@@ -645,7 +654,7 @@ GH_BODY=$work/pr-body.md
 MODE=newer DD_LOG=$work/args.log SO_CAPTURE=$work/card-lint
 export MODE DD_LOG SO_CAPTURE
 checks lint shot.png && cp "$shot" "$home/data/lint/shot.png"
-gate_rc() { PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" gate lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1; echo $?; }
+gate_rc() { PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" gate lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1; echo $?; }
 rm -f "$home/data/checks-gate.log"
 is "gate: no PASS row is refused" "$(gate_rc)" 1
 printf 't\thttps://github.com/o/r/pull/1\totherhead\tpass\t1 evidence files\n' > "$home/data/checks-gate.log"
@@ -654,7 +663,7 @@ printf 't\thttps://github.com/o/r/pull/1\t%s\tfail\tx\n' "$head_c" >> "$home/dat
 is "gate: FAIL row for the head is refused" "$(gate_rc)" 1
 printf 't\thttps://github.com/o/r/pull/1\t%s\tpass\t1 evidence files\n' "$head_c" >> "$home/data/checks-gate.log"
 is "gate: PASS row for the head is allowed" "$(gate_rc)" 0
-PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board.json" lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" lint "$wt" "$head_c" https://github.com/o/r/pull/1 >/dev/null 2>&1
 is "post: the card logged its evidence folder on the head's row" "$(grep -c "$head_c	card	evidence folder $home/data/lint" "$home/data/checks-gate.log")" 1
 
 # Feedback trail: after a merge, each sign-off card the task's brief or the PR body names is
@@ -671,7 +680,7 @@ cat "$home/data/fb/checks.md" - >"$GH_BODY" <<'BODY'
 sign-off card: `design-two`
 BODY
 fb_post() { # fb_post <pr-number> [<mode>]: the post-merge call for that PR
-  FB_MODE=${2:-ok} PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-fb.json" fb "$wt" "$head_c" "https://github.com/o/r/pull/$1" 2>&1
+  FB_MODE=${2:-ok} PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-fb.json" fb "$wt" "$head_c" "https://github.com/o/r/pull/$1" 2>&1
 }
 fb_post 245 >/dev/null
 is "feedback: each named card is marked acted on with the PR link" "$(cat "$FB_LOG")" "feedback design-two $work/board-fb.json --acted --link https://github.com/o/r/pull/245
@@ -703,7 +712,7 @@ clone=$work/clone
 git init -q "$clone" && git -C "$clone" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 checks clean shot.png && cp "$shot" "$home/data/clean/shot.png"
 export SIGNOFF_POSTS=1
-post_clone() { PATH="$work/bin:$PATH" FM_HOME=$home "$here/../merge-card" post --board "$work/board-clean.json" clean "$clone" "$head_c" - 2>&1; }
+post_clone() { PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board-clean.json" clean "$clone" "$head_c" - 2>&1; }
 SO_CAPTURE=$work/card-clean post_clone >/dev/null
 is "clean clone: git status is clean after a post" "$(git -C "$clone" status --porcelain)" ""
 is "clean clone: no .sign-off was made in it" "$(ls -A "$clone")" ".git"

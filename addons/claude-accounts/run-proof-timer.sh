@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-proof-timer.sh: the refresh timer proof for done-done. Installs the units into a throwaway XDG tree with a
 # stub systemctl, lets systemd-analyze verify the generated units, shows the real dry run for the real home
 # (writes nothing) and runs the fixture test. The host's timers are never touched.
@@ -12,7 +21,7 @@ printf '#!/bin/sh\nexit 0\n' >"$work/bin/systemctl"
 chmod +x "$work/bin/systemctl"
 {
   echo "== dry run for a home (nothing written)"
-  "$repo/claude-accounts/install-timer.sh" --dry-run "${FM_HOME:-$work/home}"
+  "$repo/claude-accounts/install-timer.sh" --dry-run "${JG_HOME:-$work/home}"
   echo "== units written into a throwaway tree, verified by systemd-analyze"
   env PATH="$work/bin:$PATH" XDG_DATA_HOME="$work/data" XDG_CONFIG_HOME="$work/cfg" "$repo/claude-accounts/install-timer.sh" "$work/home"
   systemd-analyze --user verify "$work/cfg/systemd/user/jg-claude-accounts-quota.timer" "$work/cfg/systemd/user/jg-claude-accounts-quota.service"

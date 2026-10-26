@@ -45,7 +45,7 @@
 #          deny object on stdout unless --claude was supplied.
 #   INERT - not a genuine primary home (a crewmate/scout task worktree or a
 #           non-firstmate repo): exit 0 with no output, exactly like ALLOW.
-#   ESCAPE - FM_ALLOW_SUBAGENT=1 in the environment allows deliberately.
+#   ESCAPE - JG_ALLOW_SUBAGENT=1 in the environment allows deliberately.
 #   FAIL OPEN - malformed or empty stdin, or missing jq for stdin transport.
 #
 # Claude requires stdout to remain empty on deny.
@@ -101,7 +101,7 @@ Fires only in a genuine firstmate primary home; it is a silent no-op in a
 crewmate/scout task worktree or any non-firstmate repo, where a worker using
 delegation tools is legitimate.
 Exits 0 to allow and 2 to deny, naming the real crewmate dispatch path instead.
-Set FM_ALLOW_SUBAGENT=1 in the session environment to allow deliberately.
+Set JG_ALLOW_SUBAGENT=1 in the session environment to allow deliberately.
 Malformed transport fails open.
 EOF
 }
@@ -170,12 +170,12 @@ done
 # a flag or a state file so it must be set when the session is launched, which
 # makes a genuinely intended use possible and an accidental one impossible: no
 # in-session tool call can set it for the call that follows.
-[ "${FM_ALLOW_SUBAGENT:-}" != "1" ] || exit 0
+[ "${JG_ALLOW_SUBAGENT:-}" != "1" ] || exit 0
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || exit 0
-FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
-FM_HOME=${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}
-STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+JG_ROOT=${JG_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
+JG_HOME=${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}
+STATE=${JG_STATE_OVERRIDE:-$JG_HOME/state}
 
 # Scope to a genuine primary home, exactly as the session-start nudge and the
 # turn-end guard do. jg_primary_scope_matches accepts a plain checkout or a
@@ -186,18 +186,18 @@ STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
 # inert (exit 0), never a block, so a broken environment never denies a call.
 # shellcheck source=bin/jg-primary-scope-lib.sh
 . "$SCRIPT_DIR/jg-primary-scope-lib.sh"
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 # Name the dedicated scout entry point only when this home carries it; degrade
 # to the two-step brief-then-spawn path when it does not, rather than naming a
 # script that is not there.
-if [ -f "$FM_ROOT/bin/jg-scout.sh" ]; then
+if [ -f "$JG_ROOT/bin/jg-scout.sh" ]; then
   ROUTE='first classify the work under the AGENTS.md intake contract: work already classified as a scout goes to bin/jg-scout.sh "<question>" [project], while authorized ship work and its bounded research go to bin/jg-brief.sh then bin/jg-spawn.sh'
 else
   ROUTE='first classify the work under the AGENTS.md intake contract, then use bin/jg-brief.sh followed by bin/jg-spawn.sh for dispatched work'
 fi
 
-REASON="[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception."
+REASON="[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with JG_ALLOW_SUBAGENT=1 for a deliberate exception."
 
 json_escape() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' '

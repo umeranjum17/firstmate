@@ -29,7 +29,7 @@
 # remote route is never replaced by a local endpoint.
 #
 # Relaunch goes through `bin/jg-spawn.sh <id> --secondmate` with
-# FM_SPAWN_NO_GUARD=1, the same guarded path every recovery uses. That path
+# JG_SPAWN_NO_GUARD=1, the same guarded path every recovery uses. That path
 # re-resolves placement from the task's own metadata and registry route, so a
 # remote mate is relaunched on its recorded remote host through bin/jg-on.sh -
 # never as a local replacement - behind jg-spawn's own readiness gate and
@@ -55,14 +55,14 @@
 
 set -u
 
-FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+JG_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # shellcheck source=bin/jg-backend.sh
-. "$FM_SM_LIVE_LIB_DIR/jg-backend.sh"
+. "$JG_SM_LIVE_LIB_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-remote-readiness-lib.sh
-. "$FM_SM_LIVE_LIB_DIR/jg-remote-readiness-lib.sh"
+. "$JG_SM_LIVE_LIB_DIR/jg-remote-readiness-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
-. "$FM_SM_LIVE_LIB_DIR/jg-timeout-lib.sh"
+. "$JG_SM_LIVE_LIB_DIR/jg-timeout-lib.sh"
 
 # Per-task probe+kill+relaunch serialization. A busy lock means another
 # supervisor (the other sweep, or a racing tick) is mid-episode on this mate;
@@ -73,7 +73,7 @@ FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 jg_sm_live_require_locks() {
   command -v jg_lock_try_acquire >/dev/null 2>&1 && return 0
   # shellcheck source=bin/jg-wake-lib.sh
-  . "$FM_SM_LIVE_LIB_DIR/jg-wake-lib.sh"
+  . "$JG_SM_LIVE_LIB_DIR/jg-wake-lib.sh"
 }
 
 jg_secondmate_liveness_lock() {  # <id>
@@ -123,14 +123,14 @@ jg_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
 #
 # Read-only probe of one registered secondmate's recorded endpoint. Populates:
 #
-#   FM_SM_LIVE_STATUS  silent | alive | relaunchable | skipped
-#   FM_SM_LIVE_STATE   the raw classifier/state word
-#   FM_SM_LIVE_KILL    1 when relaunch must first kill a confirmed-dead local
+#   JG_SM_LIVE_STATUS  silent | alive | relaunchable | skipped
+#   JG_SM_LIVE_STATE   the raw classifier/state word
+#   JG_SM_LIVE_KILL    1 when relaunch must first kill a confirmed-dead local
 #                      endpoint (its shell husk occupies the name)
-#   FM_SM_LIVE_CAUSE   relaunch cause phrase, on relaunchable
-#   FM_SM_LIVE_WHERE   backend=<b> or host=<h>, on relaunchable
-#   FM_SM_LIVE_REASON  exact skip suffix, on skipped
-#   FM_SM_LIVE_LINE    verbose already-live line body, on alive
+#   JG_SM_LIVE_CAUSE   relaunch cause phrase, on relaunchable
+#   JG_SM_LIVE_WHERE   backend=<b> or host=<h>, on relaunchable
+#   JG_SM_LIVE_REASON  exact skip suffix, on skipped
+#   JG_SM_LIVE_LINE    verbose already-live line body, on alive
 #
 # `silent` means the meta records no endpoint at all - that shape is owned by
 # secondmate-provisioning recovery, not liveness.
@@ -139,80 +139,80 @@ jg_secondmate_liveness_recent_attempts() {  # <id> <window-secs>
 # relaunchable verdict could be acted on.
 jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
   local meta=$1 id=$2 mode=$3
-  FM_SM_LIVE_STATUS=skipped FM_SM_LIVE_STATE=unknown FM_SM_LIVE_KILL=0
-  FM_SM_LIVE_CAUSE='' FM_SM_LIVE_WHERE='' FM_SM_LIVE_REASON='' FM_SM_LIVE_LINE=''
+  JG_SM_LIVE_STATUS=skipped JG_SM_LIVE_STATE=unknown JG_SM_LIVE_KILL=0
+  JG_SM_LIVE_CAUSE='' JG_SM_LIVE_WHERE='' JG_SM_LIVE_REASON='' JG_SM_LIVE_LINE=''
   local window harness remote_host remote_rc out agent_state readiness_reason route_out remote_backend
   window=$(jg_meta_get "$meta" window)
-  [ -n "$window" ] || { FM_SM_LIVE_STATUS=silent; return 0; }
+  [ -n "$window" ] || { JG_SM_LIVE_STATUS=silent; return 0; }
   harness=$(jg_meta_get "$meta" harness)
   remote_host=$(jg_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
     if [ "$mode" = full ]; then
       remote_rc=0
-      jg_remote_readiness_ensure "$FM_SM_LIVE_LIB_DIR" "$id" || remote_rc=$?
+      jg_remote_readiness_ensure "$JG_SM_LIVE_LIB_DIR" "$id" || remote_rc=$?
       if [ "$remote_rc" -eq 255 ]; then
-        FM_SM_LIVE_REASON="remote host unavailable or endpoint state unknown; route preserved on $remote_host"
+        JG_SM_LIVE_REASON="remote host unavailable or endpoint state unknown; route preserved on $remote_host"
         return 0
       fi
       if [ "$remote_rc" -ne 0 ]; then
-        readiness_reason=$(printf '%s\n' "$FM_REMOTE_READINESS_OUT" \
+        readiness_reason=$(printf '%s\n' "$JG_REMOTE_READINESS_OUT" \
           | awk '/^check [^=]+=(fixable|human):|^action:|^error:/ { print; exit }')
-        [ -n "$readiness_reason" ] || readiness_reason=$(jg_sm_live_first_line "$FM_REMOTE_READINESS_OUT")
+        [ -n "$readiness_reason" ] || readiness_reason=$(jg_sm_live_first_line "$JG_REMOTE_READINESS_OUT")
         [ -n "$readiness_reason" ] || readiness_reason="unknown readiness failure"
-        FM_SM_LIVE_REASON="remote readiness failed on $remote_host: $readiness_reason"
+        JG_SM_LIVE_REASON="remote readiness failed on $remote_host: $readiness_reason"
         return 0
       fi
     fi
-    if out=$("$FM_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh state "$id" < /dev/null 2>/dev/null); then
+    if out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh state "$id" < /dev/null 2>/dev/null); then
       remote_rc=0
     else
       remote_rc=$?
     fi
     if [ "$remote_rc" -eq 255 ]; then
-      FM_SM_LIVE_REASON="remote host unavailable or endpoint state unknown; route preserved on $remote_host"
+      JG_SM_LIVE_REASON="remote host unavailable or endpoint state unknown; route preserved on $remote_host"
       return 0
     fi
     if [ "$remote_rc" -ne 0 ]; then
-      FM_SM_LIVE_REASON="remote endpoint probe unreadable on $remote_host"
+      JG_SM_LIVE_REASON="remote endpoint probe unreadable on $remote_host"
       return 0
     fi
     agent_state=$(printf '%s\n' "$out" | tail -1)
-    FM_SM_LIVE_STATE=$agent_state
+    JG_SM_LIVE_STATE=$agent_state
     case "$agent_state" in
       alive)
         if [ "$mode" = full ]; then
-          if route_out=$("$FM_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh route "$id" < /dev/null 2>/dev/null); then
+          if route_out=$("$JG_SM_LIVE_LIB_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh route "$id" < /dev/null 2>/dev/null); then
             remote_rc=0
           else
             remote_rc=$?
           fi
           if [ "$remote_rc" -eq 255 ]; then
-            FM_SM_LIVE_REASON="remote host unavailable or endpoint route unknown; route preserved on $remote_host"
+            JG_SM_LIVE_REASON="remote host unavailable or endpoint route unknown; route preserved on $remote_host"
             return 0
           fi
           if [ "$remote_rc" -ne 0 ]; then
-            FM_SM_LIVE_REASON="alive remote endpoint route is unreadable on $remote_host; inspect and migrate or retire it explicitly"
+            JG_SM_LIVE_REASON="alive remote endpoint route is unreadable on $remote_host; inspect and migrate or retire it explicitly"
             return 0
           fi
           remote_backend=$(printf '%s\n' "$route_out" | sed -n 's/^backend=//p' | tail -1)
           if [ "$remote_backend" != herdr ]; then
-            FM_SM_LIVE_REASON="alive remote endpoint is recorded on backend '${remote_backend:-missing}'; migrate or retire it explicitly"
+            JG_SM_LIVE_REASON="alive remote endpoint is recorded on backend '${remote_backend:-missing}'; migrate or retire it explicitly"
             return 0
           fi
         fi
-        FM_SM_LIVE_STATUS=alive
-        FM_SM_LIVE_LINE="remote secondmate $id already live (host=$remote_host)"
+        JG_SM_LIVE_STATUS=alive
+        JG_SM_LIVE_LINE="remote secondmate $id already live (host=$remote_host)"
         ;;
       dead|missing)
-        FM_SM_LIVE_STATUS=relaunchable
-        FM_SM_LIVE_CAUSE="remote endpoint $agent_state on its configured host"
-        FM_SM_LIVE_WHERE="host=$remote_host"
+        JG_SM_LIVE_STATUS=relaunchable
+        JG_SM_LIVE_CAUSE="remote endpoint $agent_state on its configured host"
+        JG_SM_LIVE_WHERE="host=$remote_host"
         ;;
       ambiguous|unreadable|unverified)
-        FM_SM_LIVE_REASON="remote endpoint state is $agent_state on $remote_host"
+        JG_SM_LIVE_REASON="remote endpoint state is $agent_state on $remote_host"
         ;;
       *)
-        FM_SM_LIVE_REASON="remote endpoint returned an invalid state"
+        JG_SM_LIVE_REASON="remote endpoint returned an invalid state"
         ;;
     esac
     return 0
@@ -229,33 +229,33 @@ jg_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
       case "$agent_state" in dead|missing) agent_state=unverified-harness ;; esac
       ;;
   esac
-  FM_SM_LIVE_STATE=$agent_state
+  JG_SM_LIVE_STATE=$agent_state
   case "$agent_state" in
     alive)
-      FM_SM_LIVE_STATUS=alive
-      FM_SM_LIVE_LINE="secondmate $id already live (backend=$backend)"
+      JG_SM_LIVE_STATUS=alive
+      JG_SM_LIVE_LINE="secondmate $id already live (backend=$backend)"
       ;;
     dead|missing)
-      FM_SM_LIVE_STATUS=relaunchable
+      JG_SM_LIVE_STATUS=relaunchable
       if [ "$agent_state" = dead ]; then
-        FM_SM_LIVE_KILL=1
-        FM_SM_LIVE_CAUSE="confirmed agent absence on existing endpoint"
+        JG_SM_LIVE_KILL=1
+        JG_SM_LIVE_CAUSE="confirmed agent absence on existing endpoint"
       else
-        FM_SM_LIVE_CAUSE="recorded endpoint confidently missing"
+        JG_SM_LIVE_CAUSE="recorded endpoint confidently missing"
       fi
-      FM_SM_LIVE_WHERE="backend=$backend"
+      JG_SM_LIVE_WHERE="backend=$backend"
       ;;
     ambiguous)
-      FM_SM_LIVE_REASON="existing endpoint has ambiguous agent process (backend=$backend)"
+      JG_SM_LIVE_REASON="existing endpoint has ambiguous agent process (backend=$backend)"
       ;;
     unreadable)
-      FM_SM_LIVE_REASON="endpoint probe unreadable (backend=$backend)"
+      JG_SM_LIVE_REASON="endpoint probe unreadable (backend=$backend)"
       ;;
     unverified-harness)
-      FM_SM_LIVE_REASON="recorded harness '$harness' is unverified for recovery (backend=$backend)"
+      JG_SM_LIVE_REASON="recorded harness '$harness' is unverified for recovery (backend=$backend)"
       ;;
     *)
-      FM_SM_LIVE_REASON="agent recovery classifier unverified (backend=$backend)"
+      JG_SM_LIVE_REASON="agent recovery classifier unverified (backend=$backend)"
       ;;
   esac
   return 0
@@ -277,38 +277,38 @@ jg_secondmate_relaunch_lock_acquire() {  # [wait-secs]
 # endpoint. Takes the per-home relaunch lock (bounded wait, default 600
 # seconds) so relaunches of different mates serialize; the lock is held across
 # the guarded spawn and released by jg_secondmate_liveness_relaunch after it
-# records the outcome. When FM_SECONDMATE_RELAUNCH_PREACQUIRED=1 the caller
+# records the outcome. When JG_SECONDMATE_RELAUNCH_PREACQUIRED=1 the caller
 # already holds it across this recovery, so the take is skipped while the
 # ledger commit and the kill below still run. A lock owned by an
 # already-exited spawn child releases as a no-op with ordinary stale-owner
 # recovery. An unreadable or unwritable ledger, or an expired lock wait,
-# leaves the endpoint untouched and sets FM_SM_LIVE_STATUS=skipped with
-# FM_SM_LIVE_REASON.
+# leaves the endpoint untouched and sets JG_SM_LIVE_STATUS=skipped with
+# JG_SM_LIVE_REASON.
 # Caller holds the liveness lock.
 jg_secondmate_liveness_begin() {
   local meta=$1 id=$2 wait_seconds=${3:-600} relaunch_lock
   if ! jg_secondmate_liveness_recent_attempts "$id" 0 >/dev/null; then
-    FM_SM_LIVE_STATUS=skipped
-    FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $FM_SM_LIVE_STATE"
-    FM_SM_LIVE_RC=1
+    JG_SM_LIVE_STATUS=skipped
+    JG_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unreadable; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_RC=1
     return 1
   fi
   jg_sm_live_require_locks || return 1
   relaunch_lock="$STATE/.secondmate-relaunch.lock"
-  if [ "${FM_SECONDMATE_RELAUNCH_PREACQUIRED:-0}" != 1 ] && ! jg_secondmate_relaunch_lock_acquire "$wait_seconds"; then
-    FM_SM_LIVE_STATUS=skipped
-    FM_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $FM_SM_LIVE_STATE"
-    FM_SM_LIVE_RC=1
+  if [ "${JG_SECONDMATE_RELAUNCH_PREACQUIRED:-0}" != 1 ] && ! jg_secondmate_relaunch_lock_acquire "$wait_seconds"; then
+    JG_SM_LIVE_STATUS=skipped
+    JG_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_RC=1
     return 1
   fi
   if ! jg_secondmate_liveness_ledger_add "$id" attempt; then
     jg_lock_release "$relaunch_lock" || true
-    FM_SM_LIVE_STATUS=skipped
-    FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unwritable; endpoint left $FM_SM_LIVE_STATE"
-    FM_SM_LIVE_RC=1
+    JG_SM_LIVE_STATUS=skipped
+    JG_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unwritable; endpoint left $JG_SM_LIVE_STATE"
+    JG_SM_LIVE_RC=1
     return 1
   fi
-  if [ "$FM_SM_LIVE_KILL" = 1 ]; then
+  if [ "$JG_SM_LIVE_KILL" = 1 ]; then
     local backend target window
     backend=$(jg_backend_of_meta "$meta")
     target=$(jg_backend_target_of_meta "$meta")
@@ -327,19 +327,19 @@ jg_secondmate_liveness_begin() {
 # timeout when given, 600 seconds otherwise) while its spawn child still runs
 # begin after memory admission for the attempt ledger and the kill. This
 # function records the spawn outcome. Memory refusal (75) and a changed
-# endpoint (73) set FM_SM_LIVE_STATUS=deferred without charging an attempt;
-# ledger refusal (74) sets skipped. FM_SM_LIVE_REASON explains either verdict.
+# endpoint (73) set JG_SM_LIVE_STATUS=deferred without charging an attempt;
+# ledger refusal (74) sets skipped. JG_SM_LIVE_REASON explains either verdict.
 # A positive timeout bounds spawn via jg_run_timed (124/137 on timeout).
 # The per-home relaunch lock taken above is released on every path below;
 # a lock owned by an already-exited spawn child releases as a no-op.
-# Returns the spawn status in FM_SM_LIVE_RC and combined output in FM_SM_LIVE_OUT;
+# Returns the spawn status in JG_SM_LIVE_RC and combined output in JG_SM_LIVE_OUT;
 # the caller owns reporting.
 jg_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   local meta=$1 id=$2 timeout=${3:-} recovery=1 preacquired=0 relaunch_lock rc=0 wait_seconds
-  FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0
+  JG_SM_LIVE_OUT='' JG_SM_LIVE_RC=0
   relaunch_lock="$STATE/.secondmate-relaunch.lock"
-  if ! FM_SM_LIVE_OUT=$("$FM_SM_LIVE_LIB_DIR/jg-harness.sh" secondmate "$id" 2>&1); then
-    FM_SM_LIVE_RC=1
+  if ! JG_SM_LIVE_OUT=$("$JG_SM_LIVE_LIB_DIR/jg-harness.sh" secondmate "$id" 2>&1); then
+    JG_SM_LIVE_RC=1
     return 1
   fi
   if [ -n "$(jg_meta_get "$meta" remote_host)" ]; then
@@ -348,33 +348,33 @@ jg_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
   else
     wait_seconds=${timeout:-600}
     if ! jg_secondmate_relaunch_lock_acquire "$wait_seconds"; then
-      FM_SM_LIVE_STATUS=skipped
-      FM_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $FM_SM_LIVE_STATE"
-      FM_SM_LIVE_RC=1
+      JG_SM_LIVE_STATUS=skipped
+      JG_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $JG_SM_LIVE_STATE"
+      JG_SM_LIVE_RC=1
       return 1
     fi
     preacquired=1
   fi
   if [ -n "$timeout" ]; then
-    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_LIVENESS_RECOVERY=$recovery FM_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired jg_run_timed "$timeout" "$FM_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_LIVENESS_RECOVERY=$recovery JG_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired jg_run_timed "$timeout" "$JG_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
   else
-    FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 FM_SECONDMATE_LIVENESS_RECOVERY=$recovery FM_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired "$FM_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
+    JG_SM_LIVE_OUT=$(JG_SPAWN_NO_GUARD=1 JG_SECONDMATE_LIVENESS_RECOVERY=$recovery JG_SECONDMATE_RELAUNCH_PREACQUIRED=$preacquired "$JG_ROOT/bin/jg-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
   fi
-  FM_SM_LIVE_RC=$rc
+  JG_SM_LIVE_RC=$rc
   case "$rc" in
     75)
-      FM_SM_LIVE_STATUS=deferred
-      FM_SM_LIVE_REASON="memory admission deferred: $FM_SM_LIVE_OUT"
+      JG_SM_LIVE_STATUS=deferred
+      JG_SM_LIVE_REASON="memory admission deferred: $JG_SM_LIVE_OUT"
       jg_lock_release "$relaunch_lock" || true
       return "$rc" ;;
     73)
-      FM_SM_LIVE_STATUS=deferred
-      FM_SM_LIVE_REASON=$(jg_sm_live_first_line "$FM_SM_LIVE_OUT")
+      JG_SM_LIVE_STATUS=deferred
+      JG_SM_LIVE_REASON=$(jg_sm_live_first_line "$JG_SM_LIVE_OUT")
       jg_lock_release "$relaunch_lock" || true
       return "$rc" ;;
     74)
-      FM_SM_LIVE_STATUS=skipped
-      FM_SM_LIVE_REASON=$(jg_sm_live_first_line "$FM_SM_LIVE_OUT")
+      JG_SM_LIVE_STATUS=skipped
+      JG_SM_LIVE_REASON=$(jg_sm_live_first_line "$JG_SM_LIVE_OUT")
       jg_lock_release "$relaunch_lock" || true
       return "$rc" ;;
   esac

@@ -7,23 +7,23 @@
 # the whole watcher to obtain handle_push_transition. Its source list is limited
 # to the production boundaries the transition handler actually calls.
 
-FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=bin/jg-wake-lib.sh
-. "$FM_PUSH_TRANSITION_LIB_DIR/jg-wake-lib.sh"
+. "$JG_PUSH_TRANSITION_LIB_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
-. "$FM_PUSH_TRANSITION_LIB_DIR/jg-classify-lib.sh"
+. "$JG_PUSH_TRANSITION_LIB_DIR/jg-classify-lib.sh"
 # shellcheck source=bin/jg-backend.sh
-. "$FM_PUSH_TRANSITION_LIB_DIR/jg-backend.sh"
+. "$JG_PUSH_TRANSITION_LIB_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-transition-lib.sh
-. "$FM_PUSH_TRANSITION_LIB_DIR/jg-transition-lib.sh"
+. "$JG_PUSH_TRANSITION_LIB_DIR/jg-transition-lib.sh"
 # Optional wait-timers add-on.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$FM_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$FM_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
-TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
-FM_WAKE_POST_OUTPUT_ACTION=
+TRIAGE_LOG_MAX_BYTES=${JG_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
+JG_WAKE_POST_OUTPUT_ACTION=
 
 CAPTAIN_CALL_IDENTITY=
 
@@ -32,20 +32,20 @@ task_captain_call_open() {  # <task>
   CAPTAIN_CALL_IDENTITY=
   [ -n "$task" ] || return 1
   # shellcheck disable=SC2034 # Consumed by the watcher's stale-path captain-call check in jg-watch.sh.
-  CAPTAIN_CALL_IDENTITY=$(FM_HOME="$FM_HOME" "$FM_PUSH_TRANSITION_LIB_DIR/jg-captain-hold.sh" \
+  CAPTAIN_CALL_IDENTITY=$(JG_HOME="$JG_HOME" "$JG_PUSH_TRANSITION_LIB_DIR/jg-captain-hold.sh" \
     open "$task" --identity 2>/dev/null) || return 1
   return 0
 }
 # Set only after this watcher has printed a durable actionable reason. The
 # watcher's EXIT cleanup uses it to distinguish an ordinary delivered close from
 # an interruption that leaves a recovery gap before the next arm.
-FM_WATCH_DELIVERED_REASON=
-FM_WATCH_DELIVERY_PID=
-FM_WATCH_DELIVERY_IDENTITY=
+JG_WATCH_DELIVERED_REASON=
+JG_WATCH_DELIVERY_PID=
+JG_WATCH_DELIVERY_IDENTITY=
 WATCH_DELIVERY_LOG="$STATE/.watch-deliveries.log"
 WATCH_DELIVERY_LOCK="$STATE/.watch-deliveries.lock"
-WATCH_DELIVERY_MAX_BYTES=${FM_WATCH_DELIVERY_MAX_BYTES:-65536}
-WATCH_DELIVERY_KEEP_LINES=${FM_WATCH_DELIVERY_KEEP_LINES:-64}
+WATCH_DELIVERY_MAX_BYTES=${JG_WATCH_DELIVERY_MAX_BYTES:-65536}
+WATCH_DELIVERY_KEEP_LINES=${JG_WATCH_DELIVERY_KEEP_LINES:-64}
 case "$WATCH_DELIVERY_MAX_BYTES" in ''|*[!0-9]*|0) WATCH_DELIVERY_MAX_BYTES=65536 ;; esac
 case "$WATCH_DELIVERY_KEEP_LINES" in ''|*[!0-9]*|0) WATCH_DELIVERY_KEEP_LINES=64 ;; esac
 
@@ -61,18 +61,18 @@ watch_delivery_publish() {
   # Identity/reason cleaning are sequential $(): sibling $() args to one
   # printf are a bash 5.2 parse-error landmine when a CHLD trap is set.
   local reason=$1 i size tmp raw ident cleaned_reason
-  [ -n "$FM_WATCH_DELIVERY_PID" ] || return 0
-  [ -n "$FM_WATCH_DELIVERY_IDENTITY" ] || return 0
+  [ -n "$JG_WATCH_DELIVERY_PID" ] || return 0
+  [ -n "$JG_WATCH_DELIVERY_IDENTITY" ] || return 0
   i=0
   while ! jg_lock_try_acquire "$WATCH_DELIVERY_LOCK"; do
     [ "$i" -lt 20 ] || return 0
     sleep 0.02
     i=$((i + 1))
   done
-  ident=$(watch_delivery_clean_identity "$FM_WATCH_DELIVERY_IDENTITY")
+  ident=$(watch_delivery_clean_identity "$JG_WATCH_DELIVERY_IDENTITY")
   cleaned_reason=$(watch_delivery_clean_reason "$reason")
   printf '%s\t%s\t%s\n' \
-    "$FM_WATCH_DELIVERY_PID" \
+    "$JG_WATCH_DELIVERY_PID" \
     "$ident" \
     "$cleaned_reason" >> "$WATCH_DELIVERY_LOG" 2>/dev/null || true
   size=$(wc -c < "$WATCH_DELIVERY_LOG" 2>/dev/null | tr -d '[:space:]')
@@ -80,7 +80,7 @@ watch_delivery_publish() {
     ''|*[!0-9]*) ;;
     *)
       if [ "$size" -ge "$WATCH_DELIVERY_MAX_BYTES" ]; then
-        tmp="$WATCH_DELIVERY_LOG.tmp.$FM_WATCH_DELIVERY_PID"
+        tmp="$WATCH_DELIVERY_LOG.tmp.$JG_WATCH_DELIVERY_PID"
         raw="$tmp.raw"
         tail -n "$WATCH_DELIVERY_KEEP_LINES" "$WATCH_DELIVERY_LOG" 2>/dev/null \
           | tail -c "$WATCH_DELIVERY_MAX_BYTES" > "$raw" 2>/dev/null \
@@ -113,17 +113,17 @@ wake() {
     *) echo 0 > "$STATE/.heartbeat-streak" ;;
   esac
   trap '' HUP INT TERM
-  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || trap '' PIPE
+  [ -z "$JG_WAKE_POST_OUTPUT_ACTION" ] || trap '' PIPE
   if echo "$1"; then
     output_status=0
     watch_delivery_publish "$1" || true
     # shellcheck disable=SC2034 # Read by bin/jg-watch.sh's EXIT cleanup.
-    FM_WATCH_DELIVERED_REASON=$1
+    JG_WATCH_DELIVERED_REASON=$1
   else
     output_status=1
   fi
-  if [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ]; then
-    "$FM_WAKE_POST_OUTPUT_ACTION" "$output_status" || true
+  if [ -n "$JG_WAKE_POST_OUTPUT_ACTION" ]; then
+    "$JG_WAKE_POST_OUTPUT_ACTION" "$output_status" || true
   fi
   [ "$output_status" -eq 0 ] || exit "$output_status"
   exit 0

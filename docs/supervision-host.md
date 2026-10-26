@@ -92,8 +92,8 @@ An attended turn queues nothing: its captain rows reach main through the host's 
 
 The host's engine runs with these settings:
 
-- `FM_SUPERVISION_ACTOR=branch`.
-- The session-lock holder as `FM_LEASE_HOLDER_PID`.
+- `JG_SUPERVISION_ACTOR=branch`.
+- The session-lock holder as `JG_LEASE_HOLDER_PID`.
 - The primary's harness pin.
 
 So every guarded script treats it exactly as it treats the Pi branch.
@@ -288,7 +288,7 @@ But a host absorbs its own wakes, so it ends its park itself before that registr
 
 ### Setting the boundary
 
-`FM_SUPERVISION_HOST_PARK_SECONDS` sets that boundary (default 27,000).
+`JG_SUPERVISION_HOST_PARK_SECONDS` sets that boundary (default 27,000).
 A value that is not a positive integer below 28,800 is treated as the default.
 The OpenCode, omp, and Grok owners have no hook timeout and keep the same default, so their parks end on the same cadence.
 
@@ -316,10 +316,10 @@ The checkpoint passes it as the boundary and reports the boundary as its ordinar
 
 | Posture | Checkpoint bound |
 |---|---|
-| Attended | `FM_CODEX_WATCH_CHECKPOINT` (default 180 seconds). |
-| Away record exists | Raised to `FM_CODEX_WATCH_CHECKPOINT_AWAY` (default 3,600) if longer, then capped at 27,000 seconds so a parked main is not woken every few minutes. |
+| Attended | `JG_CODEX_WATCH_CHECKPOINT` (default 180 seconds). |
+| Away record exists | Raised to `JG_CODEX_WATCH_CHECKPOINT_AWAY` (default 3,600) if longer, then capped at 27,000 seconds so a parked main is not woken every few minutes. |
 
-Because that bound is not a harness timeout, the checkpoint also sets `FM_SUPERVISION_HOST_PARK_LIMIT`.
+Because that bound is not a harness timeout, the checkpoint also sets `JG_SUPERVISION_HOST_PARK_LIMIT`.
 That setting lets an engine turn that starts before the boundary finish after it.
 A captain message typed during the park waits for the checkpoint to return, at most the bound plus one engine turn, unless the captain interrupts it.
 
@@ -330,7 +330,7 @@ That conversation is keyed to the current main session.
 A new one opens in two cases:
 
 - At every main session start.
-- Every `FM_SUPERVISION_HOST_ROTATE_TURNS` turns, because each wake adds history and the per-wake cost grows with it.
+- Every `JG_SUPERVISION_HOST_ROTATE_TURNS` turns, because each wake adds history and the per-wake cost grows with it.
 
 Nothing captain-facing rides on that conversation, because the outcome store carries every result.
 The captain context it acts on is the [dialog mirror](#the-dialog-mirror) at the head of every attended wake and the away record's read-back at the tail of every away wake.

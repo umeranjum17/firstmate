@@ -44,7 +44,7 @@
 #   - `loop_limit` in .cursor/hooks.json is Cursor's own ceiling. Once
 #     loop_count reaches it Cursor stops INVOKING this hook at all, so it is the
 #     only bound that still holds if this script is broken or replaced.
-#   - FM_CURSOR_TURNEND_LOOP_CEILING bounds the payload's own loop_count from
+#   - JG_CURSOR_TURNEND_LOOP_CEILING bounds the payload's own loop_count from
 #     inside, deliberately BELOW the registered loop_limit, so firstmate's bound
 #     bites first and can emit one final loud notice instead of going silently
 #     dark at Cursor's ceiling.
@@ -71,21 +71,21 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-GRACE=${FM_GUARD_GRACE:-300}
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+GRACE=${JG_GUARD_GRACE:-300}
 WATCH="$SCRIPT_DIR/jg-watch.sh"
 OWNER="$STATE/.cursor-park-owner"
 OWNER_LOCK="$STATE/.cursor-park-owner.lock"
 BUDGET_FILE="$STATE/.turnend-cursor-blocks"
 
-LOOP_CEILING=${FM_CURSOR_TURNEND_LOOP_CEILING:-180}
-BLOCK_BUDGET=${FM_CURSOR_TURNEND_BLOCK_BUDGET:-3}
-ARM_ATTEMPTS=${FM_CURSOR_PARK_ATTEMPTS:-2}
-POLL=${FM_CURSOR_PARK_POLL:-2}
-LOCK_ATTEMPTS=${FM_CURSOR_LOCK_ATTEMPTS:-50}
+LOOP_CEILING=${JG_CURSOR_TURNEND_LOOP_CEILING:-180}
+BLOCK_BUDGET=${JG_CURSOR_TURNEND_BLOCK_BUDGET:-3}
+ARM_ATTEMPTS=${JG_CURSOR_PARK_ATTEMPTS:-2}
+POLL=${JG_CURSOR_PARK_POLL:-2}
+LOCK_ATTEMPTS=${JG_CURSOR_LOCK_ATTEMPTS:-50}
 case "$LOOP_CEILING" in ''|*[!0-9]*|0) LOOP_CEILING=180 ;; esac
 case "$BLOCK_BUDGET" in ''|*[!0-9]*|0) BLOCK_BUDGET=3 ;; esac
 case "$ARM_ATTEMPTS" in 1|2|3) : ;; *) ARM_ATTEMPTS=2 ;; esac
@@ -122,7 +122,7 @@ case "$LOOP_COUNT" in ''|*[!0-9]*) exit 0 ;; esac
 SESSION_ID=$(printf '%s' "$PAYLOAD" | jq -r '.session_id // "unknown"' 2>/dev/null || printf 'unknown')
 case "$SESSION_ID" in ''|*[!A-Za-z0-9._-]*) SESSION_ID=unknown ;; esac
 
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 # Pi-host stand-down: docs/turnend-guard.md owns the PI_CODING_AGENT /
 # CURSOR_AGENT / CURSOR_INVOKED_AS contract summarized in this script's header.
@@ -329,7 +329,7 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
   attempt=$((attempt + 1))
   ARM_OUT=$(mktemp "$STATE/.cursor-park-output.XXXXXX") || ARM_OUT=
   if [ "$HOST_MODE" -eq 1 ]; then
-    FM_SUPERVISION_HOST_PRIMARY=cursor "$SCRIPT_DIR/jg-supervision-host.sh" park >"${ARM_OUT:-/dev/null}" 2>&1 &
+    JG_SUPERVISION_HOST_PRIMARY=cursor "$SCRIPT_DIR/jg-supervision-host.sh" park >"${ARM_OUT:-/dev/null}" 2>&1 &
   elif [ -n "$ARM_OUT" ]; then
     "$SCRIPT_DIR/jg-watch-arm.sh" >"$ARM_OUT" 2>&1 &
   else
@@ -382,7 +382,7 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
 
   # A non-actionable close is benign when another verified watcher already owns
   # this home and is still beating inside the shared grace window.
-  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME"; then
     HEALTHY=1
     break
   fi
@@ -402,7 +402,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
   if [ "$HOST_MODE" -eq 1 ]; then
     WAKE=$(awk '/^supervision-host:/ { print; next } /^(signal:|stale:|check:|heartbeat)/ && shown++ < 8' "$ARM_OUT" 2>/dev/null)
     if [ -e "$STATE/.afk-contract" ] \
-      && [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
+      && [ "$(JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
       WAKE="$WAKE
 This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture."
     fi

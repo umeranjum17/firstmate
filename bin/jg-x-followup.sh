@@ -68,9 +68,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 # shellcheck source=bin/jg-x-lib.sh
 . "$SCRIPT_DIR/jg-x-lib.sh"
 # shellcheck source=bin/jg-wake-lib.sh
@@ -275,9 +275,9 @@ case "$REQ_REPLY_MAX" in
   *) REPLY_ENV+=("FMX_REPLY_MAX_CHARS=$REQ_REPLY_MAX") ;;
 esac
 if [ "${#REPLY_ENV[@]}" -gt 0 ]; then
-  env "${REPLY_ENV[@]}" "$FM_ROOT/bin/jg-x-reply.sh" "$RID" --followup "${TS_ARGS[@]}" >/dev/null
+  env "${REPLY_ENV[@]}" "$JG_ROOT/bin/jg-x-reply.sh" "$RID" --followup "${TS_ARGS[@]}" >/dev/null
 else
-  "$FM_ROOT/bin/jg-x-reply.sh" "$RID" --followup "${TS_ARGS[@]}" >/dev/null
+  "$JG_ROOT/bin/jg-x-reply.sh" "$RID" --followup "${TS_ARGS[@]}" >/dev/null
 fi
 post_rc=$?
 

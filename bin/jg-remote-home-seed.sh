@@ -28,11 +28,11 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 REG="$DATA/secondmates.md"
 MAX_MANIFEST_BYTES=1048576
 
@@ -129,7 +129,7 @@ mkdir -p "$DATA"
 BRIEF="$DATA/$ID/brief.md"
 BRIEF_CREATED=0
 if [ ! -f "$BRIEF" ]; then
-  [ -n "${FM_SECONDMATE_CHARTER:-}" ] || die "no filled charter at $BRIEF; set FM_SECONDMATE_CHARTER or scaffold one first"
+  [ -n "${JG_SECONDMATE_CHARTER:-}" ] || die "no filled charter at $BRIEF; set JG_SECONDMATE_CHARTER or scaffold one first"
   if [ "$NO_PROJECTS" -eq 1 ]; then
     "$SCRIPT_DIR/jg-brief.sh" "$ID" --secondmate --no-projects >/dev/null
   else
@@ -174,7 +174,7 @@ PROJECT_INDEX=0
 for project in "${PROJECT_NAMES[@]+"${PROJECT_NAMES[@]}"}"; do
   ORIGIN=${PROJECT_ORIGINS[$PROJECT_INDEX]}
   PROJECT_INDEX=$((PROJECT_INDEX + 1))
-  MODE_LINE=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "$project") ||
+  MODE_LINE=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "$project") ||
     die "project $project does not resolve to a delivery posture (see the refusal above)"
   read -r MODE _ <<EOF
 $MODE_LINE
@@ -249,7 +249,7 @@ if [ "$PREFLIGHT_RC" -ne 0 ]; then
   if [ "$PREFLIGHT_RC" -ne 255 ]; then
     restore_registry_and_brief
   fi
-  [ -z "$FM_REMOTE_READINESS_OUT" ] || printf '%s\n' "$FM_REMOTE_READINESS_OUT" >&2
+  [ -z "$JG_REMOTE_READINESS_OUT" ] || printf '%s\n' "$JG_REMOTE_READINESS_OUT" >&2
   if [ "$PREFLIGHT_RC" -eq 255 ]; then
     die "remote readiness completion is unknown; route and brief preserved for same-host reconciliation"
   fi

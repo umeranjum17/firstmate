@@ -7,7 +7,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_PI_LIVE_E2E pi tmux
+jg_live_gate opt-in JG_PI_LIVE_E2E pi tmux
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 unset NO_MISTAKES_GATE
@@ -25,8 +25,8 @@ PROJECT="$LAB/project"
 AHOY_PROJECT="$LAB/ahoy-project"
 HOME_DIR="$LAB/fmhome"
 PI_VERSION=$(pi --version)
-WATCH_ONLY=${FM_PI_LIVE_WATCH_ONLY:-0}
-case "$WATCH_ONLY" in 0|1) ;; *) fail "FM_PI_LIVE_WATCH_ONLY must be 0 or 1" ;; esac
+WATCH_ONLY=${JG_PI_LIVE_WATCH_ONLY:-0}
+case "$WATCH_ONLY" in 0|1) ;; *) fail "JG_PI_LIVE_WATCH_ONLY must be 0 or 1" ;; esac
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-operational-input.sh"
 # shellcheck disable=SC2016 # Backticks are literal prompt markup.
@@ -188,7 +188,7 @@ run_native_ahoy_regressions() {
   printf '%s\n' \
     '#!/usr/bin/env bash' \
     'set -u' \
-    'file="${FM_HOME:?}/state/session-start-count"' \
+    'file="${JG_HOME:?}/state/session-start-count"' \
     'count=0' \
     '[ ! -f "$file" ] || count=$(sed -n "1p" "$file")' \
     'count=$((count + 1))' \
@@ -216,7 +216,7 @@ run_native_ahoy_regressions() {
 
   first_out=$(
     cd "$AHOY_PROJECT" &&
-      FM_HOME="$first_home" pi --print --approve --no-session --no-context-files --no-extensions \
+      JG_HOME="$first_home" pi --print --approve --no-session --no-context-files --no-extensions \
         -e .pi/extensions/jg-primary-turnend-guard.ts \
         --no-skills --skill .agents/skills \
         --model openai-codex/gpt-5.6-sol --thinking low \
@@ -229,7 +229,7 @@ run_native_ahoy_regressions() {
 
   later_out=$(
     cd "$AHOY_PROJECT" &&
-      FM_HOME="$later_home" pi --print --approve --no-session --no-context-files --no-extensions \
+      JG_HOME="$later_home" pi --print --approve --no-session --no-context-files --no-extensions \
         -e .pi/extensions/jg-primary-turnend-guard.ts \
         --no-skills --skill .agents/skills \
         --model openai-codex/gpt-5.6-sol --thinking low \
@@ -270,7 +270,7 @@ chmod +x "$PROJECT/bin/jg-operational-input.sh"
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/config"
 
 "$TMUX" -L "$SOCKET" new-session -d -s "$SESSION" -c "$PROJECT" \
-  "env FM_HOME='$HOME_DIR' FM_ROOT_OVERRIDE='$PROJECT' FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 bash -lc 'printf \"%s\\n\" \"\$\$\" > \"\$FM_HOME/state/.lock\"; pi --approve --no-session --no-context-files --no-extensions -e .pi/extensions/jg-calm.ts -e .pi/extensions/jg-primary-turnend-guard.ts -e .pi/extensions/jg-primary-pi-watch.ts --model openai-codex/gpt-5.6-sol --thinking low; rc=\$?; printf \"PI_EXIT=%s\\n\" \"\$rc\"; sleep 300'"
+  "env JG_HOME='$HOME_DIR' JG_ROOT_OVERRIDE='$PROJECT' JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HEARTBEAT=600 bash -lc 'printf \"%s\\n\" \"\$\$\" > \"\$JG_HOME/state/.lock\"; pi --approve --no-session --no-context-files --no-extensions -e .pi/extensions/jg-calm.ts -e .pi/extensions/jg-primary-turnend-guard.ts -e .pi/extensions/jg-primary-pi-watch.ts --model openai-codex/gpt-5.6-sol --thinking low; rc=\$?; printf \"PI_EXIT=%s\\n\" \"\$rc\"; sleep 300'"
 
 i=0
 while [ "$i" -lt 120 ]; do
@@ -370,8 +370,8 @@ kill -TERM "$arm_pid" 2>/dev/null || fail "could not intentionally stop the isol
 wait_pid_dead "$watcher_pid" || fail "intentionally stopped watcher stayed alive"
 wait_pid_dead "$arm_pid" || fail "intentionally stopped arm stayed alive"
 sleep 2
-alarm=$(FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$PROJECT" FM_GUARD_GRACE=1 \
-  FM_SUPERVISION_MODEL=extension "$PROJECT/bin/jg-guard.sh" 2>&1)
+alarm=$(JG_HOME="$HOME_DIR" JG_ROOT_OVERRIDE="$PROJECT" JG_GUARD_GRACE=1 \
+  JG_SUPERVISION_MODEL=extension "$PROJECT/bin/jg-guard.sh" 2>&1)
 printf '%s\n' "$alarm" | grep -Fq 'WATCHER DOWN - SUPERVISION IS OFF' \
   || fail "an intentionally stopped live Pi chain did not raise the genuine outage alarm: $alarm"
 

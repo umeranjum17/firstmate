@@ -16,12 +16,12 @@ set -u
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMP_ROOT=$(jg_test_tmproot jg-procevent-when-tests)
-export FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
+export JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$ROOT/bin/jg-pr-lib.sh"
 
-pe()   { FM_HOME="$1" "$ROOT/bin/jg-procevent.sh" "${@:2}"; }
-when() { FM_HOME="$1" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
+pe()   { JG_HOME="$1" "$ROOT/bin/jg-procevent.sh" "${@:2}"; }
+when() { JG_HOME="$1" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
 
 # Every home this suite arms is registered with tests/lib.sh, which sweeps it
 # from every cleanup path so a runner still blocked on a condition that never
@@ -90,7 +90,7 @@ assert_contains "$out" "armed: when-arm-test" "arm reports the canonical source 
 assert_present "$H/state/when/when-arm-test.spec" "arm writes the private spec"
 assert_present "$H/state/when/when-arm-test.trust" "arm writes the trust binding"
 assert_present "$H/state/procevent/when-arm-test.source" "arm registers the process-event source"
-mode=$(PATH="${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
+mode=$(PATH="${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
   '. "$1/bin/jg-pr-lib.sh"; jg_pr_file_mode "$2"' _ "$ROOT" "$H/state/when/when-arm-test.spec")
 assert_contains "$mode" 600 "the spec is private"
 if when "$H" arm arm-test --condition true --action true 2>"$TMP_ROOT/dup.err"; then
@@ -319,9 +319,9 @@ done
 sleep 1
 SH
 chmod +x "$NOISY"
-FM_WHEN_OUTPUT_TAIL_BYTES=128 when "$H" arm bounded-output --stable 1 \
+JG_WHEN_OUTPUT_TAIL_BYTES=128 when "$H" arm bounded-output --stable 1 \
   --condition true --action "$NOISY" "$NOISY_READY" >/dev/null
-FM_WHEN_OUTPUT_TAIL_BYTES=128 pe "$H" reconcile >/dev/null
+JG_WHEN_OUTPUT_TAIL_BYTES=128 pe "$H" reconcile >/dev/null
 wait_for_file "$NOISY_READY" || fail "the noisy action did not start"
 for staged in "$H/state/when"/.run-out.*; do
   [ -e "$staged" ] || continue
@@ -416,7 +416,7 @@ log=$1
 echo v1 >> "$log"
 SH
 chmod +x "$OUT_OF_REPO_ACT"
-when_ro() { FM_HOME="$1" FM_ROOT_OVERRIDE="$REPO_ROOT" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
+when_ro() { JG_HOME="$1" JG_ROOT_OVERRIDE="$REPO_ROOT" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
 
 when_ro "$H" arm rebind-in-repo --interval 0.1 --stable 1 \
   --condition true --action "$IN_REPO_ACT" "$TMP_ROOT/rebind-in-repo.log" >/dev/null
@@ -451,7 +451,7 @@ assert_contains "$OUT" "rebound: when-rebind-in-repo" "the in-repo watch was reb
 assert_contains "$OUT" "1 rebound, 1 unchanged or out of scope, 0 failed" \
   "exactly the in-repo watch should rebind; the out-of-repo one stays out of scope"
 [ "$(cat "$TRUST_OUT")" = "$OLD_TRUST_OUT" ] \
-  || fail "rebind-all must never touch a watch whose action lives outside FM_ROOT"
+  || fail "rebind-all must never touch a watch whose action lives outside JG_ROOT"
 
 grep -qx "action_sha256=$NEW_HASH" "$SPEC_IN" \
   || fail "rebind-all did not record the action's current bytes in the spec"
@@ -469,7 +469,7 @@ assert_grep 'status: fired' "$RESULT" "the rebound watch fires instead of being 
 assert_grep 'action ran v2 against' "$RESULT" "the fired action ran the new bytes, not a stale copy"
 pass "rebind-all refreshes an in-repo watch's trust binding after a self-update and leaves an out-of-repo one alone"
 
-# --- rebind-all matches an action reached through a symlinked FM_ROOT -------
+# --- rebind-all matches an action reached through a symlinked JG_ROOT -------
 H="$TMP_ROOT/h-rebind-symlink"; new_home "$H"
 REPO_REAL="$TMP_ROOT/rebind-symlink-real"
 mkdir -p "$REPO_REAL/bin"
@@ -482,7 +482,7 @@ log=$1
 echo v1 >> "$log"
 SH
 chmod +x "$REPO_REAL/bin/act.sh"
-when_symlink_ro() { FM_HOME="$1" FM_ROOT_OVERRIDE="$REPO_LINK" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
+when_symlink_ro() { JG_HOME="$1" JG_ROOT_OVERRIDE="$REPO_LINK" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
 
 when_symlink_ro "$H" arm rebind-symlink --interval 0.1 --stable 1 \
   --condition true --action "$SYMLINK_ACT" "$TMP_ROOT/rebind-symlink.log" >/dev/null
@@ -494,10 +494,10 @@ echo v2 >> "$log"
 SH
 chmod +x "$REPO_REAL/bin/act.sh"
 
-OUT=$(when_symlink_ro "$H" rebind-all) || fail "rebind-all reported a failure through a symlinked FM_ROOT: $OUT"
+OUT=$(when_symlink_ro "$H" rebind-all) || fail "rebind-all reported a failure through a symlinked JG_ROOT: $OUT"
 assert_contains "$OUT" "rebound: when-rebind-symlink" \
-  "rebind-all must rebind an action reached through a symlinked FM_ROOT, not report it out of scope"
-pass "rebind-all matches FM_ROOT through a symlinked checkout path"
+  "rebind-all must rebind an action reached through a symlinked JG_ROOT, not report it out of scope"
+pass "rebind-all matches JG_ROOT through a symlinked checkout path"
 
 # --- rebind-all reaches a watch whose poller is already running -------------
 # The self-update race the fire-time revalidation targets: `run` calls
@@ -520,7 +520,7 @@ chmod +x "$LIVE_ACT"
 LIVE_TRIGGER="$TMP_ROOT/live-rebind-trigger"
 LIVE_COUNTER="$TMP_ROOT/live-rebind-count"
 LIVE_LOG="$TMP_ROOT/live-rebind.log"
-when_live_ro() { FM_HOME="$1" FM_ROOT_OVERRIDE="$REPO_ROOT" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
+when_live_ro() { JG_HOME="$1" JG_ROOT_OVERRIDE="$REPO_ROOT" "$ROOT/bin/jg-procevent-when.sh" "${@:2}"; }
 
 when_live_ro "$H" arm live-rebind --interval 0.1 --stable 1 \
   --condition "$COND" "$LIVE_TRIGGER" "$LIVE_COUNTER" \
@@ -607,7 +607,7 @@ TORN_READY="$TMP_ROOT/torn-ready"
 TORN_RELEASE="$TMP_ROOT/torn-release"
 rm -f "$TORN_READY" "$TORN_RELEASE"
 parent=$$
-FM_HOME="$TMP_ROOT/torn-race-lock-helper-home" bash -c '
+JG_HOME="$TMP_ROOT/torn-race-lock-helper-home" bash -c '
   . "$1/bin/jg-pr-lib.sh"
   . "$1/bin/jg-wake-lib.sh"
   . "$1/bin/jg-procevent-lib.sh"

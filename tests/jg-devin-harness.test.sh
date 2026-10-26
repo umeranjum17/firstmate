@@ -14,7 +14,7 @@ set -u
 . "$ROOT/bin/jg-agent-process-lib.sh"
 TMP_ROOT=$(jg_test_tmproot jg-devin-harness)
 HARNESS="$ROOT/bin/jg-harness.sh"
-unset CLAUDECODE PI_CODING_AGENT GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI FM_OMP_HARNESS ATLASSIAN_AGENT_TYPE ROVODEV_CLI
+unset CLAUDECODE PI_CODING_AGENT GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI JG_OMP_HARNESS ATLASSIAN_AGENT_TYPE ROVODEV_CLI
 
 mkdir -p "$TMP_ROOT/names"
 for name in devin devin-helper; do ln -s /bin/bash "$TMP_ROOT/names/$name"; done
@@ -37,7 +37,7 @@ jg_control_harness_supports_kind devin scout || fail 'scout refused'
 ! jg_control_harness_supports_kind devin secondmate || fail 'secondmate accepted'
 pass "worker-only resolution and lifecycle capabilities"
 
-[ "$(jg_composer_classify_content 1 '❭ Ask Devin to build features, fix bugs, or work on your code' "$FM_COMPOSER_IDLE_RE_DEFAULT" sensitive '' 1 0)" = empty ] || fail 'idle placeholder not empty'
+[ "$(jg_composer_classify_content 1 '❭ Ask Devin to build features, fix bugs, or work on your code' "$JG_COMPOSER_IDLE_RE_DEFAULT" sensitive '' 1 0)" = empty ] || fail 'idle placeholder not empty'
 [ "$(jg_composer_classify_content 1 '❭ unsubmitted draft')" = pending ] || fail 'typed draft not preserved'
 [ "$(jg_composer_classify_content 0 '❭')" = empty ] || fail 'Devin glyph not recognized'
 for signal in 'Thinking · 5s (esc twice to interrupt)' '❭ Guide Devin while it works'; do
@@ -88,18 +88,18 @@ jq -e '.attribution == false and .read_config_from.claude == false' "$config" >/
   || fail 'an absent user config must still disable attribution and Claude hook import'
 pass "worker config forces attribution off and Claude Code hook import off"
 
-# With config/keep-ai-trailers, jg-spawn passes FM_KEEP_AI_TRAILERS=1: the
+# With config/keep-ai-trailers, jg-spawn passes JG_KEEP_AI_TRAILERS=1: the
 # worker config leaves Devin's attribution as the source had it (absent means
 # Devin's default, on) while Claude hook import stays off.
-FM_KEEP_AI_TRAILERS=1 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" "$TMP_ROOT/opted-in.json" || fail 'config writer failed'
+JG_KEEP_AI_TRAILERS=1 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" "$TMP_ROOT/opted-in.json" || fail 'config writer failed'
 jq -e '.attribution == true and .read_config_from.claude == false' "$config" >/dev/null \
   || fail 'keep-ai-trailers must leave the source attribution on and still disable Claude hook import'
-FM_KEEP_AI_TRAILERS=1 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" /nonexistent/config.json || fail 'absent source refused'
+JG_KEEP_AI_TRAILERS=1 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" /nonexistent/config.json || fail 'absent source refused'
 jq -e 'has("attribution") | not' "$config" >/dev/null \
   || fail 'keep-ai-trailers must not write attribution=false for an absent user config'
-FM_KEEP_AI_TRAILERS=0 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" "$TMP_ROOT/opted-in.json" || fail 'config writer failed'
+JG_KEEP_AI_TRAILERS=0 "$ROOT/bin/jg-devin-config.sh" "$state" worker "$gen" "$TMP_ROOT/opted-in.json" || fail 'config writer failed'
 jq -e '.attribution == false' "$config" >/dev/null \
-  || fail 'FM_KEEP_AI_TRAILERS=0 must still force attribution off'
+  || fail 'JG_KEEP_AI_TRAILERS=0 must still force attribution off'
 pass "keep-ai-trailers leaves Devin attribution on"
 
 case_dir="$TMP_ROOT/spawn"
@@ -111,7 +111,7 @@ wt="$case_dir/wt"
 jg_test_spawn_home "$home" devin
 jg_git_worktree "$proj" "$wt" devin-test
 jg_test_spawn_brief "$home" devin-worker
-if ! out=$(FM_FAKE_LAUNCH_LOG="$case_dir/launch" jg_test_run_spawn "$home" "$wt" "$fakebin" devin-worker "$proj" --scout --harness devin --model fusion-claude-fable-5-1-high-sidekick-swe-2-medium --effort xhigh 2>&1)
+if ! out=$(JG_FAKE_LAUNCH_LOG="$case_dir/launch" jg_test_run_spawn "$home" "$wt" "$fakebin" devin-worker "$proj" --scout --harness devin --model fusion-claude-fable-5-1-high-sidekick-swe-2-medium --effort xhigh 2>&1)
 then fail "spawn failed: $out"; fi
 launch=$(cat "$case_dir/launch")
 assert_contains "$launch" '--permission-mode dangerous --respect-workspace-trust false' 'autonomy/trust flags missing'

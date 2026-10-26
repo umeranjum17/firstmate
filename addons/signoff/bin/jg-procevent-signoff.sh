@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # sign-off adapter for the generic process-to-event runner: captain answers
 # given on a sign-off board come in, and captain holds go out as board cards.
 #
@@ -68,7 +77,7 @@
 # closes nothing.
 #
 # Board keys are `jg-<tag>-<task-id>-<stamp>`, where <tag> is a stable digest of
-# FM_HOME and <stamp> is the hold-set stamp in alphanumerics only. The default
+# JG_HOME and <stamp> is the hold-set stamp in alphanumerics only. The default
 # board is shared by every home on the machine, so the tag keeps one home from
 # being handed another home's answer, and the stamp gives each hold occurrence
 # its own card. sign-off-axi must be on PATH: without it `arm`
@@ -82,16 +91,16 @@ set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # The Firstmate checkout owns the runner, the keyed-answer intake and the libraries.
-# FM_CODE_ROOT defaults to FM_HOME, the checkout a home runs from (as in the sentinel wrapper).
-CODE_ROOT="${FM_CODE_ROOT:-${FM_HOME:-}}"
+# JG_CODE_ROOT defaults to JG_HOME, the checkout a home runs from (as in the sentinel wrapper).
+CODE_ROOT="${JG_CODE_ROOT:-${JG_HOME:-}}"
 BIN="$CODE_ROOT/bin"
 if [ -z "$CODE_ROOT" ] || [ ! -f "$BIN/jg-procevent-lib.sh" ]; then
-  echo "jg-procevent-signoff: no Firstmate checkout with bin/jg-procevent-lib.sh; set FM_CODE_ROOT" >&2
+  echo "jg-procevent-signoff: no Firstmate checkout with bin/jg-procevent-lib.sh; set JG_CODE_ROOT" >&2
   exit 2
 fi
-FM_HOME="${FM_HOME:-$CODE_ROOT}"
-STATE=${FM_STATE_OVERRIDE:-"$FM_HOME/state"}
-export FM_HOME
+JG_HOME="${JG_HOME:-$CODE_ROOT}"
+STATE=${JG_STATE_OVERRIDE:-"$JG_HOME/state"}
+export JG_HOME
 
 . "$BIN/jg-pr-lib.sh"
 . "$BIN/jg-wake-lib.sh"
@@ -103,7 +112,7 @@ export FM_HOME
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/account-pool/bin/jg-pool-claude-env.sh"
 # shellcheck source=signoff/bin/jg-signoff-feedback-lib.sh
 . "$SCRIPT_DIR/jg-signoff-feedback-lib.sh"
-if [ -f "$FM_HOME/config/account-pool" ]; then jg_pool_claude_env || exit 1; fi
+if [ -f "$JG_HOME/config/account-pool" ]; then jg_pool_claude_env || exit 1; fi
 
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
@@ -127,7 +136,7 @@ signoff() {
 }
 
 home_key_prefix() {
-  printf 'jg-%s-' "$(printf '%s' "$FM_HOME" | cksum | awk '{printf "%08x", $1}')"
+  printf 'jg-%s-' "$(printf '%s' "$JG_HOME" | cksum | awk '{printf "%08x", $1}')"
 }
 
 stamp_token() { printf '%s' "$1" | tr -cd 'A-Za-z0-9'; }

@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-account-pool-lib.sh - account-pool add-on: config/account-pool parsing, the
 # `byokit-accounts pick` call, the launch prefix its answer applies, the relaunch --account gate,
 # and jg_account_hook, the one entry point bin/jg-spawn.sh and bin/jg-control.sh call. Sourced
-# from $FM_ADDONS_DIR/account-pool/bin/; a home without the add-on has only no-op hook lines.
+# from $JG_ADDONS_DIR/account-pool/bin/; a home without the add-on has only no-op hook lines.
 # A pick answers with folder paths only, so no secret reaches a launch line, record or log.
 
 # shellcheck source=/dev/null
 type jg_run_timed >/dev/null 2>&1 || . "${SCRIPT_DIR:?sourced from a bin/ script}/jg-timeout-lib.sh"
 
-FM_ACCOUNT_POOL_PICK_SECONDS=${FM_ACCOUNT_POOL_PICK_SECONDS:-120}
-FM_ACCOUNT_POOL_REST_SECONDS=${FM_ACCOUNT_POOL_REST_SECONDS:-60}
+JG_ACCOUNT_POOL_PICK_SECONDS=${JG_ACCOUNT_POOL_PICK_SECONDS:-120}
+JG_ACCOUNT_POOL_REST_SECONDS=${JG_ACCOUNT_POOL_REST_SECONDS:-60}
 
 # jg_account_pool_tool <harness>: the pool tool, or non-zero for an unmapped one.
 jg_account_pool_tool() {
@@ -109,7 +118,7 @@ jg_account_pool_select() {
     '' | next) ;;
     *) prefer_arg=(--prefer "$want") ;;
   esac
-  out=$(jg_run_timed "$FM_ACCOUNT_POOL_PICK_SECONDS" "$command" pick "$tool" --json "${prefer_arg[@]}" --state "$state" 2>"$errf")
+  out=$(jg_run_timed "$JG_ACCOUNT_POOL_PICK_SECONDS" "$command" pick "$tool" --json "${prefer_arg[@]}" --state "$state" 2>"$errf")
   rc=$?
   if [ "$rc" -ne 0 ]; then
     # A failed pick answers with the contract JSON on stdout and one sentence on stderr.
@@ -167,7 +176,7 @@ jg_account_pool_recorded_tool() {
     echo "error: config/account-pool cannot create a temporary file to run '$command'" >&2
     return 1
   }
-  out=$(jg_run_timed "$FM_ACCOUNT_POOL_PICK_SECONDS" "$command" status "$id" --json --state "$state" 2>"$errf")
+  out=$(jg_run_timed "$JG_ACCOUNT_POOL_PICK_SECONDS" "$command" status "$id" --json --state "$state" 2>"$errf")
   rc=$?
   tool=$(printf '%s' "$out" | jq -r '.tool // empty' 2>/dev/null)
   if [ "$rc" -ne 0 ] || [ -z "$tool" ]; then
@@ -189,7 +198,7 @@ jg_account_pool_rest() {
     echo "error: config/account-pool cannot create a temporary file to run '$command'" >&2
     return 1
   }
-  jg_run_timed "$FM_ACCOUNT_POOL_REST_SECONDS" "$command" rest "$id" --json --state "$state" >/dev/null 2>"$errf"
+  jg_run_timed "$JG_ACCOUNT_POOL_REST_SECONDS" "$command" rest "$id" --json --state "$state" >/dev/null 2>"$errf"
   rc=$?
   if [ "$rc" -ne 0 ]; then
     reason=$(sed -n '1{s/^error: //;p;}' "$errf" 2>/dev/null)
@@ -203,7 +212,7 @@ jg_account_pool_rest() {
 
 # The tools a relaunch may move between automatically, fixed in code from the plan's terms review
 # (plan v2 section 3): OpenCode Go is excluded, as is any opencode-go model. Deliberately not config.
-FM_ACCOUNT_POOL_AUTO_TOOLS="claude codex pi"
+JG_ACCOUNT_POOL_AUTO_TOOLS="claude codex pi"
 
 # jg_account_pool_tuple_field <tuple> <index>: field <index> (1-based) of a tab-separated tuple.
 jg_account_pool_tuple_field() { cut -f"$2" <<<"$1"; }
@@ -236,14 +245,14 @@ jg_account_hook_argv() {
   echo
 }
 
-# spawn-validate: jg-spawn's --account checks; reads RELAUNCH and FM_CONTROL_RELAUNCH_TX.
+# spawn-validate: jg-spawn's --account checks; reads RELAUNCH and JG_CONTROL_RELAUNCH_TX.
 jg_account_hook_spawn_validate() {
   local want=${POOL_ACCOUNT_WANT:-}
   [ "${POOL_ACCOUNT_WANT_SET:-0}" = 1 ] || return 0
   [ -n "$want" ] || { echo "error: --account requires a non-empty value" >&2; return 1; }
   jg_account_pool_want_valid "$want" || { echo "error: --account takes 'next' or one pool account id, not '$want'" >&2; return 1; }
   [ "${RELAUNCH:-0}" = 1 ] || { echo "error: --account applies to a relaunch only; a fresh launch picks its pool account on its own" >&2; return 1; }
-  [ "$want" != next ] || [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ] || {
+  [ "$want" != next ] || [ -n "${JG_CONTROL_RELAUNCH_TX:-}" ] || {
     echo "error: --account next rests the recorded account only in jg-control's pre-stop gate; a direct relaunch would ignore it and may re-pick the same account - use 'bin/jg-control.sh <task-id> relaunch --account next'" >&2
     return 1
   }
@@ -285,7 +294,7 @@ jg_account_hook_relaunch_pre() {
       return 1
     }
     tool=$(jg_account_pool_recorded_tool "${cfg%%$'\t'*}" "${cfg#*$'\t'}" "$recorded") || return 1
-    case " $FM_ACCOUNT_POOL_AUTO_TOOLS " in
+    case " $JG_ACCOUNT_POOL_AUTO_TOOLS " in
       *" $tool "*) ;;
       *)
         echo "error: '--account next' cannot move an account of tool '$tool' automatically; move this worker by hand with 'bin/jg-control.sh $task relaunch --account <id>'" >&2

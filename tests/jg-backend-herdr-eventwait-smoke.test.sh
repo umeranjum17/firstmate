@@ -120,8 +120,8 @@ pass "real herdr ($HERDR_VERSION): a driven idle->blocked transition returns the
 # --- the watcher's fast-path lands a stale record in the scratch wake queue ---
 # Load the narrow production owner only after pointing it at scratch state, then
 # override wake so the handler enqueues without exiting the test.
-export FM_STATE_OVERRIDE="$STATE"
-export FM_ROOT_OVERRIDE="$ROOT"
+export JG_STATE_OVERRIDE="$STATE"
+export JG_ROOT_OVERRIDE="$ROOT"
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-push-transition-lib.sh"
 wake() { return 0; }

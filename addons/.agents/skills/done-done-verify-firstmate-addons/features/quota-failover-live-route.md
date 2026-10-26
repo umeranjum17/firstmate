@@ -6,8 +6,8 @@ The watcher runs in Main and every active local secondmate home, and a worker st
 
 ## Drive
 
-- `FM_TEST_FORK=<Firstmate checkout> bash quota-failover/tests/install.test.sh` (`install.sh --all` on throwaway homes with the fork's own registration) and `bash quota-failover/tests/quota-failover-e2e.sh` (pass 3: the `ambient` worker).
-- Live: `FM_CHECKOUT=<Firstmate checkout> done-done run quota-failover-live-route` (`bash quota-failover/run-live-proof.sh`): a disposable lab (Haiku main) with one real pi worker pinned to a local HTTP 429 provider and this checkout's watcher in a lab-only data path; PASS is the lab watcher moving it to Claude Haiku and the worker finishing there. About 10 minutes, Haiku only. It runs the real pi binary, since `pi --help` through the host mise shim hung inside labs.
+- `JG_TEST_FORK=<Firstmate checkout> bash quota-failover/tests/install.test.sh` (`install.sh --all` on throwaway homes with the fork's own registration) and `bash quota-failover/tests/quota-failover-e2e.sh` (pass 3: the `ambient` worker).
+- Live: `JG_CHECKOUT=<Firstmate checkout> done-done run quota-failover-live-route` (`bash quota-failover/run-live-proof.sh`): a disposable lab (Haiku main) with one real pi worker pinned to a local HTTP 429 provider and this checkout's watcher in a lab-only data path; PASS is the lab watcher moving it to Claude Haiku and the worker finishing there. About 10 minutes, Haiku only. It runs the real pi binary, since `pi --help` through the host mise shim hung inside labs.
 
 ## Evidence
 

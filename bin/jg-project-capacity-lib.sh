@@ -77,7 +77,7 @@
 # sysexits "temporary failure" code, so a caller can tell a deferral that leaves
 # the task queued from an ordinary failure.
 # shellcheck disable=SC2034 # read by bin/jg-spawn.sh after sourcing.
-FM_PROJECT_CAPACITY_DEFER_EXIT=75
+JG_PROJECT_CAPACITY_DEFER_EXIT=75
 
 # The config directory holding this machine's declaration: the spawning home's
 # own <config-dir> when that home is the local root (so an override of it
@@ -94,21 +94,21 @@ jg_project_capacity_config_dir() {  # <spawning-home> <spawning-config-dir>
 }
 
 # Read the declared capacity for one project.
-# Sets FM_PROJECT_CAPACITY_FILE to the declaration path, FM_PROJECT_CAPACITY
+# Sets JG_PROJECT_CAPACITY_FILE to the declaration path, JG_PROJECT_CAPACITY
 # to the project's capacity, or to empty when the project declares none, and
-# FM_PROJECT_CAPACITY_ANY to 1 when the declaration caps any project at all.
-# Returns 1 with FM_PROJECT_CAPACITY_ERROR when the declaration is unreadable.
+# JG_PROJECT_CAPACITY_ANY to 1 when the declaration caps any project at all.
+# Returns 1 with JG_PROJECT_CAPACITY_ERROR when the declaration is unreadable.
 jg_project_capacity_lookup() {  # <config-dir> <project-name>
   local name=$2 line lineno=0 pname pcap seen='|'
-  FM_PROJECT_CAPACITY_FILE="$1/project-capacity"
-  FM_PROJECT_CAPACITY=
-  FM_PROJECT_CAPACITY_ANY=
-  FM_PROJECT_CAPACITY_ERROR=
-  if [ ! -e "$FM_PROJECT_CAPACITY_FILE" ] && [ ! -L "$FM_PROJECT_CAPACITY_FILE" ]; then
+  JG_PROJECT_CAPACITY_FILE="$1/project-capacity"
+  JG_PROJECT_CAPACITY=
+  JG_PROJECT_CAPACITY_ANY=
+  JG_PROJECT_CAPACITY_ERROR=
+  if [ ! -e "$JG_PROJECT_CAPACITY_FILE" ] && [ ! -L "$JG_PROJECT_CAPACITY_FILE" ]; then
     return 0
   fi
-  if [ ! -f "$FM_PROJECT_CAPACITY_FILE" ] || [ ! -r "$FM_PROJECT_CAPACITY_FILE" ]; then
-    FM_PROJECT_CAPACITY_ERROR="$FM_PROJECT_CAPACITY_FILE is not a readable regular file"
+  if [ ! -f "$JG_PROJECT_CAPACITY_FILE" ] || [ ! -r "$JG_PROJECT_CAPACITY_FILE" ]; then
+    JG_PROJECT_CAPACITY_ERROR="$JG_PROJECT_CAPACITY_FILE is not a readable regular file"
     return 1
   fi
   while IFS= read -r line || [ -n "$line" ]; do
@@ -133,33 +133,33 @@ jg_project_capacity_lookup() {  # <config-dir> <project-name>
     pname=${line%"$pcap"}
     pname=${pname%"${pname##*[![:space:]]}"}
     if [ -z "$pname" ]; then
-      FM_PROJECT_CAPACITY_ERROR="$FM_PROJECT_CAPACITY_FILE line $lineno is not '<project-name> <capacity>'"
-      FM_PROJECT_CAPACITY=
+      JG_PROJECT_CAPACITY_ERROR="$JG_PROJECT_CAPACITY_FILE line $lineno is not '<project-name> <capacity>'"
+      JG_PROJECT_CAPACITY=
       return 1
     fi
     case "$pcap" in
       '' | *[!0-9]* | 0*)
-        FM_PROJECT_CAPACITY_ERROR="$FM_PROJECT_CAPACITY_FILE line $lineno gives $pname a capacity that is not a positive integer"
-        FM_PROJECT_CAPACITY=
+        JG_PROJECT_CAPACITY_ERROR="$JG_PROJECT_CAPACITY_FILE line $lineno gives $pname a capacity that is not a positive integer"
+        JG_PROJECT_CAPACITY=
         return 1
         ;;
     esac
     if [ "${#pcap}" -gt 6 ]; then
-      FM_PROJECT_CAPACITY_ERROR="$FM_PROJECT_CAPACITY_FILE line $lineno gives $pname a capacity longer than six digits"
-      FM_PROJECT_CAPACITY=
+      JG_PROJECT_CAPACITY_ERROR="$JG_PROJECT_CAPACITY_FILE line $lineno gives $pname a capacity longer than six digits"
+      JG_PROJECT_CAPACITY=
       return 1
     fi
     case "$seen" in
       *"|$pname|"*)
-        FM_PROJECT_CAPACITY_ERROR="$FM_PROJECT_CAPACITY_FILE line $lineno names $pname a second time"
-        FM_PROJECT_CAPACITY=
+        JG_PROJECT_CAPACITY_ERROR="$JG_PROJECT_CAPACITY_FILE line $lineno names $pname a second time"
+        JG_PROJECT_CAPACITY=
         return 1
         ;;
     esac
     seen="$seen$pname|"
-    [ "$pname" != "$name" ] || FM_PROJECT_CAPACITY=$pcap
-  done < "$FM_PROJECT_CAPACITY_FILE"
-  [ "$seen" = '|' ] || FM_PROJECT_CAPACITY_ANY=1
+    [ "$pname" != "$name" ] || JG_PROJECT_CAPACITY=$pcap
+  done < "$JG_PROJECT_CAPACITY_FILE"
+  [ "$seen" = '|' ] || JG_PROJECT_CAPACITY_ANY=1
   return 0
 }
 
@@ -170,34 +170,34 @@ jg_project_capacity_lookup() {  # <config-dir> <project-name>
 # jg_local_firstmate_state_dirs <first-state>. <own-id> is the task being
 # admitted; its own record in <first-state> is the one this spawn replaces, so
 # it is not counted.
-# Sets FM_PROJECT_CAPACITY_OCCUPANTS to the count and
-# FM_PROJECT_CAPACITY_OCCUPANT_IDS to a comma-separated list of the holders,
+# Sets JG_PROJECT_CAPACITY_OCCUPANTS to the count and
+# JG_PROJECT_CAPACITY_OCCUPANT_IDS to a comma-separated list of the holders,
 # each outside <first-state> qualified with its home. Returns 1 with
-# FM_PROJECT_CAPACITY_ERROR when the local homes cannot be enumerated, or when
+# JG_PROJECT_CAPACITY_ERROR when the local homes cannot be enumerated, or when
 # a state directory or task record in them cannot be read, since skipping it
 # could undercount the holders.
 jg_project_capacity_occupants() {  # <project-lock> <project-dir> <first-state> <own-id>
   local want=$1 own=$2 first=$3 self=$4 state meta kind project lock id label i
   local -a cache_dirs cache_locks
-  FM_PROJECT_CAPACITY_OCCUPANTS=0
-  FM_PROJECT_CAPACITY_OCCUPANT_IDS=
-  FM_PROJECT_CAPACITY_ERROR=
+  JG_PROJECT_CAPACITY_OCCUPANTS=0
+  JG_PROJECT_CAPACITY_OCCUPANT_IDS=
+  JG_PROJECT_CAPACITY_ERROR=
   jg_local_firstmate_state_dirs "$first" || {
-    FM_PROJECT_CAPACITY_ERROR=$FM_LOCAL_FIRSTMATE_ERROR
+    JG_PROJECT_CAPACITY_ERROR=$JG_LOCAL_FIRSTMATE_ERROR
     return 1
   }
   cache_dirs=("$own")
   cache_locks=("$want")
-  for state in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for state in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
     if [ -e "$state" ] && { [ ! -d "$state" ] || [ ! -r "$state" ] || [ ! -x "$state" ]; }; then
-      FM_PROJECT_CAPACITY_ERROR="local Firstmate state directory $state cannot be read"
+      JG_PROJECT_CAPACITY_ERROR="local Firstmate state directory $state cannot be read"
       return 1
     fi
     for meta in "$state"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       [ "$meta" != "$first/$self.meta" ] || continue
       [ -r "$meta" ] || {
-        FM_PROJECT_CAPACITY_ERROR="task record $meta cannot be read"
+        JG_PROJECT_CAPACITY_ERROR="task record $meta cannot be read"
         return 1
       }
       kind=$(jg_meta_get "$meta" kind)
@@ -223,8 +223,8 @@ jg_project_capacity_occupants() {  # <project-lock> <project-dir> <first-state> 
       id=$(basename "$meta" .meta)
       label=$id
       [ "$state" = "$first" ] || label="$id in $(dirname "$state")"
-      FM_PROJECT_CAPACITY_OCCUPANTS=$((FM_PROJECT_CAPACITY_OCCUPANTS + 1))
-      FM_PROJECT_CAPACITY_OCCUPANT_IDS="${FM_PROJECT_CAPACITY_OCCUPANT_IDS:+$FM_PROJECT_CAPACITY_OCCUPANT_IDS, }$label"
+      JG_PROJECT_CAPACITY_OCCUPANTS=$((JG_PROJECT_CAPACITY_OCCUPANTS + 1))
+      JG_PROJECT_CAPACITY_OCCUPANT_IDS="${JG_PROJECT_CAPACITY_OCCUPANT_IDS:+$JG_PROJECT_CAPACITY_OCCUPANT_IDS, }$label"
     done
   done
   return 0

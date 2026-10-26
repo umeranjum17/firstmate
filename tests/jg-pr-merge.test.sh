@@ -169,86 +169,86 @@ add_gh_mocks() {
   write_github_live_json "$case_dir" "$head"
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_AXI_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     [ "$#" -eq 5 ] && [ "${4:-}" = --repo ] || exit 2
-    printf 'pull_request:\n  number: %s\n  state: %s\n' "$3" "${FM_TEST_GH_MERGE_STATE:-merged}"
+    printf 'pull_request:\n  number: %s\n  state: %s\n' "$3" "${JG_TEST_GH_MERGE_STATE:-merged}"
     ;;
 esac
 exit 0
 SH
   cat > "$case_dir/fakebin/gh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
       *statusCheckRollup*)
-        if [ -n "${FM_TEST_GH_MERGEABLE_SEQUENCE:-}" ]; then
-          call_n=$(( $(cat "$FM_TEST_GH_MERGEABLE_CALLS" 2>/dev/null || echo 0) + 1 ))
-          printf '%s\n' "$call_n" > "$FM_TEST_GH_MERGEABLE_CALLS"
-          call_m=$(sed -n "${call_n}p" "$FM_TEST_GH_MERGEABLE_SEQUENCE")
-          [ -n "$call_m" ] || call_m=$(tail -n1 "$FM_TEST_GH_MERGEABLE_SEQUENCE")
+        if [ -n "${JG_TEST_GH_MERGEABLE_SEQUENCE:-}" ]; then
+          call_n=$(( $(cat "$JG_TEST_GH_MERGEABLE_CALLS" 2>/dev/null || echo 0) + 1 ))
+          printf '%s\n' "$call_n" > "$JG_TEST_GH_MERGEABLE_CALLS"
+          call_m=$(sed -n "${call_n}p" "$JG_TEST_GH_MERGEABLE_SEQUENCE")
+          [ -n "$call_m" ] || call_m=$(tail -n1 "$JG_TEST_GH_MERGEABLE_SEQUENCE")
           # An optional second word overrides the first check's conclusion.
           read -r call_m call_c <<< "$call_m"
           jq -c --arg m "$call_m" --arg c "${call_c:-}" \
             '.mergeable = $m | if $c != "" then .statusCheckRollup[0].conclusion = $c else . end' \
-            "$FM_TEST_GH_VIEW_JSON"
+            "$JG_TEST_GH_VIEW_JSON"
         else
-          cat "$FM_TEST_GH_VIEW_JSON"
+          cat "$JG_TEST_GH_VIEW_JSON"
         fi
-        if [ -f "${FM_TEST_AWAY_RECORD_AFTER_VIEW:-}" ]; then
-          if [ -s "${FM_TEST_AWAY_RECORD_AFTER_VIEW}" ]; then
-            cp "$FM_TEST_AWAY_RECORD_AFTER_VIEW" "$FM_STATE_OVERRIDE/.afk-contract"
+        if [ -f "${JG_TEST_AWAY_RECORD_AFTER_VIEW:-}" ]; then
+          if [ -s "${JG_TEST_AWAY_RECORD_AFTER_VIEW}" ]; then
+            cp "$JG_TEST_AWAY_RECORD_AFTER_VIEW" "$JG_STATE_OVERRIDE/.afk-contract"
           else
-            rm -f "$FM_STATE_OVERRIDE/.afk-contract"
+            rm -f "$JG_STATE_OVERRIDE/.afk-contract"
           fi
         fi
         exit 0
         ;;
       *headRefOid*)
-        cat "$FM_TEST_GH_HEAD"
+        cat "$JG_TEST_GH_HEAD"
         exit 0
         ;;
       *isDraft*)
-        cat "$FM_TEST_GH_VIEW_JSON"
+        cat "$JG_TEST_GH_VIEW_JSON"
         exit 0
         ;;
     esac
     ;;
   "pr merge")
-    if [ -n "${FM_TEST_META_AT_MERGE:-}" ] && [ -f "${FM_STATE_OVERRIDE:-}/task-x1.meta" ]; then
-      cat "$FM_STATE_OVERRIDE/task-x1.meta" > "$FM_TEST_META_AT_MERGE"
+    if [ -n "${JG_TEST_META_AT_MERGE:-}" ] && [ -f "${JG_STATE_OVERRIDE:-}/task-x1.meta" ]; then
+      cat "$JG_STATE_OVERRIDE/task-x1.meta" > "$JG_TEST_META_AT_MERGE"
     fi
     # The forge call runs inside the merge's critical section, so a real
     # away-record change attempted from here is the TOCTOU itself: whatever
     # happens to it happens between the authority read and the merge.
-    if [ -x "${FM_TEST_AWAY_MUTATE_AT_MERGE:-}" ]; then
+    if [ -x "${JG_TEST_AWAY_MUTATE_AT_MERGE:-}" ]; then
       away_rc=0
-      "$FM_TEST_AWAY_MUTATE_AT_MERGE" > "$FM_TEST_AWAY_MUTATE_OUT" 2>&1 || away_rc=$?
-      printf '%s\n' "$away_rc" > "$FM_TEST_AWAY_MUTATE_RC"
-      "$FM_TEST_ROOT/bin/jg-afk-contract.sh" words \
-        > "$FM_TEST_AWAY_WORDS_AT_MERGE" 2>/dev/null \
-        || printf 'no-live-record\n' > "$FM_TEST_AWAY_WORDS_AT_MERGE"
+      "$JG_TEST_AWAY_MUTATE_AT_MERGE" > "$JG_TEST_AWAY_MUTATE_OUT" 2>&1 || away_rc=$?
+      printf '%s\n' "$away_rc" > "$JG_TEST_AWAY_MUTATE_RC"
+      "$JG_TEST_ROOT/bin/jg-afk-contract.sh" words \
+        > "$JG_TEST_AWAY_WORDS_AT_MERGE" 2>/dev/null \
+        || printf 'no-live-record\n' > "$JG_TEST_AWAY_WORDS_AT_MERGE"
     fi
-    if [ -n "${FM_TEST_GH_MERGE_OUTPUT:-}" ]; then
-      printf '%s\n' "$FM_TEST_GH_MERGE_OUTPUT"
+    if [ -n "${JG_TEST_GH_MERGE_OUTPUT:-}" ]; then
+      printf '%s\n' "$JG_TEST_GH_MERGE_OUTPUT"
     else
       printf 'merged:\n  number: %s\n  status: ok\n' "${3:-}"
     fi
     merge_rc=0
-    if [ -f "${FM_TEST_GH_MERGE_RC_FILE:-}" ]; then
-      merge_rc=$(cat "$FM_TEST_GH_MERGE_RC_FILE")
+    if [ -f "${JG_TEST_GH_MERGE_RC_FILE:-}" ]; then
+      merge_rc=$(cat "$JG_TEST_GH_MERGE_RC_FILE")
     fi
     exit "$merge_rc"
     ;;
   "api graphql")
-    if [ -f "${FM_TEST_GH_GRAPHQL_FAIL:-}" ]; then
+    if [ -f "${JG_TEST_GH_GRAPHQL_FAIL:-}" ]; then
       echo 'error: could not reach the GitHub API' >&2
       exit 1
     fi
-    cat "$FM_TEST_GH_OUTCOME"
+    cat "$JG_TEST_GH_OUTCOME"
     exit 0
     ;;
   api\ *)
@@ -257,38 +257,38 @@ case "${1:-} ${2:-}" in
     case " $* " in
       *" repos/"*"/commits/"*"/check-runs"*)
         case "$*" in
-          *"/commits/$(cat "$FM_TEST_GH_HEAD")/check-runs"*) ;;
+          *"/commits/$(cat "$JG_TEST_GH_HEAD")/check-runs"*) ;;
           *) exit 1 ;;
         esac
-        cat "$FM_TEST_GH_RUNS"
+        cat "$JG_TEST_GH_RUNS"
         exit $?
         ;;
       *" repos/"*"/rules/branches/"*merge_queue*) ;;
       *" repos/"*"/rules/branches/"*)
-        if [ -f "${FM_TEST_GH_REQUIRED_RULES_FAIL:-}" ]; then
-          cat "$FM_TEST_GH_REQUIRED_RULES_FAIL" >&2
+        if [ -f "${JG_TEST_GH_REQUIRED_RULES_FAIL:-}" ]; then
+          cat "$JG_TEST_GH_REQUIRED_RULES_FAIL" >&2
           exit 1
         fi
-        cat "$FM_TEST_GH_REQUIRED_RULES"
+        cat "$JG_TEST_GH_REQUIRED_RULES"
         exit 0
         ;;
       *" repos/"*"/branches/"*)
-        if [ -f "${FM_TEST_GH_BRANCH_FAIL:-}" ]; then
-          cat "$FM_TEST_GH_BRANCH_FAIL" >&2
+        if [ -f "${JG_TEST_GH_BRANCH_FAIL:-}" ]; then
+          cat "$JG_TEST_GH_BRANCH_FAIL" >&2
           exit 1
         fi
-        cat "$FM_TEST_GH_BRANCH"
+        cat "$JG_TEST_GH_BRANCH"
         exit 0
         ;;
     esac
-    if [ -f "${FM_TEST_GH_RULES_FAIL_BODY:-}" ]; then
-      cat "$FM_TEST_GH_RULES_FAIL_BODY" >&2
+    if [ -f "${JG_TEST_GH_RULES_FAIL_BODY:-}" ]; then
+      cat "$JG_TEST_GH_RULES_FAIL_BODY" >&2
       exit 1
     fi
-    if [ -f "${FM_TEST_GH_RULES_FAIL:-}" ]; then
+    if [ -f "${JG_TEST_GH_RULES_FAIL:-}" ]; then
       exit 1
     fi
-    cat "$FM_TEST_GH_RULES"
+    cat "$JG_TEST_GH_RULES"
     exit 0
     ;;
 esac
@@ -320,7 +320,7 @@ add_gh_axi_mock_view_fails() {
   local case_dir=$1
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_AXI_LOG"
 case "${1:-} ${2:-}" in
   "pr merge") printf 'merged:\n  number: %s\n  status: ok\n' "${3:-}" ;;
   "pr view") exit 1 ;;
@@ -339,7 +339,7 @@ for arg in "$@"; do
     */.jg-pr-poll-data.*) exit 1 ;;
   esac
 done
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$case_dir/fakebin/mv"
 }
@@ -352,15 +352,15 @@ add_glab_mock() {
   local case_dir=$1
   cat > "$case_dir/fakebin/glab" <<'SH'
 #!/usr/bin/env bash
-printf 'GITLAB_HOST=%s %s\n' "${GITLAB_HOST-<unset>}" "$*" >> "$FM_TEST_GLAB_LOG"
-case_dir=$(dirname "$FM_TEST_GLAB_JSON")
+printf 'GITLAB_HOST=%s %s\n' "${GITLAB_HOST-<unset>}" "$*" >> "$JG_TEST_GLAB_LOG"
+case_dir=$(dirname "$JG_TEST_GLAB_JSON")
 case "${1:-} ${2:-}" in
   "mr view")
     [ ! -e "$case_dir/glab-view-fails" ] || exit 1
     if [ -e "$case_dir/glab-merge-called" ] && [ ! -e "$case_dir/glab-stays-open" ]; then
       cat "$case_dir/mr-post.json"
     else
-      cat "$FM_TEST_GLAB_JSON"
+      cat "$JG_TEST_GLAB_JSON"
     fi
     exit 0
     ;;
@@ -435,8 +435,8 @@ add_tea_mock() {
   cat > "$case_dir/fakebin/tea" <<'SH'
 #!/usr/bin/env bash
 set -u
-log_dir=$(dirname "$FM_TEST_TEA_LOG")
-printf '%s\n' "$*" >> "$FM_TEST_TEA_LOG"
+log_dir=$(dirname "$JG_TEST_TEA_LOG")
+printf '%s\n' "$*" >> "$JG_TEST_TEA_LOG"
 
 if [ "${1:-} ${2:-}" = "login list" ]; then
   cat "$log_dir/tea-logins.json"
@@ -659,39 +659,39 @@ glab_merge_line() {
 
 run_pr_merge() {
   local case_dir=$1 rc; shift
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
-  FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
-  FM_TEST_GH_LOG="$case_dir/gh.log" \
-  FM_TEST_GH_OUTCOME="$case_dir/github-outcome" \
-  FM_TEST_GH_RULES="$case_dir/github-rules" \
-  FM_TEST_GH_VIEW_JSON="$case_dir/github-view.json" \
-  FM_TEST_GH_MERGEABLE_SEQUENCE="${FM_TEST_GH_MERGEABLE_SEQUENCE:-}" \
-  FM_TEST_GH_MERGEABLE_CALLS="$case_dir/mergeable-calls" \
-  FM_TEST_GH_HEAD="$case_dir/github-head" \
-  FM_TEST_GH_RUNS="$case_dir/github-runs.json" \
-  FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
-  FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
-  FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
-  FM_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \
-  FM_TEST_GH_RULES_FAIL_BODY="$case_dir/github-rules-fail-body" \
-  FM_TEST_GH_BRANCH="$case_dir/github-branch.json" \
-  FM_TEST_GH_BRANCH_FAIL="$case_dir/github-branch-fail" \
-  FM_TEST_GH_REQUIRED_RULES="$case_dir/github-required-rules.json" \
-  FM_TEST_GH_REQUIRED_RULES_FAIL="$case_dir/github-required-rules-fail" \
-  FM_TEST_META_AT_MERGE="$case_dir/meta-at-merge" \
-  FM_TEST_AWAY_RECORD_AFTER_VIEW="$case_dir/away-record-after-view" \
-  FM_TEST_ROOT="$ROOT" \
-  FM_TEST_AWAY_MUTATE_AT_MERGE="${FM_TEST_AWAY_MUTATE_AT_MERGE:-}" \
-  FM_TEST_AWAY_MUTATE_OUT="$case_dir/away-mutate-output" \
-  FM_TEST_AWAY_MUTATE_RC="$case_dir/away-mutate-rc" \
-  FM_TEST_AWAY_WORDS_AT_MERGE="$case_dir/away-words-at-merge" \
-  FM_TEST_REAL_MV="$REAL_MV" \
-  FM_TEST_GLAB_LOG="$case_dir/glab.log" \
-  FM_TEST_GLAB_JSON="$case_dir/mr.json" \
-  FM_TEST_TEA_LOG="$case_dir/tea.log" \
-  HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="${JG_TEST_HOME:-$case_dir/home}" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
+  JG_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
+  JG_TEST_GH_LOG="$case_dir/gh.log" \
+  JG_TEST_GH_OUTCOME="$case_dir/github-outcome" \
+  JG_TEST_GH_RULES="$case_dir/github-rules" \
+  JG_TEST_GH_VIEW_JSON="$case_dir/github-view.json" \
+  JG_TEST_GH_MERGEABLE_SEQUENCE="${JG_TEST_GH_MERGEABLE_SEQUENCE:-}" \
+  JG_TEST_GH_MERGEABLE_CALLS="$case_dir/mergeable-calls" \
+  JG_TEST_GH_HEAD="$case_dir/github-head" \
+  JG_TEST_GH_RUNS="$case_dir/github-runs.json" \
+  JG_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
+  JG_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
+  JG_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
+  JG_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \
+  JG_TEST_GH_RULES_FAIL_BODY="$case_dir/github-rules-fail-body" \
+  JG_TEST_GH_BRANCH="$case_dir/github-branch.json" \
+  JG_TEST_GH_BRANCH_FAIL="$case_dir/github-branch-fail" \
+  JG_TEST_GH_REQUIRED_RULES="$case_dir/github-required-rules.json" \
+  JG_TEST_GH_REQUIRED_RULES_FAIL="$case_dir/github-required-rules-fail" \
+  JG_TEST_META_AT_MERGE="$case_dir/meta-at-merge" \
+  JG_TEST_AWAY_RECORD_AFTER_VIEW="$case_dir/away-record-after-view" \
+  JG_TEST_ROOT="$ROOT" \
+  JG_TEST_AWAY_MUTATE_AT_MERGE="${JG_TEST_AWAY_MUTATE_AT_MERGE:-}" \
+  JG_TEST_AWAY_MUTATE_OUT="$case_dir/away-mutate-output" \
+  JG_TEST_AWAY_MUTATE_RC="$case_dir/away-mutate-rc" \
+  JG_TEST_AWAY_WORDS_AT_MERGE="$case_dir/away-words-at-merge" \
+  JG_TEST_REAL_MV="$REAL_MV" \
+  JG_TEST_GLAB_LOG="$case_dir/glab.log" \
+  JG_TEST_GLAB_JSON="$case_dir/mr.json" \
+  JG_TEST_TEA_LOG="$case_dir/tea.log" \
+  HOME="${JG_TEST_USER_HOME:-$case_dir/user-home}" \
   PATH="$case_dir/fakebin:$PATH" \
     "$PR_MERGE" "$@"
   rc=$?
@@ -714,7 +714,7 @@ write_github_outcome() {
 write_away_record() {
   local case_dir=$1
   shift
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-afk-contract.sh" enter "$@" >/dev/null
 }
 
@@ -869,8 +869,8 @@ test_github_mergeable_unknown_retries_then_succeeds() {
   : > "$case_dir/gh.log"
 
   set +e
-  FM_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
-  FM_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
+  JG_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
+  JG_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/83 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -901,8 +901,8 @@ test_github_mergeable_unknown_exhausts_bound_and_reports_pending() {
   : > "$case_dir/gh.log"
 
   set +e
-  FM_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
-  FM_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
+  JG_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
+  JG_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/84 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -932,8 +932,8 @@ test_github_mergeable_unknown_retry_rechecks_checks() {
   : > "$case_dir/gh.log"
 
   set +e
-  FM_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
-  FM_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
+  JG_TEST_GH_MERGEABLE_SEQUENCE="$case_dir/mergeable-sequence" \
+  JG_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/86 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -1307,7 +1307,7 @@ test_away_plan_gated_403_does_not_block_the_merge() {
     > "$case_dir/github-rules-fail-body"
   printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
   write_away_record "$case_dir"
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "away-plan-gated-403: a private repo's plan-gated 403 must not block an away merge"
   assert_logged_gh_merge "$case_dir" 91 example/repo --squash
@@ -1346,7 +1346,7 @@ test_github_unmerged_fallback_cannot_replace_queue_aware_read() {
   add_gh_mock_outcome_read_fails "$case_dir"
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_AXI_LOG"
 case "${1:-} ${2:-}" in
   "pr view") printf 'pull_request:\n  number: %s\n  state: open\n' "$3" ;;
 esac
@@ -2202,11 +2202,11 @@ test_gitlab_missing_tool_refuses_before_recording() {
       || fail "gitlab-no-$tool: the $tool-free search path lost the $other mock as well"
 
     set +e
-    FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$case_dir/state" \
-    FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
-    FM_TEST_GLAB_LOG="$case_dir/glab.log" \
-    FM_TEST_GLAB_JSON="$case_dir/mr.json" \
+    JG_ROOT_OVERRIDE="$ROOT" \
+    JG_STATE_OVERRIDE="$case_dir/state" \
+    JG_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
+    JG_TEST_GLAB_LOG="$case_dir/glab.log" \
+    JG_TEST_GLAB_JSON="$case_dir/mr.json" \
     PATH="$case_dir/no$tool" \
       "$PR_MERGE" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"
     rc=$?
@@ -2445,10 +2445,10 @@ test_forgejo_missing_tool_refuses_before_recording() {
       || fail "forgejo-no-$tool: the $tool-free search path lost the $other mock as well"
 
     set +e
-    FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$case_dir/state" \
-    FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
-    FM_TEST_TEA_LOG="$case_dir/tea.log" \
+    JG_ROOT_OVERRIDE="$ROOT" \
+    JG_STATE_OVERRIDE="$case_dir/state" \
+    JG_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
+    JG_TEST_TEA_LOG="$case_dir/tea.log" \
     PATH="$case_dir/no$tool" \
       "$PR_MERGE" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"
     rc=$?
@@ -2656,7 +2656,7 @@ test_secondmate_merge_reports_upward_once() {
   : >"$case_dir/gh-axi.log"
   replies="$case_dir/state/parent-replies.status"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "secondmate-merge-reports: merge failed"
 
   assert_grep "done [key=merged-task-x1]: merged task-x1 $url" <(sed -E 's/ \[at=[0-9]+\]//' "$replies") \
@@ -2670,7 +2670,7 @@ test_secondmate_merge_reports_upward_once() {
 
   # The same merge again: the forge accepts it in this fixture, so only the
   # at-most-once contract can keep the parent from being told twice.
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout2" 2>"$case_dir/stderr2" || fail "secondmate-merge-reports: repeat merge failed"
   [ "$(grep -c 'merged-task-x1' "$replies")" -eq 1 ] \
     || fail "secondmate-merge-reports: a repeat merge of the same PR duplicated the upward line"
@@ -2688,7 +2688,7 @@ test_secondmate_merge_reports_on_the_local_route() {
   : >"$case_dir/gh-axi.log"
   parent_status="$TMP_ROOT/secondmate-merge-local/parent/state/mate-x.status"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "secondmate-merge-local: merge failed"
 
   assert_grep "done [key=merged-task-x1]: merged task-x1 $url" <(sed -E 's/ \[at=[0-9]+\]//' "$parent_status") \
@@ -2705,7 +2705,7 @@ test_failed_merge_reports_nothing() {
   : >"$case_dir/gh-axi.log"
 
   set +e
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/63 \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/63 \
     >"$case_dir/stdout" 2>"$case_dir/stderr"
   rc=$?
   set -e
@@ -2726,7 +2726,7 @@ test_gitlab_refusal_reports_nothing() {
   printf 'schema=jg-secondmate-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-secondmate-parent"
 
   set +e
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
     >"$case_dir/stdout" 2>"$case_dir/stderr"
   rc=$?
   set -e
@@ -2747,7 +2747,7 @@ test_gitlab_merge_reports_upward() {
   printf 'schema=jg-secondmate-parent.v1\nroute=remote\n' >"$case_dir/home/.jg-secondmate-parent"
   url=$MR_URL
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "gitlab-merge-reports: merge failed"
 
   assert_grep "done [key=merged-task-x1]: merged task-x1 $url" \
@@ -2762,7 +2762,7 @@ test_queued_gitlab_merge_leaves_the_poll_armed() {
   mkdir -p "$case_dir/home"
   : >"$case_dir/glab-stays-open"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
     >"$case_dir/stdout" 2>"$case_dir/stderr" \
     || fail "queued-gitlab-merge: accepted merge command failed"
 
@@ -2782,7 +2782,7 @@ test_main_home_merge_leaves_a_durable_wake() {
   add_gh_mocks "$case_dir" 7777777777777777777777777777777777777777
   : >"$case_dir/gh-axi.log"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout" 2>"$case_dir/stderr" || fail "main-merge-wake: merge failed"
 
   assert_grep "$url" "$case_dir/state/.wake-queue" \
@@ -2802,7 +2802,7 @@ test_queued_github_merge_leaves_the_poll_armed() {
   write_github_outcome "$case_dir" OPEN false true main
   : >"$case_dir/gh-axi.log"
 
-  FM_TEST_GH_MERGE_STATE=open FM_TEST_HOME="$case_dir/home" \
+  JG_TEST_GH_MERGE_STATE=open JG_TEST_HOME="$case_dir/home" \
     run_pr_merge "$case_dir" task-x1 "$url" \
       >"$case_dir/stdout" 2>"$case_dir/stderr" \
     || fail "queued-github-merge: accepted merge command failed"
@@ -2824,7 +2824,7 @@ test_distinct_merged_prs_keep_distinct_wakes() {
   add_gh_mocks "$case_dir" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   : >"$case_dir/gh-axi.log"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$first_url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$first_url" \
     >"$case_dir/stdout-1" 2>"$case_dir/stderr-1" \
     || fail "distinct-merge-wakes: first merge failed"
   rm -f "$case_dir/state/task-x1.check.sh" \
@@ -2833,7 +2833,7 @@ test_distinct_merged_prs_keep_distinct_wakes() {
   # The first PR's merge is already confirmed (the notified marker
   # jg_merge_outcome_report wrote), so the task's next PR is accepted with
   # pr= still bound to the first URL; no hand-edit of the recorded identity.
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$second_url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$second_url" \
     >"$case_dir/stdout-2" 2>"$case_dir/stderr-2" \
     || fail "distinct-merge-wakes: second merge failed"
 
@@ -2841,7 +2841,7 @@ test_distinct_merged_prs_keep_distinct_wakes() {
     || fail "distinct-merge-wakes: first merge wake was missing or duplicated"
   [ "$(grep -c -F "$second_url" "$case_dir/state/.wake-queue")" -eq 1 ] \
     || fail "distinct-merge-wakes: second merge wake was missing or duplicated"
-  FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-wake-drain.sh" \
+  JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-wake-drain.sh" \
     >"$case_dir/drain.out" 2>"$case_dir/drain.err" \
     || fail "distinct-merge-wakes: wake drain failed"
   assert_grep "$first_url" "$case_dir/drain.out" \
@@ -2861,19 +2861,19 @@ test_uncommitted_marker_retry_is_never_silent() {
 #!/usr/bin/env bash
 case "${!#}" in
   *.pr-poll-merge-notified)
-    if mkdir "$FM_TEST_MARKER_FAILURE.claim" 2>/dev/null; then
+    if mkdir "$JG_TEST_MARKER_FAILURE.claim" 2>/dev/null; then
       exit 1
     fi
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$case_dir/fakebin/mv"
-  export FM_TEST_MARKER_FAILURE="$case_dir/marker-failure"
-  export FM_TEST_REAL_MV
-  FM_TEST_REAL_MV=$(command -v mv)
+  export JG_TEST_MARKER_FAILURE="$case_dir/marker-failure"
+  export JG_TEST_REAL_MV
+  JG_TEST_REAL_MV=$(command -v mv)
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout-1" 2>"$case_dir/stderr-1" \
     || fail "uncommitted-wake-retry: landed merge was reported as failed"
   assert_grep 'could not record the outcome' "$case_dir/stderr-1" \
@@ -2886,10 +2886,10 @@ SH
   [ ! -e "$case_dir/state/task-x1.pr-poll-merge-notified" ] \
     || fail "uncommitted-wake-retry: failed marker commit was treated as complete"
 
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout-2" 2>"$case_dir/stderr-2" \
     || fail "uncommitted-wake-retry: retry failed"
-  unset FM_TEST_MARKER_FAILURE FM_TEST_REAL_MV
+  unset JG_TEST_MARKER_FAILURE JG_TEST_REAL_MV
   count=$(grep -c -F "$url" "$case_dir/state/.wake-queue")
   [ "$count" -ge 1 ] \
     || fail "uncommitted-wake-retry: retry left the merge silent"
@@ -2909,7 +2909,7 @@ test_secondmate_without_parent_binding_is_loud() {
   printf '%s\n' mate-x >"$case_dir/home/.jg-secondmate-home"
 
   set +e
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     >"$case_dir/stdout" 2>"$case_dir/stderr"
   rc=$?
   set -e
@@ -3074,7 +3074,7 @@ test_unreadable_user_backend_config_refuses_the_merge() {
   chmod 000 "$user_config"
 
   set +e
-  FM_TEST_USER_HOME="$case_dir/user-home" \
+  JG_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/64 \
       > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -3101,7 +3101,7 @@ test_untraversable_user_backend_config_directory_refuses_the_merge() {
   chmod 000 "${user_config%/*}"
 
   set +e
-  FM_TEST_USER_HOME="$case_dir/user-home" \
+  JG_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/66 \
       > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -3125,7 +3125,7 @@ test_absent_user_backend_config_directory_and_backlog_still_merge() {
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
 
   set +e
-  FM_TEST_USER_HOME="$case_dir/user-home" \
+  JG_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/67 \
       > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -3150,7 +3150,7 @@ test_backend_override_bypasses_unreadable_user_config() {
   chmod 000 "$user_config"
 
   set +e
-  TASKS_AXI_BACKEND=markdown FM_TEST_USER_HOME="$case_dir/user-home" \
+  TASKS_AXI_BACKEND=markdown JG_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/65 \
       > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
@@ -3516,8 +3516,8 @@ test_quiet_record_keeps_merges_attended() {
   mkdir -p "$case_dir/wt" "$case_dir/home"
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
-  FM_AFK_MODE=quiet write_away_record "$case_dir"
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
+  JG_AFK_MODE=quiet write_away_record "$case_dir"
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
     > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "quiet-allow-red: the attended waiver was refused under quiet mode: $(cat "$case_dir/stderr")"
   assert_no_grep 'attended-only' "$case_dir/stderr" \
@@ -3571,7 +3571,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   mkdir -p "$case_dir/wt" "$case_dir/home"
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge the windows fix when green'
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "away-green: a green merge under the record should succeed: $(cat "$case_dir/stderr")"
   assert_logged_gh_merge "$case_dir" 83 example/repo --squash
   assert_grep "merge landed: task-x1 $url away" "$case_dir/state/.wake-queue" \
@@ -3588,7 +3588,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   add_gh_mocks "$case_dir" "$head"
   printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
   write_away_record "$case_dir"
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "away-yolo: yolo green merge should succeed"
   assert_grep "merge landed: task-x1 $url away" "$case_dir/state/.wake-queue" \
     "away-yolo: the durable outcome did not tag away"
@@ -3599,7 +3599,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   mkdir -p "$case_dir/wt" "$case_dir/home"
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge it when green'
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --attended-override \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --attended-override \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "away-attended-override: a green merge should succeed: $(cat "$case_dir/stderr")"
   assert_grep "merge landed: task-x1 $url away" "$case_dir/state/.wake-queue" \
     "away-attended-override: the durable outcome did not tag away"
@@ -3608,7 +3608,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   case_dir=$(make_case attended-untagged)
   mkdir -p "$case_dir/wt" "$case_dir/home"
   add_gh_mocks "$case_dir" "$head"
-  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "attended-untagged: an attended green merge should succeed"
   case "$(grep -F "merge landed: task-x1 $url" "$case_dir/state/.wake-queue")" in
     *"$url") ;;
@@ -3632,7 +3632,7 @@ test_away_branch_actor_merges_green_under_the_record() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   set +e
-  FM_SUPERVISION_ACTOR=branch run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_SUPERVISION_ACTOR=branch run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -3647,7 +3647,7 @@ test_away_branch_actor_merges_green_under_the_record() {
   mkdir -p "$case_dir/wt" "$case_dir/home"
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge the windows fix when green'
-  FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_SUPERVISION_ACTOR=branch JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "away-branch-green: a green merge must succeed for the branch under the record: $(cat "$case_dir/stderr")"
   assert_grep 'main is parked' "$case_dir/stderr" \
@@ -3665,7 +3665,7 @@ test_away_branch_actor_merges_green_under_the_record() {
     '{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-09-01T00:00:00Z"}'
   write_away_record "$case_dir" --words 'merge task-x1 even if lint is red'
   set +e
-  FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_SUPERVISION_ACTOR=branch JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -3675,7 +3675,7 @@ test_away_branch_actor_merges_green_under_the_record() {
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "away-branch-red: gh pr merge ran for a red branch merge while away"
   set +e
-  FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
+  JG_SUPERVISION_ACTOR=branch JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -3703,7 +3703,7 @@ test_away_branch_refuses_when_record_archived_during_preflight() {
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   : > "$case_dir/away-record-after-view"
   set +e
-  FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+  JG_SUPERVISION_ACTOR=branch JG_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -3859,7 +3859,7 @@ away_change_script() {  # <case-dir> <name>; script body on stdin
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -eu\n'
-    printf 'export FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1\n'
+    printf 'export JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1\n'
     printf 'CONTRACT="%s/bin/jg-afk-contract.sh"\n' "$ROOT"
     cat
   } > "$path"
@@ -3882,13 +3882,13 @@ test_away_record_cannot_change_between_the_authority_read_and_the_merge() {
 SH
   )
 
-  export FM_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
+  export JG_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/71 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
-  unset FM_TEST_AWAY_MUTATE_AT_MERGE
+  unset JG_TEST_AWAY_MUTATE_AT_MERGE
 
   expect_code 0 "$rc" "away-archive-at-merge: the green merge should still land"
   [ -s "$case_dir/away-mutate-rc" ] \
@@ -3904,7 +3904,7 @@ SH
     "away-archive-at-merge: the landed merge was not recorded under the away authority it read"
   # The lock goes with the merge rather than leaking: the captain's return
   # archives the record on its first try once the merge is done.
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-afk-contract.sh" archive >/dev/null \
     || fail "away-archive-at-merge: the record stayed locked after the merge"
 
@@ -3916,13 +3916,13 @@ SH
 "$CONTRACT" enter --words 'hold everything for my return'
 SH
   )
-  export FM_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
+  export JG_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/72 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
-  unset FM_TEST_AWAY_MUTATE_AT_MERGE
+  unset JG_TEST_AWAY_MUTATE_AT_MERGE
 
   expect_code 0 "$rc" "away-replace-at-merge: the green merge should still land"
   [ "$(cat "$case_dir/away-mutate-rc" 2>/dev/null || true)" != 0 ] \
@@ -3970,7 +3970,7 @@ test_merge_refuses_when_the_away_record_cannot_be_locked() {
   add_gh_mocks "$case_dir" 4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e
   lock="$case_dir/state/.afk-contract.lock"
 
-  FM_STATE_OVERRIDE="$case_dir/state" bash -c '
+  JG_STATE_OVERRIDE="$case_dir/state" bash -c '
     . "$1"
     jg_lock_acquire_wait "$2" || exit 10
     printf "ready\n" > "$3"
@@ -3986,13 +3986,13 @@ test_merge_refuses_when_the_away_record_cannot_be_locked() {
   [ -s "$case_dir/holder.ready" ] \
     || { kill "$holder_pid" 2>/dev/null || true; fail "away-lock-unavailable: the fixture never took the record lock"; }
 
-  export FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1
+  export JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/74 \
     > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
-  unset FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT
+  unset JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT
   : > "$case_dir/release-holder"
   wait "$holder_pid" || fail "away-lock-unavailable: the fixture holder did not release cleanly"
 

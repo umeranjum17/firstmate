@@ -17,8 +17,8 @@ command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (required by the zel
 TMP_ROOT=$(jg_test_tmproot jg-backend-zellij-tests)
 
 # make_zellij_fakebin: a `zellij` stub that logs every invocation (one line,
-# unit-separated args, to $FM_ZELLIJ_LOG) and returns the canned response for
-# that call read from $FM_ZELLIJ_RESPONSES/<n>.out, consumed IN ORDER (call 1
+# unit-separated args, to $JG_ZELLIJ_LOG) and returns the canned response for
+# that call read from $JG_ZELLIJ_RESPONSES/<n>.out, consumed IN ORDER (call 1
 # reads 1.out, call 2 reads 2.out, ...), mirroring
 # tests/jg-backend-herdr.test.sh's make_herdr_fakebin. A missing response file
 # means "succeed with empty stdout" (paste/send-keys/close-* are silent on
@@ -26,15 +26,15 @@ TMP_ROOT=$(jg_test_tmproot jg-backend-zellij-tests)
 # specially (not call-counted) since jg_backend_zellij_session_exists calls
 # list-sessions on every op as a passive liveness probe and must not consume
 # the ordered response queue - its canned membership is controlled by
-# FM_ZELLIJ_SESSION_LIST instead.
+# JG_ZELLIJ_SESSION_LIST instead.
 make_zellij_fakebin() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/zellij" <<'SH'
 #!/usr/bin/env bash
 set -u
-LOG="${FM_ZELLIJ_LOG:?}"
-RESP="${FM_ZELLIJ_RESPONSES:?}"
+LOG="${JG_ZELLIJ_LOG:?}"
+RESP="${JG_ZELLIJ_RESPONSES:?}"
 COUNT_FILE="$RESP/.count"
 {
   printf 'ZELLIJ_SESSION_NAME=%s' "${ZELLIJ_SESSION_NAME:-}"
@@ -43,15 +43,15 @@ COUNT_FILE="$RESP/.count"
 } >> "$LOG"
 
 if [ "${1:-}" = --version ]; then
-  printf 'zellij %s\n' "${FM_ZELLIJ_FAKE_VERSION:-0.44.0}"
+  printf 'zellij %s\n' "${JG_ZELLIJ_FAKE_VERSION:-0.44.0}"
   exit 0
 fi
 if [ "${1:-}" = list-sessions ]; then
-  printf '%s\n' "${FM_ZELLIJ_SESSION_LIST:-}"
+  printf '%s\n' "${JG_ZELLIJ_SESSION_LIST:-}"
   exit 0
 fi
 if [ "${1:-}" = attach ]; then
-  exit "${FM_ZELLIJ_ATTACH_EXIT:-0}"
+  exit "${JG_ZELLIJ_ATTACH_EXIT:-0}"
 fi
 
 next=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
@@ -151,7 +151,7 @@ test_version_check_accepts_current_version() {
   local dir fb status
   dir="$TMP_ROOT/version-ok"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_FAKE_VERSION=0.44.0 \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_FAKE_VERSION=0.44.0 \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_version_check' "$ROOT"
   status=$?
   expect_code 0 "$status" "version_check should accept 0.44.0 (the verified minimum)"
@@ -162,7 +162,7 @@ test_version_check_accepts_newer_version() {
   local dir fb status
   dir="$TMP_ROOT/version-newer"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_FAKE_VERSION=0.45.2 \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_FAKE_VERSION=0.45.2 \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_version_check' "$ROOT"
   status=$?
   expect_code 0 "$status" "version_check should accept a newer minor (0.45.2)"
@@ -173,7 +173,7 @@ test_version_check_refuses_old_version() {
   local dir fb out status
   dir="$TMP_ROOT/version-old"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_FAKE_VERSION=0.38.1 \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_FAKE_VERSION=0.38.1 \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_version_check' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "version_check should refuse 0.38.1 (below the 0.44 minimum)"
@@ -198,14 +198,14 @@ test_session_defaults_to_firstmate() {
   local out
   out=$( bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_session' "$ROOT" )
   [ "$out" = firstmate ] || fail "default session should be 'firstmate', got '$out'"
-  pass "jg_backend_zellij_session: defaults to 'firstmate' when FM_ZELLIJ_SESSION is unset"
+  pass "jg_backend_zellij_session: defaults to 'firstmate' when JG_ZELLIJ_SESSION is unset"
 }
 
 test_session_honors_override() {
   local out
-  out=$( FM_ZELLIJ_SESSION=jg-test-iso bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_session' "$ROOT" )
-  [ "$out" = jg-test-iso ] || fail "FM_ZELLIJ_SESSION override was not honored, got '$out'"
-  pass "jg_backend_zellij_session: honors the FM_ZELLIJ_SESSION test-isolation override"
+  out=$( JG_ZELLIJ_SESSION=jg-test-iso bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_session' "$ROOT" )
+  [ "$out" = jg-test-iso ] || fail "JG_ZELLIJ_SESSION override was not honored, got '$out'"
+  pass "jg_backend_zellij_session: honors the JG_ZELLIJ_SESSION test-isolation override"
 }
 
 # --- target parsing, key normalization ---------------------------------------
@@ -213,8 +213,8 @@ test_session_honors_override() {
 test_parse_target() {
   ( . "$ROOT/bin/backends/zellij.sh"
     jg_backend_zellij_parse_target "firstmate:5" || exit 1
-    [ "$FM_BACKEND_ZELLIJ_SESSION" = firstmate ] || { echo "session mismatch: $FM_BACKEND_ZELLIJ_SESSION" >&2; exit 1; }
-    [ "$FM_BACKEND_ZELLIJ_PANE" = "5" ] || { echo "pane mismatch: $FM_BACKEND_ZELLIJ_PANE" >&2; exit 1; }
+    [ "$JG_BACKEND_ZELLIJ_SESSION" = firstmate ] || { echo "session mismatch: $JG_BACKEND_ZELLIJ_SESSION" >&2; exit 1; }
+    [ "$JG_BACKEND_ZELLIJ_PANE" = "5" ] || { echo "pane mismatch: $JG_BACKEND_ZELLIJ_PANE" >&2; exit 1; }
   ) || fail "jg_backend_zellij_parse_target did not split session:pane correctly"
   pass "jg_backend_zellij_parse_target: splits '<session>:<pane_id>' on the first colon"
 }
@@ -236,7 +236,7 @@ test_scoped_title_uses_primary_home_label() {
   local dir out expected
   dir="$TMP_ROOT/scoped-title-primary"; mkdir -p "$dir"
   expected=$(zellij_expected_scoped_title jg-task1 "$dir")
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
   [ "$out" = "$expected" ] || fail "primary scoped title should be $expected, got '$out'"
   pass "jg_backend_zellij_scoped_title: scopes a primary task title with firstmate plus root hash"
 }
@@ -246,7 +246,7 @@ test_scoped_title_uses_secondmate_home_label() {
   dir="$TMP_ROOT/scoped-title-secondmate"; mkdir -p "$dir"
   printf 'sm-one\n' > "$dir/.jg-secondmate-home"
   expected=$(zellij_expected_scoped_title jg-task1 "$dir")
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
   [ "$out" = "$expected" ] || fail "secondmate scoped title should be $expected, got '$out'"
   pass "jg_backend_zellij_scoped_title: scopes a secondmate task title with the home marker plus root hash"
 }
@@ -257,12 +257,12 @@ test_scoped_title_changes_with_root_path() {
   mkdir -p "$home" "$root_one" "$root_two"
   expected_one=$(zellij_expected_scoped_title jg-task1 "$home" "$root_one")
   expected_two=$(zellij_expected_scoped_title jg-task1 "$home" "$root_two")
-  out_one=$( FM_HOME="$home" FM_ROOT_OVERRIDE="$root_one" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
-  out_two=$( FM_HOME="$home" FM_ROOT_OVERRIDE="$root_two" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
+  out_one=$( JG_HOME="$home" JG_ROOT_OVERRIDE="$root_one" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
+  out_two=$( JG_HOME="$home" JG_ROOT_OVERRIDE="$root_two" bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_scoped_title jg-task1' "$ROOT" )
   [ "$out_one" = "$expected_one" ] || fail "scoped title should include root-one hash as $expected_one, got '$out_one'"
   [ "$out_two" = "$expected_two" ] || fail "scoped title should include root-two hash as $expected_two, got '$out_two'"
-  [ "$out_one" != "$out_two" ] || fail "scoped titles should differ for distinct FM_ROOT paths"
-  pass "jg_backend_zellij_scoped_title: includes the resolved FM_ROOT hash in the home label"
+  [ "$out_one" != "$out_two" ] || fail "scoped titles should differ for distinct JG_ROOT paths"
+  pass "jg_backend_zellij_scoped_title: includes the resolved JG_ROOT hash in the home label"
 }
 
 test_expected_label_accepts_unambiguous_untagged_legacy_tab() {
@@ -274,8 +274,8 @@ test_expected_label_accepts_unambiguous_untagged_legacy_tab() {
   # the legacy fallback in jg_backend_zellij_tab_matches_label trusts it.
   zellij_tab_response "$dir" 2 3 jg-legacy
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_key firstmate:7 Escape jg-legacy' "$ROOT"
   expect_code 0 $? "send_key should still reach a task tab spawned before home-scoping shipped, when its untagged title is unambiguous"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-keys'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''Esc' \
@@ -294,8 +294,8 @@ test_expected_label_refuses_ambiguous_untagged_tab() {
   # is trusted; ambiguity here must refuse loudly rather than assume ours.
   zellij_multi_tab_response "$dir" 2 3 jg-shared 9 jg-shared
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_key firstmate:7 Escape jg-shared' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "send_key should refuse an ambiguous untagged legacy label shared by 2+ live tabs"
@@ -311,7 +311,7 @@ test_list_live_scopes_to_own_home_tag() {
   own_title=$(zellij_expected_scoped_title jg-task1)
   foreign_title=$(zellij_expected_scoped_title jg-task2 "$ROOT" "$other_root")
   # 1: list-tabs --json -> our own home-scoped tab, a DIFFERENT installation's
-  # home-scoped tab (same prefix shape, different FM_ROOT hash), and an
+  # home-scoped tab (same prefix shape, different JG_ROOT hash), and an
   # unrelated non-firstmate tab.
   zellij_multi_tab_response "$dir" 1 \
     3 "$own_title" \
@@ -320,8 +320,8 @@ test_list_live_scopes_to_own_home_tag() {
   # 2: list-panes for our own home's task1 tab only
   zellij_pane_response "$dir" 2 7 3
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_list_live firstmate' "$ROOT" )
   [ "$out" = $'firstmate:7\tjg-task1' ] \
     || fail "list_live should list only this home's own tagged tab with its plain jg-<id> label, got '$out'"
@@ -337,8 +337,8 @@ test_resolve_bare_selector_prefers_scoped_title() {
   # 2: list-panes for tab 6
   zellij_pane_response "$dir" 2 12 6
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_resolve_bare_selector jg-resolve1' "$ROOT" )
   [ "$out" = "firstmate:12" ] || fail "resolve_bare_selector should resolve the home-scoped tagged tab, got '$out'"
   pass "jg_backend_zellij_resolve_bare_selector: matches the home-scoped tagged title first"
@@ -351,8 +351,8 @@ test_resolve_bare_selector_refuses_ambiguous_untagged() {
   zellij_multi_tab_response "$dir" 1 3 jg-resolve2 9 jg-resolve2
   zellij_multi_tab_response "$dir" 2 3 jg-resolve2 9 jg-resolve2
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_resolve_bare_selector jg-resolve2' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "resolve_bare_selector should refuse an ambiguous untagged label shared by 2+ live tabs"
@@ -368,8 +368,8 @@ test_resolve_bare_selector_prefers_later_session_scoped_title_over_legacy() {
   zellij_tab_response "$dir" 2 6 "$title"
   zellij_pane_response "$dir" 3 12 6
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST=$'legacy-session\nscoped-session' \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST=$'legacy-session\nscoped-session' \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_resolve_bare_selector jg-resolve3' "$ROOT" )
   [ "$out" = "scoped-session:12" ] || fail "resolve_bare_selector should prefer a later session's scoped title over an earlier legacy title, got '$out'"
   pass "jg_backend_zellij_resolve_bare_selector: checks every session for the scoped title before legacy fallback"
@@ -383,8 +383,8 @@ test_resolve_bare_selector_refuses_cross_session_ambiguous_untagged() {
   zellij_tab_response "$dir" 3 3 jg-resolve4
   zellij_tab_response "$dir" 4 9 jg-resolve4
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST=$'one-session\ntwo-session' \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST=$'one-session\ntwo-session' \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_resolve_bare_selector jg-resolve4' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "resolve_bare_selector should refuse an untagged legacy label that appears once in each of two sessions"
@@ -398,8 +398,8 @@ test_session_exists_true_when_listed() {
   local dir fb out
   dir="$TMP_ROOT/exists-true"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST=$'firstmate\nother-session' \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST=$'firstmate\nother-session' \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_session_exists firstmate' "$ROOT"
   expect_code 0 $? "session_exists should report true when the session is in the list"
   pass "jg_backend_zellij_session_exists: true when the session name is listed"
@@ -409,8 +409,8 @@ test_session_exists_false_when_absent() {
   local dir fb
   dir="$TMP_ROOT/exists-false"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST=$'other-session' \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST=$'other-session' \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_session_exists firstmate' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "session_exists should report false when the session is absent"
@@ -421,8 +421,8 @@ test_server_ensure_skips_attach_when_already_exists() {
   local dir fb
   dir="$TMP_ROOT/server-reuse"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_server_ensure firstmate' "$ROOT"
   expect_code 0 $? "server_ensure should succeed immediately when the session already exists"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''attach' "server_ensure should not call attach when the session already exists"
@@ -432,7 +432,7 @@ test_server_ensure_skips_attach_when_already_exists() {
 # --- dispatch wiring (jg-backend.sh) ------------------------------------------
 
 test_dispatch_routes_zellij_backend() {
-  jg_backend_validate zellij 2>/dev/null || fail "jg_backend_validate should accept zellij (P3 adds it to FM_BACKEND_KNOWN)"
+  jg_backend_validate zellij 2>/dev/null || fail "jg_backend_validate should accept zellij (P3 adds it to JG_BACKEND_KNOWN)"
   pass "jg_backend_validate: zellij is a known backend (P3)"
 }
 
@@ -453,8 +453,8 @@ test_create_task_refuses_duplicate_label() {
   # 1: list-tabs --json -> existing tab already carrying the home-scoped title
   printf '[{"tab_id":2,"name":"%s","active":false}]\n' "$title" > "$dir/responses/1.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_create_task firstmate jg-dup1 /tmp/proj' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "create_task should refuse an existing tab name (zellij itself does not enforce uniqueness)"
@@ -474,8 +474,8 @@ test_create_task_creates_and_parses_ids() {
   # 3: list-panes --json -> the new tab's terminal pane
   printf '[{"id":7,"tab_id":3,"is_plugin":false}]\n' > "$dir/responses/3.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_create_task firstmate jg-newtask /tmp/proj' "$ROOT" )
   [ "$out" = "3 7" ] || fail "create_task should echo '<tab_id> <pane_id>', got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''new-tab'$'\x1f''--cwd'$'\x1f''/tmp/proj'$'\x1f''--name'$'\x1f'"$title" \
@@ -494,8 +494,8 @@ test_create_task_restores_previously_active_tab() {
   printf '[{"id":9,"tab_id":4,"is_plugin":false}]\n' > "$dir/responses/3.out"
   # 4: go-to-tab-by-id 0 (the restore call) - silent on success
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_create_task firstmate jg-focustest /tmp/proj' "$ROOT" )
   [ "$out" = "4 9" ] || fail "create_task should still echo '<tab_id> <pane_id>', got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''go-to-tab-by-id'$'\x1f''0' \
@@ -511,8 +511,8 @@ test_create_task_no_restore_when_new_tab_was_already_active() {
   printf '5\n' > "$dir/responses/2.out"
   printf '[{"id":11,"tab_id":5,"is_plugin":false}]\n' > "$dir/responses/3.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_create_task firstmate jg-noclient /tmp/proj' "$ROOT" )
   [ "$out" = "5 11" ] || fail "create_task should still echo '<tab_id> <pane_id>', got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''go-to-tab-by-id' \
@@ -528,8 +528,8 @@ test_capture_small_reads_use_viewport_and_trim() {
   zellij_pane_response "$dir" 1 7 3
   printf 'line one\nline two\nline three\nline four\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_capture firstmate:7 2' "$ROOT" )
   [ "$out" = $'line three\nline four' ] || fail "capture should trim to the last N lines locally, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''dump-screen' \
@@ -547,8 +547,8 @@ test_capture_large_reads_use_full_scrollback_and_trim() {
   zellij_pane_response "$dir" 1 7 3
   printf 'line one\nline two\nline three\nline four\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_capture firstmate:7 80' "$ROOT" )
   [ "$out" = $'line one\nline two\nline three\nline four' ] || fail "large capture should keep available output when fewer than N lines exist, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''dump-screen' \
@@ -563,8 +563,8 @@ test_capture_fails_when_pane_absent() {
   dir="$TMP_ROOT/capture-no-pane"; mkdir -p "$dir/responses"
   printf '[]\n' > "$dir/responses/1.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_capture firstmate:7 5' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "capture should fail when the session exists but the pane does not"
@@ -577,8 +577,8 @@ test_capture_fails_when_session_absent() {
   local dir fb out status
   dir="$TMP_ROOT/capture-no-session"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_capture firstmate:7 5' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "capture should fail when the session does not exist (never trust the CLI's unconditional exit 0)"
@@ -590,8 +590,8 @@ test_send_key_normalizes_and_targets_pane() {
   dir="$TMP_ROOT/sendkey"; mkdir -p "$dir/responses"
   zellij_pane_response "$dir" 1 7 3
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_key firstmate:7 Escape' "$ROOT"
   expect_code 0 $? "send_key should succeed"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''send-keys' \
@@ -605,8 +605,8 @@ test_send_literal_uses_paste_separator_for_option_shaped_text() {
   dir="$TMP_ROOT/sendliteral"; mkdir -p "$dir/responses"
   zellij_pane_response "$dir" 1 7 3
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_literal firstmate:7 "--help"' "$ROOT"
   expect_code 0 $? "send_literal should succeed"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''paste' \
@@ -625,8 +625,8 @@ test_send_text_line_clears_partial_input_when_enter_fails() {
   zellij_pane_response "$dir" 5 7 3
   fb=$(make_zellij_fakebin "$dir")
 
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" bash -c \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" bash -c \
     '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_line "firstmate:7" "export TRACEPARENT=carrier"' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "send_text_line should report a failed Enter"
@@ -648,8 +648,8 @@ test_send_text_line_reports_unsafe_input_when_cleanup_fails() {
   printf '1\n' > "$dir/responses/6.exit"
   fb=$(make_zellij_fakebin "$dir")
 
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" bash -c \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" bash -c \
     '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_line "firstmate:7" "export TRACEPARENT=carrier"' "$ROOT"
   status=$?
   expect_code 2 "$status" "send_text_line should distinguish uncleared input"
@@ -664,8 +664,8 @@ test_expected_label_allows_matching_task_tab() {
   zellij_pane_response "$dir" 1 7 3
   zellij_tab_response "$dir" 2 3 jg-label
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_key firstmate:7 Escape jg-label' "$ROOT"
   expect_code 0 $? "send_key should succeed when the pane belongs to the expected jg-id tab"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''list-tabs'$'\x1f''--json' \
@@ -681,8 +681,8 @@ test_expected_label_rejects_reused_pane_id() {
   zellij_pane_response "$dir" 1 7 3
   zellij_tab_response "$dir" 2 3 not-the-task
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_key firstmate:7 Escape jg-label' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "send_key should reject a pane whose tab name does not match the expected jg-id label"
@@ -707,22 +707,22 @@ test_current_path_probes_with_marker_and_ignores_prompt_paths() {
   zellij_pane_response "$dir" 6 7 3
   printf '%s\n' 'scratch-e2e-project HEAD' \
     '/home/fixture/src/project ❯ printf marker' \
-    '__FM_ZELLIJ_CWD_BEGIN__' \
+    '__JG_ZELLIJ_CWD_BEGIN__' \
     '/home/fixture/.treehouse/fake-' \
     'worktree' \
-    '__FM_ZELLIJ_CWD_END__' \
+    '__JG_ZELLIJ_CWD_END__' \
     '/home/fixture/.treehouse/fake-worktree ❯' \
     > "$dir/responses/7.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_current_path firstmate:7' "$ROOT" )
   [ "$out" = "/home/fixture/.treehouse/fake-worktree" ] || fail "current_path should read only the marked cwd line, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''paste' \
     "current_path did not verify the pane before the cwd probe paste"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''dump-screen' \
     "current_path did not verify the pane before capture"
-  assert_contains "$(cat "$dir/log")" "__FM_ZELLIJ_CWD_BEGIN__" "current_path did not send the cwd begin marker via paste"
+  assert_contains "$(cat "$dir/log")" "__JG_ZELLIJ_CWD_BEGIN__" "current_path did not send the cwd begin marker via paste"
   assert_contains "$(cat "$dir/log")" "pwd;" "current_path did not send the pwd probe via paste"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-keys'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''Enter' "current_path did not submit the cwd probe with Enter"
   assert_contains "$(cat "$dir/log")" $'\x1f''dump-screen'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''--full' "current_path did not capture the pane after probing"
@@ -737,11 +737,11 @@ test_current_path_ignores_tilde_prefixed_banner_lines() {
   zellij_pane_response "$dir" 4 7 3
   zellij_pane_response "$dir" 6 7 3
   printf '%s\n' "🌳 Entered worktree at ~/.treehouse/scratch-e2e-project/1. Type 'exit' to return." \
-    'scratch-e2e-project HEAD' '__FM_ZELLIJ_CWD_BEGIN__' '/home/fixture/.treehouse/real-worktree' '__FM_ZELLIJ_CWD_END__' '❯' \
+    'scratch-e2e-project HEAD' '__JG_ZELLIJ_CWD_BEGIN__' '/home/fixture/.treehouse/real-worktree' '__JG_ZELLIJ_CWD_END__' '❯' \
     > "$dir/responses/7.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_current_path firstmate:7' "$ROOT" )
   [ "$out" = "/home/fixture/.treehouse/real-worktree" ] || fail "current_path should skip the ~-prefixed banner line and read the marked cwd output, got '$out'"
   pass "jg_backend_zellij_current_path: never picks up a ~-prefixed banner line as the answer"
@@ -753,8 +753,8 @@ test_kill_resolves_tab_and_closes_by_id() {
   zellij_pane_response "$dir" 1 7 3
   printf '[{"id":7,"tab_id":3,"is_plugin":false}]\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_kill firstmate:7' "$ROOT"
   expect_code 0 $? "kill should succeed (best-effort)"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''close-tab-by-id' \
@@ -769,8 +769,8 @@ test_kill_falls_back_to_close_pane_when_tab_lookup_empty() {
   dir="$TMP_ROOT/kill-fallback"; mkdir -p "$dir/responses"
   printf '[]\n' > "$dir/responses/1.out"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_kill firstmate:7' "$ROOT"
   expect_code 0 $? "kill must stay best-effort even when the tab lookup comes up empty"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''close-pane' \
@@ -786,8 +786,8 @@ test_kill_closes_recorded_tab_when_pane_already_gone() {
   printf '[]\n' > "$dir/responses/1.out"
   printf '[{"tab_id":3,"name":"jg-zghost"}]\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_kill firstmate:7 3 jg-zghost' "$ROOT"
   expect_code 0 $? "kill must stay best-effort even when only the recorded tab id is usable"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''list-tabs'$'\x1f''--json' \
@@ -807,8 +807,8 @@ test_kill_skips_recorded_tab_when_label_mismatches() {
   printf '[]\n' > "$dir/responses/1.out"
   printf '[{"tab_id":3,"name":"not-the-task"}]\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_kill firstmate:7 3 jg-zghost' "$ROOT"
   expect_code 0 $? "kill must stay best-effort when the recorded tab id no longer belongs to the task"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''list-tabs'$'\x1f''--json' \
@@ -824,8 +824,8 @@ test_kill_is_noop_when_session_absent() {
   local dir fb
   dir="$TMP_ROOT/kill-no-session"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="" \
+  PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_kill firstmate:7' "$ROOT"
   expect_code 0 $? "kill must stay best-effort (never fail) even when the session is already gone"
   pass "jg_backend_zellij_kill: never fails when the target session no longer exists"
@@ -851,8 +851,8 @@ test_teardown_passes_recorded_tab_id_to_zellij_kill() {
   printf '[]\n' > "$dir/responses/1.out"
   printf '[{"tab_id":3,"name":"jg-zghost"}]\n' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-teardown.sh" zghost 2>&1 )
   status=$?
   expect_code 0 "$status" "jg-teardown should succeed for a zellij scout whose worktree is already gone: $out"
@@ -897,9 +897,9 @@ test_forced_secondmate_teardown_kills_zellij_children_with_child_home_tag() {
   zellij_tab_response "$dir" 2 4 "$child_title"
   printf '[]\n' > "$dir/responses/3.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_ROOT_OVERRIDE="$ROOT" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_ROOT_OVERRIDE="$ROOT" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-teardown.sh" smz --force 2>&1 )
   status=$?
   expect_code 0 "$status" "jg-teardown should force-retire a secondmate with a zellij child: $out"
@@ -930,8 +930,8 @@ test_send_text_submit_detects_landed_send() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'hello captain\n❯ ' > "$dir/responses/10.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should report empty once the composer positively classifies empty, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''paste' \
@@ -959,8 +959,8 @@ test_send_text_submit_detects_swallowed_enter() {
   zellij_pane_response "$dir" 13 7 3
   printf '%s' $'❯ hello captain' > "$dir/responses/14.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = pending ] || fail "send_text_submit should report pending once retries are exhausted with the text still in the composer, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''send-keys' \
@@ -989,8 +989,8 @@ test_send_text_submit_unrelated_change_is_not_delivery() {
   zellij_pane_response "$dir" 13 7 3
   printf '%s' $'clock 12:00:02\n❯ hello captain' > "$dir/responses/14.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" != empty ] || fail "an unrelated pane change must never read as delivered (the content-diff false positive)"
   [ "$out" = pending ] || fail "the still-typed composer should classify pending, got '$out'"
@@ -1006,8 +1006,8 @@ test_send_text_submit_rejects_unobserved_paste() {
   zellij_pane_response "$dir" 5 7 3
   printf '%s' $'transcript line\n❯ ' > "$dir/responses/6.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "an unobserved paste should report send-failed, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1024,8 +1024,8 @@ test_send_text_submit_rejects_transcript_echo_with_unrelated_draft() {
   zellij_pane_response "$dir" 5 7 3
   printf '%s' $'hello captain\n❯ unrelated draft' > "$dir/responses/6.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "a transcript echo outside an unrelated draft should report send-failed, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1042,8 +1042,8 @@ test_send_text_submit_rejects_existing_intended_text_after_noop_paste() {
   zellij_pane_response "$dir" 5 7 3
   printf '%s' $'❯ hello captain' > "$dir/responses/6.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "pre-existing intended text after a no-op paste should report send-failed, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1060,8 +1060,8 @@ test_send_text_submit_rejects_furniture_match_after_noop_paste() {
   zellij_pane_response "$dir" 5 7 3
   printf '%s' $'┃ unrelated draft\n┃ Build · GPT-5.5 Fast OpenAI · high' > "$dir/responses/6.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "high" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "footer furniture matching a short steer should report send-failed, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1081,8 +1081,8 @@ test_send_text_submit_accepts_wrapped_boxed_text() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'╭────────────────────╮\n│ ❯                  │\n╰────────────────────╯' > "$dir/responses/10.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "wrapped text replacing a shell-prompt placeholder should be observed and submitted, got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1103,8 +1103,8 @@ test_send_text_submit_accepts_wrapped_bare_text() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'this deliberately long steer wraps across a bare continuation row\n❯ ' > "$dir/responses/10.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "$1" 2 0.01 0.01' "$ROOT" "$text" )
   [ "$out" = empty ] || fail "wrapped text in a bare composer should be observed and submitted, got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1125,8 +1125,8 @@ test_send_text_submit_preserves_agent_glyph_within_wrapped_content() {
   zellij_pane_response "$dir" 9 7 3
   printf '%s' $'hello ❯ captain\n❯ ' > "$dir/responses/10.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "$1" 2 0.01 0.01' "$ROOT" "$text" )
   [ "$out" = empty ] || fail "an agent glyph within wrapped content should remain user content, got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-keys' \
@@ -1140,8 +1140,8 @@ test_send_text_submit_rejects_stale_composer_above_live_shell() {
   zellij_pane_response "$dir" 1 7 3
   printf '%s' $'❯\n$ ' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "claude" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "a stale composer above a live shell should report send-failed, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''paste' \
@@ -1156,8 +1156,8 @@ test_composer_state_reads_styled_dump() {
   # Real claude-in-zellij capture shape (audit section 3.5): ESC[m ❯ U+00A0.
   printf 'transcript line\n\033[m\342\235\257\302\240' > "$dir/responses/2.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_composer_state firstmate:7' "$ROOT" )
   [ "$out" = empty ] || fail "the real claude-in-zellij ANSI dump should classify empty, got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''dump-screen'$'\x1f''--pane-id'$'\x1f''7'$'\x1f''--ansi' \
@@ -1176,8 +1176,8 @@ test_composer_state_dead_pane_is_unknown() {
   : > "$dir/responses/2.out"
   : > "$dir/responses/4.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_composer_state firstmate:7' "$ROOT" )
   [ "$out" = unknown ] || fail "a dead pane's empty dumps must classify unknown, got '$out'"
   pass "jg_backend_zellij_composer_state: a dead pane (empty dumps) reads unknown, never a confirmation"
@@ -1187,8 +1187,8 @@ test_send_text_submit_send_failed_when_session_absent() {
   local dir fb out
   dir="$TMP_ROOT/submit-no-session"; mkdir -p "$dir/responses"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "x" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "send_text_submit should report send-failed when the session does not exist, got '$out'"
   pass "jg_backend_zellij_send_text_submit: reports 'send-failed' when the target session is not active"
@@ -1199,8 +1199,8 @@ test_send_text_submit_send_failed_when_pane_absent() {
   dir="$TMP_ROOT/submit-no-pane"; mkdir -p "$dir/responses"
   printf '[]\n' > "$dir/responses/1.out"
   fb=$(make_zellij_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" \
-    FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" \
+    JG_ZELLIJ_SESSION_LIST="firstmate" \
     bash -c '. "$0/bin/backends/zellij.sh"; jg_backend_zellij_send_text_submit firstmate:7 "x" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "send_text_submit should report send-failed when the pane does not exist, got '$out'"
   assert_not_contains "$(cat "$dir/log")" $'\x1f''paste' \
@@ -1228,8 +1228,8 @@ exit 42
 SH
   chmod +x "$fb/tmux"
 
-  out=$( PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral" JG_STATE_OVERRIDE="$state" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-peek.sh" firstmate:7 5 2>/dev/null )
   [ "$out" = "captured zellij pane" ] || fail "jg-peek did not capture through zellij for an explicit metadata-matched target, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''dump-screen' \
@@ -1238,8 +1238,8 @@ SH
     "jg-peek did not route the explicit metadata-matched target through zellij capture"
 
   : > "$dir/log"
-  PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral" FM_HOME="$neutral" FM_STATE_OVERRIDE="$state" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral" JG_HOME="$neutral" JG_STATE_OVERRIDE="$state" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-send.sh" firstmate:7 --key Escape >/dev/null 2>&1
   expect_code 0 $? "jg-send --key should route an explicit metadata-matched target through zellij"
   zellij_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--json' $'\x1f''send-keys' \
@@ -1261,8 +1261,8 @@ test_scripts_verify_label_for_jg_targets() {
   printf 'captured through jg-id\n' > "$dir/responses/3.out"
   fb=$(make_zellij_fakebin "$dir")
 
-  out=$( PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  out=$( PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral" JG_STATE_OVERRIDE="$state" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-peek.sh" jg-zlabel 5 2>/dev/null )
   [ "$out" = "captured through jg-id" ] || fail "jg-peek did not capture through zellij for an jg-id target with a matching tab label, got '$out'"
   zellij_assert_call_order "$dir/log" $'\x1f''list-tabs'$'\x1f''--json' $'\x1f''dump-screen' \
@@ -1281,8 +1281,8 @@ test_scripts_reject_jg_target_label_mismatch() {
   zellij_tab_response "$dir" 2 3 not-the-task
   fb=$(make_zellij_fakebin "$dir")
 
-  PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral" FM_HOME="$neutral" FM_STATE_OVERRIDE="$state" \
-    FM_ZELLIJ_LOG="$dir/log" FM_ZELLIJ_RESPONSES="$dir/responses" FM_ZELLIJ_SESSION_LIST="firstmate" \
+  PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral" JG_HOME="$neutral" JG_STATE_OVERRIDE="$state" \
+    JG_ZELLIJ_LOG="$dir/log" JG_ZELLIJ_RESPONSES="$dir/responses" JG_ZELLIJ_SESSION_LIST="firstmate" \
     "$ROOT/bin/jg-send.sh" jg-zreuse --key Escape >/dev/null 2>&1
   status=$?
   [ "$status" -ne 0 ] || fail "jg-send --key should reject an jg-id zellij target whose pane belongs to a differently named tab"

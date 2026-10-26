@@ -111,7 +111,7 @@
 #   verified on opencode 1.18.32); without a model the axis is recorded but omitted.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
-#   is authorized). Without it, the script resolves FM_BACKEND, then
+#   is authorized). Without it, the script resolves JG_BACKEND, then
 #   config/backend, then runtime auto-detection from the runtime firstmate's
 #   environment: $TMUX, HERDR_ENV=1, or cmux runtime signals (via
 #   bin/jg-backend.sh's jg_backend_detect, with cmux fallback details in
@@ -234,7 +234,7 @@
 #   For omp (Oh My Pi), jg-spawn resolves the `omp` executable from PATH once and
 #   refuses when it is absent. Every omp launch clears the foreign harness
 #   markers (omp publishes none of its own), sets the Firstmate-owned
-#   FM_OMP_HARNESS=omp detection marker, suppresses the first-run provider
+#   JG_OMP_HARNESS=omp detection marker, suppresses the first-run provider
 #   wizard with OMP_SKIP_SETUP=1, forces --auto-approve, pins the working
 #   directory with --cwd, and passes the tracked worker posture overlay
 #   .omp/jg-worker-overlay.yml through --config. That overlay pins composer
@@ -291,7 +291,7 @@
 #   that never reaches an isolated worktree refuses at the end of that wait,
 #   naming the last path seen and why it was rejected.
 #   That placement is proven only at launch. Every ship or scout pane therefore
-#   also receives `export FM_TASK_ID=<task-id>` before the launch command, on
+#   also receives `export JG_TASK_ID=<task-id>` before the launch command, on
 #   the same channel as GOTMPDIR, and bin/jg-test-run.sh refuses to execute the
 #   behavior suite from the repository primary checkout while that marker is
 #   set (its header owns the refusal). A secondmate runs in its own home and is
@@ -347,14 +347,14 @@
 #   LANG LC_ALL LC_CTYPE TMPDIR TMP TEMP GOTMPDIR, plus backend identity/routing:
 #   TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH HERDR_PANE_ID
 #   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID CMUX_SOCKET_PATH
-#   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION, plus the task
-#   marker FM_TASK_ID that ship and scout panes receive above, plus the
+#   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID JG_ZELLIJ_SESSION, plus the task
+#   marker JG_TASK_ID that ship and scout panes receive above, plus the
 #   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor also
 #   pins to 1 with a literal assignment so it survives the cleared environment
 #   even on a host that never had it set.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
-#   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
+#   JG_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
 #   path the steering doorbell names) and the GIT_EDITOR/GIT_SEQUENCE_EDITOR
 #   exports that keep git non-interactive in worker panes. Raw commands must
 #   be POSIX sh compatible under this opt-in; the absent-file path is unchanged.
@@ -566,8 +566,8 @@ case "${1:-}" in
   ;;
 esac
 
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # shellcheck source=bin/jg-tasks-axi-lib.sh
 . "$SCRIPT_DIR/jg-tasks-axi-lib.sh"
@@ -594,17 +594,17 @@ resolve_directory_input() {
   printf '%s\n' "$resolved"
 }
 
-FM_HOME=$(resolve_directory_input FM_HOME "$FM_HOME") || exit 1
-if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
-  FM_STATE_OVERRIDE=$(resolve_directory_input FM_STATE_OVERRIDE "$FM_STATE_OVERRIDE") || exit 1
+JG_HOME=$(resolve_directory_input JG_HOME "$JG_HOME") || exit 1
+if [ -n "${JG_STATE_OVERRIDE:-}" ]; then
+  JG_STATE_OVERRIDE=$(resolve_directory_input JG_STATE_OVERRIDE "$JG_STATE_OVERRIDE") || exit 1
 fi
-if [ -n "${FM_DATA_OVERRIDE:-}" ]; then
-  FM_DATA_OVERRIDE=$(resolve_directory_input FM_DATA_OVERRIDE "$FM_DATA_OVERRIDE") || exit 1
+if [ -n "${JG_DATA_OVERRIDE:-}" ]; then
+  JG_DATA_OVERRIDE=$(resolve_directory_input JG_DATA_OVERRIDE "$JG_DATA_OVERRIDE") || exit 1
 fi
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 # shellcheck source=bin/jg-config-inherit-lib.sh
 . "$SCRIPT_DIR/jg-config-inherit-lib.sh"
 # shellcheck source=bin/jg-exclude-tools-lib.sh
@@ -677,7 +677,7 @@ fi
 SUB_HOME_MARKER=".jg-secondmate-home"
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   jg_backlog_directory_present "$STATE" "state directory" || {
-    echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: spawn refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
 fi
@@ -688,7 +688,7 @@ fi
 # shellcheck source=bin/jg-classify-lib.sh
 . "$SCRIPT_DIR/jg-classify-lib.sh"
 jg_backlog_directory_present "$STATE" "state directory" || {
-  echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: spawn refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
 # shellcheck source=bin/jg-secondmate-nudge-lib.sh
@@ -722,7 +722,7 @@ jg_backlog_directory_present "$STATE" "state directory" || {
 # shellcheck source=bin/jg-model-allowlist.sh
 . "$SCRIPT_DIR/jg-model-allowlist.sh"
 # Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
-_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh
 if [ -r "$_jg_ap" ]; then
   # shellcheck source=/dev/null
   . "$_jg_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_jg_ap" >&2; exit 1; }
@@ -732,9 +732,9 @@ fi
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
-# Skip the watcher guard when re-exec'd for one pair of a batch (FM_SPAWN_NO_GUARD is
+# Skip the watcher guard when re-exec'd for one pair of a batch (JG_SPAWN_NO_GUARD is
 # set by the batch loop below), so the guard runs once for the batch, not once per pair.
-[ -n "${FM_SPAWN_NO_GUARD:-}" ] || "$FM_ROOT/bin/jg-guard.sh" || true
+[ -n "${JG_SPAWN_NO_GUARD:-}" ] || "$JG_ROOT/bin/jg-guard.sh" || true
 KIND=ship
 KIND_SET=0
 HARNESS_ARG=
@@ -1089,7 +1089,7 @@ spawn_remote_secondmate() {
   elif [ -n "$positional" ]; then
     harness=$positional
   else
-    harness=$("$FM_ROOT/bin/jg-harness.sh" secondmate "$id") || {
+    harness=$("$JG_ROOT/bin/jg-harness.sh" secondmate "$id") || {
       jg_lock_release "$registry_lock" || true
       jg_lock_release "$SPAWN_TASK_LOCK" || true
       return 1
@@ -1181,7 +1181,7 @@ spawn_remote_secondmate() {
     else
       echo "error: remote secondmate $id host $host is not ready for a remote second mate; launch refused" >&2
     fi
-    [ -z "$FM_REMOTE_READINESS_OUT" ] || printf '%s\n' "$FM_REMOTE_READINESS_OUT" >&2
+    [ -z "$JG_REMOTE_READINESS_OUT" ] || printf '%s\n' "$JG_REMOTE_READINESS_OUT" >&2
     [ "$rc" -ne 255 ] || return 255
     return 1
   fi
@@ -1189,7 +1189,7 @@ spawn_remote_secondmate() {
   # follows THIS primary's default-branch commit, not the Firstmate copy on that
   # host, so the commit is resolved here and handed over for the host to import
   # and fast-forward to. A skipped sync warns and launches the home unchanged.
-  if sm_primary_head=$(primary_head_commit "$FM_ROOT"); then
+  if sm_primary_head=$(primary_head_commit "$JG_ROOT"); then
     if sync_out=$("$SCRIPT_DIR/jg-on.sh" "$id" jg-remote-secondmate-control.sh sync "$id" \
       "$sm_primary_head" </dev/null 2>&1); then
       :
@@ -1238,7 +1238,7 @@ spawn_remote_secondmate() {
   # remote launch call stays byte-identical to the untraced one.
   remote_traceparent=
   if [ "$(jg_trace_context_session_effective "$STATE/.trace-context-effective")" = on ]; then
-    remote_traceparent=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CONFIG" "$meta" || true)
+    remote_traceparent=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CONFIG" "$meta" || true)
   fi
   launch_args=("$id" "$harness" "$model" "$effort" "$backend")
   [ -z "$remote_traceparent" ] || launch_args+=("$remote_traceparent")
@@ -1321,7 +1321,7 @@ spawn_remote_secondmate() {
     jg_lock_release "$remote_lock" || true
     jg_lock_release "$registry_lock" || true
     jg_lock_release "$SPAWN_TASK_LOCK" || true
-    echo "error: remote secondmate $id launched, but its task record could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+    echo "error: remote secondmate $id launched, but its task record could not be published ($JG_BACKLOG_TRANSITION_ERROR)" >&2
     return 1
   fi
   if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
@@ -1336,7 +1336,7 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id launched, but its reply source could not be armed; endpoint metadata is preserved" >&2
     return 1
   fi
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
   echo "spawned $id harness=$harness kind=secondmate mode=secondmate yolo=off window=remote:$id worktree=$home remote=$host backend=$remote_backend"
   return 0
 }
@@ -1381,11 +1381,11 @@ SPAWN_ENDPOINT_CLOSED=0
 
 spawn_fresh_commit_rollback() {
   if jg_backlog_atomic_transition rollback "$STATE/$ID.meta" \
-    "$FM_ROOT/bin/jg-busy-event.sh" "$STATE" "$ID" "${BUSY_GEN:-}"; then
+    "$JG_ROOT/bin/jg-busy-event.sh" "$STATE" "$ID" "${BUSY_GEN:-}"; then
     SPAWN_FRESH_COMMIT_PENDING=0
     return 0
   fi
-  echo "error: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: $JG_BACKLOG_TRANSITION_ERROR" >&2
   return 1
 }
 
@@ -1426,7 +1426,7 @@ spawn_abort_cleanup() {
       echo "warning: could not remove replacement wiring after aborted relaunch of $ID" >&2
     fi
     if [ -n "$RELAUNCH_REPLACEMENT_BUSY_GEN" ]; then
-      if ! "$FM_ROOT/bin/jg-busy-event.sh" retire \
+      if ! "$JG_ROOT/bin/jg-busy-event.sh" retire \
         "$RELAUNCH_REPLACEMENT_STATE" "$ID" \
         --gen "$RELAUNCH_REPLACEMENT_BUSY_GEN"; then
         echo "warning: could not retire replacement busy generation after aborted relaunch of $ID" >&2
@@ -1658,7 +1658,7 @@ spawn_herdr_presentation_order_lock_release() {
 
 # Batch dispatch (see header): when the first positional is an `id=repo` pair, treat every
 # positional as one and spawn each by re-execing this script in single-task mode. We use
-# the FM_ROOT path (not $0) so it works whatever cwd or relative path invoked us, and reuse
+# the JG_ROOT path (not $0) so it works whatever cwd or relative path invoked us, and reuse
 # the single path verbatim. A failed pair is reported and skipped; the rest still launch;
 # exit is non-zero if any pair failed. Single-task invocations never carry an '=' in arg
 # one (task ids are bare slugs), so they fall straight through to the logic below.
@@ -1704,10 +1704,10 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
     pair_args=("${pair%%=*}" "${pair#*=}" "${shared_args[@]+"${shared_args[@]}"}")
     [ "$KIND" != scout ] || pair_args+=(--scout)
     pair_rc=0
-    FM_SPAWN_NO_GUARD=1 "$FM_ROOT/bin/jg-spawn.sh" "${pair_args[@]}" || pair_rc=$?
-    if [ "$pair_rc" -eq "$FM_PROJECT_CAPACITY_DEFER_EXIT" ]; then
+    JG_SPAWN_NO_GUARD=1 "$JG_ROOT/bin/jg-spawn.sh" "${pair_args[@]}" || pair_rc=$?
+    if [ "$pair_rc" -eq "$JG_PROJECT_CAPACITY_DEFER_EXIT" ]; then
       echo "batch: DEFERRED ${pair%%=*} (${pair#*=}) - its project is at capacity, so it stays queued" >&2
-      [ "$rc" -ne 0 ] || rc=$FM_PROJECT_CAPACITY_DEFER_EXIT
+      [ "$rc" -ne 0 ] || rc=$JG_PROJECT_CAPACITY_DEFER_EXIT
     elif [ "$pair_rc" -ne 0 ]; then
       echo "batch: FAILED to spawn ${pair%%=*} (${pair#*=})" >&2
       rc=1
@@ -1729,7 +1729,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" = ship ]; then
 fi
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   jg_backlog_directory_present "$STATE" "state directory" || {
-    echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: spawn refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
 elif [ "$RELAUNCH" -eq 1 ]; then
@@ -1756,9 +1756,9 @@ spawn_refuse_if_away_spend_cap() {
   [ "$RELAUNCH" -ne 1 ] || return 0
   [ "$KIND" != secondmate ] || return 0
   [ -f "$STATE/.afk-contract" ] || return 0
-  FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1 || return 0
-  [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" = away ] || return 0
-  cap=$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" field spend_max_concurrent_workers 2>/dev/null || true)
+  JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1 || return 0
+  [ "$(JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" = away ] || return 0
+  cap=$(JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" field spend_max_concurrent_workers 2>/dev/null || true)
   case "$cap" in
   '' | *[!0-9]* | 0) return 0 ;;
   esac
@@ -1787,13 +1787,13 @@ spawn_refuse_if_away_spend_cap
 spawn_require_relocated_queued_work() {
   local actor
   [ "$RELAUNCH" -ne 1 ] || return 0
-  actor=$(jg_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
+  actor=$(jg_lease_actor) || exit "$JG_LEASE_REFUSE_EXIT"
   [ "$actor" = branch ] || return 0
   if [ "$KIND" = secondmate ]; then
     jg_lease_forbid_branch "new-task spawn (jg-spawn)"
   fi
   jg_lease_forbid_branch "new-task spawn (jg-spawn)" --away-relocated
-  if ! jg_backlog_row_probe "$DATA" "$ID" || [ "$FM_BACKLOG_ROW_STATE" != "queued no no" ]; then
+  if ! jg_backlog_row_probe "$DATA" "$ID" || [ "$JG_BACKLOG_ROW_STATE" != "queued no no" ]; then
     echo "error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task $ID has no dispatchable backlog item in this home" >&2
     exit 1
   fi
@@ -1808,7 +1808,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     # jg-control transaction that owns the control lock, never by invoking
     # this entrypoint directly (contract: bin/jg-lease-lib.sh).
     echo "error: relaunch (jg-spawn) refused - the supervision branch must relaunch through jg-control" >&2
-    exit "$FM_LEASE_REFUSE_EXIT"
+    exit "$JG_LEASE_REFUSE_EXIT"
   elif jg_lock_try_acquire "$SPAWN_CONTROL_LOCK"; then
     SPAWN_CONTROL_LOCK_HELD=1
   else
@@ -1822,7 +1822,7 @@ if [ "$RELAUNCH" -eq 0 ]; then
     exit 1
   }
   jg_backlog_directory_present "$STATE" "state directory" || {
-    echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: spawn refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
   # A FRESH spawn changes which tasks this home has, so it must not interleave
@@ -1850,7 +1850,7 @@ if [ "$RELAUNCH" -eq 0 ]; then
   # recoveries serialize instead of refusing each other. Every other fresh
   # spawn still refuses rather than waits.
   SPAWN_TASK_SET_RC=0
-  if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+  if [ "$KIND" = secondmate ] && [ "${JG_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
     jg_lock_acquire_wait_bounded "$SPAWN_TASK_SET_LOCK" 600 || SPAWN_TASK_SET_RC=$?
   else
     jg_lock_try_acquire "$SPAWN_TASK_SET_LOCK" || SPAWN_TASK_SET_RC=$?
@@ -1894,26 +1894,26 @@ HOST_MEMORY_OUT=$("$SCRIPT_DIR/jg-jev-mem-guard.sh" --config "$CONFIG/host-memor
   HOST_MEMORY_RC=$?
   printf '%s\n' "$HOST_MEMORY_OUT" >&2
   echo "error: spawn refused - task $ID stays queued until host memory eases; retry then" >&2
-  if [ "$HOST_MEMORY_RC" -eq 1 ] && [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+  if [ "$HOST_MEMORY_RC" -eq 1 ] && [ "$KIND" = secondmate ] && [ "${JG_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
     exit 75
   fi
   exit 1
 }
-if [ "$KIND" = secondmate ] && [ "${FM_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
+if [ "$KIND" = secondmate ] && [ "${JG_SECONDMATE_LIVENESS_RECOVERY:-0}" = 1 ]; then
   # shellcheck source=bin/jg-secondmate-liveness-lib.sh
   . "$SCRIPT_DIR/jg-secondmate-liveness-lib.sh"
   jg_secondmate_liveness_probe "$STATE/$ID.meta" "$ID" poll
-  if [ "$FM_SM_LIVE_STATUS" != relaunchable ]; then
-    printf '%s\n' "endpoint no longer relaunchable: $FM_SM_LIVE_STATE" >&2
+  if [ "$JG_SM_LIVE_STATUS" != relaunchable ]; then
+    printf '%s\n' "endpoint no longer relaunchable: $JG_SM_LIVE_STATE" >&2
     exit 73
   fi
   if ! jg_secondmate_liveness_begin "$STATE/$ID.meta" "$ID"; then
-    printf '%s\n' "$FM_SM_LIVE_REASON" >&2
+    printf '%s\n' "$JG_SM_LIVE_REASON" >&2
     exit 74
   fi
 fi
 # Backend selection (data/jg-backend-design-d7): explicit --backend, else
-# FM_BACKEND env, else config/backend, else runtime auto-detection, else
+# JG_BACKEND env, else config/backend, else runtime auto-detection, else
 # default tmux (jg_backend_name). jg_backend_validate_spawn refuses unknown or
 # non-spawn-capable backends. The resolved value is
 # recorded in meta only when it is NOT tmux (jg-teardown.sh and jg-watch.sh's
@@ -1970,19 +1970,19 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   fi
   jg_backlog_record_present "$RELAUNCH_META" "task record" "$STATE" || {
-    echo "error: --relaunch refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: --relaunch refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
   SPAWN_META_LOCK=$(jg_meta_lock_path "$RELAUNCH_META") || exit 1
   jg_lock_acquire_wait "$SPAWN_META_LOCK"
   SPAWN_META_LOCK_HELD=1
   jg_backlog_record_present "$RELAUNCH_META" "task record" "$STATE" || {
-    echo "error: --relaunch refused after locking: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: --relaunch refused after locking: $JG_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
   jg_backend_validate_task_endpoint "$RELAUNCH_META" "$ID" || exit 1
-  BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-  RELAUNCH_TARGET=$FM_BACKEND_VALIDATED_TARGET
+  BACKEND=$JG_BACKEND_VALIDATED_BACKEND
+  RELAUNCH_TARGET=$JG_BACKEND_VALIDATED_TARGET
   jg_backend_validate_spawn "$BACKEND" || exit 1
   jg_backend_source "$BACKEND" || exit 1
   # A relaunch must PROVE the previous agent is gone before it launches another
@@ -2077,11 +2077,11 @@ if [ "$RELAUNCH" -eq 1 ]; then
   jg_slot_record_owner "$RELAUNCH_WT" "$STATE" "$RELAUNCH_META" || slot_rc=$?
   case "$slot_rc" in
     0)
-      echo "error: task $ID's recorded worktree $RELAUNCH_WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/jg-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)" >&2
+      echo "error: task $ID's recorded worktree $RELAUNCH_WT is also recorded by task $JG_SLOT_RECORD_OWNER_ID as its $JG_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/jg-crew-state.sh $ID $JG_SLOT_RECORD_OWNER_ID)" >&2
       exit 1
       ;;
     2)
-      echo "error: cannot prove task $ID's worktree $RELAUNCH_WT is free of other task records: $FM_LOCAL_FIRSTMATE_ERROR; refusing to relaunch" >&2
+      echo "error: cannot prove task $ID's worktree $RELAUNCH_WT is free of other task records: $JG_LOCAL_FIRSTMATE_ERROR; refusing to relaunch" >&2
       exit 1
       ;;
   esac
@@ -2228,7 +2228,7 @@ omp_model_validate() { # <omp-bin> <model>
 # unreachable listing establishes nothing (harness-adapters
 # model-and-effort.md) and launches unvalidated with a notice.
 agy_model_validate() {  # <agy-bin> <model>
-  local bin=$1 model=$2 listing rc=0 bound=${FM_AGY_MODELS_TIMEOUT:-15}
+  local bin=$1 model=$2 listing rc=0 bound=${JG_AGY_MODELS_TIMEOUT:-15}
   case "$bound" in ''|*[!0-9]*|0*) bound=15 ;; esac
   [ -n "$model" ] && [ "$model" != default ] || return 0
   listing=$(jg_run_timed "$bound" "$bin" models 2>/dev/null < /dev/null) || rc=$?
@@ -2361,7 +2361,7 @@ launch_template() {
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
   # the launch boundary and documented in the header above: foreign markers
   # cleared (omp has none of its own, so an inherited CLAUDECODE would win),
-  # FM_OMP_HARNESS=omp established for bin/jg-harness.sh, OMP_SKIP_SETUP=1
+  # JG_OMP_HARNESS=omp established for bin/jg-harness.sh, OMP_SKIP_SETUP=1
   # against the fresh-profile provider wizard, --auto-approve so no approval
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
@@ -2371,7 +2371,7 @@ launch_template() {
   # session_stop continuation. The busy extension is the exception: it lives
   # outside the home, so discovery never sees it, and -e is the only load.
   omp)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPWORKERCFG__ --auto-approve --cwd __WORKTREE__ __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPWORKERCFG__ --auto-approve --cwd __WORKTREE__ __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     ;;
   # agy (Antigravity CLI): --prompt-interactive "<brief>" starts the supervised
   # interactive session and auto-submits it, so the brief rides the launch
@@ -2396,7 +2396,7 @@ launch_template() {
   # TUI), so bin/jg-harness.sh must not read an agy worker as its launcher.
   # agy exposes no hook surface, so busy state is a rendered-tail fallback
   # (bin/jg-busy-lib.sh) and nothing is armed below.
-  agy) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS __AGYBIN__ --prompt-interactive "$(__OPINPUT__ encode launch-brief < __BRIEF__)" __MODELFLAG____EFFORTFLAG__--dangerously-skip-permissions' ;;
+  agy) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS __AGYBIN__ --prompt-interactive "$(__OPINPUT__ encode launch-brief < __BRIEF__)" __MODELFLAG____EFFORTFLAG__--dangerously-skip-permissions' ;;
   # grok (Grok Build TUI): a positional prompt starts the supervised interactive
   # session. --always-approve auto-approves every tool execution (verified: the
   # crewmate runs fully autonomously, no permission gate), which an unattended
@@ -2417,7 +2417,7 @@ launch_template() {
   # inherited CLAUDECODE cannot outrank cursor's own marker in a process that
   # only reads the environment. Cursor exposes no effort flag, so the shared
   # effort axis is deliberately omitted and stays in task metadata only.
-  cursor) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_INVOKED_AS __CURSORBIN__ --trust --yolo __MODELFLAG__--workspace __WORKTREE__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  cursor) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS -u GEMINI_CLI -u CURSOR_INVOKED_AS __CURSORBIN__ --trust --yolo __MODELFLAG__--workspace __WORKTREE__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # gemini (Google Gemini CLI): a positional query starts the supervised
   # interactive session and auto-submits it, so the brief rides the launch
   # command exactly as it does for claude and grok (verified: a multi-line
@@ -2452,11 +2452,11 @@ launch_template() {
   # stays in task metadata only, per the record-and-omit contract.
   # Its turn-end and busy-state signals do NOT ride the launch command:
   # they are project hooks written into the worktree below.
-  gemini) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS GEMINI_CLI_TRUST_WORKSPACE=true GEMINI_CLI_SYSTEM_SETTINGS_PATH=__GEMINISETTINGS__ gemini -y __MODELFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  gemini) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS GEMINI_CLI_TRUST_WORKSPACE=true GEMINI_CLI_SYSTEM_SETTINGS_PATH=__GEMINISETTINGS__ gemini -y __MODELFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # Devin receives the typed launch envelope after --. Its private config
   # appends native worker lifecycle hooks. Clear NO_COLOR so the shared
   # composer guard can distinguish the dim placeholder from a real draft.
-  devin) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u ATLASSIAN_AGENT_TYPE -u ROVODEV_CLI -u NO_COLOR __DEVINBIN__ --permission-mode dangerous --respect-workspace-trust false --config __DEVINCONFIG__ __MODELFLAG__-- "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  devin) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS -u JG_OMP_HARNESS -u ATLASSIAN_AGENT_TYPE -u ROVODEV_CLI -u NO_COLOR __DEVINBIN__ --permission-mode dangerous --respect-workspace-trust false --config __DEVINCONFIG__ __MODELFLAG__-- "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # Kimi Code rejects a positional prompt, so it launches bare and receives
   # only an absolute brief pointer after the TUI readiness gate below.
   # Its turn-end signal is a globally configured Stop hook plus a guarded
@@ -2488,7 +2488,7 @@ launch_template() {
   # inherited marker. The clearing stays on the cursor and muse templates as the
   # verified launch behavior their evidence records, not as the only thing
   # standing between a retained marker and a misidentified worker.
-  muse) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS XDG_CONFIG_HOME=__MUSECONFIG__ XDG_DATA_HOME=__MUSEDATA__ MUSE_EXPERIMENTAL_FOREIGN_PERSONAL_CONTEXT_KILL=on __MUSEBIN__ --yolo __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  muse) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS XDG_CONFIG_HOME=__MUSECONFIG__ XDG_DATA_HOME=__MUSEDATA__ MUSE_EXPERIMENTAL_FOREIGN_PERSONAL_CONTEXT_KILL=on __MUSEBIN__ --yolo __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # rovo (Atlassian Rovo CLI): a positional brief is dead-on-arrival - rovo
   # loads, never enters a working state, and drops back to an idle shell within
   # about 10-15 seconds (confirmed live four times over a raw PTY and once under
@@ -2515,7 +2515,7 @@ launch_template() {
   # respect the grant, confirmed live) - merged with agent.efficiencyLevel
   # when a supported effort is requested, since a second --config-override
   # would silently discard the first (confirmed live).
-  rovo) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS __ROVOBIN__ run --yolo __MODELFLAG____ROVOCONFIGOVERRIDE__' ;;
+  rovo) printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS __ROVOBIN__ run --yolo __MODELFLAG____ROVOCONFIGOVERRIDE__' ;;
   *) return 1 ;;
   esac
 }
@@ -2544,14 +2544,14 @@ case "$ARG3" in
   # The launch_template lookup below is the unverified-adapter guard for both
   # kinds: a harness with no template aborts the spawn.
   if [ "$KIND" = secondmate ]; then
-    HARNESS=$("$FM_ROOT/bin/jg-harness.sh" secondmate "$ID") || exit 1
+    HARNESS=$("$JG_ROOT/bin/jg-harness.sh" secondmate "$ID") || exit 1
     harness_src="config/secondmates/$ID/harness or config/secondmate-harness (falling back to config/crew-harness)"
   else
     if [ -f "$CONFIG/crew-dispatch.json" ]; then
       echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
       exit 1
     fi
-    HARNESS=$("$FM_ROOT/bin/jg-harness.sh" crew)
+    HARNESS=$("$JG_ROOT/bin/jg-harness.sh" crew)
     harness_src='config/crew-harness'
   fi
   LAUNCH=$(launch_template "$HARNESS" "$KIND") || {
@@ -2632,7 +2632,7 @@ pi | pi-signed)
   PI_EXCLUDE=
   [ -z "$EXCLUDE_TOOLS" ] || PI_EXCLUDE=" --exclude-tools $(shell_quote "$EXCLUDE_TOOLS")"
   LAUNCH=${LAUNCH//__PIEXCLUDE__/$PI_EXCLUDE}
-  LAUNCH="FM_PI_HARNESS=$HARNESS $LAUNCH"
+  LAUNCH="JG_PI_HARNESS=$HARNESS $LAUNCH"
   ;;
 cursor)
   # `cursor` is not the CLI name, and the legacy alias `agent` is far too
@@ -2655,7 +2655,7 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
-  OMP_WORKER_CFG="$FM_ROOT/.omp/jg-worker-overlay.yml"
+  OMP_WORKER_CFG="$JG_ROOT/.omp/jg-worker-overlay.yml"
   [ -f "$OMP_WORKER_CFG" ] || {
     echo "error: omp worker posture overlay missing at $OMP_WORKER_CFG; a worker launched without it can park on the captain's own approval or plan-mode settings" >&2
     exit 1
@@ -2878,7 +2878,7 @@ relaunch_resume_args() {  # <harness> <backend> <target>
   [ "$backend" = herdr ] || return 0
   [ -n "$target" ] || return 0
   jg_backend_herdr_parse_target "$target" || return 0
-  identity=$(jg_backend_herdr_pane_agent_session_ref "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || return 0
+  identity=$(jg_backend_herdr_pane_agent_session_ref "$JG_BACKEND_HERDR_SESSION" "$JG_BACKEND_HERDR_PANE") || return 0
   agent=${identity%%$'\t'*}
   ref=${identity#*$'\t'}
   flag=$(jg_control_relaunch_resume_flag "$harness" "$agent") || return 0
@@ -3035,7 +3035,7 @@ case "$LAUNCH" in
     exit 1
   }
   if [ "$KIND" != secondmate ]; then
-    "$FM_ROOT/bin/jg-kimi-turnend-hook.sh" install || {
+    "$JG_ROOT/bin/jg-kimi-turnend-hook.sh" install || {
       echo "error: refusing Kimi spawn because the global turn-end hook could not be installed safely" >&2
       exit 1
     }
@@ -3164,8 +3164,8 @@ path_is_ancestor_of() {
 validate_firstmate_home_for_spawn() {
   local id=$1 home=$2 abs_home abs_active_home abs_root marker_id
   abs_home=$(resolved_existing_dir "$home") || return 1
-  abs_active_home=$(resolved_existing_dir "$FM_HOME")
-  abs_root=$(resolved_existing_dir "$FM_ROOT")
+  abs_active_home=$(resolved_existing_dir "$JG_HOME")
+  abs_root=$(resolved_existing_dir "$JG_ROOT")
   if [ "$abs_home" = "/" ]; then
     echo "error: secondmate home cannot be the filesystem root: $home" >&2
     return 1
@@ -3249,7 +3249,7 @@ validate_firstmate_operational_dirs() {
 if [ "$KIND" = secondmate ]; then
   if [ -z "$FIRSTMATE_HOME" ] && { [ -e "$STATE/$ID.meta" ] || [ -L "$STATE/$ID.meta" ]; }; then
     jg_backlog_record_present "$STATE/$ID.meta" "task record" "$STATE" || {
-      echo "error: secondmate task record is unsafe: $FM_BACKLOG_TRANSITION_ERROR" >&2
+      echo "error: secondmate task record is unsafe: $JG_BACKLOG_TRANSITION_ERROR" >&2
       exit 1
     }
     FIRSTMATE_HOME=$(grep '^home=' "$STATE/$ID.meta" | cut -d= -f2- || true)
@@ -3282,12 +3282,12 @@ if [ "$KIND" = secondmate ]; then
 # wrong-branch home is left untouched and launches as-is. The agent re-reads
   # AGENTS.md fresh on launch, so no nudge is needed here.
   # On a remote host this spawn is the host-local leg of a launch whose parent has
-  # already synced the home to ITS primary commit, and $FM_ROOT here is only that
+  # already synced the home to ITS primary commit, and $JG_ROOT here is only that
   # host's own Firstmate copy; syncing again would target the wrong checkout, so
   # the caller turns this step off (bin/jg-remote-secondmate-control.sh).
-  if [ "${FM_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
+  if [ "${JG_SKIP_SECONDMATE_SYNC:-0}" = 1 ]; then
     :
-  elif sm_primary_head=$(primary_head_commit "$FM_ROOT"); then
+  elif sm_primary_head=$(primary_head_commit "$JG_ROOT"); then
     sm_ff_out=$(ff_target "$PROJ_ABS" "secondmate $ID" "$sm_primary_head" yes yes "$ID" "$STATE" 2>&1 || true)
     case "$sm_ff_out" in
     *': skipped:'*)
@@ -3304,7 +3304,7 @@ if [ "$KIND" = secondmate ]; then
     echo "error: could not create secondmate state directory for $PROJ_ABS" >&2
     exit 1
   }
-  if [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+  if [ "${JG_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
     CONFIG_INHERIT_LOCK=$(jg_config_inherit_lock_path "$PROJ_ABS") || {
       echo "error: could not resolve secondmate inheritance lock for $PROJ_ABS" >&2
       exit 1
@@ -3316,8 +3316,8 @@ if [ "$KIND" = secondmate ]; then
     CONFIG_INHERIT_LOCK_HELD=1
     # Inheritance propagation: push the primary-authoritative live-safe local inheritance
     # surface into this secondmate home (jg-config-inherit-lib.sh).
-    FM_CONFIG_INHERIT_LIVE=1 \
-      propagate_secondmate_inheritance "$FM_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
+    JG_CONFIG_INHERIT_LIVE=1 \
+      propagate_secondmate_inheritance "$JG_HOME" "$PROJ_ABS" "$CONFIG" "$DATA" ||
       echo "warning: secondmate $ID inheritance failed for $PROJ_ABS" >&2
   fi
   if [ -f "$PROJ_ABS/data/charter.md" ]; then
@@ -3339,16 +3339,16 @@ fi
 SPAWN_PROJECT_CAPACITY=
 SPAWN_PROJECT_CAPACITY_ANY=
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
-  SPAWN_CAPACITY_CONFIG=$(jg_project_capacity_config_dir "$FM_HOME" "$CONFIG") || {
+  SPAWN_CAPACITY_CONFIG=$(jg_project_capacity_config_dir "$JG_HOME" "$CONFIG") || {
     echo "error: could not resolve the root Firstmate home that declares project capacity for $PROJ_ABS" >&2
     exit 1
   }
   if ! jg_project_capacity_lookup "$SPAWN_CAPACITY_CONFIG" "$(basename "$PROJ_ABS")"; then
-    echo "error: spawn refused: the project capacity declaration is unreadable ($FM_PROJECT_CAPACITY_ERROR); fix it so the captain's worker limits are known (docs/configuration.md \"Project capacity\")" >&2
+    echo "error: spawn refused: the project capacity declaration is unreadable ($JG_PROJECT_CAPACITY_ERROR); fix it so the captain's worker limits are known (docs/configuration.md \"Project capacity\")" >&2
     exit 1
   fi
-  SPAWN_PROJECT_CAPACITY=$FM_PROJECT_CAPACITY
-  SPAWN_PROJECT_CAPACITY_ANY=$FM_PROJECT_CAPACITY_ANY
+  SPAWN_PROJECT_CAPACITY=$JG_PROJECT_CAPACITY
+  SPAWN_PROJECT_CAPACITY_ANY=$JG_PROJECT_CAPACITY_ANY
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   { [ "$BACKEND" != orca ] || [ -n "$SPAWN_PROJECT_CAPACITY_ANY" ]; }; then
@@ -3368,12 +3368,12 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
 fi
 if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
   if ! jg_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
-    echo "error: spawn refused: project $(basename "$PROJ_ABS") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($FM_PROJECT_CAPACITY_ERROR)" >&2
+    echo "error: spawn refused: project $(basename "$PROJ_ABS") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($JG_PROJECT_CAPACITY_ERROR)" >&2
     exit 1
   fi
-  if [ "$FM_PROJECT_CAPACITY_OCCUPANTS" -ge "$SPAWN_PROJECT_CAPACITY" ]; then
-    echo "deferred: project $(basename "$PROJ_ABS") admits $SPAWN_PROJECT_CAPACITY worker(s) at once on this machine ($FM_PROJECT_CAPACITY_FILE) and $FM_PROJECT_CAPACITY_OCCUPANTS already hold a place ($FM_PROJECT_CAPACITY_OCCUPANT_IDS); task $ID was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up" >&2
-    exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
+  if [ "$JG_PROJECT_CAPACITY_OCCUPANTS" -ge "$SPAWN_PROJECT_CAPACITY" ]; then
+    echo "deferred: project $(basename "$PROJ_ABS") admits $SPAWN_PROJECT_CAPACITY worker(s) at once on this machine ($JG_PROJECT_CAPACITY_FILE) and $JG_PROJECT_CAPACITY_OCCUPANTS already hold a place ($JG_PROJECT_CAPACITY_OCCUPANT_IDS); task $ID was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up" >&2
+    exit "$JG_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
 [ -f "$BRIEF" ] || {
@@ -3412,7 +3412,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       echo "error: --base-branch requires a branch name" >&2
       exit 1
     }
-    BASE_FORGE=$("$FM_ROOT/bin/jg-project-mode.sh" --forge "$(basename "$PROJ_ABS")") || exit 1
+    BASE_FORGE=$("$JG_ROOT/bin/jg-project-mode.sh" --forge "$(basename "$PROJ_ABS")") || exit 1
     jg_base_branch_valid "$BASE_BRANCH" "$MODE" "${BASE_FORGE:-none}" "jg-spawn.sh --base-branch" || exit 1
     if ! jg_brief_base_branches "$BRIEF" >/dev/null || jg_brief_base_branches "$BRIEF" | grep -vxF -- "$BASE_BRANCH" >/dev/null; then
       echo "error: $BRIEF must record Base branch: $BASE_BRANCH and no other Base branch line to spawn with --base-branch $BASE_BRANCH; scaffold it with bin/jg-brief.sh --base-branch $BASE_BRANCH" >&2
@@ -3428,7 +3428,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   BRIEF="$DATA/$ID/launch-brief.md"
   BRIEF_TMP="$DATA/$ID/.launch-brief.md.${BASHPID:-$$}"
   {
-    jg_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
+    jg_brief_worker_role "$STATE" "$ID" "$JG_ROOT" &&
       printf '\n' &&
       cat "$SOURCE_BRIEF" &&
       if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
@@ -3467,13 +3467,13 @@ if [ "$KIND" = ship ]; then
   # local-only) resolves to no posture at all, and launching on the silent
   # default is how a mistyped forge would hand a Gerrit project the
   # pull-request contract.
-  if ! STANDING_FORGE=$("$FM_ROOT/bin/jg-project-mode.sh" --forge "$PROJ_NAME" 2>/dev/null); then
-    "$FM_ROOT/bin/jg-project-mode.sh" --forge "$PROJ_NAME" >/dev/null || true
+  if ! STANDING_FORGE=$("$JG_ROOT/bin/jg-project-mode.sh" --forge "$PROJ_NAME" 2>/dev/null); then
+    "$JG_ROOT/bin/jg-project-mode.sh" --forge "$PROJ_NAME" >/dev/null || true
     echo "error: $ID cannot launch: the registry entry for $PROJ_NAME does not resolve to a delivery posture (see the refusal above); correct data/projects.md and spawn again" >&2
     exit 1
   fi
   [ -n "$STANDING_FORGE" ] || STANDING_FORGE=none
-  STANDING_MODE=$("$FM_ROOT/bin/jg-project-mode.sh" --raw "$PROJ_NAME" 2>/dev/null | cut -d' ' -f1) || STANDING_MODE=
+  STANDING_MODE=$("$JG_ROOT/bin/jg-project-mode.sh" --raw "$PROJ_NAME" 2>/dev/null | cut -d' ' -f1) || STANDING_MODE=
   BRIEF_MODE=$(sed -n 's/^Delivery contract: mode=\([^ ]*\).*$/\1/p' "$BRIEF" | head -n 1)
   BRIEF_FORGE=$(sed -n 's/^Delivery contract: mode=[^ ]*.*[[:space:]]forge=\([^ ]*\).*$/\1/p' "$BRIEF" | head -n 1)
   [ -n "$BRIEF_FORGE" ] || BRIEF_FORGE=none
@@ -3540,12 +3540,12 @@ if [ "$KIND" = ship ]; then
   # never reaches this gate.
   if [ "$MODE" != local-only ]; then
     gate_rc=0
-    jg_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROJ_ABS" "$FM_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
+    jg_role_gate_self_publish "$JG_HOME" "$CONFIG" "$PROJ_ABS" "$JG_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
     case $gate_rc in
     0 | 2) ;;
     *)
-      echo "error: spawn refused for $ID: $FM_ROLE_PUB_DENIAL" >&2
-      echo "error: to let this home publish to ${FM_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
+      echo "error: spawn refused for $ID: $JG_ROLE_PUB_DENIAL" >&2
+      echo "error: to let this home publish to ${JG_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
       exit 1
       ;;
     esac
@@ -3564,7 +3564,7 @@ if [ "$KIND" = ship ]; then
   # spawn that ships the legacy fm/ prefix past a registered override is
   # announced, not refused: the brief-vs-spawn agreement above already
   # guarantees the worker's instructions match the branch this spawn selected.
-  STANDING_BRANCH=$("$FM_ROOT/bin/jg-project-mode.sh" --branch-prefix "$PROJ_NAME" 2>/dev/null) || STANDING_BRANCH=
+  STANDING_BRANCH=$("$JG_ROOT/bin/jg-project-mode.sh" --branch-prefix "$PROJ_NAME" 2>/dev/null) || STANDING_BRANCH=
   if [ "$BRANCH" != "$STANDING_BRANCH$ID" ]; then
     echo "notice: $ID ships branch=$BRANCH while $PROJ_NAME registers the ship-branch prefix '$STANDING_BRANCH' (branch $STANDING_BRANCH$ID) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state" >&2
   fi
@@ -3816,8 +3816,8 @@ herdr_projection_existing_meta_allows_flat() { # <meta>
       echo "error: existing herdr endpoint for $ID is malformed; refusing duplicate launch" >&2
       return 1
     }
-    target_session=$FM_BACKEND_HERDR_SESSION
-    target_pane=$FM_BACKEND_HERDR_PANE
+    target_session=$JG_BACKEND_HERDR_SESSION
+    target_pane=$JG_BACKEND_HERDR_PANE
     old_session=$(herdr_projection_meta_field_exact "$meta" herdr_session) || {
       echo "error: existing herdr metadata for $ID has an ambiguous session; refusing duplicate launch" >&2
       return 1
@@ -3878,15 +3878,15 @@ BACKLOG_ROW_STATE=
 if jg_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
   BACKLOG_TRANSITION=1
   if jg_backlog_row_probe "$DATA" "$ID"; then
-    BACKLOG_ROW_STATE=$FM_BACKLOG_ROW_STATE
-  elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+    BACKLOG_ROW_STATE=$JG_BACKLOG_ROW_STATE
+  elif [ "$JG_BACKLOG_ROW_RESULT" = not_found ]; then
     echo "error: task $ID has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/jg-tasks-axi.sh add $ID '<title>' --kind $KIND) and re-run" >&2
     exit 1
   else
-    echo "error: task $ID's backlog item could not be read before dispatch ($FM_BACKLOG_ROW_ERROR)" >&2
+    echo "error: task $ID's backlog item could not be read before dispatch ($JG_BACKLOG_ROW_ERROR)" >&2
     exit 1
   fi
-  spawn_preflight_actor=$(jg_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
+  spawn_preflight_actor=$(jg_lease_actor) || exit "$JG_LEASE_REFUSE_EXIT"
   if [ "$spawn_preflight_actor" = branch ] && jg_lease_away_relocated; then
     if [ "$BACKLOG_ROW_STATE" != "queued no no" ]; then
       echo "error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task $ID has no dispatchable backlog item in this home" >&2
@@ -3903,7 +3903,7 @@ if jg_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
 else
   BACKLOG_GATE_STATUS=$?
   if [ "$BACKLOG_GATE_STATUS" -eq 2 ]; then
-    echo "error: task $ID cannot be dispatched because its backlog data directory is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+    echo "error: task $ID cannot be dispatched because its backlog data directory is inaccessible: $DATA ($JG_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
 fi
@@ -4022,13 +4022,13 @@ else
     ;;
   herdr)
     # jg_backend_herdr_workspace_label resolves the target workspace from
-    # FM_HOME. For every KIND except secondmate, this process's own FM_HOME is
+    # JG_HOME. For every KIND except secondmate, this process's own JG_HOME is
     # already the right home (the primary spawning its own crewmate/scout, or
     # a secondmate spawning ITS OWN crewmate/scout from its own process's
-    # FM_HOME - the latter needs no glue at all). A --secondmate spawn is the
+    # JG_HOME - the latter needs no glue at all). A --secondmate spawn is the
     # one case that does: it is the PRIMARY's own jg-spawn.sh process
     # launching a DIFFERENT home (PROJ_ABS, already validated above as the
-    # secondmate's home), so FM_HOME here still names the primary. Shadow it
+    # secondmate's home), so JG_HOME here still names the primary. Shadow it
     # to PROJ_ABS for just these two calls (bash restores it automatically
     # after each prefixed simple-command call) so the secondmate's tab lands
     # in the secondmate's own workspace, not the primary's "firstmate" one.
@@ -4039,7 +4039,7 @@ else
     # workspace must never be adopted). A --secondmate launch is the exception -
     # it stands up a DIFFERENT home's own workspace by design - so it asks for
     # the per-home container instead of inheriting this launcher's.
-    HERDR_LABEL_HOME=$FM_HOME
+    HERDR_LABEL_HOME=$JG_HOME
     HERDR_LAUNCHER_RELATIONSHIP="launcher-home"
     if [ "$KIND" = secondmate ]; then
       HERDR_LABEL_HOME=$PROJ_ABS
@@ -4049,7 +4049,7 @@ else
     HERDR_PROJECTED=0
     if [ "$KIND" != secondmate ] && jg_backend_herdr_presentation_enabled "$CONFIG" "$STATE"; then
       HERDR_SES=$(jg_backend_herdr_session)
-      HERDR_PARENT_LABEL=$(FM_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_workspace_label)
+      HERDR_PARENT_LABEL=$(JG_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_workspace_label)
       if [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; then
         jg_backend_herdr_server_ensure "$HERDR_SES" || {
           echo "error: herdr presentation recovery could not ensure its exact named session" >&2
@@ -4075,7 +4075,7 @@ else
           "$HERDR_SES" "$HERDR_PRESENTATION_JOURNAL" "$ID" || exit 1
         if [ "${HERDR_RECOVERY_BACKEND:-}" = herdr ]; then
           set +e
-          FM_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_projection_reclaim_task \
+          JG_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_projection_reclaim_task \
             "$HERDR_SES" "$HERDR_PRESENTATION_JOURNAL" "$ID" "$HERDR_LABEL_HOME" \
             "$HERDR_RECOVERY_WORKSPACE_ID" "$HERDR_RECOVERY_TAB_ID" "$HERDR_RECOVERY_PANE_ID" \
             "$HERDR_PARENT_LABEL" "$W" "$PROJ_ABS"
@@ -4086,8 +4086,8 @@ else
             HERDR_PROJECTED=1
             HERDR_WORKSPACE_ID=$HERDR_RECOVERY_WORKSPACE_ID
             HERDR_SEEDED_DEFAULT_TAB_ID=""
-            HERDR_TAB_ID=$FM_BACKEND_HERDR_PROJECTION_TAB_ID
-            HERDR_PANE_ID=$FM_BACKEND_HERDR_PROJECTION_PANE_ID
+            HERDR_TAB_ID=$JG_BACKEND_HERDR_PROJECTION_TAB_ID
+            HERDR_PANE_ID=$JG_BACKEND_HERDR_PROJECTION_PANE_ID
             HERDR_PROJECTION_ABORT_CLEANUP=1
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
@@ -4106,7 +4106,7 @@ else
         # live named-session socket before journal publication.
         if ! jg_backend_herdr_server_ensure "$HERDR_SES"; then
           echo "warning: herdr presentation could not ensure its session server; using the ordinary flat layout without projection" >&2
-        elif [ "${FM_BACKEND_HERDR_PRESENTATION_PREFERENCE:-default}" = default ] &&
+        elif [ "${JG_BACKEND_HERDR_PRESENTATION_PREFERENCE:-default}" = default ] &&
           ! jg_backend_herdr_presentation_default_supported "$STATE" "$HERDR_SES"; then
           :
         elif spawn_herdr_presentation_order_lock_acquire "$HERDR_SES"; then
@@ -4120,7 +4120,7 @@ else
           HERDR_LAUNCHER_STATUS=$?
           set -e
           case "$HERDR_LAUNCHER_STATUS" in
-          0) HERDR_PARENT_WORKSPACE_ID=$FM_BACKEND_HERDR_LAUNCHER_WORKSPACE_ID ;;
+          0) HERDR_PARENT_WORKSPACE_ID=$JG_BACKEND_HERDR_LAUNCHER_WORKSPACE_ID ;;
           2) HERDR_PARENT_WORKSPACE_ID=$(jg_backend_herdr_projection_parent_workspace_exact \
             "$HERDR_SES" "$HERDR_PARENT_LABEL" 2>/dev/null || true) ;;
           *)
@@ -4134,26 +4134,26 @@ else
           else
             HERDR_PROJECTION_ID=$(jg_backend_herdr_projection_journal_create "$STATE" "$ID") || exit 1
             HERDR_PROJECTION_LABEL=$(jg_backend_herdr_projection_workspace_label "$ID" "$HERDR_PROJECTION_ID")
-            if ! FM_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_projection_create_task \
+            if ! JG_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_projection_create_task \
               "$PROJ_ABS" "$HERDR_PROJECTION_LABEL" "$W"; then
-              if [ "${FM_BACKEND_HERDR_PROJECTION_CLEANUP_SAFE:-0}" = 1 ]; then
+              if [ "${JG_BACKEND_HERDR_PROJECTION_CLEANUP_SAFE:-0}" = 1 ]; then
                 HERDR_PROJECTION_ABORT_CLEANUP=1
-                HERDR_PROJECTION_ABORT_SESSION=$FM_BACKEND_HERDR_PROJECTION_SESSION
-                HERDR_PROJECTION_ABORT_TASK_PANE=$FM_BACKEND_HERDR_PROJECTION_PANE_ID
-                HERDR_PROJECTION_ABORT_SEEDED_PANE=$FM_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
+                HERDR_PROJECTION_ABORT_SESSION=$JG_BACKEND_HERDR_PROJECTION_SESSION
+                HERDR_PROJECTION_ABORT_TASK_PANE=$JG_BACKEND_HERDR_PROJECTION_PANE_ID
+                HERDR_PROJECTION_ABORT_SEEDED_PANE=$JG_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
               fi
               exit 1
             fi
             HERDR_PROJECTED=1
-            HERDR_SES=$FM_BACKEND_HERDR_PROJECTION_SESSION
-            HERDR_WORKSPACE_ID=$FM_BACKEND_HERDR_PROJECTION_WORKSPACE_ID
-            HERDR_SEEDED_DEFAULT_TAB_ID=$FM_BACKEND_HERDR_PROJECTION_SEEDED_TAB_ID
-            HERDR_TAB_ID=$FM_BACKEND_HERDR_PROJECTION_TAB_ID
-            HERDR_PANE_ID=$FM_BACKEND_HERDR_PROJECTION_PANE_ID
+            HERDR_SES=$JG_BACKEND_HERDR_PROJECTION_SESSION
+            HERDR_WORKSPACE_ID=$JG_BACKEND_HERDR_PROJECTION_WORKSPACE_ID
+            HERDR_SEEDED_DEFAULT_TAB_ID=$JG_BACKEND_HERDR_PROJECTION_SEEDED_TAB_ID
+            HERDR_TAB_ID=$JG_BACKEND_HERDR_PROJECTION_TAB_ID
+            HERDR_PANE_ID=$JG_BACKEND_HERDR_PROJECTION_PANE_ID
             HERDR_PROJECTION_ABORT_CLEANUP=1
             HERDR_PROJECTION_ABORT_SESSION=$HERDR_SES
             HERDR_PROJECTION_ABORT_TASK_PANE=$HERDR_PANE_ID
-            HERDR_PROJECTION_ABORT_SEEDED_PANE=$FM_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
+            HERDR_PROJECTION_ABORT_SEEDED_PANE=$JG_BACKEND_HERDR_PROJECTION_SEEDED_PANE_ID
             jg_backend_herdr_projection_order_best_effort \
               "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_PARENT_LABEL" "$HERDR_PARENT_WORKSPACE_ID"
             jg_backend_herdr_workspace_lineage_report_best_effort \
@@ -4179,7 +4179,7 @@ else
       fi
     fi
     if [ "$HERDR_PROJECTED" -ne 1 ]; then
-      HERDR_CONTAINER_RAW=$(FM_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_container_ensure "$PROJ_ABS" "$HERDR_LAUNCHER_RELATIONSHIP") || exit 1
+      HERDR_CONTAINER_RAW=$(JG_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_container_ensure "$PROJ_ABS" "$HERDR_LAUNCHER_RELATIONSHIP") || exit 1
       # jg_backend_herdr_container_ensure echoes "<session>:<workspace_id>\t<seeded_default_tab_id>"
       # (the second field empty when this call ADOPTED a pre-existing workspace
       # rather than creating a fresh one). Split on the guaranteed single tab
@@ -4190,7 +4190,7 @@ else
       HERDR_SEEDED_DEFAULT_TAB_ID=${HERDR_CONTAINER_RAW#*$'\t'}
       HERDR_SES=${CONTAINER%%:*}
       HERDR_WORKSPACE_ID=${CONTAINER#*:}
-      HERDR_TASK_IDS=$(FM_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_create_task "$CONTAINER" "$W" "$PROJ_ABS" "$HERDR_SEEDED_DEFAULT_TAB_ID") || exit 1
+      HERDR_TASK_IDS=$(JG_HOME="$HERDR_LABEL_HOME" jg_backend_herdr_create_task "$CONTAINER" "$W" "$PROJ_ABS" "$HERDR_SEEDED_DEFAULT_TAB_ID") || exit 1
       read -r HERDR_TAB_ID HERDR_PANE_ID <<EOF
 $HERDR_TASK_IDS
 EOF
@@ -4253,7 +4253,7 @@ EOF
   esac
 fi
 if [ "$KIND" = secondmate ]; then
-  FM_INHERITABLE_CONFIG=trace-context \
+  JG_INHERITABLE_CONFIG=trace-context \
     propagate_inheritable_config "$CONFIG" "$PROJ_ABS/config" ||
     echo "warning: secondmate $ID trace-context inheritance failed for $PROJ_ABS" >&2
 fi
@@ -4391,7 +4391,7 @@ kimi_ready_signal_is_present() { # <plain-pane-capture>
 }
 
 kimi_wait_for_ready() {
-  local pane capture_rc i=0 max=${FM_KIMI_READY_POLLS:-60} interval=${FM_KIMI_POLL_INTERVAL:-0.5}
+  local pane capture_rc i=0 max=${JG_KIMI_READY_POLLS:-60} interval=${JG_KIMI_POLL_INTERVAL:-0.5}
   local trust_enters=0 trust_seen=0 trust_still_visible=0 trust_markers_pending=0
   local ready_captures=0
   KIMI_READY_FAILURE_DETAIL='kimi did not show a verified ready signal before brief delivery'
@@ -4414,7 +4414,7 @@ kimi_wait_for_ready() {
       trust_markers_pending=0
       ready_captures=0
       # Kimi swallows keypresses during its startup window - the same hazard
-      # FM_KIMI_SUBMIT_RETRIES covers for the brief pointer - so the
+      # JG_KIMI_SUBMIT_RETRIES covers for the brief pointer - so the
       # affirmative selection is re-sent on every poll the complete dialog is
       # still on screen. The dialog's own disappearance is the postcondition:
       # once it clears, this branch cannot fire again.
@@ -4468,7 +4468,7 @@ kimi_delivery_is_confirmed() { # <plain-pane-capture>
 }
 
 kimi_wait_for_delivery() {
-  local pane i=0 max=${FM_KIMI_DELIVERY_POLLS:-40} interval=${FM_KIMI_POLL_INTERVAL:-0.5}
+  local pane i=0 max=${JG_KIMI_DELIVERY_POLLS:-40} interval=${JG_KIMI_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
     pane=$(kimi_capture)
     kimi_delivery_is_confirmed "$pane" && return 0
@@ -4498,7 +4498,7 @@ rovo_composer_is_empty() {
 }
 
 rovo_wait_for_ready() {
-  local pane i=0 max=${FM_ROVO_READY_POLLS:-60} interval=${FM_ROVO_POLL_INTERVAL:-0.5}
+  local pane i=0 max=${JG_ROVO_READY_POLLS:-60} interval=${JG_ROVO_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
     pane=$(rovo_capture)
     # Lead with rovo's fresh-launch ASCII welcome banner (confirmed live), the
@@ -4536,7 +4536,7 @@ rovo_delivery_is_confirmed() { # <plain-pane-capture>
 }
 
 rovo_wait_for_delivery() {
-  local pane i=0 max=${FM_ROVO_DELIVERY_POLLS:-40} interval=${FM_ROVO_POLL_INTERVAL:-0.5}
+  local pane i=0 max=${JG_ROVO_DELIVERY_POLLS:-40} interval=${JG_ROVO_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
     pane=$(rovo_capture)
     rovo_delivery_is_confirmed "$pane" && return 0
@@ -4620,7 +4620,7 @@ claude_visible_capture() {
 # never clears, failing the spawn loudly rather than leaving a worker parked
 # at the dialog.
 claude_wait_for_imports_answer() {
-  local pane i=0 max=${FM_CLAUDE_IMPORTS_POLLS:-60} interval=${FM_CLAUDE_IMPORTS_POLL_INTERVAL:-0.5}
+  local pane i=0 max=${JG_CLAUDE_IMPORTS_POLLS:-60} interval=${JG_CLAUDE_IMPORTS_POLL_INTERVAL:-0.5}
   local answered=0 clear_streak=0
   while [ "$i" -lt "$max" ]; do
     pane=$(claude_visible_capture)
@@ -4650,7 +4650,7 @@ claude_wait_for_imports_answer() {
 }
 
 agy_wait_for_working() {
-  local pane i=0 max=${FM_AGY_READY_POLLS:-60} interval=${FM_AGY_POLL_INTERVAL:-0.5}
+  local pane i=0 max=${JG_AGY_READY_POLLS:-60} interval=${JG_AGY_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
     pane=$(agy_capture)
     if agy_pane_shows_trust_dialog "$pane"; then
@@ -4712,10 +4712,10 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Lease recorded task copies without touching their Git contents, then
   # acquire in the explicit project, never the new pane's inherited cwd.
   jg_local_firstmate_state_dirs "$STATE" || {
-    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2
+    echo "error: cannot enumerate recorded Treehouse copies: $JG_LOCAL_FIRSTMATE_ERROR" >&2
     exit 1
   }
-  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$PROJ_ABS" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || exit 1
+  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$PROJ_ABS" "${JG_LOCAL_FIRSTMATE_STATES[@]}" || exit 1
   allocated=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
     echo "error: treehouse could not lease a worktree for task $ID; copies held by tasks not yet torn down are not available until their teardown" >&2
     exit 1
@@ -4796,7 +4796,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # Written under the Treehouse project lock held from before slot allocation
   # through metadata publication, so no other spawn or return sees a half-claim.
   if jg_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    if ! jg_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
+    if ! jg_treehouse_slot_owner_claim "$WT" "$ID" "$JG_HOME"; then
       # The slot was never this task's, so the abort cleanup below must not
       # retain it with a recovery record: teardown of such a record would
       # return a copy this task never owned.
@@ -4850,14 +4850,14 @@ claude*)
   else
     spawn_trust_args=("$WT" "$PROJ_ABS")
   fi
-  if ! "$FM_ROOT/bin/jg-claude-trust.sh" "${spawn_trust_args[@]}" >/dev/null; then
+  if ! "$JG_ROOT/bin/jg-claude-trust.sh" "${spawn_trust_args[@]}" >/dev/null; then
     echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog; inspect window $T" >&2
     exit 1
   fi
   ;;
 agy)
   if [ "$KIND" != secondmate ]; then
-    if "$FM_ROOT/bin/jg-agy-trust.sh" "$WT" "$PROJ_ABS" >/dev/null; then
+    if "$JG_ROOT/bin/jg-agy-trust.sh" "$WT" "$PROJ_ABS" >/dev/null; then
       AGY_TRUST_PREREGISTERED=1
     else
       echo "warning: could not pre-register agy workspace trust for $WT; the launch will answer the folder-trust dialog in window $T instead" >&2
@@ -4948,7 +4948,7 @@ if [ "$KIND" = secondmate ]; then
     claude* | pi | pi-signed | omp)
       WIRING_HARNESS=
       if [ -e "$STATE_REAL/$ID.busy-gen" ]; then
-        "$FM_ROOT/bin/jg-busy-event.sh" retire "$STATE_REAL" "$ID" --current-gen || {
+        "$JG_ROOT/bin/jg-busy-event.sh" retire "$STATE_REAL" "$ID" --current-gen || {
           echo "error: failed to retire the earlier busy-state contract for $ID" >&2
           exit 1
         }
@@ -4971,7 +4971,7 @@ BUSY_GEN=
   esac
   case "$WIRING_HARNESS" in
   claude* | opencode* | pi | pi-signed | omp)
-    BUSY_GEN=$("$FM_ROOT/bin/jg-busy-event.sh" arm "$STATE_REAL" "$ID") || {
+    BUSY_GEN=$("$JG_ROOT/bin/jg-busy-event.sh" arm "$STATE_REAL" "$ID") || {
       echo "error: failed to arm the busy-state contract for $ID" >&2
       exit 1
     }
@@ -4979,7 +4979,7 @@ BUSY_GEN=
     ;;
   gemini | devin)
     if [ "$RAW_LAUNCH" -eq 0 ]; then
-      BUSY_GEN=$("$FM_ROOT/bin/jg-busy-event.sh" arm "$STATE_REAL" "$ID") || {
+      BUSY_GEN=$("$JG_ROOT/bin/jg-busy-event.sh" arm "$STATE_REAL" "$ID") || {
         echo "error: failed to arm the busy-state contract for $ID" >&2
         exit 1
       }
@@ -5023,7 +5023,7 @@ BUSY_GEN=
     # (https://code.claude.com/docs/en/hooks) and keeps any key
     # the flag omits (https://code.claude.com/docs/en/cli-reference), so the
     # home's tracked Stop guard and its settings.local.json both stay.
-    busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/jg-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
+    busy_cmd_prefix="$(shell_quote "$JG_ROOT/bin/jg-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
     busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
     j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
@@ -5031,7 +5031,7 @@ BUSY_GEN=
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.jg-busy-stop' "$WT/bin/jg-turnend-guard.sh" 2>/dev/null; then
       {
-        printf 'writer=%s\n' "$FM_ROOT/bin/jg-busy-event.sh"
+        printf 'writer=%s\n' "$JG_ROOT/bin/jg-busy-event.sh"
         printf 'state=%s\n' "$STATE_REAL"
         printf 'id=%s\n' "$ID"
         printf 'gen=%s\n' "$BUSY_GEN"
@@ -5060,7 +5060,7 @@ BUSY_GEN=
     ;;
   devin)
     if [ "$RAW_LAUNCH" -eq 0 ]; then
-      FM_KEEP_AI_TRAILERS="$KEEP_AI_TRAILERS" "$SCRIPT_DIR/jg-devin-config.sh" "$STATE_REAL" "$ID" "$BUSY_GEN" || exit 1
+      JG_KEEP_AI_TRAILERS="$KEEP_AI_TRAILERS" "$SCRIPT_DIR/jg-devin-config.sh" "$STATE_REAL" "$ID" "$BUSY_GEN" || exit 1
     fi
     ;;
   gemini)
@@ -5087,7 +5087,7 @@ BUSY_GEN=
       # Every hook command tolerates a refused event (|| true) so a stale-gen
       # writer can never break gemini's own lifecycle, and each prints the
       # empty JSON object gemini's hook contract requires on stdout.
-      busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/jg-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
+      busy_cmd_prefix="$(shell_quote "$JG_ROOT/bin/jg-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
       busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source gemini-hook"
       g_before=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event before-agent >/dev/null 2>&1 || true; printf '{}'")
       g_after=$(json_escape "touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event after-agent >/dev/null 2>&1 || true; printf '{}'")
@@ -5113,7 +5113,7 @@ import { execFile } from "node:child_process";
 const notifyTurnEnd = $busy_notify_turnend;
 const busyEvent = (state, event) =>
   new Promise((resolve) => {
-    execFile("$FM_ROOT/bin/jg-busy-event.sh", [
+    execFile("$JG_ROOT/bin/jg-busy-event.sh", [
       "apply", "$STATE_REAL", "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "opencode-plugin", "--event", event,
     ], () => resolve());
@@ -5176,7 +5176,7 @@ const excludeFile = $(perl -MJSON::PP -MEncode=decode_utf8 -e 'print encode_json
 const statusFile = $(perl -MJSON::PP -MEncode=decode_utf8 -e 'print encode_json(decode_utf8($ARGV[0]))' -- "$STATE/$ID.status");
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
-    execFile("$FM_ROOT/bin/jg-busy-event.sh", [
+    execFile("$JG_ROOT/bin/jg-busy-event.sh", [
       "apply", "$STATE_REAL", "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "pi-ext", "--event", event,
     ], () => resolve());
@@ -5218,7 +5218,7 @@ export default function (pi: any) {
     const now = Date.now();
     if (now - lastProgress < 1000) return;
     lastProgress = now;
-    execFile("$FM_ROOT/bin/jg-busy-event.sh", [
+    execFile("$JG_ROOT/bin/jg-busy-event.sh", [
       "progress", "$STATE_REAL", "$ID", "--gen", "$BUSY_GEN",
     ]);
   };
@@ -5255,7 +5255,7 @@ import { execFile } from "node:child_process";
 const notifyTurnEnd = $busy_notify_turnend;
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
-    execFile("$FM_ROOT/bin/jg-busy-event.sh", [
+    execFile("$JG_ROOT/bin/jg-busy-event.sh", [
       "apply", "$STATE_REAL", "$ID", state,
       "--gen", "$BUSY_GEN", "--source", "omp-ext", "--event", event,
     ], () => resolve());
@@ -5416,7 +5416,7 @@ EOF
 # rather than shipping a runtime that cannot strip.
 GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
 if [ "$KEEP_AI_TRAILERS" = 0 ]; then
-  "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" || {
+  "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" || {
     echo "error: could not install the AI-trailer strip hooks for $ID" >&2
     exit 1
   }
@@ -5460,7 +5460,7 @@ if [ "$TRACEPARENT_SET" -eq 1 ]; then
 else
   SPAWN_TRACE_EFFECTIVE=$(jg_trace_context_session_effective "$STATE/.trace-context-effective")
   if [ "$SPAWN_TRACE_EFFECTIVE" = on ]; then
-    SPAWN_TRACEPARENT=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CONFIG" "$STATE/$ID.meta" || true)
+    SPAWN_TRACEPARENT=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CONFIG" "$STATE/$ID.meta" || true)
   else
     SPAWN_TRACEPARENT=
   fi
@@ -5548,8 +5548,8 @@ preserve_relaunch_meta() {
   if [ "$RELAUNCH" -eq 1 ]; then
     preserve_relaunch_meta
   fi
-  if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
-    echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
+  if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${JG_CONTROL_RELAUNCH_TX:-}" ]; then
+    echo "control_relaunch_tx=$JG_CONTROL_RELAUNCH_TX"
   fi
 } >"$SPAWN_META_PATH" || {
   echo "error: task record for $ID could not be prepared at $SPAWN_META_PATH" >&2
@@ -5557,7 +5557,7 @@ preserve_relaunch_meta() {
 }
 if [ "$RELAUNCH" -eq 0 ]; then
   if ! jg_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE"; then
-    echo "error: task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+    echo "error: task record for $ID could not be published ($JG_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
   SPAWN_META_TMP=
@@ -5587,34 +5587,34 @@ spawn_report_preserved_state() {
     return 1
   fi
   if ! jg_backlog_row_probe "$DATA" "$ID"; then
-    if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+    if [ "$JG_BACKLOG_ROW_RESULT" = not_found ]; then
       SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item was not found; close out its paired task record by hand"
     else
-      SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item state is unreadable (${FM_BACKLOG_ROW_ERROR:-no error recorded}); close out its paired task record and backlog item by hand"
+      SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item state is unreadable (${JG_BACKLOG_ROW_ERROR:-no error recorded}); close out its paired task record and backlog item by hand"
     fi
     return 1
   fi
-  if [ "$FM_BACKLOG_ROW_STATE" = "in_flight no no" ]; then
+  if [ "$JG_BACKLOG_ROW_STATE" = "in_flight no no" ]; then
     SPAWN_PRESERVED_CLAIM="verified preserved: its paired task record is present and its backlog item is In flight"
     return 0
   fi
   # The commit reported success, but the row does not read back In flight:
   # move it now under the same lock and verify the result before naming it.
-  jg_backlog_start "$DATA" "$ID" || repair_error=$FM_BACKLOG_TRANSITION_ERROR
+  jg_backlog_start "$DATA" "$ID" || repair_error=$JG_BACKLOG_TRANSITION_ERROR
   if [ -z "$repair_error" ] &&
     jg_backlog_row_probe "$DATA" "$ID" &&
-    [ "$FM_BACKLOG_ROW_STATE" = "in_flight no no" ]; then
+    [ "$JG_BACKLOG_ROW_STATE" = "in_flight no no" ]; then
     SPAWN_PRESERVED_CLAIM="its backlog item did not read back In flight after the commit; it was moved to In flight now and verified, together with its paired task record"
     return 0
   fi
-  SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item reads ${FM_BACKLOG_ROW_STATE:-unreadable}${repair_error:+, and moving it to In flight failed ($repair_error)}; close out its paired task record and backlog item by hand"
+  SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item reads ${JG_BACKLOG_ROW_STATE:-unreadable}${repair_error:+, and moving it to In flight failed ($repair_error)}; close out its paired task record and backlog item by hand"
   return 1
 }
 
 if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_META_PUBLISH_STARTED=1
   if ! jg_backlog_atomic_transition publish "$SPAWN_META_TMP" "$STATE/$ID.meta" "task record" "$STATE"; then
-    echo "error: replacement task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+    echo "error: replacement task record for $ID could not be published ($JG_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
   RELAUNCH_REPLACEMENT_PENDING=0
@@ -5659,7 +5659,7 @@ spawn_launch_home_token() {
   esac
   printf '%s' "$hash"
 }
-LAUNCH_HOME_TOKEN=$(spawn_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
+LAUNCH_HOME_TOKEN=$(spawn_launch_home_token "$JG_HOME") || LAUNCH_HOME_TOKEN=
 if [ -z "$LAUNCH_HOME_TOKEN" ]; then
   echo "error: could not derive a home identity for the staged launch file" >&2
   exit 1
@@ -5704,8 +5704,8 @@ sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/jg-primary-turnend-guard.ts")
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/jg-primary-pi-watch.ts")
 sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
-sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/jg-worker-overlay.yml}")
-sq_opinput=$(shell_quote "$FM_ROOT/bin/jg-operational-input.sh")
+sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$JG_ROOT/.omp/jg-worker-overlay.yml}")
+sq_opinput=$(shell_quote "$JG_ROOT/bin/jg-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
 # A pinned Pi launch confines Pi's model lookup to the declared provider.
@@ -5773,7 +5773,7 @@ case "$LAUNCH" in
     secondmate) brief_opstate="$PROJ_ABS/state" ;;
     *) brief_opstate=$STATE ;;
   esac
-  brief_doorbell=$(FM_STATE_OVERRIDE="$brief_opstate" "$FM_ROOT/bin/jg-operational-input.sh" record launch-brief <"$BRIEF") || {
+  brief_doorbell=$(JG_STATE_OVERRIDE="$brief_opstate" "$JG_ROOT/bin/jg-operational-input.sh" record launch-brief <"$BRIEF") || {
     echo "error: could not publish the launch brief for $ID as an operational-inbox record under $brief_opstate; $HARNESS strips the typed operational marker, so the worker was not launched" >&2
     exit 1
   }
@@ -5782,7 +5782,7 @@ case "$LAUNCH" in
 esac
 case "$LAUNCH" in
 *__CLAUDEADDDIRS__*)
-  CLAUDE_ADD_DIRS=$(claude_add_dirs_flag "$KIND" "$STATE" "$DATA" "$FM_ROOT" "$ID") || {
+  CLAUDE_ADD_DIRS=$(claude_add_dirs_flag "$KIND" "$STATE" "$DATA" "$JG_ROOT" "$ID") || {
     echo "error: could not resolve the task-channel directories for $ID's claude --add-dir grant" >&2
     exit 1
   }
@@ -5808,9 +5808,9 @@ if [ -n "$WORKER_ACCOUNT" ]; then
   case "$HARNESS" in
   claude)
     if [ -n "$WORKER_ACCOUNT_ROOT" ]; then
-      LAUNCH="$(jg_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
+      LAUNCH="$(jg_worker_account_claude_shed "$JG_WORKER_ACCOUNT_CLAUDE_SHED") CLAUDE_CONFIG_DIR=$(shell_quote "$WORKER_ACCOUNT_ROOT") $LAUNCH"
     else
-      LAUNCH="$(jg_worker_account_claude_shed "$FM_WORKER_ACCOUNT_CLAUDE_SHED") -u CLAUDE_CONFIG_DIR $LAUNCH"
+      LAUNCH="$(jg_worker_account_claude_shed "$JG_WORKER_ACCOUNT_CLAUDE_SHED") -u CLAUDE_CONFIG_DIR $LAUNCH"
     fi
     ;;
   pi | pi-signed)
@@ -5823,7 +5823,7 @@ fi
 jg_account_hook launch-prefix "$HARNESS" "$WORKER_ACCOUNT"
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
-  sq_primary_home=$(shell_quote "$FM_HOME")
+  sq_primary_home=$(shell_quote "$JG_HOME")
   # Keep this in step with jg_supervision_model (bin/jg-wake-lib.sh): Claude's
   # Stop auto-arm and Cursor's stop-hook park both run the watcher only BETWEEN
   # turns, so a fresh beacon with no live watcher is their healthy mid-turn state.
@@ -5836,13 +5836,13 @@ if [ "$KIND" = secondmate ]; then
   *) supervision_model=persistent ;;
   esac
   # Deliver the primary's EFFECTIVE trace-context decision as a normalized on/off
-  # literal (never the raw FM_TRACE_CONTEXT string) so a FM_TRACE_CONTEXT override
+  # literal (never the raw JG_TRACE_CONTEXT string) so a JG_TRACE_CONTEXT override
   # on the primary reaches the secondmate's OWN workers, not just the copied
   # config/trace-context file: otherwise off would not disable them and on would
   # not enable them across the launch boundary (bin/jg-trace-context-lib.sh header).
   # Reuse the single frozen decision from the carrier resolution above so the
   # injected carrier and this on/off snapshot are guaranteed to agree.
-  LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
+  LAUNCH="JG_ROOT_OVERRIDE= JG_STATE_OVERRIDE= JG_DATA_OVERRIDE= JG_PROJECTS_OVERRIDE= JG_CONFIG_OVERRIDE= JG_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home JG_HOME=$sq_home JG_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE JG_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
 # LAUNCH_HOME_TOKEN (and its spawn_launch_home_token helper) is derived above,
 # before the OpenCode store name that consumes it; the spawn-incarnation check
@@ -5867,7 +5867,7 @@ LAUNCH_DIR="/tmp/jg-$ID+$LAUNCH_HOME_TOKEN"
 # and its visible error for inspection.
 if [ "$KEEP_AI_TRAILERS" = 0 ]; then
   GIT_CONFIG_ENV_FILE=$(shell_quote "$LAUNCH_DIR/git-config.$SPAWN_GEN.sh")
-  LAUNCH="$(shell_quote "$FM_ROOT/bin/jg-git-strip-ai-trailers.sh") env-file $(shell_quote "$GIT_HOOKS_DIR") $GIT_CONFIG_ENV_FILE && . $GIT_CONFIG_ENV_FILE || return 1 2>/dev/null || exit 1; $LAUNCH"
+  LAUNCH="$(shell_quote "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh") env-file $(shell_quote "$GIT_HOOKS_DIR") $GIT_CONFIG_ENV_FILE && . $GIT_CONFIG_ENV_FILE || return 1 2>/dev/null || exit 1; $LAUNCH"
 fi
 # Home launch-env hook (config/launch-env-hook, docs/configuration.md): when it
 # is an executable file, the pane runs it at the worktree as
@@ -5899,10 +5899,10 @@ if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
 fi
 # Every launch also exports the absolute path of this task's steering inbox, so
 # the constant doorbell line (bin/jg-task-inbox-lib.sh) can name
-# "$FM_TASK_INBOX" instead of a path that grows with the home's depth. Like the
+# "$JG_TASK_INBOX" instead of a path that grows with the home's depth. Like the
 # kill switch below it is an export statement, so it survives a compound raw
 # launch and the launch-env-allowlist `env -i` wrapper.
-LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
+LAUNCH="export JG_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
 # Git must never open an interactive editor in a worker pane. Export inside
 # the launch so both compound commands and the cleared-env wrapper inherit it;
@@ -5965,7 +5965,7 @@ fi
 # The id reached a validated bare-slug charset above, so it carries no shell
 # syntax of its own.
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
-  spawn_send_text_line "$T" "export FM_TASK_ID=$ID"
+  spawn_send_text_line "$T" "export JG_TASK_ID=$ID"
 fi
 # Send through the exact channel that already ships GOTMPDIR, so every backend
 # and harness - ship, scout, and secondmate - gets it before launch. Skipped
@@ -5992,8 +5992,8 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   for env_name in HOME PATH USER LOGNAME SHELL TERM COLORTERM LANG LC_ALL LC_CTYPE \
     TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
     HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
-    CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
-    FM_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
+    CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID JG_ZELLIJ_SESSION \
+    JG_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
     $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
     # the pane shell and never become source text or spawn-process snapshots.
@@ -6052,9 +6052,9 @@ if [ "$HARNESS" = kimi ]; then
     exit 1
   fi
   KIMI_POINTER="Read the brief at $BRIEF_REAL and follow it exactly."
-  KIMI_SUBMIT_RETRIES=${FM_KIMI_SUBMIT_RETRIES:-3}
-  KIMI_SUBMIT_SLEEP=${FM_KIMI_SUBMIT_SLEEP:-${FM_KIMI_POLL_INTERVAL:-0.5}}
-  KIMI_SUBMIT_SETTLE=${FM_KIMI_SUBMIT_SETTLE:-0}
+  KIMI_SUBMIT_RETRIES=${JG_KIMI_SUBMIT_RETRIES:-3}
+  KIMI_SUBMIT_SLEEP=${JG_KIMI_SUBMIT_SLEEP:-${JG_KIMI_POLL_INTERVAL:-0.5}}
+  KIMI_SUBMIT_SETTLE=${JG_KIMI_SUBMIT_SETTLE:-0}
   if ! KIMI_SUBMIT_VERDICT=$(jg_backend_send_text_submit \
     "$BACKEND" "$T" "$KIMI_POINTER" "$KIMI_SUBMIT_RETRIES" \
     "$KIMI_SUBMIT_SLEEP" "$KIMI_SUBMIT_SETTLE" "$W"); then
@@ -6076,9 +6076,9 @@ if [ "$HARNESS" = rovo ]; then
     exit 1
   fi
   ROVO_POINTER="Read the brief at $BRIEF_REAL and follow it exactly."
-  ROVO_SUBMIT_RETRIES=${FM_ROVO_SUBMIT_RETRIES:-3}
-  ROVO_SUBMIT_SLEEP=${FM_ROVO_SUBMIT_SLEEP:-${FM_ROVO_POLL_INTERVAL:-0.5}}
-  ROVO_SUBMIT_SETTLE=${FM_ROVO_SUBMIT_SETTLE:-0}
+  ROVO_SUBMIT_RETRIES=${JG_ROVO_SUBMIT_RETRIES:-3}
+  ROVO_SUBMIT_SLEEP=${JG_ROVO_SUBMIT_SLEEP:-${JG_ROVO_POLL_INTERVAL:-0.5}}
+  ROVO_SUBMIT_SETTLE=${JG_ROVO_SUBMIT_SETTLE:-0}
   if ! ROVO_SUBMIT_VERDICT=$(jg_backend_send_text_submit \
     "$BACKEND" "$T" "$ROVO_POINTER" "$ROVO_SUBMIT_RETRIES" \
     "$ROVO_SUBMIT_SLEEP" "$ROVO_SUBMIT_SETTLE" "$W"); then
@@ -6116,12 +6116,12 @@ claude*)
   ;;
 esac
 
-if [ "$KIND" = secondmate ] && [ "${FM_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
-  if ! jg_config_reread_discard_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
-    if jg_config_reread_quarantine_pending "$PROJ_ABS" "$ID" "$FM_HOME"; then
-      echo "CONFIG_REREAD: secondmate $ID: quarantined pre-relaunch generations after cleanup failure (destination=$PROJ_ABS/state/.jg-inherited-config-reread-quarantine source=$FM_HOME/state/.jg-inherited-config-reread-quarantine)" >&2
+if [ "$KIND" = secondmate ] && [ "${JG_SKIP_SECONDMATE_INHERIT:-0}" != 1 ]; then
+  if ! jg_config_reread_discard_pending "$PROJ_ABS" "$ID" "$JG_HOME"; then
+    if jg_config_reread_quarantine_pending "$PROJ_ABS" "$ID" "$JG_HOME"; then
+      echo "CONFIG_REREAD: secondmate $ID: quarantined pre-relaunch generations after cleanup failure (destination=$PROJ_ABS/state/.jg-inherited-config-reread-quarantine source=$JG_HOME/state/.jg-inherited-config-reread-quarantine)" >&2
     else
-      echo "CONFIG_REREAD: secondmate $ID: cleanup failed; pre-relaunch generations were force-cleared where possible (destination=$PROJ_ABS source=$FM_HOME)" >&2
+      echo "CONFIG_REREAD: secondmate $ID: cleanup failed; pre-relaunch generations were force-cleared where possible (destination=$PROJ_ABS source=$JG_HOME)" >&2
     fi
   fi
 fi
@@ -6148,7 +6148,7 @@ SPAWN_BACKLOG_COMMIT_STATUS=0
 # (bin/jg-backlog-transition-lib.sh's jg_tasks_axi): a timed-out call
 # fails through the ordinary error plumbing, and the interrupted exit path
 # reports it as the reason the preservation could not be verified.
-FM_TASKS_AXI_TIMEOUT=${FM_TASKS_AXI_TIMEOUT:-30}
+JG_TASKS_AXI_TIMEOUT=${JG_TASKS_AXI_TIMEOUT:-30}
 if spawn_commit_backlog_transition; then
   SPAWN_FRESH_COMMIT_PENDING=0
 else
@@ -6161,12 +6161,12 @@ fi
 if [ "$SPAWN_BACKLOG_COMMIT_STATUS" -ne 0 ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if spawn_fresh_commit_rollback; then
-      echo "error: task $ID's backlog item could not be moved to In flight ($FM_BACKLOG_TRANSITION_ERROR); its record was removed so no worker is left that the backlog does not own - close out endpoint $T and local copy $WT by hand, then re-run the spawn" >&2
+      echo "error: task $ID's backlog item could not be moved to In flight ($JG_BACKLOG_TRANSITION_ERROR); its record was removed so no worker is left that the backlog does not own - close out endpoint $T and local copy $WT by hand, then re-run the spawn" >&2
     else
-      echo "error: task $ID's backlog item could not be moved to In flight ($FM_BACKLOG_TRANSITION_ERROR), and failed-dispatch cleanup is incomplete; the provisional record may remain at $STATE/$ID.meta - close out endpoint $T and local copy $WT by hand, then remove the record and busy state before retrying" >&2
+      echo "error: task $ID's backlog item could not be moved to In flight ($JG_BACKLOG_TRANSITION_ERROR), and failed-dispatch cleanup is incomplete; the provisional record may remain at $STATE/$ID.meta - close out endpoint $T and local copy $WT by hand, then remove the record and busy state before retrying" >&2
     fi
   else
-    echo "error: task $ID was republished but its backlog item could not be moved to In flight ($FM_BACKLOG_TRANSITION_ERROR); fix the backlog and re-run the relaunch" >&2
+    echo "error: task $ID was republished but its backlog item could not be moved to In flight ($JG_BACKLOG_TRANSITION_ERROR); fix the backlog and re-run the relaunch" >&2
   fi
 fi
 # Durable per-incarnation runtime history, one line per launch that stays
@@ -6210,10 +6210,10 @@ SPAWN_ACCOUNT=
 [ -z "$WORKER_ACCOUNT_PROVIDER" ] || SPAWN_ACCOUNT="$SPAWN_ACCOUNT account_provider=$WORKER_ACCOUNT_PROVIDER"
 jg_account_hook spawn-line
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
-[ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
+[ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 # The board's ticket says what this lane is doing from the first minute instead
 # of the next poll. A relaunch keeps whatever stage the lane already reached.
-[ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage building --state "in progress" || true
+[ "$RELAUNCH" -eq 1 ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage building --state "in progress" || true
 # Herdr assigns every agent a random call-sign at start and fresh ones across
 # a server restart, so pin the live agent's display name to this task's id now
 # that the spawn has fully succeeded (the agent is live here; a rename on an

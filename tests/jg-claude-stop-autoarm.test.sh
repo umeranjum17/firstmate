@@ -8,7 +8,7 @@
 # Stale-owner cases instead leave a dead recorded pid for the hook to reclaim
 # through the real jg-lock.sh path. The arm wrapper is a per-test fixture, so no
 # real watcher, model, or fleet state is touched.
-# shellcheck disable=SC2016 # single quotes are deliberate: $FM_HOME expands inside the fake harness child, and grep needles are literal strings
+# shellcheck disable=SC2016 # single quotes are deliberate: $JG_HOME expands inside the fake harness child, and grep needles are literal strings
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -82,9 +82,9 @@ make_crewmate_worktree_dir() {
 run_autoarm() {
   local dir=$1 payload=${2:-'{"session_id":"sess-autoarm","stop_hook_active":false}'} rc=0
   printf '%s\n' "$payload" \
-    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-        "$FM_HOME/bin/jg-claude-stop-autoarm.sh"
+    | JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+        "$JG_HOME/bin/jg-claude-stop-autoarm.sh"
       ' 2>&1 || rc=$?
   printf 'RC=%s\n' "$rc" >&2
   return "$rc"
@@ -94,34 +94,34 @@ run_autoarm() {
 write_arm_fixture() {
   local dir=$1 kind=$2
   # Every fixture records the hook's foreground arms in state/arm-ran. A handling
-  # successor (FM_WATCH_PREDECESSOR_ARM_PID set) is recorded apart in
+  # successor (JG_WATCH_PREDECESSOR_ARM_PID set) is recorded apart in
   # state/successor-ran so attempt counts stay about the foreground; it confirms
   # a started watcher and exits, parks while state/successor-park exists, or
   # fails while state/successor-fail exists.
   cat > "$dir/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
-  printf 'arm=%s predecessor=%s\n' "$$" "$FM_WATCH_PREDECESSOR_ARM_PID" >> "$FM_HOME/state/successor-ran"
-  if [ -e "$FM_HOME/state/successor-fail" ]; then
+if [ -n "${JG_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+  printf 'arm=%s predecessor=%s\n' "$$" "$JG_WATCH_PREDECESSOR_ARM_PID" >> "$JG_HOME/state/successor-ran"
+  if [ -e "$JG_HOME/state/successor-fail" ]; then
     printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
     exit 1
   fi
-  if [ -e "$FM_HOME/state/successor-fail-once" ] && [ ! -e "$FM_HOME/state/successor-retried" ]; then
-    : > "$FM_HOME/state/successor-retried"
+  if [ -e "$JG_HOME/state/successor-fail-once" ] && [ ! -e "$JG_HOME/state/successor-retried" ]; then
+    : > "$JG_HOME/state/successor-retried"
     printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
     exit 1
   fi
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
+  while [ -e "$JG_HOME/state/successor-park" ]; do sleep 0.05; done
   exit 0
 fi
-echo "$$" >> "$FM_HOME/state/arm-ran"
+echo "$$" >> "$JG_HOME/state/arm-ran"
 SH
   case "$kind" in
     actionable)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-win actionable\n'
 exit 0
@@ -147,8 +147,8 @@ SH
       ;;
     actionable-many)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 for i in 1 2 3 4 5 6 7 8 9 10; do printf 'stale: fixture-%s actionable\n' "$i"; done
 exit 0
@@ -156,8 +156,8 @@ SH
       ;;
     reset-boundary)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-: > "$FM_HOME/state/arm-waiting"
-while [ ! -e "$FM_HOME/state/arm-release" ]; do sleep 0.02; done
+: > "$JG_HOME/state/arm-waiting"
+while [ ! -e "$JG_HOME/state/arm-release" ]; do sleep 0.02; done
 printf 'watcher: FAILED - cycle ended without an actionable reason\n'
 exit 1
 SH
@@ -165,8 +165,8 @@ SH
     slow-actionable)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
 sleep 2
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'signal: task.status done: slow fixture\n'
 exit 0
@@ -175,8 +175,8 @@ SH
     blocking-actionable)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
 sleep 6
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-win actionable\n'
 exit 0
@@ -185,16 +185,16 @@ SH
     supersede-then-fail)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
 printf 'epoch=999 owner_pid=1 outcome=arming updated_at=%s\nfixture-superseder-identity\n' "$(date +%s)" \
-  > "$FM_HOME/state/.claude-autoarm-epoch"
+  > "$JG_HOME/state/.claude-autoarm-epoch"
 printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
 exit 1
 SH
       ;;
     meta-vanishes)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-rm -f "$FM_HOME/state/task.meta"
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+rm -f "$JG_HOME/state/task.meta"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'signal: task.status done: fixture\n'
 exit 0
@@ -202,9 +202,9 @@ SH
       ;;
     afk-appears)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-: > "$FM_HOME/state/.afk"
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+: > "$JG_HOME/state/.afk"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-win actionable\n'
 exit 0
@@ -212,7 +212,7 @@ SH
       ;;
     records-grace)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
-printf '%s\n' "${FM_GUARD_GRACE:-unset}" > "$FM_HOME/state/arm-received-grace"
+printf '%s\n' "${JG_GUARD_GRACE:-unset}" > "$JG_HOME/state/arm-received-grace"
 printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
 exit 0
 SH
@@ -220,7 +220,7 @@ SH
     attached-delivered)
       cat >> "$dir/bin/jg-watch-arm.sh" <<'SH'
 printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
 printf 'signal: task.status done: fixture peer cycle ended\n'
 exit 0
 SH
@@ -244,16 +244,16 @@ RUN_AUTOARM_BG_PID=
 run_autoarm_bg() {
   local dir=$1 out=$2
   printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
-    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-        "$FM_HOME/bin/jg-claude-stop-autoarm.sh"
+    | JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+        "$JG_HOME/bin/jg-claude-stop-autoarm.sh"
       ' > "$out" 2>&1 &
   RUN_AUTOARM_BG_PID=$!
 }
 
 watcher_identity() {
   local dir=$1 pid=$2
-  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$dir/bin/jg-wake-lib.sh" "$pid"
+  JG_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$dir/bin/jg-wake-lib.sh" "$pid"
 }
 
 record_watcher_lock() {
@@ -291,7 +291,7 @@ test_inert_without_session_lock() {
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
   # No state/.lock: run the hook directly (no fake harness, no lock file).
-  out=$(printf '%s\n' '{"session_id":"s"}' | FM_HOME="$dir" bash "$dir/bin/jg-claude-stop-autoarm.sh" 2>&1); status=$?
+  out=$(printf '%s\n' '{"session_id":"s"}' | JG_HOME="$dir" bash "$dir/bin/jg-claude-stop-autoarm.sh" 2>&1); status=$?
   expect_code 0 "$status" "hook must stay inert when no session holds the home lock"
   [ ! -e "$dir/state/arm-ran" ] || fail "hook armed without a session lock"
   pass "auto-arm: inert with no session lock"
@@ -304,9 +304,9 @@ test_reclaims_stale_session_lock_before_arming() {
   printf '9999999\n' > "$dir/state/.lock"
   write_arm_fixture "$dir" actionable
   out=$(printf '%s\n' '{"session_id":"stale"}' \
-    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/expected-owner"
-        "$FM_HOME/bin/jg-claude-stop-autoarm.sh"
+    | JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/expected-owner"
+        "$JG_HOME/bin/jg-claude-stop-autoarm.sh"
       ' 2>&1); status=$?
   expect_code 2 "$status" "a dead recorded session owner must be reclaimed before the actionable rewake"
   expected_owner=$(cat "$dir/state/expected-owner")
@@ -327,7 +327,7 @@ test_inert_when_lock_held_by_other_harness() {
   "$FAKE_CLAUDE" -c 'sleep 60; :' &
   other=$!
   printf '%s\n' "$other" > "$dir/state/.lock"
-  out=$(printf '%s\n' '{"session_id":"s"}' | FM_HOME="$dir" "$FAKE_CLAUDE" -c '"$FM_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
+  out=$(printf '%s\n' '{"session_id":"s"}' | JG_HOME="$dir" "$FAKE_CLAUDE" -c '"$JG_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
   owner_after=$(cat "$dir/state/.lock")
   kill "$other" 2>/dev/null || true
   wait "$other" 2>/dev/null || true
@@ -361,7 +361,7 @@ test_stale_lock_recovery_preserves_afk_and_need_gates() {
   : > "$afk_dir/state/.afk"
   printf '9999999\n' > "$afk_dir/state/.lock"
   write_arm_fixture "$afk_dir" actionable
-  out=$(printf '%s\n' '{"session_id":"stale-afk"}' | FM_HOME="$afk_dir" "$FAKE_CLAUDE" -c '"$FM_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
+  out=$(printf '%s\n' '{"session_id":"stale-afk"}' | JG_HOME="$afk_dir" "$FAKE_CLAUDE" -c '"$JG_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
   expect_code 0 "$status" "a stale owner must not widen the AFK gate"
   [ "$(cat "$afk_dir/state/.lock")" = 9999999 ] || fail "AFK stale lock was reclaimed despite away ownership"
   [ ! -e "$afk_dir/state/arm-ran" ] || fail "stale AFK home armed"
@@ -369,7 +369,7 @@ test_stale_lock_recovery_preserves_afk_and_need_gates() {
   idle_dir=$(make_primary_dir "$TMP_ROOT/stale-idle")
   printf '9999999\n' > "$idle_dir/state/.lock"
   write_arm_fixture "$idle_dir" actionable
-  out=$(printf '%s\n' '{"session_id":"stale-idle"}' | FM_HOME="$idle_dir" "$FAKE_CLAUDE" -c '"$FM_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
+  out=$(printf '%s\n' '{"session_id":"stale-idle"}' | JG_HOME="$idle_dir" "$FAKE_CLAUDE" -c '"$JG_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1); status=$?
   expect_code 0 "$status" "a stale owner must not widen the supervision-need gate"
   [ "$(cat "$idle_dir/state/.lock")" = 9999999 ] || fail "idle stale lock was reclaimed without supervision need"
   [ ! -e "$idle_dir/state/arm-ran" ] || fail "stale idle home armed"
@@ -390,11 +390,11 @@ test_resolves_outermost_claude_pid_in_nested_bgspare_chain() {
   # so bash cannot tail-exec-collapse it into the outer pid, which would
   # collapse the two-hop chain this test depends on down to one hop.
   out=$(printf '%s\n' '{"session_id":"nested"}' \
-    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    | JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/.lock"
         "$FAKE_CLAUDE" -c "
-          printf \"%s\n\" \"\$\$\" > \"\$FM_HOME/state/inner-pid\"
-          \"\$FM_HOME/bin/jg-claude-stop-autoarm.sh\"
+          printf \"%s\n\" \"\$\$\" > \"\$JG_HOME/state/inner-pid\"
+          \"\$JG_HOME/bin/jg-claude-stop-autoarm.sh\"
         "
       ' 2>&1); status=$?
   inner_pid=$(cat "$dir/state/inner-pid" 2>/dev/null || true)
@@ -550,23 +550,23 @@ test_handling_successor_waits_for_real_slow_scan() (
   local dir out status id pid
   dir=$(make_primary_dir "$TMP_ROOT/successor-slow-real-scan")
   jg_test_track_watcher_state "$dir/state"
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_ROOT_OVERRIDE="$dir"
-  export FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_TIMEOUT=30 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
-  unset FM_ARM_CONFIRM_TIMEOUT
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" JG_ROOT_OVERRIDE="$dir"
+  export JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_TIMEOUT=30 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999
+  unset JG_ARM_CONFIRM_TIMEOUT
   mkdir -p "$dir/fakebin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "$dir/fakebin/tmux"
   chmod +x "$dir/fakebin/tmux"
   cat > "$dir/bin/jg-watch-arm.sh" <<SH
 #!/usr/bin/env bash
-if [ -n "\${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
-  printf '%s\\n' "\$\$" >> "\$FM_HOME/state/successor-ran"
+if [ -n "\${JG_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+  printf '%s\\n' "\$\$" >> "\$JG_HOME/state/successor-ran"
 fi
-export FM_ROOT_OVERRIDE="$ROOT"
+export JG_ROOT_OVERRIDE="$ROOT"
 exec "$ROOT/bin/jg-watch-arm.sh" "\$@"
 SH
   chmod +x "$dir/bin/jg-watch-arm.sh"
   for id in one two three; do
-    printf '#!/usr/bin/env bash\nsleep 25\nprintf "%%s\\n" %s >> "$FM_HOME/scanned"\n' "$id" > "$dir/state/$id.check.sh"
+    printf '#!/usr/bin/env bash\nsleep 25\nprintf "%%s\\n" %s >> "$JG_HOME/scanned"\n' "$id" > "$dir/state/$id.check.sh"
     chmod 0700 "$dir/state/$id.check.sh"
     "$ROOT/bin/jg-check-register.sh" "$id" >/dev/null || fail "register slow successor check $id"
   done
@@ -582,7 +582,7 @@ SH
   done
   [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 1 ] \
     || fail "legitimate startup triggered a duplicate successor"
-  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' \
+  JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$dir/state" "$ROOT/bin/jg-watch.sh" "$dir" \
     || fail "hook confirmed without a fresh identity-bound heartbeat"
   pid=$(cat "$dir/state/.watch.lock/pid")
@@ -827,7 +827,7 @@ test_arms_for_registered_custom_check_without_inflight() {
   dir=$(make_primary_dir "$TMP_ROOT/check-need")
   printf '#!/usr/bin/env bash\nexit 0\n' > "$dir/state/issue-comments.check.sh"
   chmod 700 "$dir/state/issue-comments.check.sh"
-  FM_STATE_OVERRIDE="$dir/state" "$ROOT/bin/jg-check-register.sh" issue-comments >/dev/null \
+  JG_STATE_OVERRIDE="$dir/state" "$ROOT/bin/jg-check-register.sh" issue-comments >/dev/null \
     || fail "jg-check-register.sh could not register the custom check"
   write_arm_fixture "$dir" actionable
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
@@ -841,14 +841,14 @@ test_single_flight_admits_exactly_one_owner() {
   dir=$(make_primary_dir "$TMP_ROOT/single-flight")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" slow-actionable
-  FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-    printf "%s\n" "{\"session_id\":\"s\"}" | "$FM_HOME/bin/jg-claude-stop-autoarm.sh" >/dev/null 2>"$FM_HOME/state/err1" &
+  JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+    printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+    printf "%s\n" "{\"session_id\":\"s\"}" | "$JG_HOME/bin/jg-claude-stop-autoarm.sh" >/dev/null 2>"$JG_HOME/state/err1" &
     p1=$!
-    printf "%s\n" "{\"session_id\":\"s\"}" | "$FM_HOME/bin/jg-claude-stop-autoarm.sh" >/dev/null 2>"$FM_HOME/state/err2" &
+    printf "%s\n" "{\"session_id\":\"s\"}" | "$JG_HOME/bin/jg-claude-stop-autoarm.sh" >/dev/null 2>"$JG_HOME/state/err2" &
     p2=$!
-    wait "$p1"; echo $? > "$FM_HOME/state/rc1"
-    wait "$p2"; echo $? > "$FM_HOME/state/rc2"
+    wait "$p1"; echo $? > "$JG_HOME/state/rc1"
+    wait "$p2"; echo $? > "$JG_HOME/state/rc2"
   '
   rc1=$(cat "$dir/state/rc1")
   rc2=$(cat "$dir/state/rc2")
@@ -982,7 +982,7 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
   pid=$!
   record_autoarm_owner "$dir" "$pid"
   record_autoarm_epoch "$dir" 464 "$pid" rewake
-  FM_STATE_OVERRIDE="$dir/state" bash -c '
+  JG_STATE_OVERRIDE="$dir/state" bash -c '
     . "$1"
     jg_lock_try_create "$2" || exit 7
     exec sleep 30
@@ -1003,12 +1003,12 @@ test_abandoned_claim_reclaim_reaps_dead_steal_without_nesting() {
 #!/usr/bin/env bash
 last=
 for arg do last=$arg; done
-printf '%s\n' "$last" >> "$FM_TEST_LN_LOG"
+printf '%s\n' "$last" >> "$JG_TEST_LN_LOG"
 exec /bin/ln "$@"
 SH
   chmod +x "$lnbin/ln"
   : > "$lnlog"
-  out=$(PATH="$lnbin:$PATH" FM_TEST_LN_LOG="$lnlog" run_autoarm "$dir" 2>/dev/null); status=$?
+  out=$(PATH="$lnbin:$PATH" JG_TEST_LN_LOG="$lnlog" run_autoarm "$dir" 2>/dev/null); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a dead-owner steal mutex must not keep an abandoned claim unrecoverable"
@@ -1444,11 +1444,11 @@ test_long_poll_grace_reaches_arm_wrapper() {
   dir=$(make_primary_dir "$TMP_ROOT/long-poll-grace")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" records-grace
-  out=$(unset FM_GUARD_GRACE; FM_POLL=900 run_autoarm "$dir" 2>/dev/null); status=$?
+  out=$(unset JG_GUARD_GRACE; JG_POLL=900 run_autoarm "$dir" 2>/dev/null); status=$?
   expect_code 2 "$status" "an unverified close without a healthy watcher must still fail closed"
-  [ -e "$dir/state/arm-received-grace" ] || fail "arm wrapper never recorded FM_GUARD_GRACE"
+  [ -e "$dir/state/arm-received-grace" ] || fail "arm wrapper never recorded JG_GUARD_GRACE"
   [ "$(cat "$dir/state/arm-received-grace")" = 960 ] || fail "arm wrapper must see the poll-derived grace (900+60), got: $(cat "$dir/state/arm-received-grace")"
-  pass "auto-arm: a long FM_POLL with FM_GUARD_GRACE unset reaches jg-watch-arm.sh with the derived grace"
+  pass "auto-arm: a long JG_POLL with JG_GUARD_GRACE unset reaches jg-watch-arm.sh with the derived grace"
 }
 
 # Supervision-host fixture variants, installed per test as
@@ -1458,17 +1458,17 @@ write_host_fixture() {
   local dir=$1 kind=$2
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'echo "$$" >> "$FM_HOME/state/host-ran"\n'
-    printf 'printf "gen=%%s owner=%%s primary=%%s mode=%%s\\n" "${FM_SUPERVISION_HOST_AUTOARM_GEN:-}" "${FM_SUPERVISION_HOST_OWNER_PID:-}" "${FM_SUPERVISION_HOST_PRIMARY:-}" "${1:-}" > "$FM_HOME/state/host-env"\n'
+    printf 'echo "$$" >> "$JG_HOME/state/host-ran"\n'
+    printf 'printf "gen=%%s owner=%%s primary=%%s mode=%%s\\n" "${JG_SUPERVISION_HOST_AUTOARM_GEN:-}" "${JG_SUPERVISION_HOST_OWNER_PID:-}" "${JG_SUPERVISION_HOST_PRIMARY:-}" "${1:-}" > "$JG_HOME/state/host-env"\n'
     case "$kind" in
       boundary)
-        printf "printf 'pending:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
-        printf 'touch "$FM_HOME/state/.last-watcher-beat"\n'
+        printf "printf 'pending:downtime:fixture-generation\\n' > \"\$JG_HOME/state/.watcher-down\"\n"
+        printf 'touch "$JG_HOME/state/.last-watcher-beat"\n'
         printf "printf 'supervision-host: cycle boundary - fixture\\n'\n"
         ;;
       handed-back)
-        printf "printf 'pending:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
-        printf 'touch "$FM_HOME/state/.last-watcher-beat"\n'
+        printf "printf 'pending:downtime:fixture-generation\\n' > \"\$JG_HOME/state/.watcher-down\"\n"
+        printf 'touch "$JG_HOME/state/.last-watcher-beat"\n'
         printf "printf 'signal: fixture.status\\n'\n"
         printf "printf 'supervision-host: the away session could not take this wake: fixture; this wake is yours\\n'\n"
         ;;
@@ -1478,7 +1478,7 @@ write_host_fixture() {
       lost-handback|lost-announced-handback)
         local marker=pending
         [ "$kind" = lost-handback ] || marker=announced
-        printf "printf '%s:handling:fixture-generation\\\\n' > \"\$FM_HOME/state/.watcher-down\"\\n" "$marker"
+        printf "printf '%s:handling:fixture-generation\\\\n' > \"\$JG_HOME/state/.watcher-down\"\\n" "$marker"
         cat <<'SH'
 printf 'signal: fixture.status\n'
 printf 'supervision-host: branch-outcome: fixture\n'
@@ -1488,23 +1488,23 @@ SH
         ;;
       live-successor-handback)
         cat <<'SH'
-printf 'pending:handling:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:handling:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'signal: fixture.status\n'
 printf 'supervision-host: the wake is main-only; this wake is yours\n'
 SH
         ;;
       benign-refusal)
         cat <<'SH'
-printf 'acked:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf 'acked:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
 printf 'signal: fixture.status\n'
 printf 'supervision-host: branch-outcome: fixture\n'
 SH
         ;;
       handed-back-many)
         cat <<'SH'
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 for i in 1 2 3 4 5 6 7 8 9 10; do printf 'signal: fixture-%s.status\n' "$i"; done
 printf 'supervision-host: the away session could not take this wake: fixture; relay its outcomes\n'
 for i in 1 2 3 4 5 6 7 8 9 10; do printf 'supervision-host: outcome %s for demo [routine]: fixture %s\n' "$i" "$i"; done
@@ -1600,7 +1600,7 @@ test_host_handback_beside_a_quiet_record_carries_no_away_note() {
   mkdir -p "$dir/config"
   rm -f "$dir/config/supervision-host-off"
   : > "$dir/state/task.meta"
-  FM_HOME="$dir" FM_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+  JG_HOME="$dir" JG_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
     || fail "fixture: could not record quiet mode"
   write_host_fixture "$dir" handed-back
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
@@ -1777,9 +1777,9 @@ test_arguments_never_arm() {
     before=$(find "$dir/state" -mindepth 1 ! -name .lock | sort)
     before_contents=$(find "$dir/state" -type f ! -name .lock -exec cksum {} + | sort)
     rc=0
-    out=$(FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-        "$FM_HOME/bin/jg-claude-stop-autoarm.sh" "$1" </dev/null 2>"$FM_HOME/help-stderr"
+    out=$(JG_HOME="$dir" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+        "$JG_HOME/bin/jg-claude-stop-autoarm.sh" "$1" </dev/null 2>"$JG_HOME/help-stderr"
       ' _ "$arg") || rc=$?
     after=$(find "$dir/state" -mindepth 1 ! -name .lock | sort)
     after_contents=$(find "$dir/state" -type f ! -name .lock -exec cksum {} + | sort)
@@ -1806,7 +1806,7 @@ test_arguments_never_arm() {
 
 test_jg_lock_status_still_works_with_shared_lib() {
   local out
-  out=$(FM_HOME="$TMP_ROOT/lock-status-home" bash "$ROOT/bin/jg-lock.sh" status 2>&1)
+  out=$(JG_HOME="$TMP_ROOT/lock-status-home" bash "$ROOT/bin/jg-lock.sh" status 2>&1)
   assert_contains "$out" "lock: free" "jg-lock.sh status must keep working after the session-lock lib extraction"
   pass "jg-lock: shared session-lock lib preserves the status path"
 }

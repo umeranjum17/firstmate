@@ -89,42 +89,42 @@ CFG_ON="$WORK/cfg-on"; CFG_OFF="$WORK/cfg-off"
 mkdir -p "$CFG_ON" "$CFG_OFF"
 : > "$CFG_ON/trace-context"
 
-unset FM_TRACE_CONTEXT
+unset JG_TRACE_CONTEXT
 jg_trace_context_enabled "$CFG_OFF" && fail "absent config/trace-context must be off by default"
 jg_trace_context_enabled "$CFG_ON" || fail "present config/trace-context must enable"
-FM_TRACE_CONTEXT=off jg_trace_context_enabled "$CFG_ON" && fail "FM_TRACE_CONTEXT=off must override a present file"
-FM_TRACE_CONTEXT=on jg_trace_context_enabled "$CFG_OFF" || fail "FM_TRACE_CONTEXT=on must override an absent file"
-FM_TRACE_CONTEXT=1 jg_trace_context_enabled "$CFG_OFF" || fail "FM_TRACE_CONTEXT=1 must enable"
-FM_TRACE_CONTEXT=maybe jg_trace_context_enabled "$CFG_ON" && fail "a non-truthy FM_TRACE_CONTEXT must disable"
-FM_TRACE_CONTEXT='' jg_trace_context_enabled "$CFG_ON" || fail "empty FM_TRACE_CONTEXT must defer to a present file (enabled)"
-FM_TRACE_CONTEXT='' jg_trace_context_enabled "$CFG_OFF" && fail "empty FM_TRACE_CONTEXT must defer to an absent file (disabled)"
-pass "enablement is default-off; FM_TRACE_CONTEXT overrides with truthy/other precedence, and unset or empty defers to config/trace-context"
+JG_TRACE_CONTEXT=off jg_trace_context_enabled "$CFG_ON" && fail "JG_TRACE_CONTEXT=off must override a present file"
+JG_TRACE_CONTEXT=on jg_trace_context_enabled "$CFG_OFF" || fail "JG_TRACE_CONTEXT=on must override an absent file"
+JG_TRACE_CONTEXT=1 jg_trace_context_enabled "$CFG_OFF" || fail "JG_TRACE_CONTEXT=1 must enable"
+JG_TRACE_CONTEXT=maybe jg_trace_context_enabled "$CFG_ON" && fail "a non-truthy JG_TRACE_CONTEXT must disable"
+JG_TRACE_CONTEXT='' jg_trace_context_enabled "$CFG_ON" || fail "empty JG_TRACE_CONTEXT must defer to a present file (enabled)"
+JG_TRACE_CONTEXT='' jg_trace_context_enabled "$CFG_OFF" && fail "empty JG_TRACE_CONTEXT must defer to an absent file (disabled)"
+pass "enablement is default-off; JG_TRACE_CONTEXT overrides with truthy/other precedence, and unset or empty defers to config/trace-context"
 
 SESSION_DIR="$WORK/session-state"
 SESSION_STATE="$SESSION_DIR/.trace-context-effective"
 mkdir -p "$SESSION_DIR"
 printf '101\n' > "$SESSION_DIR/.lock"
-FM_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
+JG_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
 [ "$(jg_trace_context_session_effective "$SESSION_STATE")" = off ] \
   || fail "session state must freeze an env-off override over a present config file"
-FM_TRACE_CONTEXT=on jg_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
+JG_TRACE_CONTEXT=on jg_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
 [ "$(jg_trace_context_session_effective "$SESSION_STATE")" = on ] \
   || fail "a new session state must freeze an env-on override over an absent config file"
 pass "session start normalizes config and environment precedence into frozen on/off state"
 
 printf '100 on\n' > "$SESSION_STATE"
 chmod 0400 "$SESSION_STATE"
-FM_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
+JG_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
 [ "$(jg_trace_context_session_effective "$SESSION_STATE")" = off ] \
   || fail "atomic publication must replace a read-only stale on record with the current off decision"
 [ "$(cat "$SESSION_STATE")" = "101 off" ] \
   || fail "session publication must bind the normalized decision to the current lock (got '$(cat "$SESSION_STATE")')"
 pass "session state is atomically published through a same-directory replacement"
 
-FM_TRACE_CONTEXT=on jg_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
+JG_TRACE_CONTEXT=on jg_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
 printf '202\n' > "$SESSION_DIR/.lock"
 chmod 0500 "$SESSION_DIR"
-FM_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
+JG_TRACE_CONTEXT=off jg_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
 chmod 0700 "$SESSION_DIR"
 [ "$(jg_trace_context_session_effective "$SESSION_STATE")" = off ] \
   || fail "a failed publication must not reactivate the prior session's on decision"
@@ -145,13 +145,13 @@ out=$(jg_trace_context_resolve "$CFG_OFF" "$NOMETA"); rc=$?
 [ -z "$out" ] && [ "$rc" -eq 0 ] || fail "default-off resolve must omit and return 0 (got rc=$rc out='$out')"
 pass "resolve omits the carrier and returns success when the capability is off (byte-identical default)"
 
-out=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$NOMETA")
+out=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$NOMETA")
 jg_trace_context_valid "$out" || fail "enabled resolve must mint a valid traceparent: $out"
 pass "resolve mints a valid traceparent when enabled"
 
 # --- secondmate home-session boundary ---------------------------------------
 # jg-spawn launches every Secondmate with the primary session's non-empty frozen
-# FM_TRACE_CONTEXT decision. The Secondmate resolves it at its own session start.
+# JG_TRACE_CONTEXT decision. The Secondmate resolves it at its own session start.
 # Its own launch-time TRACEPARENT stays in its process environment for its whole
 # life, but that is the Secondmate's agent identity, never a parent: every task
 # it spawns must root a fresh trace, or unrelated routed tasks would accumulate
@@ -159,13 +159,13 @@ pass "resolve mints a valid traceparent when enabled"
 PRIMARY_TP='00-abcabcabcabcabcabcabcabcabcabcab-1212121212121212-01'
 saved_tp=${TRACEPARENT-__unset__}
 unset TRACEPARENT
-frozen_off=$(FM_TRACE_CONTEXT=off jg_trace_context_resolve "$CFG_ON" "$WORK/sm-frozen-off.meta")
+frozen_off=$(JG_TRACE_CONTEXT=off jg_trace_context_resolve "$CFG_ON" "$WORK/sm-frozen-off.meta")
 [ -z "$frozen_off" ] || fail "a Secondmate launched off must stay disabled even after the config file appears: $frozen_off"
-frozen_on=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$WORK/sm-frozen-on.meta")
+frozen_on=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_OFF" "$WORK/sm-frozen-on.meta")
 jg_trace_context_valid "$frozen_on" || fail "a Secondmate launched on must stay enabled even while the config file is absent: $frozen_on"
 [ "${frozen_on:3:32}" != "${PRIMARY_TP:3:32}" ] || fail "an enabled Secondmate without an ambient carrier must start a new root"
-routed_a=$(TRACEPARENT="$PRIMARY_TP" FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-a.meta")
-routed_b=$(TRACEPARENT="$PRIMARY_TP" FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-b.meta")
+routed_a=$(TRACEPARENT="$PRIMARY_TP" JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-a.meta")
+routed_b=$(TRACEPARENT="$PRIMARY_TP" JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$WORK/sm-routed-b.meta")
 jg_trace_context_valid "$routed_a" || fail "resolving under an ambient TRACEPARENT must still mint a valid carrier (a='$routed_a')"
 jg_trace_context_valid "$routed_b" || fail "resolving under an ambient TRACEPARENT must still mint a valid carrier (b='$routed_b')"
 [ "${routed_a:3:32}" != "${PRIMARY_TP:3:32}" ] && [ "${routed_b:3:32}" != "${PRIMARY_TP:3:32}" ] \
@@ -180,7 +180,7 @@ pass "Secondmate home-session state stays off or on despite later file state; am
 REC_META="$WORK/rec.meta"
 printf 'kind=ship\ntraceparent=%s\nmode=no-mistakes\n' "$VALID" > "$REC_META"
 out=$(TRACEPARENT='00-ffffffffffffffffffffffffffffffff-1111111111111111-01' \
-  FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$REC_META")
+  JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$REC_META")
 [ "$out" = "$VALID" ] || fail "recovery must reuse the recorded traceparent verbatim, ignoring the ambient environment (got '$out')"
 pass "resolve reuses a valid recorded traceparent verbatim on relaunch (stable identity across restarts)"
 
@@ -190,14 +190,14 @@ pass "disabling the capability omits the carrier even for a task with a recorded
 
 CORRUPT_META="$WORK/corrupt.meta"
 printf 'traceparent=not-a-valid-traceparent\n' > "$CORRUPT_META"
-out=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$CORRUPT_META")
+out=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$CORRUPT_META")
 jg_trace_context_valid "$out" || fail "a corrupt recorded value must be re-minted to a valid one"
 [ "$out" != "not-a-valid-traceparent" ] || fail "a corrupt recorded value must not be reused"
 pass "a corrupt recorded traceparent is re-minted rather than propagated"
 
 # --- durable metadata consistency: one value for record and injection --------
 
-out=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$NOMETA")
+out=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$NOMETA")
 jg_trace_context_valid "$out" || fail "resolve must yield a single valid carrier per call"
 pass "resolve yields exactly one carrier per logical task, so the recorded and injected values are identical by construction"
 
@@ -205,7 +205,7 @@ pass "resolve yields exactly one carrier per logical task, so the recorded and i
 
 jg_trace_context_hex() { return 1; }
 ef_mint=$(jg_trace_context_mint); ef_mint_rc=$?
-ef_res=$(FM_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$NOMETA"); ef_res_rc=$?
+ef_res=$(JG_TRACE_CONTEXT=on jg_trace_context_resolve "$CFG_ON" "$NOMETA"); ef_res_rc=$?
 # Restore the real entropy source for any later use.
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-trace-context-lib.sh"
@@ -244,9 +244,9 @@ pass "the lib code never reads a brief, prompt, report, or status - it cannot le
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-config-inherit-lib.sh"
-case " $FM_INHERITABLE_CONFIG " in
+case " $JG_INHERITABLE_CONFIG " in
   *" trace-context "*) : ;;
-  *) fail "config/trace-context must be in FM_INHERITABLE_CONFIG so secondmate homes stay traced" ;;
+  *) fail "config/trace-context must be in JG_INHERITABLE_CONFIG so secondmate homes stay traced" ;;
 esac
 pass "config/trace-context is inherited into secondmate homes, keeping the nested chain enabled end to end"
 

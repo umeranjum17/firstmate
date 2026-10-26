@@ -16,9 +16,9 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$REPO_ROOT}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$REPO_ROOT}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 DOC_DIR="$REPO_ROOT/docs/supervision-protocols"
 
 HARNESS=
@@ -121,11 +121,11 @@ case "$HARNESS" in
     ;;
 esac
 
-checkpoint_seconds=${FM_CODEX_WATCH_CHECKPOINT:-180}
-pi_ext="$FM_ROOT/.pi/extensions/jg-primary-pi-watch.ts"
-pi_turnend_ext="$FM_ROOT/.pi/extensions/jg-primary-turnend-guard.ts"
-omp_ext="$FM_ROOT/.omp/extensions/jg-primary-omp-watch.ts"
-omp_turnend_ext="$FM_ROOT/.omp/extensions/jg-primary-turnend-guard.ts"
+checkpoint_seconds=${JG_CODEX_WATCH_CHECKPOINT:-180}
+pi_ext="$JG_ROOT/.pi/extensions/jg-primary-pi-watch.ts"
+pi_turnend_ext="$JG_ROOT/.pi/extensions/jg-primary-turnend-guard.ts"
+omp_ext="$JG_ROOT/.omp/extensions/jg-primary-omp-watch.ts"
+omp_turnend_ext="$JG_ROOT/.omp/extensions/jg-primary-turnend-guard.ts"
 x_mode_env="$CONFIG/x-mode.env"
 
 shell_quote() {
@@ -151,13 +151,13 @@ render_snippet() {  # [snippet]
         line=${line#*\} }
         ;;
     esac
-    line=${line//__FM_PI_EXT__/$pi_ext}
-    line=${line//__FM_PI_TURNEND_EXT__/$pi_turnend_ext}
-    line=${line//__FM_OMP_EXT__/$omp_ext}
-    line=${line//__FM_OMP_TURNEND_EXT__/$omp_turnend_ext}
-    line=${line//__FM_X_MODE_ENV_SH__/$x_mode_env_sh}
-    line=${line//__FM_X_MODE_ENV__/$x_mode_env}
-    line=${line//__FM_GROK_ARM__/$grok_arm}
+    line=${line//__JG_PI_EXT__/$pi_ext}
+    line=${line//__JG_PI_TURNEND_EXT__/$pi_turnend_ext}
+    line=${line//__JG_OMP_EXT__/$omp_ext}
+    line=${line//__JG_OMP_TURNEND_EXT__/$omp_turnend_ext}
+    line=${line//__JG_X_MODE_ENV_SH__/$x_mode_env_sh}
+    line=${line//__JG_X_MODE_ENV__/$x_mode_env}
+    line=${line//__JG_GROK_ARM__/$grok_arm}
     printf '%s\n' "$line"
   done < "$snippet"
 }

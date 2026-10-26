@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update the fleet delete guard for this user and register its watcher check in one firstmate home.
 # Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
@@ -13,7 +22,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 # Every Claude config folder: ~/.claude and each Claude account folder in the muxr registry the account pool launches
 # workers with (CLAUDE_CONFIG_DIR), whose settings.json replaces ~/.claude's. Rerun after adding an account.
-REG=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+REG=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
 CLAUDE_DIRS=$( { echo "$HOME/.claude"; [ ! -e "$REG" ] || jq -r '.accounts[] | select(.provider == "claude") | .folder' "$REG" || echo "warning: cannot read $REG; only ~/.claude is covered" >&2; } | awk '!seen[$0]++')
 
 # put <target> <candidate> [jq-path]: replace target with candidate after a backup; prints the diff (JSON: only jq-path).
@@ -58,4 +67,4 @@ while read -r d; do hook "$d/settings.json" claude; done <<<"$CLAUDE_DIRS"
 printf '#!/usr/bin/env bash\nexec %q %q\n' "$DEST/check.sh" "$FMH" > "$TMP/check"
 put "$FMH/state/delete-guard.check.sh" "$TMP/check"
 [ "$DRY" -eq 0 ] || { echo "dry run: nothing written; would run $FMH/bin/jg-check-register.sh delete-guard"; exit 0; }
-chmod 700 "$FMH/state/delete-guard.check.sh" && FM_HOME="$FMH" "$FMH/bin/jg-check-register.sh" delete-guard
+chmod 700 "$FMH/state/delete-guard.check.sh" && JG_HOME="$FMH" "$FMH/bin/jg-check-register.sh" delete-guard

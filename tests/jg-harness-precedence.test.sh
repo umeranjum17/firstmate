@@ -29,13 +29,13 @@ set -u
 
 # This suite states the markers it means to test in every case. Drop the ambient
 # ones so a verdict never depends on which harness launched the suite.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
-  FM_SUPERVISION_ACTOR FM_SUPERVISION_PRIMARY_HARNESS
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
+  JG_SUPERVISION_ACTOR JG_SUPERVISION_PRIMARY_HARNESS
 
 HARNESS="$ROOT/bin/jg-harness.sh"
 RENDER="$ROOT/bin/jg-supervision-instructions.sh"
 TMP_ROOT=$(jg_test_tmproot jg-harness-precedence)
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 # A real process named after a harness, asked for its verdict from a child.
 # The command substitution around the probe is load-bearing: a bare `-c <cmd>`
@@ -44,7 +44,7 @@ BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 under_process() {  # <named-executable> [VAR=VAL ...]
   local bin=$1
   shift
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS "$@" \
     "$bin" -c "r=\$(\"$HARNESS\"); printf '%s' \"\$r\""
 }
@@ -66,7 +66,7 @@ SH
 }
 
 # A fake ps that models a PID NAMESPACE: every process reports bash with ppid 1,
-# and pid 1 reports whatever FM_TEST_PID1_COMM names. This is what a harness
+# and pid 1 reports whatever JG_TEST_PID1_COMM names. This is what a harness
 # looks like from inside a container or `codex sandbox`, where the harness is
 # pid 1 of its own namespace rather than a child of a shell.
 namespace_ancestry_bin() {  # <dir>
@@ -81,7 +81,7 @@ for a in "$@"; do
   prev=$a
 done
 if [ "$pid" = 1 ]; then
-  comm=${FM_TEST_PID1_COMM:-init}
+  comm=${JG_TEST_PID1_COMM:-init}
   ppid=0
 else
   comm=bash
@@ -107,7 +107,7 @@ under_fake_ps() {  # <fakebin> <VAR=VAL ...> -- [harness args]
     shift
   done
   [ "${1:-}" = -- ] && shift
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS "${assignments[@]}" \
     PATH="$fakebin:$BASE_PATH" "$HARNESS" "$@"
 }
@@ -115,7 +115,7 @@ under_fake_ps() {  # <fakebin> <VAR=VAL ...> -- [harness args]
 with_blind_ancestry() {  # <fakebin> [VAR=VAL ...]
   local fakebin=$1
   shift
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS "$@" \
     PATH="$fakebin:$BASE_PATH" "$HARNESS"
 }
@@ -227,7 +227,7 @@ test_retained_cursor_marker_does_not_rename_a_nested_claude() {
 test_pi_signed_survives_agreeing_ancestry() {
   local bin got
   bin=$(named_bin "$TMP_ROOT/pi-tree" pi)
-  got=$(under_process "$bin" PI_CODING_AGENT=true FM_PI_HARNESS=pi-signed)
+  got=$(under_process "$bin" PI_CODING_AGENT=true JG_PI_HARNESS=pi-signed)
   [ "$got" = pi-signed ] || fail "signed Pi over pi ancestry resolved '$got', expected pi-signed"
   got=$(under_process "$bin" PI_CODING_AGENT=true)
   [ "$got" = pi ] || fail "plain Pi over pi ancestry resolved '$got', expected pi"
@@ -235,7 +235,7 @@ test_pi_signed_survives_agreeing_ancestry() {
   [ "$got" = pi ] || fail "unmarked pi ancestry resolved '$got', expected pi"
 
   bin=$(named_bin "$TMP_ROOT/pi-signed-tree" pi-signed)
-  got=$(under_process "$bin" PI_CODING_AGENT=true FM_PI_HARNESS=pi-signed)
+  got=$(under_process "$bin" PI_CODING_AGENT=true JG_PI_HARNESS=pi-signed)
   [ "$got" = pi-signed ] \
     || fail "signed Pi over shared signed-wrapper ancestry resolved '$got', expected pi-signed"
   got=$(under_process "$bin")
@@ -259,12 +259,12 @@ test_interpreter_args_match_does_not_outrank_a_marker() {
 r=\$("$HARNESS"); printf '%s' "\$r"
 SH
 
-  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS "$node" "$script")
   [ "$got" = codex ] \
     || fail "an unmarked interpreter holding a codex-shaped script path resolved '$got', expected codex"
 
-  got=$(env -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  got=$(env -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 "$node" "$script")
   [ "$got" = claude ] \
     || fail "a published CLAUDECODE lost to a codex-shaped script path, resolving '$got'"
@@ -292,14 +292,14 @@ test_native_child_of_an_interpreter_shim_decides_at_comm_strength() {
   # a tool subprocess of a real harness would.
   probe="$dir/probe.sh"
   cat > "$probe" <<'SH'
-r=$("$FM_TEST_HARNESS" "$@")
+r=$("$JG_TEST_HARNESS" "$@")
 printf '%s' "$r"
 SH
   # The shim SPAWNS its native binary and waits, so the node process stays alive
   # above it and the walk meets the native binary first.
   entry="$dir/codex-cli-entry.sh"
   cat > "$entry" <<'SH'
-"$FM_TEST_NATIVE" "$FM_TEST_PROBE" "$@" &
+"$JG_TEST_NATIVE" "$JG_TEST_PROBE" "$@" &
 wait "$!"
 SH
 
@@ -307,9 +307,9 @@ SH
   # the shim entry point directly below, so this helper stays the plain no-marker
   # launch.
   run_shim() {
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
       -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      FM_TEST_HARNESS="$HARNESS" FM_TEST_NATIVE="$native" FM_TEST_PROBE="$probe" \
+      JG_TEST_HARNESS="$HARNESS" JG_TEST_NATIVE="$native" JG_TEST_PROBE="$probe" \
       "$node" "$entry"
   }
 
@@ -317,14 +317,14 @@ SH
   [ "$got" = codex ] \
     || fail "the shim topology without a marker resolved '$got', expected codex"
 
-  got=$(env CLAUDECODE=1 FM_TEST_HARNESS="$HARNESS" FM_TEST_NATIVE="$native" \
-    FM_TEST_PROBE="$probe" "$node" "$entry")
+  got=$(env CLAUDECODE=1 JG_TEST_HARNESS="$HARNESS" JG_TEST_NATIVE="$native" \
+    JG_TEST_PROBE="$probe" "$node" "$entry")
   [ "$got" = codex ] \
     || fail "the real Codex shim topology with a retained CLAUDECODE resolved '$got', expected codex"
 
-  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    FM_TEST_HARNESS="$HARNESS" FM_TEST_NATIVE="$native" FM_TEST_PROBE="$probe" \
+    JG_TEST_HARNESS="$HARNESS" JG_TEST_NATIVE="$native" JG_TEST_PROBE="$probe" \
     "$node" "$entry" ancestry)
   [ "$got" = "comm codex" ] \
     || fail "the native child must decide at comm strength, got '$got'"
@@ -345,19 +345,19 @@ test_harness_at_namespace_pid1_is_examined() {
   # Non-vacuity, both directions: with a host-shaped pid 1 the marker is the
   # only evidence and must still answer, so the case below cannot pass by the
   # ancestry layer simply matching everything.
-  got=$(under_fake_ps "$fakebin" FM_TEST_PID1_COMM=init CLAUDECODE=1 --)
+  got=$(under_fake_ps "$fakebin" JG_TEST_PID1_COMM=init CLAUDECODE=1 --)
   [ "$got" = claude ] \
     || fail "a host-shaped pid 1 resolved '$got', expected claude (the marker layer is not live)"
 
-  got=$(under_fake_ps "$fakebin" FM_TEST_PID1_COMM=codex --)
+  got=$(under_fake_ps "$fakebin" JG_TEST_PID1_COMM=codex --)
   [ "$got" = codex ] \
     || fail "a Codex session at namespace pid 1 resolved '$got' with no marker, expected codex"
 
-  got=$(under_fake_ps "$fakebin" FM_TEST_PID1_COMM=codex CLAUDECODE=1 --)
+  got=$(under_fake_ps "$fakebin" JG_TEST_PID1_COMM=codex CLAUDECODE=1 --)
   [ "$got" = codex ] \
     || fail "a Codex session at namespace pid 1 holding a retained CLAUDECODE resolved '$got', expected codex"
 
-  got=$(under_fake_ps "$fakebin" FM_TEST_PID1_COMM=codex CLAUDECODE=1 -- ancestry)
+  got=$(under_fake_ps "$fakebin" JG_TEST_PID1_COMM=codex CLAUDECODE=1 -- ancestry)
   [ "$got" = "comm codex" ] \
     || fail "the namespace pid 1 harness must decide at comm strength, got '$got'"
 
@@ -389,20 +389,20 @@ test_descent_probe_reaches_a_strength_the_top_of_session_cannot() {
   # still standing while the probes run.
   hold="$dir/hold.sh"
   cat > "$hold" <<'SH'
-touch "$FM_TEST_READY"
-while [ -e "$FM_TEST_READY" ]; do sleep 0.05; done
+touch "$JG_TEST_READY"
+while [ -e "$JG_TEST_READY" ]; do sleep 0.05; done
 SH
   # The shim spawns its native binary and waits, so the node process stays alive
   # ABOVE it exactly as the real Codex npm shim does.
   entry="$dir/codex-cli-entry.sh"
   cat > "$entry" <<'SH'
-"$FM_TEST_NATIVE" "$FM_TEST_HOLD" &
+"$JG_TEST_NATIVE" "$JG_TEST_HOLD" &
 wait "$!"
 SH
 
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    FM_TEST_NATIVE="$native" FM_TEST_HOLD="$hold" FM_TEST_READY="$ready" \
+    JG_TEST_NATIVE="$native" JG_TEST_HOLD="$hold" JG_TEST_READY="$ready" \
     "$node" "$entry" &
   shim_pid=$!
 
@@ -465,7 +465,7 @@ test_descent_probe_ignores_a_sibling_branch_the_walk_cannot_reach() {
   # the tree without spawning children of their own and the depths stay fixed.
   block="$dir/block.sh"
   cat > "$block" <<'SH'
-read -r _ < "$FM_TEST_FIFO"
+read -r _ < "$JG_TEST_FIFO"
 SH
   # The MCP server is the sibling branch: a bare interpreter whose script path
   # carries a harness name it does not belong to.
@@ -476,25 +476,25 @@ SH
   # unambiguously on the codex branch rather than tied with the sibling.
   hold="$dir/hold.sh"
   cat > "$hold" <<'SH'
-"$FM_TEST_WORKER" "$FM_TEST_BLOCK" &
-printf '%s\n' "$!" > "$FM_TEST_DIR/worker.pid"
-touch "$FM_TEST_READY"
+"$JG_TEST_WORKER" "$JG_TEST_BLOCK" &
+printf '%s\n' "$!" > "$JG_TEST_DIR/worker.pid"
+touch "$JG_TEST_READY"
 wait
 SH
   entry="$dir/codex-cli-entry.sh"
   cat > "$entry" <<'SH'
-"$FM_TEST_NATIVE" "$FM_TEST_HOLD" &
-printf '%s\n' "$!" > "$FM_TEST_DIR/native.pid"
-"$FM_TEST_NODE" "$FM_TEST_MCP" &
-printf '%s\n' "$!" > "$FM_TEST_DIR/mcp.pid"
+"$JG_TEST_NATIVE" "$JG_TEST_HOLD" &
+printf '%s\n' "$!" > "$JG_TEST_DIR/native.pid"
+"$JG_TEST_NODE" "$JG_TEST_MCP" &
+printf '%s\n' "$!" > "$JG_TEST_DIR/mcp.pid"
 wait
 SH
 
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    FM_TEST_DIR="$dir" FM_TEST_NODE="$node" FM_TEST_NATIVE="$native" \
-    FM_TEST_WORKER="$worker" FM_TEST_HOLD="$hold" FM_TEST_BLOCK="$block" \
-    FM_TEST_MCP="$mcp_script" FM_TEST_READY="$ready" FM_TEST_FIFO="$fifo" \
+    JG_TEST_DIR="$dir" JG_TEST_NODE="$node" JG_TEST_NATIVE="$native" \
+    JG_TEST_WORKER="$worker" JG_TEST_HOLD="$hold" JG_TEST_BLOCK="$block" \
+    JG_TEST_MCP="$mcp_script" JG_TEST_READY="$ready" JG_TEST_FIFO="$fifo" \
     "$node" "$entry" &
   shim_pid=$!
 
@@ -562,30 +562,30 @@ test_descent_probe_tolerates_an_args_only_foreign_verdict_at_the_deepest_vantage
 
   mcp_script="$dir/.claude/mcp/foo.js"
   cat > "$mcp_script" <<'SH'
-read -r _ < "$FM_TEST_FIFO"
+read -r _ < "$JG_TEST_FIFO"
 SH
 
   # The native binary is what starts the MCP server, so the server sits BELOW it and
   # is the deepest descendant of the whole tree.
   hold="$dir/hold.sh"
   cat > "$hold" <<'SH'
-"$FM_TEST_NODE" "$FM_TEST_MCP" &
-printf '%s\n' "$!" > "$FM_TEST_DIR/mcp.pid"
-touch "$FM_TEST_READY"
+"$JG_TEST_NODE" "$JG_TEST_MCP" &
+printf '%s\n' "$!" > "$JG_TEST_DIR/mcp.pid"
+touch "$JG_TEST_READY"
 wait
 SH
   entry="$dir/codex-cli-entry.sh"
   cat > "$entry" <<'SH'
-"$FM_TEST_NATIVE" "$FM_TEST_HOLD" &
-printf '%s\n' "$!" > "$FM_TEST_DIR/native.pid"
+"$JG_TEST_NATIVE" "$JG_TEST_HOLD" &
+printf '%s\n' "$!" > "$JG_TEST_DIR/native.pid"
 wait
 SH
 
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    FM_TEST_DIR="$dir" FM_TEST_NODE="$node" FM_TEST_NATIVE="$native" \
-    FM_TEST_HOLD="$hold" FM_TEST_MCP="$mcp_script" FM_TEST_READY="$ready" \
-    FM_TEST_FIFO="$fifo" \
+    JG_TEST_DIR="$dir" JG_TEST_NODE="$node" JG_TEST_NATIVE="$native" \
+    JG_TEST_HOLD="$hold" JG_TEST_MCP="$mcp_script" JG_TEST_READY="$ready" \
+    JG_TEST_FIFO="$fifo" \
     "$node" "$entry" &
   shim_pid=$!
 
@@ -652,32 +652,32 @@ test_descent_probe_prefers_comm_strength_when_deepest_leaves_tie() {
 
     block="$dir/block.sh"
     cat > "$block" <<'SH'
-read -r _ < "$FM_TEST_FIFO"
+read -r _ < "$JG_TEST_FIFO"
 SH
     mcp_script="$dir/.claude/mcp/foo.js"
     cp "$block" "$mcp_script"
     entry="$dir/codex-cli-entry.sh"
     cat > "$entry" <<'SH'
-if [ "$FM_TEST_ORDER" = mcp-first ]; then
-  "$FM_TEST_NODE" "$FM_TEST_MCP" &
-  printf '%s\n' "$!" > "$FM_TEST_DIR/mcp.pid"
-  "$FM_TEST_NATIVE" "$FM_TEST_BLOCK" &
-  printf '%s\n' "$!" > "$FM_TEST_DIR/native.pid"
+if [ "$JG_TEST_ORDER" = mcp-first ]; then
+  "$JG_TEST_NODE" "$JG_TEST_MCP" &
+  printf '%s\n' "$!" > "$JG_TEST_DIR/mcp.pid"
+  "$JG_TEST_NATIVE" "$JG_TEST_BLOCK" &
+  printf '%s\n' "$!" > "$JG_TEST_DIR/native.pid"
 else
-  "$FM_TEST_NATIVE" "$FM_TEST_BLOCK" &
-  printf '%s\n' "$!" > "$FM_TEST_DIR/native.pid"
-  "$FM_TEST_NODE" "$FM_TEST_MCP" &
-  printf '%s\n' "$!" > "$FM_TEST_DIR/mcp.pid"
+  "$JG_TEST_NATIVE" "$JG_TEST_BLOCK" &
+  printf '%s\n' "$!" > "$JG_TEST_DIR/native.pid"
+  "$JG_TEST_NODE" "$JG_TEST_MCP" &
+  printf '%s\n' "$!" > "$JG_TEST_DIR/mcp.pid"
 fi
-touch "$FM_TEST_READY"
+touch "$JG_TEST_READY"
 wait
 SH
 
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
       -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      FM_TEST_ORDER="$order" FM_TEST_DIR="$dir" FM_TEST_NODE="$node" \
-      FM_TEST_NATIVE="$native" FM_TEST_BLOCK="$block" FM_TEST_MCP="$mcp_script" \
-      FM_TEST_READY="$ready" FM_TEST_FIFO="$fifo" "$node" "$entry" &
+      JG_TEST_ORDER="$order" JG_TEST_DIR="$dir" JG_TEST_NODE="$node" \
+      JG_TEST_NATIVE="$native" JG_TEST_BLOCK="$block" JG_TEST_MCP="$mcp_script" \
+      JG_TEST_READY="$ready" JG_TEST_FIFO="$fifo" "$node" "$entry" &
     shim_pid=$!
 
     waited=0
@@ -726,9 +726,9 @@ SH
 pin_probe() {  # <named-executable> <home> <verb> [VAR=VAL ...]
   local bin=$1 home=$2 verb=$3
   shift 3
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u FM_SUPERVISION_ACTOR \
-    -u FM_SUPERVISION_PRIMARY_HARNESS FM_HOME="$home" "$@" \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u JG_SUPERVISION_ACTOR \
+    -u JG_SUPERVISION_PRIMARY_HARNESS JG_HOME="$home" "$@" \
     "$bin" -c "r=\$(\"$HARNESS\" $verb 2>\"$home/stderr\"); rc=\$?; printf '%s|%s' \"\$r\" \"\$rc\""
 }
 
@@ -741,39 +741,39 @@ test_supervision_branch_resolves_the_primary_pin() {
 
   # Without the pin the branch reads as its own engine, which is the hazard.
   for verb in '' crew secondmate; do
-    got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true FM_SUPERVISION_ACTOR=branch)
+    got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true JG_SUPERVISION_ACTOR=branch)
     [ "$got" = 'pi|0' ] \
       || fail "an unpinned branch under a Pi engine resolved '${verb:-own}' as '$got', expected pi (the hazard is not live)"
   done
 
   for verb in '' crew secondmate; do
     got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true \
-      FM_SUPERVISION_ACTOR=branch FM_SUPERVISION_PRIMARY_HARNESS=claude)
+      JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
     [ "$got" = 'claude|0' ] \
       || fail "a pinned branch resolved '${verb:-own}' as '$got', expected the primary's claude"
   done
   printf 'default\n' > "$home/config/crew-harness"
   got=$(pin_probe "$bin" "$home" crew PI_CODING_AGENT=true \
-    FM_SUPERVISION_ACTOR=branch FM_SUPERVISION_PRIMARY_HARNESS=claude)
+    JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'claude|0' ] || fail "a pinned branch resolved a default crew config as '$got', expected claude"
 
   # An explicit crew config is still the captain's choice, pin or no pin.
   printf 'codex\n' > "$home/config/crew-harness"
   got=$(pin_probe "$bin" "$home" crew PI_CODING_AGENT=true \
-    FM_SUPERVISION_ACTOR=branch FM_SUPERVISION_PRIMARY_HARNESS=claude)
+    JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'codex|0' ] || fail "the pin overrode an explicit crew config: '$got'"
   rm -f "$home/config/crew-harness"
 
   # Main, or no actor at all, ignores the pin.
-  got=$(pin_probe "$bin" "$home" '' PI_CODING_AGENT=true FM_SUPERVISION_PRIMARY_HARNESS=claude)
+  got=$(pin_probe "$bin" "$home" '' PI_CODING_AGENT=true JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'pi|0' ] || fail "an unmarked process honored the branch-only pin: '$got'"
   got=$(pin_probe "$bin" "$home" '' PI_CODING_AGENT=true \
-    FM_SUPERVISION_ACTOR=main FM_SUPERVISION_PRIMARY_HARNESS=claude)
+    JG_SUPERVISION_ACTOR=main JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'pi|0' ] || fail "the main actor honored the branch-only pin: '$got'"
 
   # The ancestry evidence verb reports evidence only and never consults it.
   got=$(pin_probe "$bin" "$home" ancestry PI_CODING_AGENT=true \
-    FM_SUPERVISION_ACTOR=branch FM_SUPERVISION_PRIMARY_HARNESS=claude)
+    JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=claude)
   [ "$got" = 'comm pi|0' ] || fail "the ancestry verb consulted the pin: '$got'"
   pass "a supervision branch resolves own, crew, and secondmate to the primary's pinned harness"
 }
@@ -786,10 +786,10 @@ test_supervision_branch_refuses_an_unknown_primary_pin() {
   bin=$(named_bin "$dir/pi-tree" pi)
   for verb in '' crew secondmate; do
     got=$(pin_probe "$bin" "$home" "$verb" PI_CODING_AGENT=true \
-      FM_SUPERVISION_ACTOR=branch FM_SUPERVISION_PRIMARY_HARNESS=unknown)
+      JG_SUPERVISION_ACTOR=branch JG_SUPERVISION_PRIMARY_HARNESS=unknown)
     [ "$got" = '|2' ] \
       || fail "an unknown pin resolved '${verb:-own}' as '$got', expected a refusal with nothing on stdout"
-    assert_contains "$(cat "$home/stderr")" "FM_SUPERVISION_PRIMARY_HARNESS='unknown' names no known harness" \
+    assert_contains "$(cat "$home/stderr")" "JG_SUPERVISION_PRIMARY_HARNESS='unknown' names no known harness" \
       "the refusal did not name the bad pin"
   done
   pass "a supervision branch refuses to resolve a harness from a pin that names none"
@@ -808,14 +808,14 @@ test_supervision_protocol_follows_corrected_verdict() {
   bin=$(named_bin "$dir/codex-tree" codex)
   fakebin=$(blind_ancestry_bin "$dir/blind")
 
-  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_HOME="$home" \
+  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 JG_HOME="$home" \
     PATH="$fakebin:$BASE_PATH" "$RENDER")
   assert_contains "$got" "primary harness: claude" \
     "with ancestry blinded, the retained marker must still render claude (the case is otherwise vacuous)"
 
-  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_HOME="$home" \
+  got=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 JG_HOME="$home" \
     "$bin" -c "r=\$(\"$RENDER\"); printf '%s' \"\$r\"")
   assert_contains "$got" "primary harness: codex" \
     "a Codex primary carrying a retained CLAUDECODE did not render the Codex protocol"

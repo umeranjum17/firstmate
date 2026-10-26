@@ -70,6 +70,10 @@ import { Type } from "typebox";
 // the same repository root this file lives in.
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/jg-operational-input.ts";
 import { runCommandAsync } from "../../.pi/extensions/lib/jg-async-exec.ts";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -137,32 +141,32 @@ type SessionGeneration = {
 const extensionFile = fileURLToPath(import.meta.url);
 const extensionDir = dirname(extensionFile);
 const root = resolve(extensionDir, "../..");
-const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
-const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
-const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
+const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
+const fmRoot = process.env.JG_ROOT_OVERRIDE || root;
+const state = process.env.JG_STATE_OVERRIDE || `${fmHome}/state`;
+const config = process.env.JG_CONFIG_OVERRIDE || `${fmHome}/config`;
 const armScript = `${fmRoot}/bin/jg-watch-arm.sh`;
 const hostScript = `${fmRoot}/bin/jg-supervision-host.sh`;
 const marker = `${state}/.omp-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/omp-primary-watch`;
 const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
-const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
-const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
-const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+const retryBaseMs = positiveInteger("JG_WATCH_REARM_RETRY_BASE_MS", 250);
+const retryMaxMs = positiveInteger("JG_WATCH_REARM_RETRY_MAX_MS", 4000);
+const retryLimit = positiveInteger("JG_WATCH_REARM_RETRY_LIMIT", 5);
 async function armReadinessBudgetMs(hostMode: boolean): Promise<number> {
-  const override = positiveInteger("FM_OMP_ARM_READY_TIMEOUT_MS", 0);
+  const override = positiveInteger("JG_OMP_ARM_READY_TIMEOUT_MS", 0);
   if (override) return hostMode ? Math.max(override, 30000) : override;
   const result = await runCommandAsync("bash", ["-lc",
-    'config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
+    'config_dir="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
     "jg-watcher-budget", `${root}/bin/jg-wake-lib.sh`, state, `${fmRoot}/bin/jg-watch.sh`, fmHome,
-  ], { env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config, FM_STATE_OVERRIDE: state } });
+  ], { env: { ...process.env, JG_HOME: fmHome, JG_CONFIG_OVERRIDE: config, JG_STATE_OVERRIDE: state } });
   const seconds = Number(result.stdout.trim());
   if (result.status !== 0 || !Number.isFinite(seconds) || seconds < 0) return 0;
   const timeout = seconds * 1000 + 2000;
   return hostMode ? Math.max(timeout, 30000) : timeout;
 }
-const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const armRetireTimeoutMs = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const repairOnlyHint = "call jg_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
 
@@ -267,7 +271,7 @@ function awayRecordPresent(): boolean {
   if (!existsSync(`${state}/.afk-contract`)) return false;
   const result = spawnSync("bash", [`${fmRoot}/bin/jg-afk-contract.sh`, "mode"], {
     encoding: "utf8",
-    env: { ...process.env, FM_STATE_OVERRIDE: state },
+    env: { ...process.env, JG_STATE_OVERRIDE: state },
   });
   return String(result.stdout || "").trim() !== "quiet";
 }
@@ -616,7 +620,7 @@ export default function (pi: ExtensionAPI) {
         {
           cwd: fmRoot,
           encoding: "utf8",
-          env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot },
+          env: { ...process.env, JG_HOME: fmHome, JG_STATE_OVERRIDE: state, JG_ROOT_OVERRIDE: fmRoot },
         },
       );
       if (result.status === 0) return { ok: true, detail: "" };
@@ -966,15 +970,15 @@ export default function (pi: ExtensionAPI) {
     const hostMode = hostModeEnabled();
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      FM_HOME: fmHome,
-      FM_ROOT_OVERRIDE: fmRoot,
-      FM_CONFIG_OVERRIDE: config,
-      FM_WATCH_ARM_SCRIPT: hostMode ? hostScript : armScript,
-      FM_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
+      JG_HOME: fmHome,
+      JG_ROOT_OVERRIDE: fmRoot,
+      JG_CONFIG_OVERRIDE: config,
+      JG_WATCH_ARM_SCRIPT: hostMode ? hostScript : armScript,
+      JG_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
     };
-    if (hostMode) env.FM_SUPERVISION_HOST_PRIMARY = "omp";
-    const command = hostMode ? "exec \"$FM_WATCH_ARM_SCRIPT\" park --restart" : "exec \"$FM_WATCH_ARM_SCRIPT\" --restart";
-    const armChild = spawn("bash", ["-lc", `config_dir="\${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ -f "$config_dir/x-mode.env" ] && . "$config_dir/x-mode.env"; ${command}`], {
+    if (hostMode) env.JG_SUPERVISION_HOST_PRIMARY = "omp";
+    const command = hostMode ? "exec \"$JG_WATCH_ARM_SCRIPT\" park --restart" : "exec \"$JG_WATCH_ARM_SCRIPT\" --restart";
+    const armChild = spawn("bash", ["-lc", `config_dir="\${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; [ -f "$config_dir/x-mode.env" ] && . "$config_dir/x-mode.env"; ${command}`], {
       cwd: fmRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],

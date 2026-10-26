@@ -16,10 +16,10 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # The shared gate is the live-harness family's one on/off contract: it is what
-# lets FM_LIVE=0 turn every live guard off together, and tests/jg-live-gate.test.sh
+# lets JG_LIVE=0 turn every live guard off together, and tests/jg-live-gate.test.sh
 # sweeps the whole family for it. The trailing tool list replaces a hand-rolled
 # gh presence check; authentication is not a tool check and stays below.
-jg_live_gate opt-in FM_PR_STATE_LIVE_E2E gh
+jg_live_gate opt-in JG_PR_STATE_LIVE_E2E gh
 
 SCRIPT="$ROOT/bin/jg-pr-state.sh"
 PR=https://github.com/cli/cli/pull/1

@@ -70,7 +70,7 @@
 #                closing border, holding the idle hint, blank rows, and a
 #                mode/model footer line, closed by the half-block `╹▀▀▀` floor
 #                with OpenCode's own status area drawn directly below it
-#                (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT bounds the staleness
+#                (JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT bounds the staleness
 #                probe past that furniture).
 #   separated  - pi: content rows between two solid horizontal `─` rules, no
 #                glyph and no side border. Provable only with a live agent
@@ -129,7 +129,7 @@
 # genuine empty agent composer ONLY inside a bordered container. On a bare row
 # it is a dead-shell prompt and classifies `unknown` (never a safe injection
 # target). A `$` followed immediately by a digit is Pi's cost footer, not this
-# prompt (`FM_COMPOSER_PI_STATUS_RE_DEFAULT`).
+# prompt (`JG_COMPOSER_PI_STATUS_RE_DEFAULT`).
 # The AGENT glyphs `❯` (claude), `›` (codex), `⟩` (U+27E9, muse),
 # `→` (U+2192, cursor), and `❭` (U+276D, devin) are a genuine empty agent
 # composer either way.
@@ -201,7 +201,7 @@ jg_composer_strip_ansi() {
 # owner's own guess for the property it claims to follow. The live harness
 # guard (bin/jg-test-run.sh, live-harness-optin) is what catches a harness
 # that starts drawing its composer with a character outside this property.
-FM_COMPOSER_UNICODE_SPACES=()
+JG_COMPOSER_UNICODE_SPACES=()
 for _jg_composer_space_octal in \
   '\0302\0205' '\0302\0240' '\0341\0232\0200' \
   '\0342\0200\0200' '\0342\0200\0201' '\0342\0200\0202' '\0342\0200\0203' \
@@ -210,7 +210,7 @@ for _jg_composer_space_octal in \
   '\0342\0200\0250' '\0342\0200\0251' '\0342\0200\0257' \
   '\0342\0201\0237' '\0343\0200\0200'; do
   printf -v _jg_composer_space_utf8 '%b' "$_jg_composer_space_octal"
-  FM_COMPOSER_UNICODE_SPACES+=("$_jg_composer_space_utf8")
+  JG_COMPOSER_UNICODE_SPACES+=("$_jg_composer_space_utf8")
 done
 unset -v _jg_composer_space_octal _jg_composer_space_utf8
 
@@ -220,7 +220,7 @@ unset -v _jg_composer_space_octal _jg_composer_space_utf8
 # into one token, while a space preserves the separation the harness drew.
 jg_composer_normalize_spaces_var() {  # <varname>
   local __fmns_name=$1 __fmns_text=${!1} __fmns_space
-  for __fmns_space in "${FM_COMPOSER_UNICODE_SPACES[@]}"; do
+  for __fmns_space in "${JG_COMPOSER_UNICODE_SPACES[@]}"; do
     __fmns_text=${__fmns_text//"$__fmns_space"/ }
   done
   printf -v "$__fmns_name" '%s' "$__fmns_text"
@@ -248,7 +248,7 @@ jg_composer_normalize_trim_var() {  # <varname>
 #     A reset (SGR 0) or normal-intensity (SGR 22) ends a dim run.
 #   - dark/muted TRUECOLOR foreground runs (SGR 38;2;r;g;b or the colon form
 #     38:2::r:g:b) whose perceived luminance (0.299R + 0.587G + 0.114B) is below
-#     FM_COMPOSER_GHOST_LUMA_MAX (default 128): how grok renders its placeholder
+#     JG_COMPOSER_GHOST_LUMA_MAX (default 128): how grok renders its placeholder
 #     and hint text. A reset (SGR 0), a default-foreground (SGR 39), any base
 #     foreground colour (30-37 / 90-97), or a lighter 38;2 foreground ends the
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
@@ -258,7 +258,7 @@ jg_composer_normalize_trim_var() {  # <varname>
 #     no fleet harness uses it for ghost text, so it is kept (real text wins:
 #     under-stripping merely defers, which the max-defer alarm surfaces, while
 #     over-stripping would inject over real input).
-# Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
+# Raising JG_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
 # stripped as ghost text, which is why the bare-glyph fallback below must also
@@ -268,7 +268,7 @@ jg_composer_normalize_trim_var() {  # <varname>
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
 # runs alike pass through or drop intact without locale-dependent classes.
 jg_composer_strip_ghost() {
-  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" '
+  LC_ALL=C awk -v lumamax="${JG_COMPOSER_GHOST_LUMA_MAX:-128}" '
     function sgr_code(v, b) {
       b = v
       sub(/:.*/, "", b)
@@ -385,14 +385,14 @@ jg_composer_strip_ghost() {
 # tmux agy endpoint reaches the submit core with no recorded harness, and its
 # bare `>` composer verdict is `unknown`, so the busy footer is the only
 # turn-started acknowledgement that path can read.
-FM_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
-FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
+JG_DELIVERY_BUSY_REGEX_DEFAULT='esc (to )?interrupt|Working(\.\.\.|…)|Ctrl\+c:cancel|ctrl\+c to stop|esc[[:space:]]+to[[:space:]]+cancel|esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
+JG_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT='esc to interrupt|…[[:space:]]+\([0-9]+[smh]'
 # Devin 3000.11.1: the working composer and interrupt hint are independent
 # delivery signals. Neither is used as semantic worker-state evidence.
-FM_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT='esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
-FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'
-FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT='esc interrupt'
-FM_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
+JG_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT='esc twice to interrupt|^[[:space:]]*❭ Guide Devin while it works$'
+JG_DELIVERY_CODEX_BUSY_REGEX_DEFAULT='esc to interrupt'
+JG_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT='esc interrupt'
+JG_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
 # omp (Oh My Pi) renders its TUI busy line as `Working…` with U+2026 HORIZONTAL
 # ELLIPSIS, not Pi's three ASCII dots (verified byte-level on omp 18.1.2,
 # re-verified live on 18.1.11 through the Herdr backend). Only the TUI form is
@@ -408,9 +408,9 @@ FM_DELIVERY_PI_BUSY_REGEX_DEFAULT='Working\.\.\.'
 # the braille block: GNU grep rejects a range between multibyte endpoints
 # ("Invalid collation character"), so `[⠁-⣿]` compiled on macOS and failed
 # every omp busy and furniture read on Linux CI.
-FM_OMP_SPINNER_FRAMES_RE='(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|⣾|⣽|⣻|⢿|⡿|⣟|⣯|⣷)'
-FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]'
-FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
+JG_OMP_SPINNER_FRAMES_RE='(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|⣾|⣽|⣻|⢿|⡿|⣟|⣯|⣷)'
+JG_DELIVERY_OMP_BUSY_REGEX_DEFAULT='Working…|^[[:space:]]*'"$JG_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]'
+JG_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
 # cursor-agent's busy footer. The TOKEN is matched, not the spinner verb: the
 # same version rendered both `Working` and `Running` beside its braille spinner
 # in two consecutive turns, while `ctrl+c to stop` was present for the whole
@@ -418,7 +418,7 @@ FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT='Ctrl\+c:cancel'
 # This is a DELIVERY guard only - it acknowledges a submit and gates away-mode
 # injection. Cursor's recorded worker state comes from its transcript fold in
 # bin/jg-busy-lib.sh, never from this row.
-FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
+JG_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # agy (Antigravity CLI) renders a pinned status row while a turn runs: the
 # `esc to cancel` token on the left and the model cell on the right (verified
 # live, agy 1.2.0; the idle row shows `? for shortcuts` instead). The
@@ -426,30 +426,30 @@ FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT='ctrl\+c to stop'
 # deliberately not matched, so echoed worker output cannot fake an
 # acknowledgement. Delivery guard only; recorded worker state comes from the
 # agy-regex fold in bin/jg-busy-lib.sh.
-FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
-FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
+JG_DELIVERY_AGY_BUSY_REGEX_DEFAULT='esc[[:space:]]+to[[:space:]]+cancel'
+JG_DELIVERY_KIMI_BUSY_REGEX_DEFAULT='^[[:space:]]*(🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘)[[:space:]]+·[[:space:]]+'
 
 # The busy-chrome signature selected for [harness]: prints the regex
 # jg_busy_lines_match tests, or nothing when no signature is registered.
 # The table lives here once; both readers below consult it.
 jg_busy_signature_for_harness() {  # [harness]
   local harness=${1:-}
-  if [ -n "${FM_BUSY_REGEX:-}" ]; then
-    printf '%s' "$FM_BUSY_REGEX"
+  if [ -n "${JG_BUSY_REGEX:-}" ]; then
+    printf '%s' "$JG_BUSY_REGEX"
     return 0
   fi
   case "$harness" in
-    claude) printf '%s' "$FM_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT" ;;
-    devin) printf '%s' "$FM_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT" ;;
-    codex) printf '%s' "$FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT" ;;
-    opencode) printf '%s' "$FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT" ;;
-    pi|pi-signed) printf '%s' "$FM_DELIVERY_PI_BUSY_REGEX_DEFAULT" ;;
-    omp) printf '%s' "$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT" ;;
-    grok) printf '%s' "$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT" ;;
-    agy) printf '%s' "$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT" ;;
-    kimi) printf '%s' "$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT" ;;
-    cursor) printf '%s' "$FM_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT" ;;
-    '') printf '%s' "$FM_DELIVERY_BUSY_REGEX_DEFAULT" ;;
+    claude) printf '%s' "$JG_DELIVERY_CLAUDE_BUSY_REGEX_DEFAULT" ;;
+    devin) printf '%s' "$JG_DELIVERY_DEVIN_BUSY_REGEX_DEFAULT" ;;
+    codex) printf '%s' "$JG_DELIVERY_CODEX_BUSY_REGEX_DEFAULT" ;;
+    opencode) printf '%s' "$JG_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT" ;;
+    pi|pi-signed) printf '%s' "$JG_DELIVERY_PI_BUSY_REGEX_DEFAULT" ;;
+    omp) printf '%s' "$JG_DELIVERY_OMP_BUSY_REGEX_DEFAULT" ;;
+    grok) printf '%s' "$JG_DELIVERY_GROK_BUSY_REGEX_DEFAULT" ;;
+    agy) printf '%s' "$JG_DELIVERY_AGY_BUSY_REGEX_DEFAULT" ;;
+    kimi) printf '%s' "$JG_DELIVERY_KIMI_BUSY_REGEX_DEFAULT" ;;
+    cursor) printf '%s' "$JG_DELIVERY_CURSOR_BUSY_REGEX_DEFAULT" ;;
+    '') printf '%s' "$JG_DELIVERY_BUSY_REGEX_DEFAULT" ;;
     *)
       # A supplied harness must never borrow another harness's signature.
       # Register its verified signature explicitly before classifying it busy.
@@ -478,8 +478,8 @@ jg_busy_lines_match() {  # [harness]
 # a dead-shell prompt and must never read `empty`. Newline-separated and
 # consumed by `read` rather than word splitting, so `$`, `%`, and `#` stay
 # literal and no entry is ever exposed to pathname expansion.
-FM_COMPOSER_AGENT_PROMPT_GLYPHS=$(printf '%s\n' '❯' '›' '⟩' '→' '❭')
-FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
+JG_COMPOSER_AGENT_PROMPT_GLYPHS=$(printf '%s\n' '❯' '›' '⟩' '→' '❭')
+JG_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 
 # The ONE fleet-wide idle-placeholder set: composer text a harness renders in
 # an EMPTY composer that a plain capture cannot tell from typed text. Grok's
@@ -490,14 +490,14 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
 # 2026.08.11-e8db854). Devin renders the anchored `Ask Devin to build features,
 # fix bugs, or work on your code` as dim text after its `❭` glyph (verified
-# live, devin 3000.11.1). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
+# live, devin 3000.11.1). JG_COMPOSER_IDLE_RE overrides for an unverified harness;
 # matching is case-insensitive.
-FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
+JG_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
 # text, and only the run's LAST row is ever matched against it.
-FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
+JG_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # On a narrow pane OpenCode wraps the badge inside the bar box: the dot loses its
 # spaces or keeps one before it (`Buil ·MiniMax M3.1 Flash free (OpenRouter) O`),
 # the first word itself can break (`Buil` then `d` on the next row), and the
@@ -505,14 +505,14 @@ FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
 # in the composer box: its opening row (this pattern) sits directly below a blank
 # bar row, and every row from it to the box end is furniture; typed text lives
 # only above that blank row.
-FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
+JG_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT='^(Build|Buil|Plan)[[:space:]]*·[[:space:]]*[^[:space:]]'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
 # leading mode marker is the whole test - the trailing wording is free text and
 # is deliberately not matched - and the marker is quantifier-free so the same
 # bytes match under LC_ALL=C as under a UTF-8 locale.
-FM_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
+JG_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
 # omp (Oh My Pi) draws a one-row status line directly BELOW its borderless
 # composer: an identity or spinner cell, then middle-dot separated model, path,
 # git, and context cells. Verified live through Herdr on omp 18.1.11:
@@ -531,7 +531,7 @@ FM_COMPOSER_MODE_HINT_RE_DEFAULT='^[[:space:]]*(⏵|⏸)'
 # frames then an elapsed cell, or when it carries the context-usage cell after
 # a middle dot. It is consulted only as the boundary BELOW a bare composer,
 # never on the composer row itself.
-FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:]]|^[[:space:]]*'"$FM_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]([[:space:]]|$)|[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K'
+JG_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:]]|^[[:space:]]*'"$JG_OMP_SPINNER_FRAMES_RE"'[[:space:]]+[0-9]+[smh]([[:space:]]|$)|[[:space:]]·[[:space:]].*[0-9]+(\.[0-9]+)?%/[0-9]+K'
 # OpenCode 1.18.x draws a status area directly BELOW its left-bar composer's
 # half-block floor (captured live 2026-10-09 on DeepSeek V4.1 Flash panes
 # through Herdr's ANSI capture). An idle pane shows a path/context/cost row
@@ -539,7 +539,7 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # hint on that row; older builds split it), then a session row whose tail is
 # the `commands` hint, or a bare `tab agents  ctrl+p commands` home row; a
 # rate-limited pane shows the usage-limit banner rows
-# (FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT below). These rows are furniture, never typed
+# (JG_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT below). These rows are furniture, never typed
 # input: typed text can only land in the left-bar run ABOVE the floor, so the
 # cursorless staleness probe resumes past them below a proven floor. The
 # patterns stay deliberately narrow - a busy status row (`esc interrupt`) and
@@ -567,9 +567,9 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # tail row carries `(click to expand) [retrying in 1h 8m attempt #1]` wrapped
 # at the pane width - both `usin... (click to expand)` and `click to expand)`
 # first-row truncations were observed. The square glyphs are an alternation,
-# never a bracket range, for the reason FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT='^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
-FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|'"$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"
+# never a bracket range, for the reason JG_OMP_SPINNER_FRAMES_RE records.
+JG_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT='^[[:space:]]*(■|⬝)[0-9]+(■|⬝)hour(■|⬝)usage limit reached|^[[:space:]]*(usin\.\.\.[[:space:]]+)?\(?click to expand\)[[:space:]]+\[retrying in [0-9]+[hms]([[:space:]]+[0-9]+[hms])*[[:space:]]+attempt #[0-9]+\]$'
+JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[[:space:]]+\([0-9]+%\)([[:space:]]+·[[:space:]]+\$[0-9]*(\.[0-9]+)?)?([[:space:]]*ctrl\+p([[:space:]]+commands)?)?$|^[^[:space:]]+([[:space:]]+tab[[:space:]]+agents[[:space:]]+ctrl\+p)?[[:space:]]+commands$|^tab[[:space:]]+agents[[:space:]]+ctrl\+p[[:space:]]+commands$|'"$JG_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"
 # OpenCode 1.18.x also right-aligns a `<dir>:<branch>` cell INSIDE the
 # composer, on the agent/model row itself (already furniture through the
 # left-bar footer prefix). On a long worktree path that cell WRAPS at the pane
@@ -592,31 +592,31 @@ FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT='^[[:space:]]*/.*[0-9]+(\.[0-9]+)?[KMG]?[
 # `/` with no whitespace, zero or more no-whitespace continuation rows below
 # it, all ending DIRECTLY above a model row - so typed text in that position
 # keeps its shallow indent and stays pending. The opening row matches
-# FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT and each continuation row
-# matches FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT below; the caller proves
+# JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT and each continuation row
+# matches JG_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT below; the caller proves
 # the run against the model row through
 # _jg_composer_opencode_wrap_run_start. Consulted on the post-bar row body
 # before trimming, by the left-bar classifier and the extractor alike.
-FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT='^[[:space:]]{8,}(~/|/)[^[:space:]]+$'
+JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT='^[[:space:]]{8,}(~/|/)[^[:space:]]+$'
 # A wrapped `<dir>:<branch>` cell's continuation row: the same wide
 # right-aligned padding, but no `~/` or `/` lead (the wrap broke mid-token), so
 # the opening row is the only row that carries the path lead and every row here
 # is one unbroken no-whitespace token. Typed text never matches - it keeps its
 # two-space indent - so this only ever extends the opening row's furniture run.
-FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT='^[[:space:]]{8,}[^[:space:]]+$'
+JG_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT='^[[:space:]]{8,}[^[:space:]]+$'
 # Pi's footer stats row opens at column 0 with the session cost when every
 # token counter is zero (`$0.000 (sub) 5.4%/272k (auto)` on pi 0.85.1).
 # That leading `$` is a cost cell, not a dead-shell prompt, only when a digit
 # follows it immediately; `$` then whitespace stays a prompt.
 # Consulted only as the dead-shell exception below, never as composer content,
 # so the same string typed between the separator pair still reads pending.
-FM_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
+JG_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
 # Braille-pattern cells (U+2800..U+28FF) are animation furniture: codex-cli
 # 0.154.0 draws an idle "starfield" of them on the row above its `›` prompt
 # row, on the `›` row itself after the dim `Ask Codex to do anything`
 # placeholder, and on the row below it (verified live through Herdr on
 # codex-cli 0.154.0, gpt-6-astra, fast mode). The cells are truecolor greys
-# whose luminance straddles FM_COMPOSER_GHOST_LUMA_MAX, so the brighter ones
+# whose luminance straddles JG_COMPOSER_GHOST_LUMA_MAX, so the brighter ones
 # survive ghost stripping. The rule, applied by shape rather than style:
 #   - a row whose non-whitespace content is entirely braille cells is screen
 #     furniture; it never counts as wrapped typed content and it bounds a bare
@@ -628,7 +628,7 @@ FM_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
 # jg_composer_strip_braille is the ONE byte-exact remover: under LC_ALL=C awk
 # walks bytes and drops every UTF-8 sequence E2 A0..A3 80..BF. It is
 # deliberately not a grep bracket range over the block, for the reason
-# FM_OMP_SPINNER_FRAMES_RE records (GNU grep rejects a range between multibyte
+# JG_OMP_SPINNER_FRAMES_RE records (GNU grep rejects a range between multibyte
 # endpoints). Reads stdin, prints the line with its braille cells removed.
 jg_composer_strip_braille() {
   LC_ALL=C awk '
@@ -655,19 +655,19 @@ jg_composer_strip_braille() {
 # (startup banners, old transcript boxes) out of those candidate sets. tmux
 # and Herdr adapter composer reads use their visible viewports instead; Herdr
 # also uses this value as the minimum Ctrl+U clear budget after a refused proof.
-FM_COMPOSER_CAPTURE_LINES=${FM_COMPOSER_CAPTURE_LINES:-20}
+JG_COMPOSER_CAPTURE_LINES=${JG_COMPOSER_CAPTURE_LINES:-20}
 
 # Pi allows a multi-line composer between its horizontal separators. Bound the
 # structural candidate so two unrelated transcript rules with an arbitrarily
 # large region between them can never be promoted into a composer.
-FM_COMPOSER_PI_MAX_LINES=${FM_COMPOSER_PI_MAX_LINES:-8}
+JG_COMPOSER_PI_MAX_LINES=${JG_COMPOSER_PI_MAX_LINES:-8}
 
 # Column overhang of Grok 1.0.5's titled bottom border over its aligned top
 # and content rows, captured live in issue #3436's 2026-09-14 idle repro
 # (see docs/verification/runtime-backends.md). Not re-verified against a live
 # Grok install since; may need to change if a future Grok release renders a
 # different overhang or scales it with title/model-name length.
-FM_COMPOSER_GROK_TITLE_OVERHANG=3
+JG_COMPOSER_GROK_TITLE_OVERHANG=3
 
 # 0 when <content> is exactly one glyph drawn from <glyph-list>.
 _jg_composer_is_prompt_glyph() {  # <content> <glyph-list>
@@ -696,8 +696,8 @@ jg_composer_leading_prompt_glyph_var() {  # <out-varname> <content>
       "$__fmpg_glyph"*) printf -v "$__fmpg_out" '%s' "$__fmpg_glyph"; return 0 ;;
     esac
   done <<EOF
-$FM_COMPOSER_AGENT_PROMPT_GLYPHS
-$FM_COMPOSER_SHELL_PROMPT_GLYPHS
+$JG_COMPOSER_AGENT_PROMPT_GLYPHS
+$JG_COMPOSER_SHELL_PROMPT_GLYPHS
 EOF
   printf -v "$__fmpg_out" '%s' ''
   return 1
@@ -714,7 +714,7 @@ jg_composer_leading_agent_glyph_var() {  # <out-varname> <content>
       "$__fmag_glyph"*) printf -v "$__fmag_out" '%s' "$__fmag_glyph"; return 0 ;;
     esac
   done <<EOF
-$FM_COMPOSER_AGENT_PROMPT_GLYPHS
+$JG_COMPOSER_AGENT_PROMPT_GLYPHS
 EOF
   printf -v "$__fmag_out" '%s' ''
   return 1
@@ -729,7 +729,7 @@ jg_composer_leading_shell_glyph_var() {  # <out-varname> <content>
       "$__fmsg_glyph"*) printf -v "$__fmsg_out" '%s' "$__fmsg_glyph"; return 0 ;;
     esac
   done <<EOF
-$FM_COMPOSER_SHELL_PROMPT_GLYPHS
+$JG_COMPOSER_SHELL_PROMPT_GLYPHS
 EOF
   printf -v "$__fmsg_out" '%s' ''
   return 1
@@ -770,15 +770,15 @@ jg_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
   plain_content=${5:-$2}
   jg_composer_normalize_trim_var plain_content
   if [ "$bordered" != 1 ] && [ -z "$content" ] && [ -n "$plain_content" ]; then
-    if _jg_composer_is_prompt_glyph "$plain_content" "$FM_COMPOSER_AGENT_PROMPT_GLYPHS"; then
+    if _jg_composer_is_prompt_glyph "$plain_content" "$JG_COMPOSER_AGENT_PROMPT_GLYPHS"; then
       printf 'empty'; return 0
     fi
     printf 'unknown'; return 0
   fi
-  if _jg_composer_is_prompt_glyph "$content" "$FM_COMPOSER_AGENT_PROMPT_GLYPHS"; then
+  if _jg_composer_is_prompt_glyph "$content" "$JG_COMPOSER_AGENT_PROMPT_GLYPHS"; then
     printf 'empty'; return 0
   fi
-  if _jg_composer_is_prompt_glyph "$content" "$FM_COMPOSER_SHELL_PROMPT_GLYPHS"; then
+  if _jg_composer_is_prompt_glyph "$content" "$JG_COMPOSER_SHELL_PROMPT_GLYPHS"; then
     if [ "$bordered" = 1 ]; then printf 'empty'; else printf 'unknown'; fi
     return 0
   fi
@@ -860,7 +860,7 @@ jg_composer_classify_content() {  # <bordered> <content> [idle_re] [idle_case] [
 # 8-column rule run, closes with the rule glyph, and holds a real title
 # between them, mirroring the grok titled-bottom tolerance. The floor stays on
 # the leading run so a short transcript divider cannot qualify, and a spurious
-# pair still needs a second rule within FM_COMPOSER_PI_MAX_LINES: a pair that
+# pair still needs a second rule within JG_COMPOSER_PI_MAX_LINES: a pair that
 # closes over a bare agent-glyph row classifies through that same bare row,
 # while any other pair still needs a pi identity to prove anything, so this
 # can only ever move a verdict toward refusing, never toward a false `empty`.
@@ -885,7 +885,7 @@ _jg_composer_pi_separator_row() {  # <trimmed-row>
   fi
   rest=${row//─/}
   if [ "$rest" != "$row" ] \
-     && jg_composer_idle_matches "$rest" "${FM_COMPOSER_PI_NOTICE_RE:-$FM_COMPOSER_PI_NOTICE_RE_DEFAULT}" sensitive; then
+     && jg_composer_idle_matches "$rest" "${JG_COMPOSER_PI_NOTICE_RE:-$JG_COMPOSER_PI_NOTICE_RE_DEFAULT}" sensitive; then
     case "$row" in
       *────────*) return 0 ;;
     esac
@@ -908,15 +908,15 @@ _jg_composer_pi_separator_row() {  # <trimmed-row>
 # fails the mark test outright; a box content row (`│ foo │`) fails the
 # only-wave-set test. Both patterns are grep ALTERNATIONS of literal glyphs,
 # never a bracket range between multibyte endpoints, for the reason
-# FM_OMP_SPINNER_FRAMES_RE records.
-FM_COMPOSER_PI_WAVE_MARK_RE_DEFAULT='(▁|▂|▃|▄|╲|╱|◿|◣)'
-FM_COMPOSER_PI_WAVE_RE_DEFAULT='^[[:space:]]*(▁|▂|▃|▄|╲|╱|◿|◣|│)*[[:space:]]*$'
+# JG_OMP_SPINNER_FRAMES_RE records.
+JG_COMPOSER_PI_WAVE_MARK_RE_DEFAULT='(▁|▂|▃|▄|╲|╱|◿|◣)'
+JG_COMPOSER_PI_WAVE_RE_DEFAULT='^[[:space:]]*(▁|▂|▃|▄|╲|╱|◿|◣|│)*[[:space:]]*$'
 _jg_composer_pi_wave_art_row() {  # <trimmed-row>
   local row=$1
   jg_composer_normalize_trim_var row
   [ -n "$row" ] || return 1
-  jg_composer_idle_matches "$row" "${FM_COMPOSER_PI_WAVE_MARK_RE:-$FM_COMPOSER_PI_WAVE_MARK_RE_DEFAULT}" sensitive || return 1
-  jg_composer_idle_matches "$row" "${FM_COMPOSER_PI_WAVE_RE:-$FM_COMPOSER_PI_WAVE_RE_DEFAULT}" sensitive
+  jg_composer_idle_matches "$row" "${JG_COMPOSER_PI_WAVE_MARK_RE:-$JG_COMPOSER_PI_WAVE_MARK_RE_DEFAULT}" sensitive || return 1
+  jg_composer_idle_matches "$row" "${JG_COMPOSER_PI_WAVE_RE:-$JG_COMPOSER_PI_WAVE_RE_DEFAULT}" sensitive
 }
 
 # _jg_composer_pi_titled_rule_row: 0 when a trimmed row is Pi's LIVE turn frame
@@ -931,11 +931,11 @@ _jg_composer_pi_wave_art_row() {  # <trimmed-row>
 # composer was demonstrably empty.
 #
 # Deliberately NOT merged with _jg_composer_pi_separator_row: that predicate
-# stays strictly dashes-only and still owns FM_COMPOSER_SCAN_PI_LAST_SEPARATOR
+# stays strictly dashes-only and still owns JG_COMPOSER_SCAN_PI_LAST_SEPARATOR
 # (the cursorless staleness boundary), which a titled row must never move.
 # This one only OPENS the same candidate, so the whole identity conjunction
 # still decides the verdict - a live idle/done pi, a real draft, and the
-# FM_COMPOSER_PI_MAX_LINES adjacency bound are unchanged.
+# JG_COMPOSER_PI_MAX_LINES adjacency bound are unchanged.
 _jg_composer_pi_titled_rule_row() {  # <trimmed-row>
   local row=$1 rest title
   rest=$row
@@ -988,7 +988,7 @@ _jg_composer_titled_rule_row() {  # <trimmed-row> <plain-rule-spaces>
   [ "${#spaces}" -ge "${#expected}" ]
 }
 
-# Row-scan results are returned through FM_COMPOSER_SCAN_* globals (bash 3.2
+# Row-scan results are returned through JG_COMPOSER_SCAN_* globals (bash 3.2
 # has no nameref); they are internal to this owner.
 _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local pane=$1 cy=${2:-}
@@ -998,42 +998,42 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local current_indent='' current_family='' row=0 top=-1 valid=0 content_rows=0
   # Complete-box results: the box containing the cursor (cursor mode) or the
   # bottom-most complete box (no cursor).
-  FM_COMPOSER_SCAN_BOX_TOP=-1
-  FM_COMPOSER_SCAN_BOX_BOTTOM=-1
-  FM_COMPOSER_SCAN_BOX_AMBIG=0
-  FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
-  FM_COMPOSER_SCAN_UNSAFE=0
-  FM_COMPOSER_SCAN_CURSOR_EDGE=0
-  FM_COMPOSER_SCAN_BARE_ROW=-1
-  FM_COMPOSER_SCAN_SHELL_ROW=-1
-  FM_COMPOSER_SCAN_LEFTBAR_START=-1
-  FM_COMPOSER_SCAN_LEFTBAR_END=-1
-  FM_COMPOSER_SCAN_PI_PAIR_FOUND=0
-  FM_COMPOSER_SCAN_PI_PAIR_VALID=0
-  FM_COMPOSER_SCAN_PI_OPEN=-1
-  FM_COMPOSER_SCAN_PI_CLOSE=-1
+  JG_COMPOSER_SCAN_BOX_TOP=-1
+  JG_COMPOSER_SCAN_BOX_BOTTOM=-1
+  JG_COMPOSER_SCAN_BOX_AMBIG=0
+  JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
+  JG_COMPOSER_SCAN_UNSAFE=0
+  JG_COMPOSER_SCAN_CURSOR_EDGE=0
+  JG_COMPOSER_SCAN_BARE_ROW=-1
+  JG_COMPOSER_SCAN_SHELL_ROW=-1
+  JG_COMPOSER_SCAN_LEFTBAR_START=-1
+  JG_COMPOSER_SCAN_LEFTBAR_END=-1
+  JG_COMPOSER_SCAN_PI_PAIR_FOUND=0
+  JG_COMPOSER_SCAN_PI_PAIR_VALID=0
+  JG_COMPOSER_SCAN_PI_OPEN=-1
+  JG_COMPOSER_SCAN_PI_CLOSE=-1
   # 1 when the recorded pair OPENED on a plain separator (pi's idle
   # presentation) rather than on a titled rule or wave art (the working
   # presentations); _jg_composer_pi_verdict reads it to settle a `working`
   # identity over the idle shape.
-  FM_COMPOSER_SCAN_PI_OPEN_PLAIN=0
-  FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
+  JG_COMPOSER_SCAN_PI_OPEN_PLAIN=0
+  JG_COMPOSER_SCAN_PI_LAST_SEPARATOR=-1
   # The glyph PROOF of each envelope: the first row strictly inside it whose
   # content leads with an agent prompt glyph once its side borders are
   # stripped, and that glyph. This is what tells a composer container from a
   # decorative banner; it is recorded here, on the one pass that already walks
   # and trims every row, so the footer zone never re-reads the screen.
-  FM_COMPOSER_SCAN_BOX_GLYPH_ROW=-1
-  FM_COMPOSER_SCAN_BOX_GLYPH=
-  FM_COMPOSER_SCAN_PI_GLYPH_ROW=-1
-  FM_COMPOSER_SCAN_PI_GLYPH=
-  FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
-  FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
+  JG_COMPOSER_SCAN_BOX_GLYPH_ROW=-1
+  JG_COMPOSER_SCAN_BOX_GLYPH=
+  JG_COMPOSER_SCAN_PI_GLYPH_ROW=-1
+  JG_COMPOSER_SCAN_PI_GLYPH=
+  JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
+  JG_COMPOSER_SCAN_LEFTBAR_GLYPH=
   local leftbar_start=-1 pi_open=-1 pi_lines=0 pi_max pi_sep pi_titled
   local pi_open_plain=0
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
-  pi_max=$FM_COMPOSER_PI_MAX_LINES
+  pi_max=$JG_COMPOSER_PI_MAX_LINES
   case "$pi_max" in ''|*[!0-9]*|0) pi_max=8 ;; esac
   while IFS= read -r line; do
     indent=${line%%[![:space:]]*}
@@ -1090,20 +1090,20 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     fi
     if [ "$pi_sep" = 1 ] || [ "$pi_titled" = 1 ]; then
       if [ "$pi_sep" = 1 ]; then
-        FM_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
+        JG_COMPOSER_SCAN_PI_LAST_SEPARATOR=$row
       fi
       if [ "$pi_open" -ge 0 ]; then
-        FM_COMPOSER_SCAN_PI_PAIR_FOUND=1
-        FM_COMPOSER_SCAN_PI_OPEN=$pi_open
-        FM_COMPOSER_SCAN_PI_CLOSE=$row
-        FM_COMPOSER_SCAN_PI_OPEN_PLAIN=$pi_open_plain
+        JG_COMPOSER_SCAN_PI_PAIR_FOUND=1
+        JG_COMPOSER_SCAN_PI_OPEN=$pi_open
+        JG_COMPOSER_SCAN_PI_CLOSE=$row
+        JG_COMPOSER_SCAN_PI_OPEN_PLAIN=$pi_open_plain
         if [ "$pi_lines" -le "$pi_max" ]; then
-          FM_COMPOSER_SCAN_PI_PAIR_VALID=1
+          JG_COMPOSER_SCAN_PI_PAIR_VALID=1
         else
-          FM_COMPOSER_SCAN_PI_PAIR_VALID=0
+          JG_COMPOSER_SCAN_PI_PAIR_VALID=0
         fi
-        FM_COMPOSER_SCAN_PI_GLYPH_ROW=$pi_glyph_row
-        FM_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
+        JG_COMPOSER_SCAN_PI_GLYPH_ROW=$pi_glyph_row
+        JG_COMPOSER_SCAN_PI_GLYPH=$pi_glyph
       fi
       pi_open=$row
       pi_open_plain=$pi_sep
@@ -1126,14 +1126,14 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
       '┃'*)
         if [ "$leftbar_start" -lt 0 ]; then
           leftbar_start=$row
-          FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
-          FM_COMPOSER_SCAN_LEFTBAR_GLYPH=
+          JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=-1
+          JG_COMPOSER_SCAN_LEFTBAR_GLYPH=
         fi
-        FM_COMPOSER_SCAN_LEFTBAR_START=$leftbar_start
-        FM_COMPOSER_SCAN_LEFTBAR_END=$row
-        if [ "$FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
-          FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=$row_glyph_row
-          FM_COMPOSER_SCAN_LEFTBAR_GLYPH=$row_glyph
+        JG_COMPOSER_SCAN_LEFTBAR_START=$leftbar_start
+        JG_COMPOSER_SCAN_LEFTBAR_END=$row
+        if [ "$JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
+          JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW=$row_glyph_row
+          JG_COMPOSER_SCAN_LEFTBAR_GLYPH=$row_glyph
         fi
         ;;
       *) leftbar_start=-1 ;;
@@ -1144,22 +1144,22 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
     # Pi's cost footer can open with `$0.000`; that is furniture, not a prompt.
     if [ "$top" -lt 0 ] && jg_composer_leading_shell_glyph_var glyph "$trimmed" \
        && ! _jg_composer_row_is_pi_status "$trimmed"; then
-      FM_COMPOSER_SCAN_SHELL_ROW=$row
+      JG_COMPOSER_SCAN_SHELL_ROW=$row
     elif jg_composer_leading_agent_glyph_var glyph "$trimmed"; then
-      FM_COMPOSER_SCAN_BARE_ROW=$row
+      JG_COMPOSER_SCAN_BARE_ROW=$row
     fi
     # Cursor safety: a cursor sitting on a structural edge row is never an
     # input row.
     if [ -n "$cy" ] && [ "$row" -eq "$cy" ] && jg_composer_row_has_edge "$trimmed"; then
-      FM_COMPOSER_SCAN_CURSOR_EDGE=1
+      JG_COMPOSER_SCAN_CURSOR_EDGE=1
     fi
     # Complete-box state machine (all border families, geometry, ambiguity).
     if [ "$kind" = top ] || { [ "$kind" = ascii ] && [ "$top" -lt 0 ]; }; then
       if [ -n "$cy" ] && [ "$top" -ge 0 ] && [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; then
-        FM_COMPOSER_SCAN_UNSAFE=1
+        JG_COMPOSER_SCAN_UNSAFE=1
       fi
       top=$row
-      FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=$row
+      JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=$row
       current_family=$family
       current_indent=$indent
       valid=1
@@ -1204,28 +1204,28 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
         fi
         if [ -n "$cy" ]; then
           if [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; then
-            FM_COMPOSER_SCAN_BOX_TOP=$top
-            FM_COMPOSER_SCAN_BOX_BOTTOM=$row
-            FM_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
-            FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
-            FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
+            JG_COMPOSER_SCAN_BOX_TOP=$top
+            JG_COMPOSER_SCAN_BOX_BOTTOM=$row
+            JG_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
+            JG_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
+            JG_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
           fi
         else
-          FM_COMPOSER_SCAN_BOX_TOP=$top
-          FM_COMPOSER_SCAN_BOX_BOTTOM=$row
-          FM_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
-          FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
-          FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
+          JG_COMPOSER_SCAN_BOX_TOP=$top
+          JG_COMPOSER_SCAN_BOX_BOTTOM=$row
+          JG_COMPOSER_SCAN_BOX_AMBIG=$geometry_ambiguous
+          JG_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
+          JG_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
         fi
-        FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
+        JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
       else
-        if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -lt 0 ]; then
-          FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=$row
+        if [ "$JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -lt 0 ]; then
+          JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=$row
         fi
         if [ -n "$cy" ]; then
           if { [ "$top" -ge 0 ] && [ "$top" -lt "$cy" ] && [ "$cy" -le "$row" ]; } \
              || [ "$row" -eq "$cy" ]; then
-            FM_COMPOSER_SCAN_UNSAFE=1
+            JG_COMPOSER_SCAN_UNSAFE=1
           fi
         fi
       fi
@@ -1273,7 +1273,7 @@ _jg_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
 $pane
 EOF
   if [ -n "$cy" ] && [ "$top" -ge 0 ] && [ "$top" -lt "$cy" ]; then
-    FM_COMPOSER_SCAN_UNSAFE=1
+    JG_COMPOSER_SCAN_UNSAFE=1
   fi
 }
 
@@ -1301,14 +1301,14 @@ _jg_composer_titled_bottom_ok() {  # <family> <bottom-inner> <top-spaces>
   esac
   [ "$spaces" = "$expected" ] && return 0
 
-  # Grok 1.0.5 renders its real model title FM_COMPOSER_GROK_TITLE_OVERHANG
+  # Grok 1.0.5 renders its real model title JG_COMPOSER_GROK_TITLE_OVERHANG
   # columns wider than the otherwise aligned top and content rows (issue
   # #3436; see the constant's definition for provenance and caveats). Accept
   # only that exact overhang and only the typed Grok model/effort title
   # shape. This keeps arbitrary malformed bottoms ambiguous while preserving
   # the complete-box proof around a genuinely idle or pending Grok composer.
   local overhang
-  overhang=$(printf '%*s' "$FM_COMPOSER_GROK_TITLE_OVERHANG" '')
+  overhang=$(printf '%*s' "$JG_COMPOSER_GROK_TITLE_OVERHANG" '')
   [ "$spaces" = "$expected$overhang" ] || return 1
   title=${inner//"$dash"/}
   jg_composer_normalize_trim_var title
@@ -1406,7 +1406,7 @@ _jg_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
     content=$(_jg_composer_row_content "$raw" "$styled")
     plain=$(_jg_composer_row_content "$raw" 0)
     state=$(jg_composer_classify_content 1 "$content" \
-      "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 1 "$styled")
+      "${JG_COMPOSER_IDLE_RE:-$JG_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 1 "$styled")
     case "$state" in
       pending)
         if [ "$ambiguous" = 1 ]; then printf 'pending-unproven'; else printf 'pending'; fi
@@ -1435,7 +1435,7 @@ _jg_composer_classify_bare_row() {  # <screen> <styled> <row>
   _jg_composer_bare_row_strip_furniture_var content
   _jg_composer_bare_row_strip_furniture_var plain
   state=$(jg_composer_classify_content 0 "$content" \
-    "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 0 "$styled")
+    "${JG_COMPOSER_IDLE_RE:-$JG_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 0 "$styled")
   if [ "$styled" != 1 ] && [ "$state" = pending ]; then
     printf 'unknown'
     return 0
@@ -1444,47 +1444,47 @@ _jg_composer_classify_bare_row() {  # <screen> <styled> <row>
 }
 
 # _jg_composer_row_is_omp_status: 0 when the trimmed row is omp's status line
-# (FM_COMPOSER_OMP_STATUS_RE_DEFAULT above) - composer furniture that sits
+# (JG_COMPOSER_OMP_STATUS_RE_DEFAULT above) - composer furniture that sits
 # below a bare composer and must bound its wrap region exactly as an edge does.
 _jg_composer_row_is_omp_status() {  # <trimmed-row>
-  jg_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
+  jg_composer_idle_matches "$1" "${JG_COMPOSER_OMP_STATUS_RE:-$JG_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
 }
 
 # _jg_composer_row_is_opencode_status: 0 when the trimmed row is one of
-# OpenCode's below-floor status rows (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT
+# OpenCode's below-floor status rows (JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT
 # above) - composer furniture the left-bar envelope's staleness probe resumes
 # past, the way omp's status row bounds a bare composer's wrap region.
 _jg_composer_row_is_opencode_status() {  # <trimmed-row>
-  jg_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_STATUS_RE:-$FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
+  jg_composer_idle_matches "$1" "${JG_COMPOSER_OPENCODE_STATUS_RE:-$JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT}" sensitive
 }
 
 # _jg_composer_row_is_opencode_right_cell_wrap: 0 when <padded-body> - a
 # left-bar row's content after its `┃` is stripped, BEFORE trimming - is the
 # wrapped right-aligned directory fragment of the agent/model row's
-# `<dir>:<branch>` cell (FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT
+# `<dir>:<branch>` cell (JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT
 # above). The caller must additionally prove the row directly below is a
 # model row; the shape is furniture only in that position.
 _jg_composer_row_is_opencode_right_cell_wrap() {  # <padded-body>
-  jg_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE:-$FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT}" sensitive
+  jg_composer_idle_matches "$1" "${JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE:-$JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP_RE_DEFAULT}" sensitive
 }
 
 # _jg_composer_row_is_opencode_wrap_continuation: 0 when <padded-body> - a
 # left-bar row's content after its `┃` is stripped, BEFORE trimming - is a
 # continuation row of a wrapped right-aligned `<dir>:<branch>` directory
-# fragment (FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT above): the same wide
+# fragment (JG_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT above): the same wide
 # right-aligned padding with no `~/` or `/` lead and no interior whitespace.
 # Furniture only as part of a run whose opening row is
 # _jg_composer_row_is_opencode_right_cell_wrap and which ends directly above a
 # model row.
 _jg_composer_row_is_opencode_wrap_continuation() {  # <padded-body>
-  jg_composer_idle_matches "$1" "${FM_COMPOSER_OPENCODE_WRAP_CONT_RE:-$FM_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT}" sensitive
+  jg_composer_idle_matches "$1" "${JG_COMPOSER_OPENCODE_WRAP_CONT_RE:-$JG_COMPOSER_OPENCODE_WRAP_CONT_RE_DEFAULT}" sensitive
 }
 
 # _jg_composer_opencode_wrap_run_start: print the FIRST row of a wrapped
 # right-aligned `<dir>:<branch>` directory fragment that ends on the row
 # directly above <last> and lies within [<first>,<last>), else print nothing
 # and return 1. A one-row wrap is the PR 55 shape (that row is the opening
-# FM_COMPOSER_OPENCODE_RIGHT_CELL_WRAP itself); a taller wrap is a run of
+# JG_COMPOSER_OPENCODE_RIGHT_CELL_WRAP itself); a taller wrap is a run of
 # no-whitespace continuation rows below a `~/`- or `/`-opening row. The caller
 # must confirm <last> is a model row first, because the fragment is furniture
 # only in that position. Every row keeps the wide right-aligned padding, so
@@ -1517,7 +1517,7 @@ _jg_composer_opencode_wrap_run_start() {  # <screen> <styled> <first> <last>
 }
 
 # _jg_composer_opencode_badge_wrap_start: print the LAST badge-shaped row in
-# [<first>,<last>) (FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT), else print nothing
+# [<first>,<last>) (JG_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT), else print nothing
 # and return 1. That row is the badge only when a blank bar row sits directly above
 # it inside the run and a non-blank wrapped row sits below it.
 _jg_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
@@ -1529,7 +1529,7 @@ _jg_composer_opencode_badge_wrap_start() {  # <screen> <styled> <first> <last>
     case "$body" in '┃'*) body=${body#┃} ;; esac
     jg_composer_normalize_trim_var body
     if jg_composer_idle_matches "$body" \
-        "${FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$FM_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive; then
+        "${JG_COMPOSER_LEFTBAR_BADGE_WRAP_RE:-$JG_COMPOSER_LEFTBAR_BADGE_WRAP_RE_DEFAULT}" sensitive; then
       [ "$below" = 1 ] || return 1
       raw=$(_jg_composer_screen_row "$((row - 1))" "$screen")
       above=$(_jg_composer_row_content "$raw" "$styled")
@@ -1569,10 +1569,10 @@ _jg_composer_row_has_opencode_hint() {  # <trimmed-row>
 }
 
 # _jg_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
-# footer stats row (FM_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
+# footer stats row (JG_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
 # the separated pair; a `$` cost cell must not count as a dead-shell prompt.
 _jg_composer_row_is_pi_status() {  # <trimmed-row>
-  jg_composer_idle_matches "$1" "$FM_COMPOSER_PI_STATUS_RE_DEFAULT" sensitive
+  jg_composer_idle_matches "$1" "$JG_COMPOSER_PI_STATUS_RE_DEFAULT" sensitive
 }
 
 # _jg_composer_row_is_braille_furniture: 0 when the row is non-blank and its
@@ -1673,7 +1673,7 @@ _jg_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
   local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
   local last_body wrap_first=-1 badge_first=-1 ph_cont=-1
-  footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
+  footer_re=${JG_COMPOSER_LEFTBAR_FOOTER_RE:-$JG_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   badge_first=$(_jg_composer_opencode_badge_wrap_start "$screen" "$styled" "$first" "$last") || badge_first=-1
   # The agent/model row's wrapped `<dir>:<branch>` directory fragment is
   # furniture only directly above a model row, so prove the run's LAST row is
@@ -1706,7 +1706,7 @@ _jg_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
       case $content in *\") row=$((row + 1)); continue ;; esac
     fi
     if [ "$placeholder_position" = 1 ] \
-       && jg_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
+       && jg_composer_idle_matches "$content" "${JG_COMPOSER_IDLE_RE:-$JG_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
       _jg_composer_placeholder_wrap_open_var ph_cont "$row" "$content"
       row=$((row + 1)); continue
     fi
@@ -1745,7 +1745,7 @@ _jg_composer_leftbar_floor_row() {  # <trimmed-row>
 # every one of them already owned elsewhere in this file:
 #   - omp's status row and braille-only animation rows, the two furniture rows
 #     that already bound a bare composer's wrap region;
-#   - claude's permission-mode hint row (FM_COMPOSER_MODE_HINT_RE_DEFAULT);
+#   - claude's permission-mode hint row (JG_COMPOSER_MODE_HINT_RE_DEFAULT);
 #   - a row leading with an agent glyph OTHER than the one that proved the
 #     envelope. One pane runs one harness, so a foreign prompt glyph is never
 #     that harness's second composer - this is the `→` statusLine that started
@@ -1760,16 +1760,16 @@ _jg_composer_row_is_composer_furniture() {  # <trimmed-row> <proof-glyph>
   _jg_composer_row_is_omp_status "$row" && return 0
   _jg_composer_row_is_braille_furniture "$row" && return 0
   jg_composer_idle_matches "$row" \
-    "${FM_COMPOSER_MODE_HINT_RE:-$FM_COMPOSER_MODE_HINT_RE_DEFAULT}" sensitive && return 0
+    "${JG_COMPOSER_MODE_HINT_RE:-$JG_COMPOSER_MODE_HINT_RE_DEFAULT}" sensitive && return 0
   jg_composer_leading_agent_glyph_var glyph "$row" || return 1
   [ -n "$proof" ] && [ "$glyph" != "$proof" ]
 }
 
 # _jg_composer_locate_footer_zone: THE composer footer zone of <plain> (see THE
 # COMPOSER FOOTER ZONE in this file's header). Records the bottom-most
-# glyph-PROVEN envelope in FM_COMPOSER_FOOTER_AFTER (its closing row, including
-# the opencode left bar's half-block floor), FM_COMPOSER_FOOTER_GLYPH (the
-# proving row) and FM_COMPOSER_FOOTER_LAST (the contiguous non-blank run below
+# glyph-PROVEN envelope in JG_COMPOSER_FOOTER_AFTER (its closing row, including
+# the opencode left bar's half-block floor), JG_COMPOSER_FOOTER_GLYPH (the
+# proving row) and JG_COMPOSER_FOOTER_LAST (the contiguous non-blank run below
 # the closing row). The proof itself is read from the row scan, which already
 # recorded it on its single pass.
 #
@@ -1782,51 +1782,51 @@ _jg_composer_row_is_composer_furniture() {  # <trimmed-row> <proof-glyph>
 # or when the run holds no bare candidate at all (nothing to demote).
 _jg_composer_locate_footer_zone() {  # <plain>
   local plain=$1 close next trimmed proof=''
-  FM_COMPOSER_FOOTER_AFTER=-1
-  FM_COMPOSER_FOOTER_GLYPH=-1
-  FM_COMPOSER_FOOTER_LAST=-1
-  if [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -gt "$FM_COMPOSER_FOOTER_AFTER" ] \
-     && [ "$FM_COMPOSER_SCAN_BOX_GLYPH_ROW" -ge 0 ]; then
-    FM_COMPOSER_FOOTER_AFTER=$FM_COMPOSER_SCAN_BOX_BOTTOM
-    FM_COMPOSER_FOOTER_GLYPH=$FM_COMPOSER_SCAN_BOX_GLYPH_ROW
-    proof=$FM_COMPOSER_SCAN_BOX_GLYPH
+  JG_COMPOSER_FOOTER_AFTER=-1
+  JG_COMPOSER_FOOTER_GLYPH=-1
+  JG_COMPOSER_FOOTER_LAST=-1
+  if [ "$JG_COMPOSER_SCAN_BOX_BOTTOM" -gt "$JG_COMPOSER_FOOTER_AFTER" ] \
+     && [ "$JG_COMPOSER_SCAN_BOX_GLYPH_ROW" -ge 0 ]; then
+    JG_COMPOSER_FOOTER_AFTER=$JG_COMPOSER_SCAN_BOX_BOTTOM
+    JG_COMPOSER_FOOTER_GLYPH=$JG_COMPOSER_SCAN_BOX_GLYPH_ROW
+    proof=$JG_COMPOSER_SCAN_BOX_GLYPH
   fi
-  if [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -ge 0 ] \
-     && [ "$FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW" -ge 0 ]; then
-    close=$FM_COMPOSER_SCAN_LEFTBAR_END
+  if [ "$JG_COMPOSER_SCAN_LEFTBAR_END" -ge 0 ] \
+     && [ "$JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW" -ge 0 ]; then
+    close=$JG_COMPOSER_SCAN_LEFTBAR_END
     next=$((close + 1))
     trimmed=$(_jg_composer_screen_row "$next" "$plain")
     jg_composer_normalize_trim_var trimmed
     if _jg_composer_leftbar_floor_row "$trimmed"; then close=$next; fi
-    if [ "$close" -gt "$FM_COMPOSER_FOOTER_AFTER" ]; then
-      FM_COMPOSER_FOOTER_AFTER=$close
-      FM_COMPOSER_FOOTER_GLYPH=$FM_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW
-      proof=$FM_COMPOSER_SCAN_LEFTBAR_GLYPH
+    if [ "$close" -gt "$JG_COMPOSER_FOOTER_AFTER" ]; then
+      JG_COMPOSER_FOOTER_AFTER=$close
+      JG_COMPOSER_FOOTER_GLYPH=$JG_COMPOSER_SCAN_LEFTBAR_GLYPH_ROW
+      proof=$JG_COMPOSER_SCAN_LEFTBAR_GLYPH
     fi
   fi
-  if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-     && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$FM_COMPOSER_FOOTER_AFTER" ] \
-     && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ]; then
-    FM_COMPOSER_FOOTER_AFTER=$FM_COMPOSER_SCAN_PI_CLOSE
-    FM_COMPOSER_FOOTER_GLYPH=$FM_COMPOSER_SCAN_PI_GLYPH_ROW
-    proof=$FM_COMPOSER_SCAN_PI_GLYPH
+  if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+     && [ "$JG_COMPOSER_SCAN_PI_CLOSE" -gt "$JG_COMPOSER_FOOTER_AFTER" ] \
+     && [ "$JG_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ]; then
+    JG_COMPOSER_FOOTER_AFTER=$JG_COMPOSER_SCAN_PI_CLOSE
+    JG_COMPOSER_FOOTER_GLYPH=$JG_COMPOSER_SCAN_PI_GLYPH_ROW
+    proof=$JG_COMPOSER_SCAN_PI_GLYPH
   fi
-  [ "$FM_COMPOSER_FOOTER_AFTER" -ge 0 ] || return 1
+  [ "$JG_COMPOSER_FOOTER_AFTER" -ge 0 ] || return 1
   # Nothing below the envelope can be demoted unless a bare candidate sits
   # there, so settle that from the scan's own record before walking any rows.
-  [ "$FM_COMPOSER_SCAN_BARE_ROW" -gt "$FM_COMPOSER_FOOTER_AFTER" ] || return 1
-  FM_COMPOSER_FOOTER_LAST=$FM_COMPOSER_FOOTER_AFTER
-  next=$((FM_COMPOSER_FOOTER_AFTER + 1))
+  [ "$JG_COMPOSER_SCAN_BARE_ROW" -gt "$JG_COMPOSER_FOOTER_AFTER" ] || return 1
+  JG_COMPOSER_FOOTER_LAST=$JG_COMPOSER_FOOTER_AFTER
+  next=$((JG_COMPOSER_FOOTER_AFTER + 1))
   while :; do
     trimmed=$(_jg_composer_screen_row "$next" "$plain")
     jg_composer_normalize_trim_var trimmed
     [ -n "$trimmed" ] || break
     _jg_composer_row_is_composer_furniture "$trimmed" "$proof" || return 1
-    FM_COMPOSER_FOOTER_LAST=$next
+    JG_COMPOSER_FOOTER_LAST=$next
     next=$((next + 1))
   done
-  [ "$FM_COMPOSER_SCAN_BARE_ROW" -gt "$FM_COMPOSER_FOOTER_AFTER" ] \
-    && [ "$FM_COMPOSER_SCAN_BARE_ROW" -le "$FM_COMPOSER_FOOTER_LAST" ]
+  [ "$JG_COMPOSER_SCAN_BARE_ROW" -gt "$JG_COMPOSER_FOOTER_AFTER" ] \
+    && [ "$JG_COMPOSER_SCAN_BARE_ROW" -le "$JG_COMPOSER_FOOTER_LAST" ]
 }
 
 # _jg_composer_bare_continuation_row: 0 when a trimmed row below a bare
@@ -1858,13 +1858,13 @@ _jg_composer_bare_rule_sandwich() {  # <plain-screen> <row>
   local plain=$1 row=$2 above below next
   [ "$row" -ge 1 ] || return 1
   next=$((row + 1))
-  while [ "$next" -lt "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" ]; do
+  while [ "$next" -lt "$JG_COMPOSER_SCAN_PI_LAST_SEPARATOR" ]; do
     below=$(_jg_composer_screen_row "$next" "$plain")
     jg_composer_normalize_trim_var below
     _jg_composer_bare_continuation_row "$below" || return 1
     next=$((next + 1))
   done
-  [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" -eq "$next" ] || return 1
+  [ "$JG_COMPOSER_SCAN_PI_LAST_SEPARATOR" -eq "$next" ] || return 1
   below=$(_jg_composer_screen_row "$next" "$plain")
   jg_composer_normalize_trim_var below
   _jg_composer_pi_separator_row "$below" || return 1
@@ -1876,30 +1876,30 @@ _jg_composer_bare_rule_sandwich() {  # <plain-screen> <row>
 _jg_composer_select_cursorless() {
   local plain=$1 generic=-1 next boundary raw trimmed glyph bare footer=0 menu
   local run_end run_has_status run_busy probe_row probe_trimmed
-  FM_COMPOSER_SELECTION_REFUSAL=none
-  FM_COMPOSER_SELECTED_KIND=
-  FM_COMPOSER_SELECTED_FIRST=-1
-  FM_COMPOSER_SELECTED_LAST=-1
-  FM_COMPOSER_SELECTED_AMBIG=0
+  JG_COMPOSER_SELECTION_REFUSAL=none
+  JG_COMPOSER_SELECTED_KIND=
+  JG_COMPOSER_SELECTED_FIRST=-1
+  JG_COMPOSER_SELECTED_LAST=-1
+  JG_COMPOSER_SELECTED_AMBIG=0
   if _jg_composer_locate_footer_zone "$plain"; then footer=1; fi
-  if [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -ge 0 ]; then
-    generic=$FM_COMPOSER_SCAN_BOX_BOTTOM
-    FM_COMPOSER_SELECTED_KIND=box
-    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_BOX_TOP + 1))
-    FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
-    FM_COMPOSER_SELECTED_AMBIG=$FM_COMPOSER_SCAN_BOX_AMBIG
+  if [ "$JG_COMPOSER_SCAN_BOX_BOTTOM" -ge 0 ]; then
+    generic=$JG_COMPOSER_SCAN_BOX_BOTTOM
+    JG_COMPOSER_SELECTED_KIND=box
+    JG_COMPOSER_SELECTED_FIRST=$((JG_COMPOSER_SCAN_BOX_TOP + 1))
+    JG_COMPOSER_SELECTED_LAST=$((JG_COMPOSER_SCAN_BOX_BOTTOM - 1))
+    JG_COMPOSER_SELECTED_AMBIG=$JG_COMPOSER_SCAN_BOX_AMBIG
   fi
   # A bare candidate standing in a proven envelope's footer zone is that
   # harness's own furniture, never a composer. The envelope it sits under is
   # what the screen actually shows, so when that envelope's proving glyph row
   # is itself borderless, the bare candidate moves UP to it; otherwise the
   # envelope (box, left bar) stays selected on its own.
-  bare=$FM_COMPOSER_SCAN_BARE_ROW
+  bare=$JG_COMPOSER_SCAN_BARE_ROW
   if [ "$footer" = 1 ]; then
-    trimmed=$(_jg_composer_screen_row "$FM_COMPOSER_FOOTER_GLYPH" "$plain")
+    trimmed=$(_jg_composer_screen_row "$JG_COMPOSER_FOOTER_GLYPH" "$plain")
     jg_composer_normalize_trim_var trimmed
     if jg_composer_leading_agent_glyph_var glyph "$trimmed"; then
-      bare=$FM_COMPOSER_FOOTER_GLYPH
+      bare=$JG_COMPOSER_FOOTER_GLYPH
     else
       bare=-1
     fi
@@ -1916,12 +1916,12 @@ _jg_composer_select_cursorless() {
   menu=0
   raw=
   [ "$bare" -lt 0 ] || raw=$(_jg_composer_screen_row "$bare" "$plain")
-  if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+  if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
      && case "$raw" in [[:space:]]*) true ;; *) false ;; esac \
-     && [ "$bare" -gt "$FM_COMPOSER_SCAN_PI_CLOSE" ] \
-     && [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" = "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+     && [ "$bare" -gt "$JG_COMPOSER_SCAN_PI_CLOSE" ] \
+     && [ "$JG_COMPOSER_SCAN_PI_LAST_SEPARATOR" = "$JG_COMPOSER_SCAN_PI_CLOSE" ]; then
     menu=1
-    next=$((FM_COMPOSER_SCAN_PI_CLOSE + 1))
+    next=$((JG_COMPOSER_SCAN_PI_CLOSE + 1))
     while [ "$next" -le "$bare" ]; do
       trimmed=$(_jg_composer_screen_row "$next" "$plain")
       jg_composer_normalize_trim_var trimmed
@@ -1930,8 +1930,8 @@ _jg_composer_select_cursorless() {
     done
   fi
   if [ "$menu" = 1 ]; then
-    next=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
-    while [ "$next" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+    next=$((JG_COMPOSER_SCAN_PI_OPEN + 1))
+    while [ "$next" -lt "$JG_COMPOSER_SCAN_PI_CLOSE" ]; do
       trimmed=$(_jg_composer_screen_row "$next" "$plain")
       jg_composer_normalize_trim_var trimmed
       if jg_composer_leading_agent_glyph_var glyph "$trimmed"; then
@@ -1945,62 +1945,62 @@ _jg_composer_select_cursorless() {
   fi
   if [ "$bare" -gt "$generic" ]; then
     generic=$bare
-    FM_COMPOSER_SELECTED_KIND=bare
-    FM_COMPOSER_SELECTED_FIRST=$bare
-    FM_COMPOSER_SELECTED_LAST=$bare
+    JG_COMPOSER_SELECTED_KIND=bare
+    JG_COMPOSER_SELECTED_FIRST=$bare
+    JG_COMPOSER_SELECTED_LAST=$bare
   fi
-  if [ "$FM_COMPOSER_SCAN_LEFTBAR_END" -gt "$generic" ]; then
-    generic=$FM_COMPOSER_SCAN_LEFTBAR_END
-    FM_COMPOSER_SELECTED_KIND=leftbar
-    FM_COMPOSER_SELECTED_FIRST=$FM_COMPOSER_SCAN_LEFTBAR_START
-    FM_COMPOSER_SELECTED_LAST=$FM_COMPOSER_SCAN_LEFTBAR_END
+  if [ "$JG_COMPOSER_SCAN_LEFTBAR_END" -gt "$generic" ]; then
+    generic=$JG_COMPOSER_SCAN_LEFTBAR_END
+    JG_COMPOSER_SELECTED_KIND=leftbar
+    JG_COMPOSER_SELECTED_FIRST=$JG_COMPOSER_SCAN_LEFTBAR_START
+    JG_COMPOSER_SELECTED_LAST=$JG_COMPOSER_SCAN_LEFTBAR_END
   fi
-  if [ "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
-    FM_COMPOSER_SELECTION_REFUSAL=lower-incomplete-box
-    FM_COMPOSER_SELECTED_KIND=
+  if [ "$JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" -gt "$generic" ]; then
+    JG_COMPOSER_SELECTION_REFUSAL=lower-incomplete-box
+    JG_COMPOSER_SELECTED_KIND=
     return 1
   fi
-  if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-     && [ "$FM_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
-     && [ "$generic" -lt "$FM_COMPOSER_SCAN_PI_OPEN" ]; then
-    generic=$FM_COMPOSER_SCAN_PI_CLOSE
-    FM_COMPOSER_SELECTED_KIND=pi
-    FM_COMPOSER_SELECTED_FIRST=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
-    FM_COMPOSER_SELECTED_LAST=$((FM_COMPOSER_SCAN_PI_CLOSE - 1))
+  if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+     && [ "$JG_COMPOSER_SCAN_PI_CLOSE" -gt "$generic" ] \
+     && [ "$generic" -lt "$JG_COMPOSER_SCAN_PI_OPEN" ]; then
+    generic=$JG_COMPOSER_SCAN_PI_CLOSE
+    JG_COMPOSER_SELECTED_KIND=pi
+    JG_COMPOSER_SELECTED_FIRST=$((JG_COMPOSER_SCAN_PI_OPEN + 1))
+    JG_COMPOSER_SELECTED_LAST=$((JG_COMPOSER_SCAN_PI_CLOSE - 1))
   fi
-  if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 0 ] \
-     && [ "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" -gt "$generic" ]; then
+  if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 0 ] \
+     && [ "$JG_COMPOSER_SCAN_PI_LAST_SEPARATOR" -gt "$generic" ]; then
     # Spare only a bare glyph inside its own titled composer rules; see
     # _jg_composer_bare_rule_sandwich for why that shape is not scrollback.
-    if ! { [ "$FM_COMPOSER_SELECTED_KIND" = bare ] \
-           && [ "$generic" = "$FM_COMPOSER_SCAN_BARE_ROW" ] \
-           && _jg_composer_bare_rule_sandwich "$plain" "$FM_COMPOSER_SCAN_BARE_ROW"; }; then
-      FM_COMPOSER_SELECTION_REFUSAL=lower-unmatched-rule
-      FM_COMPOSER_SELECTED_KIND=
+    if ! { [ "$JG_COMPOSER_SELECTED_KIND" = bare ] \
+           && [ "$generic" = "$JG_COMPOSER_SCAN_BARE_ROW" ] \
+           && _jg_composer_bare_rule_sandwich "$plain" "$JG_COMPOSER_SCAN_BARE_ROW"; }; then
+      JG_COMPOSER_SELECTION_REFUSAL=lower-unmatched-rule
+      JG_COMPOSER_SELECTED_KIND=
       return 1
     fi
   fi
-  if [ "$FM_COMPOSER_SCAN_SHELL_ROW" -gt "$generic" ]; then
-    FM_COMPOSER_SELECTION_REFUSAL=lower-shell-prompt
-    FM_COMPOSER_SELECTED_KIND=
+  if [ "$JG_COMPOSER_SCAN_SHELL_ROW" -gt "$generic" ]; then
+    JG_COMPOSER_SELECTION_REFUSAL=lower-shell-prompt
+    JG_COMPOSER_SELECTED_KIND=
     return 1
   fi
-  if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
-    next=$((FM_COMPOSER_SELECTED_LAST + 1))
+  if [ "$JG_COMPOSER_SELECTED_KIND" = bare ]; then
+    next=$((JG_COMPOSER_SELECTED_LAST + 1))
     while :; do
       raw=$(_jg_composer_screen_row "$next" "$plain")
       trimmed=$raw
       jg_composer_normalize_trim_var trimmed
       _jg_composer_bare_continuation_row "$trimmed" || break
-      FM_COMPOSER_SELECTED_LAST=$next
+      JG_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done
   fi
-  if [ "$FM_COMPOSER_SELECTED_KIND" = box ] \
-     || [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ]; then
-    boundary=$FM_COMPOSER_SELECTED_LAST
-    if [ "$FM_COMPOSER_SELECTED_KIND" = box ]; then
-      boundary=$FM_COMPOSER_SCAN_BOX_BOTTOM
+  if [ "$JG_COMPOSER_SELECTED_KIND" = box ] \
+     || [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ]; then
+    boundary=$JG_COMPOSER_SELECTED_LAST
+    if [ "$JG_COMPOSER_SELECTED_KIND" = box ]; then
+      boundary=$JG_COMPOSER_SCAN_BOX_BOTTOM
     else
       next=$((boundary + 1))
       raw=$(_jg_composer_screen_row "$next" "$plain")
@@ -2009,7 +2009,7 @@ _jg_composer_select_cursorless() {
       if _jg_composer_leftbar_floor_row "$trimmed"; then
         boundary=$next
         # OpenCode's own status area sits directly below the floor
-        # (FM_COMPOSER_OPENCODE_STATUS_RE_DEFAULT): those rows are furniture,
+        # (JG_COMPOSER_OPENCODE_STATUS_RE_DEFAULT): those rows are furniture,
         # so the staleness probe resumes past them instead of reading the
         # composer stale. The area is one contiguous non-blank block, consumed
         # as a whole only when it is provably furniture: at least one row
@@ -2043,20 +2043,20 @@ _jg_composer_select_cursorless() {
     # glyph proved to be its furniture are not the lower live shape that makes
     # the envelope stale, so the staleness probe resumes past them.
     next=$((boundary + 1))
-    if [ "$footer" = 1 ] && [ "$FM_COMPOSER_FOOTER_AFTER" = "$boundary" ]; then
-      next=$((FM_COMPOSER_FOOTER_LAST + 1))
+    if [ "$footer" = 1 ] && [ "$JG_COMPOSER_FOOTER_AFTER" = "$boundary" ]; then
+      next=$((JG_COMPOSER_FOOTER_LAST + 1))
     fi
     raw=$(_jg_composer_screen_row "$next" "$plain")
     trimmed=$raw
     jg_composer_normalize_trim_var trimmed
     if [ -n "$trimmed" ] && ! jg_composer_row_has_edge "$trimmed"; then
-      FM_COMPOSER_SELECTION_REFUSAL=stale-envelope
-      FM_COMPOSER_SELECTED_KIND=
+      JG_COMPOSER_SELECTION_REFUSAL=stale-envelope
+      JG_COMPOSER_SELECTED_KIND=
       return 1
     fi
   fi
-  if [ -z "$FM_COMPOSER_SELECTED_KIND" ]; then
-    FM_COMPOSER_SELECTION_REFUSAL=no-composer-shape
+  if [ -z "$JG_COMPOSER_SELECTED_KIND" ]; then
+    JG_COMPOSER_SELECTION_REFUSAL=no-composer-shape
     return 1
   fi
   return 0
@@ -2066,25 +2066,25 @@ _jg_composer_select_cursorless() {
 # fixed predicate and numeric row geometry. No capture text is emitted, and
 # there is no second read: the facts belong to the same frame that failed.
 _jg_composer_extract_refusal_geometry() {  # <plain-screen>
-  local predicate=${FM_COMPOSER_SELECTION_REFUSAL:-no-composer-shape} rows
+  local predicate=${JG_COMPOSER_SELECTION_REFUSAL:-no-composer-shape} rows
   case "$predicate" in
     lower-incomplete-box|lower-unmatched-rule|lower-shell-prompt|stale-envelope|no-composer-shape) ;;
     *) predicate=unrecognized ;;
   esac
   rows=$(printf '%s\n' "$1" | LC_ALL=C awk 'END { print NR }')
   printf 'jg-composer-extract: refused predicate=%s rows=%d bare=%d rule=%d pair=%d incomplete=%d shell=%d box-bottom=%d leftbar-end=%d selected-first=%d selected-last=%d\n' \
-    "$predicate" "$rows" "$FM_COMPOSER_SCAN_BARE_ROW" \
-    "$FM_COMPOSER_SCAN_PI_LAST_SEPARATOR" "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" \
-    "$FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" "$FM_COMPOSER_SCAN_SHELL_ROW" \
-    "$FM_COMPOSER_SCAN_BOX_BOTTOM" "$FM_COMPOSER_SCAN_LEFTBAR_END" \
-    "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST" >&2
+    "$predicate" "$rows" "$JG_COMPOSER_SCAN_BARE_ROW" \
+    "$JG_COMPOSER_SCAN_PI_LAST_SEPARATOR" "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" \
+    "$JG_COMPOSER_SCAN_INCOMPLETE_BOX_FROM" "$JG_COMPOSER_SCAN_SHELL_ROW" \
+    "$JG_COMPOSER_SCAN_BOX_BOTTOM" "$JG_COMPOSER_SCAN_LEFTBAR_END" \
+    "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST" >&2
 }
 
 jg_composer_extract_selected_content() {  # <caps> <screen> [diagnostics=0]
   local caps=$1 screen=$2 styled=0 kv plain row raw content glyph joined='' footer_re prompt_row=-1
   local leading_blank=1 placeholder_position=0 prompt_is_shell=0 diagnostics=${3:-0}
   local last_body wrap_first=-1 badge_first=-1 ph_cont=-1
-  footer_re=${FM_COMPOSER_LEFTBAR_FOOTER_RE:-$FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
+  footer_re=${JG_COMPOSER_LEFTBAR_FOOTER_RE:-$JG_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT}
   while IFS= read -r kv; do
     [ "$kv" = styled=1 ] && styled=1
   done <<EOF
@@ -2096,35 +2096,35 @@ EOF
     if [ "$diagnostics" = 1 ]; then _jg_composer_extract_refusal_geometry "$plain"; fi
     return 1
   fi
-  row=$FM_COMPOSER_SELECTED_FIRST
+  row=$JG_COMPOSER_SELECTED_FIRST
   # The left-bar run's wrapped `<dir>:<branch>` directory fragment is
   # furniture only directly above a model row; prove the run's last row is
   # one before any row may claim that shape, the same rule the classifier
   # applies, so extraction never returns the fragment as composer content.
-  if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ]; then
+  if [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ]; then
     badge_first=$(_jg_composer_opencode_badge_wrap_start "$screen" "$styled" \
-      "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST") || badge_first=-1
-    raw=$(_jg_composer_screen_row "$FM_COMPOSER_SELECTED_LAST" "$screen")
+      "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST") || badge_first=-1
+    raw=$(_jg_composer_screen_row "$JG_COMPOSER_SELECTED_LAST" "$screen")
     last_body=$(_jg_composer_row_content "$raw" "$styled")
     case "$last_body" in '┃'*) last_body=${last_body#┃} ;; esac
     jg_composer_normalize_trim_var last_body
     if jg_composer_idle_matches "$last_body" "$footer_re" sensitive; then
       wrap_first=$(_jg_composer_opencode_wrap_run_start "$screen" "$styled" \
-        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST") || wrap_first=-1
+        "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST") || wrap_first=-1
     fi
   fi
-  while [ "$row" -le "$FM_COMPOSER_SELECTED_LAST" ]; do
+  while [ "$row" -le "$JG_COMPOSER_SELECTED_LAST" ]; do
     raw=$(_jg_composer_screen_row "$row" "$screen")
     content=$(_jg_composer_row_content "$raw" "$styled")
     placeholder_position=0
-    if [ "$FM_COMPOSER_SELECTED_KIND" = pi ] \
+    if [ "$JG_COMPOSER_SELECTED_KIND" = pi ] \
        && _jg_composer_row_is_pi_notice "$raw" "$styled"; then
       row=$((row + 1))
       continue
     fi
-    case "$FM_COMPOSER_SELECTED_KIND" in
+    case "$JG_COMPOSER_SELECTED_KIND" in
       bare)
-        if [ "$row" -eq "$FM_COMPOSER_SELECTED_FIRST" ] \
+        if [ "$row" -eq "$JG_COMPOSER_SELECTED_FIRST" ] \
            && jg_composer_leading_agent_glyph_var glyph "$content"; then
           content=${content#*"$glyph"}
         fi
@@ -2134,7 +2134,7 @@ EOF
         jg_composer_normalize_trim_var content
         if [ -z "$content" ]; then
           :
-        elif [ "$leading_blank" = 1 ] && [ "$row" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
+        elif [ "$leading_blank" = 1 ] && [ "$row" -gt "$JG_COMPOSER_SELECTED_FIRST" ]; then
           placeholder_position=1
           leading_blank=0
         else
@@ -2146,7 +2146,7 @@ EOF
            && jg_composer_leading_prompt_glyph_var glyph "$content"; then
           prompt_row=$row
           placeholder_position=1
-          if _jg_composer_is_prompt_glyph "$glyph" "$FM_COMPOSER_SHELL_PROMPT_GLYPHS"; then
+          if _jg_composer_is_prompt_glyph "$glyph" "$JG_COMPOSER_SHELL_PROMPT_GLYPHS"; then
             prompt_is_shell=1
           fi
           content=${content#*"$glyph"}
@@ -2164,28 +2164,28 @@ EOF
     # OpenCode's left-bar hint and legacy shell-glyph boxed placeholders have no
     # such styling proof, so their structurally fixed positions remain the two
     # idle-regex exceptions here.
-    if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ -n "$content" ] \
+    if [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] && [ -n "$content" ] \
        && [ "$ph_cont" -ge 0 ] && [ "$row" -eq $((ph_cont + 1)) ]; then
       ph_cont=-1
       case $content in *\") row=$((row + 1)); continue ;; esac
     fi
-    if [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] && [ "$placeholder_position" = 1 ] \
-       && jg_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
+    if [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] && [ "$placeholder_position" = 1 ] \
+       && jg_composer_idle_matches "$content" "${JG_COMPOSER_IDLE_RE:-$JG_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
       _jg_composer_placeholder_wrap_open_var ph_cont "$row" "$content"
     fi
     if [ -z "$content" ] \
-       || { { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
-              || { [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$prompt_is_shell" = 1 ]; }; } \
+       || { { [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] \
+              || { [ "$JG_COMPOSER_SELECTED_KIND" = box ] && [ "$prompt_is_shell" = 1 ]; }; } \
             && [ "$placeholder_position" = 1 ] \
-            && jg_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; } \
-       || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
-            && [ "$row" -eq "$FM_COMPOSER_SELECTED_LAST" ] \
+            && jg_composer_idle_matches "$content" "${JG_COMPOSER_IDLE_RE:-$JG_COMPOSER_IDLE_RE_DEFAULT}" insensitive; } \
+       || { [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] \
+            && [ "$row" -eq "$JG_COMPOSER_SELECTED_LAST" ] \
             && jg_composer_idle_matches "$content" "$footer_re" sensitive; } \
-       || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
+       || { [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] \
             && [ "$wrap_first" -ge 0 ] \
             && [ "$row" -ge "$wrap_first" ] \
-            && [ "$row" -lt "$FM_COMPOSER_SELECTED_LAST" ]; } \
-       || { [ "$FM_COMPOSER_SELECTED_KIND" = leftbar ] \
+            && [ "$row" -lt "$JG_COMPOSER_SELECTED_LAST" ]; } \
+       || { [ "$JG_COMPOSER_SELECTED_KIND" = leftbar ] \
             && [ "$badge_first" -ge 0 ] \
             && [ "$row" -ge "$badge_first" ]; }; then
       row=$((row + 1))
@@ -2223,46 +2223,46 @@ jg_composer_blocking_dialog() {  # <screen> -> dialog name
 }
 
 # A command substitution drops a shell variable, and every composer read runs
-# inside one. The name is therefore written to FM_COMPOSER_DIALOG_SINK when
+# inside one. The name is therefore written to JG_COMPOSER_DIALOG_SINK when
 # that path is set. The classifier verdict is unchanged. When the sink is
 # unset the name would be discarded, so the match is skipped.
 jg_composer_note_blocking_dialog() {  # <screen>
   local name=
-  [ -n "${FM_COMPOSER_DIALOG_SINK:-}" ] || return 1
+  [ -n "${JG_COMPOSER_DIALOG_SINK:-}" ] || return 1
   if name=$(jg_composer_blocking_dialog "$1"); then
-    printf '%s' "$name" > "$FM_COMPOSER_DIALOG_SINK" || return 1
+    printf '%s' "$name" > "$JG_COMPOSER_DIALOG_SINK" || return 1
     return 0
   fi
-  : > "$FM_COMPOSER_DIALOG_SINK" || return 1
+  : > "$JG_COMPOSER_DIALOG_SINK" || return 1
   return 1
 }
 
 # jg_composer_blocking_dialog_noted: print the name the latest classify wrote
 # to the sink. Returns 1 when the sink is unset or empty.
 jg_composer_blocking_dialog_noted() {
-  [ -n "${FM_COMPOSER_DIALOG_SINK:-}" ] || return 1
-  [ -s "$FM_COMPOSER_DIALOG_SINK" ] || return 1
-  cat "$FM_COMPOSER_DIALOG_SINK"
+  [ -n "${JG_COMPOSER_DIALOG_SINK:-}" ] || return 1
+  [ -s "$JG_COMPOSER_DIALOG_SINK" ] || return 1
+  cat "$JG_COMPOSER_DIALOG_SINK"
 }
 
 # Empty the sink, creating it when the caller has not. Sets
-# FM_COMPOSER_DIALOG_OWNED=1 only for a sink this call created, so a caller
+# JG_COMPOSER_DIALOG_OWNED=1 only for a sink this call created, so a caller
 # that shares the path can still read the name after the release.
 jg_composer_dialog_sink_prepare() {
-  FM_COMPOSER_DIALOG_OWNED=0
-  if [ -z "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
-    FM_COMPOSER_DIALOG_SINK=$(mktemp "${TMPDIR:-/tmp}/jg-composer-dialog.XXXXXX") || return 1
-    FM_COMPOSER_DIALOG_OWNED=1
+  JG_COMPOSER_DIALOG_OWNED=0
+  if [ -z "${JG_COMPOSER_DIALOG_SINK:-}" ]; then
+    JG_COMPOSER_DIALOG_SINK=$(mktemp "${TMPDIR:-/tmp}/jg-composer-dialog.XXXXXX") || return 1
+    JG_COMPOSER_DIALOG_OWNED=1
     return 0
   fi
-  : > "$FM_COMPOSER_DIALOG_SINK"
+  : > "$JG_COMPOSER_DIALOG_SINK"
 }
 
 jg_composer_dialog_sink_release() {
-  if [ "${FM_COMPOSER_DIALOG_OWNED:-}" = 1 ]; then
-    rm -f "$FM_COMPOSER_DIALOG_SINK"
-    FM_COMPOSER_DIALOG_SINK=
-    FM_COMPOSER_DIALOG_OWNED=0
+  if [ "${JG_COMPOSER_DIALOG_OWNED:-}" = 1 ]; then
+    rm -f "$JG_COMPOSER_DIALOG_SINK"
+    JG_COMPOSER_DIALOG_SINK=
+    JG_COMPOSER_DIALOG_OWNED=0
   fi
 }
 
@@ -2288,25 +2288,25 @@ EOF
   _jg_composer_scan_screen "$plain" "$cy"
   if [ -n "$cy" ]; then
     # Cursor mode (tmux): the shape CONTAINING the cursor is the composer.
-    if [ "$FM_COMPOSER_SCAN_UNSAFE" = 1 ]; then
+    if [ "$JG_COMPOSER_SCAN_UNSAFE" = 1 ]; then
       printf 'unknown'; return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
-      _jg_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
-        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))"
+    if [ "$JG_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
+      _jg_composer_classify_rows "$screen" "$styled" "$JG_COMPOSER_SCAN_BOX_AMBIG" \
+        "$((JG_COMPOSER_SCAN_BOX_TOP + 1))" "$((JG_COMPOSER_SCAN_BOX_BOTTOM - 1))"
       return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
-       && [ "$cy" -ge "$FM_COMPOSER_SCAN_LEFTBAR_START" ] \
-       && [ "$cy" -le "$FM_COMPOSER_SCAN_LEFTBAR_END" ]; then
+    if [ "$JG_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
+       && [ "$cy" -ge "$JG_COMPOSER_SCAN_LEFTBAR_START" ] \
+       && [ "$cy" -le "$JG_COMPOSER_SCAN_LEFTBAR_END" ]; then
       _jg_composer_classify_leftbar "$screen" "$styled" \
-        "$FM_COMPOSER_SCAN_LEFTBAR_START" "$FM_COMPOSER_SCAN_LEFTBAR_END"
+        "$JG_COMPOSER_SCAN_LEFTBAR_START" "$JG_COMPOSER_SCAN_LEFTBAR_END"
       return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$FM_COMPOSER_SCAN_BARE_ROW" ]; then
-      if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-         && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-         && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    if [ "$JG_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -eq "$JG_COMPOSER_SCAN_BARE_ROW" ]; then
+      if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+         && [ "$cy" -gt "$JG_COMPOSER_SCAN_PI_OPEN" ] \
+         && [ "$cy" -lt "$JG_COMPOSER_SCAN_PI_CLOSE" ]; then
         _jg_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" "$cy"
       else
         _jg_composer_classify_bare_row "$screen" "$styled" "$cy"
@@ -2320,18 +2320,18 @@ EOF
     # wrapped input - an IDENTIFIED region, so the strict blank-row rule does
     # not apply and a swallowed Enter on a long message still reads pending
     # and earns its retry.
-    if [ "$FM_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -gt "$FM_COMPOSER_SCAN_BARE_ROW" ] \
-       && _jg_composer_wrap_region_ok "$plain" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"; then
-      _jg_composer_classify_bare_wrap "$screen" "$styled" "$FM_COMPOSER_SCAN_BARE_ROW" "$cy"
+    if [ "$JG_COMPOSER_SCAN_BARE_ROW" -ge 0 ] && [ "$cy" -gt "$JG_COMPOSER_SCAN_BARE_ROW" ] \
+       && _jg_composer_wrap_region_ok "$plain" "$JG_COMPOSER_SCAN_BARE_ROW" "$cy"; then
+      _jg_composer_classify_bare_wrap "$screen" "$styled" "$JG_COMPOSER_SCAN_BARE_ROW" "$cy"
       return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-       && [ "$cy" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-       && [ "$cy" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+    if [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+       && [ "$cy" -gt "$JG_COMPOSER_SCAN_PI_OPEN" ] \
+       && [ "$cy" -lt "$JG_COMPOSER_SCAN_PI_CLOSE" ]; then
       _jg_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
       return 0
     fi
-    if [ "$FM_COMPOSER_SCAN_CURSOR_EDGE" = 1 ]; then
+    if [ "$JG_COMPOSER_SCAN_CURSOR_EDGE" = 1 ]; then
       printf 'unknown'; return 0
     fi
     # STRICT: a blank or otherwise unidentified cursor row has no positive
@@ -2347,30 +2347,30 @@ EOF
     printf 'unknown'
     return 0
   fi
-  case "$FM_COMPOSER_SELECTED_KIND" in
+  case "$JG_COMPOSER_SELECTED_KIND" in
     pi)
       _jg_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
       ;;
     box)
-      _jg_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SELECTED_AMBIG" \
-        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
+      _jg_composer_classify_rows "$screen" "$styled" "$JG_COMPOSER_SELECTED_AMBIG" \
+        "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST"
       ;;
     bare)
-      if [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then
+      if [ "$JG_COMPOSER_SELECTED_LAST" -gt "$JG_COMPOSER_SELECTED_FIRST" ]; then
         _jg_composer_classify_bare_wrap "$screen" "$styled" \
-          "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
-      elif [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
-         && [ "$FM_COMPOSER_SELECTED_FIRST" -gt "$FM_COMPOSER_SCAN_PI_OPEN" ] \
-         && [ "$FM_COMPOSER_SELECTED_FIRST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
+          "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST"
+      elif [ "$JG_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
+         && [ "$JG_COMPOSER_SELECTED_FIRST" -gt "$JG_COMPOSER_SCAN_PI_OPEN" ] \
+         && [ "$JG_COMPOSER_SELECTED_FIRST" -lt "$JG_COMPOSER_SCAN_PI_CLOSE" ]; then
         _jg_composer_classify_bare_pi_overlap "$screen" "$styled" "$has_identity" "$identity" \
-          "$FM_COMPOSER_SELECTED_FIRST"
+          "$JG_COMPOSER_SELECTED_FIRST"
       else
-        _jg_composer_classify_bare_row "$screen" "$styled" "$FM_COMPOSER_SELECTED_FIRST"
+        _jg_composer_classify_bare_row "$screen" "$styled" "$JG_COMPOSER_SELECTED_FIRST"
       fi
       ;;
     leftbar)
       _jg_composer_classify_leftbar "$screen" "$styled" \
-        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
+        "$JG_COMPOSER_SELECTED_FIRST" "$JG_COMPOSER_SELECTED_LAST"
       ;;
   esac
 }
@@ -2448,12 +2448,12 @@ jg_composer_queued_enter_verdict() {  # <composer-state> <busy|idle|unknown>
 # so a real draft cannot collide with it. The SGR 7 guard is the second,
 # independent signal on styled captures: a row pi itself drew with the cursor
 # cell in it is live input even when its text equals a notice.
-FM_COMPOSER_PI_NOTICE_RE_DEFAULT="^(⚠️ (Live session indexing failed:|Auto-consolidation failed for '|Ephemeral session cleanup failed:|Session pruning failed:|Snapshot retention sweep failed:)|⏳ Auto-consolidation for ')"
+JG_COMPOSER_PI_NOTICE_RE_DEFAULT="^(⚠️ (Live session indexing failed:|Auto-consolidation failed for '|Ephemeral session cleanup failed:|Session pruning failed:|Snapshot retention sweep failed:)|⏳ Auto-consolidation for ')"
 
 _jg_composer_classify_pi_rows() {  # <screen> <styled>
   local screen=$1 styled=$2 row raw content
-  row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
-  while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+  row=$((JG_COMPOSER_SCAN_PI_OPEN + 1))
+  while [ "$row" -lt "$JG_COMPOSER_SCAN_PI_CLOSE" ]; do
     raw=$(_jg_composer_screen_row "$row" "$screen")
     if _jg_composer_row_is_pi_notice "$raw" "$styled"; then
       row=$((row + 1))
@@ -2475,7 +2475,7 @@ _jg_composer_classify_pi_rows() {  # <screen> <styled>
 # file has for frame corruption rather than a drawn surface. Takes the raw
 # row because the SGR 7 cursor-cell guard must read the styling, not the
 # stripped text (rationale and byte evidence at
-# FM_COMPOSER_PI_NOTICE_RE_DEFAULT above). Under-stripping here only re-opens
+# JG_COMPOSER_PI_NOTICE_RE_DEFAULT above). Under-stripping here only re-opens
 # the original false `pending`; the danger direction, a real draft losing its
 # verdict, is closed by the exact family plus the cursor-cell guard.
 # ponytail: a wrapped long notice (second row starts mid-sentence) does not
@@ -2486,7 +2486,7 @@ _jg_composer_row_is_pi_notice() {  # <raw-row> <styled>
   content=$(_jg_composer_row_content "$raw" "$styled")
   jg_composer_normalize_trim_var content
   jg_composer_idle_matches "$content" \
-    "${FM_COMPOSER_PI_NOTICE_RE:-$FM_COMPOSER_PI_NOTICE_RE_DEFAULT}" sensitive || return 1
+    "${JG_COMPOSER_PI_NOTICE_RE:-$JG_COMPOSER_PI_NOTICE_RE_DEFAULT}" sensitive || return 1
   if [ "$styled" = 1 ]; then
     esc=$(printf '\033')
     printf '%s' "$raw" | LC_ALL=C grep -qF -- "${esc}[7m" && return 1
@@ -2558,7 +2558,7 @@ _jg_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   fi
   agent=${identity%%$'\t'*}
   agent_status=${identity#*$'\t'}
-  if [ "$agent" != pi ] || [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" != 1 ]; then
+  if [ "$agent" != pi ] || [ "$JG_COMPOSER_SCAN_PI_PAIR_VALID" != 1 ]; then
     printf 'unknown'
     return 0
   fi
@@ -2570,7 +2570,7 @@ _jg_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   case "$agent_status" in
     idle|done) printf 'empty' ;;
     working)
-      if [ "$FM_COMPOSER_SCAN_PI_OPEN_PLAIN" = 1 ]; then
+      if [ "$JG_COMPOSER_SCAN_PI_OPEN_PLAIN" = 1 ]; then
         printf 'empty'
       else
         printf 'unknown'

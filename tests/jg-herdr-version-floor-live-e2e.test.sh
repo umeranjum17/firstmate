@@ -30,7 +30,7 @@ LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-jg_live_gate default-on FM_HERDR_VERSION_FLOOR_LIVE_E2E herdr jq curl shasum
+jg_live_gate default-on JG_HERDR_VERSION_FLOOR_LIVE_E2E herdr jq curl shasum
 
 [ -x "$LAB_HELPER" ] || { echo "skip: Herdr lab helper not executable at $LAB_HELPER"; exit 0; }
 

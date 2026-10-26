@@ -6,8 +6,12 @@ import { basename, dirname, isAbsolute, relative, sep } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { userInfo } from "node:os";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
-const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/FM_HOME
+const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/JG_HOME
 const MAIN_HOME = `${ACCOUNT_HOME}/firstmate`;
 const AUDIT = `${dirname(fileURLToPath(import.meta.url))}/state/main-kills.jsonl`;
 const under = (root, path) => path === root || path.startsWith(`${root}/`);
@@ -321,7 +325,7 @@ function blockedBy(command, caller, procs) {
 
 // Returns the block message, or null to allow. caller is the process whose descendants may be signalled: in-process
 // adapters leave it at this process, the Claude hook passes the agent's pid. Unreadable /proc refuses.
-export function guard(command, { caller = process.pid, reason = process.env.FM_KILL_REASON } = {}) {
+export function guard(command, { caller = process.pid, reason = process.env.JG_KILL_REASON } = {}) {
 	let table, target;
 	const procs = () => {
 		if (!table) { table = procTable(); procs.main = primaryMain(caller, table); }

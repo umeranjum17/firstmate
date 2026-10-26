@@ -17,7 +17,7 @@
 #      note, each drawn behind the plugin's `fm:` label rather than `firstmate-calm:`,
 #      without moving a store marker or reaching the model, and a resume shows each
 #      anchor once.
-# The project and FM_HOME are isolated; Claude keeps using its existing managed
+# The project and JG_HOME are isolated; Claude keeps using its existing managed
 # authentication and one trusted temporary folder. A few Haiku turns are submitted.
 # shellcheck disable=SC2016 # the model, not this test shell, reads the prompt text
 set -u
@@ -25,7 +25,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_CLAUDE_CALM_LIVE_E2E claude tmux
+jg_live_gate opt-in JG_CLAUDE_CALM_LIVE_E2E claude tmux
 
 MOD="$ROOT/.claude/mods/firstmate-calm"
 OPERATIONAL_INPUT="$ROOT/bin/jg-operational-input.sh"
@@ -33,7 +33,7 @@ CLAUDE_VERSION=$(claude --version 2>/dev/null || true)
 [ -n "$CLAUDE_VERSION" ] || fail "claude is installed but reports no version"
 LAB=$(jg_test_tmproot jg-calm-claude-live)
 PROJECT="$LAB/project"
-FM_HOME_DIR="$LAB/fmhome"
+JG_HOME_DIR="$LAB/fmhome"
 DEBUG_LOG_OFF="$LAB/debug-off.log"
 DEBUG_LOG_ON="$LAB/debug-on.log"
 DEBUG_LOG_RESUME="$LAB/debug-resume.log"
@@ -55,10 +55,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$PROJECT/.claude/skills" "$FM_HOME_DIR/config"
+mkdir -p "$PROJECT/.claude/skills" "$JG_HOME_DIR/config"
 ln -s "$MOD" "$PROJECT/.claude/skills/firstmate-calm"
 printf 'alpha\nbeta\ngamma\n' >"$PROJECT/notes.txt"
-printf 'on\n' >"$FM_HOME_DIR/config/calm"
+printf 'on\n' >"$JG_HOME_DIR/config/calm"
 
 # Claude Code refuses to nest inside another Claude session, so the inherited session
 # markers are dropped from the lab's environment; the flag is set per launch only.
@@ -75,7 +75,7 @@ launch() {  # <debug-log> <flag: 1|0> [claude args...]
   [ "$flag" = 1 ] && flag_env="CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1"
   tmux -L "$SOCKET" kill-session -t "$SESSION" 2>/dev/null || true
   tmux -L "$SOCKET" new-session -d -s "$SESSION" -x 160 -y 44 -c "$PROJECT" \
-    "env $(unset_inherited) $flag_env FM_HOME='$FM_HOME_DIR' CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --model haiku --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}' --debug-file '$log' $*; printf '\nCLAUDE_EXIT=%s\n' \"\$?\"; sleep 30"
+    "env $(unset_inherited) $flag_env JG_HOME='$JG_HOME_DIR' CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --model haiku --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}' --debug-file '$log' $*; printf '\nCLAUDE_EXIT=%s\n' \"\$?\"; sleep 30"
 }
 
 screen() {
@@ -324,7 +324,7 @@ esac
 # the answer stays visible. The answer token lives only in the record.
 DOORBELL_TEXT='Firstmate operational input waiting'
 operational=$(printf 'signal: %s/state/probe.status changed. Reply with exactly OPERATIONAL_PROCESSED and nothing else.' "$LAB" \
-  | FM_HOME="$FM_HOME_DIR" "$OPERATIONAL_INPUT" record watcher) \
+  | JG_HOME="$JG_HOME_DIR" "$OPERATIONAL_INPUT" record watcher) \
   || fail "could not publish the operational probe record"
 case "$operational" in
   *"$DOORBELL_TEXT"*) : ;;
@@ -358,7 +358,7 @@ esac
 send '/calm'
 enter
 wait_screen 'shell command' 'the restored tool row after /calm off' 200
-[ "$(cat "$FM_HOME_DIR/config/calm")" = off ] || fail "/calm did not persist off"
+[ "$(cat "$JG_HOME_DIR/config/calm")" = off ] || fail "/calm did not persist off"
 restored=$(screen)
 case "$restored" in
   *"$DOORBELL_TEXT"*) : ;;
@@ -412,7 +412,7 @@ case "$hidden_again" in
     fail "/calm on did not hide the rows again"
     ;;
 esac
-[ "$(cat "$FM_HOME_DIR/config/calm")" = on ] || fail "/calm did not persist on"
+[ "$(cat "$JG_HOME_DIR/config/calm")" = on ] || fail "/calm did not persist on"
 case "$hidden_again" in
   *'gamma'*|*'OPERATIONAL_PROCESSED'*) : ;;
   *) fail "Calm on hid a genuine assistant reply" ;;
@@ -433,18 +433,18 @@ case "$resumed" in
     fail "the resumed transcript drew a row Calm hides"
     ;;
 esac
-[ "$(cat "$FM_HOME_DIR/config/calm")" = on ] || fail "resume changed the persisted choice"
+[ "$(cat "$JG_HOME_DIR/config/calm")" = on ] || fail "resume changed the persisted choice"
 send '/exit'
 enter
 sleep 1
 pass "Claude Code $CLAUDE_VERSION resumes the transcript with Calm's hidden rows still hidden and the preference intact"
 
 # --- 4. Supervision notes: shown with Calm off, from the store the host writes ----
-STATE_DIR="$FM_HOME_DIR/state"
+STATE_DIR="$JG_HOME_DIR/state"
 DEBUG_LOG_NOTES="$LAB/debug-notes.log"
 mkdir -p "$STATE_DIR"
 outcome() {
-  FM_HOME="$FM_HOME_DIR" bash "$ROOT/bin/jg-branch-outcome.sh" "$@" >/dev/null \
+  JG_HOME="$JG_HOME_DIR" bash "$ROOT/bin/jg-branch-outcome.sh" "$@" >/dev/null \
     || fail "bin/jg-branch-outcome.sh $1 failed in the lab home"
 }
 outcome append --task jg-live-a --verdict captain --summary 'LIVE_PROCESSED_CAPTAIN acknowledged earlier'
@@ -452,7 +452,7 @@ outcome append --task jg-live-b --verdict captain --summary 'LIVE_REPLAY_CAPTAIN
 outcome mark-read --through 2
 outcome mark-processed --through 1
 printf 'key=live-key\nerrors=0\ncooldown=0\nretry_after=0\n' >"$STATE_DIR/.supervision-host-health"
-printf 'off\n' >"$FM_HOME_DIR/config/calm"
+printf 'off\n' >"$JG_HOME_DIR/config/calm"
 launch "$DEBUG_LOG_NOTES" 1
 wait_idle
 wait_screen 'fm: ⚓ [seq 2] jg-live-b: LIVE_REPLAY_CAPTAIN still open' 'the session-start replay of an unprocessed captain outcome' 200
@@ -476,7 +476,7 @@ case "$notes_screen" in
 esac
 [ "$(cat "$STATE_DIR/.branch-outcomes-cursor")" = 2 ] || fail "the supervision notes moved the store's read cursor"
 [ "$(cat "$STATE_DIR/.branch-outcomes-processed")" = 1 ] || fail "the supervision notes moved the processed marker"
-[ "$(cat "$FM_HOME_DIR/config/calm")" = off ] || fail "the supervision notes changed the Calm preference"
+[ "$(cat "$JG_HOME_DIR/config/calm")" = off ] || fail "the supervision notes changed the Calm preference"
 # The notes never reach the model: a real turn asked to quote them quotes none. The
 # answer token is spelled out rather than typed, so the echoed prompt cannot match it.
 send 'Quote verbatim every line of this conversation that contains a sailboat emoji or an anchor emoji, other than this request. If there are none, reply with only the words green, harbor, and lantern in uppercase joined by underscores.'

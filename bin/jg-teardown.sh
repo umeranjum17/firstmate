@@ -220,9 +220,9 @@
 # while a live git process might still own it - the fix is patience, not rm.
 #
 # On that failure signature only, teardown_treehouse_return:
-#   1. Retries up to FM_TREEHOUSE_RETURN_LOCK_RETRIES times (default 3), waiting
-#      FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (default 1s; falls back to the older
-#      FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS name when the new one is unset) between
+#   1. Retries up to JG_TREEHOUSE_RETURN_LOCK_RETRIES times (default 3), waiting
+#      JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (default 1s; falls back to the older
+#      JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS name when the new one is unset) between
 #      attempts. Retries key off the error text, not whether the lock file still
 #      exists after the failed attempt - a lock that self-clears mid-check still
 #      deserves a retry of the return.
@@ -230,7 +230,7 @@
 #   3. If every retry still hits the lock signature and the lock remains, it is removed
 #      and the return tried once more ONLY when the lock is provably stale per
 #      bin/jg-lock-lib.sh's jg_lock_is_provably_stale, passing the worktree dir as the
-#      companion directory and FM_STALE_WORKTREE_LOCK_AGE_SECS (default 30s) as the age
+#      companion directory and JG_STALE_WORKTREE_LOCK_AGE_SECS (default 30s) as the age
 #      threshold. That shared proof owns the exact lsof-holder, mtime-age, and fail-safe
 #      rules.
 #   4. If retries exhaust and the lock is not provably stale, teardown fails as loudly
@@ -311,11 +311,11 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 SECONDMATE_REG="$DATA/secondmates.md"
 SUB_HOME_MARKER=".jg-secondmate-home"
 SUB_HOME_PARENT_MARKER=".jg-secondmate-parent"
@@ -415,7 +415,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 jg_backlog_directory_present "$STATE" "state directory" || {
-  echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: teardown refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
 # shellcheck source=bin/jg-wake-lib.sh
@@ -431,7 +431,7 @@ jg_backlog_directory_present "$STATE" "state directory" || {
 # territory (contract: bin/jg-lease-lib.sh).
 if [ "$FORCE" = --force ] && [ "$(jg_lease_actor)" = branch ]; then
   echo "error: forced teardown refused - the supervision branch cannot discard work" >&2
-  exit "$FM_LEASE_REFUSE_EXIT"
+  exit "$JG_LEASE_REFUSE_EXIT"
 fi
 jg_lease_guard "$ID" "teardown (jg-teardown)"
 
@@ -475,7 +475,7 @@ DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 teardown_release_locks() {
   local status=$? i
   if [ "$META_LOCK_HELD" = 1 ] \
-     && { [ -e "$STATE/$ID.scratch" ] || [ -L "$STATE/$ID.scratch" ] || [ -d "${DATA:-$FM_HOME/data}/$ID" ]; }; then
+     && { [ -e "$STATE/$ID.scratch" ] || [ -L "$STATE/$ID.scratch" ] || [ -d "${DATA:-$JG_HOME/data}/$ID" ]; }; then
     jg_backlog_close_marker_clear "$STATE" "$ID" || status=1
   fi
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
@@ -525,17 +525,17 @@ CONTROL_LOCK_HELD=1
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never tear
 # down a worktree (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
-FM_LOCK_LOG_PREFIX=teardown
+JG_LOCK_LOG_PREFIX=teardown
 
 jg_backlog_record_present "$META" "task record" "$STATE" || {
-  echo "error: teardown refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: teardown refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
 META_LOCK=$(jg_meta_lock_path "$META") || exit 1
 jg_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
 jg_backlog_record_present "$META" "task record" "$STATE" || {
-  echo "error: teardown refused after locking: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: teardown refused after locking: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
 TEARDOWN_META_KIND=$(jg_meta_get "$META" kind)
@@ -572,7 +572,7 @@ case "$TEARDOWN_WINDOW_COUNT:$(jg_meta_get "$META" window)" in
     case "$TEARDOWN_BACKEND_COUNT:$(jg_meta_get "$META" backend)" in
       0:|1:tmux)
         TEARDOWN_FOREIGN_ENDPOINT_KEYS='^terminal='
-        for TEARDOWN_FOREIGN_BACKEND in $FM_BACKEND_KNOWN; do
+        for TEARDOWN_FOREIGN_BACKEND in $JG_BACKEND_KNOWN; do
           [ "$TEARDOWN_FOREIGN_BACKEND" = tmux ] \
             || TEARDOWN_FOREIGN_ENDPOINT_KEYS="$TEARDOWN_FOREIGN_ENDPOINT_KEYS|^${TEARDOWN_FOREIGN_BACKEND}_"
         done
@@ -595,10 +595,10 @@ if [ "$TEARDOWN_CLEANUP_RECOVERY" != orca ] && [ "$TEARDOWN_CLEANUP_RECOVERY" !=
   else
     TEARDOWN_BACKLOG_GATE_STATUS=$?
     if [ "$TEARDOWN_BACKLOG_GATE_STATUS" -eq 2 ]; then
-      echo "error: task $ID cannot be torn down because its backlog data directory is inaccessible: $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+      echo "error: task $ID cannot be torn down because its backlog data directory is inaccessible: $DATA ($JG_BACKLOG_TRANSITION_ERROR)" >&2
       exit 1
     fi
-    TEARDOWN_BACKLOG_SKIP_REASON=$FM_BACKLOG_TRANSITION_SKIP
+    TEARDOWN_BACKLOG_SKIP_REASON=$JG_BACKLOG_TRANSITION_SKIP
   fi
 fi
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
@@ -618,14 +618,14 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
       # or agent-less before any cleanup decision is made.
       TEARDOWN_LEGACY_PENDING=1
     elif [ "$TEARDOWN_LEGACY_GEN_COUNT" = 0 ]; then
-      echo "error: task $ID's record has no spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
+      echo "error: task $ID's record has no spawn_gen that identifies one exact incarnation ($JG_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
       exit 1
     else
-      echo "error: task $ID's record has an unreadable spawn_gen that identifies one exact incarnation ($FM_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - fix the record, then retry teardown" >&2
+      echo "error: task $ID's record has an unreadable spawn_gen that identifies one exact incarnation ($JG_BACKLOG_TRANSITION_ERROR); refusing automatic teardown - fix the record, then retry teardown" >&2
       exit 1
     fi
   else
-    case "$FM_BACKLOG_META_SPAWN_GEN" in
+    case "$JG_BACKLOG_META_SPAWN_GEN" in
       legacy-*)
         # Only this teardown path mints a legacy- token; a launch publishes
         # s<epoch>.<pid>.<random>. So one still on a retained record is the
@@ -637,23 +637,23 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
         if [ "$TEARDOWN_WINDOWLESS_SHAPE" = 1 ]; then
           TEARDOWN_WINDOWLESS=1
         elif [ "$LEGACY_RECORD_GIVEN" != 1 ]; then
-          echo "error: task $ID's record carries the legacy incarnation stamp $FM_BACKLOG_META_SPAWN_GEN left by an abandoned --legacy-record teardown, not an incarnation published by a spawn; refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
+          echo "error: task $ID's record carries the legacy incarnation stamp $JG_BACKLOG_META_SPAWN_GEN left by an abandoned --legacy-record teardown, not an incarnation published by a spawn; refusing automatic teardown - relaunch the task to publish an unambiguous incarnation, then retry teardown, or pass --legacy-record once its recorded endpoint is confirmed dead or agent-less" >&2
           exit 1
         fi
         TEARDOWN_LEGACY_PENDING=1
-        TEARDOWN_LEGACY_RETAINED_STAMP=$FM_BACKLOG_META_SPAWN_GEN
+        TEARDOWN_LEGACY_RETAINED_STAMP=$JG_BACKLOG_META_SPAWN_GEN
         ;;
     esac
   fi
-  [ "$TEARDOWN_LEGACY_PENDING" = 1 ] || TEARDOWN_META_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
+  [ "$TEARDOWN_LEGACY_PENDING" = 1 ] || TEARDOWN_META_SPAWN_GEN=$JG_BACKLOG_META_SPAWN_GEN
 fi
 # Cleanup never closes a captain call (see the header). Asked here, before any
 # destructive step, so "cannot tell" can refuse while everything is intact.
 TEARDOWN_BACKLOG_TRANSITION=close
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   TEARDOWN_CAPTAIN_OPEN_STATUS=0
-  TEARDOWN_CAPTAIN_OPEN_OUT=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+  TEARDOWN_CAPTAIN_OPEN_OUT=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+    JG_DATA_OVERRIDE="$DATA" JG_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/jg-captain-hold.sh" open "$ID" 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
   case "$TEARDOWN_CAPTAIN_OPEN_STATUS" in
     0) TEARDOWN_BACKLOG_TRANSITION=retain ;;
@@ -1054,7 +1054,7 @@ remote_secondmate_teardown() {
     echo "REFUSED: remote secondmate $ID still has an unhandled captured reply" >&2
     return 1
   }
-  "$FM_ROOT/bin/jg-guard.sh" || true
+  "$JG_ROOT/bin/jg-guard.sh" || true
   if [ "$FORCE" = --force ]; then
     if out=$("$SCRIPT_DIR/jg-on.sh" "$ID" jg-remote-secondmate-control.sh retire "$ID" --force < /dev/null 2>&1); then rc=0; else rc=$?; fi
   else
@@ -1090,7 +1090,7 @@ remote_secondmate_teardown() {
   tmp="$SECONDMATE_REG.tmp.$$"
   grep -vE "^- $ID( |$)" "$SECONDMATE_REG" > "$tmp" || true
   mv -f -- "$tmp" "$SECONDMATE_REG"
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" cleaned_up "$ID" || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" cleaned_up "$ID" || true
   status_retire_presentation_task "$STATE" "$ID" || return 1
   jg_backlog_atomic_transition remove "$STATE/$ID.meta" "task record" "$STATE" || return 1
   rm -f -- "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
@@ -1145,16 +1145,16 @@ if [ "$TEARDOWN_WINDOWLESS" = 1 ]; then
   T=
 else
   jg_backend_validate_task_endpoint "$META" "$ID" || exit 1
-  BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-  T=$FM_BACKEND_VALIDATED_TARGET
+  BACKEND=$JG_BACKEND_VALIDATED_BACKEND
+  T=$JG_BACKEND_VALIDATED_TARGET
   [ "$BACKEND" != orca ] || T_ORCA=$T
 fi
 # The recorded backend, including every sibling its adapter sources, has to
 # be readable before the first destructive step. --force does not override
 # this. A forced descendant is proved in validate_firstmate_home_children_removal.
 teardown_require_backend_prerequisites "$BACKEND" "$ID" || exit 1
-if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
-  "$FM_ROOT/bin/jg-guard.sh" || true
+if [ "${JG_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
+  "$JG_ROOT/bin/jg-guard.sh" || true
 fi
 HOME_PATH=$(grep '^home=' "$META" | cut -d= -f2- || true)
 PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
@@ -1223,7 +1223,7 @@ if [ "$TEARDOWN_LEGACY_PENDING" = 1 ]; then
   TEARDOWN_LEGACY_ACCEPTED=1
 fi
 
-PUBLIC_FOLLOWUP_HOME=$FM_HOME
+PUBLIC_FOLLOWUP_HOME=$JG_HOME
 PUBLIC_FOLLOWUP_STATE=$STATE
 PUBLIC_FOLLOWUP_WORK_HOME=main
 PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=0
@@ -1250,22 +1250,22 @@ public_followup_resolve_primary_home() {
   secondmate_registry_validate_bindings "$registry" secondmate_registry_path_key "$id" "$child" || return 1
   printf '%s\n' "$parent"
 }
-if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
-  SECOND_MATE_ID=$(sed -n '1p' "$FM_HOME/$SUB_HOME_MARKER")
+if [ -f "$JG_HOME/$SUB_HOME_MARKER" ]; then
+  SECOND_MATE_ID=$(sed -n '1p' "$JG_HOME/$SUB_HOME_MARKER")
   # The durable parent record (written once at seeding, next to the identity
   # marker) names this home's route to its parent: "local" when they share a
   # filesystem, "remote" when the parent lives on another machine. Absent for
   # a home seeded before this record existed, which preserves today's exact
   # env-var-only behavior for that legacy home rather than guessing its route.
-  PARENT_ROUTE_FILE="$FM_HOME/$SUB_HOME_PARENT_MARKER"
+  PARENT_ROUTE_FILE="$JG_HOME/$SUB_HOME_PARENT_MARKER"
   PARENT_ROUTE_RECORD=absent
   PARENT_ROUTE=
   PARENT_ROUTE_HOME=
   if [ -e "$PARENT_ROUTE_FILE" ] || [ -L "$PARENT_ROUTE_FILE" ]; then
     PARENT_ROUTE_RECORD=invalid
     if jg_secondmate_parent_record_parse "$PARENT_ROUTE_FILE"; then
-      PARENT_ROUTE=$FM_SECONDMATE_PARENT_ROUTE
-      PARENT_ROUTE_HOME=$FM_SECONDMATE_PARENT_HOME
+      PARENT_ROUTE=$JG_SECONDMATE_PARENT_ROUTE
+      PARENT_ROUTE_HOME=$JG_SECONDMATE_PARENT_HOME
       PARENT_ROUTE_RECORD=valid
     fi
   fi
@@ -1281,8 +1281,8 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
     # from the file, never from the process environment, so an unrelated
     # export in the remote host's own login shell cannot trigger it the way
     # jg_pf_relay_active's environment-wins rule would.
-    if [ -f "$FM_HOME/.env" ]; then
-      HOME_ENV_TOKEN=$(fmx_env_get FMX_PAIRING_TOKEN "$FM_HOME/.env")
+    if [ -f "$JG_HOME/.env" ]; then
+      HOME_ENV_TOKEN=$(fmx_env_get FMX_PAIRING_TOKEN "$JG_HOME/.env")
       [ -z "$HOME_ENV_TOKEN" ] || PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE=1
     fi
     if [ "$PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE" = 1 ]; then
@@ -1293,11 +1293,11 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
     fi
   elif [ "$PARENT_ROUTE" = local ]; then
     PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=1
-    PRIMARY_HOME_CANDIDATE=${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-$PARENT_ROUTE_HOME}
+    PRIMARY_HOME_CANDIDATE=${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-$PARENT_ROUTE_HOME}
     PARENT_BINDINGS_MATCH=1
-    if [ -n "${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
+    if [ -n "${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
       LIVE_PARENT_HOME=$(public_followup_canonical_home \
-        "$FM_PUBLIC_FOLLOWUP_PRIMARY_HOME") || PARENT_BINDINGS_MATCH=0
+        "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME") || PARENT_BINDINGS_MATCH=0
       DURABLE_PARENT_HOME=$(public_followup_canonical_home \
         "$PARENT_ROUTE_HOME") || PARENT_BINDINGS_MATCH=0
       if [ "$PARENT_BINDINGS_MATCH" = 1 ] \
@@ -1309,7 +1309,7 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
       && jg_pf_home_id_valid "secondmate:$SECOND_MATE_ID"; then
       PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$SECOND_MATE_ID"
       if PUBLIC_FOLLOWUP_HOME=$(public_followup_resolve_primary_home \
-          "$PRIMARY_HOME_CANDIDATE" "$FM_HOME" "$SECOND_MATE_ID"); then
+          "$PRIMARY_HOME_CANDIDATE" "$JG_HOME" "$SECOND_MATE_ID"); then
         PUBLIC_FOLLOWUP_STATE="$PUBLIC_FOLLOWUP_HOME/state"
         PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=0
         if [ "$FORCE" != "--force" ] \
@@ -1324,12 +1324,12 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
   else
     # A home seeded before the durable record existed retains the legacy
     # launch-time binding behavior unchanged.
-    PRIMARY_HOME_CANDIDATE=${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}
+    PRIMARY_HOME_CANDIDATE=${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}
     if [ -n "$PRIMARY_HOME_CANDIDATE" ]; then
       if jg_pf_relay_active "$PRIMARY_HOME_CANDIDATE"; then
         PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE=1
       fi
-    elif jg_pf_relay_active "$FM_HOME"; then
+    elif jg_pf_relay_active "$JG_HOME"; then
       PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE=1
     fi
     if [ "$PUBLIC_FOLLOWUP_PARENT_RELAY_ACTIVE" = 1 ]; then
@@ -1337,7 +1337,7 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
       if jg_pf_home_id_valid "secondmate:$SECOND_MATE_ID"; then
         PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$SECOND_MATE_ID"
         if PUBLIC_FOLLOWUP_HOME=$(public_followup_resolve_primary_home \
-            "$PRIMARY_HOME_CANDIDATE" "$FM_HOME" "$SECOND_MATE_ID"); then
+            "$PRIMARY_HOME_CANDIDATE" "$JG_HOME" "$SECOND_MATE_ID"); then
           PUBLIC_FOLLOWUP_STATE="$PUBLIC_FOLLOWUP_HOME/state"
           PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=0
           if [ "$FORCE" != "--force" ] \
@@ -1356,10 +1356,10 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
   fi
 elif [ "$KIND" = secondmate ]; then
   PUBLIC_FOLLOWUP_WORK_HOME="secondmate:$ID"
-  if [ "$FORCE" != "--force" ] && jg_pf_relay_active "$FM_HOME"; then
+  if [ "$FORCE" != "--force" ] && jg_pf_relay_active "$JG_HOME"; then
     PUBLIC_FOLLOWUP_RELAY_ACTIVE=1
   fi
-elif [ "$FORCE" != "--force" ] && jg_pf_relay_active "$FM_HOME"; then
+elif [ "$FORCE" != "--force" ] && jg_pf_relay_active "$JG_HOME"; then
   PUBLIC_FOLLOWUP_RELAY_ACTIVE=1
 fi
 
@@ -1623,17 +1623,17 @@ pr_is_merged() {
     fi
   fi
   [ -n "$target" ] || return 1
-  if jg_pr_url_parse "$target" && [ "$FM_PR_PROVIDER" = forgejo ]; then
+  if jg_pr_url_parse "$target" && [ "$JG_PR_PROVIDER" = forgejo ]; then
     LANDING_GAP="the forge could not be read for PR $target"
-    jg_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
-    if [ "$FM_PR_RECORD_MERGED" != true ]; then
-      LANDING_GAP="the forge reports PR ${FM_PR_URL:-$target} as ${FM_PR_RECORD_STATE:-unknown}, not merged"
+    jg_pr_forgejo_read_record "$JG_PR_HOST" "$JG_PR_PATH" "$JG_PR_NUMBER" || return 1
+    if [ "$JG_PR_RECORD_MERGED" != true ]; then
+      LANDING_GAP="the forge reports PR ${JG_PR_URL:-$target} as ${JG_PR_RECORD_STATE:-unknown}, not merged"
       return 2
     fi
-    head=$FM_PR_RECORD_HEAD
-    LANDING_GAP="the forge reports PR ${FM_PR_URL:-$target} merged, but its head ${head:-<none>} is not a usable commit"
+    head=$JG_PR_RECORD_HEAD
+    LANDING_GAP="the forge reports PR ${JG_PR_URL:-$target} merged, but its head ${head:-<none>} is not a usable commit"
     jg_pr_head_valid "$head" || return 1
-    resolved_url=$FM_PR_URL
+    resolved_url=$JG_PR_URL
     LANDING_GAP="the forge reports PR ${resolved_url:-$target} merged, but its head ${head:-<none>} could not be fetched to check it holds this copy's work"
   else
     LANDING_GAP="the forge could not be read for PR $target"
@@ -1838,12 +1838,12 @@ retry_wait_secs_is_valid() {
   [[ "$1" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]
 }
 
-STALE_WORKTREE_LOCK_AGE_SECS=${FM_STALE_WORKTREE_LOCK_AGE_SECS:-30}
+STALE_WORKTREE_LOCK_AGE_SECS=${JG_STALE_WORKTREE_LOCK_AGE_SECS:-30}
 # Bounded patience window for transient index.lock after killing a crew process.
-# New knobs are preferred; FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS remains an alias
+# New knobs are preferred; JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS remains an alias
 # for the per-attempt wait so existing tests and operators keep working.
-TREEHOUSE_RETURN_LOCK_RETRIES=${FM_TREEHOUSE_RETURN_LOCK_RETRIES:-3}
-TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=${FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS:-${FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS:-1}}
+TREEHOUSE_RETURN_LOCK_RETRIES=${JG_TREEHOUSE_RETURN_LOCK_RETRIES:-3}
+TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=${JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS:-${JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS:-1}}
 if ! retry_wait_secs_is_valid "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"; then
   echo "teardown: invalid treehouse return lock retry wait '$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS'; using 1s" >&2
   TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=1
@@ -2114,12 +2114,12 @@ validate_worktree_teardown_safety() {
 # binds through the strict object-local head rule, with bin/jg-nm-run-lib.sh's
 # shared ledger-anchored continuation rule as the only recognition for a head
 # this copy cannot resolve at all.
-NM_TEARDOWN_TIMEOUT=${FM_TEARDOWN_NM_TIMEOUT:-10}
+NM_TEARDOWN_TIMEOUT=${JG_TEARDOWN_NM_TIMEOUT:-10}
 case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
 # How many of the most recent `no-mistakes runs` rows the parked-run
 # continuation proof may scan, mirroring bin/jg-crew-state.sh's limit posture
 # (generous: rows of other branches interleave freely in the real ledger).
-NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
+NM_TEARDOWN_RUNS_LIMIT=${JG_TEARDOWN_NM_RUNS_LIMIT:-200}
 case "$NM_TEARDOWN_RUNS_LIMIT" in ''|*[!0-9]*) NM_TEARDOWN_RUNS_LIMIT=200 ;; esac
 TASK_RUN_ID=
 task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
@@ -2260,7 +2260,7 @@ EOF
 task_process_identity() {  # <pid>
   local pid=$1 proc_root stat_line starttime value
   local -a stat_fields
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc}
   if [ -r "$proc_root/$pid/stat" ]; then
     stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
     read -r -a stat_fields <<< "${stat_line##*)}"
@@ -2495,13 +2495,13 @@ require_exclusive_worktree_slot_record() {
   case "$rc" in
     1) return 0 ;;
     2)
-      echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+      echo "REFUSED: $JG_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
       return 1
       ;;
   esac
-  echo "REFUSED: task $record_id's recorded worktree $slot is also task $FM_SLOT_RECORD_OWNER_ID's recorded $FM_SLOT_RECORD_OWNER_FIELD." >&2
-  echo "Returning that pool slot would kill $FM_SLOT_RECORD_OWNER_ID's processes and reset its copy, so nothing was changed - not even with --force." >&2
-  echo "Reconcile whichever record is wrong (bin/jg-crew-state.sh $record_id; bin/jg-crew-state.sh $FM_SLOT_RECORD_OWNER_ID), then re-run teardown." >&2
+  echo "REFUSED: task $record_id's recorded worktree $slot is also task $JG_SLOT_RECORD_OWNER_ID's recorded $JG_SLOT_RECORD_OWNER_FIELD." >&2
+  echo "Returning that pool slot would kill $JG_SLOT_RECORD_OWNER_ID's processes and reset its copy, so nothing was changed - not even with --force." >&2
+  echo "Reconcile whichever record is wrong (bin/jg-crew-state.sh $record_id; bin/jg-crew-state.sh $JG_SLOT_RECORD_OWNER_ID), then re-run teardown." >&2
   return 1
 }
 
@@ -2528,7 +2528,7 @@ require_exclusive_task_worktree_slot() {
 # skipped (see the script header for why refusing would strand the record and
 # why skipping discards nothing). Returns TEARDOWN_SLOT_REASSIGNED_RC for that
 # state so each caller gates its slot steps on one determination; the claimant
-# stays in FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME.
+# stays in JG_TREEHOUSE_SLOT_OWNER_ID and JG_TREEHOUSE_SLOT_OWNER_HOME.
 #
 # An absent claim proceeds as the slot's owner: a slot taken before claims
 # existed, or already returned to the pool, carries none, and refusing those
@@ -2538,10 +2538,10 @@ TEARDOWN_SLOT_REASSIGNED_RC=3
 require_owned_worktree_slot_record() {  # <task-id> <worktree>
   local record_id=$1 worktree=$2 marker
   jg_treehouse_slot_owner_state "$worktree" "$record_id"
-  case "$FM_TREEHOUSE_SLOT_OWNER" in
+  case "$JG_TREEHOUSE_SLOT_OWNER" in
     mine|absent) return 0 ;;
     other)
-      echo "warning: task $record_id's recorded worktree $worktree was reassigned to task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, which claimed that pool slot after this record was written; that slot is no longer $record_id's, so its processes, copy, and claim are left untouched and only $record_id's own cleanup runs." >&2
+      echo "warning: task $record_id's recorded worktree $worktree was reassigned to task $JG_TREEHOUSE_SLOT_OWNER_ID${JG_TREEHOUSE_SLOT_OWNER_HOME:+ (home $JG_TREEHOUSE_SLOT_OWNER_HOME)}, which claimed that pool slot after this record was written; that slot is no longer $record_id's, so its processes, copy, and claim are left untouched and only $record_id's own cleanup runs." >&2
       return "$TEARDOWN_SLOT_REASSIGNED_RC"
       ;;
   esac
@@ -2565,8 +2565,8 @@ require_owned_task_worktree_slot() {
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
       TEARDOWN_SLOT_REASSIGNED=1
-      TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
-      TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+      TEARDOWN_SLOT_REASSIGNED_TO=$JG_TREEHOUSE_SLOT_OWNER_ID
+      TEARDOWN_SLOT_REASSIGNED_HOME=$JG_TREEHOUSE_SLOT_OWNER_HOME
       return 0
       ;;
   esac
@@ -2579,7 +2579,7 @@ teardown_owns_worktree() {
 
 firstmate_home_has_treehouse_slot() {
   local home=$1
-  worktree_registered_for_project "$FM_ROOT" "$home"
+  worktree_registered_for_project "$JG_ROOT" "$home"
 }
 
 validate_removal_target() {
@@ -2587,12 +2587,12 @@ validate_removal_target() {
   [ -n "$target" ] || return 0
   [ -e "$target" ] || return 0
   abs_target=$(removal_target_abs_path "$target")
-  if abs_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P); then
+  if abs_home=$(cd "$JG_HOME" 2>/dev/null && pwd -P); then
     :
   else
     abs_home=
   fi
-  abs_root=$(cd "$FM_ROOT" && pwd -P)
+  abs_root=$(cd "$JG_ROOT" && pwd -P)
   case "$abs_target" in
     ''|/) echo "REFUSED: unsafe $label removal target $target" >&2; return 1 ;;
   esac
@@ -2682,13 +2682,13 @@ validate_child_worktree_for_removal() {
   [ -n "$target" ] || return 0
   [ -e "$target" ] || return 0
   abs_target=$(validate_removal_target "$target" "child worktree") || return 1
-  if abs_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P); then
+  if abs_home=$(cd "$JG_HOME" 2>/dev/null && pwd -P); then
     if path_is_ancestor_of "$abs_home" "$abs_target"; then
       echo "REFUSED: unsafe child worktree removal target $target is inside the active firstmate home" >&2
       return 1
     fi
   fi
-  abs_root=$(cd "$FM_ROOT" && pwd -P)
+  abs_root=$(cd "$JG_ROOT" && pwd -P)
   if path_is_ancestor_of "$abs_root" "$abs_target"; then
     echo "REFUSED: unsafe child worktree removal target $target is inside the firstmate repo" >&2
     return 1
@@ -2785,7 +2785,7 @@ remove_firstmate_home() {
       restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
     }
-    teardown_treehouse_return "$abs_home_path" "$FM_ROOT" "$label" || {
+    teardown_treehouse_return "$abs_home_path" "$JG_ROOT" "$label" || {
       echo "error: treehouse return failed for $label $abs_home_path; lease may still be held" >&2
       restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
@@ -2808,7 +2808,7 @@ firstmate_home_has_process_events() {
       return 0
     fi
   done
-  claim_root=${FM_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}
+  claim_root=${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}
   for path in "$claim_root"/*.claim; do
     [ -f "$path" ] && [ ! -L "$path" ] || continue
     IFS= read -r owner < "$path" 2>/dev/null || continue
@@ -2874,7 +2874,7 @@ restore_firstmate_home_process_events() {
   if [ ! -f "$runner" ] || [ -L "$runner" ] || [ ! -x "$runner" ]; then
     runner="$SCRIPT_DIR/jg-procevent.sh"
   fi
-  if ! FM_HOME="$home" FM_ROOT_OVERRIDE="$FM_ROOT" "$runner" reconcile >/dev/null; then
+  if ! JG_HOME="$home" JG_ROOT_OVERRIDE="$JG_ROOT" "$runner" reconcile >/dev/null; then
     echo "error: process-event restoration could not rearm $label $home; active waits may remain retired; recover registrations from $backup" >&2
     return "$TEARDOWN_PROCEVENT_RESTORE_FAILED"
   fi
@@ -2888,7 +2888,7 @@ cleanup_firstmate_home_process_events() {
     echo "REFUSED: $label $home has process-event state but no sweep-capable bin/jg-procevent.sh; restore the home script and rerun teardown" >&2
     return 1
   fi
-  if ! FM_HOME="$home" FM_ROOT_OVERRIDE="$home" "$runner" sweep-home; then
+  if ! JG_HOME="$home" JG_ROOT_OVERRIDE="$home" "$runner" sweep-home; then
     echo "REFUSED: process-event cleanup is incomplete for $label $home; preserving the home, lease, and retirement records for retry" >&2
     return 1
   fi
@@ -2905,7 +2905,7 @@ preflight_firstmate_home_process_events() {
     echo "REFUSED: $label $home has process-event state but no sweep-capable bin/jg-procevent.sh; restore the home script and rerun teardown" >&2
     return 1
   fi
-  if ! FM_HOME="$home" FM_ROOT_OVERRIDE="$home" "$runner" sweep-home --preflight >/dev/null; then
+  if ! JG_HOME="$home" JG_ROOT_OVERRIDE="$home" "$runner" sweep-home --preflight >/dev/null; then
     echo "REFUSED: process-event cleanup cannot safely proceed for $label $home; preserving the home, lease, and retirement records for retry" >&2
     return 1
   fi
@@ -3202,8 +3202,8 @@ teardown_herdr_preflight_target() {  # <target> <task-id>
     echo "error: herdr endpoint $target for $task_id could not be parsed exactly; nothing was changed - repair the endpoint metadata and rerun teardown" >&2
     return 1
   fi
-  session=$FM_BACKEND_HERDR_SESSION
-  pane=$FM_BACKEND_HERDR_PANE
+  session=$JG_BACKEND_HERDR_SESSION
+  pane=$JG_BACKEND_HERDR_PANE
   presence=$(jg_backend_herdr_pane_presence_state "$session" "$pane")
   case "$presence" in
     dead|present) ;;
@@ -3261,8 +3261,8 @@ preflight_firstmate_home_herdr_children() {  # <home>
     [ -e "$child_meta" ] || continue
     child_id=$(basename "$child_meta" .meta)
     jg_backend_validate_task_endpoint "$child_meta" "$child_id" || return 1
-    child_backend=$FM_BACKEND_VALIDATED_BACKEND
-    child_target=$FM_BACKEND_VALIDATED_TARGET
+    child_backend=$JG_BACKEND_VALIDATED_BACKEND
+    child_target=$JG_BACKEND_VALIDATED_TARGET
     if [ "$child_backend" = herdr ]; then
       teardown_herdr_preflight_target "$child_target" "$child_id" || return 1
     fi
@@ -3322,10 +3322,10 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 teardown_reap_registered_scratch() {
-  local FM_HOME=$1 STATE=$2 DATA=$3 ID=$4 dir listing kept=0
+  local JG_HOME=$1 STATE=$2 DATA=$3 ID=$4 dir listing kept=0
   local -a scratch roots
   scratch=()
-  listing=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-scratch.sh" list "$ID") || return 1
+  listing=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-scratch.sh" list "$ID") || return 1
   while IFS= read -r dir; do
     [ -z "$dir" ] || scratch+=("$dir")
   done <<EOF
@@ -3381,11 +3381,11 @@ cleanup_firstmate_home_children() {
     if [ -n "$child_t" ]; then
       if [ "$child_backend" = herdr ]; then
         jg_backend_herdr_parse_target "$child_t" || return 1
-        if ! teardown_herdr_session_lock_held "$FM_BACKEND_HERDR_SESSION"; then
+        if ! teardown_herdr_session_lock_held "$JG_BACKEND_HERDR_SESSION"; then
           echo "error: herdr session presentation lock is not held for child $child_id; retaining that child's durable identity records and stopping forced cleanup" >&2
           return 1
         fi
-        jg_backend_herdr_kill_serialized "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" 2>/dev/null || true
+        jg_backend_herdr_kill_serialized "$JG_BACKEND_HERDR_SESSION" "$JG_BACKEND_HERDR_PANE" 2>/dev/null || true
         if ! jg_backend_herdr_endpoint_confirmed_gone "$child_t"; then
           echo "error: herdr pane $child_t for child $child_id is not confirmed gone; retaining that child's durable identity records and stopping forced cleanup" >&2
           return 1
@@ -3393,7 +3393,7 @@ cleanup_firstmate_home_children() {
       elif [ "$child_backend" = zellij ]; then
         # Zellij titles are scoped by the owning home tag, so forced secondmate
         # cleanup must verify child tabs as that child home, not the parent.
-        ( unset FM_ROOT_OVERRIDE; FM_HOME=$home FM_ROOT=$home jg_backend_kill "$child_backend" "$child_t" "$(meta_value "$child_meta" zellij_tab_id)" "jg-$child_id" ) \
+        ( unset JG_ROOT_OVERRIDE; JG_HOME=$home JG_ROOT=$home jg_backend_kill "$child_backend" "$child_t" "$(meta_value "$child_meta" zellij_tab_id)" "jg-$child_id" ) \
           || { endpoint_close_refusal "child $child_id" "$child_backend" "$child_t" 0; return 1; }
       else
         jg_backend_kill "$child_backend" "$child_t" "$(meta_value "$child_meta" zellij_tab_id)" "jg-$child_id" \
@@ -3551,8 +3551,8 @@ if [ "$KIND" = scout ] && [ "$FORCE" != "--force" ]; then
     echo "The report is the work product. Have the crewmate write it, or use --force after explicit discard approval." >&2
     exit 1
   fi
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-      FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/jg-captain-hold.sh" verify "$ID" >/dev/null; then
+  if ! JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
+      JG_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/jg-captain-hold.sh" verify "$ID" >/dev/null; then
     echo "REFUSED: scout task $ID has not passed the captain-call completion gate." >&2
     echo "Inventory its report and any visual review through bin/jg-captain-hold.sh before teardown." >&2
     exit 1
@@ -3572,7 +3572,7 @@ if [ "$FORCE" != "--force" ] \
   && [ -n "$PUBLIC_FOLLOWUP_STATE" ] \
   && [ "$PUBLIC_FOLLOWUP_RELAY_ACTIVE" = 1 ] \
   && jg_pf_has_registrations "$PUBLIC_FOLLOWUP_STATE"; then
-  if ! PUBLIC_FOLLOWUP_BLOCKING=$(FM_HOME="$PUBLIC_FOLLOWUP_HOME" FM_STATE_OVERRIDE="$PUBLIC_FOLLOWUP_STATE" \
+  if ! PUBLIC_FOLLOWUP_BLOCKING=$(JG_HOME="$PUBLIC_FOLLOWUP_HOME" JG_STATE_OVERRIDE="$PUBLIC_FOLLOWUP_STATE" \
       "$SCRIPT_DIR/jg-public-followup.sh" guard-work "$PUBLIC_FOLLOWUP_WORK_HOME" "$ID" 2>/dev/null); then
     echo "REFUSED: task $ID still owes a public reply through the myfirstmate relay." >&2
     printf '%s\n' "$PUBLIC_FOLLOWUP_BLOCKING" >&2
@@ -3633,8 +3633,8 @@ TEARDOWN_HERDR_PANE=
 if [ "$BACKEND" = herdr ]; then
   teardown_herdr_preflight_target "$T" "$ID" || exit 1
   jg_backend_herdr_parse_target "$T" || exit 1
-  TEARDOWN_HERDR_SESSION=$FM_BACKEND_HERDR_SESSION
-  TEARDOWN_HERDR_PANE=$FM_BACKEND_HERDR_PANE
+  TEARDOWN_HERDR_SESSION=$JG_BACKEND_HERDR_SESSION
+  TEARDOWN_HERDR_PANE=$JG_BACKEND_HERDR_PANE
 fi
 
 BACKLOG_CLOSED=0
@@ -3684,7 +3684,7 @@ teardown_legacy_stamp_rollback() {
       teardown_legacy_stamp_rollback \
         || echo "error: the legacy incarnation stamp on $ID's record could not be rolled back; re-run teardown with --legacy-record after reconciling its endpoint" >&2
       if [ "$TEARDOWN_LEGACY_STAMP_FAILED" = validate ]; then
-        echo "error: the stamped legacy incarnation does not validate for $ID ($FM_BACKLOG_TRANSITION_ERROR); refusing destructive teardown" >&2
+        echo "error: the stamped legacy incarnation does not validate for $ID ($JG_BACKLOG_TRANSITION_ERROR); refusing destructive teardown" >&2
       else
         echo "error: could not stamp the accepted legacy incarnation into task $ID's record; refusing destructive teardown" >&2
       fi
@@ -3698,9 +3698,9 @@ teardown_legacy_stamp_rollback() {
       "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
     if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ] && [ -z "$TEARDOWN_LEGACY_RETAINED_STAMP" ] \
        && teardown_legacy_stamp_rollback; then
-      echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); the accepted legacy incarnation was rolled back, retaining every durable task record" >&2
+      echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($JG_BACKLOG_TRANSITION_ERROR); the accepted legacy incarnation was rolled back, retaining every durable task record" >&2
     else
-      echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
+      echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($JG_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
       if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ] && [ -z "$TEARDOWN_LEGACY_RETAINED_STAMP" ]; then
         echo "error: the legacy incarnation stamp on $ID's record could not be rolled back; re-run teardown with --legacy-record after reconciling its endpoint" >&2
       fi
@@ -3723,7 +3723,7 @@ if [ "$KIND" != secondmate ]; then
   conclude_task_no_mistakes_run "$WT"
 fi
 if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend" ]; then
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" JG_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/jg-pipeline-spend.sh" record "$ID" >/dev/null \
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
 fi
@@ -3740,11 +3740,11 @@ HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
 teardown_herdr_journal_orphaned() {
   jg_backend_source herdr || return 1
   jg_backend_herdr_projection_journal_snapshot "$HERDR_PRESENTATION_JOURNAL" "$ID" || return 1
-  if [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 1 ]; then
+  if [ "$JG_BACKEND_HERDR_JOURNAL_VERSION" = 1 ]; then
     jg_backend_herdr_projection_token_workspace_gone \
       "$TEARDOWN_HERDR_SESSION" "$HERDR_PRESENTATION_JOURNAL" "$ID"
   else
-    [ "$FM_BACKEND_HERDR_JOURNAL_SESSION:$FM_BACKEND_HERDR_JOURNAL_PANE_ID" = "$T" ]
+    [ "$JG_BACKEND_HERDR_JOURNAL_SESSION:$JG_BACKEND_HERDR_JOURNAL_PANE_ID" = "$T" ]
   fi
 }
 HERDR_PRESENTATION_RETIRE_CANDIDATE=0
@@ -3824,7 +3824,7 @@ fi
 # killing the pane shell steals focus before the close can snapshot it.
 if [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
-  teardown_reap_registered_scratch "$FM_HOME" "$STATE" "$DATA" "$ID" || exit 1
+  teardown_reap_registered_scratch "$JG_HOME" "$STATE" "$DATA" "$ID" || exit 1
 fi
 
 # Fix 3 (see script header): sweep remote job workers abandoned by an already
@@ -3895,7 +3895,7 @@ if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS"
     || endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
 fi
 if [ "$KIND" != secondmate ]; then
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+  if ! JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
       "$SCRIPT_DIR/jg-inactive-reconcile.sh" report "$ID"; then
     echo "error: $ID's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery" >&2
     exit 1
@@ -3946,7 +3946,7 @@ teardown_launch_home_token() {
   esac
   printf '%s' "$hash"
 }
-LAUNCH_HOME_TOKEN=$(teardown_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
+LAUNCH_HOME_TOKEN=$(teardown_launch_home_token "$JG_HOME") || LAUNCH_HOME_TOKEN=
 if [ -n "$LAUNCH_HOME_TOKEN" ]; then
   rm -rf "/tmp/jg-$ID+$LAUNCH_HOME_TOKEN"
 fi
@@ -3954,24 +3954,24 @@ remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 # Opt-in fleet activity ledger (docs/fleet-ledger.md), before the status log is
 # retired so its last lines are captured; off costs one file test.
-[ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" cleaned_up "$ID" || true
+[ ! -e "$CONFIG/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" cleaned_up "$ID" || true
 # A non-forced teardown only finishes work that landed, so its ticket closes and
 # keeps the delivered PR; a forced teardown discarded the work, and the poll then
 # publishes whatever the backlog says instead of a false done.
 if [ "$FORCE" != --force ]; then
   if [ -n "${PR_URL:-}" ]; then
-    FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" --pr "$PR_URL" || true
+    JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" --pr "$PR_URL" || true
   else
-    FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" || true
+    JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" || true
   fi
 fi
 # Durable per-task outcome for per-model fleet statistics, while the record and
 # the spawn-recorded model history still exist. Best effort: a failure never
 # blocks cleanup, and bin/jg-task-outcome.sh itself only fails on a usage error.
 if [ "$FORCE" = --force ]; then
-  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_DATA_OVERRIDE=$DATA "$SCRIPT_DIR/jg-task-outcome.sh" "$ID" --force || true
+  JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_DATA_OVERRIDE=$DATA "$SCRIPT_DIR/jg-task-outcome.sh" "$ID" --force || true
 else
-  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_DATA_OVERRIDE=$DATA "$SCRIPT_DIR/jg-task-outcome.sh" "$ID" || true
+  JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_DATA_OVERRIDE=$DATA "$SCRIPT_DIR/jg-task-outcome.sh" "$ID" || true
 fi
 status_retire_presentation_task "$STATE" "$ID" || exit 1
 jg_wake_queue_prune_task "$STATE" "$ID" "$T" 2>/dev/null || true
@@ -4017,9 +4017,9 @@ if [ "$BACKLOG_CLOSED" = 1 ]; then
     jg_lock_release "$META_LOCK"
     META_LOCK_HELD=0
     if [ "$BACKLOG_TRANSITION" = retain ]; then
-      echo "error: $ID's endpoint and local copy are cleaned up, but its captain-held backlog item could not be returned to Queued atomically ($FM_BACKLOG_TRANSITION_ERROR); the pending retention is recorded and the next session start retries it" >&2
+      echo "error: $ID's endpoint and local copy are cleaned up, but its captain-held backlog item could not be returned to Queued atomically ($JG_BACKLOG_TRANSITION_ERROR); the pending retention is recorded and the next session start retries it" >&2
     else
-      echo "error: $ID's endpoint and local copy are cleaned up, but its backlog item could not be closed atomically ($FM_BACKLOG_TRANSITION_ERROR); the pending close is recorded and the next session start retries it" >&2
+      echo "error: $ID's endpoint and local copy are cleaned up, but its backlog item could not be closed atomically ($JG_BACKLOG_TRANSITION_ERROR); the pending close is recorded and the next session start retries it" >&2
     fi
     exit 1
   fi
@@ -4032,7 +4032,7 @@ else
   if ! jg_backlog_atomic_transition remove "$STATE/$ID.meta" "task record" "$STATE"; then
     jg_lock_release "$META_LOCK"
     META_LOCK_HELD=0
-    echo "error: $ID's endpoint and local copy are cleaned up, but its task record could not be removed ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+    echo "error: $ID's endpoint and local copy are cleaned up, but its task record could not be removed ($JG_BACKLOG_TRANSITION_ERROR)" >&2
     exit 1
   fi
 fi
@@ -4043,12 +4043,12 @@ META_LOCK_HELD=0
 # delivery already receipted and removes the rest. Best effort - a failure here
 # leaves a record the next poll's own pass retires, and never blocks cleanup.
 if [ -d "$STATE" ] && [ "$KIND" != secondmate ]; then
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$DATA" \
     "$SCRIPT_DIR/jg-inactive-reconcile.sh" retire "$ID" || true
 fi
 rm -f "$STATE/$ID.models"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ]; then
-  "$FM_ROOT/bin/jg-fleet-sync.sh" "$PROJ" || true
+  "$JG_ROOT/bin/jg-fleet-sync.sh" "$PROJ" || true
 fi
 # A secondmate retirement may remove the home containing an overridden control
 # state directory. Do not let the side-band refresh recreate that retired home.

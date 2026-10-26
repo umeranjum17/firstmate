@@ -39,7 +39,7 @@ cleanup() {
     kill "$watch_pid" 2>/dev/null || true
     wait "$watch_pid" 2>/dev/null || true
   fi
-  FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
     "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
     worker_pid=$(cat "$TMP_ROOT/remote-jobs/worker.pid")
@@ -135,8 +135,8 @@ printf 'primary harness defaults\n' > "$PARENT/config/crew-harness"
 
 cat > "$FAKEBIN/fake-ssh" <<'SH'
 #!/usr/bin/env bash
-count=$(cat "$FM_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
-printf '%s\n' "$((count + 1))" > "$FM_FAKE_SSH_COUNT"
+count=$(cat "$JG_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((count + 1))" > "$JG_FAKE_SSH_COUNT"
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
@@ -145,7 +145,7 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-cd "$FM_FAKE_REMOTE_CWD" || exit 93
+cd "$JG_FAKE_REMOTE_CWD" || exit 93
 argv_b64=$4
 command_fields=$(perl -MMIME::Base64=decode_base64 -e '
   my $data=decode_base64($ARGV[0]);
@@ -155,13 +155,13 @@ command_fields=$(perl -MMIME::Base64=decode_base64 -e '
 IFS=$'\t' read -r command_name _command_action command_rel <<EOF
 $command_fields
 EOF
-case "${FM_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
+case "${JG_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
   inherit-partial:jg-remote-inherit.sh:config/crew-harness) exit 255 ;;
   inherit-block:jg-remote-inherit.sh:data/captain-shared.md)
-    cat > "$FM_FAKE_INHERIT_PAYLOAD"
-    touch "$FM_FAKE_INHERIT_ENTERED"
-    while [ ! -f "$FM_FAKE_INHERIT_RELEASE" ]; do sleep 0.02; done
-    "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" < "$FM_FAKE_INHERIT_PAYLOAD"
+    cat > "$JG_FAKE_INHERIT_PAYLOAD"
+    touch "$JG_FAKE_INHERIT_ENTERED"
+    while [ ! -f "$JG_FAKE_INHERIT_RELEASE" ]; do sleep 0.02; done
+    "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" < "$JG_FAKE_INHERIT_PAYLOAD"
     exit $?
     ;;
 esac
@@ -170,8 +170,8 @@ esac
 # owns the doctor's real behavior against controlled account fixtures; this
 # boundary owns only what the callers do with its verdict.
 if [ "$command_name" = jg-remote-doctor.sh ]; then
-  printf '%s %s\n' "${FM_FAKE_SSH_MODE:-normal}" "${_command_action:--}" >> "$FM_FAKE_DOCTOR_LOG"
-  case "${FM_FAKE_SSH_MODE:-normal}" in
+  printf '%s %s\n' "${JG_FAKE_SSH_MODE:-normal}" "${_command_action:--}" >> "$JG_FAKE_DOCTOR_LOG"
+  case "${JG_FAKE_SSH_MODE:-normal}" in
     unreachable) exit 255 ;;
     doctor-fix-unknown)
       if [ "${_command_action:-}" = --fix ]; then
@@ -191,12 +191,12 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
     doctor-fixable)
       # Red until --fix runs on this host, green on every later read-only run.
       if [ "${_command_action:-}" = --fix ]; then
-        touch "$FM_FAKE_DOCTOR_REPAIRED"
+        touch "$JG_FAKE_DOCTOR_REPAIRED"
         printf 'fix launchagent=applied: wrote the Aqua-scoped launch agent\n'
         printf 'ok: remote second-mate readiness confirmed on this host\n'
         exit 0
       fi
-      [ -f "$FM_FAKE_DOCTOR_REPAIRED" ] || {
+      [ -f "$JG_FAKE_DOCTOR_REPAIRED" ] || {
         printf 'check launchagent=fixable: no Firstmate herdr launch agent\n'
         printf 'error: this host is not ready for a remote second mate; unresolved: launchagent\n' >&2
         exit 1
@@ -207,14 +207,14 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
   printf 'ok: remote second-mate readiness confirmed on this host\n'
   exit 0
 fi
-if [ "${FM_FAKE_SSH_MODE:-normal}" = doctor-fixable ] \
+if [ "${JG_FAKE_SSH_MODE:-normal}" = doctor-fixable ] \
   && [ "$command_name" = jg-remote-secondmate-control.sh ] \
   && [ "$_command_action" = state ] \
-  && [ ! -f "$FM_FAKE_DOCTOR_REPAIRED" ]; then
+  && [ ! -f "$JG_FAKE_DOCTOR_REPAIRED" ]; then
   printf 'unreadable\n'
   exit 0
 fi
-case "${FM_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
+case "${JG_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
   launch-nonherdr-route:jg-remote-secondmate-control.sh:*)
     [ "$_command_action" = launch ] || exit 93
     printf 'schema=jg-remote-secondmate-control.v1\n'
@@ -233,25 +233,25 @@ case "${FM_FAKE_SSH_MODE:-normal}:$command_name:$command_rel" in
     exit 0
     ;;
   provision-block-fail:jg-remote-home-provision.sh:*)
-    touch "$FM_FAKE_SEED_ENTERED"
-    while [ ! -f "$FM_FAKE_SEED_RELEASE" ]; do sleep 0.02; done
+    touch "$JG_FAKE_SEED_ENTERED"
+    while [ ! -f "$JG_FAKE_SEED_RELEASE" ]; do sleep 0.02; done
     exit 1
     ;;
   launch-block:jg-remote-secondmate-control.sh:*)
     [ "$_command_action" = launch ] || exit 93
-    touch "$FM_FAKE_LAUNCH_ENTERED"
-    while [ ! -f "$FM_FAKE_LAUNCH_RELEASE" ]; do sleep 0.02; done
+    touch "$JG_FAKE_LAUNCH_ENTERED"
+    while [ ! -f "$JG_FAKE_LAUNCH_RELEASE" ]; do sleep 0.02; done
     ;;
 esac
-case "${FM_FAKE_SSH_MODE:-normal}" in
+case "${JG_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
-  ambiguous) "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"; exit 255 ;;
+  ambiguous) "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"; exit 255 ;;
   # The remote retirement really runs, then reports what its forced secondmate
   # teardown reports for a lost child slot: tests/jg-teardown.test.sh owns that
   # remote-side exit 4.
   retire-lost-slot)
     rc=0
-    "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" || rc=$?
+    "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" || rc=$?
     if [ "$rc" -eq 0 ] && [ "$command_name:$_command_action" = jg-remote-secondmate-control.sh:retire ]; then
       printf 'warning: treehouse return left pool slot 3 (/remote/slot-3) dirty or unverified; the pool lost this slot. Remaining paths:\n' >&2
       printf '  ?? left-behind-clone/\n' >&2
@@ -260,14 +260,14 @@ case "${FM_FAKE_SSH_MODE:-normal}" in
     fi
     exit "$rc"
     ;;
-  *) exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
+  *) exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
 esac
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 publish_healthy_watcher_identity() { # <state> <home> <watch-script>
   local state=$1 home=$2 watch=$3 identity
-  identity=$(FM_HOME="$PARENT" FM_STATE_OVERRIDE="$PARENT/state" /bin/bash -c \
+  identity=$(JG_HOME="$PARENT" JG_STATE_OVERRIDE="$PARENT/state" /bin/bash -c \
     '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$$") \
     || fail "could not derive fixture watcher identity"
   mkdir -p "$state/.watch.lock"
@@ -279,26 +279,26 @@ publish_healthy_watcher_identity() { # <state> <home> <watch-script>
 }
 
 remote_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_SSH_COUNT="$SSH_COUNT" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_SSH_MODE="${FM_FAKE_SSH_MODE:-normal}" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
-  FM_FAKE_SEED_ENTERED="$TMP_ROOT/seed.entered" \
-  FM_FAKE_SEED_RELEASE="$TMP_ROOT/seed.release" \
-  FM_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
-  FM_FAKE_DOCTOR_REPAIRED="$TMP_ROOT/doctor.repaired" \
-  FM_FAKE_INHERIT_ENTERED="$TMP_ROOT/inherit.entered" \
-  FM_FAKE_INHERIT_RELEASE="$TMP_ROOT/inherit.release" \
-  FM_FAKE_INHERIT_PAYLOAD="$TMP_ROOT/inherit.payload" \
-  FM_FAKE_LAUNCH_ENTERED="$TMP_ROOT/launch.entered" \
-  FM_FAKE_LAUNCH_RELEASE="$TMP_ROOT/launch.release" \
-  FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 FM_REMOTE_REPLY_WAIT_SECONDS=10 \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_SSH_COUNT="$SSH_COUNT" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_FAKE_SSH_MODE="${JG_FAKE_SSH_MODE:-normal}" \
+  JG_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  JG_FAKE_SEED_ENTERED="$TMP_ROOT/seed.entered" \
+  JG_FAKE_SEED_RELEASE="$TMP_ROOT/seed.release" \
+  JG_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
+  JG_FAKE_DOCTOR_REPAIRED="$TMP_ROOT/doctor.repaired" \
+  JG_FAKE_INHERIT_ENTERED="$TMP_ROOT/inherit.entered" \
+  JG_FAKE_INHERIT_RELEASE="$TMP_ROOT/inherit.release" \
+  JG_FAKE_INHERIT_PAYLOAD="$TMP_ROOT/inherit.payload" \
+  JG_FAKE_LAUNCH_ENTERED="$TMP_ROOT/launch.entered" \
+  JG_FAKE_LAUNCH_RELEASE="$TMP_ROOT/launch.release" \
+  JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_REMOTE_REPLY_WAIT_SECONDS=10 \
   "$@"
 }
 
@@ -333,20 +333,20 @@ newest_remote_inbox_corr() {
 }
 
 seed_env() {
-  FM_HOME="$TMP_ROOT/seed-parent" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_SSH_COUNT="$SSH_COUNT" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_SSH_MODE="${FM_FAKE_SSH_MODE:-normal}" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
-  FM_FAKE_SEED_ENTERED="$TMP_ROOT/seed.entered" \
-  FM_FAKE_SEED_RELEASE="$TMP_ROOT/seed.release" \
-  FM_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
-  FM_FAKE_DOCTOR_REPAIRED="$TMP_ROOT/doctor.repaired" \
+  JG_HOME="$TMP_ROOT/seed-parent" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_SSH_COUNT="$SSH_COUNT" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_FAKE_SSH_MODE="${JG_FAKE_SSH_MODE:-normal}" \
+  JG_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  JG_FAKE_SEED_ENTERED="$TMP_ROOT/seed.entered" \
+  JG_FAKE_SEED_RELEASE="$TMP_ROOT/seed.release" \
+  JG_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
+  JG_FAKE_DOCTOR_REPAIRED="$TMP_ROOT/doctor.repaired" \
   "$@"
 }
 
@@ -364,8 +364,8 @@ if [ "\${1:-}" = clone ]; then
       ;;
   esac
 fi
-if [ "\${1:-}" = clone ] && [ -n "\${FM_FAKE_CLONE_HOLD_DIR:-}" ] \
-  && [ "\$(dirname "\${!#}")" = "\$FM_FAKE_CLONE_HOLD_DIR" ]; then
+if [ "\${1:-}" = clone ] && [ -n "\${JG_FAKE_CLONE_HOLD_DIR:-}" ] \
+  && [ "\$(dirname "\${!#}")" = "\$JG_FAKE_CLONE_HOLD_DIR" ]; then
   hold_dest="\${!#}"
   "$REAL_GIT" "\$@" &
   hold_git=\$!
@@ -395,7 +395,7 @@ printf 'schema=jg-remote-home-provision.v1\nid_b64=%s\ncharter_b64=%s\nproject_c
   "$(printf ios | base64 | tr -d '\n')" \
   "$(printf 'Concurrent provisioning charter.\n' | base64 | tr -d '\n')" \
   > "$TMP_ROOT/provision.manifest"
-PATH="$FAKEBIN:$PATH" FM_HOME="$TMP_ROOT/concurrent-home" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+PATH="$FAKEBIN:$PATH" JG_HOME="$TMP_ROOT/concurrent-home" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   "$REMOTE_ROOT/bin/jg-remote-home-provision.sh" < "$TMP_ROOT/provision.manifest" \
   > "$TMP_ROOT/provision-one.out" 2>&1 &
 provision_one=$!
@@ -406,7 +406,7 @@ while [ ! -f "$TMP_ROOT/provision.entered" ]; do
   [ "$provision_wait" -le 250 ] || fail "first provisioning attempt never reached cloning"
   sleep 0.02
 done
-PATH="$FAKEBIN:$PATH" FM_HOME="$TMP_ROOT/concurrent-home" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+PATH="$FAKEBIN:$PATH" JG_HOME="$TMP_ROOT/concurrent-home" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   "$REMOTE_ROOT/bin/jg-remote-home-provision.sh" < "$TMP_ROOT/provision.manifest" \
   > "$TMP_ROOT/provision-two.out" 2>&1 &
 provision_two=$!
@@ -429,8 +429,8 @@ printf 'schema=jg-remote-home-provision.v1\nid_b64=%s\ncharter_b64=%s\nproject_c
   "$(printf race | base64 | tr -d '\n')" \
   "$(printf 'Cleanup-race provisioning charter.\n' | base64 | tr -d '\n')" \
   > "$TMP_ROOT/race.manifest"
-PATH="$FAKEBIN:$PATH" FM_HOME="$TMP_ROOT/raced-home" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_FAKE_CLONE_HOLD_DIR="$TMP_ROOT" \
+PATH="$FAKEBIN:$PATH" JG_HOME="$TMP_ROOT/raced-home" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_FAKE_CLONE_HOLD_DIR="$TMP_ROOT" \
   "$REMOTE_ROOT/bin/jg-remote-home-provision.sh" < "$TMP_ROOT/race.manifest" \
   > "$TMP_ROOT/race-provision.out" 2>&1 &
 race_provision=$!
@@ -464,8 +464,8 @@ pass "competing cleanup of the public home cannot reach a live provisioning clon
 # A home that appears at the public path while the clone is staged must make
 # the provision die without adopting, altering, or nesting into that home.
 rm -f -- "$TMP_ROOT/race-clone.held" "$TMP_ROOT/race-clone.release"
-PATH="$FAKEBIN:$PATH" FM_HOME="$TMP_ROOT/appeared-home" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_FAKE_CLONE_HOLD_DIR="$TMP_ROOT" \
+PATH="$FAKEBIN:$PATH" JG_HOME="$TMP_ROOT/appeared-home" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_FAKE_CLONE_HOLD_DIR="$TMP_ROOT" \
   "$REMOTE_ROOT/bin/jg-remote-home-provision.sh" < "$TMP_ROOT/race.manifest" \
   > "$TMP_ROOT/appeared-provision.out" 2>&1 &
 appeared_provision=$!
@@ -491,14 +491,14 @@ if find "$TMP_ROOT" -maxdepth 1 -name '.jg-home-provisioning.*' -print -quit | g
   fail "appeared-home provisioning left staging litter beside the home"
 fi
 pass "a home that appears mid-provision makes the provision die without touching it"
-if [ "${FM_TEST_PROVISION_ONLY:-0}" = 1 ]; then
+if [ "${JG_TEST_PROVISION_ONLY:-0}" = 1 ]; then
   echo "ALL TESTS PASSED"
   exit 0
 fi
 
 mkdir -p "$TMP_ROOT/seed-parent/data" "$TMP_ROOT/seed-parent/state"
-FM_SECONDMATE_CHARTER='Failing seed charter.' FM_SECONDMATE_SCOPE='failed seed' \
-  FM_FAKE_SSH_MODE=provision-block-fail seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
+JG_SECONDMATE_CHARTER='Failing seed charter.' JG_SECONDMATE_SCOPE='failed seed' \
+  JG_FAKE_SSH_MODE=provision-block-fail seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-fail remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-fail-home" --no-projects \
   > "$TMP_ROOT/seed-fail.out" 2>&1 &
 seed_fail_pid=$!
@@ -509,7 +509,7 @@ while [ ! -f "$TMP_ROOT/seed.entered" ]; do
   [ "$seed_wait" -le 250 ] || fail "failing seed never reached remote provisioning"
   sleep 0.02
 done
-FM_SECONDMATE_CHARTER='Successful seed charter.' FM_SECONDMATE_SCOPE='successful seed' \
+JG_SECONDMATE_CHARTER='Successful seed charter.' JG_SECONDMATE_SCOPE='successful seed' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-keep remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-keep-home" --no-projects > "$TMP_ROOT/seed-keep.out" 2>&1 &
 seed_keep_pid=$!
@@ -526,8 +526,8 @@ assert_present "$TMP_ROOT/seed-keep-home/.jg-secondmate-home" "serialized seed l
 pass "remote seed rollback preserves serialized competing routes"
 
 : > "$DOCTOR_LOG"
-if FM_SECONDMATE_CHARTER='Unknown readiness charter.' FM_SECONDMATE_SCOPE='unknown readiness' \
-  FM_FAKE_SSH_MODE=doctor-fix-unknown seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
+if JG_SECONDMATE_CHARTER='Unknown readiness charter.' JG_SECONDMATE_SCOPE='unknown readiness' \
+  JG_FAKE_SSH_MODE=doctor-fix-unknown seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-unknown remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-unknown-home" --no-projects \
   > "$TMP_ROOT/seed-unknown.out" 2>&1; then
   fail "seeding claimed success after readiness repair completion became unknown"
@@ -548,8 +548,8 @@ pass "unknown readiness preserves its route and brief for reconciliation"
 # readiness gate before any home is created on it, and the operator must get the
 # gap text rather than a bare refusal.
 : > "$DOCTOR_LOG"
-if FM_SECONDMATE_CHARTER='Unready host charter.' FM_SECONDMATE_SCOPE='unready host' \
-  FM_FAKE_SSH_MODE=doctor-human seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
+if JG_SECONDMATE_CHARTER='Unready host charter.' JG_SECONDMATE_SCOPE='unready host' \
+  JG_FAKE_SSH_MODE=doctor-human seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-toolless remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-toolless-home" --no-projects \
   > "$TMP_ROOT/seed-toolless.out" 2>&1; then
   fail "seeding proceeded against a host that is not ready for a remote second mate"
@@ -573,8 +573,8 @@ pass "remote seeding checks, repairs, and re-checks readiness, then stops on a r
 # The same gate must accept a host whose only gaps were repairable.
 : > "$DOCTOR_LOG"
 rm -f "$TMP_ROOT/doctor.repaired"
-out=$(FM_SECONDMATE_CHARTER='Repairable host charter.' FM_SECONDMATE_SCOPE='repairable host' \
-  FM_FAKE_SSH_MODE=doctor-fixable seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
+out=$(JG_SECONDMATE_CHARTER='Repairable host charter.' JG_SECONDMATE_SCOPE='repairable host' \
+  JG_FAKE_SSH_MODE=doctor-fixable seed_env "$ROOT/bin/jg-remote-home-seed.sh" \
   seed-repair remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-repair-home" --no-projects 2>&1) \
   || fail "seeding refused a host whose gaps the repair closed"$'\n'"$out"
 assert_present "$TMP_ROOT/seed-repair-home/.jg-secondmate-home" "the repaired host was never provisioned"
@@ -617,7 +617,7 @@ EOF
 BETA_ORIGIN="file://$TMP_ROOT/beta.git"
 PROJECTS_BEFORE=$(projects_snapshot "$TMP_ROOT/seed-parent/projects")
 
-if FM_SECONDMATE_CHARTER='Unsupplied origin charter.' FM_SECONDMATE_SCOPE='unsupplied origin' \
+if JG_SECONDMATE_CHARTER='Unsupplied origin charter.' JG_SECONDMATE_SCOPE='unsupplied origin' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-noorigin remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-noorigin-home" beta > "$TMP_ROOT/seed-noorigin.out" 2>&1; then
   fail "seeding an uncloned project with no origin claimed success"
@@ -626,7 +626,7 @@ assert_grep 'pass beta=<origin-url>' "$TMP_ROOT/seed-noorigin.out" \
   "the refusal did not name how to supply the origin"
 assert_absent "$TMP_ROOT/seed-noorigin-home" "the unresolvable origin still provisioned a remote home"
 
-if FM_SECONDMATE_CHARTER='Unsafe origin charter.' FM_SECONDMATE_SCOPE='unsafe origin' \
+if JG_SECONDMATE_CHARTER='Unsafe origin charter.' JG_SECONDMATE_SCOPE='unsafe origin' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-unsafe remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-unsafe-home" 'beta=ext::git-upload-pack' \
   > "$TMP_ROOT/seed-unsafe.out" 2>&1; then
@@ -636,7 +636,7 @@ assert_grep 'not an accepted clone URL' "$TMP_ROOT/seed-unsafe.out" \
   "the unsafe-origin refusal did not name the reason"
 assert_absent "$TMP_ROOT/seed-unsafe-home" "the unsafe origin still provisioned a remote home"
 
-if FM_SECONDMATE_CHARTER='Local-only charter.' FM_SECONDMATE_SCOPE='local only' \
+if JG_SECONDMATE_CHARTER='Local-only charter.' JG_SECONDMATE_SCOPE='local only' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-localonly remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-localonly-home" "delta=$BETA_ORIGIN" \
   > "$TMP_ROOT/seed-localonly.out" 2>&1; then
@@ -645,7 +645,7 @@ fi
 assert_grep 'is local-only and cannot be provisioned remotely' "$TMP_ROOT/seed-localonly.out" \
   "the local-only refusal did not name the registered mode"
 
-if FM_SECONDMATE_CHARTER='Unregistered charter.' FM_SECONDMATE_SCOPE='unregistered' \
+if JG_SECONDMATE_CHARTER='Unregistered charter.' JG_SECONDMATE_SCOPE='unregistered' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-unregistered remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-unregistered-home" "gamma=$BETA_ORIGIN" \
   > "$TMP_ROOT/seed-unregistered.out" 2>&1; then
@@ -654,8 +654,8 @@ fi
 assert_grep 'has no registry record' "$TMP_ROOT/seed-unregistered.out" \
   "the unregistered-project refusal did not name the missing record"
 
-out=$(FM_SECONDMATE_CHARTER='Own beta delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='beta delivery and validation' \
+out=$(JG_SECONDMATE_CHARTER='Own beta delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='beta delivery and validation' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-noclone remote-mac "$REMOTE_ROOT" \
   "$TMP_ROOT/seed-noclone-home" "beta=$BETA_ORIGIN" 2>&1) \
   || fail "seeding refused a registered project whose origin was supplied"$'\n'"$out"
@@ -685,7 +685,7 @@ printf 'schema=jg-remote-home-provision.v1\nid_b64=%s\ncharter_b64=%s\nproject_c
   "$(printf -- '- beta [direct-PR] - beta project (added 2026-08-06)' | base64 | tr -d '\n')" \
   "$(printf direct-PR | base64 | tr -d '\n')" \
   > "$TMP_ROOT/unsafe-origin.manifest"
-if FM_HOME="$TMP_ROOT/unsafe-origin-home" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+if JG_HOME="$TMP_ROOT/unsafe-origin-home" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   "$REMOTE_ROOT/bin/jg-remote-home-provision.sh" < "$TMP_ROOT/unsafe-origin.manifest" \
   > "$TMP_ROOT/unsafe-origin.out" 2>&1; then
   fail "remote provisioning accepted an origin the transport had not validated"
@@ -744,8 +744,8 @@ SH
 chmod +x "$REMOTE_ROOT/bin/git"
 
 FORGE_HOME="$TMP_ROOT/seed-forge-home"
-out=$(FM_SECONDMATE_CHARTER='Own delivery for projects hosted anywhere.' \
-  FM_SECONDMATE_SCOPE='multi-forge delivery' \
+out=$(JG_SECONDMATE_CHARTER='Own delivery for projects hosted anywhere.' \
+  JG_SECONDMATE_SCOPE='multi-forge delivery' \
   seed_env "$ROOT/bin/jg-remote-home-seed.sh" seed-forge remote-mac "$REMOTE_ROOT" \
   "$FORGE_HOME" \
   'bitbucket-app=https://bitbucket.org/team/bitbucket-app.git' \
@@ -786,8 +786,8 @@ rm -f "$REMOTE_ROOT/bin/git"
 pass "seeding carries bitbucket, self-hosted, and scp-like origins through to the remote clone"
 
 # Provision and register the remote route from the captain-facing primary.
-out=$(FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+out=$(JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" alpha)
 assert_contains "$out" "home=remote-mac:$REMOTE_HOME" "remote seed did not report the host-qualified home"
 assert_grep 'host: remote-mac; root:' "$PARENT/data/secondmates.md" "registry did not record the remote host dimension"
@@ -798,8 +798,8 @@ assert_no_grep "$PARENT/state/ios.status" "$REMOTE_HOME/data/charter.md" "remote
 assert_grep "$PARENT_ROUTE_INBOX" "$REMOTE_HOME/data/charter.md" "remote charter did not name its host-local steering inbox"
 assert_no_grep "$PARENT/state/ios.inbox" "$REMOTE_HOME/data/charter.md" "remote charter retained the inaccessible local steering inbox path"
 assert_grep "$PARENT_ROUTE_INBOX'/NNN.msg '$PARENT_ROUTE_INBOX'/handled/" "$REMOTE_HOME/data/charter.md" "remote charter did not render the inbox acknowledgement move host-local"
-if FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+if JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$TMP_ROOT/other-home" alpha \
   >/dev/null 2>&1; then
   fail "remote seed allowed an existing id to move to another home"
@@ -812,18 +812,18 @@ mkdir -p "$PROTOCOL_HOME/config" "$PROTOCOL_HOME/data" "$PROTOCOL_HOME/state"
 printf 'complete inherited payload\n' > "$TMP_ROOT/inherit-complete"
 inherit_bytes=$(LC_ALL=C wc -c < "$TMP_ROOT/inherit-complete" | tr -d ' ')
 inherit_hash=$(sha256_file "$TMP_ROOT/inherit-complete")
-if printf 'complete' | FM_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
+if printf 'complete' | JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   put config/crew-harness "$inherit_bytes" "$inherit_hash" 1 >/dev/null 2>&1; then
   fail "remote inheritance published a truncated payload"
 fi
 assert_absent "$PROTOCOL_HOME/config/crew-harness" "truncated inheritance published a destination"
-FM_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
+JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   put config/crew-harness "$inherit_bytes" "$inherit_hash" 2 \
   < "$TMP_ROOT/inherit-complete" >/dev/null
 printf 'stale inherited payload\n' > "$TMP_ROOT/inherit-stale"
 inherit_stale_bytes=$(LC_ALL=C wc -c < "$TMP_ROOT/inherit-stale" | tr -d ' ')
 inherit_stale_hash=$(sha256_file "$TMP_ROOT/inherit-stale")
-if FM_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
+if JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   put config/crew-harness "$inherit_stale_bytes" "$inherit_stale_hash" 1 \
   < "$TMP_ROOT/inherit-stale" >/dev/null 2>&1; then
   fail "remote inheritance accepted a superseded payload generation"
@@ -848,7 +848,7 @@ pass "mixed local and remote routes validate without migration"
 printf 'pi\n' > "$PARENT/config/crew-harness"
 launches_before_inherit=0
 [ ! -f "$HERDR_LOG" ] || launches_before_inherit=$(grep -c '^tab create' "$HERDR_LOG" || true)
-if FM_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+if JG_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-inherit-partial.out" 2>&1; then
   fail "remote spawn launched after ambiguous partial inheritance"
 fi
@@ -916,7 +916,7 @@ pass "legacy and mismatched remote endpoints fail closed before backend access"
 cp "$PARENT/state/ios.meta" "$TMP_ROOT/parent-ios-before-nonherdr.meta"
 cp "$PARENT/data/secondmates.md" "$TMP_ROOT/registry-before-nonherdr.md"
 set +e
-FM_FAKE_SSH_MODE=launch-nonherdr-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-nonherdr-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-nonherdr-route.out" 2>&1
 nonherdr_parent_rc=$?
 set -e
@@ -929,7 +929,7 @@ cmp -s "$TMP_ROOT/registry-before-nonherdr.md" "$PARENT/data/secondmates.md" \
   || fail "parent removed or changed the registry route after a non-herdr route refusal"
 
 set +e
-FM_FAKE_SSH_MODE=launch-default-session-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-default-session-route remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-default-session-route.out" 2>&1
 default_session_parent_rc=$?
 set -e
@@ -976,7 +976,7 @@ It is read-only in secondmate homes and must not be edited there.
 Changes return through a marked status document pointer.
 stale spawn preference
 EOF
-FM_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-concurrent.out" 2>&1 &
 spawn_concurrent=$!
 spawn_inherit_wait=0
@@ -1017,7 +1017,7 @@ pass "remote spawn serializes inheritance through launch publication"
 ssh_before_send=$(cat "$SSH_COUNT")
 records_before_send=$(find "$PARENT_ROUTE_INBOX" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
 set +e
-FM_FAKE_SSH_MODE=ambiguous remote_env "$ROOT/bin/jg-send.sh" jg-ios \
+JG_FAKE_SSH_MODE=ambiguous remote_env "$ROOT/bin/jg-send.sh" jg-ios \
   'report the build result' > "$TMP_ROOT/send.out" 2> "$TMP_ROOT/send.err"
 send_rc=$?
 set -e
@@ -1034,7 +1034,7 @@ assert_no_grep 'report the build result' "$HERDR_LOG" "the steer payload was typ
 assert_grep 'Firstmate instruction waiting' "$HERDR_LOG" "the remote doorbell never rang"
 CORR=$(newest_remote_inbox_corr)
 [ -n "$CORR" ] || fail "remote send did not carry a correlation token"
-assert_grep "FM_PENDING_REPLY_EXISTING_CORR=$CORR" "$TMP_ROOT/send.err" "ambiguous remote send did not print its correlation-reusing command"
+assert_grep "JG_PENDING_REPLY_EXISTING_CORR=$CORR" "$TMP_ROOT/send.err" "ambiguous remote send did not print its correlation-reusing command"
 phase=$(grep '^phase=' "$PARENT/state/pending-replies/$CORR" | cut -d= -f2-)
 [ "$phase" = delivery_unknown ] || fail "ambiguous remote send did not preserve its pending expectation"
 printf 'done [corr=%s]: remote build passed\n' "$CORR" >> "$REMOTE_HOME/state/parent-replies.status"
@@ -1053,7 +1053,7 @@ rm -f "$PARENT/state/.wake-queue"
 printf '{"revision":2}\n' > "$PARENT/config/crew-dispatch.json"
 printf 'grok\n' > "$PARENT/config/crew-harness"
 set +e
-FM_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-config-push.sh" \
+JG_FAKE_SSH_MODE=inherit-partial remote_env "$ROOT/bin/jg-config-push.sh" \
   > "$TMP_ROOT/config-partial.out" 2>&1
 config_partial_rc=$?
 set -e
@@ -1087,7 +1087,7 @@ It is read-only in secondmate homes and must not be edited there.
 Changes return through a marked status document pointer.
 stale concurrent preference
 EOF
-FM_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-config-push.sh" \
+JG_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/jg-config-push.sh" \
   > "$TMP_ROOT/config-concurrent-first.out" 2>&1 &
 config_first=$!
 inherit_wait=0
@@ -1185,7 +1185,7 @@ resolve_ios_pending
 
 # Structured fleet state comes from each home's published ledger. The remote
 # host is explicit, and the local route remains alongside it.
-FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$LOCAL_HOME" \
+JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$LOCAL_HOME" \
   "$ROOT/bin/jg-home-summary-refresh.sh" >/dev/null \
   || fail "local fixture did not publish its home ledger"
 remote_env "$ROOT/bin/jg-on.sh" ios jg-home-summary-refresh.sh >/dev/null \
@@ -1245,10 +1245,10 @@ pass "the remote restart verb delegates to the host-local control plane and refu
 
 rm -f "$TMP_ROOT/doctor.repaired"
 : > "$DOCTOR_LOG"
-[ "$(FM_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = unreadable ] \
+[ "$(JG_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state ios)" = unreadable ] \
   || fail "the stopped-server fixture did not make the pre-repair endpoint probe unreadable"
 launches_before_repair=$(grep -c '^tab create' "$HERDR_LOG" || true)
-BOOT_REPAIRED=$(FM_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-bootstrap.sh")
+BOOT_REPAIRED=$(JG_FAKE_SSH_MODE=doctor-fixable remote_env "$ROOT/bin/jg-bootstrap.sh")
 [ "$(cat "$DOCTOR_LOG")" = 'doctor-fixable -
 doctor-fixable --fix
 doctor-fixable -' ] || fail "liveness did not check, repair, and re-check readiness before probing"$'\n'"$(cat "$DOCTOR_LOG")"
@@ -1297,9 +1297,9 @@ watch_relaunch_timeout=120
 # Recovery may use its full production timeout; allow another 30 seconds for
 # the initial probe, watcher startup and cleanup rather than killing it at 30 s.
 watch_wait_bound=$(( (watch_relaunch_timeout + 30) * 50 ))
-FM_STATE_OVERRIDE="$WATCH_STATE" FM_SECONDMATE_LIVENESS_SECS=1 FM_POLL=1 \
-  FM_SECONDMATE_LIVENESS_TIMEOUT="$watch_relaunch_timeout" \
-  FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+JG_STATE_OVERRIDE="$WATCH_STATE" JG_SECONDMATE_LIVENESS_SECS=1 JG_POLL=1 \
+  JG_SECONDMATE_LIVENESS_TIMEOUT="$watch_relaunch_timeout" \
+  JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
   remote_env exec "$ROOT/bin/jg-watch.sh" \
   > "$TMP_ROOT/watch-liveness.out" 2> "$TMP_ROOT/watch-liveness.err" &
 watch_pid=$!
@@ -1349,9 +1349,9 @@ mkdir -p "$WATCH_STATE_UNREACHABLE"
 cp "$WATCH_STATE/ios.meta" "$WATCH_STATE_UNREACHABLE/ios.meta"
 touch "$WATCH_STATE_UNREACHABLE/home-summary.json"
 ssh_before=$(cat "$SSH_COUNT" 2>/dev/null || printf '0')
-FM_FAKE_SSH_MODE=unreachable FM_STATE_OVERRIDE="$WATCH_STATE_UNREACHABLE" \
-  FM_SECONDMATE_LIVENESS_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
-  FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+JG_FAKE_SSH_MODE=unreachable JG_STATE_OVERRIDE="$WATCH_STATE_UNREACHABLE" \
+  JG_SECONDMATE_LIVENESS_SECS=1 JG_POLL=1 JG_SIGNAL_GRACE=0 \
+  JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
   remote_env exec "$ROOT/bin/jg-watch.sh" \
   > "$TMP_ROOT/watch-unreachable.out" 2> "$TMP_ROOT/watch-unreachable.err" &
 watch_pid=$!
@@ -1388,14 +1388,14 @@ pass "watch liveness: an unreachable remote secondmate is probed, preserved, and
 # from it with protocol_mismatch. The host-local state read must still reach
 # the live endpoint through the accepted client.
 make_herdr_client_pair "$TMP_ROOT/client-pair" 0.7.1 14 0.7.5 16
-export FM_HERDR_PAIR_DIR="$TMP_ROOT/client-pair"
-SHADOWED_STATE=$(FM_HOME="$REMOTE_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
+export JG_HERDR_PAIR_DIR="$TMP_ROOT/client-pair"
+SHADOWED_STATE=$(JG_HOME="$REMOTE_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
   PATH="$TMP_ROOT/client-pair/stale:$REMOTE_ROOT/bin:$TMP_ROOT/client-pair/tools:/usr/bin:/bin" \
   "$REMOTE_ROOT/bin/jg-remote-secondmate-control.sh" state ios 2>"$TMP_ROOT/shadowed-state.err")
 [ "$SHADOWED_STATE" = alive ] \
   || fail "a live endpoint behind a stale shadowing client must still read alive, got: $SHADOWED_STATE ($(cat "$TMP_ROOT/shadowed-state.err"))"
 assert_contains "$(cat "$TMP_ROOT/client-pair/stale.log")" 'pane get' "the stale client was not the one the job PATH resolved first"
-unset FM_HERDR_PAIR_DIR
+unset JG_HERDR_PAIR_DIR
 pass "the host-local state read steps around a stale shadowing herdr client"
 
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
@@ -1440,10 +1440,10 @@ rm -rf -- "$PARENT/state/secondmate-summary-cache"
 launches_before=$(grep -c '^tab create' "$HERDR_LOG" || true)
 rm -rf -- "$PARENT/state/.watch.lock"
 rm -f -- "$PARENT/state/.last-watcher-beat"
-BOOT_UNAVAILABLE=$(FM_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-bootstrap.sh")
+BOOT_UNAVAILABLE=$(JG_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-bootstrap.sh")
 assert_contains "$BOOT_UNAVAILABLE" 'SECONDMATE_LIVENESS: secondmate ios: skipped: remote host unavailable or endpoint state unknown' \
   "bootstrap did not preserve an unreachable remote endpoint as unknown"
-UNAVAILABLE=$(FM_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+UNAVAILABLE=$(JG_FAKE_SSH_MODE=unreachable remote_env "$ROOT/bin/jg-fleet-snapshot.sh" --json)
 printf '%s' "$UNAVAILABLE" | jq -e '.secondmate_current.records | any(.id == "ios"
   and .current.state == "unknown" and .provenance.selected != "structured-home"
   and (.current.reason | test("home ledger.*(timed out|missing|unreadable|invalid)")))' >/dev/null \
@@ -1461,7 +1461,7 @@ pass "unreachable no-ledger remote state remains explicit with no local respawn 
 # record refuses cleanup and preserves both machines' durable routes.
 # A sibling remote secondmate workspace shares jg-remote and must survive every
 # refusal and the eventual successful retirement of ios.
-# This fixture overrides FM_ROOT for transport, so teardown's root-owned guard
+# This fixture overrides JG_ROOT for transport, so teardown's root-owned guard
 # sees the fixture root rather than the source script path used by jg-send.
 publish_healthy_watcher_identity "$PARENT/state" "$PARENT" "$REMOTE_ROOT/bin/jg-watch.sh"
 resolve_ios_pending
@@ -1508,13 +1508,13 @@ assert_present "$REMOTE_HOME" "unsafe pending-replies retirement removed the rem
 assert_present "$TMP_ROOT/external-pending/escape" "unsafe retirement removed an external pending reply"
 rm -f "$PARENT/state/pending-replies"
 mv "$PARENT/state/pending-replies.safe" "$PARENT/state/pending-replies"
-retired_wake_corr=$(FM_HOME="$PARENT" bash -c '
+retired_wake_corr=$(JG_HOME="$PARENT" bash -c '
   . "$1"
   jg_pending_reply_create "$2" "$2/state" ios "New routed work is in your backlog."
 ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$PARENT") \
   || fail "could not seed remote receiver wake retirement state"
 retired_wake_rec="$PARENT/state/pending-replies/$retired_wake_corr"
-FM_HOME="$PARENT" bash -c '
+JG_HOME="$PARENT" bash -c '
   . "$1"
   jg_pending_reply_set "$2" phase resolved
   jg_pending_reply_set "$2" delivered_epoch 1
@@ -1552,7 +1552,7 @@ assert_grep '- ios ' "$PARENT/data/secondmates.md" "a liveness-busy retirement r
 kill "$liveness_holder_pid" 2>/dev/null || true
 wait "$liveness_holder_pid" 2>/dev/null || true
 handoff_lock="$PARENT/state/.backlog-handoff-ios.lock"
-FM_HOME="$PARENT" /bin/bash -c '
+JG_HOME="$PARENT" /bin/bash -c '
   . "$1"
   jg_lock_acquire_wait "$2"
   touch "$3"
@@ -1569,7 +1569,7 @@ while [ ! -f "$TMP_ROOT/handoff.entered" ]; do
   sleep 0.02
 done
 rm -f "$TMUX_STATE" "$TMP_ROOT/launch.entered" "$TMP_ROOT/launch.release"
-FM_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
+JG_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-retirement.out" 2>&1 &
 spawn_retirement_pid=$!
 launch_wait=0
@@ -1581,7 +1581,7 @@ while [ ! -f "$TMP_ROOT/launch.entered" ]; do
   [ "$launch_wait" -le 1500 ] || fail "remote respawn never reached its blocked launch"
   sleep 0.02
 done
-FM_FAKE_SSH_MODE=retire-lost-slot remote_env "$ROOT/bin/jg-teardown.sh" ios \
+JG_FAKE_SSH_MODE=retire-lost-slot remote_env "$ROOT/bin/jg-teardown.sh" ios \
   > "$TMP_ROOT/teardown-serialized.out" 2> "$TMP_ROOT/teardown-serialized.err" &
 teardown_pid=$!
 sleep 0.2

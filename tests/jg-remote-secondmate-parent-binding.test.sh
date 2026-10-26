@@ -4,7 +4,7 @@
 # inside a REMOTE second-mate home refused forever with "cannot resolve the
 # primary home ... durable parent binding", because the remote launch hands the
 # child the remote code checkout as its parent home (bin/jg-spawn.sh's sole
-# writer of FM_PUBLIC_FOLLOWUP_PRIMARY_HOME receives FM_HOME=$FM_ROOT from
+# writer of JG_PUBLIC_FOLLOWUP_PRIMARY_HOME receives JG_HOME=$JG_ROOT from
 # bin/jg-remote-secondmate-control.sh's host-local launch), and that path can
 # never carry the parent's real state or registry.
 #
@@ -56,7 +56,7 @@ cleanup() {
     kill "$PUBLISH_PID" 2>/dev/null || true
     wait "$PUBLISH_PID" 2>/dev/null || true
   fi
-  FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
     "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
     worker_pid=$(cat "$TMP_ROOT/remote-jobs/worker.pid")
@@ -77,20 +77,20 @@ cat > "$PUBLISH_FAKEBIN/mv" <<'SH'
 destination=${!#}
 case "$destination" in
   */.jg-secondmate-home)
-    touch "$FM_TEST_PUBLISH_ENTERED"
-    while [ ! -f "$FM_TEST_PUBLISH_RELEASE" ]; do sleep 0.02; done
+    touch "$JG_TEST_PUBLISH_ENTERED"
+    while [ ! -f "$JG_TEST_PUBLISH_RELEASE" ]; do sleep 0.02; done
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
 chmod +x "$PUBLISH_FAKEBIN/mv"
 printf 'schema=jg-remote-home-provision.v1\nid_b64=%s\ncharter_b64=%s\nparent_host_b64=%s\nproject_count=0\n' \
   "$(printf publication | base64 | tr -d '\n')" \
   "$(printf 'Publication-order regression charter.\n' | base64 | tr -d '\n')" \
   "$(printf publish-host | base64 | tr -d '\n')" > "$PUBLISH_MANIFEST"
-PATH="$PUBLISH_FAKEBIN:$PATH" FM_HOME="$PUBLISH_HOME" FM_ROOT_OVERRIDE="$ROOT" \
-  FM_TEST_REAL_MV="$REAL_MV" FM_TEST_PUBLISH_ENTERED="$PUBLISH_ENTERED" \
-  FM_TEST_PUBLISH_RELEASE="$PUBLISH_RELEASE" \
+PATH="$PUBLISH_FAKEBIN:$PATH" JG_HOME="$PUBLISH_HOME" JG_ROOT_OVERRIDE="$ROOT" \
+  JG_TEST_REAL_MV="$REAL_MV" JG_TEST_PUBLISH_ENTERED="$PUBLISH_ENTERED" \
+  JG_TEST_PUBLISH_RELEASE="$PUBLISH_RELEASE" \
   "$ROOT/bin/jg-remote-home-provision.sh" < "$PUBLISH_MANIFEST" >/dev/null 2>&1 &
 PUBLISH_PID=$!
 publish_wait=0
@@ -150,8 +150,8 @@ printf 'FMX_PAIRING_TOKEN=repro-token\n' > "$PARENT/.env"
 # --- deterministic SSH boundary, identical shape to the lifecycle e2e suite --
 cat > "$FAKEBIN/fake-ssh" <<'SH'
 #!/usr/bin/env bash
-count=$(cat "$FM_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
-printf '%s\n' "$((count + 1))" > "$FM_FAKE_SSH_COUNT"
+count=$(cat "$JG_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((count + 1))" > "$JG_FAKE_SSH_COUNT"
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
 done
@@ -160,7 +160,7 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-cd "$FM_FAKE_REMOTE_CWD" || exit 93
+cd "$JG_FAKE_REMOTE_CWD" || exit 93
 argv_b64=$4
 command_fields=$(perl -MMIME::Base64=decode_base64 -e '
   my $data=decode_base64($ARGV[0]);
@@ -177,35 +177,35 @@ if [ "$command_name" = jg-remote-doctor.sh ]; then
 fi
 if [ "$command_name" = jg-remote-secondmate-control.sh ] \
    && [ "$_command_action" = launch ] \
-   && [ -n "${FM_TEST_PUBLICATION_TARGET:-}" ]; then
-  out=$("$FM_FAKE_REMOTE_ENTRYPOINT" "$@")
+   && [ -n "${JG_TEST_PUBLICATION_TARGET:-}" ]; then
+  out=$("$JG_FAKE_REMOTE_ENTRYPOINT" "$@")
   rc=$?
-  rm -f "$FM_TEST_PUBLICATION_TARGET"
-  ln -s "$FM_TEST_PUBLICATION_FOREIGN" "$FM_TEST_PUBLICATION_TARGET" || exit 94
+  rm -f "$JG_TEST_PUBLICATION_TARGET"
+  ln -s "$JG_TEST_PUBLICATION_FOREIGN" "$JG_TEST_PUBLICATION_TARGET" || exit 94
   printf '%s\n' "$out"
   exit "$rc"
 fi
-exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 remote_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_SSH_COUNT="$SSH_COUNT" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
-  FM_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
-  FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_SSH_COUNT="$SSH_COUNT" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  JG_FAKE_DOCTOR_LOG="$DOCTOR_LOG" \
+  JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 \
   "$@"
 }
 
-FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" alpha \
   >/dev/null || fail "real remote secondmate seeding failed"
 
@@ -222,9 +222,9 @@ remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate >/dev/null \
 STAGED_LAUNCH=$(sed -n "s/^pane send-text [^ ]* \\. '\([^']*\)' --session [^ ]*\$/\1/p" "$HERDR_LOG" | tail -1)
 [ -n "$STAGED_LAUNCH" ] && [ -f "$STAGED_LAUNCH" ] \
   || fail "the remote launch did not deliver a staged command to assert against"
-DELIVERED_LINE=$(grep -F 'FM_PUBLIC_FOLLOWUP_PRIMARY_HOME' "$STAGED_LAUNCH" | tail -1 || true)
+DELIVERED_LINE=$(grep -F 'JG_PUBLIC_FOLLOWUP_PRIMARY_HOME' "$STAGED_LAUNCH" | tail -1 || true)
 DELIVERED=$(printf '%s\n' "$DELIVERED_LINE" | tr ' ' '\n' \
-  | sed -n "s/^FM_PUBLIC_FOLLOWUP_PRIMARY_HOME='\{0,1\}\([^']*\)'\{0,1\}\$/\1/p" | tail -1)
+  | sed -n "s/^JG_PUBLIC_FOLLOWUP_PRIMARY_HOME='\{0,1\}\([^']*\)'\{0,1\}\$/\1/p" | tail -1)
 [ -n "$DELIVERED" ] || fail "the remote launch did not deliver a primary-home binding to assert against"
 case "$DELIVERED" in
   "$REMOTE_ROOT") : ;;
@@ -254,8 +254,8 @@ run_child_teardown() { # <extra env assignments...>
   local out rc=0
   write_child_meta
   out=$(env "$@" PATH="$TMP_ROOT/childfake:$PATH" \
-    FM_HOME="$REMOTE_HOME" FM_STATE_OVERRIDE="$REMOTE_HOME/state" \
-    FM_DATA_OVERRIDE="$REMOTE_HOME/data" FM_CONFIG_OVERRIDE="$REMOTE_HOME/config" \
+    JG_HOME="$REMOTE_HOME" JG_STATE_OVERRIDE="$REMOTE_HOME/state" \
+    JG_DATA_OVERRIDE="$REMOTE_HOME/data" JG_CONFIG_OVERRIDE="$REMOTE_HOME/config" \
     "$REMOTE_ROOT/bin/jg-teardown.sh" work-child 2>&1) || rc=$?
   CHILD_TEARDOWN_OUT=$out
   CHILD_TEARDOWN_RC=$rc
@@ -266,7 +266,7 @@ run_child_teardown() { # <extra env assignments...>
 # state (a captain who also runs Firstmate directly on the build Mac). Before
 # the fix this refused; the durable record now makes it out of scope.
 printf 'FMX_PAIRING_TOKEN=remote-host-token\n' > "$REMOTE_ROOT/.env"
-run_child_teardown FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED"
+run_child_teardown JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED"
 rm -f "$REMOTE_ROOT/.env"
 [ "$CHILD_TEARDOWN_RC" -eq 0 ] \
   || fail "a remote-routed child must allow cleanup when only the remote code root looks relay-active (rc=$CHILD_TEARDOWN_RC): $CHILD_TEARDOWN_OUT"
@@ -278,9 +278,9 @@ pass "a remote secondmate's finished worker cleans up when the remote code root'
 # environment, simulating the remote host's own login-shell export reaching the
 # agent's pane. jg_pf_relay_active's environment-wins rule would make this look
 # identical to a genuine same-home commitment; the fix must tell them apart by
-# reading only $FM_HOME/.env, never the process environment, once the durable
+# reading only $JG_HOME/.env, never the process environment, once the durable
 # record says the parent is remote.
-run_child_teardown FM_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED" FMX_PAIRING_TOKEN=ambient-login-token
+run_child_teardown JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$DELIVERED" FMX_PAIRING_TOKEN=ambient-login-token
 [ "$CHILD_TEARDOWN_RC" -eq 0 ] \
   || fail "a remote-routed child must allow cleanup when only an ambient exported token looks relay-active (rc=$CHILD_TEARDOWN_RC): $CHILD_TEARDOWN_OUT"
 assert_not_contains "$CHILD_TEARDOWN_OUT" "cannot resolve the primary home" \
@@ -313,8 +313,8 @@ LOCAL_META="$PARENT/state/ios.meta"
 printf 'foreign sentinel\n' > "$FOREIGN_META"
 rm -f "$LOCAL_META"
 PUBLICATION_RC=0
-PUBLICATION_OUT=$(FM_TEST_PUBLICATION_TARGET="$LOCAL_META" \
-  FM_TEST_PUBLICATION_FOREIGN="$FOREIGN_META" \
+PUBLICATION_OUT=$(JG_TEST_PUBLICATION_TARGET="$LOCAL_META" \
+  JG_TEST_PUBLICATION_FOREIGN="$FOREIGN_META" \
   remote_env "$ROOT/bin/jg-spawn.sh" ios --secondmate 2>&1) || PUBLICATION_RC=$?
 [ "$PUBLICATION_RC" -ne 0 ] \
   || fail "remote secondmate publication accepted a target resolving outside its home"

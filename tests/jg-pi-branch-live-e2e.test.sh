@@ -33,12 +33,12 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_PI_BRANCH_LIVE_E2E npm jq node
+jg_live_gate opt-in JG_PI_BRANCH_LIVE_E2E npm jq node
 export NODE_NO_WARNINGS=1
 
-PI_PACKAGE_DIR=${FM_PI_PACKAGE_DIR:-"$(npm root -g)/@earendil-works/pi-coding-agent"}
+PI_PACKAGE_DIR=${JG_PI_PACKAGE_DIR:-"$(npm root -g)/@earendil-works/pi-coding-agent"}
 if [ ! -f "$PI_PACKAGE_DIR/package.json" ]; then
-  fail "Pi package absent: the live branch guard needs @earendil-works/pi-coding-agent installed (FM_PI_PACKAGE_DIR to override)"
+  fail "Pi package absent: the live branch guard needs @earendil-works/pi-coding-agent installed (JG_PI_PACKAGE_DIR to override)"
 fi
 PI_VERSION=$(jq -r '.version' "$PI_PACKAGE_DIR/package.json" 2>/dev/null || printf 'unknown')
 
@@ -61,16 +61,16 @@ cp "$ROOT/bin/jg-operational-input.sh" "$repo/bin/jg-operational-input.sh"
 cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_LIVE_WATCH_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_LIVE_WATCH_LOG:?}"
   exit 0
 fi
-printf 'arm pid=%s\n' "$$" >> "${FM_LIVE_WATCH_LOG:?}"
+printf 'arm pid=%s\n' "$$" >> "${JG_LIVE_WATCH_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=live-sdk-generation\n' "$$"
 trap 'exit 0' TERM INT
 while :; do
-  if [ -e "$FM_LIVE_WATCH_TRIGGER" ]; then
-    reason=$(cat "$FM_LIVE_WATCH_TRIGGER")
-    rm -f "$FM_LIVE_WATCH_TRIGGER"
+  if [ -e "$JG_LIVE_WATCH_TRIGGER" ]; then
+    reason=$(cat "$JG_LIVE_WATCH_TRIGGER")
+    rm -f "$JG_LIVE_WATCH_TRIGGER"
     printf '%s\n' "$reason"
     exit 0
   fi
@@ -87,14 +87,14 @@ ln -s "$PI_PACKAGE_DIR/node_modules/typebox" "$repo/node_modules/typebox"
 # heredoc nested inside command substitution, so capture through a file.
 BRANCH_PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" \
   WATCH_PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" \
-  FM_HOME="$home" FM_REAL_ROOT="$ROOT" FM_WATCH_ROOT="$repo" \
-  FM_LIVE_WATCH_LOG="$TMP_ROOT/live-watch.log" FM_LIVE_WATCH_TRIGGER="$TMP_ROOT/live-watch.trigger" \
+  JG_HOME="$home" JG_REAL_ROOT="$ROOT" JG_WATCH_ROOT="$repo" \
+  JG_LIVE_WATCH_LOG="$TMP_ROOT/live-watch.log" JG_LIVE_WATCH_TRIGGER="$TMP_ROOT/live-watch.trigger" \
   PI_CODING_AGENT_DIR="$agentdir" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const home = resolve(process.env.FM_HOME);
+const home = resolve(process.env.JG_HOME);
 // Supervision is default-on: the live guard exercises the branch with no
 // captain grant file present at all.
 const approvedProject = `${home}/projects/live-probe`;
@@ -142,10 +142,10 @@ const pi = {
     }
   },
 };
-process.env.FM_ROOT_OVERRIDE = process.env.FM_REAL_ROOT;
+process.env.JG_ROOT_OVERRIDE = process.env.JG_REAL_ROOT;
 const branchMod = await import(pathToFileURL(process.env.BRANCH_PLUGIN).href);
 branchMod.default(pi);
-process.env.FM_ROOT_OVERRIDE = process.env.FM_WATCH_ROOT;
+process.env.JG_ROOT_OVERRIDE = process.env.JG_WATCH_ROOT;
 const watchMod = await import(pathToFileURL(process.env.WATCH_PLUGIN).href);
 watchMod.default(pi);
 // The real model surface, built from the same empty agent dir: no
@@ -174,8 +174,8 @@ const waitFor = async (predicate, label) => {
   }
   throw new Error(`timeout waiting for ${label}`);
 };
-const armCount = () => existsSync(process.env.FM_LIVE_WATCH_LOG)
-  ? readFileSync(process.env.FM_LIVE_WATCH_LOG, "utf8").split(/\n/).filter((line) => line.startsWith("arm ")).length
+const armCount = () => existsSync(process.env.JG_LIVE_WATCH_LOG)
+  ? readFileSync(process.env.JG_LIVE_WATCH_LOG, "utf8").split(/\n/).filter((line) => line.startsWith("arm ")).length
   : 0;
 for (const handler of piHandlers.get("session_start") ?? []) {
   await handler({ type: "session_start", reason: "startup" }, sessionCtx);
@@ -188,7 +188,7 @@ if (!watcherTool) throw new Error("watcher tool was not registered");
 const armed = await watcherTool.execute("live-sdk-arm", {}, undefined, undefined, {});
 if (!armed.details?.ok) throw new Error(`watcher did not arm: ${JSON.stringify(armed.details)}`);
 await waitFor(() => armCount() === 1, "initial watcher arm");
-writeFileSync(process.env.FM_LIVE_WATCH_TRIGGER, "signal: live-sdk probe\n");
+writeFileSync(process.env.JG_LIVE_WATCH_TRIGGER, "signal: live-sdk probe\n");
 await waitFor(() => mainUserMessages.length === 1, "watcher-owned main delivery");
 if (offers.length !== 1 || !offers[0].accepted) {
   throw new Error(`branch did not accept the watcher offer against the real SDK: ${JSON.stringify(offers)}`);
@@ -230,7 +230,7 @@ for (const handler of piHandlers.get("session_start") ?? []) {
 }
 await waitFor(() => armCount() >= 3, "replacement watcher arm");
 writeFileSync(`${home}/state/.wake-queue`, "1\t2\tsignal\tlive-probe.status\tsignal: live pin probe\n");
-writeFileSync(process.env.FM_LIVE_WATCH_TRIGGER, "signal: live pin probe\n");
+writeFileSync(process.env.JG_LIVE_WATCH_TRIGGER, "signal: live pin probe\n");
 await waitFor(() => mainUserMessages.length === 2, "pinned watcher-owned main delivery");
 if (offers.length !== 2 || !offers[1].accepted) {
   throw new Error(`branch did not accept the pinned watcher offer: ${JSON.stringify(offers)}`);
@@ -245,7 +245,7 @@ const pinFallback = mainUserMessages[1].content;
 if (!pinFallback.includes("FIRSTMATE WATCHER WAKE: signal: live pin probe")) {
   throw new Error(`pinned watcher-owned fallback lost the wake reason: ${pinFallback}`);
 }
-const confirmations = readFileSync(process.env.FM_LIVE_WATCH_LOG, "utf8")
+const confirmations = readFileSync(process.env.JG_LIVE_WATCH_LOG, "utf8")
   .split(/\n/)
   .filter((line) => line.startsWith("confirmed "));
 if (confirmations.length !== 2) {
@@ -284,15 +284,15 @@ cat > "$erroragentdir/models.json" <<'JSON'
 JSON
 BRANCH_PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" \
   WATCH_PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" \
-  FM_HOME="$errorhome" FM_REAL_ROOT="$ROOT" FM_WATCH_ROOT="$repo" \
-  FM_LIVE_WATCH_LOG="$TMP_ROOT/error-watch.log" FM_LIVE_WATCH_TRIGGER="$TMP_ROOT/error-watch.trigger" \
+  JG_HOME="$errorhome" JG_REAL_ROOT="$ROOT" JG_WATCH_ROOT="$repo" \
+  JG_LIVE_WATCH_LOG="$TMP_ROOT/error-watch.log" JG_LIVE_WATCH_TRIGGER="$TMP_ROOT/error-watch.trigger" \
   PI_CODING_AGENT_DIR="$erroragentdir" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" \
   node --input-type=module > "$TMP_ROOT/error-output" 2>&1 <<'EOF'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const home = resolve(process.env.FM_HOME);
+const home = resolve(process.env.JG_HOME);
 const approvedProject = `${home}/projects/live-error-probe`;
 mkdirSync(approvedProject, { recursive: true });
 writeFileSync(`${home}/state/live-error-probe.meta`, `project=${approvedProject}\nwindow=jg-live-error-probe\n`);
@@ -352,10 +352,10 @@ const pi = {
     return "off";
   },
 };
-process.env.FM_ROOT_OVERRIDE = process.env.FM_REAL_ROOT;
+process.env.JG_ROOT_OVERRIDE = process.env.JG_REAL_ROOT;
 const branchMod = await import(pathToFileURL(process.env.BRANCH_PLUGIN).href);
 branchMod.default(pi);
-process.env.FM_ROOT_OVERRIDE = process.env.FM_WATCH_ROOT;
+process.env.JG_ROOT_OVERRIDE = process.env.JG_WATCH_ROOT;
 const watchMod = await import(pathToFileURL(process.env.WATCH_PLUGIN).href);
 watchMod.default(pi);
 sessionCtx = {
@@ -376,8 +376,8 @@ writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 if (!watcherTool) throw new Error("watcher tool was not registered for the provider-error probe");
 const armed = await watcherTool.execute("provider-error-arm", {}, undefined, undefined, {});
 if (!armed.details?.ok) throw new Error(`provider-error watcher did not arm: ${JSON.stringify(armed.details)}`);
-await waitFor(() => existsSync(process.env.FM_LIVE_WATCH_LOG), "provider-error watcher arm");
-writeFileSync(process.env.FM_LIVE_WATCH_TRIGGER, "signal: c1 429 probe\n");
+await waitFor(() => existsSync(process.env.JG_LIVE_WATCH_LOG), "provider-error watcher arm");
+writeFileSync(process.env.JG_LIVE_WATCH_TRIGGER, "signal: c1 429 probe\n");
 await waitFor(() => mainUserMessages.length === 1, "provider-error watcher-owned main delivery");
 if (offers.length !== 1 || !offers[0].accepted) {
   throw new Error(`real-SDK provider-error watcher offer was not accepted: ${JSON.stringify(offers)}`);
@@ -415,7 +415,7 @@ const persistedError = persistedContext.messages
 if (persistedError?.stopReason !== "error" || !persistedError.errorMessage?.includes("Monthly usage limit reached")) {
   throw new Error(`real SessionManager did not restore the settled provider error: ${JSON.stringify(persistedError)}`);
 }
-const confirmations = readFileSync(process.env.FM_LIVE_WATCH_LOG, "utf8")
+const confirmations = readFileSync(process.env.JG_LIVE_WATCH_LOG, "utf8")
   .split(/\n/)
   .filter((line) => line.startsWith("confirmed "));
 if (confirmations.length !== 1) {
@@ -453,7 +453,7 @@ cat > "$modeldir/models.json" <<'JSON'
   }
 }
 JSON
-PI_PACKAGE_DIR="$PI_PACKAGE_DIR" PI_CODING_AGENT_DIR="$modeldir" FM_LIVE_SESSIONS="$TMP_ROOT/model-sessions" \
+PI_PACKAGE_DIR="$PI_PACKAGE_DIR" PI_CODING_AGENT_DIR="$modeldir" JG_LIVE_SESSIONS="$TMP_ROOT/model-sessions" \
   node --input-type=module > "$TMP_ROOT/model-output" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 
@@ -476,7 +476,7 @@ if (!registry.getAvailable().some((model) => model.id === "jg-live-a")) {
 }
 
 const cwd = process.cwd();
-const sessions = process.env.FM_LIVE_SESSIONS;
+const sessions = process.env.JG_LIVE_SESSIONS;
 const creating = SessionManager.create(cwd, sessions);
 const created = await createAgentSession({ cwd, sessionManager: creating, modelRuntime: runtime, model: first, tools: [] });
 if (created.session.model?.id !== "jg-live-a") {
@@ -556,7 +556,7 @@ cat > "$effortdir/models.json" <<'JSON'
   }
 }
 JSON
-PI_PACKAGE_DIR="$PI_PACKAGE_DIR" PI_CODING_AGENT_DIR="$effortdir" FM_LIVE_SESSIONS="$TMP_ROOT/effort-sessions" \
+PI_PACKAGE_DIR="$PI_PACKAGE_DIR" PI_CODING_AGENT_DIR="$effortdir" JG_LIVE_SESSIONS="$TMP_ROOT/effort-sessions" \
   node --input-type=module > "$TMP_ROOT/effort-output" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 
@@ -608,7 +608,7 @@ if (clampThinkingLevel(shallow, "jg-not-a-level") !== "off") {
 }
 
 const cwd = process.cwd();
-const sessions = process.env.FM_LIVE_SESSIONS;
+const sessions = process.env.JG_LIVE_SESSIONS;
 const creating = SessionManager.create(cwd, sessions);
 const created = await createAgentSession({
   cwd,
@@ -819,16 +819,16 @@ cat > "$streamdir/models.json" <<'JSON'
 }
 JSON
 WATCH_PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" \
-  FM_HOME="$streamhome" FM_ROOT_OVERRIDE="$repo" \
-  FM_LIVE_WATCH_LOG="$TMP_ROOT/stream-watch.log" FM_LIVE_WATCH_TRIGGER="$TMP_ROOT/stream-watch.trigger" \
-  FM_LIVE_SESSIONS="$TMP_ROOT/stream-sessions" \
+  JG_HOME="$streamhome" JG_ROOT_OVERRIDE="$repo" \
+  JG_LIVE_WATCH_LOG="$TMP_ROOT/stream-watch.log" JG_LIVE_WATCH_TRIGGER="$TMP_ROOT/stream-watch.trigger" \
+  JG_LIVE_SESSIONS="$TMP_ROOT/stream-sessions" \
   PI_CODING_AGENT_DIR="$streamdir" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" \
   node --input-type=module > "$TMP_ROOT/stream-output" 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const home = resolve(process.env.FM_HOME);
+const home = resolve(process.env.JG_HOME);
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 const pkg = resolve(process.env.PI_PACKAGE_DIR);
 const { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession } =
@@ -914,7 +914,7 @@ const model = registry.find("jg-live-stream", "jg-live-stream-model");
 if (!model) throw new Error("the real registry did not resolve the local streaming model");
 const { session } = await createAgentSession({
   cwd: process.cwd(),
-  sessionManager: SessionManager.create(process.cwd(), resolve(process.env.FM_LIVE_SESSIONS)),
+  sessionManager: SessionManager.create(process.cwd(), resolve(process.env.JG_LIVE_SESSIONS)),
   settingsManager: settings,
   resourceLoader: loader,
   modelRuntime: runtime,
@@ -922,7 +922,7 @@ const { session } = await createAgentSession({
   noTools: "builtin",
 });
 
-const armLog = process.env.FM_LIVE_WATCH_LOG;
+const armLog = process.env.JG_LIVE_WATCH_LOG;
 const armRows = (prefix) => existsSync(armLog)
   ? readFileSync(armLog, "utf8").split(/\n/).filter((line) => line.startsWith(prefix)).length
   : 0;
@@ -950,7 +950,7 @@ session.prompt("Reply with exactly the word OK.").catch((error) => {
   events.push({ type: "prompt_error", text: error instanceof Error ? error.message : String(error) });
 });
 await waitFor(() => completions === 1 && session.isStreaming, "main streaming on the held completion");
-writeFileSync(process.env.FM_LIVE_WATCH_TRIGGER, "signal: live streaming probe\n");
+writeFileSync(process.env.JG_LIVE_WATCH_TRIGGER, "signal: live streaming probe\n");
 await waitFor(
   () => events.some((event) => event.type === "input" && event.source === "extension" && event.streamingBehavior === "followUp" && event.text.includes("signal: live streaming probe")),
   "the watcher follow-up queued while main streams",
@@ -971,7 +971,7 @@ if (completions !== 2) throw new Error(`the queued follow-up did not open its ow
 
 // Idle: the successor closes while main is idle, so the next wake starts a run
 // and Pi raises before_agent_start with the exact text, then the user message.
-writeFileSync(process.env.FM_LIVE_WATCH_TRIGGER, "signal: live idle probe\n");
+writeFileSync(process.env.JG_LIVE_WATCH_TRIGGER, "signal: live idle probe\n");
 await waitFor(() => has("before_agent_start", "signal: live idle probe"), "the idle follow-up to raise before_agent_start");
 await waitFor(() => armRows("arm ") === 3, "successor after the idle delivery");
 await waitFor(() => settledRuns() === 2, "the idle run to settle");
@@ -1001,14 +1001,14 @@ retrydir="$TMP_ROOT/retry-agent-dir-$retry_case"
 mkdir -p "$retryhome/state" "$retryhome/config" "$retrydir"
 cp "$streamdir/models.json" "$retrydir/models.json"
 BRANCH_PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" \
-  FM_HOME="$retryhome" FM_ROOT_OVERRIDE="$ROOT" RETRY_CASE="$retry_case" \
+  JG_HOME="$retryhome" JG_ROOT_OVERRIDE="$ROOT" RETRY_CASE="$retry_case" \
   PI_CODING_AGENT_DIR="$retrydir" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" \
   node --input-type=module > "$TMP_ROOT/retry-output" 2>&1 <<'EOF'
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-const home = process.env.FM_HOME;
+const home = process.env.JG_HOME;
 const pkg = resolve(process.env.PI_PACKAGE_DIR);
 const { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession, initTheme } =
   await import(pathToFileURL(`${pkg}/dist/index.js`).href);
@@ -1016,7 +1016,7 @@ const { AssistantMessageComponent } = await import(pathToFileURL(`${pkg}/dist/mo
 initTheme("dark");
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 const outcome = (...args) => {
-  const result = spawnSync("bash", [`${process.env.FM_ROOT_OVERRIDE}/bin/jg-branch-outcome.sh`, ...args], { encoding: "utf8" });
+  const result = spawnSync("bash", [`${process.env.JG_ROOT_OVERRIDE}/bin/jg-branch-outcome.sh`, ...args], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(result.stderr);
   return result.stdout.trim();
 };

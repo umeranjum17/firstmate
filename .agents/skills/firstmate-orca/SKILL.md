@@ -24,11 +24,11 @@ Use raw `orca` only when the helper surface cannot answer the inspection questio
 ## Preflight
 
 Work from the current Juggernaut home or repo root.
-If `FM_HOME` is set, remember that operational state lives under `$FM_HOME` while the helper scripts still run from this repo's `bin/`.
+If `JG_HOME` is set, remember that operational state lives under `$JG_HOME` while the helper scripts still run from this repo's `bin/`.
 
 Before switching or spawning against Orca:
 
-- Confirm Orca is intentionally selected through `--backend orca`, `FM_BACKEND=orca`, or local `config/backend`.
+- Confirm Orca is intentionally selected through `--backend orca`, `JG_BACKEND=orca`, or local `config/backend`.
 - Confirm the Orca app is running and the backend readiness checks pass before expecting spawn to work.
 - Inspect active `state/*.meta` records before changing backend selection.
 - Treat a backend switch as affecting future spawns only; existing tasks keep their recorded backend.

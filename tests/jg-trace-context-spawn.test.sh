@@ -33,35 +33,35 @@ make_spawn_fakebin() {
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows)
-    [ -z "${FM_FAKE_DUPLICATE_WINDOW:-}" ] || printf '%s\n' "$FM_FAKE_DUPLICATE_WINDOW"
+    [ -z "${JG_FAKE_DUPLICATE_WINDOW:-}" ] || printf '%s\n' "$JG_FAKE_DUPLICATE_WINDOW"
     exit 0
     ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
-    if [ "${FM_FAKE_TRACEPARENT_SEND_FAIL:-0}" = 1 ]; then
+    if [ "${JG_FAKE_TRACEPARENT_SEND_FAIL:-0}" = 1 ]; then
       for a in "$@"; do
         case "$a" in
           "export TRACEPARENT="*) exit 1 ;;
         esac
       done
     fi
-    if [ "${FM_FAKE_TRACEPARENT_SEND_UNSAFE:-0}" = 1 ]; then
+    if [ "${JG_FAKE_TRACEPARENT_SEND_UNSAFE:-0}" = 1 ]; then
       for a in "$@"; do
         case "$a" in
           "export TRACEPARENT="*) exit 2 ;;
         esac
       done
     fi
-    if [ "${FM_FAKE_TRACE_METADATA_APPEND_FAIL:-0}" = 1 ]; then
+    if [ "${JG_FAKE_TRACE_METADATA_APPEND_FAIL:-0}" = 1 ]; then
       for a in "$@"; do
         case "$a" in
           "export TRACEPARENT="*)
-            chmod a-w "$FM_FAKE_META_PATH"
+            chmod a-w "$JG_FAKE_META_PATH"
             ;;
         esac
       done
@@ -70,7 +70,7 @@ case "${1:-}" in
     # (`send-keys -t <target> -l <text>`) and a text line
     # (`send-keys -t <target> <text> Enter`). Skip the flags, the target, and
     # the trailing key so only the payload is logged, one per line, in order.
-    if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
+    if [ -n "${JG_FAKE_LAUNCH_LOG:-}" ]; then
       shift
       skip_next=
       for a in "$@"; do
@@ -83,7 +83,7 @@ case "${1:-}" in
             case "$a" in
               ". '"*"'") staged=${a#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || a=$(cat "$staged") ;;
             esac
-            printf '%s\n' "$a" >> "$FM_FAKE_LAUNCH_LOG" ;;
+            printf '%s\n' "$a" >> "$JG_FAKE_LAUNCH_LOG" ;;
         esac
       done
     fi
@@ -117,7 +117,7 @@ make_spawn_case() {
   printf '%s\n' "$home|$proj|$wt|$fakebin|$launchlog|$id"
 }
 
-# Hermetic against an ambient FM_TRACE_CONTEXT: `env -u` unsets it so enablement
+# Hermetic against an ambient JG_TRACE_CONTEXT: `env -u` unsets it so enablement
 # is decided ONLY by the home's config/trace-context, whether the runner's own
 # environment enables or disables trace context.
 run_spawn() {
@@ -128,20 +128,20 @@ run_spawn() {
   # store (bin/jg-claude-trust.sh), so it runs against a throwaway HOME;
   # without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$home/user-home"
-  env -u FM_TRACE_CONTEXT \
-    FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_TRACEPARENT_SEND_FAIL="${FM_FAKE_TRACEPARENT_SEND_FAIL:-0}" \
-    FM_FAKE_TRACEPARENT_SEND_UNSAFE="${FM_FAKE_TRACEPARENT_SEND_UNSAFE:-0}" \
-    FM_FAKE_TRACE_METADATA_APPEND_FAIL="${FM_FAKE_TRACE_METADATA_APPEND_FAIL:-0}" \
-    FM_FAKE_META_PATH="$home/state/$1.meta" \
-    FM_FAKE_LAUNCH_LOG="$launchlog" PATH="$fakebin:$PATH" \
+  env -u JG_TRACE_CONTEXT \
+    JG_ROOT_OVERRIDE='' JG_HOME="$home" HOME="$home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_TRACEPARENT_SEND_FAIL="${JG_FAKE_TRACEPARENT_SEND_FAIL:-0}" \
+    JG_FAKE_TRACEPARENT_SEND_UNSAFE="${JG_FAKE_TRACEPARENT_SEND_UNSAFE:-0}" \
+    JG_FAKE_TRACE_METADATA_APPEND_FAIL="${JG_FAKE_TRACE_METADATA_APPEND_FAIL:-0}" \
+    JG_FAKE_META_PATH="$home/state/$1.meta" \
+    JG_FAKE_LAUNCH_LOG="$launchlog" PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" --mode no-mistakes --yolo off 2>&1
 }
 
-# Same, but with an explicit FM_TRACE_CONTEXT override, to prove the env decides.
+# Same, but with an explicit JG_TRACE_CONTEXT override, to prove the env decides.
 run_spawn_tc() {
   local tc=$1 home=$2 wt=$3 fakebin=$4 launchlog=$5
   shift 5
@@ -150,12 +150,12 @@ run_spawn_tc() {
   # store (bin/jg-claude-trust.sh), so it runs against a throwaway HOME;
   # without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$home/user-home"
-  env FM_TRACE_CONTEXT="$tc" \
-    FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$launchlog" PATH="$fakebin:$PATH" \
+  env JG_TRACE_CONTEXT="$tc" \
+    JG_ROOT_OVERRIDE='' JG_HOME="$home" HOME="$home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$launchlog" PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" --mode no-mistakes --yolo off 2>&1
 }
 
@@ -163,11 +163,11 @@ start_trace_session() {
   local home=$1 tc=${2-}
   printf '%s\n' "$$" > "$home/state/.lock"
   if [ -n "$tc" ]; then
-    FM_TRACE_CONTEXT="$tc" jg_trace_context_session_start \
+    JG_TRACE_CONTEXT="$tc" jg_trace_context_session_start \
       "$home/config" "$home/state/.trace-context-effective"
   else
     (
-      unset FM_TRACE_CONTEXT
+      unset JG_TRACE_CONTEXT
       jg_trace_context_session_start \
         "$home/config" "$home/state/.trace-context-effective"
     )
@@ -183,7 +183,7 @@ EOF
 meta_traceparent() { sed -n 's/^traceparent=//p' "$1"; }
 injected_traceparent() { sed -n 's/^export TRACEPARENT=//p' "$1"; }
 
-# Two-level primary -> secondmate -> worker regression for the FM_TRACE_CONTEXT
+# Two-level primary -> secondmate -> worker regression for the JG_TRACE_CONTEXT
 # effective override. Drives bin/jg-spawn.sh TWICE against real homes and a real
 # worktree: first the primary launches a secondmate (capturing the exact env the
 # primary injects into it), then that secondmate launches its OWN worker with
@@ -224,17 +224,17 @@ run_two_level() {
   # launches into (bin/jg-claude-trust.sh), so this runs against a throwaway
   # HOME; without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$base/user-home"
-  env FM_TRACE_CONTEXT="$penv" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$prim" HOME="$base/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$prim/state" FM_DATA_OVERRIDE="$prim/data" \
-    FM_PROJECTS_OVERRIDE="$prim/projects" FM_CONFIG_OVERRIDE="$prim/config" \
-    FM_SPAWN_NO_GUARD=1 CLAUDECODE=1 TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$smlog" PATH="$smfake:$PATH" \
+  env JG_TRACE_CONTEXT="$penv" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$prim" HOME="$base/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$prim/state" JG_DATA_OVERRIDE="$prim/data" \
+    JG_PROJECTS_OVERRIDE="$prim/projects" JG_CONFIG_OVERRIDE="$prim/config" \
+    JG_SPAWN_NO_GUARD=1 CLAUDECODE=1 TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$smlog" PATH="$smfake:$PATH" \
     "$SPAWN" "$sm_id" "$sm" --secondmate >/dev/null 2>&1 || true
 
   # Extract the EXACT env the primary put on the secondmate: the normalized
-  # FM_TRACE_CONTEXT in the launch prefix, and the TRACEPARENT carrier (if any).
-  TL_ENV_TC=$(grep -o 'FM_TRACE_CONTEXT=[a-z]*' "$smlog" | head -1 | cut -d= -f2)
+  # JG_TRACE_CONTEXT in the launch prefix, and the TRACEPARENT carrier (if any).
+  TL_ENV_TC=$(grep -o 'JG_TRACE_CONTEXT=[a-z]*' "$smlog" | head -1 | cut -d= -f2)
   TL_CARRIER=$(injected_traceparent "$smlog" | head -1)
 
   # Spawn 2: the secondmate launches its own worker with exactly that inherited
@@ -251,12 +251,12 @@ run_two_level() {
   wfake=$(make_spawn_fakebin "$base/w-fake")
   : > "$wlog"
   mkdir -p "$sm/user-home"
-  env FM_TRACE_CONTEXT="$TL_ENV_TC" TRACEPARENT="$TL_CARRIER" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$sm" HOME="$sm/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$sm/state" FM_DATA_OVERRIDE="$sm/data" \
-    FM_PROJECTS_OVERRIDE="$sm/projects" FM_CONFIG_OVERRIDE="$sm/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wwt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$wlog" PATH="$wfake:$PATH" \
+  env JG_TRACE_CONTEXT="$TL_ENV_TC" TRACEPARENT="$TL_CARRIER" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$sm" HOME="$sm/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$sm/state" JG_DATA_OVERRIDE="$sm/data" \
+    JG_PROJECTS_OVERRIDE="$sm/projects" JG_CONFIG_OVERRIDE="$sm/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wwt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$wlog" PATH="$wfake:$PATH" \
     "$SPAWN" "$worker_id" "$wproj" --mode no-mistakes --yolo off >/dev/null 2>&1 || true
 
   TL_WORKER_TP=$(meta_traceparent "$sm/state/$worker_id.meta")
@@ -302,7 +302,7 @@ test_disabled_writes_and_injects_neither() {
   local rec out status meta
   rec=$(make_spawn_case tc-off)
   read_case_record "$rec"
-  # No config/trace-context and no FM_TRACE_CONTEXT: default-off.
+  # No config/trace-context and no JG_TRACE_CONTEXT: default-off.
 
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
@@ -324,7 +324,7 @@ test_failed_delivery_omits_metadata_and_still_launches() {
   : > "$HOME_DIR/config/trace-context"
   start_trace_session "$HOME_DIR"
 
-  out=$(FM_FAKE_TRACEPARENT_SEND_FAIL=1 \
+  out=$(JG_FAKE_TRACEPARENT_SEND_FAIL=1 \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "failed traceparent delivery must not abort spawn"
@@ -346,7 +346,7 @@ test_unsafe_delivery_refuses_to_append_launch() {
   : > "$HOME_DIR/config/trace-context"
   start_trace_session "$HOME_DIR"
 
-  out=$(FM_FAKE_TRACEPARENT_SEND_UNSAFE=1 \
+  out=$(JG_FAKE_TRACEPARENT_SEND_UNSAFE=1 \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
   [ "$status" -ne 0 ] || fail "uncleared traceparent input must stop spawn"
@@ -364,7 +364,7 @@ test_failed_metadata_append_unsets_carrier_and_still_launches() {
   : > "$HOME_DIR/config/trace-context"
   start_trace_session "$HOME_DIR"
 
-  out=$(FM_FAKE_TRACE_METADATA_APPEND_FAIL=1 \
+  out=$(JG_FAKE_TRACE_METADATA_APPEND_FAIL=1 \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "failed traceparent metadata append must not abort spawn"
@@ -402,12 +402,12 @@ test_duplicate_secondmate_spawn_does_not_converge_trace_context() {
   # launches into (bin/jg-claude-trust.sh), so this runs against a throwaway
   # HOME; without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$base/user-home"
-  out=$(env -u FM_TRACE_CONTEXT \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$prim" HOME="$base/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$prim/state" FM_DATA_OVERRIDE="$prim/data" \
-    FM_PROJECTS_OVERRIDE="$prim/projects" FM_CONFIG_OVERRIDE="$prim/config" \
-    FM_SPAWN_NO_GUARD=1 CLAUDECODE=1 TMUX="fake,1,0" \
-    FM_FAKE_DUPLICATE_WINDOW="jg-$id" FM_FAKE_LAUNCH_LOG="$log" \
+  out=$(env -u JG_TRACE_CONTEXT \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$prim" HOME="$base/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$prim/state" JG_DATA_OVERRIDE="$prim/data" \
+    JG_PROJECTS_OVERRIDE="$prim/projects" JG_CONFIG_OVERRIDE="$prim/config" \
+    JG_SPAWN_NO_GUARD=1 CLAUDECODE=1 TMUX="fake,1,0" \
+    JG_FAKE_DUPLICATE_WINDOW="jg-$id" JG_FAKE_LAUNCH_LOG="$log" \
     PATH="$fake:$PATH" "$SPAWN" "$id" "$sm" --secondmate 2>&1)
   status=$?
 
@@ -458,7 +458,7 @@ test_session_start_freezes_env_override_and_ignores_later_edits() {
   expect_code 0 "$status" "env-off spawn should succeed"
   assert_contains "$out" "spawned $CASE_ID" "env-off spawn should report success"
   meta="$HOME_DIR/state/$CASE_ID.meta"
-  ! grep -q '^traceparent=' "$meta" || fail "session-frozen off must ignore a later FM_TRACE_CONTEXT=on"
+  ! grep -q '^traceparent=' "$meta" || fail "session-frozen off must ignore a later JG_TRACE_CONTEXT=on"
   ! grep -q '^export TRACEPARENT=' "$LAUNCH_LOG" || fail "session-frozen off must remain disabled after launch-time edits"
 
   rec=$(make_spawn_case tc-envon)
@@ -470,7 +470,7 @@ test_session_start_freezes_env_override_and_ignores_later_edits() {
   expect_code 0 "$status" "env-on spawn should succeed"
   meta="$HOME_DIR/state/$CASE_ID.meta"
   jg_trace_context_valid "$(meta_traceparent "$meta")" \
-    || fail "session-frozen on must ignore a later FM_TRACE_CONTEXT=off"
+    || fail "session-frozen on must ignore a later JG_TRACE_CONTEXT=off"
   pass "session start freezes the env override and later config or environment edits do not alter spawns"
 }
 
@@ -483,7 +483,7 @@ test_session_start_freezes_env_override_and_ignores_later_edits() {
 # fresh trace rather than adopt the Secondmate's carrier from the environment.
 test_secondmate_env_on_file_absent_keeps_nested_worker_enabled() {
   run_two_level enable absent on
-  [ "$TL_ENV_TC" = on ] || fail "the primary must deliver FM_TRACE_CONTEXT=on to the secondmate (got '$TL_ENV_TC')"
+  [ "$TL_ENV_TC" = on ] || fail "the primary must deliver JG_TRACE_CONTEXT=on to the secondmate (got '$TL_ENV_TC')"
   jg_trace_context_valid "$TL_CARRIER" || fail "an enabled primary must mint a carrier for the secondmate (got '$TL_CARRIER')"
   jg_trace_context_valid "$TL_WORKER_TP" \
     || fail "env-on/file-absent must keep the nested worker enabled (got '$TL_WORKER_TP')"
@@ -495,11 +495,11 @@ test_secondmate_env_on_file_absent_keeps_nested_worker_enabled() {
 # End-to-end two-level disable path: the primary is disabled by the environment
 # override while the config file is PRESENT (so it is copied into the secondmate
 # home). The override must still disable the secondmate's own worker, or
-# FM_TRACE_CONTEXT=off is not a real kill switch. Before the fix the copied file
+# JG_TRACE_CONTEXT=off is not a real kill switch. Before the fix the copied file
 # re-enabled the nested worker.
 test_secondmate_env_off_file_present_keeps_nested_worker_disabled() {
   run_two_level disable present off
-  [ "$TL_ENV_TC" = off ] || fail "the primary must deliver FM_TRACE_CONTEXT=off to the secondmate (got '$TL_ENV_TC')"
+  [ "$TL_ENV_TC" = off ] || fail "the primary must deliver JG_TRACE_CONTEXT=off to the secondmate (got '$TL_ENV_TC')"
   [ -z "$TL_CARRIER" ] || fail "a disabled primary must inject no carrier into the secondmate (got '$TL_CARRIER')"
   [ "$TL_SM_FILE" = present ] \
     || fail "the disable case must exercise a copied config/trace-context in the secondmate home (got '$TL_SM_FILE')"
@@ -583,22 +583,22 @@ test_two_routed_tasks_through_one_secondmate_root_distinct_traces() {
 }
 
 # Single-frozen-decision guarantee: for a secondmate spawn the recorded/injected
-# carrier and the delivered FM_TRACE_CONTEXT snapshot are always derived from ONE
+# carrier and the delivered JG_TRACE_CONTEXT snapshot are always derived from ONE
 # effective decision, so they cannot disagree (no carrier paired with off, no
 # off snapshot paired with a carrier). This drives the file-decided path
-# (FM_TRACE_CONTEXT unset), which is exactly where the two-read correction matters
+# (JG_TRACE_CONTEXT unset), which is exactly where the two-read correction matters
 # because the environment override is empty and only the config file decides.
 test_secondmate_carrier_and_snapshot_share_one_decision() {
   run_two_level fileon present ""
-  [ "$TL_ENV_TC" = on ] || fail "a file-enabled secondmate must snapshot FM_TRACE_CONTEXT=on (got '$TL_ENV_TC')"
+  [ "$TL_ENV_TC" = on ] || fail "a file-enabled secondmate must snapshot JG_TRACE_CONTEXT=on (got '$TL_ENV_TC')"
   jg_trace_context_valid "$TL_CARRIER" \
     || fail "a file-enabled secondmate's carrier must be present and valid, consistent with the on snapshot (got '$TL_CARRIER')"
 
   run_two_level fileoff absent ""
-  [ "$TL_ENV_TC" = off ] || fail "a file-disabled secondmate must snapshot FM_TRACE_CONTEXT=off (got '$TL_ENV_TC')"
+  [ "$TL_ENV_TC" = off ] || fail "a file-disabled secondmate must snapshot JG_TRACE_CONTEXT=off (got '$TL_ENV_TC')"
   [ -z "$TL_CARRIER" ] \
     || fail "a file-disabled secondmate must inject no carrier, consistent with the off snapshot (got '$TL_CARRIER')"
-  pass "secondmate carrier and FM_TRACE_CONTEXT snapshot always agree, both derived from one frozen decision (file-decided path)"
+  pass "secondmate carrier and JG_TRACE_CONTEXT snapshot always agree, both derived from one frozen decision (file-decided path)"
 }
 
 test_enabled_records_and_injects_identical_carrier_before_launch

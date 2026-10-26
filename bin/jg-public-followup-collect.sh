@@ -30,7 +30,7 @@
 #       Idempotent: an already-absent event is a success, so a repeated or
 #       replayed retirement is safe.
 #
-# FM_HOME selects the home to read, exactly as every other command the remote
+# JG_HOME selects the home to read, exactly as every other command the remote
 # entrypoint runs. Events are matched on their own obligation_id field, never on
 # a filename, so a hand-placed file cannot be collected under another loop's id.
 #
@@ -45,8 +45,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-public-followup-lib.sh
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
 
-FM_HOME="${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_HOME="${JG_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 usage() {
   cat >&2 <<'EOF'
@@ -87,9 +87,9 @@ cmd_drain() {
     [ -f "$file" ] && [ ! -L "$file" ] || continue
     event_id=$(basename "$file" .json)
     jg_pf_slug_valid "$event_id" || continue
-    if [ "$(wc -c < "$file" 2>/dev/null || echo 0)" -gt "$FM_PF_EVENT_BYTES_MAX" ]; then
+    if [ "$(wc -c < "$file" 2>/dev/null || echo 0)" -gt "$JG_PF_EVENT_BYTES_MAX" ]; then
       printf 'jg-public-followup-collect: staged event %s exceeds %s bytes and was left in place\n' \
-        "$event_id" "$FM_PF_EVENT_BYTES_MAX" >&2
+        "$event_id" "$JG_PF_EVENT_BYTES_MAX" >&2
       continue
     fi
     payload=$(jq -ce . "$file" 2>/dev/null) || {

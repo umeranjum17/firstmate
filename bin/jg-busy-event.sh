@@ -120,7 +120,7 @@ else
 fi
 
 # Serialize writers. The lock protects seq advancement and the sidecar/record
-# pair; a holder that died mid-write is broken after FM_BUSY_LOCK_STALE_SECS.
+# pair; a holder that died mid-write is broken after JG_BUSY_LOCK_STALE_SECS.
 lock_acquire() {
   local tries=0 now mtime age
   while ! mkdir "$LOCK" 2>/dev/null; do
@@ -133,7 +133,7 @@ lock_acquire() {
       # aborting the writer - and its caller, jg-teardown.sh - under `set -u`.
       case "$mtime" in ''|*[!0-9]*) mtime=$now ;; esac
       age=$((now - mtime))
-      if [ "$age" -ge "${FM_BUSY_LOCK_STALE_SECS:-5}" ]; then
+      if [ "$age" -ge "${JG_BUSY_LOCK_STALE_SECS:-5}" ]; then
         rmdir "$LOCK" 2>/dev/null || rm -rf "$LOCK" 2>/dev/null || true
         mkdir "$LOCK" 2>/dev/null && break
       fi

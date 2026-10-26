@@ -3,7 +3,7 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Retire an intentional custom watcher check and its trust binding.
 # Usage: jg-check-unregister.sh <id>
-# Pass only the id. An unset FM_STATE_OVERRIDE selects FM_HOME/state; an
+# Pass only the id. An unset JG_STATE_OVERRIDE selects JG_HOME/state; an
 # explicitly empty override, an invalid id, or a resolved state path that is
 # not an existing non-symlink directory is refused before removal.
 # Each existing named artifact must be an ordinary single-link file on the
@@ -11,9 +11,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"

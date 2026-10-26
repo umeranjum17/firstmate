@@ -59,6 +59,10 @@ import {
   createCalmWorkingShipWidget,
 } from "./lib/jg-calm-working-ship.ts";
 import {
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
   calmPresentationHides,
   calmPresentationIsActive,
   FIRSTMATE_CALM_PRESENTATION_EVENT,
@@ -184,8 +188,8 @@ export default function (pi: ExtensionAPI) {
     }
   };
 
-  const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-  const configDirectory = process.env.FM_CONFIG_OVERRIDE || resolve(fmHome, "config");
+  const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
+  const configDirectory = process.env.JG_CONFIG_OVERRIDE || resolve(fmHome, "config");
   const calmPreferencePath = resolve(configDirectory, "calm");
   // "max" is the legacy value written by the removed third presentation level, whose
   // behavior is now ordinary Calm; a home upgraded from it restores as on rather than

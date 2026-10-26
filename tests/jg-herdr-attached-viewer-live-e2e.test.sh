@@ -33,7 +33,7 @@ set -u
 
 LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
 
-jg_live_gate default-on FM_HERDR_ATTACHED_VIEWER_LIVE_E2E herdr jq python3
+jg_live_gate default-on JG_HERDR_ATTACHED_VIEWER_LIVE_E2E herdr jq python3
 
 [ -x "$LAB_HELPER" ] || { echo "skip: Herdr lab helper not executable at $LAB_HELPER"; exit 0; }
 

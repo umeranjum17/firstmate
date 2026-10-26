@@ -48,12 +48,12 @@ fi
 command -v gh >/dev/null 2>&1 || die "gh is required"
 
 URL=$1
-if ! jg_pr_url_parse "$URL" || [ "$FM_PR_PROVIDER" != github ]; then
+if ! jg_pr_url_parse "$URL" || [ "$JG_PR_PROVIDER" != github ]; then
   die "expected a GitHub pull-request URL"
 fi
 
-PATH_PART=$FM_PR_PATH
-NUMBER=$FM_PR_NUMBER
+PATH_PART=$JG_PR_PATH
+NUMBER=$JG_PR_NUMBER
 ENDPOINT="/repos/$PATH_PART/pulls/$NUMBER"
 
 CORE=$(gh pr view "$URL" \

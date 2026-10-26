@@ -39,7 +39,7 @@ HOME_N=0
 
 # --- fixtures ---------------------------------------------------------------
 
-# new_home: fresh isolated FM_HOME with an empty projects/ dir. Each test gets its
+# new_home: fresh isolated JG_HOME with an empty projects/ dir. Each test gets its
 # own so the whole-fleet form never sees another test's clones.
 new_home() {
   HOME_N=$((HOME_N + 1))
@@ -93,10 +93,10 @@ head_sha() { git -C "$1" rev-parse HEAD; }
 run_sync() {
   local home=$1
   shift
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-fleet-sync.sh" "$@" 2>/dev/null
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-fleet-sync.sh" "$@" 2>/dev/null
 }
 
-# build_enclosing_home <name>: an FM_HOME that is itself nested inside another git
+# build_enclosing_home <name>: an JG_HOME that is itself nested inside another git
 # repository - firstmate's own layout, where projects/ sits inside the firstmate
 # checkout. The enclosing repo is a clean clone of a bare origin that is one commit
 # ahead, so a sync that walked git discovery UP out of projects/<dir> would find a
@@ -223,14 +223,14 @@ SH
 
 # run_sync_guarded <home> <fakebin> <outfile> <errfile> [args...]: run fleet-sync
 # with the fakebin on PATH and stdout/stderr captured separately. Per-test knobs
-# (FM_FLEET_SYNC_PACKED_REFS_LOCK_*, GIT_FETCH_COUNTER) are read from the caller's
+# (JG_FLEET_SYNC_PACKED_REFS_LOCK_*, GIT_FETCH_COUNTER) are read from the caller's
 # exported environment.
 run_sync_guarded() {
   local home=$1 fakebin=$2 outf=$3 errf=$4 realgit
   shift 4
   realgit=$(command -v git)
   PATH="$fakebin:$PATH" REAL_GIT_FOR_TEST="$realgit" \
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$ROOT/bin/jg-fleet-sync.sh" "$@" >"$outf" 2>"$errf"
 }
 
@@ -524,7 +524,7 @@ test_bootstrap_relays_recovered_and_stuck() {
 
   # Full bootstrap: no state/ dir -> secondmate sync no-ops; no .env -> X mode off.
   # We only assert the fleet-sync relay lines; other detect lines are irrelevant.
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   assert_contains "$out" "FLEET_SYNC: stuck-clone: STUCK:" "bootstrap relays the STUCK outcome"
   assert_contains "$out" "FLEET_SYNC: rec-clone: recovered:" "bootstrap relays the recovered outcome"
@@ -543,9 +543,9 @@ test_orphaned_stale_packed_refs_lock_recovers() {
   out="$home/out-lockstale"; err="$home/err-lockstale"
 
   set +e
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" lockstale
   set -e
 
@@ -573,9 +573,9 @@ test_live_packed_refs_lock_is_never_removed() {
   out="$home/out-locklive"; err="$home/err-locklive"
 
   set +e
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" locklive
   set -e
 
@@ -602,9 +602,9 @@ test_live_git_cwd_in_clone_dir_blocks_removal() {
 
   set +e
   FLEET_TEST_LIVE_DIR="$clone" \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" lockcwd
   set -e
 
@@ -628,8 +628,8 @@ test_transient_packed_refs_lock_self_clears() {
 
   set +e
   GIT_FETCH_COUNTER="$counter" \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" locktrans
   set -e
 
@@ -661,7 +661,7 @@ test_orphaned_stale_index_lock_recovers() {
   out="$home/out-idxstale"; err="$home/err-idxstale"
 
   set +e
-  FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 \
+  JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" idxstale
   set -e
 
@@ -687,7 +687,7 @@ test_live_index_lock_is_never_removed() {
   out="$home/out-idxlive"; err="$home/err-idxlive"
 
   set +e
-  FM_FF_STALE_INDEX_LOCK_AGE_SECS=0 \
+  JG_FF_STALE_INDEX_LOCK_AGE_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" idxlive
   set -e
 
@@ -794,8 +794,8 @@ test_non_signature_fetch_failure_is_not_retried() {
   out="$home/out-locknonsig"; err="$home/err-locknonsig"
 
   set +e
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3 \
+  JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" locknonsig
   set -e
 

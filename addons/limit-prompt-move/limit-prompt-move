@@ -16,11 +16,11 @@
 set -u
 
 die() { echo "limit-prompt-move: $*" >&2; exit 1; }
-home=${1:-${FM_HOME:-}}
+home=${1:-${JG_HOME:-}}
 [ -n "$home" ] && [ -d "$home/state" ] || die "usage: limit-prompt-move <jg-home>"
-FM_HOME=$(cd "$home" && pwd) || die "cannot read $home"
-export FM_HOME
-STATE=$FM_HOME/state BIN=$FM_HOME/bin LOG=$FM_HOME/state/limit-prompt-move.log
+JG_HOME=$(cd "$home" && pwd) || die "cannot read $home"
+export JG_HOME
+STATE=$JG_HOME/state BIN=$JG_HOME/bin LOG=$JG_HOME/state/limit-prompt-move.log
 
 exec 9>"$STATE/.limit-prompt-move.lock" && flock -n 9 || exit 0
 # shellcheck source=/dev/null
@@ -34,9 +34,9 @@ _pool=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../account-pool/bin/jg-accou
 SCRIPT_DIR=$BIN
 # shellcheck source=/dev/null
 . "$_pool" || die "cannot load $_pool"
-_FM_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/jg-parked-homes-lib.sh"
+_JG_PARKED_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../parked-homes/bin/jg-parked-homes-lib.sh"
 # shellcheck source=/dev/null # sibling add-on path, resolved at runtime
-[ -f "$_FM_PARKED_LIB" ] && . "$_FM_PARKED_LIB"
+[ -f "$_JG_PARKED_LIB" ] && . "$_JG_PARKED_LIB"
 command -v jg_parked_meta >/dev/null || jg_parked_meta() { return 1; }
 
 # on_limit_menu: 0 when stdin's last non-blank lines are Claude's usage-limit menu.
@@ -56,7 +56,7 @@ BLOCKED='blocked [key=limit-prompt-move]'
 report() { # <id> <status state> <text>: the log line and the task's own status line
   printf '%s %s: %s\n' "$(date -u +%FT%TZ)" "$1" "$3" >>"$LOG"
   printf '%s [at=%s]: limit-prompt-move: %s\n' "$2" "$(date +%s)" "$3" >>"$STATE/$1.status"
-  [ ! -e "$FM_HOME/config/fleet-ledger" ] || "$BIN/jg-fleet-ledger.sh" appended "$FM_HOME/config" "$STATE/$1.status" >/dev/null 2>&1 || true
+  [ ! -e "$JG_HOME/config/fleet-ledger" ] || "$BIN/jg-fleet-ledger.sh" appended "$JG_HOME/config" "$STATE/$1.status" >/dev/null 2>&1 || true
 }
 
 first_error() { grep -m1 '^error: ' <<<"$1" || tail -n 1 <<<"$1"; }
@@ -80,7 +80,7 @@ for meta in "$STATE"/*.meta; do
   want=next from="account $acct"
   if [ -z "$acct" ]; then
     from="its unrecorded account"
-    if ! pick=$(jg_account_pool_select claude "$FM_HOME/config" 2>"$STATE/.limit-prompt-move.err") || [ -z "${pick%%$'\t'*}" ]; then
+    if ! pick=$(jg_account_pool_select claude "$JG_HOME/config" 2>"$STATE/.limit-prompt-move.err") || [ -z "${pick%%$'\t'*}" ]; then
       out=$(cat "$STATE/.limit-prompt-move.err")
       report "$id" "$BLOCKED" "sat on Claude's usage-limit menu with no recorded account, and the pool has no pick: $(first_error "${out:-no config/account-pool}"); move it by hand: bin/jg-control.sh $id relaunch --account <id>"
       continue

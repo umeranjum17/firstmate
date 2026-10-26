@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The fork's real completion-receipt journey (tests/jg-dod-lib.test.sh publishes,
 # refuses and accepts receipts and lands locally) with acceptance and the
 # publisher served from the add-on through the step-B hook lines. Absent ->
-# the guarded lines are a no-op. FM_TEST_FORK names a read-only Firstmate checkout.
+# the guarded lines are a no-op. JG_TEST_FORK names a read-only Firstmate checkout.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${FM_TEST_FORK:?set FM_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?
@@ -14,24 +23,24 @@ cleanup() {
 trap cleanup EXIT
 export HOME=$d/user TMPDIR=$d/tmp
 mkdir -p "$HOME" "$TMPDIR"
-git clone --shared "$FM_TEST_FORK" "$d/fork" >/dev/null
+git clone --shared "$JG_TEST_FORK" "$d/fork" >/dev/null
 # The current fork already has the optional add-on source and call-site hooks.
 # Keep its scripts intact so the fork's executable journeys cover those hooks.
 # shellcheck disable=SC2016 # the shim body expands when the shim runs
-printf '#!/usr/bin/env bash\nFM_FORK_BIN="$(dirname "$0")" exec "$FM_ADDONS_DIR/receipts/bin/jg-run-receipt.sh" "$@"\n' > "$d/fork/bin/jg-run-receipt.sh"
+printf '#!/usr/bin/env bash\nJG_FORK_BIN="$(dirname "$0")" exec "$JG_ADDONS_DIR/receipts/bin/jg-run-receipt.sh" "$@"\n' > "$d/fork/bin/jg-run-receipt.sh"
 chmod +x "$d/fork/bin/jg-run-receipt.sh"
 bash -n "$d/fork/bin/jg-dod-lib.sh"
 
 for test in jg-dod-lib.test.sh jg-task-delivery.test.sh jg-pr-merge.test.sh; do
-  (cd "$d/fork" && env -u FM_TASK_ID FM_ADDONS_DIR="$addons" bash "tests/$test") > "$d/$test.out" 2>&1 \
+  (cd "$d/fork" && env -u JG_TASK_ID JG_ADDONS_DIR="$addons" bash "tests/$test") > "$d/$test.out" 2>&1 \
     || { echo "FAIL: fork receipt hook journey $test" >&2; tail -20 "$d/$test.out" >&2; exit 1; }
 done
 
 # Helpers the spawn, promote and brief hooks call.
-export FM_HOME=$d/home FM_ADDONS_DIR=$addons
-mkdir -p "$FM_HOME"
+export JG_HOME=$d/home JG_ADDONS_DIR=$addons
+mkdir -p "$JG_HOME"
 # Source the real fork library so the add-on helper runs with its real dependencies.
-FM_ADDONS_DIR=$addons
+JG_ADDONS_DIR=$addons
 # shellcheck disable=SC1091 # sourced from the private fork clone at runtime
 . "$d/fork/bin/jg-dod-lib.sh"
 printf 'x\nCompletion receipt: required\n' > "$d/brief"
@@ -70,7 +79,7 @@ bound PASS "$h" ""; ! gate || { echo "FAIL: unbound receipt refuses" >&2; exit 1
 # A refusal names the exact command that fixes it, including the PR the receipt must name.
 msg=$( { bound PASS "$h" ""; jg_dod_receipt_accept "$st" t "$st/t.meta" "$h"; } 2>&1 || true)
 case $msg in
-  *"FM_RECEIPT_PR=$pr1"*"/receipts/bin/jg-run-receipt.sh t PASS"*) ;;
+  *"JG_RECEIPT_PR=$pr1"*"/receipts/bin/jg-run-receipt.sh t PASS"*) ;;
   *) echo "FAIL: refusal does not name the receipt command: $msg" >&2; exit 1 ;;
 esac
 rm "$st/t.run-receipt.json"; echo "evidence card: PASS $h $pr1" > "$st/t.evidence-card"
@@ -141,7 +150,7 @@ hook_run() {  # <name> <pr-url> <want-candidate>
   printf '#!/usr/bin/env bash\nexit 0\n' > "$hd/guardroot/bin/jg-guard.sh"
   printf '#!/usr/bin/env bash\ncase " $* " in *" --json isDraft "*) echo "{\\"isDraft\\":false}" ;; *headRefOid*) echo %s ;; esac\n' "$sha" > "$hd/fakebin/gh"
   chmod +x "$hd/guardroot/bin/jg-guard.sh" "$hd/fakebin/gh"
-  FM_ROOT_OVERRIDE=$hd/guardroot FM_HOME=$hd/home FM_STATE_OVERRIDE=$hd/home/state FM_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
+  JG_ROOT_OVERRIDE=$hd/guardroot JG_HOME=$hd/home JG_STATE_OVERRIDE=$hd/home/state JG_ADDONS_DIR=$hd/addons GATE_LOG=$hd/gate PATH=$hd/fakebin:$PATH \
     "$d/fork/bin/jg-pr-check.sh" task-a "$2" >"$hd/out" 2>"$hd/err" \
     || { echo "FAIL: jg-pr-check with add-on hook ($1): $(cat "$hd/err")" >&2; exit 1; }
   got=$(cat "$hd/gate")
@@ -151,7 +160,7 @@ hook_run outside https://github.com/o/other/pull/4 "$sha"
 hook_run same-repo https://github.com/o/r/pull/4 ""
 
 # Absent: source the real fork library with no add-on and prove it defines no hooks.
-( set -e; FM_ADDONS_DIR=$d/none FM_HOME=$d/absent-home
+( set -e; JG_ADDONS_DIR=$d/none JG_HOME=$d/absent-home
   unset -f jg_receipts_brief jg_receipts_inherit jg_receipts_promote jg_receipts_accept_done jg_dod_receipt_accept
   # shellcheck disable=SC1091 # sourced from the private fork clone at runtime
   . "$d/fork/bin/jg-dod-lib.sh"

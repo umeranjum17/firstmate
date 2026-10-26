@@ -17,7 +17,7 @@
 # Dedicated fleet-sync cases pin the computed bootstrap timeout, explicit
 # override, blank-env defaulting, partial-output relay, and pre-launch timeout
 # scan.
-# Dedicated network-phase cases pin FM_BOOTSTRAP_NETWORK as a true partition of
+# Dedicated network-phase cases pin JG_BOOTSTRAP_NETWORK as a true partition of
 # one run into its local and network halves, and the one-hop tasks-axi
 # compatibility handoff that keeps a session start from paying for that verdict
 # twice.
@@ -26,9 +26,9 @@ set -u
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-bootstrap-tests)
-export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
+export JG_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 
 # Hermetic runtime-backend detection. These cases pin the backend per-home via
 # config/backend; the dev shell's ambient runtime markers ($TMUX inside tmux,
@@ -40,7 +40,7 @@ unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_SOCKET_PATH CMUX_TAB_ID CMUX_PANEL_ID 2>/dev/null || true
 
 # A fake toolchain where every required tool is present and gh is authenticated.
-# treehouse's `get --help` advertises --lease only when FM_FAKE_TREEHOUSE_LEASE_HELP=1.
+# treehouse's `get --help` advertises --lease only when JG_FAKE_TREEHOUSE_LEASE_HELP=1.
 make_fake_toolchain() {
   local dir=$1 fakebin
   fakebin=$(jg_fakebin "$dir")
@@ -48,17 +48,17 @@ make_fake_toolchain() {
   # A user bus whose jg-sentinel service is running, so no case reads the host's own.
   cat > "$fakebin/systemctl" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
-[ "$*" != "--user is-active --quiet jg-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+[ -z "${JG_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet jg-sentinel" ] || [ -z "${JG_FAKE_SENTINEL_DOWN:-}" ] || exit 3
 exit 0
 SH
   chmod +x "$fakebin/systemctl"
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
-  jg_fake_version_tool "$fakebin" learn-from-mistakes FM_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION 0.2.0
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' "${FM_FAKE_GH_AXI_VERSION:-0.1.29}"
+  printf '%s\n' "${JG_FAKE_GH_AXI_VERSION:-0.1.29}"
   exit 0
 fi
 exit 0
@@ -75,7 +75,7 @@ SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = get ] && [ "${2:-}" = --help ]; then
-  if [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
+  if [ "${JG_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
     printf '%s\n' 'Usage: treehouse get [--lease] [--lease-holder <holder>]'
   else
     printf '%s\n' 'Usage: treehouse get'
@@ -88,7 +88,7 @@ SH
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' "${FM_FAKE_NO_MISTAKES_VERSION:-no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z}"
+  printf '%s\n' "${JG_FAKE_NO_MISTAKES_VERSION:-no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z}"
   exit 0
 fi
 exit 0
@@ -104,7 +104,7 @@ add_quota_axi() {
   cat > "$fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' "${FM_FAKE_QUOTA_AXI_VERSION:-0.1.51}"
+  printf '%s\n' "${JG_FAKE_QUOTA_AXI_VERSION:-0.1.51}"
   exit 0
 fi
 exit 0
@@ -144,11 +144,11 @@ add_real_jq() {
   real_jq=$(command -v jq 2>/dev/null) || fail "jq is required for dispatch profile validation tests"
   cat > "$fakebin/jq" <<SH
 #!/usr/bin/env bash
-if [ -n "\${FM_TEST_CHILD_ENV_LOG:-}" ]; then
+if [ -n "\${JG_TEST_CHILD_ENV_LOG:-}" ]; then
   if [ -n "\${TYPESAFE_API_KEY+x}" ] || [ -n "\${TYPESAFE_API_KEY_PRIVATE+x}" ]; then
-    printf 'secret-present\n' >> "\$FM_TEST_CHILD_ENV_LOG"
+    printf 'secret-present\n' >> "\$JG_TEST_CHILD_ENV_LOG"
   else
-    printf 'clean\n' >> "\$FM_TEST_CHILD_ENV_LOG"
+    printf 'clean\n' >> "\$JG_TEST_CHILD_ENV_LOG"
   fi
 fi
 exec '$real_jq' "\$@"
@@ -162,7 +162,7 @@ make_fake_fleet_sync_root() {
   mkdir -p "$fake_root/bin"
   cat > "$fake_root/bin/jg-fleet-sync.sh" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ] || : > "$FM_FAKE_FLEET_SYNC_STARTED_MARKER"
+[ -z "${JG_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ] || : > "$JG_FAKE_FLEET_SYNC_STARTED_MARKER"
 printf '%s\n' 'alpha: synced'
 printf '%s\n' 'beta: skipped: no origin remote'
 exec perl -e 'sleep 300'
@@ -214,33 +214,33 @@ run_bootstrap_timeout_case() {
     # shellcheck disable=SC2317,SC2329 # Exported and invoked by the bootstrap subprocess.
     git() {
       local tries
-      if [ "${FM_FAKE_GIT_WAIT_FOR_FLEET_START:-}" = 1 ] && [ -n "${FM_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ]; then
+      if [ "${JG_FAKE_GIT_WAIT_FOR_FLEET_START:-}" = 1 ] && [ -n "${JG_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ]; then
         tries=0
-        while [ "$tries" -lt 5 ] && [ ! -e "$FM_FAKE_FLEET_SYNC_STARTED_MARKER" ]; do
+        while [ "$tries" -lt 5 ] && [ ! -e "$JG_FAKE_FLEET_SYNC_STARTED_MARKER" ]; do
           command sleep 0.01
           tries=$((tries + 1))
         done
       fi
-      if [ -n "${FM_FAKE_GIT_SYNC_STARTED_RECORD:-}" ] && [ -n "${FM_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ] && [ -e "$FM_FAKE_FLEET_SYNC_STARTED_MARKER" ]; then
-        printf '%s\n' "$*" >> "$FM_FAKE_GIT_SYNC_STARTED_RECORD"
+      if [ -n "${JG_FAKE_GIT_SYNC_STARTED_RECORD:-}" ] && [ -n "${JG_FAKE_FLEET_SYNC_STARTED_MARKER:-}" ] && [ -e "$JG_FAKE_FLEET_SYNC_STARTED_MARKER" ]; then
+        printf '%s\n' "$*" >> "$JG_FAKE_GIT_SYNC_STARTED_RECORD"
       fi
       command git "$@"
     }
     export -f sleep
     export -f git
     if [ "$override" = __unset__ ]; then
-      PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
-        FM_FAKE_FLEET_SYNC_STARTED_MARKER="$started_marker" \
-        FM_FAKE_GIT_SYNC_STARTED_RECORD="$git_record" \
-        FM_FAKE_GIT_WAIT_FOR_FLEET_START="$wait_for_marker" \
-        FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
+      PATH="$fakebin:$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$fake_root" \
+        JG_FAKE_FLEET_SYNC_STARTED_MARKER="$started_marker" \
+        JG_FAKE_GIT_SYNC_STARTED_RECORD="$git_record" \
+        JG_FAKE_GIT_WAIT_FOR_FLEET_START="$wait_for_marker" \
+        JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
     else
-      PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
-        FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT="$override" \
-        FM_FAKE_FLEET_SYNC_STARTED_MARKER="$started_marker" \
-        FM_FAKE_GIT_SYNC_STARTED_RECORD="$git_record" \
-        FM_FAKE_GIT_WAIT_FOR_FLEET_START="$wait_for_marker" \
-        FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
+      PATH="$fakebin:$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$fake_root" \
+        JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT="$override" \
+        JG_FAKE_FLEET_SYNC_STARTED_MARKER="$started_marker" \
+        JG_FAKE_GIT_SYNC_STARTED_RECORD="$git_record" \
+        JG_FAKE_GIT_WAIT_FOR_FLEET_START="$wait_for_marker" \
+        JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
     fi
   )
 }
@@ -295,11 +295,11 @@ test_bootstrap_reporting() {
     if [ "$quota" = "0" ]; then
       rm -f "$fakebin/quota-axi"
     fi
-    # FM_ROOT_OVERRIDE points the worktree-tangle check at the non-git home dir so
+    # JG_ROOT_OVERRIDE points the worktree-tangle check at the non-git home dir so
     # it stays inert: this suite pins tool detection, not the tangle guard, and the
     # ambient checkout (CI runs on a feature branch) must not leak a TANGLE line in.
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP="$lease" "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP="$lease" "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -339,8 +339,8 @@ test_no_mistakes_min_version() {
     mkdir -p "$case_dir/home/config"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     fakebin=$(make_fake_toolchain "$case_dir")
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_NO_MISTAKES_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_NO_MISTAKES_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -368,8 +368,8 @@ test_gh_axi_min_version() {
     mkdir -p "$case_dir/home/config"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     fakebin=$(make_fake_toolchain "$case_dir")
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_GH_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_GH_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -401,8 +401,8 @@ test_lavish_axi_min_version() {
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     fakebin=$(make_fake_toolchain "$case_dir")
     [ "$version" != absent ] || rm -f "$fakebin/lavish-axi"
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_LAVISH_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh") \
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_LAVISH_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh") \
       || fail "$label: optional presentation must not fail bootstrap"
     assert_not_contains "$out" 'MISSING:' "$label: optional presentation must not block nonvisual dispatch"
     case "$mode" in
@@ -454,8 +454,8 @@ test_tasks_axi_min_version() {
         ;;
     esac
     add_tasks_axi "$fakebin" "$version" "$archive_body" "$multi_id"
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -489,8 +489,8 @@ test_quota_axi_min_version() {
     mkdir -p "$case_dir/home/config"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     fakebin=$(make_fake_toolchain "$case_dir")
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_QUOTA_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_QUOTA_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -528,8 +528,8 @@ git() {
 }
 SH
 
-  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   expected="MISSING: git (install: brew install git  # or the platform's package manager)"
   [ "$out" = "$expected" ] || fail "missing git should report the supported install instruction, got: $out"
   pass "bootstrap requires git with an install instruction"
@@ -544,16 +544,16 @@ test_orca_backend_gates_orca_tool_only_when_selected() {
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   printf '%s\n' orca > "$case_dir/home/config/backend"
   fakebin=$(make_fake_toolchain "$case_dir")
-  out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" orca)" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" orca)" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ "$out" = "$missing_orca" ] || fail "backend=orca should require only the Orca-specific missing tool, got: $out"
 
   case_dir="$TMP_ROOT/orca-backend-not-selected"
   mkdir -p "$case_dir/home/config"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   fakebin=$(make_fake_toolchain "$case_dir")
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_not_contains "$out" "MISSING: orca" "bootstrap should not require orca unless backend=orca is selected"
   pass "bootstrap: backend=orca gates the Orca CLI without requiring it on the default backend"
 }
@@ -584,8 +584,8 @@ test_session_provider_backends_do_not_require_tmux() {
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     printf '%s\n' "$backend" > "$case_dir/home/config/backend"
     fakebin=$(make_fake_toolchain_no_tmux "$case_dir" "$cli")
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
     [ -z "$out" ] || fail "backend=$backend with tmux absent but its own deps present should be silent, got: $out"
   done <<'ROWS'
 herdr^herdr
@@ -607,8 +607,8 @@ test_session_provider_backends_gate_own_cli_not_tmux() {
     printf '%s\n' "$backend" > "$case_dir/home/config/backend"
     # Toolchain has jq + treehouse but NOT the session CLI and NOT tmux.
     fakebin=$(make_fake_toolchain_no_tmux "$case_dir")
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
     if [ "$backend" = herdr ]; then
       missing="MISSING_MANUAL: herdr (instructions: https://herdr.dev)"
     else
@@ -635,8 +635,8 @@ test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   printf '%s\n' herdr > "$case_dir/home/config/backend"
   fakebin=$(make_fake_toolchain_no_tmux "$case_dir" herdr)
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "SENTINEL: jg-sentinel is not running" "a Herdr primary without restart recovery should say so"
   notice=$(printf '%s\n' "$out" | grep '^SENTINEL:')
   command=${notice#*'(install: '}
@@ -645,21 +645,21 @@ test_herdr_primary_without_restart_recovery_says_how_to_install_it() {
   cp "$ROOT/bin/jg-sentinel.sh" "$case_dir/home/bin/jg-sentinel.sh"
   cat > "$fakebin/systemctl" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_FAKE_NO_USER_BUS:-}" ] || exit 1
-[ "$*" != "--user is-active --quiet jg-sentinel" ] || [ -z "${FM_FAKE_SENTINEL_DOWN:-}" ] || exit 3
+[ -z "${JG_FAKE_NO_USER_BUS:-}" ] || exit 1
+[ "$*" != "--user is-active --quiet jg-sentinel" ] || [ -z "${JG_FAKE_SENTINEL_DOWN:-}" ] || exit 3
 if [ "$*" = "--user enable --now jg-sentinel" ]; then
-  printf 'systemctl\t%s\n' "$*" >> "$FM_TEST_SENTINEL_RECEIPT"
+  printf 'systemctl\t%s\n' "$*" >> "$JG_TEST_SENTINEL_RECEIPT"
 fi
 SH
   chmod +x "$case_dir/home/bin/jg-sentinel.sh" "$fakebin/systemctl"
   [ ! -e "$case_dir/shell home/.config/systemd/user" ] \
     || fail "the first-install fixture must not precreate the service directory"
-  HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" FM_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
+  HOME="$case_dir/shell home" PATH="$fakebin:$BASE_PATH" JG_TEST_SENTINEL_RECEIPT="$case_dir/receipt" \
     bash -c "$command" || fail "the emitted install command is not safely executable"
   assert_equals $'systemctl\t--user enable --now jg-sentinel' \
     "$(cat "$case_dir/receipt")" "the emitted command enables the selected service"
   unit="$case_dir/shell home/.config/systemd/user/jg-sentinel.service"
-  grep -Fx "Environment=\"FM_HOME=$case_dir/home\"" "$unit" >/dev/null \
+  grep -Fx "Environment=\"JG_HOME=$case_dir/home\"" "$unit" >/dev/null \
     || fail "the generated unit must preserve the space-containing home"
   grep -Fx "Environment=\"PATH=$fakebin:$BASE_PATH\"" "$unit" >/dev/null \
     || fail "the generated unit must preserve the space-containing PATH"
@@ -673,11 +673,11 @@ SH
   mkdir -p "$special_home/bin" "$case_dir/code % root/bin"
   cp "$ROOT/bin/jg-sentinel.sh" "$case_dir/code % root/bin/jg-sentinel.sh"
   unit="$case_dir/escaped.service"
-  FM_HOME="$special_home" PATH="$special_home/bin:$BASE_PATH" \
+  JG_HOME="$special_home" PATH="$special_home/bin:$BASE_PATH" \
     "$case_dir/code % root/bin/jg-sentinel.sh" unit > "$unit" || fail "unit generation failed"
   grep -Fx "Description=Firstmate sentinel for ${special_home//%/%%} (recovers supervision after an agent-runtime restart)" "$unit" >/dev/null \
     || fail "the generated description must preserve literal percent signs"
-  grep -Fx "Environment=\"FM_HOME=$escaped_home\"" "$unit" >/dev/null \
+  grep -Fx "Environment=\"JG_HOME=$escaped_home\"" "$unit" >/dev/null \
     || fail "the generated home assignment must escape systemd metacharacters"
   grep -Fx "Environment=\"PATH=$escaped_home/bin:$BASE_PATH\"" "$unit" >/dev/null \
     || fail "the generated PATH assignment must escape systemd metacharacters"
@@ -686,12 +686,12 @@ SH
   if command -v systemd-analyze >/dev/null 2>&1; then
     systemd-analyze verify "$unit" || fail "systemd rejected the escaped unit"
   fi
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 FM_FAKE_NO_USER_BUS=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_SENTINEL_DOWN=1 JG_FAKE_NO_USER_BUS=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "a host without a systemd user bus has nothing to install, got: $out"
   : > "$case_dir/home/.jg-secondmate-home"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_SENTINEL_DOWN=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_not_contains "$out" "SENTINEL:" "a secondmate home is recovered by its primary's sentinel"
   pass "bootstrap: a Herdr primary without the restart-recovery service gets the install command"
 }
@@ -715,8 +715,8 @@ test_cmux_bundled_cli_satisfies_dependency() {
   fakebin=$(make_fake_toolchain_no_tmux "$case_dir")
   jg_fake_exit0 "$case_dir/bundle" cmux
   bundle="$case_dir/bundle/cmux"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_BACKEND_CMUX_BUNDLE_BIN="$bundle" FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_BACKEND_CMUX_BUNDLE_BIN="$bundle" JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "a usable bundled cmux CLI should satisfy bootstrap without a PATH shim, got: $out"
   pass "bootstrap: the bundled cmux CLI satisfies the active backend dependency"
 }
@@ -728,8 +728,8 @@ test_unknown_backend_reports_invalid_configuration() {
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   printf '%s\n' bogus > "$case_dir/home/config/backend"
   fakebin=$(make_fake_toolchain "$case_dir")
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "BACKEND_INVALID: bogus (known: tmux herdr zellij orca cmux)" \
     "bootstrap should report an unknown resolved backend"
   assert_not_contains "$out" "MISSING: tmux" "an unknown backend should not silently fall back to tmux dependencies"
@@ -764,8 +764,8 @@ jq() {
   return 127
 }
 SH
-    out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
     assert_contains "$out" "MISSING: jq" "backend=$backend must fail closed on missing jq"
     assert_not_contains "$out" "MISSING: tmux" "backend=$backend must not demand tmux when jq is missing"
   done <<'ROWS'
@@ -788,8 +788,8 @@ test_treehouse_lease_check_follows_resolved_backend() {
   fakebin=$(make_fake_toolchain "$case_dir")
   rm -f "$fakebin/tmux"
   jg_fake_exit0 "$fakebin" orca
-  # FM_FAKE_TREEHOUSE_LEASE_HELP unset: the fake treehouse advertises NO --lease.
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+  # JG_FAKE_TREEHOUSE_LEASE_HELP unset: the fake treehouse advertises NO --lease.
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "backend=orca must not require treehouse (even lease-less) or tmux, got: $out"
 
@@ -800,7 +800,7 @@ test_treehouse_lease_check_follows_resolved_backend() {
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   printf '%s\n' herdr > "$case_dir/home/config/backend"
   fakebin=$(make_fake_toolchain_no_tmux "$case_dir" herdr)
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
     "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "MISSING: treehouse" "backend=herdr must still require treehouse with durable lease support"
   assert_not_contains "$out" "MISSING: tmux" "backend=herdr must not demand tmux even when treehouse is too old"
@@ -855,7 +855,7 @@ test_fleet_sync_timeout_explicit_override_wins() {
 
   assert_timeout_report "$out" 7
   assert_not_contains "$out" "timeout=59s" "explicit override should not be replaced by the computed timeout"
-  pass "bootstrap preserves FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT as an explicit override"
+  pass "bootstrap preserves JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT as an explicit override"
 }
 
 test_fleet_sync_timeout_empty_override_uses_default() {
@@ -954,8 +954,8 @@ run_routine_bootstrap_fixture() {
   fixture=${fixture#*|}
   home=${fixture%%|*}
   fakebin=${fixture#*|}
-  PATH="$fakebin:$BASE_PATH" FM_BACKEND=tmux FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+  PATH="$fakebin:$BASE_PATH" JG_BACKEND=tmux JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 \
     "$shell" "$ROOT/bin/jg-bootstrap.sh"
 }
 
@@ -974,7 +974,7 @@ test_routine_bootstrap_contract_runs_under_system_bash() {
   pass "bootstrap routine contract runs under system /bin/bash"
 }
 
-# FM_BOOTSTRAP_NETWORK splits one bootstrap run into its local and network
+# JG_BOOTSTRAP_NETWORK splits one bootstrap run into its local and network
 # halves so a session start can compose its digest from the local half alone and
 # run the network half concurrently. The property that has to hold is that the
 # split is a PARTITION: `skip` plus `only` together do exactly what `all` does,
@@ -994,18 +994,18 @@ exit 1
 SH
   chmod +x "$fakebin/gh"
 
-  all_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  all_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$all_out" "MISSING: node (install:" "the unsplit run lost its local diagnostic"
   assert_contains "$all_out" "NEEDS_GH_AUTH" "the unsplit run lost its network diagnostic"
 
-  skip_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/jg-bootstrap.sh")
+  skip_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=skip "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$skip_out" "MISSING: node (install:" "the local half lost its own diagnostic"
   assert_not_contains "$skip_out" "NEEDS_GH_AUTH" "the local half still made a network call"
 
-  only_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
+  only_out=$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$only_out" "NEEDS_GH_AUTH" "the network half lost its own diagnostic"
   assert_not_contains "$only_out" "MISSING: node" "the network half repeated the local half's work"
 
@@ -1015,10 +1015,10 @@ SH
 
   # A typo must never silently drop a safety sweep, so anything unrecognized
   # resolves to the complete run.
-  [ "$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=sikp "$ROOT/bin/jg-bootstrap.sh")" = "$all_out" ] \
-    || fail "an unrecognized FM_BOOTSTRAP_NETWORK value did not fall back to the complete run"
-  pass "bootstrap: FM_BOOTSTRAP_NETWORK partitions one run into local and network halves"
+  [ "$(PATH="$fakebin:$(jg_test_base_path_sans "$BASE_PATH" node)" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=sikp "$ROOT/bin/jg-bootstrap.sh")" = "$all_out" ] \
+    || fail "an unrecognized JG_BOOTSTRAP_NETWORK value did not fall back to the complete run"
+  pass "bootstrap: JG_BOOTSTRAP_NETWORK partitions one run into local and network halves"
 }
 
 # GitHub auth only matters to a home that ships through GitHub: when every
@@ -1033,12 +1033,12 @@ test_gh_auth_probe_skips_all_local_only_homes() {
   fakebin=$(make_fake_toolchain "$case_dir")
   printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/gh"
   chmod +x "$fakebin/gh"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
   assert_not_contains "$out" "NEEDS_GH_AUTH" "an all-local-only home was told to log in to GitHub"
   printf -- '- site [direct-PR] - Umer site (added 2026-10-12)\n' >> "$case_dir/home/data/projects.md"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "NEEDS_GH_AUTH" "a home with a PR project and no clone lost its GitHub auth check"
   pass "bootstrap: the GitHub auth probe is skipped only when every registered project is local-only"
 }
@@ -1054,8 +1054,8 @@ test_gh_auth_probe_reads_full_registered_names() {
   fakebin=$(make_fake_toolchain "$case_dir")
   printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/gh"
   chmod +x "$fakebin/gh"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "NEEDS_GH_AUTH" "a registered PR project named with a space was read as a local-only prefix"
   pass "bootstrap: the GitHub auth probe reads each registered project's full name"
 }
@@ -1072,13 +1072,13 @@ test_network_sweeps_recheck_lock_ownership() {
   mkdir -p "$fake_root/bin"
   cat > "$fake_root/bin/jg-fleet-sync.sh" <<'SH'
 #!/usr/bin/env bash
-: > "${FM_FAKE_FLEET_SYNC_STARTED_MARKER:?}"
+: > "${JG_FAKE_FLEET_SYNC_STARTED_MARKER:?}"
 SH
   chmod +x "$fake_root/bin/jg-fleet-sync.sh"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$fake_root" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only \
-    FM_BOOTSTRAP_NETWORK_LOCK_PID=111111 FM_FAKE_FLEET_SYNC_STARTED_MARKER="$marker" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$fake_root" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only \
+    JG_BOOTSTRAP_NETWORK_LOCK_PID=111111 JG_FAKE_FLEET_SYNC_STARTED_MARKER="$marker" \
     "$ROOT/bin/jg-bootstrap.sh")
   assert_absent "$marker" "a stale worker refreshed project clones after lock handoff"
   assert_contains "$out" "changed before dead-secondmate relaunch" \
@@ -1110,7 +1110,7 @@ assert_timing_record() {
 # used to be unattributable without re-running it by hand. These are the records
 # that make it attributable, and they must come from the real sweeps rather than
 # a stand-in: what is being pinned is that each network owner is actually wrapped.
-# bin/jg-timing-lib.sh stays inert unless FM_TIMING_LOG names a file, so an
+# bin/jg-timing-lib.sh stays inert unless JG_TIMING_LOG names a file, so an
 # ordinary bootstrap run is unaffected either way, which is asserted here too.
 test_network_phases_record_per_step_elapsed_times() {
   local case_dir fakebin log fields
@@ -1127,9 +1127,9 @@ test_network_phases_record_per_step_elapsed_times() {
   jg_write_secondmate_meta "$case_dir/home/state/mate-a.meta" "$case_dir/home"
 
   log="$case_dir/timings.tsv"
-  PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only \
-    FM_BOOTSTRAP_NETWORK_LOCK_PID=$$ FM_TIMING_LOG="$log" FM_TIMING_EPOCH_MS=0 \
+  PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only \
+    JG_BOOTSTRAP_NETWORK_LOCK_PID=$$ JG_TIMING_LOG="$log" JG_TIMING_EPOCH_MS=0 \
     "$ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
 
   assert_present "$log" "the network phase recorded no elapsed times at all"
@@ -1152,9 +1152,9 @@ test_network_phases_record_per_step_elapsed_times() {
   # And an ordinary run - the local half, or any caller that never asked for
   # timings - writes nothing anywhere.
   rm -f "$log"
-  PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only \
-    FM_BOOTSTRAP_NETWORK_LOCK_PID=$$ \
+  PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_BOOTSTRAP_NETWORK=only \
+    JG_BOOTSTRAP_NETWORK_LOCK_PID=$$ \
     "$ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
   assert_absent "$log" "a run that never asked for timings recorded them anyway"
   pass "bootstrap: each deferred network phase, secondmate, and clone records its own elapsed time"
@@ -1168,7 +1168,7 @@ test_tasks_axi_verdict_handoff_is_consumed_once() {
   log="$case_dir/tasks-axi.log"
   cat > "$fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_TASKS_AXI_LOG:?}"
+printf '%s\n' "$*" >> "${JG_FAKE_TASKS_AXI_LOG:?}"
 printf '0.0.1\n'
 exit 0
 SH
@@ -1176,29 +1176,29 @@ SH
 
   # Without the handoff, the incompatible stub is probed and reported.
   : > "$log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TASKS_AXI_LOG="$log" FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TASKS_AXI_LOG="$log" JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "MISSING: tasks-axi (install:" "the unaided run did not probe tasks-axi"
   assert_grep '--version' "$log" "the unaided run never ran the probe"
 
   # With it, the probe is skipped entirely and the handed-in verdict is used.
   : > "$log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TASKS_AXI_LOG="$log" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
-    FM_TASKS_AXI_COMPATIBLE=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TASKS_AXI_LOG="$log" JG_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    JG_TASKS_AXI_COMPATIBLE=1 "$ROOT/bin/jg-bootstrap.sh")
   assert_not_contains "$out" "MISSING: tasks-axi" "the handed-in verdict was ignored"
   [ ! -s "$log" ] || fail "the handed-in verdict did not save the probe: $(cat "$log")"
 
   # A malformed value is not a verdict.
   : > "$log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TASKS_AXI_LOG="$log" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
-    FM_TASKS_AXI_COMPATIBLE=yes "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TASKS_AXI_LOG="$log" JG_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    JG_TASKS_AXI_COMPATIBLE=yes "$ROOT/bin/jg-bootstrap.sh")
   assert_contains "$out" "MISSING: tasks-axi (install:" "a malformed handoff value was trusted"
 
   # And the handoff never reaches a grandchild: bootstrap spawns agents, and a
   # verdict cached into an agent's environment would outlive the tool it describes.
-  out=$(FM_TASKS_AXI_COMPATIBLE=1 bash -c '. "$1"; printf "%s\n" "${FM_TASKS_AXI_COMPATIBLE-unset}"' \
+  out=$(JG_TASKS_AXI_COMPATIBLE=1 bash -c '. "$1"; printf "%s\n" "${JG_TASKS_AXI_COMPATIBLE-unset}"' \
     _ "$ROOT/bin/jg-tasks-axi-lib.sh")
   [ "$out" = unset ] || fail "sourcing the library left the handoff in the environment: $out"
   pass "bootstrap: the tasks-axi compatibility verdict travels exactly one process hop"
@@ -1213,12 +1213,12 @@ test_crew_dispatch_active_rules_are_verbose_bootstrap_info() {
   fakebin=$(make_fake_toolchain "$case_dir")
   add_real_jq "$fakebin"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "active dispatch profile should be silent by default, got: $out"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_BOOTSTRAP_VERBOSE_FACTS=1 FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_BOOTSTRAP_VERBOSE_FACTS=1 JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
 
   expect=$'BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json\nBOOTSTRAP_INFO: crew dispatch rule: fresh news -> grok\nBOOTSTRAP_INFO: crew dispatch rule: big feature -> quota-balanced[claude/claude-sonnet-5/high, codex/gpt-5.5/high]\nBOOTSTRAP_INFO: crew dispatch rule: legacy feature -> quota-balanced[claude, codex]\nBOOTSTRAP_INFO: crew dispatch default: quota-balanced[pi/anthropic/claude-sonnet-5/high, grok/grok-4.5/high]'
   [ "$out" = "$expect" ] || fail "active dispatch verbose info block mismatch"$'\n'"expected: $expect"$'\n'"actual:   $out"
@@ -1237,8 +1237,8 @@ test_crew_dispatch_validation() {
     printf '%s\n' "$body" > "$case_dir/home/config/crew-dispatch.json"
     fakebin=$(make_fake_toolchain "$case_dir")
     add_real_jq "$fakebin"
-    out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-      TYPESAFE_API_KEY=test-key FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      TYPESAFE_API_KEY=test-key JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
     case "$mode" in
       empty)
         [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
@@ -1312,47 +1312,47 @@ ROWS
   add_real_jq "$fakebin"
 
   printf '%s\n' '{"rules":[{"when":"legacy malformed model","use":{"harness":"codex","model":5}}]}' > "$case_dir/home/config/crew-dispatch.json"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings when present' ] \
     || fail "no-key use-profile diagnostic changed from main, got: $out"
 
   printf '%s\n' '{"default":{"harness":"codex","effort":3}}' > "$case_dir/home/config/crew-dispatch.json"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - default profile model and effort must be non-empty strings when present' ] \
     || fail "no-key default-profile diagnostic changed from main, got: $out"
 
   printf '%s\n' '{"rules":[{"when":"legacy metadata","approval":"firstmate","floor":{"scope":"all_models","min_percent":200,"provider":"CLAUDE"},"use":{"harness":"claude","provider":"Anthropic","floor":{"scope":"all_models"}}}]}' > "$case_dir/home/config/crew-dispatch.json"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "resolver-only fields must be ignored without the typed key, got: $out"
   printf '%s\n' 'TYPESAFE_API_KEY=test-key' > "$case_dir/home/.env"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present' ] \
     || fail "typed .env key must activate resolver-field validation, got: $out"
 
   rm -f "$case_dir/home/.env"
   printf '%s\n' '{"default":{"harness":"devin","model":"swe-2-medium"}}' > "$case_dir/home/config/crew-dispatch.json"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "no-key bootstrap must accept the verified devin worker adapter, got: $out"
   printf '%s\n' '{"rules":[{"when":"gemini work","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google"}}]}' > "$case_dir/home/config/crew-dispatch.json"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: gemini' ] \
     || fail "no-key bootstrap must preserve its former verified-harness baseline, got: $out"
   printf '%s\n' 'TYPESAFE_API_KEY=test-key' > "$case_dir/home/.env"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    TYPESAFE_API_KEY=test-key FM_TEST_CHILD_ENV_LOG="$case_dir/child-env.log" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+    TYPESAFE_API_KEY=test-key JG_TEST_CHILD_ENV_LOG="$case_dir/child-env.log" \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
   [ -z "$out" ] || fail "environment-key validation should remain silent, got: $out"
   child_env=$(cat "$case_dir/child-env.log")
   [ -n "$child_env" ] || fail "bootstrap child environment probe did not run"

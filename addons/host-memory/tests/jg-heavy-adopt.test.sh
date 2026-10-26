@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration test for the installed mover and its real proc/cgroup traversal using private fixtures.
 set -euo pipefail
 d=$(mktemp -d); trap 'rm -rf -- "$d"' EXIT
@@ -43,7 +52,7 @@ done
 printf '100\n103\n104\n' >"$d/herdr/cgroup.procs"
 for spec in "${specs[@]}"; do pid=${spec%% *}; [ "$pid" = 100 ] || [ "$pid" = 103 ] || [ "$pid" = 104 ] || printf '%s\n' "$pid" >>"$d/herdr/child/cgroup.procs"; done
 : >"$d/heavy/cgroup.procs"
-FM_HEAVY_ADOPT_HERDR_CGROUP="$d/herdr" FM_HEAVY_ADOPT_PROC="$d/proc" FM_HEAVY_ADOPT_STATE="$d/state/jg-host-memory" FM_HEAVY_ADOPT_DEST="$d/heavy/cgroup.procs" "$installed"
+JG_HEAVY_ADOPT_HERDR_CGROUP="$d/herdr" JG_HEAVY_ADOPT_PROC="$d/proc" JG_HEAVY_ADOPT_STATE="$d/state/jg-host-memory" JG_HEAVY_ADOPT_DEST="$d/heavy/cgroup.procs" "$installed"
 for pid in 100 101 104 120; do grep -Fqx "$pid" "$d/heavy/cgroup.procs" || { echo "FAIL expected move $pid"; exit 1; }; done
 for pid in 102 103 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119; do
   if grep -Fqx "$pid" "$d/heavy/cgroup.procs"; then echo "FAIL protected process/tree moved: $pid"; exit 1; fi

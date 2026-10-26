@@ -8,6 +8,10 @@ import re
 import subprocess
 import sys
 from collections import Counter
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 MAX_TEXT = 4000
 WRAPPERS = {
@@ -86,7 +90,7 @@ def clean(text):
 
 
 def main():
-    home = Path(os.environ.get('FM_HOME', str(Path.home() / 'firstmate'))).resolve()
+    home = Path(os.environ.get('JG_HOME', str(Path.home() / 'firstmate'))).resolve()
     transcript_default = Path.home() / '.claude/projects/-home-umer-firstmate'
     transcripts = Path(os.environ.get('CHAT_TSV_TRANSCRIPTS', str(transcript_default)))
     dest, sidecar = home / 'data/chat.tsv', home / 'data/chat.tsv.seen'

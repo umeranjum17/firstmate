@@ -7,7 +7,7 @@
 #   jg-backlog-receive.sh state/handoff/<secondmate-id>.outbox.md <bytes> <sha256> <generation>
 #
 # The delivered file must be a non-symlink backlog-format scratch file confined
-# to FM_HOME/state/handoff. Every item must be Queued. Keys already present in
+# to JG_HOME/state/handoff. Every item must be Queued. Keys already present in
 # data/backlog.md are skipped; every remaining key moves in one dependency-closed
 # `tasks-axi mv` transaction under tasks-axi's own locks. On an ambiguous caller
 # retry, destination-present classification makes this operation idempotent.
@@ -19,9 +19,9 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DEST="$FM_HOME/data/backlog.md"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DEST="$JG_HOME/data/backlog.md"
 LOCK_STALE_SECS=30
 
 # shellcheck source=bin/jg-tasks-axi-lib.sh
@@ -101,11 +101,11 @@ case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;
 case "$REL" in state/handoff/*.outbox.md) ;; *) die "delivered outbox path is outside state/handoff: $REL" ;; esac
 case "/$REL/" in */../*|*/./*) die "delivered outbox path contains traversal" ;; esac
 case "$REL" in *'//'*) die "delivered outbox path is malformed" ;; esac
-[ -f "$FM_HOME/.jg-secondmate-home" ] && [ ! -L "$FM_HOME/.jg-secondmate-home" ] \
-  || die "FM_HOME is not a seeded secondmate home"
-[ -f "$FM_HOME/AGENTS.md" ] && [ -d "$FM_HOME/bin" ] || die "FM_HOME is not a Firstmate home"
-HOME_REAL=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || die "FM_HOME cannot be resolved"
-PARENT=$(dirname "$FM_HOME/$REL")
+[ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] \
+  || die "JG_HOME is not a seeded secondmate home"
+[ -f "$JG_HOME/AGENTS.md" ] && [ -d "$JG_HOME/bin" ] || die "JG_HOME is not a Firstmate home"
+HOME_REAL=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME cannot be resolved"
+PARENT=$(dirname "$JG_HOME/$REL")
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" 2>/dev/null && pwd -P) || die "delivered outbox parent is unavailable"
 case "$PARENT_REAL" in "$HOME_REAL/state/handoff") ;; *) die "delivered outbox escapes the remote scratch directory" ;; esac
 DELIVERED="$PARENT_REAL/$(basename "$REL")"
@@ -149,7 +149,7 @@ for key in "${KEYS[@]}"; do
   [ "$section" = '## Queued' ] || die "delivered outbox contains non-Queued item $key under $section"
 done
 
-mkdir -p "$FM_HOME/data"
+mkdir -p "$JG_HOME/data"
 DEST_CREATED=0
 if [ ! -f "$DEST" ]; then
   printf '## In flight\n\n## Queued\n\n## Done\n' > "$DEST"

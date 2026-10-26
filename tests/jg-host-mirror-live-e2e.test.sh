@@ -7,9 +7,9 @@
 # and main's reply. The writers read vendor hook payloads, so only the real
 # harness can prove them. Opt-in because it submits prompts:
 #
-#   FM_HOST_MIRROR_LIVE_E2E=1 tests/jg-host-mirror-live-e2e.test.sh
+#   JG_HOST_MIRROR_LIVE_E2E=1 tests/jg-host-mirror-live-e2e.test.sh
 #
-# FM_HOST_MIRROR_LIVE_HARNESSES (default "claude cursor") narrows the set. An
+# JG_HOST_MIRROR_LIVE_HARNESSES (default "claude cursor") narrows the set. An
 # absent harness is reported, never passed over silently, and a run that
 # checked no harness fails. Cursor fires project hooks only in an interactive
 # session, and Claude must show that a turn it starts itself (its Stop-hook
@@ -23,9 +23,9 @@ set -u
 # shellcheck source=bin/jg-tmux-lib.sh
 . "$ROOT/bin/jg-tmux-lib.sh"
 
-jg_live_gate opt-in FM_HOST_MIRROR_LIVE_E2E jq tmux
+jg_live_gate opt-in JG_HOST_MIRROR_LIVE_E2E jq tmux
 
-HARNESSES=${FM_HOST_MIRROR_LIVE_HARNESSES:-claude cursor}
+HARNESSES=${JG_HOST_MIRROR_LIVE_HARNESSES:-claude cursor}
 LAB=$(jg_test_tmproot jg-host-mirror-live)
 SOCKET="fmhm-$$"
 PROMPT='Reply with exactly the word mirror-ok and nothing else.'
@@ -42,7 +42,7 @@ cleanup() {
   jg_test_cleanup
 }
 trap cleanup EXIT
-unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE TMUX TMUX_PANE
+unset JG_HOME JG_ROOT_OVERRIDE JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE TMUX TMUX_PANE
 
 # A primary checkout carrying only the tracked mirror registrations, so no
 # other hook of this repo runs in it.
@@ -183,7 +183,7 @@ for harness in $HARNESSES; do
   case "$harness" in
     claude) bin=$harness ;;
     cursor) bin='cursor-agent' ;;
-    *) fail "unknown harness in FM_HOST_MIRROR_LIVE_HARNESSES: $harness" ;;
+    *) fail "unknown harness in JG_HOST_MIRROR_LIVE_HARNESSES: $harness" ;;
   esac
   if ! command -v "$bin" >/dev/null 2>&1; then
     printf 'absent - %s is not installed, so its mirror writer was not checked\n' "$harness"

@@ -87,7 +87,7 @@ test_pi_extension_reports_external_healthy_watcher() {
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -104,7 +104,7 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!handler) {
@@ -165,7 +165,7 @@ test_pi_tool_returns_agent_tool_result() {
 exit 0
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -178,7 +178,7 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!tool) throw new Error("Pi watch tool was not registered");
@@ -226,13 +226,13 @@ test_pi_redundant_tool_call_is_owned_noop() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -245,7 +245,7 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 const initial = await tool.execute("tool-call-first", {}, undefined, undefined, {});
@@ -262,14 +262,14 @@ if (/^watcher: healthy\b/.test(redundant.content[0]?.text)) {
 if (!redundant.content[0]?.text.includes("only after a later notification says the cycle is missing, failed, or unhealthy")) {
   throw new Error(`redundant call omitted the repair-only condition: ${redundant.content[0]?.text}`);
 }
-for (let i = 0; i < 100 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 100 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) throw new Error("initial arm child did not start");
+if (!existsSync(process.env.JG_ARM_LOG)) throw new Error("initial arm child did not start");
 await new Promise((resolve) => setTimeout(resolve, 100));
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.length !== 1) throw new Error(`redundant call spawned ${rows.length} arm children`);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 EOF
 )
   status=$?
@@ -288,11 +288,11 @@ test_pi_scheduled_retry_call_is_owned_noop() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 exit 0
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_BASE_MS=10000 FM_WATCH_REARM_RETRY_MAX_MS=10000 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_BASE_MS=10000 JG_WATCH_REARM_RETRY_MAX_MS=10000 node --input-type=module 2>&1 <<'EOF'
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -305,7 +305,7 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-first", {}, undefined, undefined, {});
@@ -325,7 +325,7 @@ if (!redundant.content[0]?.text.includes("only after a later notification says t
   throw new Error(`scheduled retry call omitted the repair-only condition: ${redundant.content[0]?.text}`);
 }
 await new Promise((resolve) => setTimeout(resolve, 100));
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.length !== 1) throw new Error(`scheduled retry call spawned ${rows.length} arm children`);
 EOF
 )
@@ -347,11 +347,11 @@ test_pi_actionable_close_starts_single_successor_before_delivery() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -359,10 +359,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -380,25 +380,25 @@ const pi = {
     if (candidate.name === "jg_watch_arm_pi") tool = candidate;
   },
   sendUserMessage: async () => {
-    rowsAtDelivery = existsSync(process.env.FM_ARM_LOG)
-      ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm=")).length
+    rowsAtDelivery = existsSync(process.env.JG_ARM_LOG)
+      ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm=")).length
       : 0;
     deliveryStarted = true;
     await deliveryBlocked;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-continuity", {}, undefined, undefined, {});
 for (let i = 0; i < 250; i += 1) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   if (rows.length >= 2 && deliveryStarted) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 const armRows = rows.filter((row) => row.startsWith("arm="));
 if (armRows.length !== 2) throw new Error(`expected one successor arm, got ${armRows.length}: ${rows.join(" | ")}`);
 if (!deliveryStarted) throw new Error("wake delivery did not begin");
@@ -408,7 +408,7 @@ if (!rows.some((row) => row.startsWith("confirmed generation=fixture-generation"
   throw new Error(`handling delivery was not confirmed before the follow-up: ${rows.join(" | ")}`);
 }
 await new Promise((resolve) => setTimeout(resolve, 100));
-const stableRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const stableRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (stableRows.filter((row) => row.startsWith("arm=")).length !== 2) {
   throw new Error(`blocked follow-up started extra arm work: ${stableRows.join(" | ")}`);
 }
@@ -416,7 +416,7 @@ if (stableRows.filter((row) => row.startsWith("confirmed ")).length !== 1) {
   throw new Error(`successful prompt delivery was not confirmed exactly once: ${stableRows.join(" | ")}`);
 }
 releaseDelivery();
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -442,24 +442,24 @@ test_pi_actionable_output_waits_for_predecessor_close() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'handling-confirmed\n' >> "${FM_ARM_LOG:?}"
+  printf 'handling-confirmed\n' >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=before-close-%s\n' "$$" "$count"
 if [ "$count" -eq 1 ]; then
-  printf 'actionable-emitted\n' >> "$FM_ARM_LOG"
+  printf 'actionable-emitted\n' >> "$JG_ARM_LOG"
   printf 'signal: actionable output before predecessor close\n'
   sleep 0.5
-  printf 'predecessor-closed\n' >> "$FM_ARM_LOG"
+  printf 'predecessor-closed\n' >> "$JG_ARM_LOG"
   exit 0
 fi
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -477,18 +477,18 @@ const pi = {
   },
   sendUserMessage: async (message) => {
     prompts.push(message);
-    writeFileSync(process.env.FM_ARM_LOG, "delivery\n", { flag: "a" });
+    writeFileSync(process.env.JG_ARM_LOG, "delivery\n", { flag: "a" });
   },
   events: { on() {}, emit() {} },
 };
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("initial-arm", {}, undefined, undefined, {});
 await new Promise((resolve) => setTimeout(resolve, 1200));
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 const armIndexes = rows.map((row, index) => row.startsWith("arm=") ? index : -1).filter((index) => index >= 0);
 const closeIndex = rows.indexOf("predecessor-closed");
@@ -500,7 +500,7 @@ if (deliveryIndex < armIndexes[1]) failNow(`wake was delivered before successor 
 if (prompts.length !== 1 || !prompts[0].includes("signal: actionable output before predecessor close")) {
   failNow(`wrong actionable wake: ${prompts.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -522,11 +522,11 @@ test_pi_branch_offer_owns_actionable_wake() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: branch-offer synthetic wake\n'
@@ -534,10 +534,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -546,7 +546,7 @@ import { pathToFileURL } from "node:url";
 // with a bus but no acceptor the dispatcher must fall back to main. The
 // divergence between the two runs is asserted, so the case cannot go vacuous.
 async function runScenario(withAcceptor) {
-  writeFileSync(process.env.FM_ARM_LOG, "");
+  writeFileSync(process.env.JG_ARM_LOG, "");
   const offers = [];
   let mainPrompt = "";
   let tool = null;
@@ -585,13 +585,13 @@ async function runScenario(withAcceptor) {
     if (settled) break;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+  const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
   return { offers, mainPrompt, rows };
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/branch-offer.meta`, "project=/projects/approved\nwindow=jg-branch-offer\n");
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\tbranch-offer.status\tsignal: branch-offer synthetic wake\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/branch-offer.meta`, "project=/projects/approved\nwindow=jg-branch-offer\n");
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\tsignal\tbranch-offer.status\tsignal: branch-offer synthetic wake\n");
 const accepted = await runScenario(true);
 if (accepted.offers.length !== 1) throw new Error(`expected one branch offer, got ${accepted.offers.length}`);
 if (!accepted.offers[0].message.includes("signal: branch-offer synthetic wake")) {
@@ -612,7 +612,7 @@ if (!declined.mainPrompt.includes("FIRSTMATE WATCHER WAKE")) {
 if (!declined.mainPrompt.includes("signal: branch-offer synthetic wake")) {
   throw new Error(`fallback wake lost the reason line: ${declined.mainPrompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -637,11 +637,11 @@ test_pi_hung_branch_settlement_rerings_to_main() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: hung-branch synthetic wake\n'
@@ -649,11 +649,11 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
-    FM_BRANCH_SETTLEMENT_TIMEOUT_MS=200 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
+    JG_BRANCH_SETTLEMENT_TIMEOUT_MS=200 node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -687,9 +687,9 @@ const pi = {
     mainPrompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/hung-branch.meta`, "project=/projects/approved\nwindow=jg-hung-branch\n");
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\thung-branch.status\tsignal: hung-branch synthetic wake\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/hung-branch.meta`, "project=/projects/approved\nwindow=jg-hung-branch\n");
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\tsignal\thung-branch.status\tsignal: hung-branch synthetic wake\n");
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-hung-branch", {}, undefined, undefined, {});
@@ -713,7 +713,7 @@ if (!mainPrompt.includes("re-ringed to main")) {
 if (Date.now() - startedAt > 15000) {
   throw new Error("branch-settlement fallback did not stay bounded");
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -735,11 +735,11 @@ test_pi_branch_offer_flags_heartbeat() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'heartbeat\n'
@@ -747,13 +747,13 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
   # A bare heartbeat is the real wake emitted after the cheap bash scan flags
   # a fleet pass as possibly captain-relevant. It has no task-scoped queue row,
   # so branch eligibility must remain independent of project resolution.
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -782,8 +782,8 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\theartbeat\theartbeat\theartbeat\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\theartbeat\theartbeat\theartbeat\n");
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-branch-heartbeat", {}, undefined, undefined, {});
@@ -798,7 +798,7 @@ if (offers[0].heartbeat !== true || offers[0].eligible !== true) throw new Error
 if (JSON.stringify(offers[0].projects) !== JSON.stringify([])) {
   throw new Error(`heartbeat offer unexpectedly carried scoped projects: ${JSON.stringify(offers[0].projects)}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -820,8 +820,8 @@ test_pi_heartbeat_is_not_ridden_into_main_by_a_co_present_check() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'heartbeat\n'
@@ -829,10 +829,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -864,9 +864,9 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
+  `${process.env.JG_HOME}/state/.wake-queue`,
   "1\t1\theartbeat\theartbeat\theartbeat\n2\t2\tcheck\tx-inbox\tcheck: pending x mention\n",
 );
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
@@ -886,7 +886,7 @@ if (offers.length !== 1 || offers[0].heartbeat !== true || offers[0].eligible !=
 if (prompt) {
   throw new Error(`a co-present check row rode the heartbeat into main: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -913,24 +913,24 @@ test_pi_main_only_check_classes_stay_on_main() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  printf '%s\n' "${FM_TEST_REASON:?}"
+  printf '%s\n' "${JG_TEST_REASON:?}"
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
   while IFS='|' read -r label reason; do
     [ -n "$label" ] || continue
     log="$TMP_ROOT/pi-main-only-check-$label.log"
     stop="$TMP_ROOT/pi-main-only-check-$label.stop"
-    out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
-      FM_TEST_REASON="$reason" node --input-type=module 2>&1 <<'EOF'
+    out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
+      JG_TEST_REASON="$reason" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -962,12 +962,12 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 // A task-local row the branch would happily take sits in the same queue, so
 // only the check-kind TRIGGER itself can be what keeps this wake on main.
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
-  "1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n2\t2\tcheck\tmain-only\t" + process.env.FM_TEST_REASON + "\n",
+  `${process.env.JG_HOME}/state/.wake-queue`,
+  "1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n2\t2\tcheck\tmain-only\t" + process.env.JG_TEST_REASON + "\n",
 );
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
@@ -978,10 +978,10 @@ for (let i = 0; i < 250 && !prompt; i += 1) {
 if (offers.length !== 1 || offers[0].eligible !== false) {
   throw new Error(`a main-only check was offered to the branch: ${JSON.stringify(offers)}`);
 }
-if (!prompt.includes(`FIRSTMATE WATCHER WAKE: ${process.env.FM_TEST_REASON}`)) {
+if (!prompt.includes(`FIRSTMATE WATCHER WAKE: ${process.env.JG_TEST_REASON}`)) {
   throw new Error(`a main-only check did not reach main: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
     )
@@ -1013,8 +1013,8 @@ test_pi_captain_held_signal_stays_on_main() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: task-a.status\n'
@@ -1022,10 +1022,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
     node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -1058,9 +1058,9 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
+  `${process.env.JG_HOME}/state/.wake-queue`,
   "1\t1\tsignal\ttask-a.status\tneeds-decision: task-a.status\n" +
     "1\t2\tsignal\ttask-a.status\tsignal: routine follow-up\n",
 );
@@ -1076,7 +1076,7 @@ if (offers.length !== 1 || offers[0].eligible !== false) {
 if (!prompt.includes("FIRSTMATE WATCHER WAKE: signal: task-a.status")) {
   throw new Error(`a captain-held signal trigger did not reach main: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -1103,8 +1103,8 @@ test_pi_unread_pending_reply_forces_later_stale_alias_to_main() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'stale: jg-a (routine reminder)\n'
@@ -1112,10 +1112,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
     node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -1148,9 +1148,9 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
+  `${process.env.JG_HOME}/state/.wake-queue`,
   "1\t1\tsignal\ttask-a.status\tneeds-decision: task-a.status\n" +
     "2\t2\tstale\tjg-a\tstale: jg-a (routine reminder)\n",
 );
@@ -1169,7 +1169,7 @@ if (offers.length !== 1 || offers[0].eligible !== false) {
 if (!prompt.includes("FIRSTMATE WATCHER WAKE: stale: jg-a")) {
   throw new Error(`a later stale alias with an unread decision did not wake main: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -1201,8 +1201,8 @@ test_pi_distinct_files_mixed_batch_routes_whole_batch_to_main() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: task-a.status task-b.status\n'
@@ -1210,10 +1210,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
     node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -1246,9 +1246,9 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
+  `${process.env.JG_HOME}/state/.wake-queue`,
   "1\t1\tsignal\ttask-a.status\tneeds-decision: task-a.status\n" +
     "2\t2\tsignal\ttask-b.status\tsignal: task-b.status\n",
 );
@@ -1267,7 +1267,7 @@ if (offers.length !== 1 || offers[0].eligible !== false) {
 if (!prompt.includes("FIRSTMATE WATCHER WAKE: signal: task-a.status task-b.status")) {
   throw new Error(`the distinct-file mixed batch did not reach main as one whole close: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -1293,8 +1293,8 @@ test_pi_heartbeat_is_not_ridden_into_main_by_a_co_present_needs_decision() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'heartbeat\n'
@@ -1302,10 +1302,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1337,9 +1337,9 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
+  `${process.env.JG_HOME}/state/.wake-queue`,
   "1\t1\theartbeat\theartbeat\theartbeat\n2\t2\tsignal\tdecision-task.status\tneeds-decision: decision-task.status\n",
 );
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
@@ -1357,7 +1357,7 @@ if (offers.length !== 1 || offers[0].heartbeat !== true || offers[0].eligible !=
 if (prompt) {
   throw new Error(`a co-present needs-decision row rode the heartbeat into main: ${prompt}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -1377,8 +1377,8 @@ test_pi_heartbeat_restoration_failure_stays_on_main() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'heartbeat\n'
@@ -1388,7 +1388,7 @@ printf 'synthetic successor startup failure\n' >&2
 exit 1
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1420,7 +1420,7 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-heartbeat-restoration-failure", {}, undefined, undefined, {});
@@ -1461,7 +1461,7 @@ SH
   # (docs/pi-supervision-branch.md), and default-on eligibility must not
   # change that. A live, always-accepting bus listener proves the negative:
   # even with an acceptor present, a watcher-failure close is never offered.
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1493,7 +1493,7 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await handler("", { ui: { notify() {} } });
@@ -1528,29 +1528,29 @@ test_pi_away_record_collapses_eligibility_and_keeps_vetoes_on_main() {
   install_pi_watch_extension_fixture "$repo"
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   printf 'project=%s/projects/approved\nwindow=jg-window\n' "$home" > "$home/state/task-a.meta"
-  FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null || fail "away entry failed"
+  JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null || fail "away entry failed"
   [ -f "$home/state/.afk-contract" ] || fail "the away-posture record was not written"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then exit 0; fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  printf '%s\n' "${FM_TEST_REASON:?}"
+  printf '%s\n' "${JG_TEST_REASON:?}"
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
   while IFS='|' read -r label expect reason queue; do
     [ -n "$label" ] || continue
     log="$TMP_ROOT/pi-away-$label.log"
     stop="$TMP_ROOT/pi-away-$label.stop"
-    out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
-      FM_TEST_REASON="$reason" FM_TEST_QUEUE="$queue" FM_TEST_EXPECT="$expect" node --input-type=module 2>&1 <<'EOF'
+    out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" \
+      JG_TEST_REASON="$reason" JG_TEST_QUEUE="$queue" JG_TEST_EXPECT="$expect" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1582,10 +1582,10 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 writeFileSync(
-  `${process.env.FM_HOME}/state/.wake-queue`,
-  process.env.FM_TEST_QUEUE.replace(/\\t/g, "\t").replace(/\\n/g, "\n"),
+  `${process.env.JG_HOME}/state/.wake-queue`,
+  process.env.JG_TEST_QUEUE.replace(/\\t/g, "\t").replace(/\\n/g, "\n"),
 );
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
@@ -1597,7 +1597,7 @@ for (let i = 0; i < 250 && offers.length === 0 && !prompt; i += 1) {
 for (let i = 0; i < 25 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-if (process.env.FM_TEST_EXPECT === "branch") {
+if (process.env.JG_TEST_EXPECT === "branch") {
   if (offers.length !== 1 || offers[0].eligible !== true) {
     throw new Error(`under the away-posture record this wake was not offered to the branch: ${JSON.stringify(offers)}`);
   }
@@ -1606,11 +1606,11 @@ if (process.env.FM_TEST_EXPECT === "branch") {
   if (offers.length !== 1 || offers[0].eligible !== false) {
     throw new Error(`a broken-queue wake was offered to the branch under the record: ${JSON.stringify(offers)}`);
   }
-  if (!prompt.includes(`FIRSTMATE WATCHER WAKE: ${process.env.FM_TEST_REASON}`)) {
+  if (!prompt.includes(`FIRSTMATE WATCHER WAKE: ${process.env.JG_TEST_REASON}`)) {
     throw new Error(`a wake the branch cannot take did not fall back to main: ${prompt}`);
   }
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
     )
@@ -1636,7 +1636,7 @@ CASES
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1668,7 +1668,7 @@ const pi = {
     prompt = message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await handler("", { ui: { notify() {} } });
@@ -1701,11 +1701,11 @@ test_pi_handling_delivery_failure_is_typed_once() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 1
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -1713,10 +1713,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1732,7 +1732,7 @@ const pi = {
     prompt += message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-handling-fail", {}, undefined, undefined, {});
@@ -1746,13 +1746,13 @@ if (!prompt.includes("handling delivery confirmation was rejected")) {
 if ((prompt.match(/FIRSTMATE WATCHER WAKE/g) || []).length !== 1) {
   throw new Error(`failed handshake was not a single typed message: ${prompt}`);
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.filter((row) => row.startsWith("refused ")).length < 1) {
   throw new Error(`handling-delivered was never attempted: ${rows.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -1775,11 +1775,11 @@ test_pi_confirm_failure_retires_arm_with_distinct_watcher_pid() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 1
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -1788,11 +1788,11 @@ fi
 sleep 0.02 & dead=$!; wait "$dead" 2>/dev/null || true
 if [ "$dead" = "$$" ]; then dead=1; fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-distinct\n' "$dead"
-trap 'printf "retired\n" > "${FM_RETIRED_FILE:?}"; exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+trap 'printf "retired\n" > "${JG_RETIRED_FILE:?}"; exit 0' TERM INT
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_RETIRED_FILE="$retired" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_RETIRED_FILE="$retired" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1808,7 +1808,7 @@ const pi = {
     prompt += message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-confirm-distinct", {}, undefined, undefined, {});
@@ -1821,15 +1821,15 @@ if (!prompt.includes("handling delivery confirmation was rejected")) {
 let retired = false;
 for (let i = 0; i < 250 && !retired; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
-  retired = existsSync(process.env.FM_RETIRED_FILE);
+  retired = existsSync(process.env.JG_RETIRED_FILE);
 }
 if (!retired) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   throw new Error(`broken arm survived a failed confirmation with a distinct watcher pid: ${rows.join(" | ")}`);
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 const armRows = rows.filter((row) => row.startsWith("arm="));
 if (armRows.length !== 2) throw new Error(`expected one successor arm, got ${armRows.length}: ${rows.join(" | ")}`);
 const watcherPid = rows.find((row) => row.startsWith("refused "))?.split("watcher=")[1];
@@ -1837,7 +1837,7 @@ const armPid = armRows[1].split(" ")[0].slice("arm=".length);
 if (!watcherPid || watcherPid === armPid) {
   throw new Error(`fixture did not use distinct arm and watcher pids: ${rows.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -1866,11 +1866,11 @@ test_pi_confirm_failure_spares_a_newer_arm() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'refused generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 1
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -1879,18 +1879,18 @@ fi
 if [ "$count" -eq 2 ]; then
   sleep 0 & dead=$!; wait "$dead" 2>/dev/null || true
   (
-    while [ ! -e "${FM_GO_FILE:?}" ]; do sleep 0.02; done
+    while [ ! -e "${JG_GO_FILE:?}" ]; do sleep 0.02; done
     printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-stale\n' "$dead"
-    while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.05; done
+    while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.05; done
   ) &
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-newer\n' "$$"
-trap 'printf "retired\n" > "${FM_RETIRED_FILE:?}"; exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+trap 'printf "retired\n" > "${JG_RETIRED_FILE:?}"; exit 0' TERM INT
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_GO_FILE="$go" FM_RETIRED_FILE="$retired" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_GO_FILE="$go" JG_RETIRED_FILE="$retired" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1906,11 +1906,11 @@ const pi = {
     prompt += message;
   },
 };
-const armRows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
+const armRows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
   : [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-confirm-newer-first", {}, undefined, undefined, {});
@@ -1934,17 +1934,17 @@ if (!repair.content[0].text.includes("started Pi extension arm child")) {
 for (let i = 0; i < 250 && armRows().length < 3; i += 1) await sleep(20);
 if (armRows().length !== 3) throw new Error(`expected a newer third arm: ${armRows().join(" | ")}`);
 const newerPid = Number(armRows()[2].slice("arm=".length));
-writeFileSync(process.env.FM_GO_FILE, "go\n");
+writeFileSync(process.env.JG_GO_FILE, "go\n");
 for (let i = 0; i < 250 && !prompt.includes("handling delivery confirmation was rejected"); i += 1) await sleep(20);
 if (!prompt.includes("handling delivery confirmation was rejected")) {
   throw new Error(`the stale successor's confirmation never failed: ${prompt}`);
 }
 await sleep(200);
-if (existsSync(process.env.FM_RETIRED_FILE)) {
+if (existsSync(process.env.JG_RETIRED_FILE)) {
   throw new Error("a failed confirmation for a stale successor retired the newer healthy arm");
 }
 process.kill(newerPid, 0);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -1958,7 +1958,7 @@ EOF
 # shell reports a generation mismatch (status 3), so the wake must be
 # delivered with no rejection appendix, nothing may be retired, and the
 # attempt plus the confirm result must land in the bounded extension log.
-# The log assertions run opted in (FM_WATCH_EXTENSION_LOG_KEEP_LINES=50
+# The log assertions run opted in (JG_WATCH_EXTENSION_LOG_KEEP_LINES=50
 # below); the default-off contract lives in
 # test_pi_extension_log_stays_off_unless_opted_in.
 test_pi_superseded_delivery_has_no_rejection_appendix() {
@@ -1974,11 +1974,11 @@ test_pi_superseded_delivery_has_no_rejection_appendix() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'superseded generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'superseded generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 3
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -1986,10 +1986,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_WATCH_EXTENSION_LOG_KEEP_LINES=50 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_WATCH_EXTENSION_LOG_KEEP_LINES=50 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2005,7 +2005,7 @@ const pi = {
     prompt += message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-handling-superseded", {}, undefined, undefined, {});
@@ -2019,13 +2019,13 @@ if (prompt.includes("handling delivery confirmation was rejected")) {
 if ((prompt.match(/FIRSTMATE WATCHER WAKE/g) || []).length !== 1) {
   throw new Error(`a superseded delivery was not a single plain message: ${prompt}`);
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.filter((row) => row.startsWith("superseded ")).length < 1) {
   throw new Error(`handling-delivered was never attempted: ${rows.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -2056,11 +2056,11 @@ test_pi_superseded_delivery_is_offered_to_branch() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirm generation=%s watcher=%s status=%s\n' "$2" "$4" "${FM_CONFIRM_STATUS:?}" >> "${FM_ARM_LOG:?}"
-  exit "$FM_CONFIRM_STATUS"
+  printf 'confirm generation=%s watcher=%s status=%s\n' "$2" "$4" "${JG_CONFIRM_STATUS:?}" >> "${JG_ARM_LOG:?}"
+  exit "$JG_CONFIRM_STATUS"
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: superseded synthetic wake\n'
@@ -2068,16 +2068,16 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 async function runScenario(confirmStatus) {
-  process.env.FM_CONFIRM_STATUS = String(confirmStatus);
-  writeFileSync(process.env.FM_ARM_LOG, "");
+  process.env.JG_CONFIRM_STATUS = String(confirmStatus);
+  writeFileSync(process.env.JG_ARM_LOG, "");
   const offers = [];
   let mainPrompt = "";
   let tool = null;
@@ -2112,13 +2112,13 @@ async function runScenario(confirmStatus) {
   for (let i = 0; i < 250 && offers.length === 0 && mainPrompt === ""; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+  const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
   return { offers, mainPrompt, rows };
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/superseded-branch.meta`, "project=/projects/approved\nwindow=jg-superseded-branch\n");
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\tsuperseded-branch.status\tsignal: superseded synthetic wake\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/superseded-branch.meta`, "project=/projects/approved\nwindow=jg-superseded-branch\n");
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\tsignal\tsuperseded-branch.status\tsignal: superseded synthetic wake\n");
 for (const confirmStatus of [0, 3]) {
   const result = await runScenario(confirmStatus);
   if (!result.rows.some((row) => row.startsWith("confirm ") && row.endsWith(`status=${confirmStatus}`))) {
@@ -2137,7 +2137,7 @@ for (const confirmStatus of [0, 3]) {
     throw new Error(`confirm status ${confirmStatus}: accepted offer still reached main: ${result.mainPrompt}`);
   }
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -2162,11 +2162,11 @@ test_pi_extension_log_stays_off_unless_opted_in() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'superseded generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'superseded generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 3
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -2174,7 +2174,7 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
   cat > "$driver" <<'EOF'
@@ -2193,7 +2193,7 @@ const pi = {
     prompt += message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-handling-superseded", {}, undefined, undefined, {});
@@ -2207,13 +2207,13 @@ if (prompt.includes("handling delivery confirmation was rejected")) {
 if ((prompt.match(/FIRSTMATE WATCHER WAKE/g) || []).length !== 1) {
   throw new Error(`a superseded delivery was not a single plain message: ${prompt}`);
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.filter((row) => row.startsWith("superseded ")).length < 1) {
   throw new Error(`handling-delivered was never attempted: ${rows.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   for mode in unset zero bogus; do
@@ -2223,10 +2223,10 @@ EOF
     extension_log="$home/state/.watch-extension.log"
     mkdir -p "$home/state" "$home/config"
     if [ "$mode" = unset ]; then
-      out=$(PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node "$driver" 2>&1)
+      out=$(PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node "$driver" 2>&1)
     else
       if [ "$mode" = zero ]; then knob_value=0; else knob_value="not-a-number"; fi
-      out=$(PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_WATCH_EXTENSION_LOG_KEEP_LINES="$knob_value" node "$driver" 2>&1)
+      out=$(PLUGIN="$repo/.pi/extensions/jg-primary-pi-watch.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_WATCH_EXTENSION_LOG_KEEP_LINES="$knob_value" node "$driver" 2>&1)
     fi
     status=$?
     expect_code 0 "$status" "Pi superseded delivery must still succeed with the log $mode: $out"
@@ -2258,19 +2258,19 @@ SH
   chmod +x "$holder"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
-  ("${FM_HOLDER:?}" "${FM_STOP_FILE:?}" >&1 2>/dev/null &)
+  ("${JG_HOLDER:?}" "${JG_STOP_FILE:?}" >&1 2>/dev/null &)
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_HOLDER="$holder" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_HOLDER="$holder" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2283,15 +2283,15 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 const first = await tool.execute("tool-call-first-arm", {}, undefined, undefined, {});
 if (!first.content[0].text.includes("started Pi extension arm child")) {
   throw new Error(`first arm did not start: ${first.content[0].text}`);
 }
-const armRows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const armRows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 let armPid = "";
 for (let i = 0; i < 250 && !armPid; i += 1) {
@@ -2326,7 +2326,7 @@ for (let i = 0; i < 250 && !rearmed; i += 1) {
 if (!rearmed) {
   throw new Error(`repair started no second arm: ${armRows().join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -2353,22 +2353,22 @@ test_pi_scheduled_retry_starts_fresh_arm_over_dead_child() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 if [ "$count" -eq 1 ]; then
-  (while [ ! -e "${FM_RELEASE_FILE:?}" ]; do sleep 0.02; done) &
+  (while [ ! -e "${JG_RELEASE_FILE:?}" ]; do sleep 0.02; done) &
   exit 0
 fi
 if [ "$count" -eq 2 ]; then
-  (while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.05; done) &
+  (while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.05; done) &
   exit 0
 fi
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_RELEASE_FILE="$release" FM_WATCH_REARM_RETRY_BASE_MS=20 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_RELEASE_FILE="$release" JG_WATCH_REARM_RETRY_BASE_MS=20 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2381,8 +2381,8 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-const armRows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
+const armRows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
   : [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function waitForArms(count) {
@@ -2401,7 +2401,7 @@ async function waitForExit(pid) {
   }
   throw new Error(`arm pid ${pid} never exited`);
 }
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-retry-dead-first", {}, undefined, undefined, {});
@@ -2411,12 +2411,12 @@ if (!repair.content[0].text.includes("started Pi extension arm child")) {
   throw new Error(`repair did not start a second arm: ${repair.content[0].text}`);
 }
 await waitForExit(await waitForArms(2));
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 for (let i = 0; i < 250 && armRows().length < 3; i += 1) await sleep(20);
 if (armRows().length !== 3) {
   throw new Error(`the first arm's close scheduled no retry over the dead second arm: ${armRows().join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -2445,8 +2445,8 @@ test_pi_deferred_close_starts_fresh_arm_over_dead_child() {
 if [ "${1:-}" = --handling-delivered ]; then
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic actionable close\n'
@@ -2454,19 +2454,19 @@ if [ "$count" -eq 1 ]; then
 fi
 if [ "$count" -eq 2 ]; then
   printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
-  while [ ! -e "${FM_RELEASE_FILE:?}" ]; do sleep 0.02; done
+  while [ ! -e "${JG_RELEASE_FILE:?}" ]; do sleep 0.02; done
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 if [ "$count" -eq 3 ]; then
-  (while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.05; done) &
+  (while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.05; done) &
   exit 0
 fi
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_RELEASE_FILE="$release" FM_WATCH_REARM_RETRY_BASE_MS=20 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_RELEASE_FILE="$release" JG_WATCH_REARM_RETRY_BASE_MS=20 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2487,8 +2487,8 @@ const pi = {
     await deliveryHeld;
   },
 };
-const armRows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
+const armRows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm="))
   : [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function waitForArms(count) {
@@ -2507,14 +2507,14 @@ async function waitForExit(pid) {
   }
   throw new Error(`arm pid ${pid} never exited`);
 }
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-deferred-dead-first", {}, undefined, undefined, {});
 const successorPid = await waitForArms(2);
 for (let i = 0; i < 250 && !deliveryStarted; i += 1) await sleep(20);
 if (!deliveryStarted) throw new Error("the restored wake was never delivered");
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 await waitForExit(successorPid);
 await sleep(100);
 const repair = await tool.execute("tool-call-deferred-dead-repair", {}, undefined, undefined, {});
@@ -2527,7 +2527,7 @@ for (let i = 0; i < 250 && armRows().length < 4; i += 1) await sleep(20);
 if (armRows().length !== 4) {
   throw new Error(`the deferred close started no retry over the dead repair arm: ${armRows().join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -2547,8 +2547,8 @@ test_pi_hung_successor_falls_back_to_typed_wake() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic wake\n'
@@ -2558,7 +2558,7 @@ trap 'exit 0' TERM INT
 while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2573,12 +2573,12 @@ const pi = {
   },
   sendUserMessage: async (message) => {
     prompt += message;
-    rowsAtPrompt = existsSync(process.env.FM_ARM_LOG)
-      ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").length
+    rowsAtPrompt = existsSync(process.env.JG_ARM_LOG)
+      ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").length
       : 0;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-hung-successor", {}, undefined, undefined, {});
@@ -2587,15 +2587,15 @@ await tool.execute("tool-call-hung-successor", {}, undefined, undefined, {});
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 4) throw new Error(`expected one successor plus two retries, got ${rows.length}: ${rows.join(" | ")}`);
 if (rowsAtPrompt !== 4) throw new Error(`wake arrived before restoration exhausted (${rowsAtPrompt} arm rows)`);
 if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
 if (!prompt.includes("could not restore watcher continuity after 2 retries")) throw new Error(`missing typed restoration failure: ${prompt}`);
 await new Promise((resolve) => setTimeout(resolve, 100));
-const stableRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const stableRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (stableRows.length !== 4) throw new Error(`single-flight recovery launched ${stableRows.length} arms`);
 EOF
 )
@@ -2616,23 +2616,23 @@ test_pi_unretired_successor_falls_back_without_retry() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_ARM_LOG" ]; then
-  count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ -f "$JG_ARM_LOG" ]; then
+  count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 else
   count=0
 fi
 if [ "$count" -eq 0 ]; then
-  printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+  printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic wake\n'
   exit 0
 fi
 trap '' TERM INT
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.1; done
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.1; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_RELEASE_FILE="$release" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=20 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_RELEASE_FILE="$release" JG_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=20 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2647,26 +2647,26 @@ const pi = {
   },
   sendUserMessage: async (message) => {
     prompt += message;
-    rowsAtPrompt = existsSync(process.env.FM_ARM_LOG)
-      ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").length
+    rowsAtPrompt = existsSync(process.env.JG_ARM_LOG)
+      ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").length
       : 0;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-unretired-successor", {}, undefined, undefined, {});
 for (let i = 0; i < 500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 2) throw new Error(`unretired arm overlapped a retry: ${rows.join(" | ")}`);
 if (rowsAtPrompt !== 2) throw new Error(`wake arrived after an overlapping retry (${rowsAtPrompt} arm rows)`);
 if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
 if (!prompt.includes("unready successor arm did not exit within 20ms")) throw new Error(`missing unretired-arm failure: ${prompt}`);
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
@@ -2691,26 +2691,26 @@ test_pi_late_unretired_close_resumes_supervision() {
     plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
     cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: original wake\n'
   exit 0
 fi
 if [ "$count" -eq 2 ]; then
-  trap 'printf "retired\\n" > "${FM_UNRETIRED_RETIRE_FILE:?}"' TERM INT
-  printf 'ready\n' > "${FM_UNRETIRED_READY_FILE:?}"
-  while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
-  [ "$FM_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
+  trap 'printf "retired\\n" > "${JG_UNRETIRED_RETIRE_FILE:?}"' TERM INT
+  printf 'ready\n' > "${JG_UNRETIRED_READY_FILE:?}"
+  while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.02; done
+  [ "$JG_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
     chmod +x "$repo/bin/jg-watch-arm.sh"
-    out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_UNRETIRED_READY_FILE="$ready" FM_UNRETIRED_RETIRE_FILE="$retired" FM_RELEASE_FILE="$release" FM_STOP_FILE="$stop" FM_LATE_KIND="$kind" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=20 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+    out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_UNRETIRED_READY_FILE="$ready" JG_UNRETIRED_RETIRE_FILE="$retired" JG_RELEASE_FILE="$release" JG_STOP_FILE="$stop" JG_LATE_KIND="$kind" JG_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=20 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2730,8 +2730,8 @@ const pi = {
     prompts.push(message);
   },
 };
-const rows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 async function waitFor(predicate, message) {
   for (let i = 0; i < 500; i += 1) {
@@ -2740,33 +2740,33 @@ async function waitFor(predicate, message) {
   }
   throw new Error(message);
 }
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-late-close", {}, undefined, undefined, {});
 await waitFor(
-  () => existsSync(process.env.FM_UNRETIRED_READY_FILE),
+  () => existsSync(process.env.JG_UNRETIRED_READY_FILE),
   "unretired successor did not enter its retirement wait",
 );
 await waitFor(() => prompts.length >= 1, "original fallback was not delivered");
 await waitFor(
-  () => existsSync(process.env.FM_UNRETIRED_RETIRE_FILE),
+  () => existsSync(process.env.JG_UNRETIRED_RETIRE_FILE),
   "unretired successor was not asked to retire before fallback",
 );
 if (rows().length !== 2) throw new Error(`unretired arm overlapped before fallback: ${rows().join(" | ")}`);
 if (!prompts[0]?.includes("original wake")) throw new Error(`missing original fallback: ${prompts.join(" | ")}`);
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 for (let i = 0; i < 500; i += 1) {
-  if (rows().length >= 3 && (process.env.FM_LATE_KIND !== "actionable" || prompts.some((message) => message.includes("late wake")))) break;
+  if (rows().length >= 3 && (process.env.JG_LATE_KIND !== "actionable" || prompts.some((message) => message.includes("late wake")))) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
 if (rows().length !== 3) throw new Error(`late close did not restore one successor: ${rows().join(" | ")}`);
-if (process.env.FM_LATE_KIND === "actionable") {
+if (process.env.JG_LATE_KIND === "actionable") {
   if (prompts.length !== 2 || !prompts[1].includes("late wake")) throw new Error(`late actionable close was not delivered: ${prompts.join(" | ")}`);
 } else if (prompts.length !== 1) {
   throw new Error(`late non-actionable close sent an extra wake: ${prompts.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
@@ -2788,15 +2788,15 @@ test_pi_empty_close_retries_instead_of_disappearing() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then exit 0; fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2812,21 +2812,21 @@ const pi = {
     prompts += 1;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-empty", {}, undefined, undefined, {});
 for (let i = 0; i < 250; i += 1) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   if (rows.length >= 2) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.length !== 2) throw new Error(`clean empty close was ignored: ${rows.join(" | ")}`);
 if (prompts !== 0) throw new Error(`restored transient close surfaced ${prompts} failure prompts`);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
   )
@@ -2846,12 +2846,12 @@ test_pi_established_empty_close_honors_retry_limit() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 exit 0
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -2867,15 +2867,15 @@ const pi = {
     prompt += message;
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-established-empty", {}, undefined, undefined, {});
 for (let i = 0; i < 250 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 3) throw new Error(`retry limit launched ${rows.length} arm cycles: ${rows.join(" | ")}`);
 if (!prompt.includes("after 2 retries")) throw new Error(`retry exhaustion was not surfaced: ${prompt}`);
@@ -2898,12 +2898,12 @@ test_pi_actionable_close_rechecks_session_lock() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.02; done
 printf 'signal: lock handoff\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_RELEASE_FILE="$release" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_RELEASE_FILE="$release" node --input-type=module 2>&1 <<'EOF'
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -2920,7 +2920,7 @@ const pi = {
     prompt += message;
   },
 };
-const lock = `${process.env.FM_HOME}/state/.lock`;
+const lock = `${process.env.JG_HOME}/state/.lock`;
 writeFileSync(lock, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
@@ -2928,11 +2928,11 @@ await tool.execute("tool-call-lock-close", {}, undefined, undefined, {});
 const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
 try {
   writeFileSync(lock, `${other.pid}\n`);
-  writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+  writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
   for (let i = 0; i < 250 && !prompt.includes("no longer owns the lock"); i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+  const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
   if (rows.length !== 1) throw new Error(`successor launched after lock loss: ${rows.join(" | ")}`);
   if (!prompt.includes("no longer owns the lock")) throw new Error(`missing lock-loss failure: ${prompt}`);
 } finally {
@@ -2956,10 +2956,10 @@ test_pi_arm_distinguishes_session_lock_ownership() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -2977,7 +2977,7 @@ const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!tool) throw new Error("Pi watch tool was not registered");
 
-const lock = `${process.env.FM_HOME}/state/.lock`;
+const lock = `${process.env.JG_HOME}/state/.lock`;
 const callArm = () => tool.execute("tool-call-lock", {}, undefined, undefined, {});
 const assertMissingLock = (result, label) => {
   if (result.details?.ok !== false) throw new Error(`${label} unexpectedly armed: ${JSON.stringify(result.details)}`);
@@ -3009,16 +3009,16 @@ try {
   other.kill("SIGTERM");
 }
 
-if (existsSync(process.env.FM_ARM_LOG)) throw new Error("watcher arm ran without lock ownership");
+if (existsSync(process.env.JG_ARM_LOG)) throw new Error("watcher arm ran without lock ownership");
 writeFileSync(lock, `${process.pid}\n`);
 const owned = await callArm();
 if (owned.details?.ok !== true || !owned.details.message.includes("started Pi extension arm child")) {
   throw new Error(`owned lock did not arm: ${JSON.stringify(owned.details)}`);
 }
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) throw new Error("owned lock did not run the watcher arm");
+if (!existsSync(process.env.JG_ARM_LOG)) throw new Error("owned lock did not run the watcher arm");
 EOF
 )
   status=$?
@@ -3043,29 +3043,29 @@ test_pi_session_transition_generation_owner() {
 #!/usr/bin/env bash
 # Model the real --restart arm taking over from the still-live replacement
 # predecessor only after this successor process has been committed.
-previous=$(cat "${FM_CHILD_PID_FILE:?}" 2>/dev/null || true)
+previous=$(cat "${JG_CHILD_PID_FILE:?}" 2>/dev/null || true)
 if [ -n "$previous" ] && kill -0 "$previous" 2>/dev/null; then
   kill -TERM "$previous" 2>/dev/null || true
 fi
-if [ -f "${FM_FAIL_ONCE:?}" ]; then
-  rm -f "$FM_FAIL_ONCE"
-  printf 'failed-replacement-attempt\n' >> "${FM_ARM_LOG:?}"
+if [ -f "${JG_FAIL_ONCE:?}" ]; then
+  rm -f "$JG_FAIL_ONCE"
+  printf 'failed-replacement-attempt\n' >> "${JG_ARM_LOG:?}"
   printf 'watcher: FAILED - simulated replacement launch failure\n' >&2
   exit 7
 fi
 # The marker identifies this exact process lifetime after its PID is recycled.
-marker=$(mktemp "${FM_MARKER_ROOT:?}/arm.XXXXXX") || exit 1
+marker=$(mktemp "${JG_MARKER_ROOT:?}/arm.XXXXXX") || exit 1
 cleanup() { rm -f "$marker"; }
 trap cleanup EXIT
 trap 'exit 0' TERM INT
 printf 'watcher: started pid=%s\n' "$$"
-printf '%s\n' "$$" > "${FM_CHILD_PID_FILE:?}"
-printf '%s\n' "$marker" > "${FM_CHILD_MARKER_FILE:?}"
-printf 'arm pid=%s marker=%s\n' "$$" "$marker" >> "${FM_ARM_LOG:?}"
+printf '%s\n' "$$" > "${JG_CHILD_PID_FILE:?}"
+printf '%s\n' "$marker" > "${JG_CHILD_MARKER_FILE:?}"
+printf 'arm pid=%s marker=%s\n' "$$" "$marker" >> "${JG_ARM_LOG:?}"
 while :; do sleep 0.2; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_CHILD_PID_FILE="$child_pid_file" FM_CHILD_MARKER_FILE="$child_marker_file" FM_MARKER_ROOT="$marker_root" FM_ARM_LOG="$arm_log" FM_FAIL_ONCE="$fail_once" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_CHILD_PID_FILE="$child_pid_file" JG_CHILD_MARKER_FILE="$child_marker_file" JG_MARKER_ROOT="$marker_root" JG_ARM_LOG="$arm_log" JG_FAIL_ONCE="$fail_once" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3106,8 +3106,8 @@ async function waitFor(pred, label, attempts = 250) {
 function currentArm() {
   try {
     return {
-      pid: readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim(),
-      marker: readFileSync(process.env.FM_CHILD_MARKER_FILE, "utf8").trim(),
+      pid: readFileSync(process.env.JG_CHILD_PID_FILE, "utf8").trim(),
+      marker: readFileSync(process.env.JG_CHILD_MARKER_FILE, "utf8").trim(),
     };
   } catch {
     return { pid: "", marker: "" };
@@ -3115,7 +3115,7 @@ function currentArm() {
 }
 
 function extensionOwner() {
-  const path = `${process.env.FM_HOME}/state/.pi-watch-extension-loaded`;
+  const path = `${process.env.JG_HOME}/state/.pi-watch-extension-loaded`;
   try {
     return readFileSync(path, "utf8").trim().split("\n")[2] ?? "";
   } catch {
@@ -3124,8 +3124,8 @@ function extensionOwner() {
 }
 
 function liveArmPids() {
-  if (!existsSync(process.env.FM_ARM_LOG)) return [];
-  return readFileSync(process.env.FM_ARM_LOG, "utf8")
+  if (!existsSync(process.env.JG_ARM_LOG)) return [];
+  return readFileSync(process.env.JG_ARM_LOG, "utf8")
     .trim()
     .split(/\n/)
     .filter(Boolean)
@@ -3144,7 +3144,7 @@ mod.default(startup.pi);
 if (!/^generation=[1-9][0-9]* phase=active$/.test(extensionOwner())) {
   throw new Error(`extension bind did not publish its pre-lock active generation: ${extensionOwner()}`);
 }
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await startup.handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, {});
 await waitFor(() => {
   const arm = currentArm();
@@ -3204,9 +3204,9 @@ current = await replaceSession(current, "reload");
 
 // A replacement that kills the predecessor but fails before watcher readiness
 // remains generation-owned and reaches its bounded automatic retry.
-writeFileSync(process.env.FM_FAIL_ONCE, "fail once\n");
+writeFileSync(process.env.JG_FAIL_ONCE, "fail once\n");
 current = await replaceSession(current, "resume");
-if (!readFileSync(process.env.FM_ARM_LOG, "utf8").includes("failed-replacement-attempt")) {
+if (!readFileSync(process.env.JG_ARM_LOG, "utf8").includes("failed-replacement-attempt")) {
   throw new Error("replacement launch failure did not exercise automatic retry");
 }
 
@@ -3249,7 +3249,7 @@ if (!pidAlive(activeChild)) throw new Error("active generation child died after 
 if (existsSync(startupMarker)) throw new Error("startup generation child was resurrected");
 // Model the old generation PID being recycled for the active child.
 // Its retired lifetime marker must keep the historical row from counting live.
-writeFileSync(process.env.FM_ARM_LOG, `arm pid=${activeChild} marker=${startupMarker}\n`, { flag: "a" });
+writeFileSync(process.env.JG_ARM_LOG, `arm pid=${activeChild} marker=${startupMarker}\n`, { flag: "a" });
 if (liveArmPids().length !== 1 || liveArmPids()[0] !== activeChild) {
   throw new Error(`stale callback mutated live arm set: ${liveArmPids().join(",")}`);
 }
@@ -3297,30 +3297,30 @@ test_pi_session_replacement_carries_inflight_actionable_close() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-marker=$(mktemp "${FM_MARKER_ROOT:?}/arm.XXXXXX") || exit 1
+marker=$(mktemp "${JG_MARKER_ROOT:?}/arm.XXXXXX") || exit 1
 cleanup() { rm -f "$marker"; }
 trap cleanup EXIT
 trap 'exit 0' TERM INT
-printf 'arm pid=%s marker=%s\n' "$$" "$marker" >> "${FM_ARM_LOG:?}"
+printf 'arm pid=%s marker=%s\n' "$$" "$marker" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=replacement-fixture\n' "$$"
 while :; do
-  if [ -e "$FM_TRIGGER_FILE" ]; then
-    outcome=$(cat "$FM_TRIGGER_FILE")
-    rm -f "$FM_TRIGGER_FILE"
+  if [ -e "$JG_TRIGGER_FILE" ]; then
+    outcome=$(cat "$JG_TRIGGER_FILE")
+    rm -f "$JG_TRIGGER_FILE"
     printf 'signal: '
     sleep 0.02
     printf '%s\n' "$outcome"
     exit 0
   fi
-  [ ! -e "$FM_STOP_FILE" ] || exit 0
+  [ ! -e "$JG_STOP_FILE" ] || exit 0
   sleep 0.02
 done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_MARKER_ROOT="$marker_root" FM_TRIGGER_FILE="$trigger" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_MARKER_ROOT="$marker_root" JG_TRIGGER_FILE="$trigger" JG_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3372,8 +3372,8 @@ function pidAlive(pid) {
 }
 
 function armRows() {
-  if (!existsSync(process.env.FM_ARM_LOG)) return [];
-  return readFileSync(process.env.FM_ARM_LOG, "utf8")
+  if (!existsSync(process.env.JG_ARM_LOG)) return [];
+  return readFileSync(process.env.JG_ARM_LOG, "utf8")
     .trim()
     .split(/\n/)
     .filter((row) => row.startsWith("arm "))
@@ -3395,9 +3395,9 @@ async function waitFor(pred, label, attempts = 500) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/replacement-race.meta`, "project=/projects/replacement-race\nwindow=jg-replacement-race\n");
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\treplacement-race.status\tsignal: replacement-race actionable outcome\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/replacement-race.meta`, "project=/projects/replacement-race\nwindow=jg-replacement-race\n");
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\tsignal\treplacement-race.status\tsignal: replacement-race actionable outcome\n");
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 const previous = makePi(true);
 mod.default(previous.pi);
@@ -3407,13 +3407,13 @@ if (!initial.details?.ok || !String(initial.details.message).includes("started P
 }
 await waitFor(() => liveArms().length === 1, "initial live arm");
 
-writeFileSync(process.env.FM_TRIGGER_FILE, "replacement-race actionable outcome\n");
+writeFileSync(process.env.JG_TRIGGER_FILE, "replacement-race actionable outcome\n");
 await waitFor(() => oldDeliveryStarted, "old-session accepted branch delivery");
 if (previous.prompts.length !== 0) {
   throw new Error(`accepted old-session branch wake reached main: ${previous.prompts.join(" | ")}`);
 }
 await waitFor(() => liveArms().length === 1 && armRows().length >= 2, "old-session successor");
-writeFileSync(process.env.FM_TRIGGER_FILE, "replacement-successor actionable outcome\n");
+writeFileSync(process.env.JG_TRIGGER_FILE, "replacement-successor actionable outcome\n");
 await waitFor(() => liveArms().length === 0, "mid-delivery successor actionable close");
 
 await previous.handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
@@ -3433,7 +3433,7 @@ if (replacement.prompts.some((message) => message.includes("signal: replacement-
   throw new Error(`replacement raced the accepted old-session delivery: ${replacement.prompts.join(" | ")}`);
 }
 writeFileSync(
-  `${process.env.FM_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`,
+  `${process.env.JG_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`,
   "{malformed handoff\n",
 );
 releaseOldDelivery();
@@ -3465,7 +3465,7 @@ await new Promise((resolve) => setTimeout(resolve, 100));
 if (liveArms().length !== 1) {
   throw new Error(`old delivery completion disturbed replacement ownership: ${JSON.stringify(liveArms())}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -3488,8 +3488,8 @@ test_pi_streaming_followup_is_replayed_after_replacement() {
 trap 'exit 0' TERM INT
 printf 'watcher: started pid=%s\n' "$$"
 while :; do
-  if [ -e "$FM_TRIGGER_FILE" ]; then
-    rm -f "$FM_TRIGGER_FILE"
+  if [ -e "$JG_TRIGGER_FILE" ]; then
+    rm -f "$JG_TRIGGER_FILE"
     printf 'signal: streaming queued actionable outcome\n'
     exit 0
   fi
@@ -3497,7 +3497,7 @@ while :; do
 done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_TRIGGER_FILE="$trigger" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_TRIGGER_FILE="$trigger" node --input-type=module 2>&1 <<'EOF'
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3529,13 +3529,13 @@ async function waitFor(pred, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const originalMod = await import(pathToFileURL(process.env.PLUGIN).href);
 const original = makePi();
 originalMod.default(original.pi);
 await original.handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, {});
 original.handlers.get("agent_start")?.({}, {});
-writeFileSync(process.env.FM_TRIGGER_FILE, "trigger\n");
+writeFileSync(process.env.JG_TRIGGER_FILE, "trigger\n");
 await waitFor(
   () => original.prompts.some((message) => message.includes("signal: streaming queued actionable outcome")),
   "old-session queued follow-up",
@@ -3559,10 +3559,10 @@ const finalMod = await import(`${pathToFileURL(process.env.PLUGIN).href}?replace
 const finalSession = makePi();
 finalMod.default(finalSession.pi);
 const { unlinkSync } = await import("node:fs");
-unlinkSync(`${process.env.FM_HOME}/state/.lock`);
+unlinkSync(`${process.env.JG_HOME}/state/.lock`);
 await finalSession.handlers.get("session_start")?.({ type: "session_start", reason: "new" }, {});
 if (finalSession.prompts.length !== 0) throw new Error("lockless replacement adopted its handoff early");
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const reclaimed = await finalSession.getTool().execute("reclaimed-arm", {}, undefined, undefined, {});
 if (!reclaimed.details?.ok) throw new Error(`reclaimed arm failed: ${JSON.stringify(reclaimed.details)}`);
 await waitFor(
@@ -3599,19 +3599,19 @@ test_pi_streaming_time_delivery_keeps_the_successor_chain() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed=%s\n' "$2" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed=%s\n' "$2" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=chain-%s\n' "$$" "$count"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_TRIGGER_FILE.$count" ]; do sleep 0.02; done
+while [ ! -e "$JG_TRIGGER_FILE.$count" ]; do sleep 0.02; done
 printf 'signal: streaming chain wake %s\n' "$count"
 exit 0
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_TRIGGER_FILE="$trigger" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_TRIGGER_FILE="$trigger" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3639,8 +3639,8 @@ const pi = {
 // The running run reaching a queued follow-up: Pi emits the user message.
 const consumeQueued = (message) =>
   handlers.get("message_start")?.({ message: { role: "user", content: [{ type: "text", text: message }] } }, {});
-const arms = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").split("\n").filter((row) => row.startsWith("arm=")).length
+const arms = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").split("\n").filter((row) => row.startsWith("arm=")).length
   : 0;
 async function waitFor(pred, label) {
   for (let i = 0; i < 500; i += 1) {
@@ -3651,17 +3651,17 @@ async function waitFor(pred, label) {
 }
 const wakes = (text) => prompts.filter((message) => message.includes(text)).length;
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, {});
 await waitFor(() => arms() === 1, "first arm");
 streaming = true;
-writeFileSync(`${process.env.FM_TRIGGER_FILE}.1`, "close\n");
+writeFileSync(`${process.env.JG_TRIGGER_FILE}.1`, "close\n");
 await waitFor(() => prompts.length === 1, "first wake delivered while main streams");
 if (wakes("signal: streaming chain wake 1") !== 1) throw new Error(`wrong first wake: ${prompts.join(" | ")}`);
 await waitFor(() => arms() === 2, "successor after the streaming-time delivery");
-writeFileSync(`${process.env.FM_TRIGGER_FILE}.2`, "close\n");
+writeFileSync(`${process.env.JG_TRIGGER_FILE}.2`, "close\n");
 await waitFor(() => prompts.length === 2, "second wake delivered while main still streams");
 if (wakes("signal: streaming chain wake 2") !== 1) throw new Error(`wrong second wake: ${prompts.join(" | ")}`);
 await waitFor(() => arms() === 3, "successor after the second streaming-time delivery");
@@ -3671,7 +3671,7 @@ if (beforeAgentStarts !== 0) throw new Error(`streaming follow-ups raised before
 // the captain replaces the session, so only the second rides the handoff.
 consumeQueued(prompts[0]);
 await handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
-const handoffPath = `${process.env.FM_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`;
+const handoffPath = `${process.env.JG_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`;
 const handoff = JSON.parse(readFileSync(handoffPath, "utf8"));
 if (handoff.pending.length !== 1 || handoff.pending[0].delivered || !handoff.pending[0].message.includes("signal: streaming chain wake 2")) {
   throw new Error(`replacement handoff did not carry exactly the unconsumed wake: ${JSON.stringify(handoff)}`);
@@ -3712,8 +3712,8 @@ test_pi_successor_failure_during_delivery_is_retried_after_delivery() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 if [ "$count" -eq 1 ]; then
   printf 'signal: wake before the successor dies\n'
@@ -3725,10 +3725,10 @@ if [ "$count" -eq 2 ]; then
   exit 3
 fi
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3757,8 +3757,8 @@ const pi = {
     },
   },
 };
-const arms = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").split("\n").filter((row) => row.startsWith("arm=")).length
+const arms = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").split("\n").filter((row) => row.startsWith("arm=")).length
   : 0;
 async function waitFor(pred, label) {
   for (let i = 0; i < 500; i += 1) {
@@ -3768,9 +3768,9 @@ async function waitFor(pred, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-writeFileSync(`${process.env.FM_HOME}/state/mid-delivery.meta`, "project=/projects/mid-delivery\nwindow=jg-mid-delivery\n");
-writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\tmid-delivery.status\tsignal: wake before the successor dies\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/mid-delivery.meta`, "project=/projects/mid-delivery\nwindow=jg-mid-delivery\n");
+writeFileSync(`${process.env.JG_HOME}/state/.wake-queue`, "1\t1\tsignal\tmid-delivery.status\tsignal: wake before the successor dies\n");
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("initial-arm", {}, undefined, undefined, {});
@@ -3784,7 +3784,7 @@ await waitFor(() => arms() === 3, "a retry watcher after the delivery settled");
 await new Promise((resolve) => setTimeout(resolve, 150));
 if (arms() !== 3) throw new Error(`the deferred retry was not single-flight: ${arms()} arms`);
 if (prompts.length !== 0) throw new Error(`a bounded retry surfaced a failure prompt: ${prompts.join(" | ")}`);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 process.exit(0);
 EOF
 )
@@ -3805,11 +3805,11 @@ test_pi_late_retiring_actionable_reaches_replacement() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 count=0
-[ ! -f "$FM_ARM_COUNT" ] || count=$(cat "$FM_ARM_COUNT")
+[ ! -f "$JG_ARM_COUNT" ] || count=$(cat "$JG_ARM_COUNT")
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_ARM_COUNT"
-previous=$(cat "$FM_ARM_COUNT.pid" 2>/dev/null || true)
-printf '%s\n' "$$" > "$FM_ARM_COUNT.pid"
+printf '%s\n' "$count" > "$JG_ARM_COUNT"
+previous=$(cat "$JG_ARM_COUNT.pid" 2>/dev/null || true)
+printf '%s\n' "$$" > "$JG_ARM_COUNT.pid"
 [ -z "$previous" ] || kill -TERM "$previous" 2>/dev/null || true
 late_close() {
   sleep 0.15
@@ -3821,7 +3821,7 @@ printf 'watcher: started pid=%s\n' "$$"
 while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_COUNT="$count" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=20 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_COUNT="$count" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=20 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3853,20 +3853,20 @@ async function waitFor(pred, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const originalMod = await import(pathToFileURL(process.env.PLUGIN).href);
 const original = makePi();
 originalMod.default(original.pi);
 const armed = await original.getTool().execute("initial-arm", {}, undefined, undefined, {});
 if (!armed.details?.ok) throw new Error(`initial arm failed: ${JSON.stringify(armed.details)}`);
-await waitFor(() => existsSync(process.env.FM_ARM_COUNT) && readFileSync(process.env.FM_ARM_COUNT, "utf8").trim() === "1", "original arm");
+await waitFor(() => existsSync(process.env.JG_ARM_COUNT) && readFileSync(process.env.JG_ARM_COUNT, "utf8").trim() === "1", "original arm");
 await original.handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
-writeFileSync(`${process.env.FM_HOME}/state/extensions`, "block late handoff publication\n");
-const foreignState = `${process.env.FM_HOME}/foreign-state`;
+writeFileSync(`${process.env.JG_HOME}/state/extensions`, "block late handoff publication\n");
+const foreignState = `${process.env.JG_HOME}/foreign-state`;
 const { mkdirSync } = await import("node:fs");
 mkdirSync(foreignState, { recursive: true });
 writeFileSync(`${foreignState}/.lock`, `${process.pid}\n`);
-process.env.FM_STATE_OVERRIDE = foreignState;
+process.env.JG_STATE_OVERRIDE = foreignState;
 const foreignMod = await import(`${pathToFileURL(process.env.PLUGIN).href}?replacement=foreign-state`);
 const foreign = makePi();
 foreignMod.default(foreign.pi);
@@ -3876,7 +3876,7 @@ if (foreign.prompts.some((message) => message.includes("signal: late retiring ac
   throw new Error(`late old-state outcome crossed into foreign state: ${foreign.prompts.join(" | ")}`);
 }
 await foreign.handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "quit" }, {});
-delete process.env.FM_STATE_OVERRIDE;
+delete process.env.JG_STATE_OVERRIDE;
 
 const replacementMod = await import(`${pathToFileURL(process.env.PLUGIN).href}?replacement=late-retiring-close`);
 const replacement = makePi();
@@ -3913,11 +3913,11 @@ test_pi_replacement_tokens_are_process_unique() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 count=0
-[ ! -f "$FM_ARM_COUNT" ] || count=$(cat "$FM_ARM_COUNT")
+[ ! -f "$JG_ARM_COUNT" ] || count=$(cat "$JG_ARM_COUNT")
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_ARM_COUNT"
-previous=$(cat "$FM_ARM_COUNT.pid" 2>/dev/null || true)
-printf '%s\n' "$$" > "$FM_ARM_COUNT.pid"
+printf '%s\n' "$count" > "$JG_ARM_COUNT"
+previous=$(cat "$JG_ARM_COUNT.pid" 2>/dev/null || true)
+printf '%s\n' "$$" > "$JG_ARM_COUNT.pid"
 [ -z "$previous" ] || kill -TERM "$previous" 2>/dev/null || true
 late_close() {
   sleep 0.08
@@ -3929,7 +3929,7 @@ printf 'watcher: started pid=%s\n' "$$"
 while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_COUNT="$count" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=10 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_COUNT="$count" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=10 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3960,7 +3960,7 @@ async function waitFor(pred, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 for (let moduleIndex = 1; moduleIndex <= 2; moduleIndex += 1) {
   const mod = await import(`${pathToFileURL(process.env.PLUGIN).href}?token-module=${moduleIndex}`);
   const instance = makePi();
@@ -3968,7 +3968,7 @@ for (let moduleIndex = 1; moduleIndex <= 2; moduleIndex += 1) {
   const armed = await instance.getTool().execute(`arm-${moduleIndex}`, {}, undefined, undefined, {});
   if (!armed.details?.ok) throw new Error(`module ${moduleIndex} arm failed: ${JSON.stringify(armed.details)}`);
   await waitFor(
-    () => existsSync(process.env.FM_ARM_COUNT) && Number(readFileSync(process.env.FM_ARM_COUNT, "utf8").trim()) >= moduleIndex,
+    () => existsSync(process.env.JG_ARM_COUNT) && Number(readFileSync(process.env.JG_ARM_COUNT, "utf8").trim()) >= moduleIndex,
     `module ${moduleIndex} arm`,
   );
   await instance.handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
@@ -3982,10 +3982,10 @@ collectorMod.default(collector.pi);
 const collectorArm = await collector.getTool().execute("arm-collector", {}, undefined, undefined, {});
 if (!collectorArm.details?.ok) throw new Error(`collector arm failed: ${JSON.stringify(collectorArm.details)}`);
 await waitFor(
-  () => existsSync(process.env.FM_ARM_COUNT) && Number(readFileSync(process.env.FM_ARM_COUNT, "utf8").trim()) >= 3,
+  () => existsSync(process.env.JG_ARM_COUNT) && Number(readFileSync(process.env.JG_ARM_COUNT, "utf8").trim()) >= 3,
   "collector arm",
 );
-const handoffPath = `${process.env.FM_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`;
+const handoffPath = `${process.env.JG_HOME}/state/extensions/pi-primary-watch/session-replacement-actionable.json`;
 await waitFor(() => existsSync(handoffPath), "replacement handoff");
 await waitFor(() => JSON.parse(readFileSync(handoffPath, "utf8")).pending.length === 2, "two distinct handoff outcomes");
 const handoff = JSON.parse(readFileSync(handoffPath, "utf8"));
@@ -4018,28 +4018,28 @@ test_pi_replacement_persistence_failure_keeps_predecessor_until_successor() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 count=0
-[ ! -f "$FM_ARM_COUNT" ] || count=$(cat "$FM_ARM_COUNT")
+[ ! -f "$JG_ARM_COUNT" ] || count=$(cat "$JG_ARM_COUNT")
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_ARM_COUNT"
+printf '%s\n' "$count" > "$JG_ARM_COUNT"
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s\n' "$$"
   printf 'signal: persistence failure actionable outcome\n'
   exit 0
 fi
-previous=$(cat "$FM_CHILD_MARKER" 2>/dev/null || true)
+previous=$(cat "$JG_CHILD_MARKER" 2>/dev/null || true)
 if [ -n "$previous" ] && kill -0 "$previous" 2>/dev/null; then
   kill -TERM "$previous" 2>/dev/null || true
   while kill -0 "$previous" 2>/dev/null; do sleep 0.01; done
 fi
-cleanup() { rm -f "$FM_CHILD_MARKER"; }
+cleanup() { rm -f "$JG_CHILD_MARKER"; }
 trap cleanup EXIT
 trap 'exit 0' TERM INT
-printf '%s\n' "$$" > "$FM_CHILD_MARKER"
+printf '%s\n' "$$" > "$JG_CHILD_MARKER"
 printf 'watcher: started pid=%s\n' "$$"
 while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_COUNT="$count" FM_CHILD_MARKER="$marker" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_COUNT="$count" JG_CHILD_MARKER="$marker" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4070,19 +4070,19 @@ async function waitFor(pred, label) {
   throw new Error(`timeout waiting for ${label}`);
 }
 
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 const armed = await tool.execute("initial-arm", {}, undefined, undefined, {});
 if (!armed.details?.ok) throw new Error(`initial arm failed: ${JSON.stringify(armed.details)}`);
-await waitFor(() => deliveryStarted && existsSync(process.env.FM_CHILD_MARKER), "blocked delivery and successor child");
-writeFileSync(`${process.env.FM_HOME}/state/extensions`, "block handoff directory\n");
+await waitFor(() => deliveryStarted && existsSync(process.env.JG_CHILD_MARKER), "blocked delivery and successor child");
+writeFileSync(`${process.env.JG_HOME}/state/extensions`, "block handoff directory\n");
 await handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "new" }, {});
-if (!existsSync(process.env.FM_CHILD_MARKER)) {
+if (!existsSync(process.env.JG_CHILD_MARKER)) {
   throw new Error("replacement shutdown retired the established predecessor after handoff persistence failed");
 }
 const { unlinkSync } = await import("node:fs");
-unlinkSync(`${process.env.FM_HOME}/state/extensions`);
+unlinkSync(`${process.env.JG_HOME}/state/extensions`);
 const replacementMod = await import(`${pathToFileURL(process.env.PLUGIN).href}?replacement=persistence-failure`);
 replacementMod.default(pi);
 await handlers.get("session_start")?.({ type: "session_start", reason: "new" }, {});
@@ -4112,7 +4112,7 @@ test_pi_process_exit_cleanup_listener_lifecycle() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   : > "$repo/bin/jg-watch-arm.sh"
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 
 const handlers = new Map();
@@ -4157,12 +4157,12 @@ test_pi_process_exit_cleanup_stops_arm_child() {
   plugin="$repo/.pi/extensions/jg-primary-pi-watch.ts"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-trap 'printf "%s\n" "$$" >> "$FM_CLEANUP_LOG"; exit 0' TERM
-printf '%s\n' "$$" > "$FM_CHILD_PID_FILE"
+trap 'printf "%s\n" "$$" >> "$JG_CLEANUP_LOG"; exit 0' TERM
+printf '%s\n' "$$" > "$JG_CHILD_PID_FILE"
 while :; do sleep 1; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_CLEANUP_LOG="$cleanup_log" FM_CHILD_PID_FILE="$pid_file" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_CLEANUP_LOG="$cleanup_log" JG_CHILD_PID_FILE="$pid_file" node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4178,24 +4178,24 @@ const pi = {
   },
   sendUserMessage: async () => {},
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-exit", {}, undefined, undefined, {});
-for (let i = 0; i < 250 && !existsSync(process.env.FM_CHILD_PID_FILE); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_CHILD_PID_FILE); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_CHILD_PID_FILE)) throw new Error("arm child did not start");
-const firstChild = readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim();
+if (!existsSync(process.env.JG_CHILD_PID_FILE)) throw new Error("arm child did not start");
+const firstChild = readFileSync(process.env.JG_CHILD_PID_FILE, "utf8").trim();
 await handlers.get("session_shutdown")?.({ type: "session_shutdown" }, {});
 await handlers.get("session_start")?.({ type: "session_start" }, {});
 await tool.execute("tool-call-replacement", {}, undefined, undefined, {});
 for (let i = 0; i < 250; i += 1) {
-  const currentChild = readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim();
+  const currentChild = readFileSync(process.env.JG_CHILD_PID_FILE, "utf8").trim();
   if (currentChild !== firstChild) break;
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (readFileSync(process.env.FM_CHILD_PID_FILE, "utf8").trim() === firstChild) {
+if (readFileSync(process.env.JG_CHILD_PID_FILE, "utf8").trim() === firstChild) {
   throw new Error("replacement arm child did not start");
 }
 process.exit(0);
@@ -4252,11 +4252,11 @@ test_opencode_primary_watch_plugin_uses_effective_state_home() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'home=%s root=%s\n' "${FM_HOME:-}" "${FM_ROOT_OVERRIDE:-}" >> "${FM_ARM_LOG:?}"
+printf 'home=%s root=%s\n' "${JG_HOME:-}" "${JG_ROOT_OVERRIDE:-}" >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" node 2>&1 <<'EOF'
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4267,27 +4267,27 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
 }
-const text = readFileSync(process.env.FM_ARM_LOG, "utf8");
+const text = readFileSync(process.env.JG_ARM_LOG, "utf8");
 const expectedRoot = realpathSync(process.env.WORKTREE);
-if (!text.includes(`home=${process.env.FM_HOME}`) || !text.includes(`root=${expectedRoot}`)) {
+if (!text.includes(`home=${process.env.JG_HOME}`) || !text.includes(`root=${expectedRoot}`)) {
   console.error(text);
   process.exit(1);
 }
 EOF
 )
   status=$?
-  expect_code 0 "$status" "OpenCode watch plugin must use FM_HOME state outside the repo root"
+  expect_code 0 "$status" "OpenCode watch plugin must use JG_HOME state outside the repo root"
   [ -z "$out" ] || fail "OpenCode effective-state test printed output: $out"
-  pass "OpenCode watcher plugin uses the effective FM_HOME state"
+  pass "OpenCode watcher plugin uses the effective JG_HOME state"
 }
 
 test_opencode_primary_watch_plugin_sources_effective_config() {
@@ -4300,14 +4300,14 @@ test_opencode_primary_watch_plugin_sources_effective_config() {
   git init -q "$repo"
   : > "$repo/AGENTS.md"
   cp "$ROOT/bin/jg-primary-scope-lib.sh" "$repo/bin/jg-primary-scope-lib.sh"
-  printf 'export FM_POLL=7\n' > "$home/config/x-mode.env"
+  printf 'export JG_POLL=7\n' > "$home/config/x-mode.env"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'poll=%s\n' "${FM_POLL:-missing}" >> "${FM_ARM_LOG:?}"
+printf 'poll=%s\n' "${JG_POLL:-missing}" >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4318,16 +4318,16 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
 }
-const text = readFileSync(process.env.FM_ARM_LOG, "utf8");
+const text = readFileSync(process.env.JG_ARM_LOG, "utf8");
 if (!text.includes("poll=7")) {
   console.error(text);
   process.exit(1);
@@ -4335,7 +4335,7 @@ if (!text.includes("poll=7")) {
 EOF
 )
   status=$?
-  expect_code 0 "$status" "OpenCode watch plugin must source FM_HOME config outside the repo root"
+  expect_code 0 "$status" "OpenCode watch plugin must source JG_HOME config outside the repo root"
   [ -z "$out" ] || fail "OpenCode effective-config test printed output: $out"
   pass "OpenCode watcher plugin sources the effective config"
 }
@@ -4354,11 +4354,11 @@ test_opencode_primary_watch_plugin_requires_session_lock() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" node 2>&1 <<'EOF'
 import { existsSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4370,7 +4370,7 @@ const hooks = await mod.FmPrimaryWatchArm({
   worktree: process.env.WORKTREE,
 });
 const event = { event: { type: "session.idle", properties: { sessionID: "session-test" } } };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, "999999\n");
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, "999999\n");
 await hooks.event(event);
 // The hook starts its attempt without awaiting it, and the plugin answers a
 // second attempt from the one already in flight. Join that attempt through the
@@ -4382,16 +4382,16 @@ if (refusal !== "read-only") {
   console.error(`expected a read-only refusal without the session lock, got ${refusal}`);
   process.exit(1);
 }
-if (existsSync(process.env.FM_ARM_LOG)) {
+if (existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm ran without owning the session lock");
   process.exit(1);
 }
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event(event);
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm did not run after the session lock matched");
   process.exit(1);
 }
@@ -4417,11 +4417,11 @@ test_opencode_watch_arm_coordinator_respects_primary_scope() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" node 2>&1 <<'EOF'
 import { existsSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4432,14 +4432,14 @@ await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const status = await globalThis.__firstmateOpenCodeWatchArm.ensureArmed("session-test", client);
 await new Promise((resolve) => setTimeout(resolve, 120));
 if (status !== "not-primary") {
   console.error(`expected not-primary, got ${status}`);
   process.exit(1);
 }
-if (existsSync(process.env.FM_ARM_LOG)) {
+if (existsSync(process.env.JG_ARM_LOG)) {
   console.error("coordinator armed from a linked worktree");
   process.exit(1);
 }
@@ -4467,11 +4467,11 @@ test_opencode_watch_arm_coordinator_accepts_secondmate_marker() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" node 2>&1 <<'EOF'
 import { existsSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4482,16 +4482,16 @@ await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const status = await globalThis.__firstmateOpenCodeWatchArm.ensureArmed("session-test", client);
 if (status === "not-primary") {
   console.error("linked secondmate-marker home was refused as not-primary");
   process.exit(1);
 }
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error(`watch arm did not run for a secondmate-marker home (${status})`);
   process.exit(1);
 }
@@ -4519,11 +4519,11 @@ test_opencode_primary_watch_plugin_rearms_after_wake() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'arm=%s predecessor=%s\n' "$$" "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^arm=' "$FM_ARM_LOG")
+printf 'arm=%s predecessor=%s\n' "$$" "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic wake\n'
@@ -4531,10 +4531,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4548,8 +4548,8 @@ const promptBlocked = new Promise((resolve) => {
 const client = {
   session: {
     promptAsync: async () => {
-      rowsAtPrompt = existsSync(process.env.FM_ARM_LOG)
-        ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm=")).length
+      rowsAtPrompt = existsSync(process.env.JG_ARM_LOG)
+        ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").filter((row) => row.startsWith("arm=")).length
         : 0;
       prompts += 1;
       await promptBlocked;
@@ -4562,16 +4562,16 @@ const hooks = await mod.FmPrimaryWatchArm({
   worktree: process.env.WORKTREE,
 });
 const event = { event: { type: "session.idle", properties: { sessionID: "session-test" } } };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event(event);
 for (let i = 0; i < 250; i += 1) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   if (rows.length >= 2 && prompts >= 1) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 const armRows = rows.filter((row) => row.startsWith("arm="));
 if (armRows.length !== 2) throw new Error(`expected one successor arm, got ${armRows.length}: ${rows.join(" | ")}`);
 if (prompts !== 1) throw new Error(`expected one blocked wake prompt, got ${prompts}`);
@@ -4581,7 +4581,7 @@ if (!rows.some((row) => row.startsWith("confirmed generation=fixture-generation"
   throw new Error(`handling delivery was not confirmed before the follow-up: ${rows.join(" | ")}`);
 }
 await new Promise((resolve) => setTimeout(resolve, 100));
-const stableRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const stableRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (stableRows.filter((row) => row.startsWith("arm=")).length !== 2) {
   throw new Error(`blocked follow-up started extra arm work: ${stableRows.join(" | ")}`);
 }
@@ -4589,7 +4589,7 @@ if (stableRows.filter((row) => row.startsWith("confirmed ")).length !== 1) {
   throw new Error(`successful prompt delivery was not confirmed exactly once: ${stableRows.join(" | ")}`);
 }
 releasePrompt();
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 EOF
   )
   status=$?
@@ -4619,7 +4619,7 @@ test_opencode_primary_watch_plugin_runs_the_supervision_host() {  # [away|quiet]
     # QUIET): the plugin asks the record owner, so the same handback carries no
     # away note.
     for f in jg-afk-contract.sh jg-classify-lib.sh jg-timeout-lib.sh; do cp "$ROOT/bin/$f" "$repo/bin/$f"; done
-    FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    JG_HOME="$home" JG_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
       || fail "fixture: could not record quiet mode"
   else
     : > "$home/state/.afk-contract"
@@ -4629,17 +4629,17 @@ test_opencode_primary_watch_plugin_runs_the_supervision_host() {  # [away|quiet]
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'plain-arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'plain-arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 exit 1
 SH
   cat > "$repo/bin/jg-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'host=%s args=%s primary=%s predecessor=%s\n' "$$" "$*" "${FM_SUPERVISION_HOST_PRIMARY:-}" \
-  "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-count=$(grep -c '^host=' "$FM_ARM_LOG")
+printf 'host=%s args=%s primary=%s predecessor=%s\n' "$$" "$*" "${JG_SUPERVISION_HOST_PRIMARY:-}" \
+  "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+count=$(grep -c '^host=' "$JG_ARM_LOG")
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   sleep 0.3
@@ -4648,10 +4648,10 @@ if [ "$count" -eq 1 ]; then
 fi
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-supervision-host.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" RECORD_KIND="$kind" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" RECORD_KIND="$kind" node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4659,11 +4659,11 @@ const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 const prompts = [];
 const client = { session: { promptAsync: async (request) => { prompts.push(request.body.parts[0].text); } } };
 const hooks = await mod.FmPrimaryWatchArm({ client, directory: process.env.WORKTREE, worktree: process.env.WORKTREE });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 400 && prompts.length < 1; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
-const rows = existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n") : [];
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+const rows = existsSync(process.env.JG_ARM_LOG) ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n") : [];
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 if (rows.some((row) => row.startsWith("plain-arm="))) throw new Error(`an opted-in home ran the plain arm: ${rows.join(" | ")}`);
 const hosts = rows.filter((row) => row.startsWith("host="));
 if (hosts.length !== 2) throw new Error(`expected the host and one successor host, got: ${rows.join(" | ")}`);
@@ -4709,8 +4709,8 @@ test_opencode_pre_ready_actionable_close_preserves_its_successor() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: original wake\n'
@@ -4718,16 +4718,16 @@ if [ "$count" -eq 1 ]; then
 fi
 if [ "$count" -eq 2 ]; then
   printf 'signal: pre-ready successor wake\n'
-  trap 'printf "retired\\n" > "${FM_PRE_READY_RETIRED_FILE:?}"; exit 0' TERM INT
-  while [ ! -e "$FM_PRE_READY_RELEASE_FILE" ]; do sleep 0.02; done
+  trap 'printf "retired\\n" > "${JG_PRE_READY_RETIRED_FILE:?}"; exit 0' TERM INT
+  while [ ! -e "$JG_PRE_READY_RELEASE_FILE" ]; do sleep 0.02; done
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_PRE_READY_RELEASE_FILE="$release" FM_PRE_READY_RETIRED_FILE="$retired" FM_STOP_FILE="$stop" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_PRE_READY_RELEASE_FILE="$release" JG_PRE_READY_RETIRED_FILE="$retired" JG_STOP_FILE="$stop" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4745,30 +4745,30 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 500; i += 1) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   if (rows.length >= 2 && prompts.some((message) => message.includes("original wake"))) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.length !== 2) throw new Error(`pre-ready successor was replaced before its close: ${rows.join(" | ")}`);
 if (!prompts.some((message) => message.includes("original wake"))) throw new Error(`original actionable wake was not delivered: ${prompts.join(" | ")}`);
 await new Promise((resolve) => setTimeout(resolve, 150));
-if (existsSync(process.env.FM_PRE_READY_RETIRED_FILE)) throw new Error("pre-ready actionable successor was retired before its close");
-writeFileSync(process.env.FM_PRE_READY_RELEASE_FILE, "release\n");
+if (existsSync(process.env.JG_PRE_READY_RETIRED_FILE)) throw new Error("pre-ready actionable successor was retired before its close");
+writeFileSync(process.env.JG_PRE_READY_RELEASE_FILE, "release\n");
 for (let i = 0; i < 500; i += 1) {
-  const successorRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+  const successorRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
   if (successorRows.length >= 3 && prompts.some((message) => message.includes("pre-ready successor wake"))) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const stableRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const stableRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (stableRows.length !== 3) throw new Error(`pre-ready close did not create exactly one successor: ${stableRows.join(" | ")}`);
 if (!prompts.some((message) => message.includes("pre-ready successor wake"))) throw new Error(`pre-ready actionable wake was not delivered: ${prompts.join(" | ")}`);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 EOF
 )
   status=$?
@@ -4791,8 +4791,8 @@ test_opencode_hung_successor_falls_back_to_typed_wake() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic wake\n'
@@ -4802,7 +4802,7 @@ trap 'exit 0' TERM INT
 while :; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4813,8 +4813,8 @@ const client = {
   session: {
     promptAsync: async (request) => {
       prompt += request.body.parts[0].text;
-      rowsAtPrompt = existsSync(process.env.FM_ARM_LOG)
-        ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").length
+      rowsAtPrompt = existsSync(process.env.JG_ARM_LOG)
+        ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").length
         : 0;
     },
   },
@@ -4824,22 +4824,22 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 // Three unready successors each cost the full readiness budget, so wait well
 // past their sum. The wait ends as soon as the wake lands.
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 4) throw new Error(`expected one successor plus two retries, got ${rows.length}: ${rows.join(" | ")}`);
 if (rowsAtPrompt !== 4) throw new Error(`wake arrived before restoration exhausted (${rowsAtPrompt} arm rows)`);
 if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
 if (!prompt.includes("could not restore watcher continuity after 2 retries")) throw new Error(`missing typed restoration failure: ${prompt}`);
 await new Promise((resolve) => setTimeout(resolve, 100));
-const stableRows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const stableRows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (stableRows.length !== 4) throw new Error(`single-flight recovery launched ${stableRows.length} arms`);
 EOF
 )
@@ -4864,23 +4864,23 @@ test_opencode_unretired_successor_falls_back_without_retry() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_ARM_LOG" ]; then
-  count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ -f "$JG_ARM_LOG" ]; then
+  count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 else
   count=0
 fi
 if [ "$count" -eq 0 ]; then
-  printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+  printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: synthetic wake\n'
   exit 0
 fi
 trap '' TERM INT
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.1; done
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.1; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_RELEASE_FILE="$release" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=20 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_RELEASE_FILE="$release" JG_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=20 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4891,8 +4891,8 @@ const client = {
   session: {
     promptAsync: async (request) => {
       prompt += request.body.parts[0].text;
-      rowsAtPrompt = existsSync(process.env.FM_ARM_LOG)
-        ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").length
+      rowsAtPrompt = existsSync(process.env.JG_ARM_LOG)
+        ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n").length
         : 0;
     },
   },
@@ -4902,19 +4902,19 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 2) throw new Error(`unretired arm overlapped a retry: ${rows.join(" | ")}`);
 if (rowsAtPrompt !== 2) throw new Error(`wake arrived after an overlapping retry (${rowsAtPrompt} arm rows)`);
 if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
 if (!prompt.includes("unready successor arm did not exit within 20ms")) throw new Error(`missing unretired-arm failure: ${prompt}`);
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
@@ -4943,26 +4943,26 @@ test_opencode_late_unretired_close_resumes_supervision() {
     : > "$home/state/task.meta"
     cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   printf 'signal: original wake\n'
   exit 0
 fi
 if [ "$count" -eq 2 ]; then
-  trap 'printf "retired\\n" > "${FM_UNRETIRED_RETIRE_FILE:?}"' TERM INT
-  printf 'ready\n' > "${FM_UNRETIRED_READY_FILE:?}"
-  while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
-  [ "$FM_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
+  trap 'printf "retired\\n" > "${JG_UNRETIRED_RETIRE_FILE:?}"' TERM INT
+  printf 'ready\n' > "${JG_UNRETIRED_READY_FILE:?}"
+  while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.02; done
+  [ "$JG_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
   exit 0
 fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
     chmod +x "$repo/bin/jg-watch-arm.sh"
-    out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_UNRETIRED_READY_FILE="$ready" FM_UNRETIRED_RETIRE_FILE="$retired" FM_RELEASE_FILE="$release" FM_STOP_FILE="$stop" FM_LATE_KIND="$kind" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_ARM_RETIRE_TIMEOUT_MS=20 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+    out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_UNRETIRED_READY_FILE="$ready" JG_UNRETIRED_RETIRE_FILE="$retired" JG_RELEASE_FILE="$release" JG_STOP_FILE="$stop" JG_LATE_KIND="$kind" JG_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" JG_WATCH_ARM_RETIRE_TIMEOUT_MS=20 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -4975,8 +4975,8 @@ const client = {
     },
   },
 };
-const rows = () => existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = () => existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 async function waitFor(predicate, message) {
   for (let i = 0; i < 500; i += 1) {
@@ -4990,31 +4990,31 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 await waitFor(
-  () => existsSync(process.env.FM_UNRETIRED_READY_FILE),
+  () => existsSync(process.env.JG_UNRETIRED_READY_FILE),
   "unretired successor did not enter its retirement wait",
 );
 await waitFor(() => prompts.length >= 1, "original fallback was not delivered");
 await waitFor(
-  () => existsSync(process.env.FM_UNRETIRED_RETIRE_FILE),
+  () => existsSync(process.env.JG_UNRETIRED_RETIRE_FILE),
   "unretired successor was not asked to retire before fallback",
 );
 if (rows().length !== 2) throw new Error(`unretired arm overlapped before fallback: ${rows().join(" | ")}`);
 if (!prompts[0]?.includes("original wake")) throw new Error(`missing original fallback: ${prompts.join(" | ")}`);
-writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
 for (let i = 0; i < 500; i += 1) {
-  if (rows().length >= 3 && (process.env.FM_LATE_KIND !== "actionable" || prompts.some((message) => message.includes("late wake")))) break;
+  if (rows().length >= 3 && (process.env.JG_LATE_KIND !== "actionable" || prompts.some((message) => message.includes("late wake")))) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
 if (rows().length !== 3) throw new Error(`late close did not restore one successor: ${rows().join(" | ")}`);
-if (process.env.FM_LATE_KIND === "actionable") {
+if (process.env.JG_LATE_KIND === "actionable") {
   if (prompts.length !== 2 || !prompts[1].includes("late wake")) throw new Error(`late actionable close was not delivered: ${prompts.join(" | ")}`);
 } else if (prompts.length !== 1) {
   throw new Error(`late non-actionable close sent an extra wake: ${prompts.join(" | ")}`);
 }
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
@@ -5040,15 +5040,15 @@ test_opencode_empty_close_retries_instead_of_disappearing() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+count=$(wc -l < "$JG_ARM_LOG" | tr -d '[:space:]')
 if [ "$count" -eq 1 ]; then exit 0; fi
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 trap 'exit 0' TERM INT
-while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+while [ ! -e "$JG_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_STOP_FILE="$stop" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -5066,19 +5066,19 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 250; i += 1) {
-  const rows = existsSync(process.env.FM_ARM_LOG)
-    ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  const rows = existsSync(process.env.JG_ARM_LOG)
+    ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
     : [];
   if (rows.length >= 2) break;
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.length !== 2) throw new Error(`clean empty close was ignored: ${rows.join(" | ")}`);
 if (prompts !== 0) throw new Error(`restored transient close surfaced ${prompts} failure prompts`);
-writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+writeFileSync(process.env.JG_STOP_FILE, "stop\n");
 EOF
 )
   status=$?
@@ -5101,12 +5101,12 @@ test_opencode_established_empty_close_honors_retry_limit() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 exit 0
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 JG_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -5124,13 +5124,13 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 250 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const rows = existsSync(process.env.FM_ARM_LOG)
-  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+const rows = existsSync(process.env.JG_ARM_LOG)
+  ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n")
   : [];
 if (rows.length !== 3) throw new Error(`retry limit launched ${rows.length} arm cycles: ${rows.join(" | ")}`);
 if (!prompt.includes("after 2 retries")) throw new Error(`retry exhaustion was not surfaced: ${prompt}`);
@@ -5157,12 +5157,12 @@ test_opencode_actionable_close_rechecks_session_lock() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
-while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
+printf 'arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
+while [ ! -e "$JG_RELEASE_FILE" ]; do sleep 0.02; done
 printf 'signal: lock handoff\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_RELEASE_FILE="$release" node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_RELEASE_FILE="$release" node 2>&1 <<'EOF'
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -5181,21 +5181,21 @@ const hooks = await mod.FmPrimaryWatchArm({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-const lock = `${process.env.FM_HOME}/state/.lock`;
+const lock = `${process.env.JG_HOME}/state/.lock`;
 writeFileSync(lock, `${process.pid}\n`);
 const eventPromise = hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
 const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
 try {
   writeFileSync(lock, `${other.pid}\n`);
-  writeFileSync(process.env.FM_RELEASE_FILE, "release\n");
+  writeFileSync(process.env.JG_RELEASE_FILE, "release\n");
   await eventPromise;
   for (let i = 0; i < 250 && !prompt.includes("no longer owns the lock"); i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+  const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
   if (rows.length !== 1) throw new Error(`successor launched after lock loss: ${rows.join(" | ")}`);
   if (!prompt.includes("no longer owns the lock")) throw new Error(`missing lock-loss failure: ${prompt}`);
 } finally {
@@ -5225,17 +5225,17 @@ test_opencode_watch_arm_coordinates_with_turnend_guard() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=1 (beacon fresh)\n'
 SH
   cat > "$repo/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard\n' >> "${JG_GUARD_LOG:?}"
 printf 'guard should not run\n' >&2
 exit 2
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-turnend-guard.sh"
-  out=$(ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
+  out=$(ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
 import { existsSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -5259,16 +5259,16 @@ const guardHooks = await guardMod.FmPrimaryTurnendGuard({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await guardHooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_ARM_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
 }
-if (existsSync(process.env.FM_GUARD_LOG)) {
+if (existsSync(process.env.JG_GUARD_LOG)) {
   console.error("turn-end guard ran before the watch arm could establish supervision");
   process.exit(1);
 }
@@ -5300,17 +5300,17 @@ test_opencode_healthy_arm_output_does_not_suppress_guard() {
   : > "$home/state/task.meta"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'args=%s\n' "$*" >> "${FM_ARM_LOG:?}"
+printf 'args=%s\n' "$*" >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   cat > "$repo/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard\n' >> "${JG_GUARD_LOG:?}"
 printf 'guard ran after external healthy watcher\n' >&2
 exit 2
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-turnend-guard.sh"
-  out=$(ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
+  out=$(ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" JG_HOME="$home" JG_ARM_LOG="$log" JG_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -5334,20 +5334,20 @@ const guardHooks = await guardMod.FmPrimaryTurnendGuard({
   directory: process.env.WORKTREE,
   worktree: process.env.WORKTREE,
 });
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 await guardHooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_GUARD_LOG); i += 1) {
+for (let i = 0; i < 250 && !existsSync(process.env.JG_GUARD_LOG); i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (!existsSync(process.env.FM_ARM_LOG)) {
+if (!existsSync(process.env.JG_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
 }
-if (!readFileSync(process.env.FM_ARM_LOG, "utf8").includes("args=--restart")) {
+if (!readFileSync(process.env.JG_ARM_LOG, "utf8").includes("args=--restart")) {
   console.error("watch arm was not asked to restart into an owned child");
   process.exit(1);
 }
-if (!existsSync(process.env.FM_GUARD_LOG)) {
+if (!existsSync(process.env.JG_GUARD_LOG)) {
   console.error("turn-end guard was suppressed by an external healthy watcher");
   process.exit(1);
 }

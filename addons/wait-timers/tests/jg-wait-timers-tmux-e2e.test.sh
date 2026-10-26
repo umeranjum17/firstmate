@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMUX_BIN=$(command -v tmux) || exit 1
@@ -24,8 +33,8 @@ mkdir -p "$world"/{state,data,config,home,tmp,fakebin,parent/state}
 printf '#!/usr/bin/env bash\nexec %q -L %q "$@"\n' "$TMUX_BIN" "$sock" > "$world/fakebin/tmux"
 chmod +x "$world/fakebin/tmux"
 export HOME="$world/home" XDG_CONFIG_HOME="$world/home/config" TMPDIR="$world/tmp"
-export PATH="$world/fakebin:$PATH" FM_HOME="$world" FM_STATE_OVERRIDE="$world/state" FM_DATA_OVERRIDE="$world/data" FM_CONFIG_OVERRIDE="$world/config"
-export FM_ROOT_OVERRIDE="$world" FM_TMUX_SESSION=firstmate FM_SESSION=firstmate
+export PATH="$world/fakebin:$PATH" JG_HOME="$world" JG_STATE_OVERRIDE="$world/state" JG_DATA_OVERRIDE="$world/data" JG_CONFIG_OVERRIDE="$world/config"
+export JG_ROOT_OVERRIDE="$world" JG_TMUX_SESSION=firstmate JG_SESSION=firstmate
 printf 'tmux\n' > "$world/config/backend"
 printf 'lead\n' > "$world/.jg-secondmate-home"
 printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$world/parent" > "$world/.jg-secondmate-parent"
@@ -35,9 +44,9 @@ printf '## In flight\n\n## Queued\n\n## Done\n' > "$world/data/backlog.md"
 tmux new-session -d -s firstmate -n jg-held-lane 'sleep 300'
 printf 'window=firstmate:jg-held-lane\nkind=ship\nharness=pi\nbackend=tmux\nworktree=%s\n' "$world" > "$world/state/held-lane.meta"
 cycle() {
-  FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_HOME_SUMMARY_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
-    FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
+  JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_HOME_SUMMARY_INTERVAL=999999 JG_SECONDMATE_LIVENESS_SECS=99999999 \
+    JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 \
     bash "$ROOT/bin/jg-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!
   for _unused in 1 2 3 4 5 6 7 8; do
@@ -66,8 +75,8 @@ cycle
 cycle
 # The signal scan runs before the timer tick, so one cycle consumes the
 # appended pause line's signal before the episode arms; the arming cycle's
-# poll must also leave the owner unalerted even though FM_WAIT_ALERT_SECS=2,
-# because a declared pause rechecks at FM_PAUSE_RESURFACE_SECS (default 4 h).
+# poll must also leave the owner unalerted even though JG_WAIT_ALERT_SECS=2,
+# because a declared pause rechecks at JG_PAUSE_RESURFACE_SECS (default 4 h).
 [ -f "$world/state/.waiting-timers/held-lane" ] || { echo 'due pause not armed'; exit 1; }
 IFS=$'\t' read -r _sig _since owner _parent _key < "$world/state/.waiting-timers/held-lane"
 [ "$owner" = 0 ] || { echo 'pause alerted at the owner-alert threshold'; exit 1; }
@@ -99,11 +108,11 @@ for verb in blocked needs-decision; do
   printf '%s [key=dependency]: fixture dependency until 2099-01-01T00:00Z\n' "$verb" > "$world/state/ladder.status"
   # The signal scan precedes the timer tick, so mark the fresh declaration
   # seen or the priming run exits on its signal before recording the episode.
-  FM_HOME="$world" FM_STATE_OVERRIDE="$world/state" bash -c '
+  JG_HOME="$world" JG_STATE_OVERRIDE="$world/state" bash -c '
     # shellcheck disable=SC1090
     . "$1"; jg_wake_status_mark_current "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$world/state" "$world/state/ladder.status"
-  FM_POLL=1 FM_SIGNAL_GRACE=1 FM_WAIT_ALERT_SECS=300 FM_WAIT_ESCALATE_SECS=900 \
+  JG_POLL=1 JG_SIGNAL_GRACE=1 JG_WAIT_ALERT_SECS=300 JG_WAIT_ESCALATE_SECS=900 \
     bash "$ROOT/bin/jg-watch.sh" > "$world/out" 2> "$world/err" &
   watch_pid=$!
   for _unused in $(seq 1 40); do

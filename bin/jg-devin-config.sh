@@ -14,7 +14,7 @@
 # and Claude MCP imports, while AGENTS.md and .agents/skills still load.
 # attribution=false is forced too, because Devin otherwise adds a
 # Co-Authored-By: Devin trailer and a Generated with Devin line to commits
-# and PRs, unless FM_KEEP_AI_TRAILERS=1 (jg-spawn sets it when the home has
+# and PRs, unless JG_KEEP_AI_TRAILERS=1 (jg-spawn sets it when the home has
 # config/keep-ai-trailers); then the source's attribution setting is kept.
 # UserPromptSubmit opens a turn; Stop and SessionEnd close it. Devin 3000.11.1
 # emits no Stop on double-Escape cancellation, so jg-control invalidates its
@@ -33,7 +33,7 @@ STATE=${1:?state directory required}
 ID=${2:?task id required}
 GEN=${3:?busy generation required}
 SOURCE=${4:-$HOME/.config/devin/config.json}
-KEEP=${FM_KEEP_AI_TRAILERS:-0}
+KEEP=${JG_KEEP_AI_TRAILERS:-0}
 case "$ID" in ''|*[!A-Za-z0-9._-]*) echo 'error: invalid task id' >&2; exit 1 ;; esac
 [ -d "$STATE" ] || { echo 'error: state directory missing' >&2; exit 1; }
 STATE=$(cd "$STATE" && pwd -P)

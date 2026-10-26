@@ -3,33 +3,33 @@
 # the adapter package with actual FirstMate extensions and durable scripts.
 # A local protocol peer and watcher close stand in for model calls and a live
 # fleet. No provider request leaves the machine and no live fleet is touched.
-# PI_CODEX_NATIVE_PACKAGE selects the installed adapter package; FM_PI_BIN
-# selects Pi. FM_NATIVE_TEST_KEEP=1 preserves the isolated fixture for diagnosis.
+# PI_CODEX_NATIVE_PACKAGE selects the installed adapter package; JG_PI_BIN
+# selects Pi. JG_NATIVE_TEST_KEEP=1 preserves the isolated fixture for diagnosis.
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-jg_live_gate default-on FM_PI_CODEX_NATIVE_LIVE node "${FM_PI_BIN:-pi}"
+jg_live_gate default-on JG_PI_CODEX_NATIVE_LIVE node "${JG_PI_BIN:-pi}"
 PI_CODEX_NATIVE_PACKAGE=${PI_CODEX_NATIVE_PACKAGE:-"$HOME/.pi/agent/packages/pi-codex-native"}
 if [ ! -f "$PI_CODEX_NATIVE_PACKAGE/index.ts" ]; then
-  if [ "${FM_PI_CODEX_NATIVE_LIVE:-${FM_LIVE:-0}}" = 1 ]; then
+  if [ "${JG_PI_CODEX_NATIVE_LIVE:-${JG_LIVE:-0}}" = 1 ]; then
     fail "native Pi adapter missing: $PI_CODEX_NATIVE_PACKAGE"
   fi
   echo "skip: native Pi adapter not installed (PI_CODEX_NATIVE_PACKAGE to select it)"
   exit 0
 fi
 export PI_CODEX_NATIVE_PACKAGE
-FM_NATIVE_TEST_ROOT="$ROOT" node --input-type=module <<'JS'
+JG_NATIVE_TEST_ROOT="$ROOT" node --input-type=module <<'JS'
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
-const root = process.env.FM_NATIVE_TEST_ROOT;
+const root = process.env.JG_NATIVE_TEST_ROOT;
 const nativePackage =
   process.env.PI_CODEX_NATIVE_PACKAGE ||
   path.join(homedir(), ".pi/agent/packages/pi-codex-native");
-const piVersion = execFileSync(process.env.FM_PI_BIN || "pi", ["--version"], {
+const piVersion = execFileSync(process.env.JG_PI_BIN || "pi", ["--version"], {
   encoding: "utf8", timeout: 10000,
 }).trim();
 let adapterVersion = "unknown";
@@ -64,12 +64,12 @@ script("jg-turnend-guard.sh", "#!/usr/bin/env bash\nexit 0\n");
 script(
   "jg-watch-arm.sh",
   `#!/usr/bin/env bash
-if [ "\${1:-}" = --handling-delivered ]; then printf 'confirmed\\n' >> "$FM_HOME/state/arm.log"; exit 0; fi
-printf 'arm\\n' >> "$FM_HOME/state/arm.log"
+if [ "\${1:-}" = --handling-delivered ]; then printf 'confirmed\\n' >> "$JG_HOME/state/arm.log"; exit 0; fi
+printf 'arm\\n' >> "$JG_HOME/state/arm.log"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=native-smoke\\n' "$$"
 trap 'exit 0' TERM INT
 while :; do
- if [ -f "$FM_HOME/state/trigger" ]; then rm -f "$FM_HOME/state/trigger"; printf 'check: native-worker-complete\\n'; exit 0; fi
+ if [ -f "$JG_HOME/state/trigger" ]; then rm -f "$JG_HOME/state/trigger"; printf 'check: native-worker-complete\\n'; exit 0; fi
  sleep 0.05
 done
 `,
@@ -77,7 +77,7 @@ done
 const own = path.join(fixture, "own-lock.ts");
 fs.writeFileSync(
   own,
-  `import {writeFileSync,appendFileSync} from 'node:fs'; export default function(pi){pi.on('session_start',()=>writeFileSync(process.env.FM_HOME+'/state/.lock',String(process.pid)+'\\n'));pi.events.on('codex-native:progress',event=>appendFileSync(process.env.FM_HOME+'/state/progress-events',JSON.stringify(event)+'\\n'));}`,
+  `import {writeFileSync,appendFileSync} from 'node:fs'; export default function(pi){pi.on('session_start',()=>writeFileSync(process.env.JG_HOME+'/state/.lock',String(process.pid)+'\\n'));pi.events.on('codex-native:progress',event=>appendFileSync(process.env.JG_HOME+'/state/progress-events',JSON.stringify(event)+'\\n'));}`,
 );
 const peer = path.join(fixture, "native-peer.mjs");
 fs.writeFileSync(
@@ -85,7 +85,7 @@ fs.writeFileSync(
   `#!/usr/bin/env node
 import fs from 'node:fs';
 let buffer='',counter=0,config;
-const log=(data)=>fs.appendFileSync(process.env.FM_HOME+'/state/native.log',JSON.stringify(data)+'\\n');
+const log=(data)=>fs.appendFileSync(process.env.JG_HOME+'/state/native.log',JSON.stringify(data)+'\\n');
 const emit=(x)=>process.stdout.write(JSON.stringify(x)+'\\n');
 async function control(name,args={}){
  const response=await fetch(config.url,{method:'POST',headers:{...config.http_headers,'Content-Type':'application/json',Accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:++counter,method:'tools/call',params:{name,arguments:args}})});
@@ -179,12 +179,12 @@ async function start(resume) {
   ];
   if (resume) args.push("--session", resume);
   else args.push("--codex-effort", "ultra");
-  child = spawn(process.env.FM_PI_BIN || "pi", args, {
+  child = spawn(process.env.JG_PI_BIN || "pi", args, {
     cwd: repo,
     env: {
       ...process.env,
-      FM_HOME: home,
-      FM_ROOT_OVERRIDE: repo,
+      JG_HOME: home,
+      JG_ROOT_OVERRIDE: repo,
       PI_CODEX_NATIVE_BIN: peer,
       PI_CODING_AGENT_DIR: path.join(fixture, "pi-config"),
       PI_TELEMETRY: "false",
@@ -266,7 +266,7 @@ try {
       "--summary",
       "WORKER_DONE_SENTINEL verified fixture completion",
     ],
-    { env: { ...process.env, FM_HOME: home } },
+    { env: { ...process.env, JG_HOME: home } },
   );
   fs.writeFileSync(path.join(state, "trigger"), "complete\n");
   await wait(
@@ -328,7 +328,7 @@ try {
         result: "PASS",
         piVersion,
         adapterVersion,
-        ...(process.env.FM_NATIVE_TEST_KEEP === "1" ? { fixture } : {}),
+        ...(process.env.JG_NATIVE_TEST_KEEP === "1" ? { fixture } : {}),
         checks: [
           "actual Pi runtime and native package",
           "native Ultra preserved across operational turns and restart",
@@ -354,7 +354,7 @@ try {
   throw error;
 } finally {
   await stop();
-  if (passed && process.env.FM_NATIVE_TEST_KEEP !== "1")
+  if (passed && process.env.JG_NATIVE_TEST_KEEP !== "1")
     fs.rmSync(fixture, { recursive: true, force: true });
   else console.error("Native FirstMate test fixture: " + fixture);
 }

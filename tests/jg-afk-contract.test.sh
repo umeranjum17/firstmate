@@ -24,7 +24,7 @@ make_home() {  # <name> -> prints the home dir
 contract() {  # <home> <args...>
   local home=$1
   shift
-  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$CONTRACT" "$@"
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$CONTRACT" "$@"
 }
 
 # A confirmed record in the retired version 1 shape, exactly as the clause
@@ -515,7 +515,7 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
   before=$(cat "$home/state/.afk-contract")
   lock="$home/state/.afk-contract.lock"
 
-  FM_STATE_OVERRIDE="$home/state" bash -c '
+  JG_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
     jg_lock_acquire_wait "$2" || exit 10
     printf "ready\n" > "$3"
@@ -532,7 +532,7 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
     || { kill "$holder_pid" 2>/dev/null || true; fail "lock-contended: the fixture never took the lock"; }
 
   set +e
-  out=$(FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1 contract "$home" archive 2>&1)
+  out=$(JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1 contract "$home" archive 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock-contended: archive ran while the record was locked"; }
@@ -541,7 +541,7 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
     || { kill "$holder_pid" 2>/dev/null || true; fail "lock-contended: the refused archive still moved the record"; }
 
   set +e
-  out=$(FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1 contract "$home" enter --words 'replacement words' 2>&1)
+  out=$(JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1 contract "$home" enter --words 'replacement words' 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || { kill "$holder_pid" 2>/dev/null || true; fail "lock-contended: enter replaced the record while it was locked"; }
@@ -568,7 +568,7 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
 test_quiet_record_reads_as_a_present_captain_holding_nothing() {
   local home out
   home=$(make_home quiet-present)
-  out=$(FM_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet entry failed: $out"
+  out=$(JG_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet entry failed: $out"
   assert_contains "$out" 'Quiet mode recorded at ' 'quiet announcement names quiet mode'
   assert_contains "$out" 'nothing waits for your return' 'quiet announcement says nothing is held'
   assert_contains "$out" 'a local landing or a merge included, proceeds now under ordinary attended authority' 'quiet announcement names requested actions proceeding'
@@ -580,7 +580,7 @@ test_quiet_record_reads_as_a_present_captain_holding_nothing() {
   out=$(contract "$home" readback) || fail "quiet readback failed"
   assert_contains "$out" 'Quiet mode (recorded):' 'quiet readback title'
   assert_not_contains "$out" 'hold-for-return' 'a quiet read-back must not read as hold-for-return'
-  out=$(FM_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet refresh failed: $out"
+  out=$(JG_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet refresh failed: $out"
   assert_contains "$out" 'quiet mode already recorded at ' 'a quiet refresh names quiet mode'
   assert_not_contains "$out" 'hold-for-return' 'a quiet refresh must not read as hold-for-return'
   [ "$(contract "$home" mode)" = quiet ] || fail "a quiet refresh changed the mode"
@@ -603,7 +603,7 @@ test_quiet_record_reads_as_a_present_captain_holding_nothing() {
 test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away() {
   local home out quiet_entered
   home=$(make_home quiet-to-away)
-  FM_AFK_MODE=quiet contract "$home" enter >/dev/null 2>&1 || fail "quiet entry failed"
+  JG_AFK_MODE=quiet contract "$home" enter >/dev/null 2>&1 || fail "quiet entry failed"
   quiet_entered=$(contract "$home" field entered_epoch)
   out=$(contract "$home" enter 2>&1) || fail "away refresh over quiet failed: $out"
   assert_contains "$out" 'quiet mode became the away posture' 'the conversion names itself'
@@ -614,10 +614,10 @@ test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away() {
 
   home=$(make_home away-not-masked)
   contract "$home" enter --words 'merge it when green' >/dev/null 2>&1 || fail "away entry failed"
-  out=$(FM_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet refresh over away failed: $out"
+  out=$(JG_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet refresh over away failed: $out"
   assert_contains "$out" 'hold-for-return only' 'a quiet refresh over away still reads away'
   [ "$(contract "$home" mode)" = away ] || fail "a quiet refresh turned an away record quiet"
-  FM_AFK_MODE=quiet contract "$home" enter --words 'new words' >/dev/null 2>&1 || fail "quiet replacement over away failed"
+  JG_AFK_MODE=quiet contract "$home" enter --words 'new words' >/dev/null 2>&1 || fail "quiet replacement over away failed"
   [ "$(contract "$home" mode)" = away ] || fail "a quiet replacement turned an away record quiet"
   pass "an away entry over quiet mode records away, and a quiet entry never masks a standing away record"
 }

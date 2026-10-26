@@ -22,30 +22,30 @@
 # task's full status log path, while every OPEN DECISIONS entry begins with the
 # task id that identifies its durable state/<id>.status source.
 
-FM_LINE_CAP_DEFAULT=220
-FM_LINE_CAP_SUFFIX=' [truncated]'
+JG_LINE_CAP_DEFAULT=220
+JG_LINE_CAP_SUFFIX=' [truncated]'
 
-# jg_cap_line_var <line> [<max>]: put <line> in FM_LINE_CAP_LINE, cut to <max>
-# characters with FM_LINE_CAP_SUFFIX in place of the tail when it is longer. A
+# jg_cap_line_var <line> [<max>]: put <line> in JG_LINE_CAP_LINE, cut to <max>
+# characters with JG_LINE_CAP_SUFFIX in place of the tail when it is longer. A
 # line at or under the cap is kept unchanged, marker and all bytes intact.
 # This is the rule itself. It assigns rather than prints so a caller that needs
 # the value - the wake digest builds its section in a variable to weigh each
 # item against a global budget - never pays a command substitution per item on
 # a path that runs at the top of every wake-handling turn.
 jg_cap_line_var() {
-  local line=$1 max=${2:-$FM_LINE_CAP_DEFAULT} keep
+  local line=$1 max=${2:-$JG_LINE_CAP_DEFAULT} keep
   if [ "${#line}" -le "$max" ]; then
-    FM_LINE_CAP_LINE=$line
+    JG_LINE_CAP_LINE=$line
     return 0
   fi
-  keep=$((max - ${#FM_LINE_CAP_SUFFIX}))
+  keep=$((max - ${#JG_LINE_CAP_SUFFIX}))
   [ "$keep" -ge 0 ] || keep=0
-  FM_LINE_CAP_LINE="${line:0:$keep}$FM_LINE_CAP_SUFFIX"
+  JG_LINE_CAP_LINE="${line:0:$keep}$JG_LINE_CAP_SUFFIX"
 }
 
 # jg_cap_line <line> [<max>]: the same cut, printed on stdout, for a caller that
 # is streaming lines rather than accumulating them.
 jg_cap_line() {
   jg_cap_line_var "$@"
-  printf '%s\n' "$FM_LINE_CAP_LINE"
+  printf '%s\n' "$JG_LINE_CAP_LINE"
 }

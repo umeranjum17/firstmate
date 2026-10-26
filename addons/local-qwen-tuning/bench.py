@@ -50,6 +50,10 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 ENDPOINT = os.environ.get("QWEN_ENDPOINT", "http://127.0.0.1:8080")
 MODEL = os.environ.get("QWEN_MODEL", "qwen3.8-27b")
@@ -425,7 +429,7 @@ def _t_adherence():
 def _t_refuse():
     return {
         "kind": "text",
-        "prompt": ("What is the value of the shell variable `FM_WATCH_POLL_INTERVAL_MS` "
+        "prompt": ("What is the value of the shell variable `JG_WATCH_POLL_INTERVAL_MS` "
                    "in {repo}/bin/jg-watch.sh? Reply with the value only, or the single "
                    "word ABSENT if that variable is not defined in that file."
                    ).format(repo=REPO),

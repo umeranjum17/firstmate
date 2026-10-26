@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
-FM_HOME=$TMP/home
-mkdir -p "$FM_HOME"/{bin,state,config}
-cat > "$FM_HOME/bin/jg-task-inbox-lib.sh" <<'SH'
+JG_HOME=$TMP/home
+mkdir -p "$JG_HOME"/{bin,state,config}
+cat > "$JG_HOME/bin/jg-task-inbox-lib.sh" <<'SH'
 jg_task_inbox_write_idempotent() {
   local state=$1 task=$2 body=$3 dir="$1/$2.inbox" file
   mkdir -p "$dir"
@@ -39,30 +48,30 @@ else
 fi
 SH
 chmod +x "$TMP/signoff"
-printf 'kind=ship\n' > "$FM_HOME/state/task-a.meta"
-printf 'kind=ship\n' > "$FM_HOME/state/task-b.meta"
-printf 'kind=ship\n' > "$FM_HOME/state/finished.meta"
-printf 'done [at=1]: finished\n' > "$FM_HOME/state/finished.status"
-export FM_HOME SIGN_OFF_CLI="$TMP/signoff" FM_STATE_OVERRIDE="$FM_HOME/state" FM_CONFIG_OVERRIDE="$FM_HOME/config" CALL_LOG="$TMP/calls"
+printf 'kind=ship\n' > "$JG_HOME/state/task-a.meta"
+printf 'kind=ship\n' > "$JG_HOME/state/task-b.meta"
+printf 'kind=ship\n' > "$JG_HOME/state/finished.meta"
+printf 'done [at=1]: finished\n' > "$JG_HOME/state/finished.status"
+export JG_HOME SIGN_OFF_CLI="$TMP/signoff" JG_STATE_OVERRIDE="$JG_HOME/state" JG_CONFIG_OVERRIDE="$JG_HOME/config" CALL_LOG="$TMP/calls"
 : > "$TMP/board.json"
 "$ROOT/bin/jg-engage-route.sh" bind alias task-b
 "$ROOT/bin/jg-engage-route.sh" dispatch "$TMP/board.json"
-grep -q req-a "$FM_HOME/state/task-a.inbox/"*.msg
-grep -q req-b "$FM_HOME/state/task-b.inbox/"*.msg
-grep -q req-alt "$FM_HOME/state/task-b.inbox/"*.msg
-[ ! -f "$FM_HOME/state/missing.inbox/request" ]
-[ ! -f "$FM_HOME/state/finished.inbox/request" ]
-grep -q $'req-f\tqueued\towner task finished is finished' "$FM_HOME/state/engage-route.log"
-grep -q $'req-z\tqueued\tno owner record for filer missing' "$FM_HOME/state/engage-route.log"
+grep -q req-a "$JG_HOME/state/task-a.inbox/"*.msg
+grep -q req-b "$JG_HOME/state/task-b.inbox/"*.msg
+grep -q req-alt "$JG_HOME/state/task-b.inbox/"*.msg
+[ ! -f "$JG_HOME/state/missing.inbox/request" ]
+[ ! -f "$JG_HOME/state/finished.inbox/request" ]
+grep -q $'req-f\tqueued\towner task finished is finished' "$JG_HOME/state/engage-route.log"
+grep -q $'req-z\tqueued\tno owner record for filer missing' "$JG_HOME/state/engage-route.log"
 if grep -q '^answers ' "$CALL_LOG"; then exit 1; fi
 "$ROOT/bin/jg-engage-route.sh" dispatch "$TMP/board.json"
-[ "$(find "$FM_HOME/state/task-a.inbox" -type f -name '*.msg' | wc -l)" -eq 1 ]
-[ "$(find "$FM_HOME/state/task-b.inbox" -type f -name '*.msg' | wc -l)" -eq 2 ]
-mkdir -p "$FM_HOME/state/task-a.inbox/handled"
-first=$(find "$FM_HOME/state/task-a.inbox" -maxdepth 1 -name '*.msg' -print -quit)
-mv "$first" "$FM_HOME/state/task-a.inbox/handled/"
+[ "$(find "$JG_HOME/state/task-a.inbox" -type f -name '*.msg' | wc -l)" -eq 1 ]
+[ "$(find "$JG_HOME/state/task-b.inbox" -type f -name '*.msg' | wc -l)" -eq 2 ]
+mkdir -p "$JG_HOME/state/task-a.inbox/handled"
+first=$(find "$JG_HOME/state/task-a.inbox" -maxdepth 1 -name '*.msg' -print -quit)
+mv "$first" "$JG_HOME/state/task-a.inbox/handled/"
 "$ROOT/bin/jg-engage-route.sh" dispatch "$TMP/board.json"
-grep -Fq $'req-a\towner-ack\ttask-a' "$FM_HOME/state/engage-route.log"
-[ "$(find "$FM_HOME/state/task-a.inbox" -type f -name '*.msg' | wc -l)" -eq 1 ]
-[ "$(awk -F '\t' '$1=="alias" {print $2}' "$FM_HOME/config/engage-owners")" = task-b ]
+grep -Fq $'req-a\towner-ack\ttask-a' "$JG_HOME/state/engage-route.log"
+[ "$(find "$JG_HOME/state/task-a.inbox" -type f -name '*.msg' | wc -l)" -eq 1 ]
+[ "$(awk -F '\t' '$1=="alias" {print $2}' "$JG_HOME/config/engage-owners")" = task-b ]
 echo 'engage-route fixture journey passed'

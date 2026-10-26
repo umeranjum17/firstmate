@@ -5,17 +5,17 @@ a model or provider outage and raises one grouped wake to the home. It is the
 fork's `bin/jg-model-outage-lib.sh`, refreshed to the fork's current copy (with
 the parked-homes guard) and made to run from this directory: its sibling
 libraries (`jg-timeout-lib.sh`, `jg-composer-lib.sh`) are read from the fork's
-`bin/` (`$SCRIPT_DIR`, else `$FM_HOME/bin`), and `jg_parked_meta` is the
+`bin/` (`$SCRIPT_DIR`, else `$JG_HOME/bin`), and `jg_parked_meta` is the
 watcher's if defined, else "never parked".
 
 ## Step-B hook (fork `bin/jg-watch.sh`)
 
 Replace the fork's `. "$SCRIPT_DIR/jg-model-outage-lib.sh"` with the optional source
-`[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"`
+`[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"`
 and the per-cycle call with
 `if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi`.
 Absent add-on = kun behavior. `tests/model-outage-hook-e2e.sh` (with
-`FM_TEST_FORK` set to a Firstmate checkout) proves both cases over fixture lanes.
+`JG_TEST_FORK` set to a Firstmate checkout) proves both cases over fixture lanes.
 
 The same library defines `jg_alerts_push_suppress <task>`, which the fork's
 `handle_push_transition` calls (when defined) instead of its old inline check: it
@@ -33,7 +33,7 @@ otherwise or when the watcher's `jg_meta_get`/`task_captain_call_open` are absen
   printable line.
 - `tests/model-outage-scan-e2e.sh` — the scan behaviour over fixture lanes (union wake,
   recovered/unreadable lanes, hung verdict, wrapped banner, usage-limit banner once,
-  banner above the composer or in scrollback); run with `FM_TEST_FORK` set to a Firstmate checkout.
+  banner above the composer or in scrollback); run with `JG_TEST_FORK` set to a Firstmate checkout.
 - `tests/jg-model-outage-live-e2e.test.sh` — the opt-in credentialed live
   journey. Moved verbatim and **never run from here**: it drives live agents
   (see the proof note).

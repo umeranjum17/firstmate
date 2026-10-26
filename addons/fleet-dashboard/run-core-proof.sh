@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Core journey: the fleet dashboard shows live fleet state in a real browser at a phone width.
 # Seeds a throwaway Firstmate home (agent lanes, a landed task, queued and held tasks), serves this
 # checkout's dashboard against that seed, opens it in headless Chrome at 390px, and writes the Board
 # (lanes) and Insights (queue reasons) as text and screenshots to $DONE_DONE_EVIDENCE_ROOT.
 # The seed is the only home read: no real fleet, no credentials, no live writes.
-# FM_BIN names the Firstmate bin/ whose helper scripts the build runs (default: ~/firstmate/bin); the
-# queue reasons come from this checkout's fleet-flow reader, which the build reaches through FM_ADDONS_DIR.
+# JG_BIN names the Firstmate bin/ whose helper scripts the build runs (default: ~/firstmate/bin); the
+# queue reasons come from this checkout's fleet-flow reader, which the build reaches through JG_ADDONS_DIR.
 set -Eeuo pipefail
 # A browser step that times out stops the run under set -e; name it so a failed run says where.
 trap 'echo "run-core-proof: stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
 : "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
-FM_BIN=${FM_BIN:-$HOME/firstmate/bin}
-[ -f "$FM_BIN/jg-tasks-axi.sh" ] || { echo "run-core-proof: FM_BIN has no jg-tasks-axi.sh: $FM_BIN" >&2; exit 1; }
+JG_BIN=${JG_BIN:-$HOME/firstmate/bin}
+[ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "run-core-proof: JG_BIN has no jg-tasks-axi.sh: $JG_BIN" >&2; exit 1; }
 home=$(mktemp -d)
 bin=$home/bin
 session=core-journey-$$
@@ -113,7 +122,7 @@ PY
   printf 'some avg10=45.00 avg60=8.00 avg300=3.00 total=0\n' > "$home/proc/pressure/memory"  # a 10 s spike the gate lets pass
   : > "$home/proc/locks"
   # The Firstmate helpers the build runs, linked in.
-  for f in "$FM_BIN"/*; do ln -s "$f" "$bin/${f##*/}"; done
+  for f in "$JG_BIN"/*; do ln -s "$f" "$bin/${f##*/}"; done
   # The owner's sign-off board token, and a lead home, alpha, whose steering endpoint is a window on a private tmux server.
   mkdir -p "$home/board" "$home/alpha/data" "$home/alpha/state" "$home/tmux"
   printf 'core-owner-token-%s\n' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" > "$home/board/board.token"
@@ -128,8 +137,8 @@ PY
 }
 
 dash() {  # <build|serve> [args]: the dashboard against the seed home, with the stubs first on PATH
-  env -u TMUX PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" FM_BIN="$bin" FM_ADDONS_DIR="$root" TMUX_TMPDIR="$home/tmux" \
-    FM_DEVICE_LOCK_DIR="$home/locks" FM_DASHBOARD_PROC="$home/proc" FM_MAC_HOST= \
+  env -u TMUX PATH="$home/stubs:$PATH" HOME="$home" JG_HOME="$home" JG_BIN="$bin" JG_ADDONS_DIR="$root" TMUX_TMPDIR="$home/tmux" \
+    JG_DEVICE_LOCK_DIR="$home/locks" JG_DASHBOARD_PROC="$home/proc" JG_MAC_HOST= \
     bash "$here/jg-dashboard.sh" "$@"
 }
 
@@ -306,20 +315,20 @@ chrome-devtools-axi eval "document.cookie = 'sign-off-4420=$tok; path=/'" >/dev/
 say main main/m-ask 'Pick the layout that keeps the ask list on top.'
 chrome-devtools-axi wait 'Sent to Main' >/dev/null  # the comment shows in the thread at once
 chrome-devtools-axi screenshot "$DONE_DONE_EVIDENCE_ROOT/ticket-comment-sent-390.png" >/dev/null
-inbox() { env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home" bash "$bin/jg-inbox.sh" "$@"; }
+inbox() { env PATH="$home/stubs:$PATH" HOME="$home" JG_HOME="$home" bash "$bin/jg-inbox.sh" "$@"; }
 note=$(jq -r 'select(.ticket == "main/m-ask") | .note' "$home/state/dashboard/comments.jsonl")
 grep -qF 'Answer the captain in the ticket thread: bin/jg-inbox.sh reply' "$home/state/inbox/$note.note" || { echo "run-core-proof: the comment did not reach Main's inbox with how to answer" >&2; exit 1; }
 inbox drain --ack "$note" >/dev/null
 inbox reply "$note" "Agreed: the ask list stays on top in both layouts." >/dev/null
 # The lead: the comment goes through jg-send to its endpoint, which rings; the lead picks the steer up (moves it to
-# handled/) and runs the answer command it carries, unchanged, with its own FM_HOME.
+# handled/) and runs the answer command it carries, unchanged, with its own JG_HOME.
 say alpha alpha/t-lead 'Keep the ask list above the fold on a phone.'
 chrome-devtools-axi wait 'Sent to the alpha lead as a steer' >/dev/null
 steer=$(grep -lF 'Keep the ask list above the fold on a phone.' "$home"/state/alpha.inbox/*.msg)
 env -u TMUX TMUX_TMPDIR="$home/tmux" tmux capture-pane -p -t core:alpha | grep -qF 'instruction waiting' || { echo "run-core-proof: the lead's endpoint was not rung" >&2; exit 1; }
 mv "$steer" "$home/state/alpha.inbox/handled/"
-answer=$(sed -n 's/.*(your FM_HOME already names your own home): //p' "$home/state/alpha.inbox/handled/${steer##*/}" | sed 's/<your answer in plain words>/Read: the ask list stays above the fold./')
-(cd "$home/alpha" && env PATH="$home/stubs:$PATH" HOME="$home" FM_HOME="$home/alpha" bash -c "$answer") >/dev/null
+answer=$(sed -n 's/.*(your JG_HOME already names your own home): //p' "$home/state/alpha.inbox/handled/${steer##*/}" | sed 's/<your answer in plain words>/Read: the ask list stays above the fold./')
+(cd "$home/alpha" && env PATH="$home/stubs:$PATH" HOME="$home" JG_HOME="$home/alpha" bash -c "$answer") >/dev/null
 dash build >/dev/null
 for w in 390 1280; do
   shot "ticket-thread-$w" "?thread-$w#/tickets?ticket=main/m-ask" "$w" 'Agreed: the ask list stays on top'

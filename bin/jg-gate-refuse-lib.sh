@@ -35,10 +35,10 @@
 # returns 0 and the lifecycle proceeds exactly as before.
 #
 # THE ONE AUTHORIZED EXCEPTION - a disposable lab home: a gate agent may drive
-# lifecycle against an FM_HOME that carries the FM_GATE_LAB_MARKER file, because
+# lifecycle against an JG_HOME that carries the JG_GATE_LAB_MARKER file, because
 # bin/jg-lab-home.sh stamps it only on an empty directory
 # (jg_gate_lab_mark refuses a populated dir, so the helper cannot mark a real home).
-# The allowance additionally requires every FM_*_OVERRIDE to be empty or unset,
+# The allowance additionally requires every JG_*_OVERRIDE to be empty or unset,
 # so the lab call uses the marked home's stock layout and no override can split
 # part of the "lab" back onto the real fleet. The threat model stays a CONFUSED
 # agent: a hostile agent that would hand-forge the marker file is the
@@ -53,12 +53,12 @@
 # This boundary layers above no-mistakes' separately-shipping HEAD-continuity
 # guard, which remains the adversarial/residual backstop.
 #
-# TEST-HARNESS ESCAPE HATCH (FM_GATE_REFUSE_BYPASS=1): firstmate's own test suite
+# TEST-HARNESS ESCAPE HATCH (JG_GATE_REFUSE_BYPASS=1): firstmate's own test suite
 # must exercise the real fleet entrypoints, but the no-mistakes gate
 # runs that suite FROM a gate worktree (cwd git-common-dir under
 # .no-mistakes/repos/*.git, and possibly NO_MISTAKES_GATE set) - the exact
 # environment this guard refuses. So both signals would fire during firstmate's
-# own validation and break unrelated tests. FM_GATE_REFUSE_BYPASS=1 makes the
+# own validation and break unrelated tests. JG_GATE_REFUSE_BYPASS=1 makes the
 # guard a no-op; firstmate's shared test helpers (tests/lib.sh and the backend
 # safety helpers) export it for temp-sandbox fleet tests. The disposable lab
 # primary recipe in .no-mistakes.yaml uses the marked-home allowance instead.
@@ -77,19 +77,19 @@
 
 # The exit code every refusal uses, distinct enough to recognize in a caller or
 # test as "the gate refusal fired" rather than an ordinary usage error.
-FM_GATE_REFUSE_EXIT=3
+JG_GATE_REFUSE_EXIT=3
 
 # The disposable-lab-home marker file and the token line it must carry. The
 # format is owned here; bin/jg-lab-home.sh is the supported writer.
-FM_GATE_LAB_MARKER='.jg-lab-home'
-FM_GATE_LAB_TOKEN='jg-lab-home v1'
+JG_GATE_LAB_MARKER='.jg-lab-home'
+JG_GATE_LAB_TOKEN='jg-lab-home v1'
 
 # jg_gate_lab_home <dir>: return 0 when <dir> is a marked disposable lab home.
 jg_gate_lab_home() {
   local home=${1:-}
   [ -n "$home" ] || return 1
-  [ -f "$home/$FM_GATE_LAB_MARKER" ] || return 1
-  [ "$(sed -n '1p' "$home/$FM_GATE_LAB_MARKER" 2>/dev/null || true)" = "$FM_GATE_LAB_TOKEN" ]
+  [ -f "$home/$JG_GATE_LAB_MARKER" ] || return 1
+  [ "$(sed -n '1p' "$home/$JG_GATE_LAB_MARKER" 2>/dev/null || true)" = "$JG_GATE_LAB_TOKEN" ]
 }
 
 # jg_gate_lab_mark <dir>: stamp <dir> as a disposable lab home. Fails closed on
@@ -99,16 +99,16 @@ jg_gate_lab_mark() {
   [ -n "$home" ] && [ -d "$home" ] || return 1
   listing=$(find "$home" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) || return 1
   [ -z "$listing" ] || return 1
-  printf '%s\n' "$FM_GATE_LAB_TOKEN" > "$home/$FM_GATE_LAB_MARKER"
+  printf '%s\n' "$JG_GATE_LAB_TOKEN" > "$home/$JG_GATE_LAB_MARKER"
 }
 
 # jg_gate_lab_permitted: return 0 when the current call targets a marked lab
-# home through a stock layout - $FM_HOME carries the marker and no
-# FM_*_OVERRIDE relocation has a nonempty value.
+# home through a stock layout - $JG_HOME carries the marker and no
+# JG_*_OVERRIDE relocation has a nonempty value.
 jg_gate_lab_permitted() {
   local v
-  jg_gate_lab_home "${FM_HOME:-}" || return 1
-  for v in "${!FM_@}"; do
+  jg_gate_lab_home "${JG_HOME:-}" || return 1
+  for v in "${!JG_@}"; do
     case "$v" in
       *_OVERRIDE) [ -z "${!v}" ] || return 1 ;;
     esac
@@ -121,11 +121,11 @@ jg_gate_lab_permitted() {
 # callers that omit it retain the historical current-worktree behavior.
 jg_is_gate_agent() {
   local anchor=${1:-.} common
-  if [ "${FM_GATE_REFUSE_BYPASS:-}" = 1 ]; then
+  if [ "${JG_GATE_REFUSE_BYPASS:-}" = 1 ]; then
     return 1
   fi
   if [ "${NO_MISTAKES_GATE+x}" = x ]; then
-    FM_GATE_REFUSE_REASON='env'
+    JG_GATE_REFUSE_REASON='env'
     return 0
   fi
   common=$(cd "$anchor" 2>/dev/null \
@@ -133,28 +133,28 @@ jg_is_gate_agent() {
     && pwd -P || true)
   case "$common" in
     */.no-mistakes/repos/*.git)
-      FM_GATE_REFUSE_REASON='path'
-      FM_GATE_REFUSE_COMMON=$common
+      JG_GATE_REFUSE_REASON='path'
+      JG_GATE_REFUSE_COMMON=$common
       return 0 ;;
   esac
   return 1
 }
 
-# jg_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
+# jg_refuse_if_gate_agent: exit JG_GATE_REFUSE_EXIT with a clear stderr message if
 # this process looks like a no-mistakes gate agent without a permitted lab home.
 # Call before any fleet mutation. No-ops (returns 0) for a normal firstmate
 # session, a permitted lab home, or when firstmate's own test harness sets
-# FM_GATE_REFUSE_BYPASS=1 (see the header).
+# JG_GATE_REFUSE_BYPASS=1 (see the header).
 jg_refuse_if_gate_agent() {
   jg_is_gate_agent "${1:-.}" || return 0
   if jg_gate_lab_permitted; then
-    echo "jg-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
+    echo "jg-gate-refuse: gate agent lifecycle permitted only against lab home $JG_HOME" >&2
     return 0
   fi
-  if [ "$FM_GATE_REFUSE_REASON" = env ]; then
+  if [ "$JG_GATE_REFUSE_REASON" = env ]; then
     echo "error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)" >&2
   else
-    echo "error: refusing fleet lifecycle from inside a no-mistakes gate worktree ($FM_GATE_REFUSE_COMMON)" >&2
+    echo "error: refusing fleet lifecycle from inside a no-mistakes gate worktree ($JG_GATE_REFUSE_COMMON)" >&2
   fi
-  exit "$FM_GATE_REFUSE_EXIT"
+  exit "$JG_GATE_REFUSE_EXIT"
 }

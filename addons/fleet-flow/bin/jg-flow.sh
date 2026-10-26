@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-flow.sh - read-only flow data, no endpoint or cache writes.
-# Usage: FM_HOME=<home> jg-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]
-# FM_BIN names the Firstmate bin/ holding the helper libraries this reader runs
+# Usage: JG_HOME=<home> jg-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]
+# JG_BIN names the Firstmate bin/ holding the helper libraries this reader runs
 # (jg-classify-lib.sh, jg-tasks-axi-lib.sh, jg-backlog-transition-lib.sh, jg-tasks-axi.sh);
 # unset, it defaults to this script's own directory, so a Firstmate checkout copy needs nothing.
 # --capacity reads Linux procfs, installed memory-gate defaults, the heavy slice,
 # and /tmp filesystem usage (du limited to 3 s). Partial du exposes readable
 # lower bounds, not complete directory sizes/ranks. RSS is per process, not additive
 # host memory. Ownership is a recorded worktree/cwd match, otherwise unknown.
-# FM_MAC_HOST=user@host opts into one read-only SSH probe, limited to 6 s,
+# JG_MAC_HOST=user@host opts into one read-only SSH probe, limited to 6 s,
 # with existing host keys only and host-key updates disabled (UpdateHostKeys=no).
 # The Mac needs python3; observations cover memory, root free disk, non-Shutdown
 # simulators and Android emulator PIDs. Mac available_bytes counts free+inactive+
@@ -38,7 +47,7 @@
 # one UTC-day bucket per day covering [NOW-7d, NOW] (first bucket partial); their counts sum to
 # executed_7d. Each lane's state_seconds sums recorded seconds per status state from the first
 # working stamp, closing the trailing state at merge when merged is recorded; unrecorded stages are absent.
-# capacity is null unless --capacity is requested; FM_MAC_HOST alone runs no probe.
+# capacity is null unless --capacity is requested; JG_MAC_HOST alone runs no probe.
 # Times are seconds. null means unknown, including unstamped status lines.
 # Pickup and cleanup use ledger events, NOT file birth/mtime or spawn_gen
 # (relaunch changes spawn_gen). pr_ready is NOT pr_opened or checks_green.
@@ -59,11 +68,11 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The directory holding the Firstmate helper libraries this reader runs. It defaults
 # to this script's own directory (the fork's bin/), so a fork copy needs nothing;
-# else FM_BIN names the Firstmate bin/ when this script runs from another repo.
-if [ -n "${FM_BIN+x}" ]; then
-  [ -d "$FM_BIN" ] && [ -f "$FM_BIN/jg-tasks-axi.sh" ] || { echo "jg-flow: FM_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $FM_BIN" >&2; exit 1; }
+# else JG_BIN names the Firstmate bin/ when this script runs from another repo.
+if [ -n "${JG_BIN+x}" ]; then
+  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-flow: JG_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
 else
-  FM_BIN="$SCRIPT_DIR"
+  JG_BIN="$SCRIPT_DIR"
 fi
 [ "${1:-}" = --json ] || { echo 'usage: jg-flow.sh --json [--now <unix-seconds>] [--checks] [--capacity]' >&2; exit 2; }
 shift
@@ -77,7 +86,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$now" in ''|*[!0-9]*) echo 'jg-flow: --now requires Unix seconds' >&2; exit 2 ;; esac
-exec python3 - "${FM_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$FM_BIN/jg-classify-lib.sh" "$capacity" <<'PY'
+exec python3 - "${JG_HOME:-$SCRIPT_DIR/..}" "$now" "$checks" "$JG_BIN/jg-classify-lib.sh" "$capacity" <<'PY'
 import json, math, os, re, statistics, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -177,14 +186,14 @@ def backlog_rows(name, home, state='queued'):
         result = subprocess.run(['bash', '-c', '''
 . "$1/jg-tasks-axi-lib.sh"
 . "$1/jg-backlog-transition-lib.sh"
-jg_backlog_tasks_axi_addressing "$FM_HOME/data" || exit 2
-if [ -n "$FM_BACKLOG_AXI_FILE" ] && { [ ! -f "$FM_BACKLOG_AXI_FILE" ] || [ ! -r "$FM_BACKLOG_AXI_FILE" ]; }; then
-    printf 'backlog unavailable: %s\\n' "$FM_BACKLOG_AXI_FILE" >&2
+jg_backlog_tasks_axi_addressing "$JG_HOME/data" || exit 2
+if [ -n "$JG_BACKLOG_AXI_FILE" ] && { [ ! -f "$JG_BACKLOG_AXI_FILE" ] || [ ! -r "$JG_BACKLOG_AXI_FILE" ]; }; then
+    printf 'backlog unavailable: %s\\n' "$JG_BACKLOG_AXI_FILE" >&2
     exit 2
 fi
 exec bash "$1/jg-tasks-axi.sh" list --state "$2" --fields blocked_by,held,hold_kind,hold_reason
 ''', 'jg-flow', str(Path(sys.argv[4]).parent), state], capture_output=True, text=True, timeout=20,
-            env=dict(os.environ, FM_HOME=str(home), FM_DATA_OVERRIDE=''))
+            env=dict(os.environ, JG_HOME=str(home), JG_DATA_OVERRIDE=''))
         if result.returncode:
             raise ValueError(result.stderr.strip() or 'backlog consumer failed')
         lines = result.stdout.splitlines()
@@ -496,7 +505,7 @@ def machine_capacity():
     policy_source = installed if installed.is_file() else ROOT / 'config/jg-mem-gate.sh'
     gate = '\n'.join(read(policy_source) or [])
     limits = {}
-    for key in ('FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+    for key in ('JG_MEM_MIN_GB', 'JG_EMU_MAX', 'JG_GRADLE_MAX', 'JG_MEM_JOB_GB'):
         defaults = set(re.findall(r'\$\{' + key + r':-(\d+)\}', gate))
         value = os.environ.get(key) or (next(iter(defaults)) if len(defaults) == 1 else '')
         limits[key] = int(value) if len(defaults) == 1 and value.isdigit() else None
@@ -504,7 +513,7 @@ def machine_capacity():
     limits['psi_max'] = int(threshold[1]) if threshold else None
     counts = {k: sum(j['kind'] == k for j in jobs) if complete else None for k in ('emulator', 'gradle_gate_match')}
     free = {k: max(limits[c] - counts[k], 0) if limits[c] is not None and counts[k] is not None else None
-            for k, c in [('emulator', 'FM_EMU_MAX'), ('gradle_gate_match', 'FM_GRADLE_MAX')]}
+            for k, c in [('emulator', 'JG_EMU_MAX'), ('gradle_gate_match', 'JG_GRADLE_MAX')]}
     heavy = probe(['systemctl', '--user', 'show', 'jg-heavy.slice', '-p', 'LoadState', '-p', 'MemoryCurrent', '-p', 'MemoryMax'])
     heavy_values = dict(l.split('=', 1) for l in (heavy or '').splitlines() if '=' in l)
     loaded = heavy_values.get('LoadState') == 'loaded'
@@ -541,8 +550,8 @@ def machine_capacity():
         else:
             notes.append({'source': '/tmp/top_folders', 'reason': 'du output incomplete or invalid'})
     mac = {'reachable': None, 'available_bytes': None, 'free_disk_bytes': None, 'simulators': None,
-           'android_pids': None, 'source': 'FM_MAC_HOST'}
-    host = os.environ.get('FM_MAC_HOST', '')
+           'android_pids': None, 'source': 'JG_MAC_HOST'}
+    host = os.environ.get('JG_MAC_HOST', '')
     if re.fullmatch(r'\w[\w.-]*@\w[\w.-]*', host):
         # Fixed read-only commands; no command text, environment or private files are returned.
         code = """import subprocess,json,re,os,time
@@ -584,7 +593,7 @@ print(json.dumps(out))"""
         except (OSError, ValueError, subprocess.TimeoutExpired) as err:
             notes.append({'source': 'Mac SSH probe', 'reason': str(err)})
     else:
-        notes.append({'source': 'FM_MAC_HOST', 'reason': 'Mac probe not configured or target invalid'})
+        notes.append({'source': 'JG_MAC_HOST', 'reason': 'Mac probe not configured or target invalid'})
     return dict(observed_at=int(time.time()), memory_bytes=memory, memory_pressure_percent=psi,
                 jobs=jobs, census_complete=complete, gate_source=str(policy_source), gate_scope='observer environment and installed defaults',
                 limits=limits, gate_counts=counts, slots_under_caps=free, heavy_slice=slice_data, tmp=tmp, mac=mac)

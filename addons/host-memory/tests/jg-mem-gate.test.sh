@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration check for bin/jg-mem-gate.sh, run with stub commands, fixture memory files and private lock dirs.
 # Usage: jg-mem-gate.test.sh [gate-script]   exit 0 = PASS. Never starts a real emulator or Gradle build.
 # 1. (lock-deadlock regression) an emulator job that waits for an emulator slot must not hold the host
@@ -23,12 +32,12 @@ printf '#!/bin/sh\necho "test user bus unavailable" >&2\nexit 1\n' > "$T/bin/sys
 chmod +x "$T"/bin/*
 echo 'MemAvailable:   67108864 kB' > "$T/proc/meminfo"  # 64 GB free and no pressure: only a cap can hold a job
 echo 'some avg10=0.00 avg60=0.00 avg300=0.00 total=0' > "$T/proc/pressure/memory"
-export PATH=$T/bin:$PATH XDG_RUNTIME_DIR=$T/run FM_MEM_GATE_PROC=$T/proc MARK=$T/ran FM_MEM_MIN_GB=0
+export PATH=$T/bin:$PATH XDG_RUNTIME_DIR=$T/run JG_MEM_GATE_PROC=$T/proc MARK=$T/ran JG_MEM_MIN_GB=0
 fail=0
 
-FM_EMU_MAX=0 setsid "$G" "$T/bin/emulator" 2>/dev/null & w=$!
+JG_EMU_MAX=0 setsid "$G" "$T/bin/emulator" 2>/dev/null & w=$!
 sleep 2
-FM_GRADLE_MAX=99 timeout 25 "$G" "$T/bin/gradlew" 2>/dev/null; rc=$?
+JG_GRADLE_MAX=99 timeout 25 "$G" "$T/bin/gradlew" 2>/dev/null; rc=$?
 kill -- -$w 2>/dev/null; wait $w 2>/dev/null
 if [ "$rc" = 0 ]; then echo 'PASS lock not held while waiting'; else echo "FAIL rc=$rc (Gradle job stuck behind the waiting emulator job)"; fail=1; fi
 # That started Gradle job leaves a 30 s holder on its host lock; the wrapper checks use their own lock dir.

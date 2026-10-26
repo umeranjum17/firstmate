@@ -148,7 +148,7 @@ A failed confirmation is a restoration failure: the adapter classifies the error
 Pi retires the current successor only when the failed token names its exact watcher pid and generation and that pid is no longer alive, while omp and OpenCode retire the current successor whenever the restoration's watcher pid is no longer alive.
 On Pi a generation mismatch means a newer pipeline superseded this delivery mid-restore, so the wake routes like a confirmed delivery, with no failure appendix, and nothing is retired.
 An already-acknowledged episode confirms as a no-op when the confirmation names its generation, because the drain acknowledged it after the successor started but before the confirmation ran.
-The Pi extension diagnostic log is opt-in and off by default: only a positive FM_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness timeouts, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
+The Pi extension diagnostic log is opt-in and off by default: only a positive JG_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness timeouts, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
 docs/configuration.md owns the knob's default and accepted values.
 A failed confirmation is never swallowed.
 
@@ -171,7 +171,7 @@ When restoration does not succeed, the model is never left blind.
 Claude's Stop hook also starts one handling successor before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
-1. Launches `bin/jg-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
+1. Launches `bin/jg-watch-arm.sh` with the closed arm's pid as `JG_WATCH_PREDECESSOR_ARM_PID`.
 2. Waits for that arm's one status line, relaunching it boundedly while it stays unconfirmed.
 3. Only then exits 2 with the wake.
 
@@ -197,9 +197,9 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `FM_SECONDMATE_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
+The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SECONDMATE_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
 Its observation timer survives watcher replacement, resets when the oldest row changes or a reminder is delivered, and clears when no actionable row remains, giving each handling successor time to establish continuity.
-A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `FM_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
+A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `JG_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
 Declared external-wait stale rows are excluded and retain their existing pause cadence.
 Reminders preserve the queued reason except that a signal payload marked `needs-decision:` is delivered as the supported `signal:` reason, leaving the durable decision marker intact for routing and drain.
 `tests/jg-watch-triage.test.sh`'s `test_own_queue_redelivers_without_churning_successors` exercises the watcher, live grant, reminder, drain, and acknowledgement journey.
@@ -223,7 +223,7 @@ In its `--claude` mode it cooperates with the auto-arm.
 
 Every owner above runs inside the agent runtime, so a killed Herdr server takes all of them down at once, and a Claude primary whose turn had already ended has no Stop event left to re-arm.
 `bin/jg-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
-`mkdir -p ~/.config/systemd/user && FM_HOME="/absolute/home" bin/jg-sentinel.sh unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel`.
+`mkdir -p ~/.config/systemd/user && JG_HOME="/absolute/home" bin/jg-sentinel.sh unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel`.
 While the service is inactive, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying the install command with shell-quoted absolute home and executable paths.
 On a server restart it reconciles the home's direct reports, orders each live secondmate to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 Session start runs the same reconcile once in the background, so every home resumes its own lanes: a dead lane is relaunched, a lane whose turn was lost gets one resume nudge, and a mid-turn or properly waiting lane is left alone.
@@ -415,7 +415,7 @@ Each record includes:
 - Lock identity before and after close.
 - Successor disposition.
 
-The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYCLE_LOG_KEEP_LINES`.
+The file is size-capped through `JG_WATCH_CYCLE_LOG_MAX_BYTES` and `JG_WATCH_CYCLE_LOG_KEEP_LINES`.
 `state/.watch-triage.log` remains only the watcher's bounded absorbed-wake debug log and carries no lifecycle semantics.
 
 ### Grace, beacon, and stop signals
@@ -426,7 +426,7 @@ An arm whose own script path sits under a disposable no-mistakes validation chec
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
 The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked check or a blocked `jg_backend_capture` pane read, so both run its EXIT cleanup and stop that read.
 `watcher_stop_signals` in `bin/jg-watch.sh` owns the signal-handling rationale.
-The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
+The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `JG_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
 
@@ -521,7 +521,7 @@ It checks that a newly appended keyed decision is classified without rereading e
 It also covers generation-claim single-flight, stuck-claim supersession, superseded-owner silence, notice-marker refusal and retry, ownership-atomic episode reset, and the legacy upgrade shim.
 [`turnend-guard.md`](turnend-guard.md) owns those behavior contracts.
 
-`FM_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh`:
+`JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh`:
 
 1. Starts with the reproduced stale-lock state.
 2. Receives session start through the tracked SessionStart hook.

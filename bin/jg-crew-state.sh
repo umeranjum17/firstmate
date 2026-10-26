@@ -20,7 +20,7 @@
 # with no heuristics and no LLM.
 # For a terminal passed no-mistakes run, a matching merge-poll retirement
 # receipt is local merged evidence; otherwise a 5s-bounded forge read is tried.
-# FM_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
+# JG_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
 # An absent or unreadable PR identity yields an honest unknown, never an
 # optimistic merged claim.
 # Output is one stable, parseable, token-tight line firstmate can read every
@@ -177,9 +177,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-tmux-lib.sh
 . "$SCRIPT_DIR/jg-tmux-lib.sh"
@@ -203,9 +203,9 @@ ID=${1:-}
 
 # Fleet snapshot composition supplies its captured metadata path here so every
 # state read resolves the same task generation selected by that snapshot.
-META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
-LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
-NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
+META=${JG_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
+LOG=${JG_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
+NM_TIMEOUT=${JG_CREW_STATE_NM_TIMEOUT:-10}
 case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (jg_nm_runs_status_for_worktree in bin/jg-nm-run-lib.sh) scans for the legacy
@@ -213,8 +213,8 @@ case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
 # setting). Generous enough to
 # still find a branch's own run on a busy multi-crew fleet without listing the
 # entire history every call.
-FM_CREW_STATE_RUNS_LIMIT=${FM_CREW_STATE_RUNS_LIMIT:-200}
-case "$FM_CREW_STATE_RUNS_LIMIT" in ''|*[!0-9]*) FM_CREW_STATE_RUNS_LIMIT=200 ;; esac
+JG_CREW_STATE_RUNS_LIMIT=${JG_CREW_STATE_RUNS_LIMIT:-200}
+case "$JG_CREW_STATE_RUNS_LIMIT" in ''|*[!0-9]*) JG_CREW_STATE_RUNS_LIMIT=200 ;; esac
 SEP=' · '
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -249,7 +249,7 @@ fi
 # --- status log ------------------------------------------------------------
 
 # Map a status-log verb onto a canonical state for the fallback path. `paused` is
-# the deliberate-external-wait verb (jg-classify-lib.sh's FM_CLASSIFY_PAUSED_VERB):
+# the deliberate-external-wait verb (jg-classify-lib.sh's JG_CLASSIFY_PAUSED_VERB):
 # a crew with no active run and an idle pane that declared a known external wait
 # reports `paused` distinctly, so a supervisor reading this sees a declared pause
 # and its reason rather than a wedge-suspect idle.
@@ -294,7 +294,7 @@ LOG_VERB=$(status_line_verb "$LOG_LINE")
 # down or dead mate; only the remote host's own dead/missing verdict may say
 # the endpoint is actually gone.
 if [ -n "$REMOTE_HOST" ]; then
-  if ! REMOTE_STATE=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-on.sh" "$ID" \
+  if ! REMOTE_STATE=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-on.sh" "$ID" \
     jg-remote-secondmate-control.sh state "$ID" < /dev/null 2>/dev/null); then
     REMOTE_STATE=
   fi
@@ -377,7 +377,7 @@ pr_read_record_bounded() {  # <owner> <repo> <number>
   if ! record=$(jg_run_timed 5 bash -c '
     . "$1"
     jg_pr_github_read_record "$2" "$3" "$4" || exit 1
-    printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
+    printf "state=%s\nmerged=%s\n" "$JG_PR_RECORD_STATE" "$JG_PR_RECORD_MERGED"
   ' _ "$SCRIPT_DIR/jg-pr-lib.sh" "$1" "$2" "$3" 2>/dev/null); then
     return 1
   fi
@@ -385,8 +385,8 @@ pr_read_record_bounded() {  # <owner> <repo> <number>
   merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
   [ -n "$state" ] || return 1
   [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_STATE=$state
+  JG_PR_RECORD_MERGED=$merged
 }
 
 mr_read_record_bounded() {  # <host> <path> <number>
@@ -395,7 +395,7 @@ mr_read_record_bounded() {  # <host> <path> <number>
   if ! record=$(jg_run_timed 5 bash -c '
     . "$1"
     jg_pr_gitlab_read_record "$2" "$3" "$4" || exit 1
-    printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
+    printf "state=%s\nmerged=%s\n" "$JG_PR_RECORD_STATE" "$JG_PR_RECORD_MERGED"
   ' _ "$SCRIPT_DIR/jg-pr-lib.sh" "$1" "$2" "$3" 2>/dev/null); then
     return 1
   fi
@@ -403,8 +403,8 @@ mr_read_record_bounded() {  # <host> <path> <number>
   merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
   [ -n "$state" ] || return 1
   [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_STATE=$state
+  JG_PR_RECORD_MERGED=$merged
 }
 
 forgejo_read_record_bounded() {  # <host> <path> <number>
@@ -413,7 +413,7 @@ forgejo_read_record_bounded() {  # <host> <path> <number>
   if ! record=$(jg_run_timed 5 bash -c '
     . "$1"
     jg_pr_forgejo_read_record "$2" "$3" "$4" || exit 1
-    printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
+    printf "state=%s\nmerged=%s\n" "$JG_PR_RECORD_STATE" "$JG_PR_RECORD_MERGED"
   ' _ "$SCRIPT_DIR/jg-pr-lib.sh" "$1" "$2" "$3" 2>/dev/null); then
     return 1
   fi
@@ -421,8 +421,8 @@ forgejo_read_record_bounded() {  # <host> <path> <number>
   merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
   [ -n "$state" ] || return 1
   [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_STATE=$state
+  JG_PR_RECORD_MERGED=$merged
 }
 
 change_read_record_bounded() {  # <host> <number>
@@ -431,7 +431,7 @@ change_read_record_bounded() {  # <host> <number>
   if ! record=$(jg_run_timed 5 bash -c '
     . "$1"
     jg_pr_gerrit_read_record "$2" "$3" || exit 1
-    printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
+    printf "state=%s\nmerged=%s\n" "$JG_PR_RECORD_STATE" "$JG_PR_RECORD_MERGED"
   ' _ "$SCRIPT_DIR/jg-pr-lib.sh" "$1" "$2" 2>/dev/null); then
     return 1
   fi
@@ -439,39 +439,39 @@ change_read_record_bounded() {  # <host> <number>
   merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
   [ -n "$state" ] || return 1
   [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_STATE=$state
+  JG_PR_RECORD_MERGED=$merged
 }
 
 passed_pr_detail() {
   local provider url host path number owner repo raw_pr state_lc
   raw_pr=$(strip_quotes "$(nm_field pr)")
   if jg_pr_url_parse "$raw_pr"; then
-    provider=$FM_PR_PROVIDER
-    url=$FM_PR_URL
-    host=$FM_PR_HOST
-    path=$FM_PR_PATH
-    number=$FM_PR_NUMBER
+    provider=$JG_PR_PROVIDER
+    url=$JG_PR_URL
+    host=$JG_PR_HOST
+    path=$JG_PR_PATH
+    number=$JG_PR_NUMBER
   elif jg_pr_metadata_identity_parse "$META"; then
-    provider=$FM_PR_META_PROVIDER
-    url=$FM_PR_META_URL
-    host=$FM_PR_META_HOST
-    path=$FM_PR_META_PATH
-    number=$FM_PR_META_NUMBER
+    provider=$JG_PR_META_PROVIDER
+    url=$JG_PR_META_URL
+    host=$JG_PR_META_HOST
+    path=$JG_PR_META_PATH
+    number=$JG_PR_META_NUMBER
   else
     printf 'run passed: PR state unknown (no PR identity)'
     return
   fi
   if jg_pr_poll_retirement_receipt_valid "$STATE" "$ID" \
-    && [ "$FM_PR_RETIRE_PROVIDER" = "$provider" ] \
-    && [ "$FM_PR_RETIRE_URL" = "$url" ] \
-    && [ "$FM_PR_RETIRE_HOST" = "$host" ] \
-    && [ "$FM_PR_RETIRE_PATH" = "$path" ] \
-    && [ "$FM_PR_RETIRE_NUMBER" = "$number" ]; then
+    && [ "$JG_PR_RETIRE_PROVIDER" = "$provider" ] \
+    && [ "$JG_PR_RETIRE_URL" = "$url" ] \
+    && [ "$JG_PR_RETIRE_HOST" = "$host" ] \
+    && [ "$JG_PR_RETIRE_PATH" = "$path" ] \
+    && [ "$JG_PR_RETIRE_NUMBER" = "$number" ]; then
     printf 'run passed: PR merged'
     return
   fi
-  if [ "${FM_CREW_STATE_NO_FORGE:-0}" = 1 ]; then
+  if [ "${JG_CREW_STATE_NO_FORGE:-0}" = 1 ]; then
     printf 'run passed: PR state unknown (forge read skipped)'
     return
   fi
@@ -484,11 +484,11 @@ passed_pr_detail() {
         printf 'run passed: PR state unknown (unreadable)'
         return
       fi
-      if [ "$FM_PR_RECORD_MERGED" = true ]; then
+      if [ "$JG_PR_RECORD_MERGED" = true ]; then
         printf 'run passed: PR merged'
         return
       fi
-      state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+      state_lc=$(printf '%s' "$JG_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
       case "$state_lc" in
         open)   printf 'run passed: PR open' ;;
         closed) printf 'run passed: PR closed' ;;
@@ -500,11 +500,11 @@ passed_pr_detail() {
         printf 'run passed: PR state unknown (unreadable)'
         return
       fi
-      if [ "$FM_PR_RECORD_MERGED" = true ]; then
+      if [ "$JG_PR_RECORD_MERGED" = true ]; then
         printf 'run passed: PR merged'
         return
       fi
-      state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+      state_lc=$(printf '%s' "$JG_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
       case "$state_lc" in
         open|opened) printf 'run passed: PR open' ;;
         closed)      printf 'run passed: PR closed' ;;
@@ -516,13 +516,13 @@ passed_pr_detail() {
         printf 'run passed: PR state unknown (unreadable)'
         return
       fi
-      if [ "$FM_PR_RECORD_MERGED" = true ]; then
+      if [ "$JG_PR_RECORD_MERGED" = true ]; then
         printf 'run passed: PR merged'
         return
       fi
       # Forgejo reports a merged pull request as closed with merged true, so
       # an unmerged one is its own open or closed state.
-      state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+      state_lc=$(printf '%s' "$JG_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
       case "$state_lc" in
         open)   printf 'run passed: PR open' ;;
         closed) printf 'run passed: PR closed' ;;
@@ -534,12 +534,12 @@ passed_pr_detail() {
         printf 'run passed: PR state unknown (unreadable)'
         return
       fi
-      if [ "$FM_PR_RECORD_MERGED" = true ]; then
+      if [ "$JG_PR_RECORD_MERGED" = true ]; then
         printf 'run passed: PR merged'
         return
       fi
       # Gerrit spells an open change NEW and a closed one ABANDONED.
-      state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+      state_lc=$(printf '%s' "$JG_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
       case "$state_lc" in
         new)       printf 'run passed: PR open' ;;
         abandoned) printf 'run passed: PR closed' ;;
@@ -557,7 +557,7 @@ nm_findings_count() {
 }
 nm_gate_step_row() {
   local row step rest status findings
-  row=$(printf '%s\n' "$RUN_OUT" | grep -E "$FM_NM_GATE_ROW_RE" | head -1)
+  row=$(printf '%s\n' "$RUN_OUT" | grep -E "$JG_NM_GATE_ROW_RE" | head -1)
   [ -n "$row" ] || return 0
   row=$(trim "$row")
   step=$(trim "${row%%,*}")
@@ -569,7 +569,7 @@ nm_gate_step_row() {
 }
 nm_gate_status() {
   local s row
-  s=$(printf '%s\n' "$RUN_OUT" | grep -E "$FM_NM_GATE_SCALAR_RE" | head -1)
+  s=$(printf '%s\n' "$RUN_OUT" | grep -E "$JG_NM_GATE_SCALAR_RE" | head -1)
   if [ -n "$s" ]; then
     s=$(strip_quotes "$(trim "${s#*:}")")
     printf '%s' "$s"
@@ -579,7 +579,7 @@ nm_gate_status() {
   [ -n "$row" ] && { row=${row#*|}; printf '%s' "${row%%|*}"; }
 }
 nm_has_gate() {
-  printf '%s\n' "$RUN_OUT" | grep -Eq "$FM_NM_GATE_LINE_RE"
+  printf '%s\n' "$RUN_OUT" | grep -Eq "$JG_NM_GATE_LINE_RE"
 }
 nm_gate_line_name() {
   local gate step
@@ -946,7 +946,7 @@ nm_ci_checks_state() {
 # The same reader checks for conflicting run records when the AXI overview
 # cannot identify this branch's run.
 nm_runs_list() {
-  nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT"
+  nm_run runs --limit "$JG_CREW_STATE_RUNS_LIMIT"
 }
 
 # CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
@@ -1132,7 +1132,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     status=$(strip_quotes "$(nm_field status)")
     RUN_STATUS=$status
     outcome=$(strip_quotes "$(nm_field outcome)")
-    awaiting=$(printf '%s\n' "$RUN_OUT" | grep -E "$FM_NM_AWAITING_AGENT_RE" | head -1 || true)
+    awaiting=$(printf '%s\n' "$RUN_OUT" | grep -E "$JG_NM_AWAITING_AGENT_RE" | head -1 || true)
     gate_status=$(nm_gate_status)
     has_gate=0
     nm_has_gate && has_gate=1
@@ -1168,7 +1168,7 @@ if [ "$HAVE_RUN" = 1 ]; then
       # compare a whole component for equality, so nothing a gate name or a
       # later note happens to contain can mint it.
       if nm_gate_awaits_human_decision; then
-        RUN_DETAIL="$RUN_DETAIL${SEP}$FM_GATE_HUMAN_DECISION"
+        RUN_DETAIL="$RUN_DETAIL${SEP}$JG_GATE_HUMAN_DECISION"
       fi
     else
       case "$status" in
@@ -1375,7 +1375,7 @@ fi
 
 # Fall back to the resolved status declaration, but ONLY when its verb maps to a real
 # run-state. A decision-closing event - resolved: (jg-classify-lib.sh's
-# FM_CLASSIFY_RESOLVE_VERB), and any future decision-only sibling - is NOT a state:
+# JG_CLASSIFY_RESOLVE_VERB), and any future decision-only sibling - is NOT a state:
 # it exists solely to CLOSE a keyed decision in the durable fold, so a trailing
 # resolved: must never become the current state or leak its resolution prose as the
 # detail. Skipping it lets a just-resolved idle crew (typically a secondmate, which

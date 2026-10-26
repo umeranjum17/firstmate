@@ -12,9 +12,9 @@ set -u
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/jg-tmux-submit-busy.XXXXXX")
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-# Override jg_pane_is_busy for testing: FM_FAKE_PANE_BUSY=1 means busy.
+# Override jg_pane_is_busy for testing: JG_FAKE_PANE_BUSY=1 means busy.
 jg_pane_is_busy() {
-  [ "${FM_FAKE_PANE_BUSY:-0}" = 1 ]
+  [ "${JG_FAKE_PANE_BUSY:-0}" = 1 ]
 }
 
 make_submit_mock() {
@@ -23,7 +23,7 @@ make_submit_mock() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-COMPOSER="${FM_FAKE_COMPOSER:?}"
+COMPOSER="${JG_FAKE_COMPOSER:?}"
 case "${1:-}" in
   display-message)
     for a in "$@"; do
@@ -31,12 +31,12 @@ case "${1:-}" in
     done
     exit 0 ;;
   capture-pane)
-    if [ -n "${FM_FAKE_CAPTURE_COUNT:-}" ]; then
+    if [ -n "${JG_FAKE_CAPTURE_COUNT:-}" ]; then
       count=0
-      [ ! -f "$FM_FAKE_CAPTURE_COUNT" ] || count=$(cat "$FM_FAKE_CAPTURE_COUNT")
+      [ ! -f "$JG_FAKE_CAPTURE_COUNT" ] || count=$(cat "$JG_FAKE_CAPTURE_COUNT")
       count=$((count + 1))
-      printf '%s\n' "$count" > "$FM_FAKE_CAPTURE_COUNT"
-      if [ "${FM_FAKE_FAIL_FIRST_CAPTURE:-0}" = 1 ] && [ "$count" -eq 1 ]; then
+      printf '%s\n' "$count" > "$JG_FAKE_CAPTURE_COUNT"
+      if [ "${JG_FAKE_FAIL_FIRST_CAPTURE:-0}" = 1 ] && [ "$count" -eq 1 ]; then
         exit 1
       fi
     fi
@@ -49,15 +49,15 @@ case "${1:-}" in
         -l) ;;
         Enter) is_enter=1 ;;
         -*) ;;
-        *) [ -z "${FM_FAKE_SENT:-}" ] || printf 'typed %s\n' "$1" >> "$FM_FAKE_SENT" ;;
+        *) [ -z "${JG_FAKE_SENT:-}" ] || printf 'typed %s\n' "$1" >> "$JG_FAKE_SENT" ;;
       esac
       shift
     done
     if [ "$is_enter" = 1 ]; then
-      [ -z "${FM_FAKE_SENT:-}" ] || printf 'Enter\n' >> "$FM_FAKE_SENT"
-      if [ -n "${FM_FAKE_SWALLOW:-}" ] && [ -f "$FM_FAKE_SWALLOW" ]; then
-        [ "${FM_FAKE_PERSIST_SWALLOW:-0}" = 1 ] || rm -f "$FM_FAKE_SWALLOW"
-        [ "${FM_FAKE_APPEND_BUSY:-0}" != 1 ] || printf '✻ Working…\n' >> "$COMPOSER"
+      [ -z "${JG_FAKE_SENT:-}" ] || printf 'Enter\n' >> "$JG_FAKE_SENT"
+      if [ -n "${JG_FAKE_SWALLOW:-}" ] && [ -f "$JG_FAKE_SWALLOW" ]; then
+        [ "${JG_FAKE_PERSIST_SWALLOW:-0}" = 1 ] || rm -f "$JG_FAKE_SWALLOW"
+        [ "${JG_FAKE_APPEND_BUSY:-0}" != 1 ] || printf '✻ Working…\n' >> "$COMPOSER"
       else
         printf '╭─────╮\n│ >   │\n╰─────╯\n' > "$COMPOSER"
       fi
@@ -82,11 +82,11 @@ test_busy_pane_pending_returns_empty() {
   : > "$sent"
   touch "$dir/.swallow"
   # Pre-check: composer state should be pending (via function, not $()).
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" jg_tmux_composer_state "win" > "$vfile" 2>/dev/null
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" jg_tmux_composer_state "win" > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] || fail "pre-check: composer state expected pending, got '$(cat "$vfile")'"
   # Now test the submit - write verdict to file to avoid nested $().
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=1 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_PANE_BUSY=1 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "busy-pane pending should return empty, got '$(cat "$vfile")'"
   [ "$(grep -c '^Enter$' "$sent" 2>/dev/null || true)" -eq 3 ] \
@@ -104,8 +104,8 @@ test_idle_pane_pending_returns_pending() {
   printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
   : > "$sent"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_PANE_BUSY=0 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] || fail "idle-pane pending should return pending, got '$(cat "$vfile")'"
   pass "jg_tmux_submit_enter_core: idle pane + pending composer stays pending (genuine swallow preserved)"
@@ -121,8 +121,8 @@ test_wrapped_continuation_retries_swallowed_enter() {
   printf '❯ wrapped typed input\ncontinues on the next terminal row\n' > "$composer"
   : > "$sent"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_PANE_BUSY=0 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] \
     || fail "wrapped input must remain pending after swallowed Enter, got '$(cat "$vfile")'"
@@ -141,8 +141,8 @@ test_placeholder_like_bare_input_retries_swallowed_enter() {
   printf 'transcript\n❯ Type a message...\n' > "$composer"
   : > "$sent"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_PANE_BUSY=0 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending ] \
     || fail "placeholder-like bare input must remain pending after swallowed Enter, got '$(cat "$vfile")'"
@@ -160,7 +160,7 @@ test_busy_pane_composer_clears_first_try() {
   vfile="$dir/verdict"
   printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
   : > "$sent"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=1 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" JG_FAKE_PANE_BUSY=1 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "busy-pane with cleared composer should return empty, got '$(cat "$vfile")'"
   pass "jg_tmux_submit_enter_core: busy pane clears composer on first Enter - returns empty"
@@ -175,7 +175,7 @@ test_idle_pane_composer_clears_first_try() {
   vfile="$dir/verdict"
   printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$composer"
   : > "$sent"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=0 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" JG_FAKE_PANE_BUSY=0 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = empty ] || fail "idle-pane with cleared composer should return empty, got '$(cat "$vfile")'"
   pass "jg_tmux_submit_enter_core: idle pane clears composer on first Enter - returns empty as before"
@@ -189,8 +189,8 @@ test_busy_pane_unknown_stays_unknown() {
   vfile="$dir/verdict"
   printf '│ > unbounded\n' > "$composer"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_PANE_BUSY=1 \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_PANE_BUSY=1 \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = unknown ] \
     || fail "a busy pane must not convert an unsafe composer to empty, got '$(cat "$vfile")'"
@@ -205,9 +205,9 @@ test_failed_baseline_capture_keeps_busy_unknown_unconfirmed() {
   vfile="$dir/verdict"
   printf '│ > unbounded\n' > "$composer"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
-    FM_FAKE_CAPTURE_COUNT="$dir/captures" FM_FAKE_FAIL_FIRST_CAPTURE=1 \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_APPEND_BUSY=1 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" \
+    JG_FAKE_CAPTURE_COUNT="$dir/captures" JG_FAKE_FAIL_FIRST_CAPTURE=1 \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_APPEND_BUSY=1 \
     jg_tmux_submit_core "win" "fix" 3 0.05 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = unknown ] \
     || fail "a failed idle-baseline capture must not let a later busy footer confirm delivery, got '$(cat "$vfile")'"
@@ -226,11 +226,11 @@ test_busy_pane_ambiguous_pending_retries_without_conversion() {
   : > "$sent"
   printf '╭────────────╮\n│ > fix  │\n╰────────────╯\n' > "$composer"
   touch "$dir/.swallow"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" jg_tmux_composer_state "win" > "$vfile" 2>/dev/null
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" jg_tmux_composer_state "win" > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending-unproven ] \
     || fail "ambiguous composer text should be pending-unproven, got '$(cat "$vfile")'"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" FM_FAKE_PANE_BUSY=1 \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" JG_FAKE_PANE_BUSY=1 \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 \
     jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   [ "$(cat "$vfile")" = pending-unproven ] \
     || fail "a busy pane must not convert pending-unproven to empty, got '$(cat "$vfile")'"
@@ -252,7 +252,7 @@ test_unrecognized_state_skips_busy_conversion() {
     jg_tmux_composer_state() { printf 'future-state'; }
     # shellcheck disable=SC2329
     jg_pane_is_busy() { touch "$busy_called"; return 0; }
-    PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
+    PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" \
       jg_tmux_submit_enter_core "win" 3 0.05 > "$vfile" 2>/dev/null
   ) || fail "unrecognized-state submit check failed"
   [ "$(cat "$vfile")" = future-state ] \
@@ -268,7 +268,7 @@ test_claude_busy_signature_uses_real_capture_shapes() {
   fakebin=$(make_submit_mock "$dir")
   composer="$dir/composer"
   pane_busy() {
-    PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" \
+    PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" \
       bash -c '. "$1/bin/jg-tmux-lib.sh"; jg_pane_is_busy "$2" "$3"' \
       _ "$ROOT" "$1" "${2:-}"
   }
@@ -370,8 +370,8 @@ test_exit_picker_refuses_confirming_enter() {
   : > "$sent"
   touch "$dir/.swallow"
   jg_composer_dialog_sink_prepare || fail "the dialog sink could not be prepared"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
-    FM_FAKE_SWALLOW="$dir/.swallow" FM_FAKE_PERSIST_SWALLOW=1 FM_FAKE_PANE_BUSY=0 \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
+    JG_FAKE_SWALLOW="$dir/.swallow" JG_FAKE_PERSIST_SWALLOW=1 JG_FAKE_PANE_BUSY=0 \
     jg_tmux_submit_enter_core "win" 3 0 > "$vfile" 2>/dev/null
   jg_composer_dialog_sink_release
   [ "$(cat "$vfile")" = unknown ] || fail "exit picker should return unknown, got '$(cat "$vfile")'"
@@ -401,7 +401,7 @@ test_typed_submit_on_open_exit_picker_types_nothing() {
     'Enter to confirm · Esc to cancel' > "$composer"
   before=$(cat "$composer")
   : > "$sent"
-  PATH="$fakebin:$PATH" FM_FAKE_COMPOSER="$composer" FM_FAKE_SENT="$sent" \
+  PATH="$fakebin:$PATH" JG_FAKE_COMPOSER="$composer" JG_FAKE_SENT="$sent" \
     jg_backend_send_text_submit tmux win 'please continue' 3 0 0 >"$dir/out" 2>"$err" || rc=$?
   [ "$rc" -ne 0 ] || fail "a typed submit onto an open picker should refuse"
   [ ! -s "$sent" ] || fail "a typed submit onto an open picker sent input: $(cat "$sent")"

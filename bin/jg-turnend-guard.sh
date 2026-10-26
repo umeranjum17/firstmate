@@ -72,7 +72,7 @@
 #      own under the shared ancestry-or-trusted-id verdict exits with a read-only
 #      diagnostic instead of blocking a session that cannot repair supervision
 #      without stealing ownership;
-#   3. otherwise wait briefly (FM_CLAUDE_AUTOARM_SYNC_WAIT_MS, default 800ms)
+#   3. otherwise wait briefly (JG_CLAUDE_AUTOARM_SYNC_WAIT_MS, default 800ms)
 #      for the auto-arm to claim this home (a live OPEN generation claim in the
 #      state/.claude-autoarm-epoch ledger - jg_autoarm_claim_open - or a legacy
 #      build's lock-holding claim under the legacy abandonment proof) or to
@@ -82,7 +82,7 @@
 #      the first fresh exhausted-failure epoch preserves the bounded progression,
 #      while later fresh failed epochs consume it instead of resetting it;
 #   4. only when neither materializes is the auto-arm genuinely absent: re-block
-#      with the repair banner, bounded to FM_CLAUDE_TURNEND_BLOCK_BUDGET
+#      with the repair banner, bounded to JG_CLAUDE_TURNEND_BLOCK_BUDGET
 #      (default 3) consecutive blocks per session - safely below Claude Code's
 #      hard 8-consecutive-block override - then allow one loud attended
 #      fail-open only for an already verified failure episode. The budget
@@ -94,17 +94,17 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-GRACE=${FM_GUARD_GRACE:-300}
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+GRACE=${JG_GUARD_GRACE:-300}
 WATCH="$SCRIPT_DIR/jg-watch.sh"
 CLAUDE_MODE=0
 CURSOR_MODE=0
-SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-800}
-EPOCH_FRESH=${FM_CLAUDE_AUTOARM_EPOCH_FRESH:-15}
-BLOCK_BUDGET=${FM_CLAUDE_TURNEND_BLOCK_BUDGET:-3}
+SYNC_WAIT_MS=${JG_CLAUDE_AUTOARM_SYNC_WAIT_MS:-800}
+EPOCH_FRESH=${JG_CLAUDE_AUTOARM_EPOCH_FRESH:-15}
+BLOCK_BUDGET=${JG_CLAUDE_TURNEND_BLOCK_BUDGET:-3}
 case "$SYNC_WAIT_MS" in ''|*[!0-9]*) SYNC_WAIT_MS=800 ;; esac
 case "$EPOCH_FRESH" in ''|*[!0-9]*|0) EPOCH_FRESH=15 ;; esac
 case "$BLOCK_BUDGET" in ''|*[!0-9]*|0) BLOCK_BUDGET=3 ;; esac
@@ -124,7 +124,7 @@ done
 # second Stop writer could land after this one and flip the verdict.
 # shellcheck disable=SC2329 # Invoked by the EXIT trap below.
 record_parent_stop_state() {
-  local status=$? pointer="$FM_ROOT/.jg-busy-stop" key value writer='' state='' id='' gen='' verdict=idle event=stop
+  local status=$? pointer="$JG_ROOT/.jg-busy-stop" key value writer='' state='' id='' gen='' verdict=idle event=stop
   [ "$CLAUDE_MODE" -eq 1 ] || return 0
   [ -f "$pointer" ] && [ ! -L "$pointer" ] || return 0
   while IFS='=' read -r key value; do
@@ -197,7 +197,7 @@ fi
 # and differs from the common (shared) git-dir, while a main, non-worktree
 # checkout has the two equal. Child worktrees never carry the gitignored marker,
 # so this exempts them while guarding every real secondmate home.
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 # --- the question rule ------------------------------------------------------
 # The owner's rule (data/owner-rules.md): "if you ask questions as well make
@@ -248,7 +248,7 @@ budget_reset() {
 }
 
 jg_supervision_status "$STATE" "$GRACE"
-if [ "$FM_SUP_NEEDED" = false ]; then
+if [ "$JG_SUP_NEEDED" = false ]; then
   [ -e "$FAILURE_NOTICE" ] || budget_reset
   exit 0
 fi
@@ -260,7 +260,7 @@ allow_supervised_stop() {
   exit 2
 }
 
-if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME"; then
   allow_supervised_stop
 fi
 
@@ -276,7 +276,7 @@ fi
 # (poll-cadence-derived, see the comment above) instead of the flat $GRACE
 # every other check on this page uses, so a daemon that is genuinely still
 # cycling - just slower than a fixed 300s window - is not misread as down.
-AFK_GRACE=${FM_GUARD_GRACE:-$(jg_poll_derived_grace)}
+AFK_GRACE=${JG_GUARD_GRACE:-$(jg_poll_derived_grace)}
 if [ "$(jg_path_age "$STATE/.last-watcher-beat")" -lt "$AFK_GRACE" ] \
   && jg_afk_daemon_owns_supervision "$STATE"; then
   allow_supervised_stop
@@ -294,14 +294,14 @@ block_stop() {
   {
     printf '●%s\n' "$rule"
     printf '●  TURN WOULD END BLIND - SUPERVISION IS OFF\n'
-    if [ "$FM_SUP_IN_FLIGHT" -gt 0 ]; then
-      printf '●  %s task(s) in flight, but no live watcher holds this home lock (last beat: %s).\n' "$FM_SUP_IN_FLIGHT" "$FM_SUP_BEACON_DESC"
-    elif [ "$FM_SUP_SOURCES" -gt 0 ]; then
-      printf '●  %s process-event source(s) registered, but no live watcher holds this home lock (last beat: %s).\n' "$FM_SUP_SOURCES" "$FM_SUP_BEACON_DESC"
-    elif [ "$FM_SUP_CHECKS" -gt 0 ]; then
-      printf '●  %s registered custom check(s), but no live watcher holds this home lock (last beat: %s).\n' "$FM_SUP_CHECKS" "$FM_SUP_BEACON_DESC"
+    if [ "$JG_SUP_IN_FLIGHT" -gt 0 ]; then
+      printf '●  %s task(s) in flight, but no live watcher holds this home lock (last beat: %s).\n' "$JG_SUP_IN_FLIGHT" "$JG_SUP_BEACON_DESC"
+    elif [ "$JG_SUP_SOURCES" -gt 0 ]; then
+      printf '●  %s process-event source(s) registered, but no live watcher holds this home lock (last beat: %s).\n' "$JG_SUP_SOURCES" "$JG_SUP_BEACON_DESC"
+    elif [ "$JG_SUP_CHECKS" -gt 0 ]; then
+      printf '●  %s registered custom check(s), but no live watcher holds this home lock (last beat: %s).\n' "$JG_SUP_CHECKS" "$JG_SUP_BEACON_DESC"
     else
-      printf '●  X-mode relay polling needs supervision, but no live watcher holds this home lock (last beat: %s).\n' "$FM_SUP_BEACON_DESC"
+      printf '●  X-mode relay polling needs supervision, but no live watcher holds this home lock (last beat: %s).\n' "$JG_SUP_BEACON_DESC"
     fi
     if [ "$CLAUDE_MODE" -eq 1 ]; then
       printf '●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.\n'
@@ -320,7 +320,7 @@ block_stop() {
 # the owning session remains responsible for restoring the watcher.
 if [ "$CLAUDE_MODE" -eq 1 ] && jg_session_lock_foreign_owner_live "$STATE"; then
   printf '{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid %s). Allowing this turn to end safely; the owning session must restore supervision."}\n' \
-    "$FM_SESSION_LOCK_FOREIGN_OWNER_PID"
+    "$JG_SESSION_LOCK_FOREIGN_OWNER_PID"
   exit 0
 fi
 
@@ -408,7 +408,7 @@ budget_account_current_epoch() {  # [observe|block]
 
 autoarm_owns_recovery() {
   local pid role outcome age
-  jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME" && return 0
+  jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME" && return 0
   # A live OPEN generation claim owns recovery: the ledger names a live,
   # identity-matched owner still arming that is not stuck (jg_autoarm_claim_open
   # in bin/jg-wake-lib.sh owns that predicate). A finished, dead,
@@ -504,7 +504,7 @@ terminal_fail_open() {
     jg_lock_release "$OWNER_LOCK"
     return 1
   fi
-  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME"; then
     if ! jg_failure_episode_reset "$STATE" held; then
       jg_lock_release "$BUDGET_LOCK"
       jg_lock_release "$OWNER_LOCK"
@@ -547,7 +547,7 @@ failure_episode_verified() {
 i=0
 while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   if autoarm_owns_recovery; then
-    if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+    if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME"; then
       jg_failure_episode_reset "$STATE" || exit 2
     fi
     exit 0
@@ -556,7 +556,7 @@ while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   i=$((i + 1))
 done
 if autoarm_owns_recovery; then
-  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  if jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME"; then
     jg_failure_episode_reset "$STATE" || exit 2
   fi
   exit 0
@@ -568,12 +568,12 @@ budget_account_current_epoch block || block_stop
 terminal_fail_open
 terminal_status=$?
 if [ "$terminal_status" -eq 0 ]; then
-  if [ "$FM_SUP_IN_FLIGHT" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_IN_FLIGHT task(s) in flight"
-  elif [ "$FM_SUP_SOURCES" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_SOURCES process-event source(s) registered"
-  elif [ "$FM_SUP_CHECKS" -gt 0 ]; then
-    NEED_DESC="$FM_SUP_CHECKS registered custom check(s)"
+  if [ "$JG_SUP_IN_FLIGHT" -gt 0 ]; then
+    NEED_DESC="$JG_SUP_IN_FLIGHT task(s) in flight"
+  elif [ "$JG_SUP_SOURCES" -gt 0 ]; then
+    NEED_DESC="$JG_SUP_SOURCES process-event source(s) registered"
+  elif [ "$JG_SUP_CHECKS" -gt 0 ]; then
+    NEED_DESC="$JG_SUP_CHECKS registered custom check(s)"
   else
     NEED_DESC="X-mode relay polling active"
   fi

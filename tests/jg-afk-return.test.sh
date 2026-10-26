@@ -46,21 +46,21 @@ install_runner() {  # <case-dir>
   cat > "$dir/bin/jg-afk-launch.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = stop ] || exit 2
-printf 'stop\n' >> "$FM_HOME/stop.log"
-rm -f "$FM_HOME/state/.afk"
-if [ -e "$FM_HOME/state/.fail-terminal-stop-once" ]; then
-  rm -f "$FM_HOME/state/.fail-terminal-stop-once"
+printf 'stop\n' >> "$JG_HOME/stop.log"
+rm -f "$JG_HOME/state/.afk"
+if [ -e "$JG_HOME/state/.fail-terminal-stop-once" ]; then
+  rm -f "$JG_HOME/state/.fail-terminal-stop-once"
   exit 1
 fi
-rm -f "$FM_HOME/state/.afk-daemon-terminal"
+rm -f "$JG_HOME/state/.afk-daemon-terminal"
 "$(dirname "$0")/jg-afk-contract.sh" archive >/dev/null
 SH
   cat > "$dir/bin/jg-wake-drain.sh" <<'SH'
 #!/usr/bin/env bash
-file="$FM_HOME/state/.fake-drain"
+file="$JG_HOME/state/.fake-drain"
 if [ "${1:-}" = --ack-through ]; then
   [ "${3:-}" = --recovery-generation ] && [ "${4:-}" = fixture-generation ] || exit 2
-  printf '%s\n' "$2" >> "$FM_HOME/state/.fake-drain-acks"
+  printf '%s\n' "$2" >> "$JG_HOME/state/.fake-drain-acks"
   : > "$file"
   exit 0
 fi
@@ -75,7 +75,7 @@ SH
 
 run_return() {  # <case-dir> <mode>
   local dir=$1 mode=$2
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" "$mode" 2>&1
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" "$mode" 2>&1
 }
 
 ack_return() {  # <case-dir> <return-output>
@@ -83,7 +83,7 @@ ack_return() {  # <case-dir> <return-output>
   sequence=$(printf '%s\n' "$output" | sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' | tail -1)
   generation=$(printf '%s\n' "$output" | sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' | tail -1)
   [ -n "$sequence" ] && [ -n "$generation" ] || fail "return output lacked a generation-bound post-handling acknowledgement: $output"
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" \
     "$dir/bin/jg-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation"
 }
 
@@ -146,7 +146,7 @@ test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
   # catch-up posture as content rather than refusing. The blocked worker still
   # projects as its own Underway row, and the catch-up posture is a separate
   # action-free Charted Next gate row that never becomes a Captain's Call entry.
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json 2>&1) \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json 2>&1) \
     || fail "Bearings should render behind the return catch-up gate: $out"
   # The live projected state of the blocked worker follows its endpoint, which
   # this fixture deliberately does not stand up; what the gate must no longer
@@ -162,7 +162,7 @@ test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
                       and (.title | test("^1 blocker"))))
     and ([.decisions_open[].id] | index("(return-catchup)") | not)' >/dev/null \
     || fail "Bearings did not reserve the catch-up posture outside bounded action-free gate rows: $out"
-  toon=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" 2>&1) \
+  toon=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" 2>&1) \
     || fail "default Bearings should render behind the return catch-up gate: $toon"
   gate_header=$(printf '%s\n' "$toon" | awk '/^gates\[[0-9]+\]\{/ { print; exit }')
   assert_contains "$gate_header" '{id,title,blocked_by,reason,owner,filed}' "catch-up removed filed from the TOON gate schema"
@@ -171,7 +171,7 @@ test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
   # The guard itself still separates its two branches by exit status, so an
   # active away window keeps refusing while catch-up reports.
   set +e
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
   rc=$?
   set -e
   [ "$rc" -eq 4 ] || fail "the catch-up branch should be distinguishable by exit status (rc=$rc): $out"
@@ -192,7 +192,7 @@ test_return_gate_owns_remediation_and_reports_catchup_to_bearings() {
 
   printf 'resolved [key=synthetic-dependency]: refreshed the synthetic token and resumed the task\n' >> "$dir/home/state/repair-task.status"
   out=$(run_return "$dir" check) || fail "resolved blocker did not clear return catch-up: $out"
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json \
     | jq -e '[.gates[].id] | index("(return-catchup)") | not' >/dev/null \
     || fail "the cleared gate left the catch-up posture row in Bearings"
   assert_contains "$out" 'catch-up clear' "successful check did not announce that ordinary work may proceed"
@@ -272,7 +272,7 @@ test_evidence_publication_failure_preserves_wake_for_redrain() {
   : > "$dir/read-only-output"
 
   set +e
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" \
     "$dir/bin/jg-afk-return.sh" begin 3< "$dir/read-only-output" >&3 2> "$dir/failed.err"
   rc=$?
   set -e
@@ -304,7 +304,7 @@ test_away_reentry_refuses_pending_return_gate() {
   mkdir -p "$dir/home/state" "$dir/home/data" "$dir/home/config"
   printf 'schema\tjg-afk-return.v1\nphase\tblocked\n' > "$dir/home/state/.afk-return-catchup"
   set +e
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-afk-launch.sh" start-native 2>&1)
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-afk-launch.sh" start-native 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "away re-entry succeeded while return catch-up was pending"
@@ -364,13 +364,13 @@ test_check_retries_recorded_terminal_teardown() {
 contract_in() {  # <case-dir> <args...>
   local dir=$1
   shift
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-contract.sh" "$@"
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-contract.sh" "$@"
 }
 
 outcome_in() {  # <case-dir> <args...>
   local dir=$1
   shift
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-branch-outcome.sh" "$@"
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-branch-outcome.sh" "$@"
 }
 
 line_of() {  # <haystack> <needle> -> 1-based line number of the first match, or empty
@@ -469,7 +469,7 @@ test_return_brief_composes_from_record_store_and_held_set() {
   assert_contains "$second" 'supervision ran through the away window with no detected gap' "check lost the health snapshot taken at begin"
   assert_contains "$second" 'catch-up clear' "check did not clear the gate"
   [ ! -e "$gate" ] || fail "the cleared check left the gate behind"
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard \
     || fail "guard still refused after the record was archived and the gate cleared"
   pass "the return brief renders health, the words with the session account, waiting, could-not-fix, handled, and cost from durable records, and the gate shrinks to what the away session could not fix"
 }
@@ -499,7 +499,7 @@ test_return_brief_points_at_the_drain_on_a_host_home_only() {
     touch "$dir/home/state/.last-watcher-beat"
     : > "$dir/home/state/.fake-drain"
     # shellcheck disable=SC2016 # the single-quoted script expands in the harness shell
-    out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+    out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
       "$fakebin/$harness" -c '"$0" begin 2>&1' "$dir/bin/jg-afk-return.sh") || fail "$harness: the return did not clear: $out"
     assert_contains "$out" '7 outcome(s) handled by the away session (6 routine, 1 escalated above)' "$harness: the brief must count the window's outcomes"
     if [ "$harness" = claude ]; then
@@ -534,7 +534,7 @@ test_return_brief_all_silent_window_does_not_point_at_drain() {
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
   # shellcheck disable=SC2016 # the single-quoted script expands in the harness shell
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$fakebin/claude" -c '"$0" begin 2>&1' "$dir/bin/jg-afk-return.sh") || fail "the all-silent return did not clear: $out"
   assert_contains "$out" '1 outcome(s) handled by the away session (1 routine, 0 escalated above)' \
     "the all-silent window's stored outcome count was lost"
@@ -569,7 +569,7 @@ test_return_keeps_catchup_gated_when_the_drain_cannot_record_outcomes() {
   mv "$dir/bin/jg-branch-outcome.sh" "$dir/bin/jg-branch-outcome.real.sh"
   cat > "$dir/bin/jg-branch-outcome.sh" <<'EOF'
 #!/usr/bin/env bash
-[ "${1:-}" != mark-read ] || [ ! -e "$FM_HOME/cursor-stuck" ] || exit 1
+[ "${1:-}" != mark-read ] || [ ! -e "$JG_HOME/cursor-stuck" ] || exit 1
 exec "$(dirname "$0")/jg-branch-outcome.real.sh" "$@"
 EOF
   chmod +x "$dir/bin/jg-branch-outcome.sh"
@@ -577,7 +577,7 @@ EOF
   touch "$dir/home/state/.last-watcher-beat"
   set +e
   # shellcheck disable=SC2016 # the single-quoted script expands in the harness shell
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$fakebin/claude" -c '"$0" begin 2>&1' "$dir/bin/jg-afk-return.sh")
   rc=$?
   set -e
@@ -593,7 +593,7 @@ EOF
   [ ! -e "$dir/home/state/.branch-outcomes-cursor" ] || fail "the stuck cursor moved"
   rm -f "$dir/home/cursor-stuck"
   # shellcheck disable=SC2016 # the single-quoted script expands in the harness shell
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$fakebin/claude" -c '"$0" check 2>&1' "$dir/bin/jg-afk-return.sh") || fail "catch-up did not clear once the drain recorded its outcomes: $out"
   assert_contains "$out" 'catch-up clear' "the recorded presentation did not clear catch-up"
   assert_contains "$out" "presented in the drain's BRANCH OUTCOMES section" "a successful drain's brief must point at its presentation"
@@ -774,7 +774,7 @@ SH
   : > "$dir/home/state/.fake-drain"
   gate="$dir/home/state/.afk-return-catchup"
   set +e
-  out=$(PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" \
+  out=$(PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1)
   rc=$?
   set -e
@@ -785,14 +785,14 @@ SH
   # refusal must name what actually holds it instead of promising a blocker
   # list it cannot produce, and Bearings must carry that same reason.
   set +e
-  guard_out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
+  guard_out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
   guard_rc=$?
   set -e
   [ "$guard_rc" -eq 4 ] || fail "a blockerless catch-up gate should use the catch-up branch (rc=$guard_rc): $guard_out"
   assert_contains "$guard_out" 'no open blocker' "the blockerless refusal did not say the gate lists no blocker"
   assert_contains "$guard_out" 'catch-up retained: held set unreadable' "the blockerless refusal did not name the retention reason"
   assert_not_contains "$guard_out" 'every listed blocker' "the blockerless refusal still demanded an empty blocker list"
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$ROOT/bin/jg-bearings-snapshot.sh" --json \
     | jq -e '.gates | any(.id == "(return-catchup)" and (.title | startswith("catch-up retained:")))' >/dev/null \
     || fail "Bearings did not carry the blockerless catch-up retention reason"
   waiting=$(printf '%s\n' "$out" | awk '/^Waiting on you:/{show=1} /^Tried and failed, or could not be fixed:/{show=0} show')
@@ -884,7 +884,7 @@ test_return_guard_refuses_while_the_record_exists() {
   install_runner "$dir"
   contract_in "$dir" enter >/dev/null 2>&1 || fail "could not write the away-posture record"
   set +e
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" "$dir/bin/jg-afk-return.sh" guard 2>&1)
   rc=$?
   set -e
   [ "$rc" -eq 3 ] || fail "guard should refuse while the away-posture record exists (rc=$rc): $out"
@@ -972,7 +972,7 @@ seed_host_latch() {  # <case-dir> <errors> <cooldown> <retry-after> <log-lines>
   TZ=UTC touch -t "$(date -u -r "$(( $(date +%s) - 7200 ))" +%Y%m%d%H%M.%S 2>/dev/null || date -u -d "@$(($(date +%s) - 7200))" +%Y%m%d%H%M.%S)" \
     "$dir/home/state/.lock" "$dir/home/state/.lock-session"
   # shellcheck disable=SC2016 # expands in the child shell
-  key=$(FM_HOME="$dir/home" bash -c '. "$1/jg-wake-lib.sh" && . "$1/jg-supervision-engine-lib.sh" \
+  key=$(JG_HOME="$dir/home" bash -c '. "$1/jg-wake-lib.sh" && . "$1/jg-supervision-engine-lib.sh" \
     && jg_supervision_host_config "$2" claude && jg_supervision_host_health_key "$3"' _ \
     "$dir/bin" "$dir/home/config" "$dir/home/state") || fail "could not compute the latch key"
   printf 'key=%s\nerrors=%s\ncooldown=%s\nretry_after=%s\n' "$key" "$2" "$3" "$4" > "$dir/home/state/.supervision-host-health"
@@ -997,7 +997,7 @@ $now${tab}failed${tab}turn=t.4${tab}posture=away${tab}rc=1${tab}reports=0${tab}u
 $now${tab}to-main${tab}the away session could not take this wake: the engine turn failed (exit 1); this wake is yours"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a latch with no blocker should not hold the gate: $out"
   section=$(printf '%s\n' "$out" | sed -n '/^Tried and failed, or could not be fixed:$/,/^Landed, cleanup due:$/p')
   assert_contains "$section" "  - the supervision session latched at $(date -u -r "$now" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d "@$now" '+%Y-%m-%dT%H:%M:%SZ') after 2 consecutive engine errors and paused away supervision (at least 2 engine error(s) in the window, last cooldown 300s)" \
@@ -1016,7 +1016,7 @@ $now${tab}to-main${tab}the away session could not take this wake: the engine tur
 $now${tab}recovered${tab}after a successful probe"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a recovered latch should not hold the gate: $out"
   assert_contains "$out" 'it recovered at ' "a latch cleared inside the window was not reported as recovered"
 
@@ -1032,7 +1032,7 @@ $((now + 60))${tab}latch${tab}errors=2${tab}cooldown=300s
 $((now + 120))${tab}latch${tab}errors=3${tab}cooldown=600s"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a second latch with no blocker should not hold the gate: $out"
   assert_contains "$out" "  - the supervision session latched at $(date -u -r "$((now + 60))" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d "@$((now + 60))" '+%Y-%m-%dT%H:%M:%SZ') after 2 consecutive engine errors and paused away supervision (last cooldown 600s); still paused at return" \
     "a second latch after a recovery was not reported with its own trip-row error count"
@@ -1045,7 +1045,7 @@ $((now + 120))${tab}latch${tab}errors=3${tab}cooldown=600s"
   seed_host_latch "$dir" 2 300 1 "$((now - 3600))${tab}latch${tab}errors=2${tab}cooldown=300s"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a cooled latch should not hold the gate: $out"
   assert_contains "$out" '  - the supervision session was already latched after engine errors when the window began; still paused at return: its cooldown has ended, so the next wake probes the engine again' \
     "a latch held past its cooldown was not reported with its probe state"
@@ -1057,7 +1057,7 @@ $((now + 120))${tab}latch${tab}errors=3${tab}cooldown=600s"
   seed_host_latch "$dir" 1 0 0 "$now${tab}failed${tab}turn=t.1${tab}posture=away${tab}rc=124${tab}reports=0${tab}unacked=2${tab}no-result${tab}${tab}signal: a"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "engine errors with no blocker should not hold the gate: $out"
   assert_contains "$out" '  - at least 1 supervision engine turn(s) ended in an engine error during the away window without latching; not paused at return' \
     "engine errors that did not latch were not reported"
@@ -1071,7 +1071,7 @@ $((now + 120))${tab}latch${tab}errors=3${tab}cooldown=600s"
   seed_host_latch "$dir" 3 600 "$((now + 600))" "$now${tab}failed${tab}turn=t.9${tab}posture=away${tab}rc=1${tab}reports=0${tab}unacked=2${tab}error=1 cost=0${tab}boom${tab}signal: a"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a trimmed latch with no blocker should not hold the gate: $out"
   assert_contains "$out" '  - the supervision session latched after engine errors and paused away supervision (trip time unavailable, at least 1 engine error(s) in the window); still paused at return: every wake reaches main until ' \
     "a paused latch whose trip row was trimmed was not reported"
@@ -1086,7 +1086,7 @@ $((now + 120))${tab}latch${tab}errors=3${tab}cooldown=600s"
 $now${tab}latch${tab}errors=3${tab}cooldown=600s"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a probe-only latch with no blocker should not hold the gate: $out"
   assert_contains "$out" '  - the supervision session latched after engine errors and paused away supervision (trip time unavailable, at least 1 engine error(s) in the window); still paused at return: every wake reaches main until ' \
     "a paused latch whose ledger holds only a probe row was not reported without a trip time"
@@ -1100,7 +1100,7 @@ $now${tab}latch${tab}errors=3${tab}cooldown=600s"
   seed_host_latch "$dir" 3 600 "$((now + 600))" "$((now - 3600))${tab}latch${tab}errors=3${tab}cooldown=600s"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a pre-window probe-only latch with no blocker should not hold the gate: $out"
   assert_contains "$out" '  - the supervision session latched after engine errors and paused away supervision (trip time unavailable); still paused at return' \
     "a paused latch whose ledger holds only a pre-window probe row was not reported without a trip time"
@@ -1113,7 +1113,7 @@ $now${tab}latch${tab}errors=3${tab}cooldown=600s"
   rm -f "$dir/home/state/.supervision-host.log"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a latch with no ledger and no blocker should not hold the gate: $out"
   section=$(printf '%s\n' "$out" | sed -n '/^Tried and failed, or could not be fixed:$/,/^Landed, cleanup due:$/p')
   assert_contains "$section" '  - the supervision session latched after engine errors and paused away supervision (trip time unavailable); still paused at return' \
@@ -1135,7 +1135,7 @@ test_return_brief_keeps_recovered_trip_when_next_append_is_lost() {
 $recovered${tab}recovered${tab}after a successful probe"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a lost second trip append should not hold the gate: $out"
   section=$(printf '%s\n' "$out" | sed -n '/^Tried and failed, or could not be fixed:$/,/^Landed, cleanup due:$/p')
   first_iso=$(date -u -r "$first" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$first" +%Y-%m-%dT%H:%M:%SZ)
@@ -1161,7 +1161,7 @@ test_return_brief_does_not_invent_a_trip_while_recovery_is_being_saved() {
 $recovered${tab}recovered${tab}after a successful probe"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a recovery being saved should not hold the gate: $out"
   section=$(printf '%s\n' "$out" | sed -n '/^Tried and failed, or could not be fixed:$/,/^Landed, cleanup due:$/p')
   first_iso=$(date -u -r "$first" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$first" +%Y-%m-%dT%H:%M:%SZ)
@@ -1186,7 +1186,7 @@ test_return_brief_keeps_trip_row_count_after_probe() {
 $((now + 1))${tab}latch${tab}errors=3${tab}cooldown=600s"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a probed latch should not hold the gate: $out"
   assert_contains "$out" 'after 2 consecutive engine errors and paused away supervision (last cooldown 600s)'  \
     "the failed probe replaced the trip row's error count"
@@ -1209,7 +1209,7 @@ $((now + 1))${tab}latch${tab}errors=3${tab}cooldown=600s"
     "$dir/home/state/.lock" "$dir/home/state/.lock-session"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
-  out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+  out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
     "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "a cross-session latch should not hold the gate: $out"
   assert_contains "$out" 'trip time unavailable' \
     "the current session's probe was combined with an old session's trip"
@@ -1244,7 +1244,7 @@ $second${tab}latch${tab}errors=3${tab}cooldown=300s" ;;
       "$dir/home/state/.lock" "$dir/home/state/.lock-session"
     touch "$dir/home/state/.last-watcher-beat"
     : > "$dir/home/state/.fake-drain"
-    out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+    out=$(JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" JG_CONFIG_OVERRIDE="$dir/home/config" \
       "$dir/bin/jg-afk-return.sh" begin 2>&1) || fail "$scenario: return should clear: $out"
     section=$(printf '%s\n' "$out" | sed -n '/^Tried and failed, or could not be fixed:$/,/^Landed, cleanup due:$/p')
     case "$scenario" in

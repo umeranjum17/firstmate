@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-task-outcome.sh - append one durable task-outcome line to
 # <home>/data/metrics/task-outcomes.tsv for per-model fleet statistics.
 # Usage: jg-task-outcome.sh <task-id> [--force]
@@ -29,19 +38,19 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "$#" -eq 0 ] || [ -f "${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}/$1.meta" ] || exit 0
-# The lock helpers live in the Firstmate checkout, not in this add-on: FM_BIN, else $FM_HOME/bin.
-WAKE_LIB="${FM_BIN:-${FM_HOME:-}/bin}/jg-wake-lib.sh"
+[ "$#" -eq 0 ] || [ -f "${JG_STATE_OVERRIDE:-${JG_HOME:-${JG_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}/$1.meta" ] || exit 0
+# The lock helpers live in the Firstmate checkout, not in this add-on: JG_BIN, else $JG_HOME/bin.
+WAKE_LIB="${JG_BIN:-${JG_HOME:-}/bin}/jg-wake-lib.sh"
 [ -f "$WAKE_LIB" ] || {
-  echo "jg-task-outcome.sh: cannot find $WAKE_LIB (set FM_BIN to a Firstmate checkout's bin/, or FM_HOME to its root)" >&2
+  echo "jg-task-outcome.sh: cannot find $WAKE_LIB (set JG_BIN to a Firstmate checkout's bin/, or JG_HOME to its root)" >&2
   exit 2
 }
 # shellcheck source=/dev/null
 . "$WAKE_LIB"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 usage() {
   echo "usage: jg-task-outcome.sh <task-id> [--force]" >&2
@@ -84,8 +93,8 @@ PROJECT=${PROJECT##*/}
 
 PR=$(awk -F= '$1 == "pr" { sub(/^[^=]*=/, ""); v=$0 } END { print v }' "$META" 2>/dev/null || true)
 
-if [ -f "$FM_HOME/.jg-secondmate-home" ] && [ ! -L "$FM_HOME/.jg-secondmate-home" ]; then
-  HOME_NAME=$(head -n 1 "$FM_HOME/.jg-secondmate-home" 2>/dev/null | tr -d '\r\n')
+if [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ]; then
+  HOME_NAME=$(head -n 1 "$JG_HOME/.jg-secondmate-home" 2>/dev/null | tr -d '\r\n')
 else
   HOME_NAME=main
 fi

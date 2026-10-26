@@ -24,12 +24,12 @@ mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 
 # The real drain asserts watcher liveness through jg-guard.sh, whose tangle
-# check warns when FM_ROOT sits on a feature branch; point it at a fresh
+# check warns when JG_ROOT sits on a feature branch; point it at a fresh
 # non-git dir so the banner stays inert in this disposable worktree (the same
 # trick tests/wake-helpers.sh installs for the drain suites).
-FM_ROOT_OVERRIDE="$(jg_test_tmproot jg-parent-channel-scan-exclusion-root)"
-export FM_ROOT_OVERRIDE
-mkdir -p "$FM_ROOT_OVERRIDE"
+JG_ROOT_OVERRIDE="$(jg_test_tmproot jg-parent-channel-scan-exclusion-root)"
+export JG_ROOT_OVERRIDE
+mkdir -p "$JG_ROOT_OVERRIDE"
 
 cleanup() { rm -rf -- "$TMP_ROOT"; }
 trap cleanup EXIT
@@ -91,7 +91,7 @@ LOCAL_STATE="$LOCAL_MATE/state"
 
 test_predicate_resolves_only_the_remote_channel() {
   local out rc
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     status_scan_parent_channel_exclude "$2"
@@ -99,13 +99,13 @@ test_predicate_resolves_only_the_remote_channel() {
     || fail "the remote mate's channel must resolve for exclusion, got rc=$?"
   [ "$out" = "$REMOTE_STATE/parent-replies.status" ] \
     || fail "the exclusion must be the resolved channel path, got: $out"
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     status_scan_parent_channel_exclude "$2"
   ' _ "$ROOT" "$PLAIN_STATE")
   [ -z "$out" ] || fail "a main home must exclude nothing, got: $out"
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     status_scan_parent_channel_exclude "$2"
@@ -116,7 +116,7 @@ test_predicate_resolves_only_the_remote_channel() {
 
 test_resolver_predicates_on_home_shape_not_name() {
   local out
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-parent-channel-lib.sh
     . "$1/bin/jg-parent-channel-lib.sh"
     jg_parent_channel_outbound_status "$2" "$3"
@@ -124,13 +124,13 @@ test_resolver_predicates_on_home_shape_not_name() {
     || fail "the remote mate's outbound status must resolve"
   [ "$out" = "$REMOTE_STATE/parent-replies.status" ] \
     || fail "the remote route must resolve into the mate's own state dir, got: $out"
-  FM_TEST_LIB_SOURCED=1 bash -c '
+  JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-parent-channel-lib.sh
     . "$1/bin/jg-parent-channel-lib.sh"
     jg_parent_channel_outbound_status "$2" "$3"
   ' _ "$ROOT" "$PLAIN" "$PLAIN_STATE" \
     && fail "a main home has no outbound parent-channel status"
-  FM_TEST_LIB_SOURCED=1 bash -c '
+  JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-parent-channel-lib.sh
     . "$1/bin/jg-parent-channel-lib.sh"
     jg_parent_channel_outbound_status "$2" "$3"
@@ -145,7 +145,7 @@ test_remote_folds_omit_channel_and_keep_genuine_task() {
   local dir out
   dir="$TMP_ROOT/folds"
   seed_remote_mate "$dir/home"
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     echo "WHOLE:"; scan_open_decisions "$2"
@@ -168,7 +168,7 @@ test_incremental_fold_omits_channel_and_keeps_genuine_task() {
   local dir out
   dir="$TMP_ROOT/folds-incremental"
   seed_remote_mate "$dir/home"
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     scan_open_decisions_incremental "$2"
@@ -185,7 +185,7 @@ test_channel_lines_never_reach_the_remote_unread_surface() {
   local dir out
   dir="$TMP_ROOT/unread"
   seed_remote_mate "$dir/home"
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     scan_unread_surface_lines "$2"
@@ -198,7 +198,7 @@ test_channel_lines_never_reach_the_remote_unread_surface() {
 
 test_name_shared_file_folds_in_a_main_home() {
   local out
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     scan_open_decisions "$2"
@@ -212,7 +212,7 @@ test_name_shared_file_folds_in_a_main_home() {
 
 test_name_shared_file_folds_in_a_local_mate() {
   local out
-  out=$(FM_TEST_LIB_SOURCED=1 bash -c '
+  out=$(JG_TEST_LIB_SOURCED=1 bash -c '
     # shellcheck source=bin/jg-classify-lib.sh
     . "$1/bin/jg-classify-lib.sh"
     scan_open_decisions "$2"
@@ -226,12 +226,12 @@ test_name_shared_file_folds_in_a_local_mate() {
 
 # Source the watcher once with an isolated state/home; its source guard returns
 # before the lock/loop, so only the functions load. scan_signals and
-# heartbeat_scan_finds_actionable read STATE at call time. FM_ROOT_OVERRIDE
+# heartbeat_scan_finds_actionable read STATE at call time. JG_ROOT_OVERRIDE
 # stays at the inert dir set above; the unit-called functions read STATE, not
 # the repo root.
 WATCH_STATE="$REMOTE_STATE"
-export FM_STATE_OVERRIDE="$WATCH_STATE"
-export FM_HOME="$REMOTE"
+export JG_STATE_OVERRIDE="$WATCH_STATE"
+export JG_HOME="$REMOTE"
 # Production modules are independently linted canonical roots. Keep this test's
 # ShellCheck context local while preserving its unchanged runtime source path.
 # shellcheck source=/dev/null
@@ -257,20 +257,20 @@ test_heartbeat_backstop_skips_channel_in_remote_mate() {
   printf 'note: benchmark results are in\n' > "$dir/home/state/real-task.status"
   STATE="$dir/home/state"
   heartbeat_scan_finds_actionable; rc=$?
-  [ "$rc" -eq 1 ] || fail "the channel must not surface through the heartbeat backstop (rc=$rc): $FM_HEARTBEAT_SURFACE_ENDPOINTS"
-  case "$FM_HEARTBEAT_SURFACE_ENDPOINTS" in
-    *parent-replies*) fail "the channel leaked into the heartbeat backstop: $FM_HEARTBEAT_SURFACE_ENDPOINTS" ;;
+  [ "$rc" -eq 1 ] || fail "the channel must not surface through the heartbeat backstop (rc=$rc): $JG_HEARTBEAT_SURFACE_ENDPOINTS"
+  case "$JG_HEARTBEAT_SURFACE_ENDPOINTS" in
+    *parent-replies*) fail "the channel leaked into the heartbeat backstop: $JG_HEARTBEAT_SURFACE_ENDPOINTS" ;;
   esac
   # A genuine task's captain-relevant line must keep reaching the backstop.
   printf 'blocked [key=wedge]: the crew is stuck\n' >> "$dir/home/state/real-task.status"
   heartbeat_scan_finds_actionable; rc=$?
   [ "$rc" -eq 0 ] || fail "a genuine task's decision must surface through the heartbeat backstop"
-  case "$FM_HEARTBEAT_SURFACE_ENDPOINTS" in
+  case "$JG_HEARTBEAT_SURFACE_ENDPOINTS" in
     *real-task.status*) ;;
-    *) fail "the heartbeat backstop must name the genuine task: $FM_HEARTBEAT_SURFACE_ENDPOINTS" ;;
+    *) fail "the heartbeat backstop must name the genuine task: $JG_HEARTBEAT_SURFACE_ENDPOINTS" ;;
   esac
-  case "$FM_HEARTBEAT_SURFACE_ENDPOINTS" in
-    *parent-replies*) fail "the channel leaked into the heartbeat backstop: $FM_HEARTBEAT_SURFACE_ENDPOINTS" ;;
+  case "$JG_HEARTBEAT_SURFACE_ENDPOINTS" in
+    *parent-replies*) fail "the channel leaked into the heartbeat backstop: $JG_HEARTBEAT_SURFACE_ENDPOINTS" ;;
   esac
   pass "the heartbeat backstop skips a remote mate's channel and keeps its tasks"
 }
@@ -298,7 +298,7 @@ test_watcher_scan_keeps_name_shared_files_outside_remote_mates() {
 daemon_heartbeat_scan() {  # <home>
   local home=$1
   rm -f "$home/state/.subsuper-last-scan"
-  FM_TEST_LIB_SOURCED=1 FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  JG_TEST_LIB_SOURCED=1 JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     bash -c '
       # shellcheck source=/dev/null
       . "$1/bin/jg-supervise-daemon.sh"
@@ -353,7 +353,7 @@ test_drain_presents_no_channel_content_in_remote_mate() {
   dir="$TMP_ROOT/drain"
   seed_remote_mate "$dir/home"
   mkdir -p "$dir/home/data"
-  FM_STATE_OVERRIDE="$dir/home/state" FM_HOME="$dir/home" \
+  JG_STATE_OVERRIDE="$dir/home/state" JG_HOME="$dir/home" \
     "$ROOT/bin/jg-wake-drain.sh" > "$dir/drain.out" \
     || fail "the drain failed over a remote mate home"
   out=$(cat "$dir/drain.out")
@@ -384,7 +384,7 @@ test_drain_ignores_stale_channel_records_from_an_older_watcher() {
     > "$dir/home/state/.parent-replies.open-decisions-cursor"
   printf 'parent-replies\tstrong:1:2:3\t99\t0\n' \
     > "$dir/home/state/.status-presentation-cursor"
-  FM_STATE_OVERRIDE="$dir/home/state" FM_HOME="$dir/home" \
+  JG_STATE_OVERRIDE="$dir/home/state" JG_HOME="$dir/home" \
     "$ROOT/bin/jg-wake-drain.sh" > "$dir/drain.out" \
     || fail "the drain failed over stale channel records"
   out=$(cat "$dir/drain.out")

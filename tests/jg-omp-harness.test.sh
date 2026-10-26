@@ -9,13 +9,13 @@
 # verdicts come from what the vendor emits (a process name, a settings schema,
 # an extension event). This suite pins the LOGIC with real processes, a fake
 # omp binary, and a plain Node host, so CI enforces it with no omp installed;
-# FM_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh is the live guard that
+# JG_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh is the live guard that
 # catches vendor drift against a real omp. Neither replaces the other.
 #
 # The load-bearing contracts:
 #   1. omp publishes no marker; the anchored process name `omp` is the ancestry
 #      evidence, and ompd/comp never identify.
-#   2. FM_OMP_HARNESS=omp is a precedence override that needs a real omp
+#   2. JG_OMP_HARNESS=omp is a precedence override that needs a real omp
 #      ancestor: it beats an inherited CLAUDECODE under omp and is inert when it
 #      leaks into a worker whose ancestry holds no omp.
 #   3. Every omp launch clears foreign markers, carries the tracked posture
@@ -68,25 +68,25 @@ test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+  out=$(env -u CLAUDECODE -u JG_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
     # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-    out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+    out=$(env -u CLAUDECODE -u JG_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
       "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
     [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
+  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 JG_OMP_HARNESS=omp \
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")
-  [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
+  [ "$out" = omp ] || fail "JG_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
+  out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 JG_OMP_HARNESS=omp \
     bash -c '"$1"; :' _ "$HARNESS")
-  [ "$out" != omp ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
+  [ "$out" != omp ] || fail "a leaked JG_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "jg-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
 
@@ -147,7 +147,7 @@ EOF
 run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
-  FM_FAKE_LAUNCH_LOG="$launchlog" jg_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
+  JG_FAKE_LAUNCH_LOG="$launchlog" jg_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
 }
 
 test_spawn_launch_line_and_worker_wiring() {
@@ -164,7 +164,7 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_grep "effort=medium" "$state/$id.meta" "meta missing the pinned effort"
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
+  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
   assert_contains "$launch" "--config '$ROOT/.omp/jg-worker-overlay.yml' --auto-approve --cwd '$WT_DIR'" \
     "omp launch did not carry the tracked posture overlay, --auto-approve, and the pinned working directory"
@@ -227,13 +227,13 @@ test_secondmate_launch_relies_on_discovery() {
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
   : > "$launchlog"
-  # FM_BACKEND=tmux pins the fake tmux even where the developer shell carries a
+  # JG_BACKEND=tmux pins the fake tmux even where the developer shell carries a
   # live Herdr environment; without it auto-detection would spawn a real pane.
-  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
-    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
-    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' JG_BACKEND=tmux CLAUDECODE=1 \
+    JG_ROOT_OVERRIDE='' JG_HOME="$world/home" \
+    JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
+    JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
     "$ROOT/bin/jg-spawn.sh" sm "$home" omp --secondmate 2>&1)
   status=$?
   expect_code 0 "$status" "omp secondmate spawn should succeed: $out"
@@ -243,8 +243,8 @@ test_secondmate_launch_relies_on_discovery() {
     || fail "an omp secondmate launch must name exactly one -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch"
   assert_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
   assert_contains "$launch" "--config '$ROOT/.omp/jg-worker-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
-  assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
-  assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
+  assert_contains "$launch" "JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
+  assert_contains "$launch" "JG_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_present "$world/home/state/sm.omp-ext.ts" "a secondmate must receive the per-task busy extension"
   pass "jg-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions"
 }
@@ -268,11 +268,11 @@ test_secondmate_config_pinned_model_is_validated() {
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
   : > "$launchlog"
-  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
-    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
-    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+  out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' JG_BACKEND=tmux CLAUDECODE=1 \
+    JG_ROOT_OVERRIDE='' JG_HOME="$world/home" \
+    JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
+    JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
     "$ROOT/bin/jg-spawn.sh" sm "$home" --secondmate 2>&1)
   status=$?
   expect_code 1 "$status" "a config-pinned unlisted omp model must refuse the secondmate spawn: $out"
@@ -365,7 +365,7 @@ test_control_composer_and_model_tables() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named-model")
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
-  out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u FM_SUPERVISION_MODEL \
+  out=$(env -u CLAUDECODE -u JG_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u JG_SUPERVISION_MODEL \
     "$bin/omp" -c '. "$1"; jg_supervision_model' _ "$ROOT/bin/jg-wake-lib.sh")
   [ "$out" = extension ] || fail "an omp primary must run the extension supervision model, got '$out'"
   pass "control, composer, and supervision-model tables carry omp's verified values"
@@ -431,13 +431,13 @@ test_ownership_proof_is_omp_keyed() {
   record_omp_session "$root" "$home" "$pid" || fail "could not record the verdict session"
   touch "$home/state/.last-watcher-beat"
   local verdict
-  verdict=$(FM_SUPERVISION_MODEL=extension FM_HOME="$home" bash -c '
-    . "$1"; jg_watcher_supervision_verdict "$2" "$3" 999 "$4" "$5"; printf "%s %s" "$FM_WATCHER_VERDICT_OK" "$FM_WATCHER_VERDICT_REASON"' \
+  verdict=$(JG_SUPERVISION_MODEL=extension JG_HOME="$home" bash -c '
+    . "$1"; jg_watcher_supervision_verdict "$2" "$3" 999 "$4" "$5"; printf "%s %s" "$JG_WATCHER_VERDICT_OK" "$JG_WATCHER_VERDICT_REASON"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$home/state" "$root/bin/jg-watch.sh" "$home" "$root")
   [ "${verdict%% *}" = true ] || fail "an unheld lock with a fresh beacon and the omp proof must be healthy, got '$verdict'"
   rm -f "$home/state/.omp-turnend-extension-loaded"
-  verdict=$(FM_SUPERVISION_MODEL=extension FM_HOME="$home" bash -c '
-    . "$1"; jg_watcher_supervision_verdict "$2" "$3" 999 "$4" "$5"; printf "%s %s" "$FM_WATCHER_VERDICT_OK" "$FM_WATCHER_VERDICT_REASON"' \
+  verdict=$(JG_SUPERVISION_MODEL=extension JG_HOME="$home" bash -c '
+    . "$1"; jg_watcher_supervision_verdict "$2" "$3" 999 "$4" "$5"; printf "%s %s" "$JG_WATCHER_VERDICT_OK" "$JG_WATCHER_VERDICT_REASON"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$home/state" "$root/bin/jg-watch.sh" "$home" "$root")
   [ "$verdict" = "false no-watcher" ] || fail "without the proof the same hand-off must alarm as no-watcher, got '$verdict'"
   kill "$pid" 2>/dev/null || true
@@ -465,7 +465,7 @@ test_turnend_guard_extension_compels_one_continuation() {
   mkdir -p "$home/state"
   cat > "$repo/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
-payload=$(cat); printf '%s\n' "$payload" >> "${FM_GUARD_LOG:?}"
+payload=$(cat); printf '%s\n' "$payload" >> "${JG_GUARD_LOG:?}"
 case "$payload" in *'"stop_hook_active":true'*) exit 0 ;; esac
 printf 'guard says: repair with jg_watch_arm_omp\n' >&2; exit 2
 SH
@@ -477,7 +477,7 @@ SH
   # shellcheck disable=SC2016 # $2 expands in the generated script
   printf '#!/usr/bin/env bash\nprintf "OMP DIGEST source=%%s\\n" "$2"\n' > "$repo/bin/jg-sessionstart-run.sh"
   chmod +x "$repo/bin/"*.sh
-  out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" EXT="$repo/.omp/extensions/jg-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
+  out=$(JG_GUARD_LOG="$TMP_ROOT/guard/guard.log" JG_HOME="$home" EXT="$repo/.omp/extensions/jg-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
 const handlers = new Map();
@@ -507,9 +507,9 @@ if (!r1.additionalContext.startsWith("⁣FIRSTMATE_OP: v1 turn-end-guard: ")) th
 if (!r1.additionalContext.includes("TURN WOULD END BLIND") || !r1.additionalContext.includes("repair with jg_watch_arm_omp")) throw new Error("continuation dropped the guard text");
 const r2 = await handlers.get("session_stop")({ type: "session_stop", stop_hook_active: true }, {});
 if (r2 !== undefined) throw new Error(`the flagged second stop must stand down, got ${JSON.stringify(r2)}`);
-const payloads = readFileSync(process.env.FM_GUARD_LOG, "utf8").trim().split("\n");
+const payloads = readFileSync(process.env.JG_GUARD_LOG, "utf8").trim().split("\n");
 if (payloads.join("|") !== '{"stop_hook_active":false}|{"stop_hook_active":true}') throw new Error(`guard payloads were ${payloads.join("|")}`);
-if (!existsSync(`${process.env.FM_HOME}/state/.omp-turnend-extension-loaded`)) throw new Error("loaded marker was not written");
+if (!existsSync(`${process.env.JG_HOME}/state/.omp-turnend-extension-loaded`)) throw new Error("loaded marker was not written");
 await handlers.get("session_shutdown")({}, {});
 EOF
 )
@@ -529,8 +529,8 @@ test_watch_extension_arms_and_delivers() {
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
-if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
-  : > "$FM_HOME/state/.e2e-fired"
+if [ ! -e "${JG_HOME:?}/state/.e2e-fired" ]; then
+  : > "$JG_HOME/state/.e2e-fired"
   sleep 1
   printf 'signal: omp-e2e done\n'
   exit 0
@@ -538,11 +538,11 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_OMP_ARM_READY_TIMEOUT_MS=3000 JG_WATCH_REARM_RETRY_LIMIT=1 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/jg-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, existsSync, readFileSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; let command = null; const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },
@@ -558,7 +558,7 @@ if (!command) throw new Error("/jg-watch-arm-omp was not registered");
 if (tool.parameters?.type !== "object") throw new Error("tool parameters must be an empty object schema");
 const result = await tool.execute();
 if (!/^watcher: started omp extension arm child 1;/.test(result.content[0].text)) throw new Error(`unexpected arm result: ${result.content[0].text}`);
-const marker = readFileSync(`${process.env.FM_HOME}/state/.omp-watch-extension-loaded`, "utf8").split("\n");
+const marker = readFileSync(`${process.env.JG_HOME}/state/.omp-watch-extension-loaded`, "utf8").split("\n");
 if (marker[1] !== String(process.pid)) throw new Error("loaded marker must record the session pid");
 const again = await tool.execute();
 if (!/^watcher: unchanged - omp extension already owns an arm child/.test(again.content[0].text)) throw new Error(`redundant arm was not an ownership no-op: ${again.content[0].text}`);
@@ -569,7 +569,7 @@ if (sent[0].o?.deliverAs !== "followUp") throw new Error("wake must be delivered
 // The wake is consumed when omp starts the next run with that exact prompt.
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
 await handlers.get("session_shutdown")({}, {});
-if (existsSync(`${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("a consumed wake must not ride the replacement handoff");
+if (existsSync(`${process.env.JG_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("a consumed wake must not ride the replacement handoff");
 process.exit(0);
 EOF
 )
@@ -593,7 +593,7 @@ test_watch_extension_runs_the_supervision_host() {  # [away|quiet]
     # QUIET): the extension asks the record owner, so the same handback carries
     # no away note.
     for f in jg-afk-contract.sh jg-classify-lib.sh jg-timeout-lib.sh; do cp "$ROOT/bin/$f" "$repo/bin/$f"; done
-    FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    JG_HOME="$home" JG_AFK_MODE=quiet "$ROOT/bin/jg-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
       || fail "fixture: could not record quiet mode"
   else
     : > "$home/state/.afk-contract"
@@ -601,17 +601,17 @@ test_watch_extension_runs_the_supervision_host() {  # [away|quiet]
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
-  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${JG_ARM_LOG:?}"
   exit 0
 fi
-printf 'plain-arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'plain-arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 exit 1
 SH
   cat > "$repo/bin/jg-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'host=%s args=%s primary=%s predecessor=%s\n' "$$" "$*" "${FM_SUPERVISION_HOST_PRIMARY:-}" \
-  "${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${FM_ARM_LOG:?}"
-if [ "$(grep -c '^host=' "$FM_ARM_LOG")" -eq 1 ]; then
+printf 'host=%s args=%s primary=%s predecessor=%s\n' "$$" "$*" "${JG_SUPERVISION_HOST_PRIMARY:-}" \
+  "${JG_WATCH_PREDECESSOR_ARM_PID:-none}" >> "${JG_ARM_LOG:?}"
+if [ "$(grep -c '^host=' "$JG_ARM_LOG")" -eq 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
   sleep 1
   printf 'signal: omp-host done\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\nsupervision-host: outcome 1 for demo [captain]: fixture\n'
@@ -621,11 +621,11 @@ printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-2\n' "$$"
 sleep 30
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_LIMIT=1 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 \
     RECORD_KIND="$kind" EXT="$repo/.omp/extensions/jg-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },
@@ -637,7 +637,7 @@ const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
 await tool.execute();
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
-const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+const rows = readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n");
 if (rows.some((row) => row.startsWith("plain-arm="))) throw new Error(`an opted-in home ran the plain arm: ${rows.join(" | ")}`);
 const hosts = rows.filter((row) => row.startsWith("host="));
 if (hosts.length !== 2) throw new Error(`expected the host and one successor host, got: ${rows.join(" | ")}`);
@@ -682,22 +682,22 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off() {
     cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --handling-delivered ] && exit 0
-printf 'plain-arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'plain-arm=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 sleep 30
 SH
     cat > "$repo/bin/jg-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'host=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 sleep 30
 SH
     chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-supervision-host.sh"
-    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" \
+    out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" \
       EXT="$repo/.omp/extensions/jg-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { existsSync, writeFileSync, readFileSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null;
 const pi = {
   on(e, h) { handlers.set(e, h); },
@@ -708,8 +708,8 @@ const pi = {
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
 await tool.execute();
-for (let i = 0; i < 60 && !existsSync(process.env.FM_ARM_LOG); i += 1) await new Promise((r) => setTimeout(r, 100));
-const rows = existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n") : [];
+for (let i = 0; i < 60 && !existsSync(process.env.JG_ARM_LOG); i += 1) await new Promise((r) => setTimeout(r, 100));
+const rows = existsSync(process.env.JG_ARM_LOG) ? readFileSync(process.env.JG_ARM_LOG, "utf8").trim().split("\n") : [];
 if (rows.length === 0 || !rows.every((row) => row.startsWith("plain-arm="))) {
   throw new Error(`a home that does not run the host must spawn only the plain arm: ${rows.join(" | ")}`);
 }
@@ -740,9 +740,9 @@ exit 1
 SH
   cat > "$repo/bin/jg-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'host=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
-if [ "$(grep -c '^host=' "$FM_ARM_LOG")" -eq 1 ]; then
+if [ "$(grep -c '^host=' "$JG_ARM_LOG")" -eq 1 ]; then
   sleep 1
   printf 'supervision-host: outcome 1 for demo [captain]: fixture boundary\n'
   exit 0
@@ -750,12 +750,12 @@ fi
 sleep 30
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_LIMIT=1 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/jg-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
+const handoff = `${process.env.JG_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
 const handlers = new Map(); let tool = null; const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },
@@ -810,9 +810,9 @@ exit 1
 SH
   cat > "$repo/bin/jg-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'host=%s\n' "$$" >> "${JG_ARM_LOG:?}"
 started="watcher: started pid=$$ (beacon fresh) recovery-generation=gen-$$"
-case "$(grep -c '^host=' "$FM_ARM_LOG")" in
+case "$(grep -c '^host=' "$JG_ARM_LOG")" in
   1)
     printf '%s\n' "$started"
     sleep 1
@@ -830,11 +830,11 @@ printf '%s\n' "$started"
 sleep 30
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh" "$repo/bin/jg-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_ARM_LOG="$log" JG_WATCH_REARM_RETRY_LIMIT=1 JG_WATCH_REARM_RETRY_BASE_MS=5 JG_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/jg-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync } from "node:fs";
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = [];
 const pi = {
   on(e, h) { handlers.set(e, h); },

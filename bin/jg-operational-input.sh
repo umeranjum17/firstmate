@@ -20,7 +20,7 @@
 # included, from every submitted prompt (Claude Code 2.1.280 does so for typed,
 # pasted, and launch-prompt input), so a typed envelope reaches them as plain
 # ASCII that no consumer can tell apart from human text. For a harness named in
-# FM_OPERATIONAL_RECORD_HARNESSES a producer instead writes the complete current
+# JG_OPERATIONAL_RECORD_HARNESSES a producer instead writes the complete current
 # envelope to a durable record and types only a constant ASCII doorbell naming
 # it. The doorbell text alone proves nothing: it counts as Firstmate input only
 # when the record it names exists and holds a current generic envelope. Records
@@ -29,9 +29,9 @@
 #   Record:   <state>/operational-inbox/<name>.msg, <name> matching [0-9a-z-]+,
 #             exactly the encoded envelope bytes, published by atomic rename.
 #             Records are never re-rung or acknowledged; every write prunes
-#             records at about FM_OPERATIONAL_RECORD_RETENTION_DAYS (7) elapsed days.
-#   Doorbell: FM_OPERATIONAL_DOORBELL_PREFIX <absolute physical record path>
-#             FM_OPERATIONAL_DOORBELL_SUFFIX, one printable-ASCII line whose
+#             records at about JG_OPERATIONAL_RECORD_RETENTION_DAYS (7) elapsed days.
+#   Doorbell: JG_OPERATIONAL_DOORBELL_PREFIX <absolute physical record path>
+#             JG_OPERATIONAL_DOORBELL_SUFFIX, one printable-ASCII line whose
 #             leading ": " is the shell no-op, as for the steering doorbell.
 # Verification has two strengths: jg_operational_doorbell_record_kind checks only
 # the named record, which presentation-only consumers mirror (the Claude Code
@@ -48,30 +48,30 @@
 #   jg-operational-input.sh open <path>    # this home's record body stdout
 #   jg-operational-input.sh --help
 #
-# `record` and `open` resolve this home's state as FM_STATE_OVERRIDE, else
-# ${FM_HOME:-${FM_ROOT_OVERRIDE:-<code root>}}/state. `classify` stays a pure text
+# `record` and `open` resolve this home's state as JG_STATE_OVERRIDE, else
+# ${JG_HOME:-${JG_ROOT_OVERRIDE:-<code root>}}/state. `classify` stays a pure text
 # classifier: a doorbell is recognized only through `doorbell-kind` or `open`.
 # All successful data commands print exactly one value and no diagnostics.
 # A non-match exits 1 silently. Invalid use exits 2. Bash 3.2 compatible.
 
-FM_OPERATIONAL_MARK=$'\xE2\x81\xA3'
-FM_OPERATIONAL_PREFIX="${FM_OPERATIONAL_MARK}FIRSTMATE_OP: "
-FM_OPERATIONAL_VERSION=v1
-FM_OPERATIONAL_HEADER_PREFIX="${FM_OPERATIONAL_PREFIX}${FM_OPERATIONAL_VERSION} "
-FM_OPERATIONAL_KINDS='session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome'
+JG_OPERATIONAL_MARK=$'\xE2\x81\xA3'
+JG_OPERATIONAL_PREFIX="${JG_OPERATIONAL_MARK}FIRSTMATE_OP: "
+JG_OPERATIONAL_VERSION=v1
+JG_OPERATIONAL_HEADER_PREFIX="${JG_OPERATIONAL_PREFIX}${JG_OPERATIONAL_VERSION} "
+JG_OPERATIONAL_KINDS='session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome'
 
 # Compatibility name retained for the away-mode owner and its tests.
 # shellcheck disable=SC2034 # Public source-library variable used by callers.
-FM_INJECT_MARK=$FM_OPERATIONAL_MARK
+JG_INJECT_MARK=$JG_OPERATIONAL_MARK
 
 # The from-firstmate carrier stays byte-compatible with live secondmate charter
 # context while this owner supplies its construction and structural kind.
-FM_FROMFIRST_LABEL='[jg-from-firstmate]'
-FM_FROMFIRST_SEPARATOR=$FM_OPERATIONAL_MARK
-FM_FROMFIRST_MARK="${FM_FROMFIRST_LABEL}${FM_FROMFIRST_SEPARATOR}"
+JG_FROMFIRST_LABEL='[jg-from-firstmate]'
+JG_FROMFIRST_SEPARATOR=$JG_OPERATIONAL_MARK
+JG_FROMFIRST_MARK="${JG_FROMFIRST_LABEL}${JG_FROMFIRST_SEPARATOR}"
 
 jg_operational_kind_is_current() {  # <kind>
-  case " $FM_OPERATIONAL_KINDS " in
+  case " $JG_OPERATIONAL_KINDS " in
     *" $1 "*) return 0 ;;
   esac
   return 1
@@ -82,7 +82,7 @@ jg_operational_input_encode() {  # <generic-kind> <body> <result-var>
   [ -n "$result_var" ] || return 2
   jg_operational_kind_is_current "$kind" || return 2
   [ -n "$body" ] || return 2
-  printf -v "$result_var" '%s%s: %s' "$FM_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
+  printf -v "$result_var" '%s%s: %s' "$JG_OPERATIONAL_HEADER_PREFIX" "$kind" "$body"
 }
 
 jg_operational_input_construct() {  # <kind> <body> <result-var>
@@ -99,10 +99,10 @@ jg_operational_generic_kind() {  # <message> <result-var>
   local message=${1-} result_var=${2-} remainder parsed_kind body
   [ -n "$result_var" ] || return 2
   case "$message" in
-    "$FM_OPERATIONAL_HEADER_PREFIX"*': '?*) ;;
+    "$JG_OPERATIONAL_HEADER_PREFIX"*': '?*) ;;
     *) return 1 ;;
   esac
-  remainder=${message#"$FM_OPERATIONAL_HEADER_PREFIX"}
+  remainder=${message#"$JG_OPERATIONAL_HEADER_PREFIX"}
   parsed_kind=${remainder%%': '*}
   jg_operational_kind_is_current "$parsed_kind" || return 1
   body=${remainder#"${parsed_kind}: "}
@@ -118,7 +118,7 @@ jg_operational_input_kind() {  # <message> <result-var>
     return 0
   fi
   case "$message" in
-    "$FM_FROMFIRST_MARK"?*)
+    "$JG_FROMFIRST_MARK"?*)
       printf -v "$result_var" '%s' from-firstmate
       return 0
       ;;
@@ -130,13 +130,13 @@ jg_operational_input_body() {  # <current-message> <result-var>
   local message=${1-} result_var=${2-} current_kind parsed_body
   [ -n "$result_var" ] || return 2
   if jg_operational_generic_kind "$message" current_kind; then
-    parsed_body=${message#"${FM_OPERATIONAL_HEADER_PREFIX}${current_kind}: "}
+    parsed_body=${message#"${JG_OPERATIONAL_HEADER_PREFIX}${current_kind}: "}
     printf -v "$result_var" '%s' "$parsed_body"
     return 0
   fi
   case "$message" in
-    "$FM_FROMFIRST_MARK"?*)
-      parsed_body=${message#"$FM_FROMFIRST_MARK"}
+    "$JG_FROMFIRST_MARK"?*)
+      parsed_body=${message#"$JG_FROMFIRST_MARK"}
       printf -v "$result_var" '%s' "$parsed_body"
       return 0
       ;;
@@ -148,11 +148,11 @@ jg_operational_input_body() {  # <current-message> <result-var>
 # They exist only for persisted pre-protocol transcripts and must never be used
 # by current producers or current-path tests.
 # shellcheck disable=SC2016 # Backticks are literal historical prompt markup.
-FM_LEGACY_SESSIONSTART='Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.'
-FM_LEGACY_WATCHER_PREFIX='FIRSTMATE WATCHER WAKE: '
-FM_LEGACY_WATCHER_SUFFIX=$'\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'
-FM_LEGACY_TURNEND_PREFIX=$'TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n'
-FM_LEGACY_AWAY_PREFIX="${FM_OPERATIONAL_MARK}Supervisor escalate ("
+JG_LEGACY_SESSIONSTART='Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.'
+JG_LEGACY_WATCHER_PREFIX='FIRSTMATE WATCHER WAKE: '
+JG_LEGACY_WATCHER_SUFFIX=$'\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'
+JG_LEGACY_TURNEND_PREFIX=$'TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n'
+JG_LEGACY_AWAY_PREFIX="${JG_OPERATIONAL_MARK}Supervisor escalate ("
 
 jg_legacy_operational_input_kind() {  # <message> <result-var>
   local message=${1-} result_var=${2-}
@@ -161,27 +161,27 @@ jg_legacy_operational_input_kind() {  # <message> <result-var>
   # PR 899 landed an untyped FIRSTMATE_OP prefix. Its subtype cannot be
   # recovered without body prose, so it is explicitly generic.
   case "$message" in
-    "$FM_OPERATIONAL_PREFIX"?*)
+    "$JG_OPERATIONAL_PREFIX"?*)
       printf -v "$result_var" '%s' legacy-operational
       return 0
       ;;
   esac
 
-  if [ "$message" = "$FM_LEGACY_SESSIONSTART" ]; then
+  if [ "$message" = "$JG_LEGACY_SESSIONSTART" ]; then
     printf -v "$result_var" '%s' session-start
     return 0
   fi
   case "$message" in
-    "$FM_LEGACY_AWAY_PREFIX"*)
+    "$JG_LEGACY_AWAY_PREFIX"*)
       printf -v "$result_var" '%s' away-supervisor
       return 0
       ;;
-    "$FM_LEGACY_WATCHER_PREFIX"*"$FM_LEGACY_WATCHER_SUFFIX")
-      [ "${#message}" -gt "$(( ${#FM_LEGACY_WATCHER_PREFIX} + ${#FM_LEGACY_WATCHER_SUFFIX} ))" ] || return 1
+    "$JG_LEGACY_WATCHER_PREFIX"*"$JG_LEGACY_WATCHER_SUFFIX")
+      [ "${#message}" -gt "$(( ${#JG_LEGACY_WATCHER_PREFIX} + ${#JG_LEGACY_WATCHER_SUFFIX} ))" ] || return 1
       printf -v "$result_var" '%s' watcher
       return 0
       ;;
-    "$FM_LEGACY_TURNEND_PREFIX"?*)
+    "$JG_LEGACY_TURNEND_PREFIX"?*)
       printf -v "$result_var" '%s' turn-end-guard
       return 0
       ;;
@@ -211,21 +211,21 @@ jg_message_mark_from_firstmate() {  # <message> <result-var>
   if jg_message_from_firstmate "$message"; then
     transformed=$message
   else
-    transformed="${FM_FROMFIRST_MARK}${message}"
+    transformed="${JG_FROMFIRST_MARK}${message}"
   fi
   printf -v "$result_var" '%s' "$transformed"
 }
 
 # --- record-backed carrier (see header) ---------------------------------------
-FM_OPERATIONAL_RECORD_HARNESSES='claude'
-FM_OPERATIONAL_RECORD_DIRNAME='operational-inbox'
-FM_OPERATIONAL_DOORBELL_PREFIX=": Firstmate operational input waiting: read '"
-FM_OPERATIONAL_DOORBELL_SUFFIX="' and handle its contents as Firstmate operational input."
-FM_OPERATIONAL_RECORD_RETENTION_DAYS=7
+JG_OPERATIONAL_RECORD_HARNESSES='claude'
+JG_OPERATIONAL_RECORD_DIRNAME='operational-inbox'
+JG_OPERATIONAL_DOORBELL_PREFIX=": Firstmate operational input waiting: read '"
+JG_OPERATIONAL_DOORBELL_SUFFIX="' and handle its contents as Firstmate operational input."
+JG_OPERATIONAL_RECORD_RETENTION_DAYS=7
 
 # Whether operational input to <harness> must travel as a record plus doorbell.
 jg_operational_harness_needs_record() {  # <harness>
-  case " $FM_OPERATIONAL_RECORD_HARNESSES " in
+  case " $JG_OPERATIONAL_RECORD_HARNESSES " in
     *" ${1-} "*) return 0 ;;
   esac
   return 1
@@ -238,7 +238,7 @@ jg_operational_record_prune() {  # <record-dir>
   else
     stat_cmd=(stat -c '%Y %n')
   fi
-  cutoff=$(( $(date +%s) - FM_OPERATIONAL_RECORD_RETENTION_DAYS * 86400 ))
+  cutoff=$(( $(date +%s) - JG_OPERATIONAL_RECORD_RETENTION_DAYS * 86400 ))
   find "$1" -maxdepth 1 -type f \( -name '*.msg' -o -name '.record.*' \) \
     -exec "${stat_cmd[@]}" {} + 2>/dev/null | while read -r mtime path; do
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
@@ -255,7 +255,7 @@ jg_operational_record_write() {  # <state-dir> <kind> <body> <doorbell-var>
   local LC_ALL=C
   [ -n "$state" ] && [ -n "$result_var" ] || return 2
   jg_operational_input_encode "$kind" "$body" encoded || return 2
-  dir="$state/$FM_OPERATIONAL_RECORD_DIRNAME"
+  dir="$state/$JG_OPERATIONAL_RECORD_DIRNAME"
   mkdir -p "$dir" 2>/dev/null || return 1
   abs=$(cd -P "$dir" 2>/dev/null && pwd -P) || return 1
   case "$abs" in
@@ -270,8 +270,8 @@ jg_operational_record_write() {  # <state-dir> <kind> <body> <doorbell-var>
     return 1
   fi
   jg_operational_record_prune "$dir"
-  printf -v "$result_var" '%s%s/%s%s' "$FM_OPERATIONAL_DOORBELL_PREFIX" "$abs" "$name" \
-    "$FM_OPERATIONAL_DOORBELL_SUFFIX"
+  printf -v "$result_var" '%s%s/%s%s' "$JG_OPERATIONAL_DOORBELL_PREFIX" "$abs" "$name" \
+    "$JG_OPERATIONAL_DOORBELL_SUFFIX"
 }
 
 # The record path a well-formed doorbell names; no filesystem access.
@@ -280,11 +280,11 @@ jg_operational_doorbell_path() {  # <message> <result-var>
   local LC_ALL=C
   [ -n "$result_var" ] || return 2
   case "$message" in
-    "$FM_OPERATIONAL_DOORBELL_PREFIX"*"$FM_OPERATIONAL_DOORBELL_SUFFIX") ;;
+    "$JG_OPERATIONAL_DOORBELL_PREFIX"*"$JG_OPERATIONAL_DOORBELL_SUFFIX") ;;
     *) return 1 ;;
   esac
-  candidate=${message#"$FM_OPERATIONAL_DOORBELL_PREFIX"}
-  candidate=${candidate%"$FM_OPERATIONAL_DOORBELL_SUFFIX"}
+  candidate=${message#"$JG_OPERATIONAL_DOORBELL_PREFIX"}
+  candidate=${candidate%"$JG_OPERATIONAL_DOORBELL_SUFFIX"}
   case "$candidate" in
     /*) ;;
     *) return 1 ;;
@@ -294,7 +294,7 @@ jg_operational_doorbell_path() {  # <message> <result-var>
   esac
   dir=${candidate%/*}
   name=${candidate##*/}
-  [ "${dir##*/}" = "$FM_OPERATIONAL_RECORD_DIRNAME" ] || return 1
+  [ "${dir##*/}" = "$JG_OPERATIONAL_RECORD_DIRNAME" ] || return 1
   case "$name" in
     *.msg) name=${name%.msg} ;;
     *) return 1 ;;
@@ -326,7 +326,7 @@ jg_operational_doorbell_kind() {  # <message> <state-dir> <result-var>
   local message=${1-} state=${2-} result_var=${3-} named_record want have
   [ -n "$state" ] && [ -n "$result_var" ] || return 2
   jg_operational_doorbell_path "$message" named_record || return 1
-  want=$(cd -P "$state/$FM_OPERATIONAL_RECORD_DIRNAME" 2>/dev/null && pwd -P) || return 1
+  want=$(cd -P "$state/$JG_OPERATIONAL_RECORD_DIRNAME" 2>/dev/null && pwd -P) || return 1
   have=$(cd -P "${named_record%/*}" 2>/dev/null && pwd -P) || return 1
   [ "$want" = "$have" ] || return 1
   jg_operational_record_kind "$named_record" "$result_var"
@@ -334,12 +334,12 @@ jg_operational_doorbell_kind() {  # <message> <state-dir> <result-var>
 
 jg_operational_home_state() {
   local root
-  if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
-    printf '%s' "$FM_STATE_OVERRIDE"
+  if [ -n "${JG_STATE_OVERRIDE:-}" ]; then
+    printf '%s' "$JG_STATE_OVERRIDE"
     return
   fi
   root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || return 1
-  printf '%s/state' "${FM_HOME:-${FM_ROOT_OVERRIDE:-$root}}"
+  printf '%s/state' "${JG_HOME:-${JG_ROOT_OVERRIDE:-$root}}"
 }
 
 jg_operational_read_stdin() {  # <result-var>
@@ -418,7 +418,7 @@ jg_operational_main() {
     open)
       [ "$#" -eq 2 ] || return 2
       state=$(jg_operational_home_state) || return 1
-      jg_operational_doorbell_kind "${FM_OPERATIONAL_DOORBELL_PREFIX}${argument}${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
+      jg_operational_doorbell_kind "${JG_OPERATIONAL_DOORBELL_PREFIX}${argument}${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
         "$state" output || return 1
       input=$(cat "$argument" 2>/dev/null && printf x) || return 1
       jg_operational_input_body "${input%x}" output || return 1

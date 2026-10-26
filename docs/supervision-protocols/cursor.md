@@ -15,7 +15,7 @@ When this session owns supervision and away mode is not active:
    This is bounded and safe: only one park exists in that window, so the event is a real wake rather than a stale duplicate of another park's wake, the durable wake queue makes handling idempotent, and the next `stop` claim makes an older park that is still running stand down without emitting.
    The private supersession records are `state/.cursor-park-owner` and its short publication and commit lock `state/.cursor-park-owner.lock`.
 5. On a `turn-end-guard` follow-up, the park could not establish a live cycle.
-   Inspect the watcher startup path rather than turning the notice into a repeating manual-arm loop; the nag is bounded by `FM_CURSOR_TURNEND_BLOCK_BUDGET` (default 3) and then stops on its own.
+   Inspect the watcher startup path rather than turning the notice into a repeating manual-arm loop; the nag is bounded by `JG_CURSOR_TURNEND_BLOCK_BUDGET` (default 3) and then stops on its own.
 6. Treat `watcher: started ...` and `watcher: attached ...` inside park output as proof that one live cycle exists.
    On attach, the arm follows verified identity-matched successors instead of exiting when the first cycle ends.
 7. The durable wake queue preserves actionable events between a follow-up and the next park.

@@ -3,7 +3,7 @@
 # cancellation, stdin default, and staging-litter reaping.
 #
 # Pins, against the real worker and the real jg-on -> entrypoint transport
-# (through the deterministic FM_SSH_BIN seam tests/jg-on.test.sh proves
+# (through the deterministic JG_SSH_BIN seam tests/jg-on.test.sh proves
 # preserves exit status):
 #   T9: a job for home B completes while home A runs a long job, and two
 #       A-jobs execute strictly in stage order even when staged rapidly.
@@ -107,19 +107,19 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 shift 2
-exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
-export FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
-export FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
-export FM_REMOTE_JOB_QUEUE_TIMEOUT=60
-export FM_REMOTE_JOB_TIMEOUT=30
-export FM_REMOTE_JOB_STAGE_REAP_SECONDS=1
+export JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
+export JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
+export JG_REMOTE_JOB_QUEUE_TIMEOUT=60
+export JG_REMOTE_JOB_TIMEOUT=30
+export JG_REMOTE_JOB_STAGE_REAP_SECONDS=1
 # shellcheck source=bin/jg-remote-job-lib.sh
 . "$ROOT/bin/jg-remote-job-lib.sh"
 
-jg_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$JG_REMOTE_JOB_ERROR"
 rm -f -- "$STATE_ROOT/seq"
 SEQ_PIDS=()
 for i in $(seq 1 20); do
@@ -151,10 +151,10 @@ rmdir "$STATE_ROOT/.seq-claims/999999"
 pass "atomic sequence claims remain unique and reap only after expiry"
 
 jg_on() {
-  FM_HOME="$LOCAL_HOME" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_HOME="$LOCAL_HOME" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
   "$ROOT/bin/jg-on.sh" "$@"
 }
 
@@ -172,8 +172,8 @@ wait_for_state() { # <id> <state>
   return 1
 }
 
-HOME="$ACCOUNT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+HOME="$ACCOUNT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" > "$TMP_ROOT/worker.out" 2> "$TMP_ROOT/worker.err" &
 for _ in $(seq 1 100); do
   [ -f "$STATE_ROOT/worker.ready" ] && break
@@ -186,22 +186,22 @@ assert_present "$STATE_ROOT/worker.ready" "the worker did not publish its readin
 LOG_A="$TMP_ROOT/log-a"
 LOG_B="$TMP_ROOT/log-b"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh a1 "$LOG_A" 4 < /dev/null > /dev/null
-A1=$FM_REMOTE_JOB_ID
+A1=$JG_REMOTE_JOB_ID
 wait_for_state "$A1" running || fail "home A's long job did not begin running"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh a2 "$LOG_A" 0 < /dev/null > /dev/null
-A2=$FM_REMOTE_JOB_ID
+A2=$JG_REMOTE_JOB_ID
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_EDGE" jg-mark-job.sh b1 "$LOG_B" 0 < /dev/null > /dev/null
-B1=$FM_REMOTE_JOB_ID
+B1=$JG_REMOTE_JOB_ID
 B_BEGAN=$(date +%s)
-jg_remote_job_wait "$ACCOUNT_HOME" "$B1" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$B1" || fail "$JG_REMOTE_JOB_ERROR"
 B_ELAPSED=$(( $(date +%s) - B_BEGAN ))
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "home B's job behind home A's long job did not complete"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "home B's job behind home A's long job did not complete"
 [ "$B_ELAPSED" -le 3 ] || fail "home B's job waited ${B_ELAPSED}s behind home A's long job"
 [ "$(job_state "$A1")" = running ] || fail "home A's long job should still be running for the FIFO assertion"
 [ "$(cat "$LOG_A")" = a1 ] || fail "home A's queued job ran beside its running job: $(cat "$LOG_A")"
 jg_remote_job_reap "$ACCOUNT_HOME" "$B1" || fail "home B's job could not be reaped"
-jg_remote_job_wait "$ACCOUNT_HOME" "$A1" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$A2" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$A1" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$A2" || fail "$JG_REMOTE_JOB_ERROR"
 [ "$(printf '%s' "$(cat "$LOG_A")")" = "$(printf 'a1\na2')" ] \
   || fail "home A's jobs did not execute in stage order: $(cat "$LOG_A")"
 jg_remote_job_reap "$ACCOUNT_HOME" "$A1" || fail "home A's first job could not be reaped"
@@ -212,17 +212,17 @@ pass "lanes run homes concurrently while each home stays FIFO"
 # execute in staging-sequence order, not the queue directory's random-id order.
 : > "$LOG_A"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh hold "$LOG_A" 2 < /dev/null > /dev/null
-HOLD=$FM_REMOTE_JOB_ID
+HOLD=$JG_REMOTE_JOB_ID
 wait_for_state "$HOLD" running || fail "the lane-holding job did not begin running"
 RAPID_IDS=()
 for tag in r1 r2 r3 r4 r5; do
   jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh "$tag" "$LOG_A" 0 < /dev/null > /dev/null
-  RAPID_IDS+=("$FM_REMOTE_JOB_ID")
+  RAPID_IDS+=("$JG_REMOTE_JOB_ID")
 done
-jg_remote_job_wait "$ACCOUNT_HOME" "$HOLD" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$HOLD" || fail "$JG_REMOTE_JOB_ERROR"
 jg_remote_job_reap "$ACCOUNT_HOME" "$HOLD" || true
 for id in "${RAPID_IDS[@]}"; do
-  jg_remote_job_wait "$ACCOUNT_HOME" "$id" || fail "$FM_REMOTE_JOB_ERROR"
+  jg_remote_job_wait "$ACCOUNT_HOME" "$id" || fail "$JG_REMOTE_JOB_ERROR"
   jg_remote_job_reap "$ACCOUNT_HOME" "$id" || true
 done
 [ "$(cat "$LOG_A")" = "$(printf 'hold\nr1\nr2\nr3\nr4\nr5')" ] \
@@ -231,7 +231,7 @@ pass "same-home jobs staged in the same second execute in staging-sequence order
 
 : > "$LOG_A"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh publish-hold "$LOG_A" 3 < /dev/null > /dev/null
-PUBLISH_HOLD=$FM_REMOTE_JOB_ID
+PUBLISH_HOLD=$JG_REMOTE_JOB_ID
 wait_for_state "$PUBLISH_HOLD" running || fail "the publication-order lane holder did not begin running"
 (
   {
@@ -248,7 +248,7 @@ done
 ls "$STATE_ROOT/jobs"/.stage.* >/dev/null 2>&1 \
   || fail "the delayed stdin stage did not begin capturing"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh fast "$LOG_A" 0 < /dev/null > /dev/null
-FAST_STAGE=$FM_REMOTE_JOB_ID
+FAST_STAGE=$JG_REMOTE_JOB_ID
 wait "$DELAYED_STAGE_PID" || fail "the delayed stdin stage failed to publish"
 DELAYED_STAGE=$(cat "$TMP_ROOT/delayed-stage-id")
 FAST_SEQ=$(jg_remote_job_read_number "$STATE_ROOT/jobs/$FAST_STAGE" seq) \
@@ -257,9 +257,9 @@ DELAYED_SEQ=$(jg_remote_job_read_number "$STATE_ROOT/jobs/$DELAYED_STAGE" seq) \
   || fail "the delayed stage lost its sequence"
 [ "$FAST_SEQ" -lt "$DELAYED_SEQ" ] \
   || fail "sequence order did not follow publication order: fast=$FAST_SEQ delayed=$DELAYED_SEQ"
-jg_remote_job_wait "$ACCOUNT_HOME" "$PUBLISH_HOLD" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$FAST_STAGE" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$DELAYED_STAGE" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$PUBLISH_HOLD" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$FAST_STAGE" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$DELAYED_STAGE" || fail "$JG_REMOTE_JOB_ERROR"
 [ "$(cat "$LOG_A")" = "$(printf 'publish-hold\nfast\ndelayed')" ] \
   || fail "execution order diverged from publication sequence: $(tr '\n' ' ' < "$LOG_A")"
 jg_remote_job_reap "$ACCOUNT_HOME" "$PUBLISH_HOLD" || true
@@ -270,7 +270,7 @@ pass "same-home sequence order follows completed staging publication"
 # T3a: a caller killed while its job is still queued cancels it; the worker
 # never executes it.
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$HOME_A" jg-mark-job.sh hold2 "$LOG_A" 4 < /dev/null > /dev/null
-HOLD2=$FM_REMOTE_JOB_ID
+HOLD2=$JG_REMOTE_JOB_ID
 wait_for_state "$HOLD2" running || fail "the cancellation fixture's lane holder did not begin running"
 QUEUED_EFFECT="$TMP_ROOT/queued-cancel-effect"
 jg_on ios jg-touch-job.sh "$QUEUED_EFFECT" > /dev/null 2>&1 &
@@ -294,7 +294,7 @@ for _ in $(seq 1 200); do
 done
 [ ! -d "$STATE_ROOT/jobs/$QUEUED_JOB" ] \
   || fail "the cancelled queued job's record survived (state: $(job_state "$QUEUED_JOB"))"
-jg_remote_job_wait "$ACCOUNT_HOME" "$HOLD2" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$HOLD2" || fail "$JG_REMOTE_JOB_ERROR"
 jg_remote_job_reap "$ACCOUNT_HOME" "$HOLD2" || true
 sleep 1
 assert_absent "$QUEUED_EFFECT" "the worker executed a queued job whose caller was killed"
@@ -332,10 +332,10 @@ pass "a caller killed mid-wait stops its running job's process group"
 ORPHAN_START="$TMP_ROOT/orphan-cancel-start"
 ORPHAN_FINISH="$TMP_ROOT/orphan-cancel-finish"
 # shellcheck disable=SC2016 # Expansion is deliberately deferred to the child shell.
-env FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+env JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   bash -c '
     "$1/bin/jg-on.sh" build jg-two-phase-job.sh "$2" "$3" 12 >/dev/null 2>&1 &
     while [ ! -f "$2" ]; do sleep 0.1; done
@@ -359,10 +359,10 @@ pass "a signal-less caller disconnect cancels the abandoned job through the pare
 BURST_BEGAN=$(date +%s)
 for tag in c1 c2 c3; do
   rc=0
-  jg_run_timed 15 env FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-    FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-    FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-    FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  jg_run_timed 15 env JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+    JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+    JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+    JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
     "$ROOT/bin/jg-on.sh" ios jg-touch-job.sh "$TMP_ROOT/burst-$tag" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ] || fail "post-cancellation burst command $tag failed with $rc"
   assert_present "$TMP_ROOT/burst-$tag" "post-cancellation burst command $tag did not run"
@@ -377,10 +377,10 @@ printf 'rsm\n' > "$HOME_A/.jg-secondmate-home"
 printf '# fixture secondmate home\n' > "$HOME_A/AGENTS.md"
 mkdir -p "$HOME_A/state" "$HOME_A/bin"
 rc=0
-jg_run_timed 20 env FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+jg_run_timed 20 env JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   "$ROOT/bin/jg-on.sh" ios jg-remote-secondmate-control.sh state rsm \
   < <(sleep 30) > "$TMP_ROOT/state-out" 2> "$TMP_ROOT/state-err" || rc=$?
 [ "$rc" -ne 124 ] || fail "a control-state call with an open stdin pipe wedged staging"

@@ -119,7 +119,7 @@ if [ "${1:-}" = --ansi-self-test ]; then
   exit 0
 fi
 
-jg_live_gate opt-in FM_MUSE_SIGNALS_LIVE muse tmux node
+jg_live_gate opt-in JG_MUSE_SIGNALS_LIVE muse tmux node
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-muse-signals.XXXXXX") || fail "could not create the isolated Muse lab"
 trap cleanup EXIT

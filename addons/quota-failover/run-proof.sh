@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
@@ -10,10 +19,10 @@ cat >"$home/bin/jg-stub-lib.sh" <<'LIB'
 jg_meta_get() { sed -n "s|^$2=||p" "$1" | tail -n 1; }
 jg_backend_of_meta() { echo fixture; }
 jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
-jg_backend_visible_capture() { [ ! -f "$FM_HOME/state/$2.screen" ] || cat "$FM_HOME/state/$2.screen"; return 0; }
+jg_backend_visible_capture() { [ ! -f "$JG_HOME/state/$2.screen" ] || cat "$JG_HOME/state/$2.screen"; return 0; }
 jg_busy_classify_meta() { echo 'idle no-busy-record'; }
 jg_busy_record_read() { echo ''; }
-FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
+JG_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
 jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 jg_quota_single_provider_for_harness() { return 1; }
 jg_parent_channel_report() { :; }
@@ -22,7 +31,7 @@ LIB
 for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do ln -s jg-stub-lib.sh "$home/bin/$lib"; done
 cat >"$home/bin/jg-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/control.log"
+printf '%s\n' "$*" >>"$JG_HOME/state/control.log"
 CONTROL
 cat >"$home/bin/jg-crew-state.sh" <<'CREW'
 #!/usr/bin/env bash

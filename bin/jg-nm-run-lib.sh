@@ -378,10 +378,10 @@ jg_nm_run_is_pipeline_owned_active() {  # <toon-output>
 # nm_gate_status / nm_has_gate render the `parked at <gate>` detail from the
 # same evidence. If a new parked marker is added to one reader only, an
 # unverified run's gate detail reaches the crew report.
-FM_NM_GATE_LINE_RE='^[[:space:]]*gate:[[:space:]]*'
-FM_NM_AWAITING_AGENT_RE='^[[:space:]]*awaiting_agent:'
-FM_NM_GATE_SCALAR_RE='^[[:space:]]*(status|state):[[:space:]]*"?(awaiting_approval|fix_review)"?[[:space:]]*$'
-FM_NM_GATE_ROW_RE='^[[:space:]]*[^,]+,[[:space:]]*"?(awaiting_approval|fix_review)"?[[:space:]]*,'
+JG_NM_GATE_LINE_RE='^[[:space:]]*gate:[[:space:]]*'
+JG_NM_AWAITING_AGENT_RE='^[[:space:]]*awaiting_agent:'
+JG_NM_GATE_SCALAR_RE='^[[:space:]]*(status|state):[[:space:]]*"?(awaiting_approval|fix_review)"?[[:space:]]*$'
+JG_NM_GATE_ROW_RE='^[[:space:]]*[^,]+,[[:space:]]*"?(awaiting_approval|fix_review)"?[[:space:]]*,'
 
 # 0 if the run in captured `axi status` TOON $1 carries any of those PARKED
 # markers. The top-level `status:` word alone does NOT decide this: the CLI
@@ -389,7 +389,7 @@ FM_NM_GATE_ROW_RE='^[[:space:]]*[^,]+,[[:space:]]*"?(awaiting_approval|fix_revie
 # markers routinely disagree.
 jg_nm_run_is_parked() {  # <toon-output>
   printf '%s\n' "$1" | grep -Eq \
-    "$FM_NM_GATE_LINE_RE|$FM_NM_AWAITING_AGENT_RE|$FM_NM_GATE_SCALAR_RE|$FM_NM_GATE_ROW_RE"
+    "$JG_NM_GATE_LINE_RE|$JG_NM_AWAITING_AGENT_RE|$JG_NM_GATE_SCALAR_RE|$JG_NM_GATE_ROW_RE"
 }
 
 # 0 if the run in captured `axi status` TOON $1 is EXECUTING: in flight and

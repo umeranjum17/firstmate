@@ -33,7 +33,7 @@ TMUX_LOG="$TMP_ROOT/remote-tmux.log"
 TMUX_STATE="$TMP_ROOT/remote-tmux.state"
 CLAIMS="$TMP_ROOT/claims"
 mkdir -p "$PARENT/data" "$PARENT/state" "$PARENT/config" "$PARENT/projects" "$REMOTE_ROOT" "$CLAIMS"
-trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
+trap 'JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
 
 # The remote host's tracked code root is this branch, as a real git repository:
 # jg-on and the remote entrypoint both require the dispatched command to be
@@ -45,7 +45,7 @@ trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-proceven
 
 # The remote host runs the Herdr fixture, whose every invocation is logged
 # verbatim, so the pre-launch `export TRACEPARENT=` line and the launch
-# literal's FM_TRACE_CONTEXT prefix are both observable exactly as the pane
+# literal's JG_TRACE_CONTEXT prefix are both observable exactly as the pane
 # received them. The tmux fixture below only keeps the remote home's own
 # non-second-mate tooling resolvable.
 cat > "$REMOTE_ROOT/bin/tmux" <<SH
@@ -108,7 +108,7 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-cd "$FM_FAKE_REMOTE_CWD" || exit 93
+cd "$JG_FAKE_REMOTE_CWD" || exit 93
 # The readiness gate is answered here rather than by the real doctor, which
 # would inspect the RUNNER's own account; tests/jg-remote-doctor.test.sh owns
 # the doctor's behavior against controlled account fixtures.
@@ -116,7 +116,7 @@ if printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n' | head -1 | gre
   printf 'ok: remote second-mate readiness confirmed on this host\n'
   exit 0
 fi
-exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
@@ -126,24 +126,24 @@ printf 'codex\n' > "$PARENT/config/crew-harness"
 printf '## In flight\n\n## Queued\n\n## Done\n' > "$PARENT/data/backlog.md"
 
 remote_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
-  FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 \
   "$@"
 }
 
 # Freeze the parent home's trace-context decision the way a locked session start
-# does, hermetically against an ambient FM_TRACE_CONTEXT.
+# does, hermetically against an ambient JG_TRACE_CONTEXT.
 freeze_parent_session() {
   printf '%s\n' "$$" > "$PARENT/state/.lock"
   (
-    unset FM_TRACE_CONTEXT
+    unset JG_TRACE_CONTEXT
     jg_trace_context_session_start "$PARENT/config" "$PARENT/state/.trace-context-effective"
   )
 }
@@ -159,13 +159,13 @@ remote_staged_launch() {
   cat "$staged"
 }
 remote_launch_snapshot() {
-  remote_staged_launch | grep -o 'FM_TRACE_CONTEXT=[a-z]*' | tail -1 | cut -d= -f2
+  remote_staged_launch | grep -o 'JG_TRACE_CONTEXT=[a-z]*' | tail -1 | cut -d= -f2
 }
 meta_traceparent() { sed -n 's/^traceparent=//p' "$1"; }
 
 # Provision and register the remote route from the captain-facing primary.
-FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects >/dev/null \
   || fail "remote seed did not provision the traced route"
 
@@ -182,7 +182,7 @@ assert_present "$PARENT/state/ios.meta" "default-off remote spawn published no p
 ! grep -q '^traceparent=' "$REMOTE_HOME/state/parent-route/ios.meta" \
   || fail "default-off remote spawn must not record a carrier on the remote host"
 [ "$(remote_launch_snapshot)" = off ] \
-  || fail "default-off remote spawn must deliver FM_TRACE_CONTEXT=off (got '$(remote_launch_snapshot)')"
+  || fail "default-off remote spawn must deliver JG_TRACE_CONTEXT=off (got '$(remote_launch_snapshot)')"
 assert_absent "$REMOTE_HOME/config/trace-context" "default-off remote spawn inherited an enablement flag"
 grep -q 'export GOTMPDIR=' "$HERDR_LOG" || fail "the remote spawn should still run (GOTMPDIR is always exported)"
 pass "disabled: a remote-routed second mate records and receives no carrier and stays enabled-off end to end"
@@ -207,7 +207,7 @@ jg_trace_context_valid "$INJECTED_TP" \
 [ "$REMOTE_TP" = "$PARENT_TP" ] \
   || fail "the remote endpoint record must carry the parent's identity (remote='$REMOTE_TP' parent='$PARENT_TP')"
 [ "$(remote_launch_snapshot)" = on ] \
-  || fail "an enabled remote spawn must deliver FM_TRACE_CONTEXT=on (got '$(remote_launch_snapshot)')"
+  || fail "an enabled remote spawn must deliver JG_TRACE_CONTEXT=on (got '$(remote_launch_snapshot)')"
 assert_present "$REMOTE_HOME/config/trace-context" \
   "an enabled remote launch did not inherit the enablement flag into the remote home"
 GOTMP_LINE=$(grep -n 'export GOTMPDIR=' "$HERDR_LOG" | tail -1 | cut -d: -f1)
@@ -239,8 +239,8 @@ pass "relaunch: a remote-routed second mate keeps one stable identity across res
 # life. A second remote route resolved from that same environment must root its
 # own trace rather than chain onto it or onto the first route.
 AMBIENT='00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab-bbbbbbbbbbbbbbbb-01'
-FM_SECONDMATE_CHARTER='Own the second build Mac.' \
-  FM_SECONDMATE_SCOPE='second remote domain' \
+JG_SECONDMATE_CHARTER='Own the second build Mac.' \
+  JG_SECONDMATE_SCOPE='second remote domain' \
   TRACEPARENT="$AMBIENT" \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios2 remote-mac "$REMOTE_ROOT" "$SECOND_HOME" --no-projects >/dev/null \
   || fail "second remote seed failed"
@@ -272,11 +272,11 @@ if command -v shasum >/dev/null 2>&1; then
 else
   FLAG_HASH=$(sha256sum "$TMP_ROOT/flag-payload" | awk '{print $1}')
 fi
-FM_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
+JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   put config/trace-context "$FLAG_BYTES" "$FLAG_HASH" 1 < "$TMP_ROOT/flag-payload" >/dev/null \
   || fail "the remote inherit receiver refused a declared inheritable item"
 assert_present "$PROTOCOL_HOME/config/trace-context" "the accepted inherited enablement flag was not published"
-if FM_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
+if JG_HOME="$PROTOCOL_HOME" "$REMOTE_ROOT/bin/jg-remote-inherit.sh" \
   put config/secondmate-harness "$FLAG_BYTES" "$FLAG_HASH" 1 < "$TMP_ROOT/flag-payload" >/dev/null 2>&1; then
   fail "the remote inherit receiver accepted an item outside the declared set"
 fi
@@ -293,7 +293,7 @@ VALID='00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab-bbbbbbbbbbbbbbbb-01'
 try_flag() { # <expect-substring> <message> [extra args...]
   local expect=$1 message=$2 out
   shift 2
-  if out=$(FM_SPAWN_NO_GUARD=1 FM_HOME="$FLAG_HOME" "$ROOT/bin/jg-spawn.sh" \
+  if out=$(JG_SPAWN_NO_GUARD=1 JG_HOME="$FLAG_HOME" "$ROOT/bin/jg-spawn.sh" \
     flag-a-b1 "$TMP_ROOT/flag-proj" "$@" 2>&1); then
     fail "$message (the spawn succeeded instead)"
   fi

@@ -83,7 +83,7 @@ SH
 if [ "\${1:-}" = --handling-delivered ]; then
   exit 1
 fi
-export FM_ROOT_OVERRIDE="$ROOT"
+export JG_ROOT_OVERRIDE="$ROOT"
 export PATH="$fakebin:\$PATH"
 exec "$ROOT/bin/jg-watch-arm.sh" "\$@"
 SH
@@ -93,9 +93,9 @@ SH
   chmod 600 "$home/state/.watcher-down"
   printf '%s\t1\tcheck\tseed\tcheck: seed recovery\n' "$(date +%s)" > "$home/state/.wake-queue"
   out=$(
-    PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" \
-      FM_STATE_OVERRIDE="$home/state" PATH="$fakebin:$PATH" \
-      FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    PLUGIN="$plugin" JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" \
+      JG_STATE_OVERRIDE="$home/state" PATH="$fakebin:$PATH" \
+      JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
       node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -112,7 +112,7 @@ const pi = {
     prompts.push(String(message));
   },
 };
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.JG_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!tool) throw new Error("Pi watch tool was not registered");
@@ -132,8 +132,8 @@ const rearm = prompts.filter((message) => message.includes("check: rearm-resurfa
 if (rearm.length !== 1) {
   throw new Error(`expected exactly one recovery follow-up, got ${rearm.length}: ${prompts.join(" || ")}`);
 }
-const lockPid = existsSync(`${process.env.FM_HOME}/state/.watch.lock/pid`)
-  ? readFileSync(`${process.env.FM_HOME}/state/.watch.lock/pid`, "utf8").trim()
+const lockPid = existsSync(`${process.env.JG_HOME}/state/.watch.lock/pid`)
+  ? readFileSync(`${process.env.JG_HOME}/state/.watch.lock/pid`, "utf8").trim()
   : "";
 if (!/^[0-9]+$/.test(lockPid)) throw new Error("successor watcher lock pid missing");
 try {
@@ -141,7 +141,7 @@ try {
 } catch {
   throw new Error(`successor watcher ${lockPid} is not alive`);
 }
-const marker = readFileSync(`${process.env.FM_HOME}/state/.watcher-down`, "utf8").trim();
+const marker = readFileSync(`${process.env.JG_HOME}/state/.watcher-down`, "utf8").trim();
 if (!marker.startsWith("announced:") && !marker.startsWith("pending:")) {
   throw new Error(`successor did not keep a live recovery episode: ${marker}`);
 }
@@ -152,7 +152,7 @@ process.exit(0);
 EOF
   )
   status=$?
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '%s\n' "$out"
   fi
   lock_pid=$(sed -n 's/^T1_LOCK_PID=//p' <<<"$out" | tail -1)
@@ -180,9 +180,9 @@ test_handling_successor_does_not_go_blind() {
   printf 'pending:downtime:gap.1.aaa\n' > "$state/.watcher-down"
   chmod 600 "$state/.watcher-down"
   out="$dir/watch.out"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=600 \
-    FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH" > "$out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=600 \
+    JG_WATCH_HANDLING_SUCCESSOR=1 "$WATCH" > "$out" 2>&1 &
   child=$!
   now=0
   while [ "$now" -lt 40 ]; do
@@ -214,7 +214,7 @@ test_handling_successor_does_not_go_blind() {
     || { kill -TERM "$child" 2>/dev/null || true; fail "handling successor did not enqueue a durable row for the crew event"; }
   ! grep -F 'check: rearm-resurface' "$out" >/dev/null \
     || { kill -TERM "$child" 2>/dev/null || true; fail "handling successor emitted synthetic recovery instead of supervising: $(cat "$out")"; }
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'T2_WATCH_OUTPUT=%s\n' "$(tr '\n' ' ' < "$out")"
     printf 'T2_QUEUE_ROW=%s\n' "$(grep "$(printf '\tsignal\tcrew.status\t')" "$state/.wake-queue" | tail -1)"
   fi
@@ -250,13 +250,13 @@ test_adapter_waits_for_slow_supervision_scan() (
   else
     : > "$home/config/supervision-host-off"
   fi
-  export FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state"
-  export FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_TIMEOUT=45 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
-  unset FM_OMP_ARM_READY_TIMEOUT_MS FM_PI_ARM_READY_TIMEOUT_MS FM_OPENCODE_ARM_READY_TIMEOUT_MS FM_ARM_CONFIRM_TIMEOUT FM_SUPERVISION_HOST_READY_TIMEOUT
+  export JG_HOME="$home" JG_ROOT_OVERRIDE="$repo" JG_STATE_OVERRIDE="$home/state"
+  export JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_TIMEOUT=45 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999
+  unset JG_OMP_ARM_READY_TIMEOUT_MS JG_PI_ARM_READY_TIMEOUT_MS JG_OPENCODE_ARM_READY_TIMEOUT_MS JG_ARM_CONFIRM_TIMEOUT JG_SUPERVISION_HOST_READY_TIMEOUT
   {
     printf '#!/usr/bin/env bash\nsleep %s\n' "$delay"
     cat <<'SH'
-touch "$FM_HOME/scanned"
+touch "$JG_HOME/scanned"
 SH
   } > "$home/state/slow.check.sh"
   chmod 0700 "$home/state/slow.check.sh"
@@ -267,7 +267,7 @@ SH
   PLUGIN="$plugin" MODE="$mode" PATH="$fakebin:$PATH" bash -c 'case "$1" in omp*) name=omp ;; opencode*) name=opencode ;; *) name=$1 ;; esac; exec -a "$name" node --input-type=module' _ "$mode" <<'JS' || fail "$mode aborted a legitimate slow supervision scan"
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-const home = process.env.FM_HOME;
+const home = process.env.JG_HOME;
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 const prompts = [];
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
@@ -281,7 +281,7 @@ if (process.env.MODE === "pi" || process.env.MODE.startsWith("omp")) {
   await tool.execute("slow-scan", {}, undefined, undefined, {});
 } else {
   const client = { session: { promptAsync: async (request) => { prompts.push(JSON.stringify(request)); } } };
-  await mod.FmPrimaryWatchArm({ client, directory: process.env.FM_ROOT_OVERRIDE, worktree: process.env.FM_ROOT_OVERRIDE });
+  await mod.FmPrimaryWatchArm({ client, directory: process.env.JG_ROOT_OVERRIDE, worktree: process.env.JG_ROOT_OVERRIDE });
   await globalThis.__firstmateOpenCodeWatchArm.ensureArmed("slow-scan", client);
 }
 for (let i = 0; i < 1200 && !prompts.length; i++) await new Promise((resolve) => setTimeout(resolve, 100));

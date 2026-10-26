@@ -34,14 +34,14 @@ matrix_case A05 allow 'exec bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case A06 allow "$ROOT/bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A07 allow "cd '$ROOT'; exec bin/jg-watch-arm.sh"
 matrix_case A08 allow "cd '../firstmate'; bin/jg-watch-checkpoint.sh --seconds 180"
-matrix_case A09 allow "export FM_HOME='$ROOT'; bin/jg-watch-checkpoint.sh --seconds 180"
+matrix_case A09 allow "export JG_HOME='$ROOT'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A10 allow 'source config/x-mode.env; bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case A11 allow "source 'config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A12 allow "source './config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A13 allow "source '$ROOT/config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A14 allow "[ -f 'config/x-mode.env' ] && source 'config/x-mode.env'; exec bin/jg-watch-arm.sh"
 matrix_case A15 allow "cd $ROOT && exec bin/jg-watch-arm.sh"
-matrix_case A16 allow "export FM_HOME=$ROOT && bin/jg-watch-checkpoint.sh --seconds 180"
+matrix_case A16 allow "export JG_HOME=$ROOT && bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case A17 allow $'source "config/x-mode.env"\nbin/jg-watch-checkpoint.sh --seconds 180'
 
 matrix_case R01 allow "pgrep -fl '/bin/jg-watch.sh' || true"
@@ -111,11 +111,11 @@ matrix_case D42 deny 'bin/jg-watch-{arm,checkpoint}.sh &'
 matrix_case D43 deny 'bin/jg-watch-arm.sh* &'
 matrix_case D44 deny "pattern='jg-watch'; pkill -f \"\$pattern\""
 matrix_case D45 deny "p=\$(pgrep -f '/bin/jg-watch.sh'); q=\$p; kill \$q"
-matrix_case D46 deny '$FM_HOME/bin/jg-watch-arm.sh &'
+matrix_case D46 deny '$JG_HOME/bin/jg-watch-arm.sh &'
 matrix_case D47 deny '$HOME/firstmate/bin/jg-watch-arm.sh | cat'
 matrix_case D48 deny '~/firstmate/bin/jg-watch-arm.sh &'
 matrix_case D49 deny 'bin/jg-watch.sh'
-matrix_case D50 deny '$FM_HOME/bin/jg-watch.sh'
+matrix_case D50 deny '$JG_HOME/bin/jg-watch.sh'
 matrix_case D51 deny '~/firstmate/bin/jg-watch.sh --restart'
 matrix_case D52 deny "bin/jg-\$'\x77'atch-arm.sh &"
 matrix_case D53 deny 'bin/jg-$"watch"-arm.sh &'
@@ -136,8 +136,8 @@ matrix_case E01 allow "bin/jg-watch-checkpoint.sh --seconds '180;still-one-arg'"
 matrix_case E02 allow "bin/jg-watch-checkpoint.sh --label 'jg-watch-arm.sh; literal argument'"
 matrix_case E03 allow 'bin/jg-watch-arm.sh # output > file &'
 matrix_case E04 allow $'# setup comment with jg-watch.sh; && >\nsource "config/x-mode.env"\nbin/jg-watch-checkpoint.sh --seconds 180'
-matrix_case E05 deny "FM_HOME=$ROOT bin/jg-watch-checkpoint.sh --seconds 180"
-matrix_case E06 deny "env FM_HOME=$ROOT bin/jg-watch-arm.sh"
+matrix_case E05 deny "JG_HOME=$ROOT bin/jg-watch-checkpoint.sh --seconds 180"
+matrix_case E06 deny "env JG_HOME=$ROOT bin/jg-watch-arm.sh"
 matrix_case E07 deny "source '/tmp/not-firstmate/config/x-mode.env'; bin/jg-watch-checkpoint.sh --seconds 180"
 matrix_case E08 deny "bash -lc 'bin/jg-watch-checkpoint.sh --seconds 180'"
 matrix_case E09 deny '(bin/jg-watch-checkpoint.sh --seconds 180)'
@@ -145,13 +145,13 @@ matrix_case E10 deny "eval 'bin/jg-watch-arm.sh &'"
 matrix_case E11 deny "exec bash -lc 'bin/jg-watch-arm.sh &'"
 matrix_case E12 allow 'bash -lc "$WATCHER_COMMAND" # jg-watch-arm.sh'
 matrix_case E13 allow "printf '%s\\n' 'argument has ; and jg-watch-arm.sh and &&'"
-matrix_case E14 allow '$FM_HOME/bin/jg-teardown.sh &'
-matrix_case E15 allow '$FM_HOME/bin/jg-watch-arm.sh'
+matrix_case E14 allow '$JG_HOME/bin/jg-teardown.sh &'
+matrix_case E15 allow '$JG_HOME/bin/jg-watch-arm.sh'
 matrix_case E16 allow '~/firstmate/bin/jg-watch-checkpoint.sh --seconds 180'
 matrix_case E17 allow 'for f in 1; do echo jg-watch; done'
 
 MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-arm-policy-matrix.XXXXXX")
-FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
+JG_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
 trap jg_test_cleanup EXIT
 
 run_matrix_entry() {
@@ -235,12 +235,12 @@ test_direct_policy_contract() {
   assert_policy direct-unclassifiable $'deny\tunclassifiable-protected-command' "bin/jg-watch-arm.sh 'unterminated"
   assert_policy direct-unsupported $'deny\tunclassifiable-protected-command' 'if true; then bin/jg-watch-arm.sh; fi'
   assert_policy direct-constructed-payload $'deny\twatcher-nested' "WATCHER='bin/jg-watch-arm.sh &'; bash -lc \"\$WATCHER\""
-  assert_policy direct-parameter-export allow 'export FM_HOME=${HOME}; bin/jg-watch-checkpoint.sh --seconds 180'
-  assert_policy direct-expanded-arm-blessed allow '$FM_HOME/bin/jg-watch-arm.sh'
-  assert_policy direct-expanded-arm-background $'deny\twatcher-background' '$FM_HOME/bin/jg-watch-arm.sh &'
+  assert_policy direct-parameter-export allow 'export JG_HOME=${HOME}; bin/jg-watch-checkpoint.sh --seconds 180'
+  assert_policy direct-expanded-arm-blessed allow '$JG_HOME/bin/jg-watch-arm.sh'
+  assert_policy direct-expanded-arm-background $'deny\twatcher-background' '$JG_HOME/bin/jg-watch-arm.sh &'
   assert_policy direct-expanded-arm-pipeline $'deny\twatcher-pipeline' '$HOME/firstmate/bin/jg-watch-arm.sh | cat'
   assert_policy direct-watch-not-blessed $'deny\twatcher-direct' 'bin/jg-watch.sh'
-  assert_policy direct-watch-expanded $'deny\twatcher-direct' '$FM_HOME/bin/jg-watch.sh'
+  assert_policy direct-watch-expanded $'deny\twatcher-direct' '$JG_HOME/bin/jg-watch.sh'
   assert_policy direct-watch-safe-shape $'deny\twatcher-direct' 'cd /tmp; bin/jg-watch.sh'
   heredoc_data=$'cat <<\'EOF\'\nbin/jg-watch-arm.sh &\nEOF'
   heredoc_watcher=$'bin/jg-watch-arm.sh <<\'EOF\'\ndata only\nEOF'
@@ -346,7 +346,7 @@ test_prefilter_is_strict_superset() {
   [ "$rc" -eq 2 ] || fail "prefilter must delegate a locale-string-encoded protected path, not fast-allow it, got exit $rc"
   # The marker is specifically $ followed by a quote, not any $ expansion: an
   # ordinary $VAR that is not a watcher reference still takes the fast path.
-  "$CHECK" --command '$FM_HOME/bin/jg-teardown.sh &' >/dev/null 2>&1
+  "$CHECK" --command '$JG_HOME/bin/jg-teardown.sh &' >/dev/null 2>&1
   rc=$?
   [ "$rc" -eq 0 ] || fail "a benign \$VAR non-watcher command must still fast-allow, got exit $rc"
   "$CHECK" --command 'echo "$HOME/scratch" && ls -la' >/dev/null 2>&1

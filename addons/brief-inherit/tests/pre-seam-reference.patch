@@ -52,7 +52,7 @@ index 5dc8b1ce..791da67d 100755
 +  done
  fi
  
--_bi="${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"
+-_bi="${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"
 -# shellcheck disable=SC1090 # The optional add-on source is installed outside this repository.
 -[ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }
 -
@@ -63,13 +63,13 @@ diff --git a/bin/jg-config-inherit-lib.sh b/bin/jg-config-inherit-lib.sh
 index 7f61447a..ad058407 100644
 --- a/bin/jg-config-inherit-lib.sh
 +++ b/bin/jg-config-inherit-lib.sh
-@@ -87,8 +87,7 @@ FM_SHARED_CAPTAIN_MODE="444"
+@@ -87,8 +87,7 @@ JG_SHARED_CAPTAIN_MODE="444"
  # The declared inheritable set (space-separated, config-dir-relative item paths).
  # Extend here to inherit more of the primary's local config; override via the
  # environment only in tests. Items must not contain whitespace.
--FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
--_bi="${FM_ADDONS_DIR:-${FM_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
-+FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role brief-include-shared.md lane-target}"
+-JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
+-_bi="${JG_ADDONS_DIR:-${JG_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
++JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role brief-include-shared.md lane-target}"
  
  # firstmate-role additionally carries a proof-of-state receipt: a scoped role
  # grant (or its recorded absence) authorizes a secondmate home only while

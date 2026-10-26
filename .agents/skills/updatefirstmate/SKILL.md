@@ -61,9 +61,9 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 3. **Restart every second mate the updater named.**
    Pass the whole `restart-secondmates:` list to one command (skip this step entirely when it says `none`):
    ```sh
-   FM_HOME=<this-firstmate-home> bin/jg-secondmate-restart.sh <jg-id>...
+   JG_HOME=<this-firstmate-home> bin/jg-secondmate-restart.sh <jg-id>...
    ```
-   Include `FM_HOME=<this-juggernaut-home>` unless `FM_HOME` is already set to the active Juggernaut home.
+   Include `JG_HOME=<this-juggernaut-home>` unless `JG_HOME` is already set to the active Juggernaut home.
    This is automatic and needs no per-mate confirmation from the captain.
    Local and remote mates go in the same list; the command owns the transport, the profile each replacement runs on, and the wait.
 
@@ -81,7 +81,7 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 4. **Send the re-read message to the rest.**
    For every target on the `nudge-secondmates:` line (do nothing when it says `none`), send the one-line re-read steer:
    ```sh
-   FM_HOME=<this-firstmate-home> bin/jg-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
+   JG_HOME=<this-firstmate-home> bin/jg-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
    ```
    These are the mates that are on the latest bytes but could not be restarted provably, so the steer is the most this pass can honestly do for them.
    It is a gentle steer, not an interruption: the mate already got a safe tracked-files fast-forward, and the steer never forces, tears down, or discards its work.

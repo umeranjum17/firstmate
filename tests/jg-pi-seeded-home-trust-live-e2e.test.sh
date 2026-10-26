@@ -33,7 +33,7 @@ trap cleanup EXIT
 
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 
-jg_live_gate default-on FM_PI_SEEDED_HOME_TRUST_LIVE pi tmux
+jg_live_gate default-on JG_PI_SEEDED_HOME_TRUST_LIVE pi tmux
 
 PI_BIN=$(command -v pi) || fail "pi missing after live gate"
 VERSION_OUT=$("$PI_BIN" --version 2>&1) || fail "pi --version failed: $VERSION_OUT"

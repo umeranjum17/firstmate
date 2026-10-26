@@ -159,11 +159,11 @@ reset_log() {
 }
 
 # run <exit-var> <out-var> <err-var> [args...]: the tool with fakebin first on
-# PATH and an isolated FM_HOME; TYPESAFE_API_KEY comes from the caller's env.
+# PATH and an isolated JG_HOME; TYPESAFE_API_KEY comes from the caller's env.
 run() {
   local __exit=$1 __out=$2 __err=$3 _out _code
   shift 3
-  _out=$(PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
+  _out=$(PATH="$FAKEBIN:$BASE_PATH" JG_HOME="$HOME_DIR" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
   _code=$?
   printf -v "$__exit" '%s' "$_code"
   printf -v "$__out" '%s' "$_out"
@@ -173,7 +173,7 @@ run() {
 run_without_curl() {
   local __exit=$1 __out=$2 __err=$3 _out _code
   shift 3
-  _out=$(PATH="$NO_CURL_BIN" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
+  _out=$(PATH="$NO_CURL_BIN" JG_HOME="$HOME_DIR" TYPESAFE_API_KEY="$KEY" "$TOOL" "$@" 2> "$TMP_ROOT/stderr")
   _code=$?
   printf -v "$__exit" '%s' "$_code"
   printf -v "$__out" '%s' "$_out"
@@ -209,8 +209,8 @@ OVERRIDE_CONFIG="$TMP_ROOT/override-config"
 mkdir -p "$OVERRIDE_CONFIG"
 cp "$BASE_RULES" "$OVERRIDE_CONFIG/crew-dispatch.json"
 reset_log
-TYPESAFE_API_KEY=$KEY FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" run code out err "$BRIEF" --project pager
-assert_contains "$out" '  status: clear' "FM_CONFIG_OVERRIDE selects the canonical rules directory"
+TYPESAFE_API_KEY=$KEY JG_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" run code out err "$BRIEF" --project pager
+assert_contains "$out" '  status: clear' "JG_CONFIG_OVERRIDE selects the canonical rules directory"
 pass "TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work"
 
 # --- clear: request shape, secret handling, argmax --------------------------

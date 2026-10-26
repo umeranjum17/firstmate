@@ -2,7 +2,7 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared extraction of secondmate registry summary and scope from a charter.
-# Source only. FM_SECONDMATE_CHARTER and FM_SECONDMATE_SCOPE remain explicit
+# Source only. JG_SECONDMATE_CHARTER and JG_SECONDMATE_SCOPE remain explicit
 # caller overrides; otherwise the named sections in the filled brief are used.
 
 normalize_registry_text() {
@@ -29,8 +29,8 @@ brief_section_text() {
 
 registry_summary_for_brief() {
   local brief=$1
-  if [ -n "${FM_SECONDMATE_CHARTER:-}" ]; then
-    printf '%s\n' "$FM_SECONDMATE_CHARTER" | normalize_registry_text
+  if [ -n "${JG_SECONDMATE_CHARTER:-}" ]; then
+    printf '%s\n' "$JG_SECONDMATE_CHARTER" | normalize_registry_text
   else
     brief_section_text "$brief" "Charter" | normalize_registry_text
   fi
@@ -38,8 +38,8 @@ registry_summary_for_brief() {
 
 registry_scope_for_brief() {
   local brief=$1
-  if [ -n "${FM_SECONDMATE_SCOPE:-}" ]; then
-    printf '%s\n' "$FM_SECONDMATE_SCOPE" | normalize_registry_text
+  if [ -n "${JG_SECONDMATE_SCOPE:-}" ]; then
+    printf '%s\n' "$JG_SECONDMATE_SCOPE" | normalize_registry_text
   else
     brief_section_text "$brief" "Routing scope" | normalize_registry_text
   fi

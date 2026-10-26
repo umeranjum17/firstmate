@@ -36,21 +36,21 @@ case "${1-}" in
   --version) printf '0.1.80\n' ;;
   '')
     printf 'sessions[1]{file,status,url,pending_prompts}:\n'
-    [ ! -s "$FM_HOME/lavish-open" ] \
-      || printf '  %s,open,"http://127.0.0.1:4387/session/0123456789abcdef",0\n' "$(cat "$FM_HOME/lavish-open")"
+    [ ! -s "$JG_HOME/lavish-open" ] \
+      || printf '  %s,open,"http://127.0.0.1:4387/session/0123456789abcdef",0\n' "$(cat "$JG_HOME/lavish-open")"
     ;;
   poll)
     # The build's listening sample can land before this process resolves a
     # session. Recording entry makes that gap observable: a claim that dies
     # without reaching poll is not a listener.
-    printf 'entered\n' > "$FM_HOME/stub-poll"
+    printf 'entered\n' > "$JG_HOME/stub-poll"
     # Bounded, so a listener that escapes its test stops on its own.
-    while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+    while [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
     exit 75
     ;;
   *)
     real=$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")
-    printf '%s\n' "$real" > "$FM_HOME/lavish-open"
+    printf '%s\n' "$real" > "$JG_HOME/lavish-open"
     jq -n --arg file "$real" \
       '{sessions:{"0123456789abcdef":{file:$file,url:"http://127.0.0.1:4387/session/0123456789abcdef"}}}' \
       > "$LAVISH_AXI_STATE_DIR/state.json"
@@ -70,9 +70,9 @@ require_listener_reached_poll() {  # <home>
   local home=$1 i=0 owner=''
   while [ "$i" -lt 40 ]; do
     i=$((i + 1))
-    owner=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-      FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    owner=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+      JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+      JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
       LAVISH_AXI_STATE_DIR="$home/lavish-state" \
       "$ROOT/bin/jg-procevent.sh" list 2>/dev/null \
       | awk 'NR > 1 { print $3; exit }')
@@ -101,9 +101,9 @@ render_board() {  # <home> <underway-json> <charted-json> [charted_more] [charte
     schema:"jg-bearings-board.v1", home:"render-home", generated:"2026-08-26T00:00Z",
     prs_live:false, captains_call:[], underway:$underway, landed:[],
     charted:$charted, charted_more:$more, charted_warning_more:$warning_more}' > "$data"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     LAVISH_AXI_STATE_DIR="$home/lavish-state" \
     "$BOARD" build "$data" >/dev/null || fail "the board did not build"
   require_listener_reached_poll "$home"

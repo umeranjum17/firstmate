@@ -42,9 +42,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 # shellcheck source=bin/jg-public-followup-lib.sh
 # Also brings in bin/jg-x-lib.sh, which this script's relay client uses.
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
@@ -61,9 +61,9 @@ if jg_pf_has_events "$STATE"; then
   PF_ROOT=$(jg_pf_root "$STATE")
   PF_SIG=$(jg_pf_events_signature "$STATE" 2>/dev/null) || PF_SIG=
   if [ -n "$PF_SIG" ] \
-    && [ "$(cat "$PF_ROOT/$FM_PF_SURFACED_BASENAME" 2>/dev/null || true)" != "$PF_SIG" ]; then
+    && [ "$(cat "$PF_ROOT/$JG_PF_SURFACED_BASENAME" 2>/dev/null || true)" != "$PF_SIG" ]; then
     if printf '%s\n' "$PF_SIG" \
-      | fmx_private_artifact_publish_stdin "$PF_ROOT" "$FM_PF_SURFACED_BASENAME" 600 2>/dev/null; then
+      | fmx_private_artifact_publish_stdin "$PF_ROOT" "$JG_PF_SURFACED_BASENAME" 600 2>/dev/null; then
       printf 'public-followup terminal results are waiting to be reconciled\n'
     fi
   fi

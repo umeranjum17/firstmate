@@ -34,7 +34,7 @@
 #   status               Print configuration and the last poll cursor. No
 #                        network, no wake.
 #
-# Volume: poll surfaces at most FM_MAIL_POLL_MAX_WAKES messages per run
+# Volume: poll surfaces at most JG_MAIL_POLL_MAX_WAKES messages per run
 # (default 20, valid 1..200); a larger flood is left unseen so the next poll
 # surfaces the next batch, keeping the durable wake queue bounded no matter how
 # much inbound mail arrives. A header fetch that fails is still surfaced once
@@ -42,22 +42,22 @@
 # lands; a persistently unfetchable uid is never skipped and never re-wakes.
 #
 # Deployment - credentials and endpoints are read from the environment,
-# filling missing keys from the gitignored $FM_HOME/.env (same convention
+# filling missing keys from the gitignored $JG_HOME/.env (same convention
 # as the Relay/FMX token; env wins). Add these four required values, plus
 # the optional ports and timeout:
-#   FM_MAIL_USER=<imap/smtp account>
-#   FM_MAIL_PASS=<password>
-#   FM_IMAP_HOST=<imap host>
-#   FM_IMAP_PORT=<imap port>     (default 993, implicit TLS)
-#   FM_SMTP_HOST=<smtp host>
-#   FM_SMTP_PORT=<smtp port>     (default 465, implicit TLS)
-#   FM_MAIL_TIMEOUT=<seconds>    (default 20; IMAP/SMTP socket timeout)
-# FM_HOME falls back to the repo root when unset. This script carries no secret
-# and no default endpoint that could resolve against a wrong home; FM_MAIL_USER,
-# FM_MAIL_PASS, FM_IMAP_HOST, and FM_SMTP_HOST are always required, and
-# FM_MAIL_PASS is never logged. The wake library is sourced from next to this
-# script, not from $FM_HOME/bin; cursor, journal, retry set, and queue stay
-# under $FM_HOME/state.
+#   JG_MAIL_USER=<imap/smtp account>
+#   JG_MAIL_PASS=<password>
+#   JG_IMAP_HOST=<imap host>
+#   JG_IMAP_PORT=<imap port>     (default 993, implicit TLS)
+#   JG_SMTP_HOST=<smtp host>
+#   JG_SMTP_PORT=<smtp port>     (default 465, implicit TLS)
+#   JG_MAIL_TIMEOUT=<seconds>    (default 20; IMAP/SMTP socket timeout)
+# JG_HOME falls back to the repo root when unset. This script carries no secret
+# and no default endpoint that could resolve against a wrong home; JG_MAIL_USER,
+# JG_MAIL_PASS, JG_IMAP_HOST, and JG_SMTP_HOST are always required, and
+# JG_MAIL_PASS is never logged. The wake library is sourced from next to this
+# script, not from $JG_HOME/bin; cursor, journal, retry set, and queue stay
+# under $JG_HOME/state.
 #
 # IMAP/SMTP work is delegated to bin/jg-mail.py (imaplib/smtplib, implicit TLS
 # on 993/465). STARTTLS and port 587 are not supported. BODY.PEEK is used on
@@ -67,11 +67,11 @@ set -euo pipefail
 
 # --- resolve home, env, and endpoints -------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_HOME="${FM_HOME:-}"
-if [ -z "$FM_HOME" ]; then
-  FM_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
+JG_HOME="${JG_HOME:-}"
+if [ -z "$JG_HOME" ]; then
+  JG_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
-ENV_FILE="$FM_HOME/.env"
+ENV_FILE="$JG_HOME/.env"
 # Load the home .env for keys not already set, so a direct invocation's
 # environment overrides .env exactly like the Relay/FMX contract (fmx_env_get:
 # "env wins over .env"). Tolerates a leading "export ", surrounding whitespace,
@@ -102,30 +102,30 @@ if [ -f "$ENV_FILE" ]; then
   done < "$ENV_FILE"
 fi
 
-for r in FM_MAIL_USER FM_MAIL_PASS FM_IMAP_HOST FM_SMTP_HOST; do
+for r in JG_MAIL_USER JG_MAIL_PASS JG_IMAP_HOST JG_SMTP_HOST; do
   if [ -z "${!r:-}" ]; then
-    echo "jg-mail: missing required \$FM_HOME/.env value: $r" >&2
-    echo "jg-mail: add $r (and the other three FM_MAIL_* values) to $ENV_FILE" >&2
+    echo "jg-mail: missing required \$JG_HOME/.env value: $r" >&2
+    echo "jg-mail: add $r (and the other three JG_MAIL_* values) to $ENV_FILE" >&2
     exit 1
   fi
 done
-IMAP_HOST="$FM_IMAP_HOST"
-IMAP_PORT="${FM_IMAP_PORT:-993}"
-SMTP_HOST="$FM_SMTP_HOST"
-SMTP_PORT="${FM_SMTP_PORT:-465}"
+IMAP_HOST="$JG_IMAP_HOST"
+IMAP_PORT="${JG_IMAP_PORT:-993}"
+SMTP_HOST="$JG_SMTP_HOST"
+SMTP_PORT="${JG_SMTP_PORT:-465}"
 case "$IMAP_PORT" in
   ''|*[!0-9]*|0)
-    echo "jg-mail: FM_IMAP_PORT must be a positive integer, got: ${FM_IMAP_PORT:-}" >&2
+    echo "jg-mail: JG_IMAP_PORT must be a positive integer, got: ${JG_IMAP_PORT:-}" >&2
     exit 1
     ;;
 esac
 case "$SMTP_PORT" in
   ''|*[!0-9]*|0)
-    echo "jg-mail: FM_SMTP_PORT must be a positive integer, got: ${FM_SMTP_PORT:-}" >&2
+    echo "jg-mail: JG_SMTP_PORT must be a positive integer, got: ${JG_SMTP_PORT:-}" >&2
     exit 1
     ;;
 esac
-MAIL_MAX_WAKES="${FM_MAIL_POLL_MAX_WAKES:-20}"
+MAIL_MAX_WAKES="${JG_MAIL_POLL_MAX_WAKES:-20}"
 case "$MAIL_MAX_WAKES" in
   ''|*[!0-9]*|0) MAIL_MAX_WAKES=20 ;;
 esac
@@ -144,7 +144,7 @@ if [ ! -f "$PY_BIN" ]; then
   exit 1
 fi
 
-STATE_DIR="$FM_HOME/state"
+STATE_DIR="$JG_HOME/state"
 mkdir -p "$STATE_DIR"
 CURSOR="$STATE_DIR/.mail-seen"
 # Durable emission journal: every successfully published poll wake records its
@@ -171,12 +171,12 @@ TURN="$STATE_DIR/.mail-turn"
 # Invoke the python engine with the resolved endpoints, cursor, and cap in the
 # environment so credentials never reach argv.
 run_py() {
-  FM_MAIL_USER="$FM_MAIL_USER" FM_MAIL_PASS="$FM_MAIL_PASS" \
-  FM_IMAP_HOST="$IMAP_HOST" FM_IMAP_PORT="$IMAP_PORT" \
-  FM_SMTP_HOST="$SMTP_HOST" FM_SMTP_PORT="$SMTP_PORT" \
-  FM_MAIL_CURSOR="$CURSOR" FM_MAIL_RETRY="$RETRY" \
-  FM_MAIL_RETRY_POS="$RETRY_POS" FM_MAIL_TURN="$TURN" \
-  FM_MAIL_POLL_MAX_WAKES="$MAIL_MAX_WAKES" \
+  JG_MAIL_USER="$JG_MAIL_USER" JG_MAIL_PASS="$JG_MAIL_PASS" \
+  JG_IMAP_HOST="$IMAP_HOST" JG_IMAP_PORT="$IMAP_PORT" \
+  JG_SMTP_HOST="$SMTP_HOST" JG_SMTP_PORT="$SMTP_PORT" \
+  JG_MAIL_CURSOR="$CURSOR" JG_MAIL_RETRY="$RETRY" \
+  JG_MAIL_RETRY_POS="$RETRY_POS" JG_MAIL_TURN="$TURN" \
+  JG_MAIL_POLL_MAX_WAKES="$MAIL_MAX_WAKES" \
     "$PY" "$PY_BIN" "$@"
 }
 
@@ -286,7 +286,7 @@ mail_record_evidence() {
 
 mail_rollback_wake_locked() {
   # Remove a just-appended wake row plus any partial journal/cursor evidence.
-  # Runs under the held FM_WAKE_QUEUE_LOCK, so the rewrite cannot race an
+  # Runs under the held JG_WAKE_QUEUE_LOCK, so the rewrite cannot race an
   # acknowledgement. The journal entry is removed FIRST and required: deleting
   # the wake row while a journal entry survives would let the next heal mark
   # the uid surfaced without a wake. If the journal cannot be verified and
@@ -313,16 +313,16 @@ mail_rollback_wake_locked() {
   fi
   # Queue row: remove it (required) so nothing ackable survives without a
   # durable record.
-  tmp=$(mktemp "$FM_WAKE_QUEUE.rollback.XXXXXX") || return 1
+  tmp=$(mktemp "$JG_WAKE_QUEUE.rollback.XXXXXX") || return 1
   if ! awk -F '\t' -v key="$clean_key" '
     NF >= 5 && $3 == "check" && $4 == key { next }
     { print }
-  ' "$FM_WAKE_QUEUE" > "$tmp"; then
+  ' "$JG_WAKE_QUEUE" > "$tmp"; then
     rm -f -- "$tmp"
     return 1
   fi
   chmod 0600 "$tmp" 2>/dev/null || true
-  if ! mv -f -- "$tmp" "$FM_WAKE_QUEUE"; then
+  if ! mv -f -- "$tmp" "$JG_WAKE_QUEUE"; then
     rm -f -- "$tmp"
     return 1
   fi
@@ -339,7 +339,7 @@ mail_rollback_wake_locked() {
 
 wake_for() {
   # Publish one `check` wake and its durable records under a single held
-  # FM_WAKE_QUEUE_LOCK. The key is generation-aware when the mailbox reports a
+  # JG_WAKE_QUEUE_LOCK. The key is generation-aware when the mailbox reports a
   # UIDVALIDITY, so a restored mailbox's reused uid can never collide with a
   # stale wake key. The wake row is appended first, then the evidence records;
   # the drain acknowledges and deletes consumed rows only under the same lock,
@@ -377,7 +377,7 @@ wake_for() {
   # shellcheck source=bin/jg-wake-lib.sh
   # shellcheck disable=SC1091
   . "$lib"
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   if jg_wake_append_locked check "$wake_key" "check: mail $id - $summary"; then
     if mail_record_evidence "$generation" "$id" "$tag"; then
       :
@@ -406,7 +406,7 @@ wake_for() {
       status=4
     fi
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
@@ -636,7 +636,7 @@ case "${1:-}" in
     printf '%s' "$body" | run_py send "$to" "$subj" "-"
     ;;
   status)
-    echo "mail account: $FM_MAIL_USER"
+    echo "mail account: $JG_MAIL_USER"
     echo "imap: $IMAP_HOST:$IMAP_PORT smtp: $SMTP_HOST:$SMTP_PORT"
     run_py seen "$CURSOR" || true
     ;;

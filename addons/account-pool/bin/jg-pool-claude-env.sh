@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Source before a tool that can spawn Claude. Cache only folder paths and variable
 # names, never credentials. A configured pool failure never uses the default login.
-# FM_POOL_REQUIRE_FRESH=1 refuses cached picks for callers requiring current capacity.
+# JG_POOL_REQUIRE_FRESH=1 refuses cached picks for callers requiring current capacity.
 jg_pool_claude_env() {
-  local home=${FM_HOME:?set FM_HOME} command=byokit-accounts state='' line out='' reason='' cache folder var age
+  local home=${JG_HOME:?set JG_HOME} command=byokit-accounts state='' line out='' reason='' cache folder var age
   local -a shed=()
   cache=$home/state/claude-tool-pick.json
   [ -f "$home/config/account-pool" ] || { echo 'pool: config/account-pool is missing' >&2; return 1; }
@@ -15,7 +24,7 @@ jg_pool_claude_env() {
   if [ ! -d "$folder" ] || ! jq -e '.ok == true and (.set.CLAUDE_CONFIG_DIR | type == "string" and startswith("/")) and
     ((.unset // []) | type == "array" and all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*$")))' <<<"$out" >/dev/null 2>&1; then
     reason=${reason:-invalid pool answer}
-    if [ "${FM_POOL_REQUIRE_FRESH:-0}" = 1 ]; then
+    if [ "${JG_POOL_REQUIRE_FRESH:-0}" = 1 ]; then
       echo "pool: fresh pick failed ($reason); cached accounts will not be used" >&2
       return 1
     fi

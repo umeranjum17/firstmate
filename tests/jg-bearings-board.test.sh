@@ -45,7 +45,7 @@ case "${1-}" in
     # live owner in these tests is a live process rather than a timing artifact.
     # Both waits are bounded, so a listener that escapes its test cannot keep
     # spawning processes for as long as the host stays up.
-    limit=${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}
+    limit=${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}
     while [ ! -e "$state/poll-trigger" ]; do
       [ "$SECONDS" -lt "$limit" ] || exit 75
       sleep 0.05
@@ -106,9 +106,9 @@ end_session_as_captain() { : > "$1/lavish-state/user-ended"; : > "$1/lavish-stat
 run_board() {  # <home> <args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     LAVISH_FAKE_STATE="$home/lavish-state" LAVISH_AXI_STATE_DIR="$home/lavish-state" \
     "$BOARD" "$@"
 }
@@ -116,9 +116,9 @@ run_board() {  # <home> <args...>
 run_procevent() {  # <home> <command args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     LAVISH_AXI_STATE_DIR="$home/lavish-state" \
     "$ROOT/bin/jg-procevent.sh" "$@"
 }
@@ -126,8 +126,8 @@ run_procevent() {  # <home> <command args...>
 run_decisions() {  # <home> <command args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
     "$ROOT/bin/jg-decision-hold.sh" "$@"
 }
 
@@ -339,7 +339,7 @@ test_build_injects_binds_then_arms() {
     || fail "the injected payload does not round-trip to the input document"
   grep -qF '</script><b>' "$board" \
     && fail "a payload string embedded a live closing script tag in the page"
-  grep -qxF '__FM_BEARINGS_BOARD_DATA__' "$board" \
+  grep -qxF '__JG_BEARINGS_BOARD_DATA__' "$board" \
     && fail "the data slot survived injection"
 
   sid=$(run_lavish_source_id "$home" "$board")
@@ -381,13 +381,13 @@ EOF
 #!/usr/bin/env bash
 if [ -z "${1:-}" ]; then
   printf 'sessions[1]{file,status,url,pending_prompts}:\n'
-  [ ! -s "$FM_HOME/order-open" ] \
-    || printf '  %s,open,"http://127.0.0.1/session/order",0\n' "$(cat "$FM_HOME/order-open")"
+  [ ! -s "$JG_HOME/order-open" ] \
+    || printf '  %s,open,"http://127.0.0.1/session/order",0\n' "$(cat "$JG_HOME/order-open")"
   exit 0
 fi
 if [ "${1:-}" != poll ]; then
   real=$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")
-  printf '%s\n' "$real" > "$FM_HOME/order-open"
+  printf '%s\n' "$real" > "$JG_HOME/order-open"
   mkdir -p "$LAVISH_AXI_STATE_DIR"
   jq -n --arg file "$real" \
     '{sessions:{"0123456789abcdef":{file:$file,url:"http://127.0.0.1:14387/session/0123456789abcdef"}}}' \
@@ -452,9 +452,9 @@ SH
 
 run_lavish_source_id() {  # <home> <artifact>
   local home=$1
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent-lavish.sh" source-id "$2"
 }
 
@@ -483,7 +483,7 @@ test_build_refuses_a_template_without_exactly_one_slot() {
   write_valid_payload "$data"
   printf '<html><body>no slot</body></html>\n' > "$home/broken-template.html"
   set +e
-  out=$(FM_BEARINGS_BOARD_TEMPLATE="$home/broken-template.html" run_board "$home" build "$data" 2>&1)
+  out=$(JG_BEARINGS_BOARD_TEMPLATE="$home/broken-template.html" run_board "$home" build "$data" 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "a template with no data slot was accepted"
@@ -704,7 +704,7 @@ exit 1
 SH
   chmod +x "$home/fakebin/ps"
   set +e
-  out=$(FM_PROC_ROOT_OVERRIDE="$home/no-proc" run_board "$home" build "$data" 2>&1)
+  out=$(JG_PROC_ROOT_OVERRIDE="$home/no-proc" run_board "$home" build "$data" 2>&1)
   rc=$?
   set -e
   rm -f "$home/fakebin/ps"

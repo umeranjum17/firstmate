@@ -14,7 +14,7 @@ TMP_ROOT=$(jg_test_tmproot jg-stow-cascade)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 FAKEBIN=$(jg_fakebin "$TMP_ROOT/fakebin")
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 # A fake ssh standing in for the whole remote transport. It decodes jg-on.sh's
 # NUL argv stream so each remote leg can answer as its own command, and its mode
@@ -34,16 +34,16 @@ done
 argv=$6
 # tr runs inside the pipeline because command substitution drops NUL bytes.
 command=$(printf '%s' "$argv" | base64 --decode 2>/dev/null | tr '\000' '\n' | head -1)
-case "${FM_FAKE_SSH_MODE:-normal}" in
+case "${JG_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
   hang) sleep 45; exit 0 ;;
 esac
 case "$command" in
   jg-startup-memory-budget.sh)
-    cat "$FM_FAKE_REMOTE_BUDGET"
+    cat "$JG_FAKE_REMOTE_BUDGET"
     ;;
   jg-remote-secondmate-control.sh)
-    printf '%s\n' "${FM_FAKE_REMOTE_AGENT_STATE:-alive}"
+    printf '%s\n' "${JG_FAKE_REMOTE_AGENT_STATE:-alive}"
     ;;
   *) exit 91 ;;
 esac
@@ -56,9 +56,9 @@ cat > "$FAKEBIN/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *list-windows*) printf '%s\n' "${FM_FAKE_TMUX_WINDOW:-}" ;;
-  *list-panes*) printf '%s\n' "${FM_FAKE_TMUX_PANE:-}" ;;
-  *display-message*'#{pane_current_command}'*) printf '%s\n' "${FM_FAKE_TMUX_COMMAND:-claude}" ;;
+  *list-windows*) printf '%s\n' "${JG_FAKE_TMUX_WINDOW:-}" ;;
+  *list-panes*) printf '%s\n' "${JG_FAKE_TMUX_PANE:-}" ;;
+  *display-message*'#{pane_current_command}'*) printf '%s\n' "${JG_FAKE_TMUX_COMMAND:-claude}" ;;
   *display-message*'#{pane_pid}'*) printf '%s\n' "$$" ;;
   *display-message*'#{pane_id}'*) printf '%s\n' '%1' ;;
   *display-message*'#{cursor_y}'*) printf '%s\n' 0 ;;
@@ -103,8 +103,8 @@ run_cascade() { # <primary-home> [env assignments...]
     PATH="$FAKEBIN:$BASE_PATH" \
     HOME="${HOME:-/tmp}" \
     TMPDIR="${TMPDIR:-/tmp}" \
-    FM_HOME="$home" \
-    FM_SSH_BIN="$FAKEBIN/fake-ssh" \
+    JG_HOME="$home" \
+    JG_SSH_BIN="$FAKEBIN/fake-ssh" \
     "$@" \
     "$CASCADE"
 }
@@ -219,9 +219,9 @@ test_transport_routes_by_placement_and_liveness() {
 
   set +e
   out=$(run_cascade "$primary" \
-    FM_FAKE_TMUX_WINDOW='jg-live-local' \
-    FM_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt" \
-    FM_FAKE_REMOTE_AGENT_STATE=alive)
+    JG_FAKE_TMUX_WINDOW='jg-live-local' \
+    JG_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt" \
+    JG_FAKE_REMOTE_AGENT_STATE=alive)
   set -e
   [ "$(value_in "$(stanza "$out" live-local)" transport)" = agent ] \
     || fail "a local home with a live agent was not routed to that agent"
@@ -239,9 +239,9 @@ test_transport_routes_by_placement_and_liveness() {
 
   set +e
   out=$(run_cascade "$primary" \
-    FM_FAKE_TMUX_WINDOW='jg-live-local' \
-    FM_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt" \
-    FM_FAKE_REMOTE_AGENT_STATE=dead)
+    JG_FAKE_TMUX_WINDOW='jg-live-local' \
+    JG_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt" \
+    JG_FAKE_REMOTE_AGENT_STATE=dead)
   set -e
   s=$(stanza "$out" remote-live)
   [ "$(value_in "$s" transport)" = deferred ] \
@@ -305,9 +305,9 @@ test_a_slow_remote_is_bounded_and_the_rest_still_report() {
   started=$(date +%s)
   set +e
   out=$(run_cascade "$primary" \
-    FM_STOW_CASCADE_TIMEOUT=2 \
-    FM_FAKE_SSH_MODE=hang \
-    FM_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt")
+    JG_STOW_CASCADE_TIMEOUT=2 \
+    JG_FAKE_SSH_MODE=hang \
+    JG_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt")
   rc=$?
   set -e
   elapsed=$(( $(date +%s) - started ))
@@ -327,8 +327,8 @@ test_a_slow_remote_is_bounded_and_the_rest_still_report() {
 
   set +e
   out=$(run_cascade "$primary" \
-    FM_FAKE_SSH_MODE=unreachable \
-    FM_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt")
+    JG_FAKE_SSH_MODE=unreachable \
+    JG_FAKE_REMOTE_BUDGET="$TMP_ROOT/remote-budget.txt")
   rc=$?
   set -e
   [ "$(value_in "$(stanza "$out" bounded-remote)" budget_report)" = error ] \

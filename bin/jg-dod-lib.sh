@@ -134,10 +134,10 @@
 
 # Optional merge-card add-on: defines jg_dod_merge_gate and jg_merge_post_hook.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
 # Optional receipts add-on: defines jg_dod_receipt_accept and the jg_receipts_* helpers.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/firstmate-addons}/receipts/bin/jg-receipts-lib.sh"
 
 jg_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3
@@ -362,7 +362,7 @@ jg_nm_driving_block() {  # <forge>
   fi
   # config/wait-no-turns selects the foreground drive. Absent, the text matches
   # the backgrounded drive a home had before that flag.
-  wait_cfg=${CONFIG:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}}
+  wait_cfg=${CONFIG:-${JG_CONFIG_OVERRIDE:-${JG_HOME:-}/config}}
   if [ -e "$wait_cfg/wait-no-turns" ]; then
     drive_block="Drive the run with ONE foreground \`no-mistakes axi run\` and let it block.
 It bounds its own hold for you: \`--wait\` (default 8m) exists precisely so a harness with a ten-minute command cap gets a structured return instead of being killed mid-hold.
@@ -643,9 +643,9 @@ jg_dod_recorded_pr_on_forge() {  # <state> <id> <meta> <mode> <url>
     return 0
   fi
   ( jg_pr_url_parse "$url" \
-    && { [ "$FM_PR_PROVIDER" = gerrit ] \
+    && { [ "$JG_PR_PROVIDER" = gerrit ] \
       || jg_pr_poll_merge_already_notified "$state" "$id" \
-        "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; } )
+        "$JG_PR_PROVIDER" "$JG_PR_HOST" "$JG_PR_PATH" "$JG_PR_NUMBER"; } )
 }
 
 # 0 when <url> names a Gerrit change whose current patch set carries the tree of
@@ -656,14 +656,14 @@ jg_dod_recorded_pr_on_forge() {  # <state> <id> <meta> <mode> <url>
 jg_dod_gerrit_change_carries_head() {  # <worktree> <url>
   local wt=$1 url=$2 revision head_tree revision_tree lib
   jg_pr_url_parse "$url" || return 1
-  [ "$FM_PR_PROVIDER" = gerrit ] || return 1
+  [ "$JG_PR_PROVIDER" = gerrit ] || return 1
   lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jg-pr-lib.sh"
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
   revision=$(jg_run_timed 10 bash -c '
     . "$1"
     jg_pr_gerrit_read_revision "$2" "$3" || exit 1
-    printf "%s\n" "$FM_PR_RECORD_REVISION"
-  ' _ "$lib" "$FM_PR_HOST" "$FM_PR_NUMBER" 2>/dev/null) || return 1
+    printf "%s\n" "$JG_PR_RECORD_REVISION"
+  ' _ "$lib" "$JG_PR_HOST" "$JG_PR_NUMBER" 2>/dev/null) || return 1
   jg_pr_head_valid "$revision" || return 1
   head_tree=$(git -C "$wt" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null) || return 1
   revision_tree=$(git -C "$wt" rev-parse --verify --quiet "$revision^{tree}" 2>/dev/null) || return 1
@@ -743,9 +743,9 @@ jg_dod_pr_outside_origin() {  # <worktree> <pr-url>
   jg_pr_url_parse "$url" || return 1
   origin_url=$(git -C "$wt" remote get-url origin 2>/dev/null) || return 1
   jg_pr_repo_from_git_url "$origin_url" || return 1
-  [ -n "$FM_PR_GIT_HOST" ] && [ -n "$FM_PR_GIT_REPO" ] || return 1
-  [ "$(printf '%s' "$FM_PR_GIT_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$FM_PR_HOST" | tr '[:upper:]' '[:lower:]')" ] \
-    || [ "$(printf '%s' "$FM_PR_GIT_REPO" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$FM_PR_PATH" | tr '[:upper:]' '[:lower:]')" ]
+  [ -n "$JG_PR_GIT_HOST" ] && [ -n "$JG_PR_GIT_REPO" ] || return 1
+  [ "$(printf '%s' "$JG_PR_GIT_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$JG_PR_HOST" | tr '[:upper:]' '[:lower:]')" ] \
+    || [ "$(printf '%s' "$JG_PR_GIT_REPO" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$JG_PR_PATH" | tr '[:upper:]' '[:lower:]')" ]
 }
 
 # The live head commit of one pull request, read from the forge: GitHub through
@@ -754,38 +754,38 @@ jg_dod_pr_outside_origin() {  # <worktree> <pr-url>
 # CLI, an unreadable record, or a non-SHA answer is an honest unknown, and the
 # caller keeps its refusal rather than accepting on one. Each read is bounded
 # because it runs inside done-acceptance paths that supervision calls on every
-# poll. Sets FM_DOD_LIVE_HEAD on success.
+# poll. Sets JG_DOD_LIVE_HEAD on success.
 jg_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
   local provider=$1 host=$2 path=$3 number=$4 url=$5 json lib
-  FM_DOD_LIVE_HEAD=
+  JG_DOD_LIVE_HEAD=
   case "$provider" in
     github)
       if ! command -v gh >/dev/null 2>&1; then
         return 1
       fi
-      FM_DOD_LIVE_HEAD=$(jg_run_timed 15 gh pr view "$url" --json headRefOid -q .headRefOid 2>/dev/null) || return 1
+      JG_DOD_LIVE_HEAD=$(jg_run_timed 15 gh pr view "$url" --json headRefOid -q .headRefOid 2>/dev/null) || return 1
       ;;
     gitlab)
       if ! command -v glab >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
         return 1
       fi
       json=$(jg_run_timed 15 env GITLAB_HOST="$host" glab mr view "$number" -R "https://$host/$path" -F json 2>/dev/null) || return 1
-      FM_DOD_LIVE_HEAD=$(printf '%s' "$json" | jq -er 'if (type == "object") and (.sha | type == "string") then .sha else error("pull request record has no sha") end' 2>/dev/null) || return 1
+      JG_DOD_LIVE_HEAD=$(printf '%s' "$json" | jq -er 'if (type == "object") and (.sha | type == "string") then .sha else error("pull request record has no sha") end' 2>/dev/null) || return 1
       ;;
     forgejo)
       lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jg-pr-lib.sh"
       # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-      FM_DOD_LIVE_HEAD=$(jg_run_timed 15 bash -c '
+      JG_DOD_LIVE_HEAD=$(jg_run_timed 15 bash -c '
         . "$1"
         jg_pr_forgejo_read_record "$2" "$3" "$4" || exit 1
-        printf "%s\n" "$FM_PR_RECORD_HEAD"
+        printf "%s\n" "$JG_PR_RECORD_HEAD"
       ' _ "$lib" "$host" "$path" "$number" 2>/dev/null) || return 1
       ;;
     *)
       return 1
       ;;
   esac
-  jg_pr_head_valid "$FM_DOD_LIVE_HEAD"
+  jg_pr_head_valid "$JG_DOD_LIVE_HEAD"
 }
 
 # 0 when <line> is not a ship done: to gate, when it names the task's recorded
@@ -843,7 +843,7 @@ jg_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
     return 1
   }
   gerrit=0
-  [ -n "$url" ] && jg_pr_url_parse "$url" && [ "$FM_PR_PROVIDER" = gerrit ] && gerrit=1
+  [ -n "$url" ] && jg_pr_url_parse "$url" && [ "$JG_PR_PROVIDER" = gerrit ] && gerrit=1
   if [ "$gerrit" = 0 ] && jg_dod_note_reports_published_change "$(status_line_note "$line")"; then
     printf '%s\n' "the published-for-review report does not name a Gerrit change in the canonical https://<host>/c/<project>/+/<number> form"
     return 1
@@ -871,9 +871,9 @@ jg_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
   # head on the project's shared local branch, never a pull request.
   case "$mode" in
     direct-PR|no-mistakes|'')
-      if [ -n "$url" ] && jg_pr_url_parse "$url" && [ "$FM_PR_PROVIDER" != gerrit ] \
-        && jg_dod_forge_pr_head_live "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" "$url" \
-        && [ "$FM_DOD_LIVE_HEAD" = "$sha" ]; then
+      if [ -n "$url" ] && jg_pr_url_parse "$url" && [ "$JG_PR_PROVIDER" != gerrit ] \
+        && jg_dod_forge_pr_head_live "$JG_PR_PROVIDER" "$JG_PR_HOST" "$JG_PR_PATH" "$JG_PR_NUMBER" "$url" \
+        && [ "$JG_DOD_LIVE_HEAD" = "$sha" ]; then
         return 0
       fi
       ;;

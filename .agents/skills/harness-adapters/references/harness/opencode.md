@@ -30,7 +30,7 @@ Without a conversion, every typed-plane send to a busy OpenCode pane falsely rep
 Tmux and Herdr delegate this exception to the one `jg_composer_queued_enter_verdict` policy in `../../../bin/jg-composer-lib.sh`.
 Backend-specific signals are documented in `../../../docs/tmux-backend.md` and `../../../docs/herdr-backend.md`.
 Regression coverage is `../../../tests/jg-tmux-submit-busy.test.sh`, `../../../tests/jg-composer-lib.test.sh`, and `../../../tests/jg-backend-herdr.test.sh`.
-The live Herdr guard is `FM_HERDR_SUBMIT_CONFIRM_LIVE=1 ../../../tests/jg-herdr-submit-confirm-live-e2e.test.sh`.
+The live Herdr guard is `JG_HERDR_SUBMIT_CONFIRM_LIVE=1 ../../../tests/jg-herdr-submit-confirm-live-e2e.test.sh`.
 
 ## Primary integration
 

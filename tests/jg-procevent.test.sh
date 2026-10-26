@@ -18,7 +18,7 @@ set -u
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMP_ROOT=$(jg_test_tmproot jg-procevent-tests)
-export FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
+export JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 export LAVISH_AXI_STATE_DIR="$TMP_ROOT/lavish-state"
 mkdir -p "$LAVISH_AXI_STATE_DIR"
 
@@ -47,7 +47,7 @@ cat > "$BLOCKER" <<'SH'
 # escapes its test cannot keep spawning processes indefinitely.
 trigger=$1; shift
 while [ ! -e "$trigger" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.05
 done
 [ -n "${BLOCKER_STDERR:-}" ] && printf 'noise on stderr\n' >&2
@@ -70,7 +70,7 @@ exec "$@"
 SH
 chmod +x "$STARTED_BLOCKER"
 
-pe() { FM_HOME="$1" "$ROOT/bin/jg-procevent.sh" "${@:2}"; }
+pe() { JG_HOME="$1" "$ROOT/bin/jg-procevent.sh" "${@:2}"; }
 
 # Every home this suite registers a source in is tracked so teardown can stop
 # its runners. A runner started by reconcile is detached and reparented, so a
@@ -164,7 +164,7 @@ wait_capture() {  # <home> <source-id> [tries]
   local _
   for _ in $(seq 1 "$n"); do
     if first_result "$home" "$id" >/dev/null 2>&1 \
-      && [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$id.claim" ]; then
+      && [ ! -e "$JG_PROCEVENT_CLAIM_ROOT/$id.claim" ]; then
       return 0
     fi
     sleep 0.1
@@ -193,7 +193,7 @@ wait_for_lines() {
 
 hold_source_lock() {  # <source-id> <ready-file> <release-file>
   local id=$1 ready=$2 release=$3 parent=$$
-  FM_HOME="$TMP_ROOT/lock-helper-home" bash -c '
+  JG_HOME="$TMP_ROOT/lock-helper-home" bash -c '
     . "$1/bin/jg-pr-lib.sh"
     . "$1/bin/jg-wake-lib.sh"
     . "$1/bin/jg-procevent-lib.sh"
@@ -210,7 +210,7 @@ hold_source_lock() {  # <source-id> <ready-file> <release-file>
 
 hold_source_lock_then_handle() {  # <home> <source-id> <sequence> <ready-file> <release-file>
   local home=$1 id=$2 seq=$3 ready=$4 release=$5 parent=$$
-  FM_HOME="$home" bash -c '
+  JG_HOME="$home" bash -c '
     . "$1/bin/jg-pr-lib.sh"
     . "$1/bin/jg-wake-lib.sh"
     . "$1/bin/jg-procevent-lib.sh"
@@ -235,7 +235,7 @@ assert_contains "$out" "published=0 started=0" "reconcile is a no-op with nothin
 [ -z "$(ls -A "$IDLE/state" 2>/dev/null)" ] || fail "an unconfigured home generated state: $(ls -A "$IDLE/state")"
 pass "no configured source means no generated state and no process"
 
-sup=$(PATH="${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
+sup=$(PATH="${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
   '. "$1/bin/jg-supervision-lib.sh"; jg_supervision_needed "$2" && echo yes || echo no' _ "$ROOT" "$IDLE/state")
 assert_contains "$sup" no "an unconfigured home does not need supervision"
 
@@ -245,7 +245,7 @@ TRIG="$TMP_ROOT/trigger-one"
 out=$(pe_register "$H1" lavish src-one -- "$BLOCKER" "$TRIG" "payload one")
 assert_contains "$out" "registered: src-one" "register records a source"
 
-sup=$(PATH="${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
+sup=$(PATH="${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
   '. "$1/bin/jg-supervision-lib.sh"; jg_supervision_needed "$2" && echo yes || echo no' _ "$ROOT" "$H1/state")
 assert_contains "$sup" yes "a registered source needs supervision with no task metadata"
 
@@ -253,7 +253,7 @@ pe "$H1" reconcile >/dev/null
 # Reconcile's replacement runner is detached, so ownership is recorded after
 # reconcile has already returned. Wait for the claim itself: a duplicate start
 # only has an owner to lose to once that claim exists.
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/src-one.claim" || fail "reconcile never claimed the registered source"
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/src-one.claim" || fail "reconcile never claimed the registered source"
 out=$(pe "$H1" start src-one)
 assert_contains "$out" "already owned" "a duplicate start loses instead of running a second child"
 
@@ -267,7 +267,7 @@ pass "one blocking completion yields exactly one bounded normalized event"
 
 RESULT=$(first_result "$H1" src-one || true)
 [ -n "$RESULT" ] || fail "no durable result was captured"
-mode=$(PATH="${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
+mode=$(PATH="${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
   '. "$1/bin/jg-pr-lib.sh"; jg_pr_file_mode "$2"' _ "$ROOT" "$RESULT")
 assert_contains "$mode" 600 "the captured result is private"
 assert_grep 'payload one' "$RESULT" "the captured result holds the source output verbatim"
@@ -285,7 +285,7 @@ HSYM="$TMP_ROOT/symlinked-parent/home"; new_home "$HSYM"
 SYM_TRIGGER="$TMP_ROOT/symlink-trigger"
 pe_register "$HSYM" lavish symlinked-src -- "$BLOCKER" "$SYM_TRIGGER" "symlinked payload" >/dev/null
 pe "$HSYM" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/symlinked-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/symlinked-src.claim" \
   || fail "a home reached through a symlinked ancestor never claimed its source"
 : > "$SYM_TRIGGER"
 wait_for "$HSYM/state/.wake-queue" \
@@ -304,8 +304,8 @@ DIRECT_TRIGGER="$TMP_ROOT/direct-trigger"
 pe_register "$HPG" lavish direct-src -- "$BLOCKER" "$DIRECT_TRIGGER" "direct result" >/dev/null
 pe "$HPG" start direct-src > "$TMP_ROOT/direct-start.out" &
 direct_runner=$!
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/direct-src.claim" || fail "direct start never claimed its source"
-direct_leader=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/direct-src.claim")
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/direct-src.claim" || fail "direct start never claimed its source"
+direct_leader=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/direct-src.claim")
 direct_group=$(ps -o pgid= -p "$direct_leader" 2>/dev/null | tr -d '[:space:]')
 [ "$direct_group" = "$direct_leader" ] \
   || fail "direct start claimed before leading its process group: pid=$direct_leader pgid=$direct_group"
@@ -348,11 +348,11 @@ waitpid($sibling, 0);
 exit 0;
 PL
 pe_register "$HPG" lavish shared-src -- "$BLOCKER" "$SHARED_TRIGGER" "shared result" >/dev/null
-FM_HOME="$HPG" perl "$SHARED_LAUNCHER" "$SHARED_SIBLING" \
+JG_HOME="$HPG" perl "$SHARED_LAUNCHER" "$SHARED_SIBLING" \
   "$ROOT/bin/jg-procevent.sh" start shared-src > "$TMP_ROOT/shared-start.out" &
 shared_launcher=$!
 wait_for "$SHARED_SIBLING" || fail "shared caller group never started its unrelated sibling"
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/shared-src.claim" || fail "shared-group start never claimed its source"
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/shared-src.claim" || fail "shared-group start never claimed its source"
 shared_sibling=$(cat "$SHARED_SIBLING")
 pe "$HPG" retire shared-src >/dev/null
 kill -0 "$shared_sibling" 2>/dev/null || fail "retirement signaled an unrelated caller-group process"
@@ -443,7 +443,7 @@ assert_contains "$private_out" "cannot durably record handling" "mode enforcemen
 assert_absent "$HPRIVATE/state/procevent-inbox/private-src.1.handled" "failed mode enforcement left an authoritative marker"
 private_out=$(umask 000; pe "$HPRIVATE" handled private-src 1)
 assert_contains "$private_out" "handled: private-src 1" "handling succeeds after private mode enforcement recovers"
-private_mode=$(PATH="${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
+private_mode=$(PATH="${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c \
   '. "$1/bin/jg-pr-lib.sh"; jg_pr_file_mode "$2"' _ "$ROOT" "$HPRIVATE/state/procevent-inbox/private-src.1.handled")
 assert_contains "$private_mode" 600 "the handled marker is private under a permissive caller umask"
 pass "handled acknowledgement creation is private and fails safely"
@@ -474,8 +474,8 @@ cat > "$ADAPTER_ROOT/bin/jg-procevent-applying.sh" <<'SH'
 #!/usr/bin/env bash
 case "${1-}" in
   autohandle)
-    printf '%s %s\n' "$2" "$3" >> "$FM_HOME/state/applied"
-    "$FM_PROCEVENT_UNDER_TEST" handled "$2" "$3" >/dev/null
+    printf '%s %s\n' "$2" "$3" >> "$JG_HOME/state/applied"
+    "$JG_PROCEVENT_UNDER_TEST" handled "$2" "$3" >/dev/null
     ;;
   *) exit 2 ;;
 esac
@@ -483,14 +483,14 @@ SH
 cat > "$ADAPTER_ROOT/bin/jg-procevent-selfann.sh" <<'SH'
 #!/usr/bin/env bash
 # Fixture adapter that declares a durable downstream announcement of its own.
-# FM_HOME/state/selfann-fail makes its application fail so the fallback
+# JG_HOME/state/selfann-fail makes its application fail so the fallback
 # publication path stays provable.
 case "${1-}" in
   self-announcing) exit 0 ;;
   autohandle)
-    [ ! -e "$FM_HOME/state/selfann-fail" ] || exit 1
-    printf '%s %s\n' "$2" "$3" >> "$FM_HOME/state/applied"
-    "$FM_PROCEVENT_UNDER_TEST" handled "$2" "$3" >/dev/null
+    [ ! -e "$JG_HOME/state/selfann-fail" ] || exit 1
+    printf '%s %s\n' "$2" "$3" >> "$JG_HOME/state/applied"
+    "$JG_PROCEVENT_UNDER_TEST" handled "$2" "$3" >/dev/null
     ;;
   *) exit 2 ;;
 esac
@@ -501,8 +501,8 @@ chmod +x "$ADAPTER_ROOT/bin/jg-procevent-endnow.sh" "$ADAPTER_ROOT/bin/jg-procev
 pe_adapter() {  # <home> <command>...: run the runner against the fixture adapters
   local home=$1
   shift
-  FM_ROOT_OVERRIDE="$ADAPTER_ROOT" FM_PROCEVENT_UNDER_TEST="$ROOT/bin/jg-procevent.sh" \
-    FM_HOME="$home" "$ROOT/bin/jg-procevent.sh" "$@"
+  JG_ROOT_OVERRIDE="$ADAPTER_ROOT" JG_PROCEVENT_UNDER_TEST="$ROOT/bin/jg-procevent.sh" \
+    JG_HOME="$home" "$ROOT/bin/jg-procevent.sh" "$@"
 }
 
 HPUBLISH="$TMP_ROOT/hpublish"; new_home "$HPUBLISH"
@@ -525,7 +525,7 @@ out=$(pe_adapter "$HPUBLISH" reconcile)
 assert_contains "$out" "published=1" "the unpublished capture was not announced on later reconciliation"
 assert_contains "$out" "started=0" "reconcile started an always-ready poll that races the recovery assertions"
 assert_contains "$(wake_payloads "$HPUBLISH")" "procevent applying publish-src 1" "later reconciliation did not deliver the capture to a handler"
-FM_HOME="$HPUBLISH" FM_PROCEVENT_UNDER_TEST="$ROOT/bin/jg-procevent.sh" \
+JG_HOME="$HPUBLISH" JG_PROCEVENT_UNDER_TEST="$ROOT/bin/jg-procevent.sh" \
   "$ADAPTER_ROOT/bin/jg-procevent-applying.sh" autohandle publish-src 1 \
     "$HPUBLISH/state/procevent-inbox/publish-src.1.result"
 assert_grep 'publish-src 1' "$HPUBLISH/state/applied" "the handler could not apply the later announcement"
@@ -575,7 +575,7 @@ out=$(pe_adapter "$HTERM" start ends-src)
 assert_contains "$out" "captured:" "a terminal result is still captured durably"
 assert_contains "$out" "retired: ends-src" "the runner reports the adapter-driven retirement"
 assert_absent "$HTERM/state/procevent/ends-src.source" "an adapter-classified terminal result retires its registration"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/ends-src.claim" "terminal retirement releases this runner's own claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/ends-src.claim" "terminal retirement releases this runner's own claim"
 assert_contains "$(wake_payloads "$HTERM")" "procevent endnow ends-src 1" "the terminal result is still announced"
 [ "$(count_results "$HTERM" ends-src)" = 1 ] || fail "terminal retirement lost or duplicated the captured result"
 TERMINAL_RESULT=$(first_result "$HTERM" ends-src || true)
@@ -645,7 +645,7 @@ out=$(PATH="$FAIL_RM_BIN:$PATH" pe_adapter "$HRETFAIL" start retire-fail-src 2>&
 assert_contains "$out" "cannot retire terminal source" "a failed registration removal is reported"
 assert_present "$HRETFAIL/state/procevent/retire-fail-src.source" \
   "failed retirement preserves the exact registration"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/retire-fail-src.claim" \
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/retire-fail-src.claim" \
   "failed retirement preserves its terminal ownership claim"
 out=$(PATH="$FAIL_RM_BIN:$PATH" pe_adapter "$HRETFAIL" reconcile)
 assert_contains "$out" "started=0" "failed terminal retirement never restarts the poll"
@@ -654,7 +654,7 @@ assert_contains "$out" "started=0" "failed terminal retirement never restarts th
 pe_adapter "$HRETFAIL" reconcile >/dev/null
 assert_absent "$HRETFAIL/state/procevent/retire-fail-src.source" \
   "repeated retirement removes the same registration once removal recovers"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/retire-fail-src.claim" \
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/retire-fail-src.claim" \
   "the claim releases only after that registration is removed"
 [ "$(count_results "$HRETFAIL" retire-fail-src)" = 1 ] \
   || fail "retirement recovery reran the terminal source"
@@ -691,7 +691,7 @@ printf '<h1>review</h1>\n' > "$REVIEW_ART"
 lavish_session "$REVIEW_ART"
 lavish_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$REVIEW_ART")
 jg_test_track_procevent_home "$HLT"
-PATH="$LAVISH_BIN:$PATH" FM_HOME="$HLT" "$ROOT/bin/jg-procevent-lavish.sh" arm "$REVIEW_ART" >/dev/null
+PATH="$LAVISH_BIN:$PATH" JG_HOME="$HLT" "$ROOT/bin/jg-procevent-lavish.sh" arm "$REVIEW_ART" >/dev/null
 for _ in $(seq 1 6); do
   PATH="$LAVISH_BIN:$PATH" pe "$HLT" reconcile >/dev/null
   sleep 0.3
@@ -704,10 +704,10 @@ done
   || fail "one Send & End produced more than one distinct event: $(wake_payloads "$HLT" | sort -u)"
 assert_contains "$(wake_payloads "$HLT")" "procevent lavish $lavish_id 1" "the human's final feedback is announced"
 assert_absent "$HLT/state/procevent/$lavish_id.source" "the ended review source retires automatically"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/$lavish_id.claim" "the ended review releases its owned claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/$lavish_id.claim" "the ended review releases its owned claim"
 LAVISH_RESULT=$(first_result "$HLT" "$lavish_id" || true)
 assert_grep 'ship it' "$LAVISH_RESULT" "automatic retirement retains the human's final feedback"
-out=$(PATH="$LAVISH_BIN:$PATH" FM_HOME="$HLT" "$ROOT/bin/jg-procevent-lavish.sh" retire "$REVIEW_ART")
+out=$(PATH="$LAVISH_BIN:$PATH" JG_HOME="$HLT" "$ROOT/bin/jg-procevent-lavish.sh" retire "$REVIEW_ART")
 assert_contains "$out" "retired: $lavish_id" "explicit adapter retirement stays supported after automatic retirement"
 pass "one Send & End yields exactly one captured result, automatic retirement, and no recurring poll"
 
@@ -732,7 +732,7 @@ printf '<h1>quiet</h1>\n' > "$QUIET_ART"
 lavish_session "$QUIET_ART"
 quiet_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$QUIET_ART")
 jg_test_track_procevent_home "$HEMPTY"
-PATH="$EMPTY_BIN:$PATH" FM_HOME="$HEMPTY" \
+PATH="$EMPTY_BIN:$PATH" JG_HOME="$HEMPTY" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$QUIET_ART" >/dev/null
 quiet_out=$(PATH="$EMPTY_BIN:$PATH" pe "$HEMPTY" start "$quiet_id" 2>&1)
 assert_not_contains "$quiet_out" "not-autohandled" \
@@ -814,19 +814,19 @@ new_task_endpoint "$HMULTI" worker-1
 new_task_endpoint "$HMULTI" worker-2
 mkdir -p "$HMULTI/config"
 printf 'wrong-server.example\n' > "$HMULTI/config/lavish-axi-host"
-PATH="$MULTI_BIN:$PATH" LAVISH_AXI_HOST=arming.example LAVISH_AXI_PORT=24387 FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" LAVISH_AXI_HOST=arming.example LAVISH_AXI_PORT=24387 JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-1 \
   --agent-reply-file "$MULTI_ROOT/reply1" >/dev/null
-if PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" >/dev/null 2>"$MULTI_ROOT/firstmate-arm.err"; then
   fail "firstmate arm replaced a worker-owned board"
 fi
 assert_contains "$(cat "$MULTI_ROOT/firstmate-arm.err")" "owned by task worker-1" \
   "second armer refusal did not name the worker owner"
-list_out=$(FM_HOME="$HMULTI" "$ROOT/bin/jg-procevent.sh" list)
+list_out=$(JG_HOME="$HMULTI" "$ROOT/bin/jg-procevent.sh" list)
 assert_contains "$list_out" "task:worker-1/listening" \
   "arm did not leave the worker-owned board with a live listener"
-PATH="$MULTI_BIN:$PATH" LAVISH_AXI_HOST=recovery.example LAVISH_AXI_PORT=34387 FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" LAVISH_AXI_HOST=recovery.example LAVISH_AXI_PORT=34387 JG_HOME="$HMULTI" \
   pe "$HMULTI" start "$multi_id" > "$MULTI_ROOT/run1" 2>&1 &
 MULTI_RUN=$!
 for _ in $(seq 1 100); do [ "$(cat "$MULTI_ROOT/count" 2>/dev/null || true)" = 1 ] && break; sleep 0.02; done
@@ -842,7 +842,7 @@ for _ in $(seq 1 100); do [ -f "$HMULTI/state/worker-1.inbox/001.msg" ] && break
 # from under that round, and while it stands neither firstmate nor a sibling
 # task can register over it or acknowledge worker-1's capture.
 open_retire_status=0
-PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$MULTI_ART" \
   >/dev/null 2>"$MULTI_ROOT/open-retire.err" || open_retire_status=$?
 [ "$open_retire_status" -ne 0 ] \
@@ -851,14 +851,14 @@ assert_contains "$(cat "$MULTI_ROOT/open-retire.err")" "unacknowledged" \
   "the refused retire did not say the owner's round is still unacknowledged"
 [ -e "$HMULTI/state/procevent/$multi_id.source" ] \
   || fail "a refused retire still removed the worker-owned source record"
-if PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-2 \
   >/dev/null 2>"$MULTI_ROOT/open-sibling.err"; then
   fail "a sibling task registered over an open worker-owned round"
 fi
 assert_contains "$(cat "$MULTI_ROOT/open-sibling.err")" "owned by task worker-1" \
   "the sibling refusal over an open round did not name the worker owner"
-if PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" \
   >/dev/null 2>"$MULTI_ROOT/open-firstmate.err"; then
   fail "firstmate armed a board with an open worker-owned round"
@@ -870,7 +870,7 @@ assert_contains "$(cat "$MULTI_ROOT/open-firstmate.err")" "owned by task worker-
 [ ! -e "$HMULTI/state/worker-2.inbox" ] \
   || fail "a refused sibling registration took delivery of the owner's feedback"
 
-PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-1 \
   --agent-reply-file "$MULTI_ROOT/reply2" >/dev/null
 wait "$MULTI_RUN" || true
@@ -883,7 +883,7 @@ touch "$MULTI_ROOT/trigger2"
 for _ in $(seq 1 100); do [ -f "$HMULTI/state/worker-1.inbox/002.msg" ] && break; sleep 0.02; done
 [ -f "$HMULTI/state/worker-1.inbox/002.msg" ] \
   || fail "the next worker-owned feedback did not reach the worker inbox"
-PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-1 \
   --agent-reply-file "$MULTI_ROOT/reply3" >/dev/null
 for _ in $(seq 1 100); do
@@ -914,13 +914,13 @@ pass "worker board replies and recovered listeners derive their server from the 
 # the round, and acknowledging it is what concludes and retires the board.
 [ -e "$HMULTI/state/procevent/$multi_id.source" ] \
   || fail "the terminal round released the worker's board before it was acknowledged"
-if PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" >/dev/null 2>"$MULTI_ROOT/terminal-arm.err"; then
   fail "firstmate armed a worker-owned board whose terminal round was unacknowledged"
 fi
 assert_contains "$(cat "$MULTI_ROOT/terminal-arm.err")" "owned by task worker-1" \
   "the refusal over an open terminal round did not name the worker owner"
-if PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+if PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$MULTI_ART" --for worker-2 \
   >/dev/null 2>"$MULTI_ROOT/sibling-arm.err"; then
   fail "a sibling task took over a worker-owned board whose terminal round was unacknowledged"
@@ -928,7 +928,7 @@ fi
 assert_contains "$(cat "$MULTI_ROOT/sibling-arm.err")" "owned by task worker-1" \
   "the sibling registration refusal did not name the worker owner"
 terminal_retire_status=0
-PATH="$MULTI_BIN:$PATH" FM_HOME="$HMULTI" \
+PATH="$MULTI_BIN:$PATH" JG_HOME="$HMULTI" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$MULTI_ART" \
   >/dev/null 2>"$MULTI_ROOT/terminal-retire.err" || terminal_retire_status=$?
 [ "$terminal_retire_status" -ne 0 ] \
@@ -983,7 +983,7 @@ lavish_session "$ORPHAN_ART"
 orphan_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$ORPHAN_ART")
 jg_test_track_procevent_home "$HORPHAN"
 new_task_endpoint "$HORPHAN" worker-4
-PATH="$ORPHAN_BIN:$PATH" FM_HOME="$HORPHAN" \
+PATH="$ORPHAN_BIN:$PATH" JG_HOME="$HORPHAN" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ORPHAN_ART" --for worker-4 >/dev/null
 (umask 077; mkdir -p "$HORPHAN/state/procevent-inbox")
 chmod 0700 "$HORPHAN/state/procevent-inbox"
@@ -1019,7 +1019,7 @@ lavish_session "$ADOPT_ART"
 adopt_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$ADOPT_ART")
 jg_test_track_procevent_home "$HADOPT"
 new_task_endpoint "$HADOPT" worker-5
-PATH="$ADOPT_BIN:$PATH" FM_HOME="$HADOPT" \
+PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ADOPT_ART" >/dev/null
 wait_capture "$HADOPT" "$adopt_id" \
   || fail "the firstmate fixture capture never landed"
@@ -1027,9 +1027,9 @@ wait_capture "$HADOPT" "$adopt_id" \
   || fail "the firstmate fixture capture never landed"
 [ ! -f "$HADOPT/state/procevent-inbox/$adopt_id.1.handled" ] \
   || fail "the firstmate fixture capture was already acknowledged"
-PATH="$ADOPT_BIN:$PATH" FM_HOME="$HADOPT" \
+PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$ADOPT_ART" >/dev/null
-if PATH="$ADOPT_BIN:$PATH" FM_HOME="$HADOPT" \
+if PATH="$ADOPT_BIN:$PATH" JG_HOME="$HADOPT" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ADOPT_ART" --for worker-5 \
   >/dev/null 2>"$TMP_ROOT/adopt-arm.err"; then
   fail "a worker armed a board carrying another owner's unacknowledged capture"
@@ -1052,7 +1052,7 @@ printf '<h1>no endpoint</h1>\n' > "$NOMETA_ART"
 lavish_session "$NOMETA_ART"
 nometa_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$NOMETA_ART")
 jg_test_track_procevent_home "$HNOMETA"
-if PATH="$ADOPT_BIN:$PATH" FM_HOME="$HNOMETA" \
+if PATH="$ADOPT_BIN:$PATH" JG_HOME="$HNOMETA" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$NOMETA_ART" --for worker-10 \
   >/dev/null 2>"$TMP_ROOT/nometa-arm.err"; then
   fail "a board was armed for a task id that names no endpoint"
@@ -1062,7 +1062,7 @@ assert_contains "$(cat "$TMP_ROOT/nometa-arm.err")" "worker-10" \
 [ ! -e "$HNOMETA/state/procevent/$nometa_id.source" ] \
   || fail "a board armed for an unreachable owner still published its registration"
 new_task_endpoint "$HNOMETA" worker-10
-PATH="$ADOPT_BIN:$PATH" FM_HOME="$HNOMETA" \
+PATH="$ADOPT_BIN:$PATH" JG_HOME="$HNOMETA" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$NOMETA_ART" --for worker-10 >/dev/null
 [ -e "$HNOMETA/state/procevent/$nometa_id.source" ] \
   || fail "a board was refused for a task that does have an endpoint"
@@ -1090,7 +1090,7 @@ case "${1:-}" in
         *) break ;;
       esac
     done
-    [ "$literal" = 1 ] && printf '%s\n' "${1:-}" >> "${FM_SEND_LOG:-/dev/null}"
+    [ "$literal" = 1 ] && printf '%s\n' "${1:-}" >> "${JG_SEND_LOG:-/dev/null}"
     exit 0 ;;
   display-message)
     for a in "$@"; do
@@ -1114,7 +1114,7 @@ redeliver_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$REDELIVER_ART")
 jg_test_track_procevent_home "$HREDELIVER"
 new_task_endpoint "$HREDELIVER" worker-6
 RING_LOG="$TMP_ROOT/redeliver-ring.log"; : > "$RING_LOG"
-PATH="$RING_BIN:$ADOPT_BIN:$PATH" FM_SEND_LOG="$RING_LOG" FM_HOME="$HREDELIVER" \
+PATH="$RING_BIN:$ADOPT_BIN:$PATH" JG_SEND_LOG="$RING_LOG" JG_HOME="$HREDELIVER" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REDELIVER_ART" --for worker-6 >/dev/null
 wait_capture "$HREDELIVER" "$redeliver_id" \
   || fail "the first worker-owned round was never captured"
@@ -1126,7 +1126,7 @@ wait_for_lines "$RING_LOG" 1 \
   || fail "a single newly captured round rang more than once: $(cat "$RING_LOG")"
 i=0
 while [ "$i" -lt 5 ]; do
-  PATH="$RING_BIN:$ADOPT_BIN:$PATH" FM_SEND_LOG="$RING_LOG" pe "$HREDELIVER" reconcile >/dev/null 2>&1 || true
+  PATH="$RING_BIN:$ADOPT_BIN:$PATH" JG_SEND_LOG="$RING_LOG" pe "$HREDELIVER" reconcile >/dev/null 2>&1 || true
   i=$((i + 1))
 done
 [ "$(wc -l < "$RING_LOG" | tr -d ' ')" = 1 ] \
@@ -1137,7 +1137,7 @@ mv "$HREDELIVER/state/worker-6.inbox/001.msg" \
   "$HREDELIVER/state/worker-6.inbox/handled/001.msg"
 i=0
 while [ "$i" -lt 5 ]; do
-  PATH="$RING_BIN:$ADOPT_BIN:$PATH" FM_SEND_LOG="$RING_LOG" pe "$HREDELIVER" reconcile >/dev/null 2>&1 || true
+  PATH="$RING_BIN:$ADOPT_BIN:$PATH" JG_SEND_LOG="$RING_LOG" pe "$HREDELIVER" reconcile >/dev/null 2>&1 || true
   i=$((i + 1))
 done
 [ "$(wc -l < "$RING_LOG" | tr -d ' ')" = 1 ] \
@@ -1167,7 +1167,7 @@ lavish_session "$CONC_ART"
 conc_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$CONC_ART")
 jg_test_track_procevent_home "$HCONC"
 new_task_endpoint "$HCONC" worker-7
-PATH="$CONC_BIN:$PATH" FM_HOME="$HCONC" \
+PATH="$CONC_BIN:$PATH" JG_HOME="$HCONC" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$CONC_ART" --for worker-7 >/dev/null
 wait_capture "$HCONC" "$conc_id" \
   || fail "the terminal worker-owned round never landed"
@@ -1190,7 +1190,7 @@ assert_contains "$conclude_out" "retired: $conc_id" \
   "acknowledging the terminal round did not report the board retired"
 [ ! -e "$HCONC/state/procevent/$conc_id.source" ] \
   || fail "acknowledging the terminal round did not retire the worker-owned board"
-PATH="$CONC_BIN:$PATH" FM_HOME="$HCONC" \
+PATH="$CONC_BIN:$PATH" JG_HOME="$HCONC" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$CONC_ART" --for worker-7 >/dev/null
 repeat_out=$(PATH="$CONC_BIN:$PATH" pe "$HCONC" handled "$conc_id" 1)
 assert_contains "$repeat_out" "already-handled: $conc_id 1" \
@@ -1222,7 +1222,7 @@ lavish_session "$INTR_ART"
 intr_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$INTR_ART")
 jg_test_track_procevent_home "$HINTR"
 new_task_endpoint "$HINTR" worker-12
-PATH="$INTR_BIN:$PATH" FM_HOME="$HINTR" \
+PATH="$INTR_BIN:$PATH" JG_HOME="$HINTR" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$INTR_ART" --for worker-12 >/dev/null
 wait_capture "$HINTR" "$intr_id" \
   || fail "the terminal worker-owned round was never captured"
@@ -1232,7 +1232,7 @@ rm -f "$HINTR/state/procevent/$intr_id.source"
 PATH="$INTR_BIN:$PATH" pe "$HINTR" reconcile >/dev/null 2>&1 || true
 [ "$(cat "$INTR_ROOT/count" 2>/dev/null || echo 0)" = 1 ] \
   || fail "an interrupted conclude let the ended board be polled again"
-if PATH="$INTR_BIN:$PATH" FM_HOME="$HINTR" \
+if PATH="$INTR_BIN:$PATH" JG_HOME="$HINTR" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$INTR_ART" --for worker-12 \
   >/dev/null 2>"$INTR_ROOT/intr-arm.err"; then
   fail "an interrupted conclude let its owner re-arm the ended board"
@@ -1269,7 +1269,7 @@ jg_test_track_procevent_home "$HROLL"
 new_task_endpoint "$HROLL" worker-8
 printf 'reply from generation one\n' > "$ROLL_ROOT/reply1"
 printf 'reply from generation two\n' > "$ROLL_ROOT/reply2"
-PATH="$ROLL_BIN:$PATH" FM_HOME="$HROLL" \
+PATH="$ROLL_BIN:$PATH" JG_HOME="$HROLL" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ROLL_ART" --for worker-8 \
   --agent-reply-file "$ROLL_ROOT/reply1" >/dev/null
 wait_for "$ROLL_ROOT/replies" \
@@ -1284,7 +1284,7 @@ wait_capture "$HROLL" "$roll_id" \
 cp "$HROLL/state/procevent/$roll_id.source" "$ROLL_ROOT/generation-one.source"
 chmod 0500 "$HROLL/state/procevent-inbox"
 rollback_status=0
-PATH="$ROLL_BIN:$PATH" FM_HOME="$HROLL" \
+PATH="$ROLL_BIN:$PATH" JG_HOME="$HROLL" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ROLL_ART" --for worker-8 \
   --agent-reply-file "$ROLL_ROOT/reply2" >/dev/null 2>&1 || rollback_status=$?
 chmod 0700 "$HROLL/state/procevent-inbox"
@@ -1294,7 +1294,7 @@ cmp -s "$ROLL_ROOT/generation-one.source" "$HROLL/state/procevent/$roll_id.sourc
   || fail "a failed re-arm replaced the generation the board is still running"
 [ ! -f "$HROLL/state/procevent-inbox/$roll_id.1.handled" ] \
   || fail "a failed re-arm still acknowledged the round it could not close"
-PATH="$ROLL_BIN:$PATH" FM_HOME="$HROLL" \
+PATH="$ROLL_BIN:$PATH" JG_HOME="$HROLL" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ROLL_ART" --for worker-8 \
   --agent-reply-file "$ROLL_ROOT/reply2" >/dev/null
 wait_for_lines "$ROLL_ROOT/replies" 2 \
@@ -1328,12 +1328,12 @@ jg_test_track_procevent_home "$HREARM"
 new_task_endpoint "$HREARM" worker-11
 printf 'first generation reply\n' > "$REARM_ROOT/reply1"
 printf 'second generation reply\n' > "$REARM_ROOT/reply2"
-PATH="$REARM_BIN:$PATH" FM_HOME="$HREARM" \
+PATH="$REARM_BIN:$PATH" JG_HOME="$HREARM" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REARM_ART" --for worker-11 \
   --agent-reply-file "$REARM_ROOT/reply1" >/dev/null
 [ -e "$HREARM/state/procevent/$rearm_id.source" ] \
   || fail "the initial arm of a worker-owned board did not register it"
-if PATH="$REARM_BIN:$PATH" FM_HOME="$HREARM" \
+if PATH="$REARM_BIN:$PATH" JG_HOME="$HREARM" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REARM_ART" --for worker-11 \
   --agent-reply-file "$REARM_ROOT/reply2" >/dev/null 2>"$REARM_ROOT/idle-rearm.err"; then
   fail "a worker re-armed its own board with no captured round to acknowledge"
@@ -1349,14 +1349,14 @@ wait_for "$HREARM/state/procevent-inbox/$rearm_id.1.result" \
   || fail "the refused idle re-arm cost the board the reply its listener was already carrying"
 [ -f "$HREARM/state/procevent-inbox/$rearm_id.1.result" ] \
   || fail "the first worker-owned round never landed"
-if PATH="$REARM_BIN:$PATH" FM_HOME="$HREARM" \
+if PATH="$REARM_BIN:$PATH" JG_HOME="$HREARM" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REARM_ART" --for worker-11 \
   --agent-reply-file "$REARM_ROOT/never-written" >/dev/null 2>&1; then
   fail "a re-arm carrying a nonexistent reply path was accepted"
 fi
 [ ! -f "$HREARM/state/procevent-inbox/$rearm_id.1.handled" ] \
   || fail "a re-arm refused over its reply path still acknowledged the open round"
-PATH="$REARM_BIN:$PATH" FM_HOME="$HREARM" \
+PATH="$REARM_BIN:$PATH" JG_HOME="$HREARM" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REARM_ART" --for worker-11 \
   --agent-reply-file "$REARM_ROOT/reply2" >/dev/null
 [ -f "$HREARM/state/procevent-inbox/$rearm_id.1.handled" ] \
@@ -1384,7 +1384,7 @@ printf '<h1>answered</h1>\n' > "$ANSWER_ART"
 lavish_session "$ANSWER_ART"
 answer_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$ANSWER_ART")
 jg_test_track_procevent_home "$HANSWER"
-PATH="$ANSWER_BIN:$PATH" FM_HOME="$HANSWER" \
+PATH="$ANSWER_BIN:$PATH" JG_HOME="$HANSWER" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ANSWER_ART" >/dev/null
 PATH="$ANSWER_BIN:$PATH" pe "$HANSWER" reconcile >/dev/null
 wait_for "$HANSWER/state/.wake-queue" \
@@ -1454,7 +1454,7 @@ printf '<h1>default rate</h1>\n' > "$DEFAULT_RATE_ART"
 lavish_session "$DEFAULT_RATE_ART"
 DEFAULT_RATE_COUNT="$TMP_ROOT/default-rate-count"
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" LAVISH_COUNT="$DEFAULT_RATE_COUNT" LAVISH_SCRIPT=interrupt \
-  FM_LAVISH_POLL_RETRY_DELAY='' \
+  JG_LAVISH_POLL_RETRY_DELAY='' \
   "$ROOT/bin/jg-procevent-lavish.sh" poll "$DEFAULT_RATE_ART" >/dev/null 2>&1 &
 DEFAULT_RATE_PID=$!
 perl -MTime::HiRes=sleep -e 'sleep 6.2'
@@ -1469,7 +1469,7 @@ pass "the shipped poll governor bounds an instantly returning source"
 
 # A bounded test override keeps the retry policy's real bound under test without
 # making the suite wait out the production delay.
-export FM_LAVISH_POLL_RETRY_DELAY=1
+export JG_LAVISH_POLL_RETRY_DELAY=1
 
 # Two interruptions, then the captain's real feedback: the retries are silent and
 # only the feedback becomes a captured result and a check wake.
@@ -1480,7 +1480,7 @@ lavish_session "$RETRY_ART"
 retry_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$RETRY_ART")
 jg_test_track_procevent_home "$HRETRY"
 LAVISH_COUNT="$TMP_ROOT/retry-count"; LAVISH_SCRIPT="interrupt interrupt feedback"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HRETRY" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HRETRY" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$RETRY_ART" >/dev/null
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" pe "$HRETRY" reconcile >/dev/null
 wait_for "$HRETRY/state/.wake-queue" || fail "feedback after interrupted polls produced no wake"
@@ -1510,7 +1510,7 @@ new_task_endpoint "$HREPLY" worker-9
 printf 'applied round one\n' > "$TMP_ROOT/reply-retry.txt"
 LAVISH_REPLY_LOG="$TMP_ROOT/reply-retry-log"; export LAVISH_REPLY_LOG
 LAVISH_COUNT="$TMP_ROOT/reply-retry-count"; LAVISH_SCRIPT="interrupt interrupt feedback"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HREPLY" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HREPLY" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$REPLY_ART" --for worker-9 \
   --agent-reply-file "$TMP_ROOT/reply-retry.txt" >/dev/null
 wait_for "$HREPLY/state/worker-9.inbox/001.msg" 200 \
@@ -1552,7 +1552,7 @@ SETUP_GUARD_COUNT="$TMP_ROOT/setup-guard-count"
 printf 'kept for the next listener\n' > "$SETUP_GUARD_REPLY"
 setup_guard_status=0
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" LAVISH_COUNT="$SETUP_GUARD_COUNT" LAVISH_SCRIPT=feedback \
-  FM_LAVISH_POLL_RETRY_DELAY=not-a-number \
+  JG_LAVISH_POLL_RETRY_DELAY=not-a-number \
   "$ROOT/bin/jg-procevent-lavish.sh" poll "$REPLY_ART" \
   --agent-reply-file "$SETUP_GUARD_REPLY" >/dev/null 2>&1 || setup_guard_status=$?
 [ "$setup_guard_status" -ne 0 ] \
@@ -1594,7 +1594,7 @@ lavish_session "$EXH_ART"
 exh_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$EXH_ART")
 jg_test_track_procevent_home "$HEXH"
 LAVISH_COUNT="$TMP_ROOT/exhaust-count"; LAVISH_SCRIPT="interrupt"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HEXH" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HEXH" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$EXH_ART" >/dev/null
 wait_capture "$HEXH" "$exh_id" 200 \
   || fail "exhaustion produced no captured result"
@@ -1608,7 +1608,7 @@ assert_contains "$(wake_payloads "$HEXH")" "procevent lavish $exh_id 1" \
   "the interruption that survives the bound is announced normally"
 assert_grep 'poll response was interrupted' "$(first_result "$HEXH" "$exh_id")" \
   "the announced result is the exact interruption the server returned"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HEXH" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HEXH" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$EXH_ART" >/dev/null
 pass "an interruption that outlives the bounded retries is captured and announced"
 
@@ -1621,7 +1621,7 @@ lavish_session "$OTHER_ART"
 other_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$OTHER_ART")
 jg_test_track_procevent_home "$HOTHER"
 LAVISH_COUNT="$TMP_ROOT/other-count"; LAVISH_SCRIPT="other-server-error"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHER" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HOTHER" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$OTHER_ART" >/dev/null
 wait_for "$HOTHER/state/.wake-queue" \
   || fail "an unrelated SERVER_ERROR is captured and announced immediately"
@@ -1629,10 +1629,10 @@ wait_for "$HOTHER/state/.wake-queue" \
   || fail "an unrelated SERVER_ERROR was retried $(cat "$LAVISH_COUNT") times instead of surfacing at once"
 assert_contains "$(wake_payloads "$HOTHER")" "procevent lavish $other_id 1" \
   "an unrelated SERVER_ERROR is captured and announced immediately"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHER" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HOTHER" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$OTHER_ART" >/dev/null
 pass "only the exact interruption is retried; an unrelated SERVER_ERROR still surfaces"
-unset FM_LAVISH_POLL_RETRY_DELAY
+unset JG_LAVISH_POLL_RETRY_DELAY
 
 # A whitespace variant is not the exact transient response and must surface on
 # the first poll instead of drifting into the quiet retry policy.
@@ -1643,7 +1643,7 @@ lavish_session "$NEAR_ART"
 near_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$NEAR_ART")
 jg_test_track_procevent_home "$HNEAR"
 LAVISH_COUNT="$TMP_ROOT/near-count"; LAVISH_SCRIPT="near-interrupt feedback"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HNEAR" FM_LAVISH_POLL_RETRY_DELAY=1 \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HNEAR" JG_LAVISH_POLL_RETRY_DELAY=1 \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$NEAR_ART" >/dev/null
 wait_for "$HNEAR/state/.wake-queue" \
   || fail "a whitespace variant of the interruption is captured and announced immediately"
@@ -1651,7 +1651,7 @@ wait_for "$HNEAR/state/.wake-queue" \
   || fail "a near-match interruption was retried instead of surfacing on its first poll"
 assert_contains "$(wake_payloads "$HNEAR")" "procevent lavish $near_id 1" \
   "a whitespace variant of the interruption is captured and announced immediately"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HNEAR" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HNEAR" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$NEAR_ART" >/dev/null
 pass "only the literal two-line interruption enters the quiet retry policy"
 
@@ -1664,8 +1664,8 @@ lavish_session "$INVALID_ART"
 invalid_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$INVALID_ART")
 for invalid_delay in 0 61 invalid; do
   invalid_status=0
-  invalid_out=$(PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HINVALID" \
-    FM_LAVISH_POLL_RETRY_DELAY="$invalid_delay" \
+  invalid_out=$(PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HINVALID" \
+    JG_LAVISH_POLL_RETRY_DELAY="$invalid_delay" \
     "$ROOT/bin/jg-procevent-lavish.sh" arm "$INVALID_ART" 2>&1) || invalid_status=$?
   [ "$invalid_status" -ne 0 ] \
     || fail "arm accepted invalid retry delay: $invalid_delay"
@@ -1698,9 +1698,9 @@ lavish_session "$STREAM_ART"
 stream_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$STREAM_ART")
 jg_test_track_procevent_home "$HSTREAM"
 LAVISH_COUNT="$TMP_ROOT/stream-count"; LAVISH_SCRIPT="stream"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSTREAM" TMPDIR="$STREAM_TMPDIR" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HSTREAM" TMPDIR="$STREAM_TMPDIR" \
   LAVISH_STREAM_READY="$LAVISH_STREAM_READY" LAVISH_STREAM_RELEASE="$LAVISH_STREAM_RELEASE" \
-  FM_PROCEVENT_MAX_OUTPUT_BYTES=100 \
+  JG_PROCEVENT_MAX_OUTPUT_BYTES=100 \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$STREAM_ART" >/dev/null
 wait_for "$LAVISH_STREAM_READY" || fail "streaming poll did not start"
 stream_staged=("$STREAM_TMPDIR"/jg-lavish-poll.*)
@@ -1712,7 +1712,7 @@ wait_for "$HSTREAM/state/.wake-queue" || fail "streaming poll produced no wake"
 stream_result=$(first_result "$HSTREAM" "$stream_id" || true)
 [ "$(wc -c < "$stream_result" | tr -d ' ')" -le 100 ] \
   || fail "streaming poll bypassed the runner output bound"
-PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSTREAM" \
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" JG_HOME="$HSTREAM" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$STREAM_ART" >/dev/null
 pass "Lavish classification staging stays bounded while nonmatches stream"
 
@@ -1792,7 +1792,7 @@ expected=$(printf '%s\n' \
   "$HP/state/procevent-inbox/ordered-src.10.result")
 [ "$pending" = "$expected" ] || fail "pending results were not emitted in numeric sequence order: $pending"
 pe "$HP" reconcile >/dev/null
-deduped=$(FM_HOME="$HP" bash -c '
+deduped=$(JG_HOME="$HP" bash -c '
   . "$1/bin/jg-wake-lib.sh"
   jg_wake_print_deduped "$2/state/.wake-queue" | awk -F "\t" "{print \$5}"
 ' _ "$ROOT" "$HP")
@@ -1818,13 +1818,13 @@ pass "one owner per canonical source across homes"
 # A source whose child never completes must not survive retirement. This is the
 # leak that reparented four orphaned runners: the fixture directory was removed
 # while the detached child kept blocking, with nothing left to reap it.
-runner_pid=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/shared-src.claim" 2>/dev/null)
+runner_pid=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/shared-src.claim" 2>/dev/null)
 [ -n "$runner_pid" ] || fail "no runner pid recorded for the blocked source"
 kill -0 "$runner_pid" 2>/dev/null || fail "the blocked runner is not live before retirement"
 pe "$HA" retire shared-src >/dev/null
 for _ in $(seq 1 40); do kill -0 "$runner_pid" 2>/dev/null || break; sleep 0.1; done
 kill -0 "$runner_pid" 2>/dev/null && fail "retire left the blocked runner alive"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/shared-src.claim" "retire releases the claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/shared-src.claim" "retire releases the claim"
 pass "retiring a never-completing source stops its runner and its blocked child"
 
 # reconcile must also stop a runner whose registration was removed out from under
@@ -1839,7 +1839,7 @@ pe_register "$HZ" lavish orphan-src \
   -- "$STARTED_BLOCKER" "$ORPHAN_STARTED" "$BLOCKER" "$TRIG4" "orphan" >/dev/null
 pe "$HZ" reconcile >/dev/null
 wait_for "$ORPHAN_STARTED" || fail "the orphan fixture runner never entered its source command"
-orphan_pid=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/orphan-src.claim" 2>/dev/null)
+orphan_pid=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/orphan-src.claim" 2>/dev/null)
 if [ -z "$orphan_pid" ] || ! kill -0 "$orphan_pid" 2>/dev/null; then
   fail "orphan fixture runner did not start"
 fi
@@ -1851,8 +1851,8 @@ kill -0 "$orphan_pid" 2>/dev/null && fail "reconcile left an orphaned runner ali
 pass "reconcile reaps a runner whose source registration is gone"
 
 # --- a stale claim is reclaimable, a live one is not ------------------------
-CLAIM="$FM_PROCEVENT_CLAIM_ROOT/stale-src.claim"
-mkdir -p "$FM_PROCEVENT_CLAIM_ROOT"
+CLAIM="$JG_PROCEVENT_CLAIM_ROOT/stale-src.claim"
+mkdir -p "$JG_PROCEVENT_CLAIM_ROOT"
 HC="$TMP_ROOT/hc"; new_home "$HC"
 printf '%s\n%s\nstale-token\nstale-identity\n' "$HC" "999999" > "$CLAIM"
 chmod 0600 "$CLAIM"
@@ -1870,8 +1870,8 @@ HC_NEW="$TMP_ROOT/hc-new"; new_home "$HC_NEW"
 HC_OLD_STATE="$TMP_ROOT/hc-old-state"
 mkdir -p "$HC_OLD_STATE/procevent"
 printf '%s\n%s\ncross-home-token\ncross-home-identity\n%s\n' \
-  "$HC_OLD" "999999" "$HC_OLD_STATE/procevent" > "$FM_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
-chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
+  "$HC_OLD" "999999" "$HC_OLD_STATE/procevent" > "$JG_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
+chmod 0600 "$JG_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
 printf 'partial cross-home output\n' > "$HC_OLD_STATE/procevent/.cross-home-src.cross-home-token.output"
 chmod 0600 "$HC_OLD_STATE/procevent/.cross-home-src.cross-home-token.output"
 pe_register "$HC_NEW" lavish cross-home-src -- /bin/echo recovered >/dev/null
@@ -1892,8 +1892,8 @@ printf 'race result\n'
 SH
 chmod +x "$RACE_BLOCKER"
 pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" >/dev/null
-printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
-chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
+printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$JG_PROCEVENT_CLAIM_ROOT/race-src.claim"
+chmod 0600 "$JG_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
 for _ in $(seq 1 24); do
   pe "$HR" start race-src >/dev/null &
@@ -1935,9 +1935,9 @@ chmod +x "$ORPHAN_BLOCKER"
 pe_register "$HG" lavish orphan-src -- \
   "$ORPHAN_BLOCKER" "$ORPHAN_LOG" "$ORPHAN_TRIGGER" "$ORPHAN_GROUP" "$ORPHAN_OVERLAP" >/dev/null
 pe "$HG" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/orphan-src.claim" || fail "leader-crash fixture never claimed its source"
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/orphan-src.claim" || fail "leader-crash fixture never claimed its source"
 wait_for "$ORPHAN_LOG" || fail "leader-crash fixture source never started"
-orphan_leader=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/orphan-src.claim")
+orphan_leader=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/orphan-src.claim")
 case "$orphan_leader" in ''|*[!0-9]*) fail "could not read the runner leader pid: $orphan_leader" ;; esac
 printf '%s\n' "$orphan_leader" > "$ORPHAN_GROUP"
 
@@ -1951,7 +1951,7 @@ kill -0 -"$orphan_leader" 2>/dev/null \
   || fail "reconcile signalled an ambiguous leaderless process group: $orphan_out"
 assert_contains "$orphan_out" "started=0" \
   "reconcile does not replace an ambiguous leaderless generation"
-[ -e "$FM_PROCEVENT_CLAIM_ROOT/orphan-src.claim" ] \
+[ -e "$JG_PROCEVENT_CLAIM_ROOT/orphan-src.claim" ] \
   || fail "refusing ambiguous cleanup must preserve the claim"
 [ "$(wc -l < "$ORPHAN_LOG" | tr -d ' ')" = 1 ] \
   || fail "reconcile started a source beside an ambiguous leaderless group"
@@ -1960,7 +1960,7 @@ assert_absent "$ORPHAN_OVERLAP" "no replacement source starts while the leaderle
 # in a listing and `uncertain=1` in output the supervision cycle discards
 # reach nobody, so the strand has to announce itself durably, exactly once,
 # under a key the watcher can tell apart from a captured result.
-orphan_token=$(sed -n '3p' "$FM_PROCEVENT_CLAIM_ROOT/orphan-src.claim")
+orphan_token=$(sed -n '3p' "$JG_PROCEVENT_CLAIM_ROOT/orphan-src.claim")
 [ -n "$orphan_token" ] || fail "could not read the leaderless claim's token"
 [ "$(stranded_wake_count "$HG" orphan-src)" = 1 ] \
   || fail "reconcile stranded a leaderless source without announcing it: $orphan_out"
@@ -2005,8 +2005,8 @@ DEAD_TRIGGER="$TMP_ROOT/dead-gen-trigger"
 DEAD_LOG="$TMP_ROOT/dead-gen-executions"
 pe_register "$HG2" lavish dead-gen-src -- "$RACE_BLOCKER" "$DEAD_LOG" "$DEAD_TRIGGER" >/dev/null
 printf '%s\n%s\ndead-token\ndead-identity\n%s\n' "$HG2" 999999 "$HG2/state/procevent" \
-  > "$FM_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
-chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
+  > "$JG_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
+chmod 0600 "$JG_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
 dead_out=$(pe "$HG2" reconcile)
 assert_contains "$dead_out" "started=1" "a generation with no leader and no group is still reclaimable"
 wait_for "$DEAD_LOG" || fail "the replacement source never started for a truly dead generation"
@@ -2035,12 +2035,12 @@ SR_TRIGGER="$TMP_ROOT/state-root-trigger"
 SR_LOG="$TMP_ROOT/state-root-executions"
 pe_register "$HSR" lavish state-root-src -- "$RACE_BLOCKER" "$SR_LOG" "$SR_TRIGGER" >/dev/null
 pe "$HSR" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/state-root-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/state-root-src.claim" \
   || fail "state-root fixture never claimed its source"
 wait_for "$SR_LOG" || fail "state-root fixture source never started"
-sr_leader=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/state-root-src.claim")
+sr_leader=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/state-root-src.claim")
 case "$sr_leader" in ''|*[!0-9]*) fail "could not read the state-root fixture leader pid" ;; esac
-[ -n "$(sed -n '8p' "$FM_PROCEVENT_CLAIM_ROOT/state-root-src.claim")" ] \
+[ -n "$(sed -n '8p' "$JG_PROCEVENT_CLAIM_ROOT/state-root-src.claim")" ] \
   || fail "fixture invalid: the claim carries no state-root identity to invalidate"
 
 kill -KILL -"$sr_leader" 2>/dev/null || true
@@ -2057,7 +2057,7 @@ assert_contains "$sr_out" "started=1" "a dead generation was not reclaimed after
 # reported exactly this while the replacement silently failed to claim.
 wait_for_lines "$SR_LOG" 2 \
   || fail "reconcile reported a start but no replacement source ever ran: $(cat "$SR_LOG")"
-sr_new=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/state-root-src.claim")
+sr_new=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/state-root-src.claim")
 [ "$sr_new" != "$sr_leader" ] || fail "the dead generation's claim was never replaced"
 kill -0 "$sr_new" 2>/dev/null || fail "the replacement runner did not take ownership"
 : > "$SR_TRIGGER"
@@ -2076,12 +2076,12 @@ sr2_identity=$(bash -c '. "$1/bin/jg-pr-lib.sh"; jg_pr_file_identity "$2"' _ \
   # A state-root identity that names the right directory with the wrong inode:
   # exactly what a claim recorded before its home was re-created looks like.
   printf '%s\n%s\n%s\n%s\n%s\n' "$HSR2/state" 1 1 "$(id -u)" 755
-} > "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
-chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
+} > "$JG_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
+chmod 0600 "$JG_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
 wedged_out=$(pe "$HSR2" retire wedged-src 2>&1) \
   || fail "retire refused to release a claim whose whole generation is gone: $wedged_out"
 assert_contains "$wedged_out" "retired: wedged-src" "retire did not report releasing the wedged source: $wedged_out"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim" "retire left the dead generation owning the source"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/wedged-src.claim" "retire left the dead generation owning the source"
 assert_absent "$HSR2/state/procevent/wedged-src.source" "retire left the wedged source registered"
 pass "retire releases a dead generation's claim instead of refusing forever"
 
@@ -2092,14 +2092,14 @@ SR3_TRIGGER="$TMP_ROOT/state-root-live-trigger"
 SR3_LOG="$TMP_ROOT/state-root-live-executions"
 pe_register "$HSR3" lavish live-drift-src -- "$RACE_BLOCKER" "$SR3_LOG" "$SR3_TRIGGER" >/dev/null
 pe "$HSR3" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/live-drift-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/live-drift-src.claim" \
   || fail "live-drift fixture never claimed its source"
 wait_for "$SR3_LOG" || fail "live-drift fixture source never started"
-sr3_leader=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/live-drift-src.claim")
+sr3_leader=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/live-drift-src.claim")
 chmod 750 "$HSR3/state" || fail "could not drift the live owner's state-root identity"
 sr3_out=$(pe "$HSR3" start live-drift-src)
 assert_contains "$sr3_out" "already owned" "a live generation was displaced after its state root drifted: $sr3_out"
-[ "$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/live-drift-src.claim")" = "$sr3_leader" ] \
+[ "$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/live-drift-src.claim")" = "$sr3_leader" ] \
   || fail "the live generation's claim was replaced"
 kill -0 "$sr3_leader" 2>/dev/null || fail "the live owner was killed by a reclaim attempt"
 sr3_reconcile=$(pe "$HSR3" reconcile)
@@ -2115,10 +2115,10 @@ SR4_TRIGGER="$TMP_ROOT/state-root-reused-trigger"
 SR4_LOG="$TMP_ROOT/state-root-reused-executions"
 pe_register "$HSR4" lavish reused-group-src -- "$RACE_BLOCKER" "$SR4_LOG" "$SR4_TRIGGER" >/dev/null
 pe "$HSR4" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/reused-group-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/reused-group-src.claim" \
   || fail "reused-group fixture never claimed its source"
 wait_for "$SR4_LOG" || fail "reused-group fixture source never started"
-sr4_claim="$FM_PROCEVENT_CLAIM_ROOT/reused-group-src.claim"
+sr4_claim="$JG_PROCEVENT_CLAIM_ROOT/reused-group-src.claim"
 sr4_leader=$(sed -n '2p' "$sr4_claim")
 sr4_identity=$(sed -n '4p' "$sr4_claim")
 kill -0 -"$sr4_leader" 2>/dev/null \
@@ -2221,10 +2221,10 @@ SR5_TRIGGER="$TMP_ROOT/reused-plain-trigger"
 SR5_LOG="$TMP_ROOT/reused-plain-executions"
 pe_register "$HSR5" lavish reused-plain-src -- "$RACE_BLOCKER" "$SR5_LOG" "$SR5_TRIGGER" >/dev/null
 pe "$HSR5" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/reused-plain-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/reused-plain-src.claim" \
   || fail "undrifted reused-pid fixture never claimed its source"
 wait_for "$SR5_LOG" || fail "undrifted reused-pid fixture source never started"
-sr5_claim="$FM_PROCEVENT_CLAIM_ROOT/reused-plain-src.claim"
+sr5_claim="$JG_PROCEVENT_CLAIM_ROOT/reused-plain-src.claim"
 sr5_leader=$(sed -n '2p' "$sr5_claim")
 awk 'NR == 4 { print "different-live-process-identity"; next } { print }' \
   "$sr5_claim" > "$sr5_claim.tmp" && mv "$sr5_claim.tmp" "$sr5_claim"
@@ -2274,7 +2274,7 @@ ep_damage() { cat "$TMP_ROOT/episode-bad.source" > "$EP_SOURCE"; }
 ep_repair() { cat "$TMP_ROOT/episode-good.source" > "$EP_SOURCE"; }
 ep_reconcile() {  # <expected-fragment> <expected-exit-nonzero:0|1> <msg>; sets ep_out
   local rc=0
-  ep_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
+  ep_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HEP" reconcile) || rc=$?
   assert_contains "$ep_out" "$1" "$3: $ep_out"
   if [ "$2" -eq 1 ]; then
     [ "$rc" -ne 0 ] || fail "$3 (reconcile exited 0): $ep_out"
@@ -2300,7 +2300,7 @@ assert_contains "$ep_wake" "episode-src" \
 # inside the window. It cannot know whether the runner died or was slow, so it
 # must not assert a cause, must not present `start` as the fix, and must say
 # that a later cycle finding the source owned closes the episode by itself.
-assert_contains "$ep_wake" "did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS" \
+assert_contains "$ep_wake" "did not prove it took the source's claim within JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS" \
   "the launch-failed wake does not state what confirmation observed: $ep_wake"
 assert_contains "$ep_wake" "attached bin/jg-procevent.sh start episode-src to reproduce a refusal" \
   "the launch-failed wake does not say start reproduces rather than fixes: $ep_wake"
@@ -2321,10 +2321,10 @@ assert_contains "$ep_out" "failed=0" "a repaired source was still reported faile
 [ "$(launch_failed_wake_count "$HEP" episode-src)" = 1 ] \
   || fail "a confirmed launch produced a launch-failed wake: $ep_out"
 for _ in $(seq 1 100); do
-  [ -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] || break
+  [ -e "$JG_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] || break
   sleep 0.1
 done
-[ ! -e "$FM_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] \
+[ ! -e "$JG_PROCEVENT_CLAIM_ROOT/episode-src.claim" ] \
   || fail "the confirmed episode runner never released its claim"
 ep_damage
 ep_reconcile "failed=1" 1 "a source that failed again after recovering was not reported failed"
@@ -2359,7 +2359,7 @@ if ! { awk '/^argv:$/ { print; exit } { print }' "$LK_SOURCE" > "$LK_SOURCE.tmp"
   && cat "$LK_SOURCE.tmp" > "$LK_SOURCE" && rm -f -- "$LK_SOURCE.tmp"; }; then
   fail "could not damage the long-id registration"
 fi
-lk_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HLK" reconcile) || true
+lk_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HLK" reconcile) || true
 assert_contains "$lk_out" "failed=1" "the long-id launch was not reported failed: $lk_out"
 lk_key=$(launch_failed_wake_keys "$HLK" "$LK_ID")
 [ -n "$lk_key" ] || fail "the long-id launch failure was not announced: $lk_out"
@@ -2390,7 +2390,7 @@ fi
 mv "$UF_SOURCE.tmp" "$UF_SOURCE" || fail "could not damage the unstartable registration"
 chmod 0600 "$UF_SOURCE"
 uf_rc=0
-uf_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HUF" reconcile) || uf_rc=$?
+uf_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HUF" reconcile) || uf_rc=$?
 assert_contains "$uf_out" "started=0" \
   "reconcile counted a runner that never started as a start: $uf_out"
 assert_contains "$uf_out" "failed=1" \
@@ -2430,7 +2430,7 @@ wait_for "$FC_READY" || fail "the fast-source fixture could not hold a source lo
   for _ in $(seq 1 600); do
     if first_result "$HFC" aa-fast-src >/dev/null 2>&1 \
       && [ ! -e "$HFC/state/procevent/aa-fast-src.runner" ] \
-      && [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/aa-fast-src.claim" ]; then
+      && [ ! -e "$JG_PROCEVENT_CLAIM_ROOT/aa-fast-src.claim" ]; then
       break
     fi
     sleep 0.05
@@ -2439,7 +2439,7 @@ wait_for "$FC_READY" || fail "the fast-source fixture could not hold a source lo
 ) &
 FC_RELEASER=$!
 fc_rc=0
-fc_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HFC" reconcile) || fc_rc=$?
+fc_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 pe "$HFC" reconcile) || fc_rc=$?
 wait "$FC_RELEASER" 2>/dev/null || true
 wait "$HOLDER_PID" 2>/dev/null || true
 first_result "$HFC" aa-fast-src >/dev/null \
@@ -2463,7 +2463,7 @@ HZP="$TMP_ROOT/hzp"; new_home "$HZP"
 ZP_TRIGGER="$TMP_ROOT/zeropad-trigger"
 pe_register "$HZP" lavish zeropad-src -- "$BLOCKER" "$ZP_TRIGGER" "zeropad" >/dev/null
 zp_rc=0
-zp_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=08 pe "$HZP" reconcile 2>/dev/null) || zp_rc=$?
+zp_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=08 pe "$HZP" reconcile 2>/dev/null) || zp_rc=$?
 assert_contains "$zp_out" "started=1" \
   "a zero-padded confirm window lost the launch reconcile started: $zp_out"
 assert_contains "$zp_out" "failed=0" \
@@ -2484,15 +2484,15 @@ IW_TRIGGER="$TMP_ROOT/invalid-window-trigger"
 pe_register "$HIW" lavish invalid-window-src -- "$BLOCKER" "$IW_TRIGGER" "window" >/dev/null
 for iw_value in 5s 0 700; do
   iw_rc=0
-  iw_out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$iw_value" pe "$HIW" reconcile 2>&1) || iw_rc=$?
+  iw_out=$(JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$iw_value" pe "$HIW" reconcile 2>&1) || iw_rc=$?
   [ "$iw_rc" -ne 0 ] \
     || fail "reconcile accepted the unusable confirm window '$iw_value': $iw_out"
-  assert_contains "$iw_out" "FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS" \
+  assert_contains "$iw_out" "JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS" \
     "the unusable confirm window '$iw_value' was not named by what refused it: $iw_out"
   case "$iw_out" in
     *failed=*) fail "the unusable confirm window '$iw_value' was blamed on the sources: $iw_out" ;;
   esac
-  [ ! -e "$FM_PROCEVENT_CLAIM_ROOT/invalid-window-src.claim" ] \
+  [ ! -e "$JG_PROCEVENT_CLAIM_ROOT/invalid-window-src.claim" ] \
     || fail "reconcile launched a runner before refusing the confirm window '$iw_value'"
 done
 # The refusal costs the source nothing: it still arms on the next run with a
@@ -2524,7 +2524,7 @@ UW_REG_FILE="$TMP_ROOT/untidyable-recorded-registry"
 uw_identity=$(bash -c '. "$1/bin/jg-pr-lib.sh"; jg_pr_file_identity "$2"' _ \
   "$ROOT" "$HUW/state/procevent/untidyable-src.source") \
   || fail "could not read the untidyable fixture registration identity"
-UW_CLAIM="$FM_PROCEVENT_CLAIM_ROOT/untidyable-src.claim"
+UW_CLAIM="$JG_PROCEVENT_CLAIM_ROOT/untidyable-src.claim"
 {
   printf '%s\n%s\nuntidyable-token\nuntidyable-identity\n' "$HUW" 999999
   printf '%s\n%s\nactive\n' "$UW_REG_FILE" "$uw_identity"
@@ -2556,9 +2556,9 @@ HJ="$TMP_ROOT/hj"; new_home "$HJ"
 TORN_TRIGGER="$TMP_ROOT/torn-trigger"
 pe_register "$HJ" lavish torn-src -- "$BLOCKER" "$TORN_TRIGGER" "torn" >/dev/null
 pe "$HJ" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/torn-src.claim" || fail "torn-read fixture runner did not claim its source"
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/torn-src.claim" || fail "torn-read fixture runner did not claim its source"
 awk 'NR == 3 { print "replacement-token"; next } { print }' \
-  "$FM_PROCEVENT_CLAIM_ROOT/torn-src.claim" > "$TMP_ROOT/torn-next.claim"
+  "$JG_PROCEVENT_CLAIM_ROOT/torn-src.claim" > "$TMP_ROOT/torn-next.claim"
 chmod 0600 "$TMP_ROOT/torn-next.claim"
 TORN_READY="$TMP_ROOT/torn-lock-ready"
 TORN_RELEASE="$TMP_ROOT/torn-lock-release"
@@ -2569,7 +2569,7 @@ pe "$HJ" list > "$TMP_ROOT/torn-list.out" &
 torn_list_pid=$!
 sleep 0.2
 kill -0 "$torn_list_pid" 2>/dev/null || fail "claim reader escaped the source boundary during replacement"
-mv "$TMP_ROOT/torn-next.claim" "$FM_PROCEVENT_CLAIM_ROOT/torn-src.claim"
+mv "$TMP_ROOT/torn-next.claim" "$JG_PROCEVENT_CLAIM_ROOT/torn-src.claim"
 : > "$TORN_RELEASE"
 wait "$torn_list_pid" || fail "claim reader failed after serialized replacement"
 wait "$torn_holder_pid" || fail "torn-read source boundary holder failed"
@@ -2601,7 +2601,7 @@ rm -f "$HK/state/procevent/retire-start-src.source"
 wait "$retire_start_pid" 2>/dev/null || true
 wait "$retire_start_holder_pid" || fail "retire-start source boundary holder failed"
 assert_absent "$START_LOG" "a start queued before retirement must revalidate the registration"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/retire-start-src.claim" "retirement cannot leave a late claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/retire-start-src.claim" "retirement cannot leave a late claim"
 pass "retirement and start share one serialized lifecycle boundary"
 
 HI="$TMP_ROOT/hi"; new_home "$HI"
@@ -2609,21 +2609,21 @@ pe_register "$HI" lavish reused-src -- /bin/true >/dev/null
 sleep 60 &
 innocent_pid=$!
 printf '%s\n%s\nreused-token\nnot-the-live-process-identity\n' \
-  "$HI" "$innocent_pid" > "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim"
-chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim"
+  "$HI" "$innocent_pid" > "$JG_PROCEVENT_CLAIM_ROOT/reused-src.claim"
+chmod 0600 "$JG_PROCEVENT_CLAIM_ROOT/reused-src.claim"
 pe "$HI" retire reused-src >/dev/null
 kill -0 "$innocent_pid" 2>/dev/null || fail "retirement signaled a PID whose identity did not match the claim"
 kill "$innocent_pid" 2>/dev/null || true
 wait "$innocent_pid" 2>/dev/null || true
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim" "retirement releases the exact reused-pid claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/reused-src.claim" "retirement releases the exact reused-pid claim"
 pass "detected PID reuse is refused before signalling"
 
 HL="$TMP_ROOT/hl"; new_home "$HL"
 IDENTITY_TRIGGER="$TMP_ROOT/identity-trigger"
 pe_register "$HL" lavish identity-src -- "$BLOCKER" "$IDENTITY_TRIGGER" "identity" >/dev/null
 pe "$HL" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/identity-src.claim" || fail "identity fixture runner did not claim its source"
-identity_pid=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/identity-src.claim")
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/identity-src.claim" || fail "identity fixture runner did not claim its source"
+identity_pid=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/identity-src.claim")
 IDENTITY_FAKEBIN=$(jg_fakebin "$TMP_ROOT/identity-tools")
 cat > "$IDENTITY_FAKEBIN/ps" <<'SH'
 #!/usr/bin/env bash
@@ -2631,13 +2631,13 @@ exit 1
 SH
 chmod +x "$IDENTITY_FAKEBIN/ps"
 identity_status=0
-identity_out=$(PATH="$IDENTITY_FAKEBIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proc" \
+identity_out=$(PATH="$IDENTITY_FAKEBIN:$PATH" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proc" \
   pe "$HL" retire identity-src 2>&1) || identity_status=$?
 [ "$identity_status" -ne 0 ] || fail "retirement succeeded despite uncertain live identity"
 assert_contains "$identity_out" "source remains registered" "uncertain retirement reports preserved state"
 kill -0 "$identity_pid" 2>/dev/null || fail "uncertain retirement signaled the runner"
 assert_present "$HL/state/procevent/identity-src.source" "uncertain retirement preserves registration"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/identity-src.claim" "uncertain retirement preserves claim generation"
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/identity-src.claim" "uncertain retirement preserves claim generation"
 pe "$HL" retire identity-src >/dev/null
 pass "transient identity failure preserves the live source for retry"
 
@@ -2647,10 +2647,10 @@ SWEEP_TRIGGER_TWO="$TMP_ROOT/sweep-trigger-two"
 pe_register "$HM" lavish sweep-one -- "$BLOCKER" "$SWEEP_TRIGGER_ONE" "sweep one" >/dev/null
 pe_register "$HM" lavish sweep-two -- "$BLOCKER" "$SWEEP_TRIGGER_TWO" "sweep two" >/dev/null
 pe "$HM" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/sweep-one.claim" || fail "home sweep fixture one did not start"
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim" || fail "home sweep fixture two did not start"
-sweep_pid_one=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/sweep-one.claim")
-sweep_pid_two=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim")
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/sweep-one.claim" || fail "home sweep fixture one did not start"
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/sweep-two.claim" || fail "home sweep fixture two did not start"
+sweep_pid_one=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/sweep-one.claim")
+sweep_pid_two=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/sweep-two.claim")
 # The claim-only case is an owned claim with no live runner, so build exactly
 # that: kill the runner's group so it cannot run its own cleanup, confirm it is
 # gone, and only then drop the registration. Deleting the registration out from
@@ -2662,13 +2662,13 @@ kill -KILL -"$sweep_pid_two" 2>/dev/null || true
 for _ in $(seq 1 50); do kill -0 "$sweep_pid_two" 2>/dev/null || break; sleep 0.1; done
 kill -0 "$sweep_pid_two" 2>/dev/null \
   && fail "the claim-only sweep fixture runner did not stop"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim" \
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/sweep-two.claim" \
   "a killed runner leaves its owned claim behind for the sweep"
 rm -f "$HM/state/procevent/sweep-two.source"
 out=$(pe "$HM" sweep-home --preflight)
 assert_contains "$out" "sweep preflight: ready" "home sweep preflight validates the full bounded snapshot"
 assert_present "$HM/state/procevent/sweep-one.source" "home sweep preflight does not remove registrations"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/sweep-one.claim" "home sweep preflight does not release claims"
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/sweep-one.claim" "home sweep preflight does not release claims"
 out=$(pe "$HM" sweep-home)
 assert_contains "$out" "swept: attempted=2" "home sweep retires registrations and owned claim-only sources"
 for sweep_pid in "$sweep_pid_one" "$sweep_pid_two"; do
@@ -2676,8 +2676,8 @@ for sweep_pid in "$sweep_pid_one" "$sweep_pid_two"; do
   kill -0 "$sweep_pid" 2>/dev/null && fail "home sweep left a runner alive"
 done
 assert_absent "$HM/state/procevent/sweep-one.source" "home sweep removes registrations"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/sweep-one.claim" "home sweep releases the first claim"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/sweep-two.claim" "home sweep releases a claim with no registration"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/sweep-one.claim" "home sweep releases the first claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/sweep-two.claim" "home sweep releases a claim with no registration"
 pass "bounded home sweep preflights then retires every locally owned source"
 
 HN="$TMP_ROOT/hn"; HO="$TMP_ROOT/ho"; new_home "$HN"; new_home "$HO"
@@ -2685,13 +2685,13 @@ FOREIGN_TRIGGER="$TMP_ROOT/foreign-trigger"
 pe_register "$HN" lavish foreign-src -- "$BLOCKER" "$FOREIGN_TRIGGER" "foreign" >/dev/null
 pe_register "$HO" lavish foreign-src -- "$BLOCKER" "$FOREIGN_TRIGGER" "foreign" >/dev/null
 pe "$HN" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/foreign-src.claim" || fail "foreign-owner fixture did not start"
-foreign_pid=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/foreign-src.claim")
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/foreign-src.claim" || fail "foreign-owner fixture did not start"
+foreign_pid=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/foreign-src.claim")
 out=$(pe "$HO" sweep-home)
 assert_contains "$out" "swept: attempted=1" "home sweep retires the local registration"
 kill -0 "$foreign_pid" 2>/dev/null || fail "home sweep signaled a foreign-home runner"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/foreign-src.claim" "home sweep preserves a foreign-home claim"
-[ "$(sed -n '1p' "$FM_PROCEVENT_CLAIM_ROOT/foreign-src.claim")" = "$HN" ] || fail "home sweep changed foreign claim ownership"
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/foreign-src.claim" "home sweep preserves a foreign-home claim"
+[ "$(sed -n '1p' "$JG_PROCEVENT_CLAIM_ROOT/foreign-src.claim")" = "$HN" ] || fail "home sweep changed foreign claim ownership"
 assert_absent "$HO/state/procevent/foreign-src.source" "home sweep removes only the local registration"
 pe "$HN" retire foreign-src >/dev/null
 pass "home sweep leaves foreign-home claims and runners untouched"
@@ -2700,16 +2700,16 @@ HU="$TMP_ROOT/hu"; new_home "$HU"
 SWEEP_UNCERTAIN_TRIGGER="$TMP_ROOT/sweep-uncertain-trigger"
 pe_register "$HU" lavish sweep-uncertain -- "$BLOCKER" "$SWEEP_UNCERTAIN_TRIGGER" "uncertain" >/dev/null
 pe "$HU" reconcile >/dev/null
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim" || fail "uncertain sweep fixture did not start"
-sweep_uncertain_pid=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim")
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim" || fail "uncertain sweep fixture did not start"
+sweep_uncertain_pid=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim")
 sweep_status=0
-sweep_out=$(PATH="$IDENTITY_FAKEBIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-sweep-proc" \
+sweep_out=$(PATH="$IDENTITY_FAKEBIN:$PATH" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-sweep-proc" \
   pe "$HU" sweep-home 2>&1) || sweep_status=$?
 [ "$sweep_status" -ne 0 ] || fail "home sweep succeeded with an uncertain runner identity"
 assert_contains "$sweep_out" "home sweep preflight failed" "uncertain home sweep reports a retryable refusal"
 kill -0 "$sweep_uncertain_pid" 2>/dev/null || fail "uncertain home sweep signaled the runner"
 assert_present "$HU/state/procevent/sweep-uncertain.source" "uncertain home sweep preserves registration"
-assert_present "$FM_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim" "uncertain home sweep preserves the claim"
+assert_present "$JG_PROCEVENT_CLAIM_ROOT/sweep-uncertain.claim" "uncertain home sweep preserves the claim"
 pe "$HU" sweep-home >/dev/null
 pass "home sweep refuses safely until runner identity is readable"
 
@@ -2753,7 +2753,7 @@ pass "nonzero exit with no output stays armed and silent"
 HF="$TMP_ROOT/hf"; new_home "$HF"
 # shellcheck disable=SC2016  # single quotes are deliberate: the child shell expands this.
 pe_register "$HF" lavish big-src -- /bin/sh -c 'printf "x%.0s" $(seq 1 5000)' >/dev/null
-FM_PROCEVENT_MAX_OUTPUT_BYTES=100 FM_HOME="$HF" "$ROOT/bin/jg-procevent.sh" start big-src >/dev/null 2>&1
+JG_PROCEVENT_MAX_OUTPUT_BYTES=100 JG_HOME="$HF" "$ROOT/bin/jg-procevent.sh" start big-src >/dev/null 2>&1
 RB=$(first_result "$HF" big-src || true)
 [ -n "$RB" ] || fail "bounded output was not captured at all"
 [ "$(wc -c < "$RB" | tr -d ' ')" -le 100 ] || fail "output bound was not enforced"
@@ -2772,7 +2772,7 @@ done
 SH
 chmod +x "$NOISY"
 pe_register "$HG" lavish noisy-src -- "$NOISY" "$NOISY_PID" >/dev/null
-FM_PROCEVENT_MAX_OUTPUT_BYTES=100 pe "$HG" reconcile >/dev/null
+JG_PROCEVENT_MAX_OUTPUT_BYTES=100 pe "$HG" reconcile >/dev/null
 wait_for "$NOISY_PID" || fail "noisy source child did not start"
 noisy_child=$(cat "$NOISY_PID")
 staged=
@@ -2819,23 +2819,23 @@ for post_term_case in mismatch unreadable unreadable-pgid nonleader; do
 #!/usr/bin/env bash
 trap 'printf "signalled\n" >> "$2"' TERM
 printf '%s\n' "$$" > "$1"
-while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+while [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
 SH
   chmod +x "$POST_TERM_SOURCE"
   POST_TERM_BIN=$(jg_fakebin "$HPOST_TERM/tools")
   REAL_PS=$(command -v ps) || fail "the post-TERM reuse fixture requires ps"
   pe_register "$HPOST_TERM" lavish post-term-src -- \
     "$POST_TERM_SOURCE" "$POST_TERM_PID" "$POST_TERM_SIGNALS" >/dev/null
-  FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" \
-    FM_PROCEVENT_OWNER_CHECK_SECONDS=5 pe "$HPOST_TERM" reconcile >/dev/null
+  JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" \
+    JG_PROCEVENT_OWNER_CHECK_SECONDS=5 pe "$HPOST_TERM" reconcile >/dev/null
   wait_for "$POST_TERM_PID" || fail "the post-TERM reuse fixture did not start"
-  wait_for "$FM_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
+  wait_for "$JG_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
     || fail "the post-TERM reuse fixture did not claim its source"
-  POST_TERM_RUNNER=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/post-term-src.claim")
+  POST_TERM_RUNNER=$(sed -n '2p' "$JG_PROCEVENT_CLAIM_ROOT/post-term-src.claim")
   # The child can publish its PID before startup releases the source lock.
   # Cross that boundary before suspending the runner, or retirement waits on
   # a stopped lock owner instead of exercising the signal checks below.
-  FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" pe "$HPOST_TERM" list >/dev/null \
+  JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" pe "$HPOST_TERM" list >/dev/null \
     || fail "the post-TERM fixture never finished its source launch"
   kill -STOP "$POST_TERM_RUNNER" || fail "the post-TERM fixture could not keep its leader alive"
   cat > "$POST_TERM_BIN/ps" <<SH
@@ -2860,7 +2860,7 @@ SH
   chmod +x "$POST_TERM_BIN/ps"
   post_term_status=0
   post_term_started=$(date +%s)
-  post_term_out=$(PATH="$POST_TERM_BIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" \
+  post_term_out=$(PATH="$POST_TERM_BIN:$PATH" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-post-term-proc" \
     pe "$HPOST_TERM" retire post-term-src 2>&1) || post_term_status=$?
   case "$post_term_case" in
     mismatch|nonleader)
@@ -2874,14 +2874,14 @@ SH
         || fail "a $post_term_case group was killed during escalation"
       assert_present "$HPOST_TERM/state/procevent/post-term-src.source" \
         "first-signal $post_term_case evidence preserves registration"
-      assert_present "$FM_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
+      assert_present "$JG_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
         "first-signal $post_term_case evidence preserves its claim"
       kill -KILL -"$POST_TERM_RUNNER" 2>/dev/null || true
       ;;
     *)
       if [ ! -s "$POST_TERM_SIGNALS" ]; then
         post_term_evidence "$post_term_case" "$POST_TERM_RUNNER" \
-          "$FM_PROCEVENT_CLAIM_ROOT/post-term-src.claim" "$POST_TERM_SIGNALS" \
+          "$JG_PROCEVENT_CLAIM_ROOT/post-term-src.claim" "$POST_TERM_SIGNALS" \
           "$post_term_started" "$post_term_out"
         fail "the post-TERM fixture never received TERM"
       fi
@@ -2889,7 +2889,7 @@ SH
         || fail "retirement abandoned a proved stop after $post_term_case identity: $post_term_out"
       assert_absent "$HPOST_TERM/state/procevent/post-term-src.source" \
         "proved escalation retires the source after $post_term_case identity"
-      assert_absent "$FM_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
+      assert_absent "$JG_PROCEVENT_CLAIM_ROOT/post-term-src.claim" \
         "proved escalation releases its claim after $post_term_case identity"
       ;;
   esac
@@ -2902,23 +2902,23 @@ done
 HBAD="$TMP_ROOT/hbad"; new_home "$HBAD"
 pe_register "$HBAD" lavish bad-limit -- /bin/true >/dev/null
 bad_limit_status=0
-bad_limit_out=$(FM_PROCEVENT_MAX_OUTPUT_BYTES=invalid pe "$HBAD" start bad-limit 2>&1) || bad_limit_status=$?
+bad_limit_out=$(JG_PROCEVENT_MAX_OUTPUT_BYTES=invalid pe "$HBAD" start bad-limit 2>&1) || bad_limit_status=$?
 [ "$bad_limit_status" -ne 0 ] || fail "an invalid output bound was accepted"
 assert_contains "$bad_limit_out" "must be a nonnegative integer" "invalid output bound reports its contract"
-assert_absent "$FM_PROCEVENT_CLAIM_ROOT/bad-limit.claim" "invalid output bound leaves no source claim"
+assert_absent "$JG_PROCEVENT_CLAIM_ROOT/bad-limit.claim" "invalid output bound leaves no source claim"
 pass "invalid output bounds fail closed"
 
 # --- the Lavish adapter uses the published poll shape -----------------------
 ART="$TMP_ROOT/artifact.html"
 printf '<h1>fixture</h1>\n' > "$ART"
 lavish_session "$ART"
-sid=$(FM_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART")
+sid=$(JG_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART")
 case "$sid" in lavish-*) : ;; *) fail "adapter source id has an unexpected shape: $sid" ;; esac
-sid2=$(FM_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART")
+sid2=$(JG_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART")
 [ "$sid" = "$sid2" ] || fail "adapter source id is not stable"
 ART_ALIAS="$TMP_ROOT/artifact-alias.html"
 ln -s "$ART" "$ART_ALIAS"
-sid3=$(FM_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART_ALIAS")
+sid3=$(JG_HOME="$TMP_ROOT/hg" "$ROOT/bin/jg-procevent-lavish.sh" source-id "$ART_ALIAS")
 [ "$sid" = "$sid3" ] || fail "a final-component symlink produced a second source id"
 ART_NEWLINE="$TMP_ROOT/line-ending"$'\n'
 printf '<h1>newline fixture</h1>\n' > "$ART_NEWLINE"
@@ -2932,7 +2932,7 @@ pass "the adapter derives physical identity without newline path corruption"
 HS="$TMP_ROOT/hs"; new_home "$HS"
 mkdir -p "$HS/state/procevent"
 : > "$HS/state/procevent/source-only.source"
-guard_out=$(FM_ROOT_OVERRIDE="$TMP_ROOT/guard-root" FM_HOME="$HS" FM_GUARD_GRACE=1 \
+guard_out=$(JG_ROOT_OVERRIDE="$TMP_ROOT/guard-root" JG_HOME="$HS" JG_GUARD_GRACE=1 \
   "$ROOT/bin/jg-guard.sh" 2>&1)
 assert_contains "$guard_out" "WATCHER DOWN - SUPERVISION IS OFF" \
   "the general guard warns when only a process-event source needs supervision"
@@ -2987,7 +2987,7 @@ for endpoint in '127.0.0.1:14387' 'board.example:24387' '[::1]:34387'; do
   lavish_session "$HOST_ART" "http://$endpoint/session/0123456789abcdef"
   : > "$HOST_SEEN"
   PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
-    LAVISH_AXI_PORT=44387 FM_HOME="$HOST_HOME" \
+    LAVISH_AXI_PORT=44387 JG_HOME="$HOST_HOME" \
     "$ROOT/bin/jg-procevent-lavish.sh" poll "$HOST_ART" >/dev/null
   expected=${endpoint//\[/}; expected=${expected//\]/}
   [ "$(cat "$HOST_SEEN")" = "$expected" ] \
@@ -2999,7 +2999,7 @@ lavish_session "$HOST_ART"
 : > "$HOST_SEEN"
 PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" HOST_RETRY=1 \
   HOST_CONFIG_FILE="$HOST_HOME/config/lavish-axi-host" LAVISH_AXI_HOST=ambient.example \
-  LAVISH_AXI_PORT=44387 FM_LAVISH_POLL_RETRY_DELAY=1 FM_HOME="$HOST_HOME" \
+  LAVISH_AXI_PORT=44387 JG_LAVISH_POLL_RETRY_DELAY=1 JG_HOME="$HOST_HOME" \
   "$ROOT/bin/jg-procevent-lavish.sh" poll "$HOST_ART" >/dev/null
 printf '%s\n%s\n' '127.0.0.1:14387' '127.0.0.1:14387' > "$HOST_HOME/expected"
 cmp -s "$HOST_HOME/expected" "$HOST_SEEN" \
@@ -3021,7 +3021,7 @@ for shape in missing malformed no-session invalid-url; do
   : > "$HOST_SEEN"
   bad_status=0
   bad_out=$(PATH="$HOST_BIN:$PATH" HOST_SEEN="$HOST_SEEN" LAVISH_AXI_HOST=wrong.example \
-    LAVISH_AXI_STATE_DIR="$BAD_STORE" FM_HOME="$HOST_HOME" \
+    LAVISH_AXI_STATE_DIR="$BAD_STORE" JG_HOME="$HOST_HOME" \
     "$ROOT/bin/jg-procevent-lavish.sh" poll "$HOST_ART" \
     --agent-reply-file "$HOST_HOME/reply" 2>&1) || bad_status=$?
   [ "$bad_status" -ne 0 ] || fail "$shape session evidence was accepted"
@@ -3430,7 +3430,7 @@ STORM_SOURCE="$TMP_ROOT/storm-source.sh"
 cat > "$STORM_SOURCE" <<'SH'
 #!/usr/bin/env bash
 perl -MTime::HiRes=time -e 'printf "%.6f\n", time' >> "$1"
-FM_HOME="$2" perl -MPOSIX=setsid -e '
+JG_HOME="$2" perl -MPOSIX=setsid -e '
   my @command = @ARGV;
   defined(my $pid = fork) or exit 1;
   exit 0 if $pid;
@@ -3452,8 +3452,8 @@ pe_register "$HFLOOR" lavish floor-src -- \
 # Three real launches can outlive a four-second lease on a loaded host. Give
 # this fixture a bounded observation window, then retire it as soon as sampled
 # rather than leaving its orphan loop running alongside the remaining tests.
-FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
-  FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HFLOOR" reconcile >/dev/null
+JG_PROCEVENT_OWNER_LEASE_SECONDS=30 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+  JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HFLOOR" reconcile >/dev/null
 floor_deadline=$((SECONDS + 30))
 while :; do
   floor_count=0
@@ -3477,10 +3477,10 @@ HPACE="$TMP_ROOT/registration-pacing"; new_home "$HPACE"
 jg_test_track_procevent_home "$HPACE"
 PACE_LOG="$TMP_ROOT/registration-pacing.log"
 pe_register "$HPACE" lavish pace-src -- "$FAST_SOURCE" "$PACE_LOG" >/dev/null
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src >/dev/null
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src >/dev/null
 pe "$HPACE" retire pace-src >/dev/null
 pe_register "$HPACE" lavish pace-src -- "$FAST_SOURCE" "$PACE_LOG" >/dev/null
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src > "$TMP_ROOT/replacement-pacing.out" 2>&1 &
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HPACE" start pace-src > "$TMP_ROOT/replacement-pacing.out" 2>&1 &
 PACE_START_PID=$!
 pace_deadline=$((SECONDS + 4))
 while kill -0 "$PACE_START_PID" 2>/dev/null; do
@@ -3503,14 +3503,14 @@ HPACE_RACE="$TMP_ROOT/registration-pacing-race"; new_home "$HPACE_RACE"
 jg_test_track_procevent_home "$HPACE_RACE"
 PACE_RACE_LOG="$TMP_ROOT/registration-pacing-race.log"
 pe_register "$HPACE_RACE" lavish pace-race-src -- "$FAST_SOURCE" "$PACE_RACE_LOG" >/dev/null
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3 pe "$HPACE_RACE" start pace-race-src >/dev/null
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=3 pe "$HPACE_RACE" start pace-race-src >/dev/null
 # The superseded runner sleeps out its whole floor before it rechecks the
 # registration, so the floor must outlast the claim wait and re-registration
 # below even on a loaded machine; a 3s floor let the stale command launch.
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=15 \
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=15 \
   pe "$HPACE_RACE" start pace-race-src > "$TMP_ROOT/registration-pacing-race.out" 2>&1 &
 PACE_RACE_PID=$!
-wait_for "$FM_PROCEVENT_CLAIM_ROOT/pace-race-src.claim" \
+wait_for "$JG_PROCEVENT_CLAIM_ROOT/pace-race-src.claim" \
   || fail "the superseded pacing fixture did not claim its registration"
 [ "$(wc -l < "$PACE_RACE_LOG" | tr -d ' ')" = 1 ] \
   || fail "the superseded pacing fixture was not waiting on its launch floor"
@@ -3524,7 +3524,7 @@ wait "$PACE_RACE_PID" || fail "the superseded paced runner failed"
 # home refuse to sweep, so assert the marker is gone and the sweep still runs.
 assert_absent "$HPACE_RACE/state/procevent/pace-race-src.runner" \
   "a superseded paced runner leaves no runner marker behind"
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3 pe "$HPACE_RACE" start pace-race-src >/dev/null
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=3 pe "$HPACE_RACE" start pace-race-src >/dev/null
 PACE_RACE_STAMPS=$(find "$HPACE_RACE/state/procevent" -maxdepth 1 -type f \
   -name 'pace-race-src.*.last-launch' | wc -l | tr -d ' ')
 [ "$PACE_RACE_STAMPS" = 1 ] \
@@ -3537,7 +3537,7 @@ COMMIT_LOG="$TMP_ROOT/registration-commit.log"
 mkdir -p "$HCOMMIT/state/procevent/commit-src.1-2.last-launch"
 pe_register "$HCOMMIT" lavish commit-src -- "$FAST_SOURCE" "$COMMIT_LOG" >/dev/null \
   || fail "post-commit pacing cleanup made registration report failure"
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HCOMMIT" start commit-src >/dev/null \
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HCOMMIT" start commit-src >/dev/null \
   || fail "a successfully published registration was not executable"
 [ "$(wc -l < "$COMMIT_LOG" | tr -d ' ')" = 1 ] \
   || fail "the committed registration did not invoke its source"
@@ -3547,14 +3547,14 @@ HROLLBACK="$TMP_ROOT/rollback-pacing"; new_home "$HROLLBACK"
 jg_test_track_procevent_home "$HROLLBACK"
 ROLLBACK_LOG="$TMP_ROOT/rollback-pacing.log"
 pe_register "$HROLLBACK" lavish rollback-src -- "$FAST_SOURCE" "$ROLLBACK_LOG" >/dev/null
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HROLLBACK" start rollback-src >/dev/null
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=1 pe "$HROLLBACK" start rollback-src >/dev/null
 ROLLBACK_STAMP=
 for candidate in "$HROLLBACK/state/procevent"/rollback-src.*.last-launch; do
   [ -f "$candidate" ] && ROLLBACK_STAMP=$candidate
 done
 [ -n "$ROLLBACK_STAMP" ] || fail "the first launch did not persist its pacing state"
 printf '%s\n' "$(( $(date +%s) + 3600 ))" > "$ROLLBACK_STAMP"
-FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HROLLBACK" start rollback-src > "$TMP_ROOT/rollback.out" 2>&1 &
+JG_PROCEVENT_LAUNCH_FLOOR_SECONDS=3600 pe "$HROLLBACK" start rollback-src > "$TMP_ROOT/rollback.out" 2>&1 &
 ROLLBACK_START_PID=$!
 rollback_deadline=$((SECONDS + 4))
 while kill -0 "$ROLLBACK_START_PID" 2>/dev/null; do
@@ -3586,7 +3586,7 @@ jg_test_track_procevent_home "$HRECREATED"
 RECREATED_TRIGGER="$TMP_ROOT/recreated-owner.trigger"
 pe_register "$HRECREATED" lavish recreated-src -- \
   "$BLOCKER" "$RECREATED_TRIGGER" "recreated payload" >/dev/null
-FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+JG_PROCEVENT_OWNER_LEASE_SECONDS=30 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HRECREATED" reconcile >/dev/null
 wait_for "$HRECREATED/state/procevent/recreated-src.runner" \
   || fail "the recreated-path fixture never launched its source"
@@ -3594,7 +3594,7 @@ RECREATED_RUNNER_PID=$(cat "$HRECREATED/state/procevent/recreated-src.runner")
 mv "$HRECREATED/state" "$TMP_ROOT/recreated-owner-old-state"
 pe_register "$HRECREATED" lavish recreated-src -- \
   "$BLOCKER" "$RECREATED_TRIGGER" "replacement payload" >/dev/null
-FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+JG_PROCEVENT_OWNER_LEASE_SECONDS=30 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HRECREATED" reconcile >/dev/null
 recreated_deadline=$((SECONDS + 8))
 while kill -0 "$RECREATED_RUNNER_PID" 2>/dev/null; do
@@ -3608,7 +3608,7 @@ HGUARDFAIL="$TMP_ROOT/guard-failure"; new_home "$HGUARDFAIL"
 jg_test_track_procevent_home "$HGUARDFAIL"
 pe_register "$HGUARDFAIL" lavish guard-fail-src -- "$FAST_SOURCE" "$TMP_ROOT/unguarded-launches"
 guard_fail_status=0
-guard_fail_out=$(FM_PROCEVENT_OWNER_LEASE_SECONDS=invalid \
+guard_fail_out=$(JG_PROCEVENT_OWNER_LEASE_SECONDS=invalid \
   pe "$HGUARDFAIL" start guard-fail-src 2>&1) || guard_fail_status=$?
 [ "$guard_fail_status" -ne 0 ] || fail "a runner continued after its owner guard failed to initialize"
 assert_contains "$guard_fail_out" "cannot start the runner's owner guard" \
@@ -3621,7 +3621,7 @@ HATTACHED="$TMP_ROOT/attached-owner"; new_home "$HATTACHED"
 jg_test_track_procevent_home "$HATTACHED"
 ATTACHED_TRIGGER="$TMP_ROOT/attached.trigger"
 pe_register "$HATTACHED" lavish attached-src -- "$BLOCKER" "$ATTACHED_TRIGGER" "attached payload"
-FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+JG_PROCEVENT_OWNER_LEASE_SECONDS=1 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HATTACHED" start attached-src > "$TMP_ROOT/attached.out" 2>&1 &
 ATTACHED_START_PID=$!
 wait_for "$HATTACHED/state/procevent/attached-src.runner" \
@@ -3658,7 +3658,7 @@ SH
 chmod +x "$CLOCK_BIN/date"
 pe_register "$HCLOCK" lavish lease-clock-src -- \
   "$BLOCKER" "$CLOCK_TRIGGER" "clock payload" >/dev/null
-PATH="$CLOCK_BIN:$PATH" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+PATH="$CLOCK_BIN:$PATH" JG_PROCEVENT_OWNER_LEASE_SECONDS=1 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HCLOCK" start lease-clock-src > "$TMP_ROOT/lease-clock.out" 2>&1 &
 CLOCK_START_PID=$!
 wait_for "$HCLOCK/state/procevent/lease-clock-src.runner" \
@@ -3675,7 +3675,7 @@ jg_test_track_procevent_home "$HDETACHED"
 DETACHED_TRIGGER="$TMP_ROOT/detached-attached.trigger"
 pe_register "$HDETACHED" lavish detached-attached-src -- \
   "$BLOCKER" "$DETACHED_TRIGGER" "detached attached payload"
-FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 FM_HOME="$HDETACHED" \
+JG_PROCEVENT_OWNER_LEASE_SECONDS=1 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 JG_HOME="$HDETACHED" \
   perl -MPOSIX=setsid -e 'setsid() >= 0 or exit 1; exec @ARGV' \
     "$ROOT/bin/jg-procevent.sh" start detached-attached-src \
     > "$TMP_ROOT/detached-attached.out" 2>&1 &
@@ -3713,8 +3713,8 @@ SH
 chmod +x "$REUSED_GROUP_BIN/ps"
 pe_register "$HREUSED_GROUP" lavish reused-runner-group-src -- \
   "$BLOCKER" "$REUSED_GROUP_TRIGGER" "reused group payload" >/dev/null
-PATH="$REUSED_GROUP_BIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-proc" \
-  FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+PATH="$REUSED_GROUP_BIN:$PATH" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-proc" \
+  JG_PROCEVENT_OWNER_LEASE_SECONDS=30 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HREUSED_GROUP" reconcile >/dev/null
 wait_for "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner" \
   || fail "the reused-group fixture runner did not start"
@@ -3731,7 +3731,7 @@ kill -0 -"$REUSED_GROUP_RUNNER" 2>/dev/null \
 # asserts the complementary guarantee - once the ambiguity is gone, retirement
 # reaps the whole group rather than leaving it behind.
 rm -f "$REUSED_GROUP_MARKER"
-PATH="$REUSED_GROUP_BIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-proc" \
+PATH="$REUSED_GROUP_BIN:$PATH" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-proc" \
   pe "$HREUSED_GROUP" retire reused-runner-group-src >/dev/null
 for _ in $(seq 1 50); do kill -0 -"$REUSED_GROUP_RUNNER" 2>/dev/null || break; sleep 0.1; done
 kill -0 -"$REUSED_GROUP_RUNNER" 2>/dev/null \
@@ -3758,13 +3758,13 @@ cat > "$ORPHAN_STUB" <<'SH'
 # leftover listener into a host-wide storm, so the tick log is the evidence that
 # the storm stopped and not merely that one pid went away.
 marker=$1
-( while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+( while [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     printf 'tick\n' >> "$marker.ticks"
     sleep 0.1
   done ) &
 printf '%s\n' "$!" > "$marker.descendant"
 while [ ! -e "$marker.trigger" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.1
 done
 printf 'orphan payload\n'
@@ -3783,10 +3783,10 @@ QUIET_STUB="$TMP_ROOT/quiet-stub.sh"
 cat > "$QUIET_STUB" <<'SH'
 #!/usr/bin/env bash
 marker=$1
-( sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ) &
+( sleep "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ) &
 printf '%s\n' "$!" > "$marker.descendant"
 while [ ! -e "$marker.trigger" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.1
 done
 printf 'orphan payload\n'
@@ -3823,9 +3823,9 @@ PROOF_LOAD_SLACK=2
 orphan_pe() {  # <home> <command...>
   local home=$1
   shift
-  FM_PROCEVENT_OWNER_LEASE_SECONDS="$PROOF_LEASE_SECONDS" \
-    FM_PROCEVENT_OWNER_CHECK_SECONDS="$PROOF_CHECK_SECONDS" \
-    FM_HOME="$home" "$ROOT/bin/jg-procevent.sh" "$@"
+  JG_PROCEVENT_OWNER_LEASE_SECONDS="$PROOF_LEASE_SECONDS" \
+    JG_PROCEVENT_OWNER_CHECK_SECONDS="$PROOF_CHECK_SECONDS" \
+    JG_HOME="$home" "$ROOT/bin/jg-procevent.sh" "$@"
 }
 
 wait_gone() {  # <pid-or-group-spec> [tries]
@@ -3952,8 +3952,8 @@ chmod +x "$RETRY_BIN/ps"
 
 retry_pe() {  # <command...>
   PATH="$RETRY_BIN:$PATH" STOP_RETRY_STATE="$RETRY_STATE" \
-    FM_PROCEVENT_OWNER_LEASE_SECONDS=2 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
-    FM_HOME="$RETRY_HOME" "$ROOT/bin/jg-procevent.sh" "$@"
+    JG_PROCEVENT_OWNER_LEASE_SECONDS=2 JG_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+    JG_HOME="$RETRY_HOME" "$ROOT/bin/jg-procevent.sh" "$@"
 }
 
 retry_pe register lavish retry-src -- "$ORPHAN_STUB" "$TMP_ROOT/stop-retry-marker" >/dev/null
@@ -4017,7 +4017,7 @@ marker=$1
 trap 'printf "signalled\n" >> "$marker.signals"' TERM INT HUP
 printf '%s\n' "$$" > "$marker.child"
 while [ ! -e "$marker.trigger" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.1 &
   wait $!
 done
@@ -4033,22 +4033,22 @@ for proof_state in absent zombie; do
   PROOF_RELEASE=
   if [ "$proof_state" = zombie ]; then
     PROOF_RELEASE="$HPROOF/reap"
-    FM_HOME="$HPROOF" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
+    JG_HOME="$HPROOF" JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
       perl - "$PROOF_RELEASE" "$ROOT/bin/jg-procevent.sh" _start proof-src >"$HPROOF/start.log" 2>&1 <<'PL' &
 my $release = shift @ARGV;
 defined(my $pid = fork) or exit 125;
 if ($pid == 0) {
   setpgrp(0, 0) or exit 125;
-  $ENV{FM_PROCEVENT_RUNNER_GROUP} = $$;
+  $ENV{JG_PROCEVENT_RUNNER_GROUP} = $$;
   exec @ARGV;
   exit 125;
 }
-my $deadline = time + ($ENV{FM_TEST_STUB_MAX_BLOCK_SECONDS} // 120);
+my $deadline = time + ($ENV{JG_TEST_STUB_MAX_BLOCK_SECONDS} // 120);
 while (!-e $release && time < $deadline) { select undef, undef, undef, 0.05; }
 waitpid($pid, 0) == $pid or exit 125;
 PL
   else
-    FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
+    JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
       pe "$HPROOF" start proof-src >"$HPROOF/start.log" 2>&1 &
   fi
   PROOF_START=$!
@@ -4057,7 +4057,7 @@ PL
   PROOF_PID=$(cat "$HPROOF/state/procevent/proof-src.runner")
   wait_for "$PROOF_MARKER.child" || fail "the signal-proof child never started"
   PROOF_CHILD=$(cat "$PROOF_MARKER.child")
-  FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
+  JG_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-proof-proc" \
     pe "$HPROOF" retire proof-src >"$HPROOF/retire.log" 2>&1 &
   PROOF_STOP=$!
   proof_transition=0
@@ -4220,7 +4220,7 @@ for arg in "\$@"; do
       finished=\$("$REAL_PERL" -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \\
         'printf "%.6f\\n", clock_gettime(CLOCK_MONOTONIC)') || exit 1
       if [ ! -s "\$GUARD_BOUND_STATE/reference" ]; then
-        printf '%s\\n' "\$finished" > "\$FM_HOME/state/procevent/.owner-lease" || exit 1
+        printf '%s\\n' "\$finished" > "\$JG_HOME/state/procevent/.owner-lease" || exit 1
         printf '%s\\n' "\$finished" > "\$GUARD_BOUND_STATE/reference" || exit 1
       else
         printf '%s\\t%s\\t%s\\t%s\\n' "\$started" "\$finished" "\$age" "\${!#}" \\
@@ -4236,9 +4236,9 @@ SH
 chmod +x "$BOUND_BIN/perl"
 bound_pe() {
   PATH="$BOUND_BIN:$PATH" GUARD_BOUND_STATE="$BOUND_STATE" \
-    FM_PROCEVENT_OWNER_LEASE_SECONDS="$BOUND_LEASE_SECONDS" \
-    FM_PROCEVENT_OWNER_CHECK_SECONDS="$BOUND_CHECK_SECONDS" \
-    FM_HOME="$HBOUND" "$ROOT/bin/jg-procevent.sh" "$@"
+    JG_PROCEVENT_OWNER_LEASE_SECONDS="$BOUND_LEASE_SECONDS" \
+    JG_PROCEVENT_OWNER_CHECK_SECONDS="$BOUND_CHECK_SECONDS" \
+    JG_HOME="$HBOUND" "$ROOT/bin/jg-procevent.sh" "$@"
 }
 bound_pe register lavish bound-src -- "$QUIET_STUB" "$TMP_ROOT/guard-bound-marker" >/dev/null
 bound_pe reconcile >/dev/null
@@ -4329,7 +4329,7 @@ for interval in 08 010; do
   pe_register "$HINTERVAL" lavish "interval-$interval" \
     -- "$QUIET_STUB" "$HINTERVAL/poll" >/dev/null
   PATH="$INTERVAL_BIN:$PATH" INTERVAL_SLEEP_LOG="$HINTERVAL/sleeps" \
-    FM_PROCEVENT_OWNER_CHECK_SECONDS="$interval" \
+    JG_PROCEVENT_OWNER_CHECK_SECONDS="$interval" \
     pe "$HINTERVAL" reconcile >/dev/null
   wait_for "$HINTERVAL/poll.descendant" \
     || fail "a zero-prefixed decimal interval ($interval) prevented the listener from starting"
@@ -4385,9 +4385,9 @@ DEBOUNCE_LEASE_SECONDS=30
 DEBOUNCE_CHECK_SECONDS=1
 debounce_pe() {
   PATH="$DEBOUNCE_BIN:$PATH" LEASE_DEBOUNCE_STATE="$DEBOUNCE_STATE" \
-    FM_PROCEVENT_OWNER_LEASE_SECONDS="$DEBOUNCE_LEASE_SECONDS" \
-    FM_PROCEVENT_OWNER_CHECK_SECONDS="$DEBOUNCE_CHECK_SECONDS" \
-    FM_HOME="$DEBOUNCE_HOME" "$ROOT/bin/jg-procevent.sh" "$@"
+    JG_PROCEVENT_OWNER_LEASE_SECONDS="$DEBOUNCE_LEASE_SECONDS" \
+    JG_PROCEVENT_OWNER_CHECK_SECONDS="$DEBOUNCE_CHECK_SECONDS" \
+    JG_HOME="$DEBOUNCE_HOME" "$ROOT/bin/jg-procevent.sh" "$@"
 }
 debounce_pe register lavish debounce-src -- "$QUIET_STUB" "$TMP_ROOT/lease-debounce-marker" >/dev/null
 debounce_pe reconcile >/dev/null
@@ -4503,10 +4503,10 @@ ready_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$ready_art")
 jg_test_track_procevent_home "$READY/home"
 export READY_MARK="$READY/mark" READY_RELEASE="$READY/release"
 : > "$READY_MARK"
-PATH="$READY/bin:$PATH" FM_HOME="$READY/home" \
+PATH="$READY/bin:$PATH" JG_HOME="$READY/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$ready_art" > "$READY/arm.out"
 assert_contains "$(cat "$READY/arm.out")" "armed: $ready_id" "a live listener was not reported ready"
-[ -e "$FM_PROCEVENT_CLAIM_ROOT/$ready_id.claim" ] \
+[ -e "$JG_PROCEVENT_CLAIM_ROOT/$ready_id.claim" ] \
   || fail "arm reported ready without a listener claim"
 for _ in $(seq 1 50); do
   grep -q started "$READY_MARK" && break
@@ -4515,10 +4515,10 @@ done
 grep -q started "$READY_MARK" || fail "arm reported ready before the listener command ran"
 touch "$READY_RELEASE"
 for _ in $(seq 1 50); do
-  [ -e "$FM_PROCEVENT_CLAIM_ROOT/$ready_id.claim" ] || break
+  [ -e "$JG_PROCEVENT_CLAIM_ROOT/$ready_id.claim" ] || break
   sleep 0.05
 done
-PATH="$READY/bin:$PATH" FM_HOME="$READY/home" \
+PATH="$READY/bin:$PATH" JG_HOME="$READY/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$ready_art" >/dev/null 2>&1 || true
 pass "arm reports ready only after the listener is running"
 
@@ -4538,13 +4538,13 @@ delay_ready="$DELAY/lock-ready"
 delay_rel="$DELAY/lock-release"
 hold_source_lock "$delay_id" "$delay_ready" "$delay_rel"
 wait_for "$delay_ready" || fail "delayed-start fixture could not hold the source lock"
-PATH="$DELAY/bin:$PATH" FM_HOME="$DELAY/home" \
+PATH="$DELAY/bin:$PATH" JG_HOME="$DELAY/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$delay_art" > "$DELAY/arm.out" 2>"$DELAY/arm.err" &
 delay_arm=$!
 sleep 0.4
 assert_not_contains "$(cat "$DELAY/arm.out" 2>/dev/null || true)" "armed:" \
   "arm reported ready while the listener could not start"
-[ ! -e "$FM_PROCEVENT_CLAIM_ROOT/$delay_id.claim" ] \
+[ ! -e "$JG_PROCEVENT_CLAIM_ROOT/$delay_id.claim" ] \
   || fail "a listener claimed the source while its lock was held"
 touch "$delay_rel"
 wait "$delay_arm" || fail "arm failed after the delayed listener was allowed to start: $(cat "$DELAY/arm.err")"
@@ -4558,10 +4558,10 @@ grep -q started "$READY_MARK" || fail "the delayed listener never ran"
 touch "$READY_RELEASE"
 wait "$HOLDER_PID" 2>/dev/null || true
 for _ in $(seq 1 50); do
-  [ -e "$FM_PROCEVENT_CLAIM_ROOT/$delay_id.claim" ] || break
+  [ -e "$JG_PROCEVENT_CLAIM_ROOT/$delay_id.claim" ] || break
   sleep 0.05
 done
-PATH="$DELAY/bin:$PATH" FM_HOME="$DELAY/home" \
+PATH="$DELAY/bin:$PATH" JG_HOME="$DELAY/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$delay_art" >/dev/null 2>&1 || true
 pass "arm waits out a delayed listener start before reporting ready"
 
@@ -4581,12 +4581,12 @@ SH
   lavish_session "$art"
   id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$art")
   jg_test_track_procevent_home "$dir/home"
-  mkdir -p "$FM_PROCEVENT_CLAIM_ROOT/$id.claim"
+  mkdir -p "$JG_PROCEVENT_CLAIM_ROOT/$id.claim"
   export READY_MARK="$dir/mark"
   : > "$READY_MARK"
   began=$(date +%s)
   set +e
-  PATH="$dir/bin:$PATH" FM_HOME="$dir/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$secs" \
+  PATH="$dir/bin:$PATH" JG_HOME="$dir/home" JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS="$secs" \
     "$ROOT/bin/jg-procevent-lavish.sh" arm "$art" > "$dir/arm.out" 2>"$dir/arm.err"
   rc=$?
   set -e
@@ -4599,8 +4599,8 @@ SH
   [ -e "$dir/home/state/procevent/$id.source" ] \
     || fail "arm removed a registration that retire refused to remove ($dir)"
   printf '%s\n' "$elapsed" > "$dir/elapsed"
-  rmdir "$FM_PROCEVENT_CLAIM_ROOT/$id.claim" 2>/dev/null || true
-  PATH="$dir/bin:$PATH" FM_HOME="$dir/home" \
+  rmdir "$JG_PROCEVENT_CLAIM_ROOT/$id.claim" 2>/dev/null || true
+  PATH="$dir/bin:$PATH" JG_HOME="$dir/home" \
     "$ROOT/bin/jg-procevent-lavish.sh" retire "$art" >/dev/null 2>&1 || true
 }
 
@@ -4628,12 +4628,12 @@ live_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$live_art")
 jg_test_track_procevent_home "$LIVE/home"
 export READY_MARK="$LIVE/mark" READY_RELEASE="$LIVE/release"
 : > "$READY_MARK"
-PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" \
+PATH="$LIVE/bin:$PATH" JG_HOME="$LIVE/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$live_art" > "$LIVE/arm1.out"
 assert_contains "$(cat "$LIVE/arm1.out")" "armed: $live_id" "the first arm was not reported ready"
 wait_for_lines "$READY_MARK" 1 || fail "the first generation's listener never ran"
 set +e
-PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+PATH="$LIVE/bin:$PATH" JG_HOME="$LIVE/home" JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$live_art" > "$LIVE/arm2.out" 2> "$LIVE/arm2.err"
 live_rc=$?
 set -e
@@ -4653,7 +4653,7 @@ sleep 0.3
 [ "$(wc -l < "$READY_MARK" | tr -d ' ')" = 1 ] \
   || fail "re-arm started a second listener beside the live earlier one"
 touch "$READY_RELEASE"
-PATH="$LIVE/bin:$PATH" FM_HOME="$LIVE/home" \
+PATH="$LIVE/bin:$PATH" JG_HOME="$LIVE/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$live_art" >/dev/null 2>&1 || true
 pass "re-arm over a live earlier listener reports it still serving the board"
 
@@ -4684,7 +4684,7 @@ legacy_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$legacy_art")
 jg_test_track_procevent_home "$LEGACY/home"
 new_task_endpoint "$LEGACY/home" worker-legacy
 printf 'legacy reply body\n' > "$LEGACY/reply-file"
-PATH="$LEGACY/bin:$PATH" FM_HOME="$LEGACY/home" \
+PATH="$LEGACY/bin:$PATH" JG_HOME="$LEGACY/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$legacy_art" --for worker-legacy \
   --agent-reply-file "$LEGACY/reply-file" >/dev/null \
   || fail "the older compatible Lavish reply path did not arm"
@@ -4719,7 +4719,7 @@ jg_test_track_procevent_home "$REPLY_FAIL/home"
 new_task_endpoint "$REPLY_FAIL/home" worker-reply-fail
 printf 'reply that will fail\n' > "$REPLY_FAIL/reply-file"
 reply_fail_rc=0
-reply_fail_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+reply_fail_out=$(PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$reply_fail_art" --for worker-reply-fail \
   --agent-reply-file "$REPLY_FAIL/reply-file" 2>&1) || reply_fail_rc=$?
 [ "$reply_fail_rc" -ne 0 ] || fail "a refused reply let arm report success"
@@ -4740,7 +4740,7 @@ case "${1-}" in
   *) exit 2 ;;
 esac
 SH
-PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$reply_fail_art" --for worker-reply-fail \
   --agent-reply-file "$REPLY_FAIL/reply-file" >/dev/null \
   || fail "arm was not retryable with the same reply after Lavish refused it"
@@ -4754,14 +4754,14 @@ pass "a refused synchronous reply leaves the same arm retryable"
 printf 'foreign reply\n' > "$REPLY_FAIL/foreign-reply"
 new_task_endpoint "$REPLY_FAIL/home" worker-intruder
 refused_rc=0
-refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$reply_fail_art" --for worker-intruder \
   --agent-reply-file "$REPLY_FAIL/foreign-reply" 2>&1) || refused_rc=$?
 [ "$refused_rc" -ne 0 ] || fail "a non-owner arm with a reply was not refused"
 assert_contains "$refused_out" "owned by task worker-reply-fail" \
   "the non-owner arm was refused for an unexpected reason: $refused_out"
 refused_rc=0
-refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$reply_fail_art" --for worker-reply-fail \
   --agent-reply-file "$REPLY_FAIL/foreign-reply" 2>&1) || refused_rc=$?
 [ "$refused_rc" -ne 0 ] || fail "an owner re-arm with no waiting round was not refused"
@@ -4771,14 +4771,14 @@ unreachable_art="$REPLY_FAIL/unreachable.html"
 printf '<h1>unreachable owner</h1>\n' > "$unreachable_art"
 lavish_session "$unreachable_art"
 refused_rc=0
-refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$unreachable_art" --for worker-no-endpoint \
   --agent-reply-file "$REPLY_FAIL/foreign-reply" 2>&1) || refused_rc=$?
 [ "$refused_rc" -ne 0 ] || fail "an arm for a task with no endpoint was not refused"
 assert_contains "$refused_out" "would reach no endpoint" \
   "the endpointless arm was refused for an unexpected reason: $refused_out"
 [ ! -s "$REPLY_FAIL/replies" ] || fail "a refused arm posted its reply to the board: $(cat "$REPLY_FAIL/replies")"
-PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
+PATH="$REPLY_FAIL/bin:$PATH" JG_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$reply_fail_art" >/dev/null 2>&1 || true
 touch "$REPLY_FAIL/release"
 pass "an arm refused for ownership, round, or endpoint never posts its reply"
@@ -4841,7 +4841,7 @@ jg_test_track_procevent_home "$UNKNOWN/home"
 new_task_endpoint "$UNKNOWN/home" worker-unknown
 printf 'reply for an unknown version\n' > "$UNKNOWN/reply-file"
 unknown_rc=0
-unknown_out=$(PATH="$UNKNOWN/bin:$PATH" FM_HOME="$UNKNOWN/home" \
+unknown_out=$(PATH="$UNKNOWN/bin:$PATH" JG_HOME="$UNKNOWN/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$unknown_art" --for worker-unknown \
   --agent-reply-file "$UNKNOWN/reply-file" 2>&1) || unknown_rc=$?
 [ "$unknown_rc" -ne 0 ] || fail "arm fell back to a legacy reply when the Lavish version was unknown"
@@ -4902,7 +4902,7 @@ jg_test_track_procevent_home "$DRAIN/home"
 new_task_endpoint "$DRAIN/home" worker-drain
 printf 'first drain reply\n' > "$DRAIN/reply1"
 printf 'second drain reply\n' > "$DRAIN/reply2"
-PATH="$DRAIN/bin:$PATH" FM_HOME="$DRAIN/home" \
+PATH="$DRAIN/bin:$PATH" JG_HOME="$DRAIN/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$drain_art" --for worker-drain \
   --agent-reply-file "$DRAIN/reply1" >/dev/null \
   || fail "the first generation of the draining fixture did not arm"
@@ -4911,7 +4911,7 @@ PATH="$DRAIN/bin:$PATH" FM_HOME="$DRAIN/home" \
 [ "$(head -n 1 "$DRAIN/order")" = reply ] \
   || fail "arm started the long-poll before Lavish accepted the reply"
 pass "arm posts and confirms the staged reply before reporting listener readiness"
-drain_claim="$FM_PROCEVENT_CLAIM_ROOT/$drain_id.claim"
+drain_claim="$JG_PROCEVENT_CLAIM_ROOT/$drain_id.claim"
 cp "$drain_claim" "$DRAIN/generation-one.claim"
 touch "$DRAIN/release1"
 wait_for "$DRAIN/home/state/procevent-inbox/$drain_id.1.result" \
@@ -4939,7 +4939,7 @@ awk -v pid="$drain_holder" -v ident="$drain_holder_identity" \
 chmod 0600 "$drain_claim"
 [ "$(pe "$DRAIN/home" list | awk -v id="$drain_id" '$1 == id { print $3 }')" = task:worker-drain/round-open ] \
   || fail "fixture invalid: the stood-up first generation is not reported live: $(pe "$DRAIN/home" list)"
-PATH="$DRAIN/bin:$PATH" FM_HOME="$DRAIN/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=5 \
+PATH="$DRAIN/bin:$PATH" JG_HOME="$DRAIN/home" JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=5 \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$drain_art" --for worker-drain \
   --agent-reply-file "$DRAIN/reply2" > "$DRAIN/arm2.out" 2> "$DRAIN/arm2.err" &
 drain_arm=$!
@@ -4974,10 +4974,10 @@ undisp_id=$("$ROOT/bin/jg-procevent-lavish.sh" source-id "$undisp_art")
 jg_test_track_procevent_home "$UNDISP/home"
 export READY_MARK="$UNDISP/mark" READY_RELEASE="$UNDISP/release"
 : > "$READY_MARK"
-PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" \
+PATH="$UNDISP/bin:$PATH" JG_HOME="$UNDISP/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$undisp_art" >/dev/null
 wait_for_lines "$READY_MARK" 1 || fail "the undisplaceable fixture's listener never ran"
-undisp_claim="$FM_PROCEVENT_CLAIM_ROOT/$undisp_id.claim"
+undisp_claim="$JG_PROCEVENT_CLAIM_ROOT/$undisp_id.claim"
 undisp_identity=$(sed -n '4p' "$undisp_claim")
 awk 'NR == 4 { print "different-live-process-identity"; next } { print }' \
   "$undisp_claim" > "$undisp_claim.tmp" && mv "$undisp_claim.tmp" "$undisp_claim"
@@ -4985,7 +4985,7 @@ chmod 0600 "$undisp_claim"
 [ "$(pe "$UNDISP/home" list | awk -v id="$undisp_id" '$1 == id { print $3 }')" = orphaned ] \
   || fail "fixture invalid: the reused-pid claim is not reported orphaned"
 set +e
-PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+PATH="$UNDISP/bin:$PATH" JG_HOME="$UNDISP/home" JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
   "$ROOT/bin/jg-procevent-lavish.sh" arm "$undisp_art" > "$UNDISP/arm2.out" 2>/dev/null
 undisp_rc=$?
 set -e
@@ -5001,7 +5001,7 @@ awk -v v="$undisp_identity" 'NR == 4 { print v; next } { print }' \
   "$undisp_claim" > "$undisp_claim.tmp" && mv "$undisp_claim.tmp" "$undisp_claim"
 chmod 0600 "$undisp_claim"
 touch "$READY_RELEASE"
-PATH="$UNDISP/bin:$PATH" FM_HOME="$UNDISP/home" \
+PATH="$UNDISP/bin:$PATH" JG_HOME="$UNDISP/home" \
   "$ROOT/bin/jg-procevent-lavish.sh" retire "$undisp_art" >/dev/null 2>&1 || true
 pass "arm does not launch beside a stale claim whose process group is alive"
 

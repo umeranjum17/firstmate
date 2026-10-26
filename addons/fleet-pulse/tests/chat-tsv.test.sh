@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -euo pipefail
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
@@ -38,7 +47,7 @@ with Path(sys.argv[1]).open('w') as f:
         msg = {'role': 'user', 'content': content}
         f.write(json.dumps({'type': 'user', 'uuid': uid, 'timestamp': f'2026-10-20T12:{i:02}:00Z', 'cwd': '/home/you/firstmate', 'message': msg}) + '\n')
 PY
-export FM_HOME=$home CHAT_TSV_TRANSCRIPTS=$transcripts
+export JG_HOME=$home CHAT_TSV_TRANSCRIPTS=$transcripts
 script_dir=$(dirname "${BASH_SOURCE[0]}")/../bin
 extractor=$script_dir/chat-tsv.py
 refresh=$script_dir/chat-tsv-refresh.sh
@@ -71,23 +80,23 @@ refresh_home=$d/refresh-home
 mkdir -p "$refresh_home/data"
 git -C "$refresh_home" init -q
 printf 'data/\n' > "$refresh_home/.gitignore"
-if FM_HOME='' CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/missing-home" 2>&1; then exit 1; fi
-grep -Fq 'FM_HOME must be set' "$d/missing-home"
+if JG_HOME='' CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/missing-home" 2>&1; then exit 1; fi
+grep -Fq 'JG_HOME must be set' "$d/missing-home"
 not_ignored=$d/not-ignored
 mkdir -p "$not_ignored/data"
 git -C "$not_ignored" init -q
-if FM_HOME=$not_ignored CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/not-ignored.out" 2>&1; then exit 1; fi
+if JG_HOME=$not_ignored CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/not-ignored.out" 2>&1; then exit 1; fi
 grep -Fq 'is not gitignored' "$d/not-ignored.out"
-FM_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh1" 2>&1
+JG_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh1" 2>&1
 grep -Fq 'appended=7 rows total=7' "$d/refresh1"
 cp "$refresh_home/data/chat.tsv" "$d/initial.tsv"
 printf '%s\n' "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-real","timestamp":"2026-10-20T13:00:00Z","cwd":"/home/you/firstmate","message":{"role":"user","content":"New real note."}}))')" "$(python3 -c 'import json; print(json.dumps({"type":"user","uuid":"new-wake","timestamp":"2026-10-20T13:01:00Z","message":{"role":"user","content":"Firstmate supervision wake: injected wake."}}))')" >> "$transcripts/session.jsonl"
-FM_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh2" 2>&1
+JG_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh2" 2>&1
 grep -Fq 'appended=1 rows total=8' "$d/refresh2"
 head -n 7 "$refresh_home/data/chat.tsv" | cmp - "$d/initial.tsv"
 grep -Fq 'New real note.' "$refresh_home/data/chat.tsv"
 if grep -Fq 'injected wake' "$refresh_home/data/chat.tsv"; then exit 1; fi
-FM_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh3" 2>&1
+JG_HOME=$refresh_home CHAT_TSV_TRANSCRIPTS=$transcripts bash "$refresh" > "$d/refresh3" 2>&1
 grep -Fq 'appended=0 rows total=8' "$d/refresh3"
 if grep -Eq '123456|sk-FAKEFAKEFAKE123456' "$refresh_home/data/chat.tsv" "$refresh_home/data/chat.tsv.seen"; then exit 1; fi
 if grep -Eq 'Please fix this|New real note|123456|sk-FAKE' "$d/refresh1" "$d/refresh2" "$d/refresh3"; then exit 1; fi

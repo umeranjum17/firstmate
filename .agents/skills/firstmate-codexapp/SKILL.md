@@ -13,7 +13,7 @@ metadata:
 ## Overview
 
 Use this playbook when Juggernaut work needs a visible Codex Desktop thread.
-The current supported shape is Desktop host-tool choreography plus an explicit status-file return-channel check, not a `codex-app` value in `FM_BACKEND`.
+The current supported shape is Desktop host-tool choreography plus an explicit status-file return-channel check, not a `codex-app` value in `JG_BACKEND`.
 
 ## Boundary
 

@@ -36,7 +36,7 @@
 //     record read-back from <path>; a missing or empty read-back prints the
 //     tail's fixed unavailable notice instead.
 //
-// The state directory is FM_STATE_OVERRIDE, else $FM_HOME/state, else the
+// The state directory is JG_STATE_OVERRIDE, else $JG_HOME/state, else the
 // repository's own state/. Exit 0 on success, 2 on invalid use, 3 when a
 // wake-prompt --mirror-file cannot be read.
 
@@ -55,8 +55,8 @@ function usage() {
 }
 
 function stateDir() {
-  if (process.env.FM_STATE_OVERRIDE) return process.env.FM_STATE_OVERRIDE;
-  const home = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
+  if (process.env.JG_STATE_OVERRIDE) return process.env.JG_STATE_OVERRIDE;
+  const home = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
   return path.join(home, "state");
 }
 

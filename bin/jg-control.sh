@@ -135,24 +135,24 @@
 #     is typed, so existing text is preserved instead of being concatenated.
 #
 # Candidate execution without installation: invoke the candidate root's
-# bin/jg-control.sh with FM_HOME set to the owning home and FM_ROOT_OVERRIDE
-# set to that candidate root. Records and config still belong to FM_HOME;
-# executable owners come from the candidate. Unset unrelated FM_STATE_OVERRIDE,
-# FM_DATA_OVERRIDE and FM_CONFIG_OVERRIDE rather than redirecting task identity.
+# bin/jg-control.sh with JG_HOME set to the owning home and JG_ROOT_OVERRIDE
+# set to that candidate root. Records and config still belong to JG_HOME;
+# executable owners come from the candidate. Unset unrelated JG_STATE_OVERRIDE,
+# JG_DATA_OVERRIDE and JG_CONFIG_OVERRIDE rather than redirecting task identity.
 # A refusal still requires ordinary recovery; never bypass lifecycle guards.
 #
 # Environment knobs (all bounded waits, seconds):
-#   FM_CONTROL_POLL              poll interval for postcondition waits (0.5)
-#   FM_CONTROL_SETTLE_WAIT       adapter acknowledgement wait after interrupt (5)
-#   FM_CONTROL_ARM_WAIT          wait for an armed interrupt's rendered proof
+#   JG_CONTROL_POLL              poll interval for postcondition waits (0.5)
+#   JG_CONTROL_SETTLE_WAIT       adapter acknowledgement wait after interrupt (5)
+#   JG_CONTROL_ARM_WAIT          wait for an armed interrupt's rendered proof
 #                                after the press gap (1.5)
-#   FM_CONTROL_EXIT_WAIT         alive->dead wait after the exit command (30)
-#   FM_CONTROL_LAUNCH_WAIT       dead->alive wait after a relaunch (90)
-#   FM_CONTROL_EXIT_RETRIES      Enter retries for the exit command (3)
+#   JG_CONTROL_EXIT_WAIT         alive->dead wait after the exit command (30)
+#   JG_CONTROL_LAUNCH_WAIT       dead->alive wait after a relaunch (90)
+#   JG_CONTROL_EXIT_RETRIES      Enter retries for the exit command (3)
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
   # The whole leading comment block, ending at the first non-comment line.
@@ -169,18 +169,18 @@ esac
 # drive a crewmate's lifecycle (see bin/jg-gate-refuse-lib.sh).
 jg_refuse_if_gate_agent
 
-if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
-  echo "error: FM_HOME is not set; jg-control refuses to resolve a task without an explicit firstmate home" >&2
+if [ -z "${JG_HOME+x}" ] || [ -z "${JG_HOME:-}" ]; then
+  echo "error: JG_HOME is not set; jg-control refuses to resolve a task without an explicit firstmate home" >&2
   exit 1
 fi
-[ -d "$FM_HOME" ] || {
-  echo "error: FM_HOME '$FM_HOME' is not a directory" >&2
+[ -d "$JG_HOME" ] || {
+  echo "error: JG_HOME '$JG_HOME' is not a directory" >&2
   exit 1
 }
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 [ -d "$STATE" ] || {
-  echo "error: state dir '$STATE' is missing; jg-control cannot resolve tasks for FM_HOME '$FM_HOME'" >&2
+  echo "error: state dir '$STATE' is missing; jg-control cannot resolve tasks for JG_HOME '$JG_HOME'" >&2
   exit 1
 }
 
@@ -199,7 +199,7 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/jg-worker-account-lib.sh
 . "$SCRIPT_DIR/jg-worker-account-lib.sh"
 # Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
-_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh
 if [ -r "$_jg_ap" ]; then
   # shellcheck source=/dev/null
   . "$_jg_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_jg_ap" >&2; exit 1; }
@@ -209,12 +209,12 @@ fi
 # shellcheck source=bin/jg-exclude-tools-lib.sh
 . "$SCRIPT_DIR/jg-exclude-tools-lib.sh"
 
-POLL=${FM_CONTROL_POLL:-0.5}
-SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
-ARM_WAIT=${FM_CONTROL_ARM_WAIT:-1.5}
-EXIT_WAIT=${FM_CONTROL_EXIT_WAIT:-30}
-LAUNCH_WAIT=${FM_CONTROL_LAUNCH_WAIT:-90}
-EXIT_RETRIES=${FM_CONTROL_EXIT_RETRIES:-3}
+POLL=${JG_CONTROL_POLL:-0.5}
+SETTLE_WAIT=${JG_CONTROL_SETTLE_WAIT:-5}
+ARM_WAIT=${JG_CONTROL_ARM_WAIT:-1.5}
+EXIT_WAIT=${JG_CONTROL_EXIT_WAIT:-30}
+LAUNCH_WAIT=${JG_CONTROL_LAUNCH_WAIT:-90}
+EXIT_RETRIES=${JG_CONTROL_EXIT_RETRIES:-3}
 
 die() {  # <message>
   echo "error: $1" >&2
@@ -234,8 +234,8 @@ control_cleanup() {
   fi
   # Remove the dialog file while the lock is still held: once it is released,
   # the next lifecycle command for this task writes the same path.
-  if [ -n "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
-    rm -f "$FM_COMPOSER_DIALOG_SINK"
+  if [ -n "${JG_COMPOSER_DIALOG_SINK:-}" ]; then
+    rm -f "$JG_COMPOSER_DIALOG_SINK"
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -356,7 +356,7 @@ CONTROL_LOCK_HELD=1
 # EXIT trap, so the parent has to hold the path the trap removes. Set it
 # only once the lock is held: a process that loses the lock runs the same
 # trap, and would remove the file the lock holder is reading.
-FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
+JG_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   case "$RAW_ID" in
@@ -383,8 +383,8 @@ if [ -n "$(jg_meta_get "$META" remote_host)" ]; then
 fi
 
 jg_backend_validate_task_endpoint "$META" "$ID" || exit 1
-BACKEND=$FM_BACKEND_VALIDATED_BACKEND
-T=$FM_BACKEND_VALIDATED_TARGET
+BACKEND=$JG_BACKEND_VALIDATED_BACKEND
+T=$JG_BACKEND_VALIDATED_TARGET
 LABEL="jg-$ID"
 RECORDED_HARNESS=$(jg_meta_get "$META" harness)
 KIND=$(jg_meta_get "$META" kind)
@@ -819,14 +819,14 @@ do_exit() {
   if [ -n "$hazard" ] && rendered_matches "$hazard"; then
     die "task $ID shows the $HARNESS revert picker, where typed text becomes a search and Enter reverts file changes; refusing to type the $cmd exit command. Close it with $(jg_control_interrupt_key "$HARNESS"), never Enter, then retry '$VERB'"
   fi
-  : > "$FM_COMPOSER_DIALOG_SINK" \
+  : > "$JG_COMPOSER_DIALOG_SINK" \
     || die "task $ID's dialog check could not be recorded"
   composer_state=$(jg_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
     || composer_state=unknown
   # The classify that filled the sink ran in a subshell, so read the file
   # rather than a function that subshell sourced.
-  if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
-    dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
+  if [ -s "${JG_COMPOSER_DIALOG_SINK:-}" ]; then
+    dialog=$(cat "$JG_COMPOSER_DIALOG_SINK")
     refuse_blocking_prompt "$dialog"
   fi
   # The refusal names the working recovery so the next operator clears or
@@ -867,8 +867,8 @@ do_exit() {
   # verified exact stop dialog may be confirmed by the guarded control path;
   # every other recognised picker keeps upstream's refusal. A dead agent may
   # leave the same text behind; that is not a prompt still waiting.
-  if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
-    dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
+  if [ -s "${JG_COMPOSER_DIALOG_SINK:-}" ]; then
+    dialog=$(cat "$JG_COMPOSER_DIALOG_SINK")
     if [ "$(agent_state)" != dead ]; then
       complete_exit_confirmation || refuse_blocking_prompt "$dialog"
       wait_exit_stopped 1 || die "task $ID exit confirmation delivered but agent stop remains unconfirmed"
@@ -879,10 +879,10 @@ do_exit() {
     # A submit can return before any read sees the picker: a native busy
     # verdict needs no composer read, and a cleared composer can be read
     # before the picker renders. Read the screen once more here.
-    : > "$FM_COMPOSER_DIALOG_SINK" || true
+    : > "$JG_COMPOSER_DIALOG_SINK" || true
     jg_backend_composer_state "$BACKEND" "$T" "$LABEL" >/dev/null 2>&1 || true
-    if [ -s "$FM_COMPOSER_DIALOG_SINK" ]; then
-      refuse_blocking_prompt "$(cat "$FM_COMPOSER_DIALOG_SINK")"
+    if [ -s "$JG_COMPOSER_DIALOG_SINK" ]; then
+      refuse_blocking_prompt "$(cat "$JG_COMPOSER_DIALOG_SINK")"
     fi
     die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s"
   }
@@ -1099,14 +1099,14 @@ resolve_relaunch_profile() {
   # signed out must refuse here, while nothing has changed yet.
   local account_model=$TARGET_MODEL
   [ "$account_model" != default ] || account_model=
-  jg_worker_account_select "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" \
+  jg_worker_account_select "$TARGET_HARNESS" "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" \
     "$account_model" "$TARGET_HARNESS" >/dev/null || return 1
-  jg_account_hook relaunch-pre "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$account_model" "$(jg_meta_get "$META" account)" "$PRIOR_MODEL" "$ID" || return 1
+  jg_account_hook relaunch-pre "$TARGET_HARNESS" "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$account_model" "$(jg_meta_get "$META" account)" "$PRIOR_MODEL" "$ID" || return 1
   # Likewise config/crew-exclude-tools: a malformed file, or a replacement
   # runtime that cannot hide the listed tools, refuses here, before the old
   # agent stops. Secondmate agents are not covered.
   if [ "$KIND" != secondmate ]; then
-    jg_exclude_tools_check "$TARGET_HARNESS" 0 "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" >/dev/null || return 1
+    jg_exclude_tools_check "$TARGET_HARNESS" 0 "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" >/dev/null || return 1
   fi
 }
 
@@ -1127,9 +1127,9 @@ safe_checkpoint() {
   [ "$wt_real" = "$wt_top_real" ] \
     || die "task $ID's recorded worktree $WT is not a worktree root (root is $wt_top); refusing to relaunch against an ambiguous checkout"
   if jg_slot_record_owner "$WT" "$STATE" "$META"; then
-    die "task $ID's recorded worktree $WT is also recorded by task $FM_SLOT_RECORD_OWNER_ID as its $FM_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/jg-crew-state.sh $ID $FM_SLOT_RECORD_OWNER_ID)"
+    die "task $ID's recorded worktree $WT is also recorded by task $JG_SLOT_RECORD_OWNER_ID as its $JG_SLOT_RECORD_OWNER_FIELD; refusing to relaunch two agents into one copy. Reconcile which record is stale (bin/jg-crew-state.sh $ID $JG_SLOT_RECORD_OWNER_ID)"
   elif [ $? -eq 2 ]; then
-    die "cannot prove task $ID's worktree $WT is free of other task records: $FM_LOCAL_FIRSTMATE_ERROR; refusing to relaunch"
+    die "cannot prove task $ID's worktree $WT is free of other task records: $JG_LOCAL_FIRSTMATE_ERROR; refusing to relaunch"
   fi
   if head=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null); then
     :
@@ -1246,7 +1246,7 @@ do_relaunch() {
   fi
   # jg-spawn admits the launch on host memory too, but only after the agent is
   # stopped; asking first leaves the running agent untouched on a refusal.
-  "$SCRIPT_DIR/jg-jev-mem-guard.sh" --config "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/host-memory" \
+  "$SCRIPT_DIR/jg-jev-mem-guard.sh" --config "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/host-memory" \
     --admit "$ID" --state "$STATE" >&2 \
     || die "relaunch of $ID refused before its agent was touched: host memory is under pressure; retry once it eases"
   safe_checkpoint
@@ -1257,7 +1257,7 @@ do_relaunch() {
   record_note
   journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
 
-  jg_account_hook relaunch-commit "$TARGET_HARNESS" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$(jg_meta_get "$META" account)" || return 1
+  jg_account_hook relaunch-commit "$TARGET_HARNESS" "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$(jg_meta_get "$META" account)" || return 1
   journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
   exit_result=$(do_exit)
   journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
@@ -1272,7 +1272,7 @@ do_relaunch() {
   fi
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   jg_account_hook spawn-args
-  if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
+  if JG_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
       "$SCRIPT_DIR/jg-spawn.sh" "${spawn_args[@]}" >/dev/null; then
     RELAUNCH_META_PUBLISHED=1
     # $T was resolved from the record before the launch. When the recorded
@@ -1287,8 +1287,8 @@ do_relaunch() {
     # was just rewritten by the launch owner, so that row is the whole
     # diagnostic. Let it through rather than dying with nothing to act on.
     if jg_backend_validate_task_endpoint "$META" "$ID" >/dev/null \
-       && [ -n "$FM_BACKEND_VALIDATED_TARGET" ]; then
-      T=$FM_BACKEND_VALIDATED_TARGET
+       && [ -n "$JG_BACKEND_VALIDATED_TARGET" ]; then
+      T=$JG_BACKEND_VALIDATED_TARGET
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi

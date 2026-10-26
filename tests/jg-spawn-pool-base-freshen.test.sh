@@ -78,16 +78,16 @@ REC
     "the remote-seeded spawn did not report success"
   assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" \
     "the remote-seeded spawn did not publish its allocated pool worktree"
-  lock=$(FM_HOME="$HOME_DIR" bash -c '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
+  lock=$(JG_HOME="$HOME_DIR" bash -c '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$PROJECT_DIR") \
     || fail "the launched remote-seeded home could not resolve its Treehouse project lock"
   case "$lock" in
     "$HOME_DIR/state/"*) ;;
     *) fail "the remote-seeded spawn anchored its lock outside its local root: $lock" ;;
   esac
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# remote-seeded Treehouse spawn command\n'
-    printf '$ FM_HOME=%s bin/jg-spawn.sh %s %s --scout\n%s\nexit=%s\n' \
+    printf '$ JG_HOME=%s bin/jg-spawn.sh %s %s --scout\n%s\nexit=%s\n' \
       "$HOME_DIR" "$id" "$PROJECT_DIR" "$out" "$status"
     printf 'published worktree=%s\nresolved project lock=%s\n' "$POOL_DIR" "$lock"
   fi
@@ -118,7 +118,7 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
 
     out=$(run_spawn "$id" --scout)
     status=$?
-    if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
       printf '# evidence begin: linked-home spawn, returned=%s\n' "$returned"
       printf '$ bin/jg-spawn.sh %s %s --scout\n%s\nexit=%s\n' "$id" "$PROJECT_DIR" "$out" "$status"
       printf 'primary HEAD before=%s after=%s\n' "$INITIAL_SHA" "$(git -C "$primary" rev-parse HEAD)"
@@ -177,7 +177,7 @@ test_stale_pool_base_refreshes_before_branching() {
   branch_head=$(git -C "$POOL_DIR" rev-parse HEAD)
   [ "$branch_head" = "$current" ] || fail "spawn left the pooled worktree on stale history"
   [ "$branch_head" != "$INITIAL_SHA" ] || fail "fixture did not prove origin/main advanced past the pool base"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed spawn: %s\n' "$(printf '%s\n' "$out" | tail -n 1)"
     printf '# observed base: HEAD=%s origin/main=%s advanced-main=%s\n' \
       "$branch_head" "$current" "$(cat "$POOL_DIR/advanced-main.txt")"
@@ -256,7 +256,7 @@ test_originless_pool_launches_without_a_freshness_fetch() {
   [ ! -e "$POOL_DIR/.git/FETCH_HEAD" ] || fail "spawn fetched against a pooled worktree with no origin"
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] \
     || fail "spawn moved HEAD on an origin-less pooled worktree that had nothing to refresh against"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed origin-less launch: %s\n' "$(printf '%s\n' "$out" | tail -n 1)"
   fi
   pass "an origin-less pooled worktree launches as-is, skipping the freshness gate"
@@ -378,7 +378,7 @@ test_unreachable_origin_refuses_stale_pool_base() {
     "spawn did not clearly refuse an unreachable origin"
   after=$(git -C "$POOL_DIR" rev-parse HEAD)
   [ "$after" = "$before" ] || fail "spawn changed the pooled worktree after origin became unreachable"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed unreachable-origin refusal: %s\n' "$(printf '%s\n' "$out" | tail -n 1)"
   fi
   pass "an unreachable origin refuses a potentially stale pooled worktree"
@@ -402,7 +402,7 @@ test_direct_pr_and_scout_refresh_before_launch() {
       || fail "$contract spawn did not start at current origin/main"
     assert_grep 'must survive a newly spawned branch' "$POOL_DIR/advanced-main.txt" \
       "$contract spawn omitted advanced-main content"
-    if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
       printf '# observed %s spawn: %s\n' "$contract" "$(printf '%s\n' "$out" | tail -n 1)"
     fi
   done
@@ -425,7 +425,7 @@ test_dirty_pool_refuses_without_discarding_work() {
     || fail "spawn moved HEAD while refusing a dirty pooled worktree"
   assert_grep 'keep this local work' "$POOL_DIR/uncommitted.txt" \
     "spawn discarded uncommitted work while refusing the pool"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed dirty refusal: %s; preserved=%s\n' \
       "$(printf '%s\n' "$out" | tail -n 1)" "$(cat "$POOL_DIR/uncommitted.txt")"
   fi
@@ -447,7 +447,7 @@ test_unresolved_remote_default_refuses_pool() {
     "spawn did not clearly refuse an unresolved remote default branch"
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] \
     || fail "spawn moved HEAD after failing to resolve the remote default branch"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed unresolved-default refusal: %s\n' "$(printf '%s\n' "$out" | tail -n 1)"
   fi
   pass "an unresolved remote default branch refuses the pooled worktree"
@@ -559,7 +559,7 @@ test_stale_submodule_pin_explains_itself() {
     || fail "spawn moved HEAD while refusing a stale submodule pin"
   [ "$(git -C "$POOL_DIR/ui" rev-parse HEAD)" = "$before_sub" ] \
     || fail "spawn converged the submodule; this gate must never touch the slot"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# observed stale-pin refusal: %s\n' "$(printf '%s\n' "$out" | grep 'submodule' | head -n 1)"
   fi
   pass "an origin-less pool with a stale submodule pin refuses while naming both pins and no remedy"
@@ -917,14 +917,14 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
   chmod +x "$fakebin/tmux"
   (
     local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
-    local FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    local JG_ROOT_OVERRIDE='' JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data"
     export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
-    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
-    export FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" FM_BACKEND=tmux FM_SPAWN_NO_GUARD=1
+    export JG_ROOT_OVERRIDE JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE
+    export JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" JG_BACKEND=tmux JG_SPAWN_NO_GUARD=1
     # This journey launches only sleep, not a model; memory admission is not
     # the behavior under test. Keep its proc input isolated from host load.
     mkdir -p "$case_dir/proc"
-    export FM_HOST_MEMORY_PROC="$case_dir/proc" TMUX='' PATH="$fakebin:$PATH"
+    export JG_HOST_MEMORY_PROC="$case_dir/proc" TMUX='' PATH="$fakebin:$PATH"
     trap 'tmux kill-server 2>/dev/null || true' EXIT
     first=$(cd "$project" && treehouse get --lease --lease-holder seed-one) || exit 1
     second=$(cd "$project" && treehouse get --lease --lease-holder seed-two) || exit 1
@@ -937,7 +937,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
     head=$(git -C "$first" rev-parse HEAD)
     printf 'kind=ship\nworktree=%s\n' "$first" > "$home/state/retained-task.meta"
     tmux new-session -d -s firstmate -c "$project" || exit 1
-    out=$(bash "${FM_TEST_LEASE_SPAWN_BIN:-$ROOT/bin/jg-spawn.sh}" lease-journey "$project" --scout 'sleep 600' 2>&1)
+    out=$(bash "${JG_TEST_LEASE_SPAWN_BIN:-$ROOT/bin/jg-spawn.sh}" lease-journey "$project" --scout 'sleep 600' 2>&1)
     status=$?
     printf '%s\n' "$out"
     [ "$status" = 0 ] && grep -Fxq "worktree=$second" "$home/state/lease-journey.meta" || exit 1
@@ -953,7 +953,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
     printf 'Investigation complete; no outstanding decisions.\n' > "$home/data/lease-journey/report.md"
     printf 'done: report written\n' > "$home/state/lease-journey.status"
     bash "$ROOT/bin/jg-captain-hold.sh" complete lease-journey --none || exit 1
-    FM_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/jg-teardown.sh" lease-journey || exit 1
+    JG_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/jg-teardown.sh" lease-journey || exit 1
     jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and (.leased != true))' "$pool/treehouse-state.json" || exit 1
     [ ! -e "$home/state/lease-journey.meta" ] || exit 1
     [ "$(git -C "$first" rev-parse HEAD)" = "$head" ] || exit 1
@@ -981,7 +981,7 @@ test_real_pool_lease_survives_worker_exit_and_teardown_releases_it() {
       if [ "$id" = recovery-cleanup ]; then
         printf 'tasks-axi\n' > "$home/config/backlog-backend"
       fi
-      FM_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/jg-teardown.sh" "$id" --force || exit 1
+      JG_TEARDOWN_GUARD_DONE=1 bash "$ROOT/bin/jg-teardown.sh" "$id" --force || exit 1
       printf 'manual\n' > "$home/config/backlog-backend"
       [ ! -e "$home/state/$id.meta" ] || exit 1
       jq -e --arg path "$second" 'any(.worktrees[]; .path == $path and (.leased != true))' "$pool/treehouse-state.json" || exit 1
@@ -1008,9 +1008,9 @@ test_real_home_seed_protects_recorded_copy() {
   printf '# Charter\n\nOwn firstmate work.\n\n# Routing scope\n\nFirstmate.\n\n# Project clones\n\nNone. This is a project-less domain.\n' > "$home/data/seed-home/brief.md"
   (
     local HOME="$home" XDG_CONFIG_HOME="$home/.config" TMPDIR="$case_dir" TREEHOUSE_NO_UPDATE_CHECK=1
-    local FM_ROOT_OVERRIDE="$project" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data"
+    local JG_ROOT_OVERRIDE="$project" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data"
     export HOME XDG_CONFIG_HOME TMPDIR TREEHOUSE_NO_UPDATE_CHECK
-    export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE
+    export JG_ROOT_OVERRIDE JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE
     first=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
     second=$(cd "$project" && treehouse get --lease --lease-holder initial) || exit 1
     (cd "$project" && treehouse return --force "$first" && treehouse return --force "$second") || exit 1
@@ -1044,7 +1044,7 @@ test_real_home_seed_protects_recorded_copy() {
   pass "real home seeding protects recorded copies and allocates only a free home"
 }
 
-if [ "${FM_TEST_REAL_LEASE_ONLY:-0}" = 1 ]; then
+if [ "${JG_TEST_REAL_LEASE_ONLY:-0}" = 1 ]; then
   test_real_pool_lease_survives_worker_exit_and_teardown_releases_it
   test_real_home_seed_protects_recorded_copy
   exit 0

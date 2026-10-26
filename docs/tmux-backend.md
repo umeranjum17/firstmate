@@ -9,7 +9,7 @@ Install tmux with `brew install tmux` or your platform package manager.
 The universal harness and toolchain requirements are in [`configuration.md`](configuration.md#toolchain).
 
 tmux is the hard default when no explicit setting or runtime auto-detection selects another backend.
-Select it explicitly with local `config/backend` containing `tmux`, with `FM_BACKEND=tmux` for one launch, or by asking Juggernaut to use tmux.
+Select it explicitly with local `config/backend` containing `tmux`, with `JG_BACKEND=tmux` for one launch, or by asking Juggernaut to use tmux.
 Explicit tmux selection via `config/backend` or `--backend tmux` overrides runtime auto-detection.
 
 No provisioning is required before the first task.
@@ -38,7 +38,7 @@ tmux select-window -t <session-name>:jg-<id>
 ```
 
 Typing into an attached task window is authoritative direct intervention.
-Routine supervision does not require attachment: `bin/jg-peek.sh <id>` captures a bounded tail and `FM_HOME=<home> bin/jg-send.sh <id> '<text>'` steers the recorded endpoint.
+Routine supervision does not require attachment: `bin/jg-peek.sh <id>` captures a bounded tail and `JG_HOME=<home> bin/jg-send.sh <id> '<text>'` steers the recorded endpoint.
 
 Verify setup by spawning a small task and confirming its `jg-<id>` window appears in the selected session.
 

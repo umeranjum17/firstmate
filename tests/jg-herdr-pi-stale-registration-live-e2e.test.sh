@@ -36,7 +36,7 @@ fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 note() { printf '# %s\n' "$1"; }
 
-jg_live_gate default-on FM_HERDR_PI_STALE_REGISTRATION_LIVE_E2E herdr pi jq
+jg_live_gate default-on JG_HERDR_PI_STALE_REGISTRATION_LIVE_E2E herdr pi jq
 
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"

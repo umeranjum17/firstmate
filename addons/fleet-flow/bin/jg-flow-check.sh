@@ -22,11 +22,11 @@
 #                                    and --resume names it for the next free slot, oldest first; no steer is needed.
 #   parked ... (resume-on: <when>)   any other park names its resume condition: a date (YYYY-MM-DD), a PR URL or `captain`.
 #                                    A park without one is STALLED: the pulse counts it and a stalled line names it.
-# FM_MAIN_HOME names the main home (default ~/firstmate), where lane-caps, the status rollup and bin/ live.
+# JG_MAIN_HOME names the main home (default ~/firstmate), where lane-caps, the status rollup and bin/ live.
 import os, re, sys, glob, json, time, subprocess, statistics as st
 
 CAP = 4
-MAIN = os.environ.get('FM_MAIN_HOME') or os.path.expanduser('~/firstmate')
+MAIN = os.environ.get('JG_MAIN_HOME') or os.path.expanduser('~/firstmate')
 NAMES = {'1': 'takeone', '3': 'crewhouse', '4': 'writeboost', '8': 'muxr', '9': 'desklink', '10': 'byokit'}
 AT = re.compile(r'\[at=(\d+)\]')
 VERB = re.compile(r'^(?:\d{9,11}\s+)?([a-z][a-z-]*)')
@@ -37,9 +37,9 @@ HOLD_UNTIL = re.compile(r'\(hold-until:\s*(\d{4}-\d{2}-\d{2})\)')
 home = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else sys.exit('usage: jg-flow-check.sh <home> [--can-start|--target|--summary]')
 mode = sys.argv[2] if len(sys.argv) > 2 else ''
 S, D = f'{home}/state', f'{home}/data'
-# Slot nicknames for --summary/--target rows; override one slot with FM_SLOT_<n>_NAME.
+# Slot nicknames for --summary/--target rows; override one slot with JG_SLOT_<n>_NAME.
 _slot = os.path.basename(os.path.dirname(home))
-name = os.environ.get(f'FM_SLOT_{_slot}_NAME') or NAMES.get(_slot, _slot)
+name = os.environ.get(f'JG_SLOT_{_slot}_NAME') or NAMES.get(_slot, _slot)
 # Per-home cap override: config/lane-caps lines '<home> <cap>'.
 CAP = next((int(l.split()[1]) for l in open(f'{MAIN}/config/lane-caps') if l.split()[:1] == [name]), CAP) if os.path.exists(f'{MAIN}/config/lane-caps') else CAP
 NOW = int(time.time())
@@ -136,7 +136,7 @@ ANSWERED = re.compile(r'state: ([a-z][a-z-]*) ·')
 def crew_state(t):
     try:
         return subprocess.Popen([f'{MAIN}/bin/jg-crew-state.sh', t], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                text=True, errors='replace', env={**os.environ, 'FM_HOME': home, 'FM_CREW_STATE_NO_FORGE': '1'})
+                                text=True, errors='replace', env={**os.environ, 'JG_HOME': home, 'JG_CREW_STATE_NO_FORGE': '1'})
     except OSError:
         return None
 
@@ -166,7 +166,7 @@ HARD = CAP + 2
 def ready_ids():
     # Raises on a failed query: a failed read must never look like a proven zero.
     r = subprocess.run([f'{MAIN}/bin/jg-tasks-axi.sh', 'ready'], capture_output=True, text=True, timeout=8,
-                       env={**os.environ, 'FM_HOME': home})
+                       env={**os.environ, 'JG_HOME': home})
     if r.returncode: raise RuntimeError(f'ready query exit {r.returncode}: ' + (r.stderr.strip().splitlines() or [''])[-1])
     return re.findall(r'^\s{2}([\w.-]+),queued', r.stdout, re.M)
 

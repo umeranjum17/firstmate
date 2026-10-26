@@ -42,12 +42,12 @@ mkdir -p "$FAKE"
 cat > "$FAKE/lsof" <<'SH'
 #!/usr/bin/env bash
 # Prints the -F pn shape for every pid listed in the owner file.
-[ -f "$FM_FAKE_SOCKET_OWNER" ] || exit 0
+[ -f "$JG_FAKE_SOCKET_OWNER" ] || exit 0
 while IFS= read -r pid; do
   [ -n "$pid" ] || continue
   printf 'p%s\n' "$pid"
-  printf 'n%s\n' "$FM_FAKE_HERDR_SOCKET"
-done < "$FM_FAKE_SOCKET_OWNER"
+  printf 'n%s\n' "$JG_FAKE_HERDR_SOCKET"
+done < "$JG_FAKE_SOCKET_OWNER"
 SH
 cat > "$FAKE/launchctl" <<'SH'
 #!/usr/bin/env bash
@@ -56,41 +56,41 @@ domain=${2:-}
 scope=${domain%%/*}
 label=${domain#*/}
 label=${label#*/}
-state="$FM_FAKE_STATE/launchctl-$scope-$label"
+state="$JG_FAKE_STATE/launchctl-$scope-$label"
 [ -f "$state" ] || exit 113
 cat "$state"
 SH
 cat > "$FAKE/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "$FM_FAKE_HERDR_LOG"
-running=$(cat "$FM_FAKE_HERDR_RUNNING" 2>/dev/null || printf 'false')
+printf '%s\n' "$*" >> "$JG_FAKE_HERDR_LOG"
+running=$(cat "$JG_FAKE_HERDR_RUNNING" 2>/dev/null || printf 'false')
 case "$*" in
   "status --json --session "*)
-    if [ -f "$FM_FAKE_STATE/release-after" ]; then
-      left=$(cat "$FM_FAKE_STATE/release-after")
+    if [ -f "$JG_FAKE_STATE/release-after" ]; then
+      left=$(cat "$JG_FAKE_STATE/release-after")
       if [ "$left" -gt 0 ]; then
-        printf '%s\n' "$((left - 1))" > "$FM_FAKE_STATE/release-after"
+        printf '%s\n' "$((left - 1))" > "$JG_FAKE_STATE/release-after"
       else
-        rm -f "$FM_FAKE_STATE/release-after"
-        printf 'false\n' > "$FM_FAKE_HERDR_RUNNING"
+        rm -f "$JG_FAKE_STATE/release-after"
+        printf 'false\n' > "$JG_FAKE_HERDR_RUNNING"
         running=false
       fi
     fi
     printf '{"server":{"running":%s,"socket":"%s","version":"0.9.0"},"client":{"version":"0.9.0"}}\n' \
-      "$running" "$FM_FAKE_HERDR_SOCKET"
+      "$running" "$JG_FAKE_HERDR_SOCKET"
     ;;
   "server stop --session "*)
-    if [ -f "$FM_FAKE_STATE/stop-ignored" ]; then
+    if [ -f "$JG_FAKE_STATE/stop-ignored" ]; then
       exit 0
-    elif [ -f "$FM_FAKE_STATE/stop-releases-after" ]; then
-      cp "$FM_FAKE_STATE/stop-releases-after" "$FM_FAKE_STATE/release-after"
+    elif [ -f "$JG_FAKE_STATE/stop-releases-after" ]; then
+      cp "$JG_FAKE_STATE/stop-releases-after" "$JG_FAKE_STATE/release-after"
     else
-      printf 'false\n' > "$FM_FAKE_HERDR_RUNNING"
+      printf 'false\n' > "$JG_FAKE_HERDR_RUNNING"
     fi
     ;;
   "server --session "*)
-    printf 'pid=%s session=%s\n' "$$" "${3:-}" > "$FM_FAKE_STATE/started"
+    printf 'pid=%s session=%s\n' "$$" "${3:-}" > "$JG_FAKE_STATE/started"
     ;;
 esac
 exit 0
@@ -121,8 +121,8 @@ hold_under() {
   rm -f "$fifo" "$pidfile"
   mkfifo "$fifo"
   eval "exec ${HOLDER_FD}<>\"\$fifo\""
-  ( export FM_HOLDER_JQ="$JQ" FM_HOLDER_FIFO="$fifo" FM_HOLDER_PIDFILE="$pidfile"
-    exec -a "$argv0" bash -c 'env -i FM_HOLDER=1 "$FM_HOLDER_JQ" . "$FM_HOLDER_FIFO" & printf "%s\n" "$!" > "$FM_HOLDER_PIDFILE"; wait' "$@" ) &
+  ( export JG_HOLDER_JQ="$JQ" JG_HOLDER_FIFO="$fifo" JG_HOLDER_PIDFILE="$pidfile"
+    exec -a "$argv0" bash -c 'env -i JG_HOLDER=1 "$JG_HOLDER_JQ" . "$JG_HOLDER_FIFO" & printf "%s\n" "$!" > "$JG_HOLDER_PIDFILE"; wait' "$@" ) &
   HOLDER_PIDS+=("$!")
   HOLDER_FD=$((HOLDER_FD + 1))
   local i=0
@@ -158,10 +158,10 @@ guard() { # [extra env assignments...]
   set +e
   GUARD_OUT=$(
     env -i PATH="$CASE_PATH" HOME="$TMP_ROOT" \
-      FM_FAKE_STATE="$CASE_STATE" FM_FAKE_HERDR_LOG="$CASE_LOG" FM_FAKE_HERDR_RUNNING="$CASE_RUNNING" \
-      FM_FAKE_SOCKET_OWNER="$CASE_OWNER" FM_FAKE_HERDR_SOCKET="$CASE_SOCKET" \
-      FM_HOLDER_JQ="$JQ" \
-      FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS=8 \
+      JG_FAKE_STATE="$CASE_STATE" JG_FAKE_HERDR_LOG="$CASE_LOG" JG_FAKE_HERDR_RUNNING="$CASE_RUNNING" \
+      JG_FAKE_SOCKET_OWNER="$CASE_OWNER" JG_FAKE_HERDR_SOCKET="$CASE_SOCKET" \
+      JG_HOLDER_JQ="$JQ" \
+      JG_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS=8 \
       "$@" "$GUARD" "$FAKE/herdr" "$SESSION" 2>&1
   )
   GUARD_RC=$?
@@ -186,14 +186,14 @@ assert_stop_before_start() {
 
 # Prove the holder construction on this host: the environment of a jq holder
 # must be readable, or every marker case would be vacuous.
-hold FM_PROBE_MARKER=1
+hold JG_PROBE_MARKER=1
 PROBE_PID=$HOLDER_PID
 sleep 0.2
 # shellcheck source=bin/jg-remote-herdr-owner-lib.sh
 . "$ROOT/bin/jg-remote-herdr-owner-lib.sh"
 probe_env=$(jg_remote_herdr_process_env "$PROBE_PID")
 case "$probe_env" in
-  *FM_PROBE_MARKER=1*) ;;
+  *JG_PROBE_MARKER=1*) ;;
   *) fail "this host does not expose a holder's environment (macOS hides platform-binary environments; jq at $JQ must be a non-platform binary): $probe_env" ;;
 esac
 pass "holder processes expose their environment to the owner library"
@@ -216,11 +216,11 @@ hold XPC_SERVICE_NAME=dev.firstmate.herdr.jg-remote
 BACKGROUND_PID=$HOLDER_PID
 hold XPC_SERVICE_NAME=0
 XPC_ZERO_PID=$HOLDER_PID
-hold FM_REMOTE_JOB_ACTIVE=1
+hold JG_REMOTE_JOB_ACTIVE=1
 WORKER_PID=$HOLDER_PID
 hold SSH_CONNECTION='100.102.217.78 51234 100.100.1.2 22' SSH_CLIENT='100.102.217.78 51234 22'
 SSH_PID=$HOLDER_PID
-hold FM_NOTHING_TO_SEE=1
+hold JG_NOTHING_TO_SEE=1
 UNMARKED_PID=$HOLDER_PID
 hold_under herdr --session "$SESSION" remote-client-bridge
 BRIDGE_CHILD_PID=$HOLDER_PID

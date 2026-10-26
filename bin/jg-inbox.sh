@@ -75,13 +75,13 @@
 # write rather than reaching for a value that belongs to another home. That
 # configuration is also the opt-in: `say` and `ask` are off until it exists.
 #
-#   config/inbox-region     FM_INBOX_REGION     AWS region.            required
-#   config/inbox-stt-model  FM_INBOX_STT_MODEL  speech-to-text model.  required by say
-#   config/inbox-ask-model  FM_INBOX_ASK_MODEL  side-question model.   required by ask
-#   config/inbox-profile    FM_INBOX_PROFILE    AWS profile.           optional
+#   config/inbox-region     JG_INBOX_REGION     AWS region.            required
+#   config/inbox-stt-model  JG_INBOX_STT_MODEL  speech-to-text model.  required by say
+#   config/inbox-ask-model  JG_INBOX_ASK_MODEL  side-question model.   required by ask
+#   config/inbox-profile    JG_INBOX_PROFILE    AWS profile.           optional
 #
 # An absent profile means the call uses whatever credentials are already in the
-# environment, which is also what FM_INBOX_PROFILE= (empty) forces.
+# environment, which is also what JG_INBOX_PROFILE= (empty) forces.
 #
 # `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain`
 # need NO configuration at all, because they make no model call. The voice
@@ -90,7 +90,7 @@
 # home already uses for other tools.
 #
 # Environment:
-#   FM_HOME              operational home whose state/ and data/ are used.
+#   JG_HOME              operational home whose state/ and data/ are used.
 #
 # PRIVACY: `say` sends your audio and `ask` sends your question to Bedrock.
 # `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain`
@@ -120,13 +120,13 @@ unset _extra
 export PATH
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="$(cd "$SELF_DIR/.." && pwd)"
-FM_HOME="${FM_HOME:-$FM_ROOT}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="$(cd "$SELF_DIR/.." && pwd)"
+JG_HOME="${JG_HOME:-$JG_ROOT}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 INBOX="$STATE/inbox"
 
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 die() { printf 'jg-inbox: %s\n' "$*" >&2; exit 1; }
 
@@ -157,29 +157,29 @@ require_setting() {  # <file-name> <env-var> <what>
   printf '%s' "$value"
 }
 
-REGION="${FM_INBOX_REGION:-}"
-STT_MODEL="${FM_INBOX_STT_MODEL:-}"
-ASK_MODEL="${FM_INBOX_ASK_MODEL:-}"
+REGION="${JG_INBOX_REGION:-}"
+STT_MODEL="${JG_INBOX_STT_MODEL:-}"
+ASK_MODEL="${JG_INBOX_ASK_MODEL:-}"
 # Unset falls through to config; explicitly empty means "use ambient credentials".
-PROFILE="${FM_INBOX_PROFILE-$(read_setting inbox-profile)}"
+PROFILE="${JG_INBOX_PROFILE-$(read_setting inbox-profile)}"
 
 # Resolved only by the subcommands that make a model call, so note, announce,
 # reply, receipts, ready, status, list and drain keep working in a home that
 # has configured nothing.
 need_region() {
-  [ -n "$REGION" ] || REGION=$(require_setting inbox-region FM_INBOX_REGION "AWS region")
+  [ -n "$REGION" ] || REGION=$(require_setting inbox-region JG_INBOX_REGION "AWS region")
 }
 
 need_stt_model() {
   need_region
   [ -n "$STT_MODEL" ] || STT_MODEL=$(require_setting inbox-stt-model \
-    FM_INBOX_STT_MODEL "speech-to-text model")
+    JG_INBOX_STT_MODEL "speech-to-text model")
 }
 
 need_ask_model() {
   need_region
   [ -n "$ASK_MODEL" ] || ASK_MODEL=$(require_setting inbox-ask-model \
-    FM_INBOX_ASK_MODEL "side-question model")
+    JG_INBOX_ASK_MODEL "side-question model")
 }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"; }
@@ -187,7 +187,7 @@ need() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 # The profile's credential_process (`ada`) costs a MEASURED ~1030ms on every
 # single call, which is about half the wall time of `say` and `ask`. If real
 # credentials are already in the environment, skip --profile entirely and let the
-# ambient ones win. Set FM_INBOX_PROFILE= (empty) to force that even without env
+# ambient ones win. Set JG_INBOX_PROFILE= (empty) to force that even without env
 # credentials present.
 aws_call() {
   if [ -z "$PROFILE" ] || [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
@@ -210,12 +210,12 @@ RECEIPTS_HANDLED_BOUND=20
 RECEIPTS_REPLIES_BOUND=20
 
 load_wake_lib() {
-  local lib="$FM_ROOT/bin/jg-wake-lib.sh"
-  [ "${FM_INBOX_WAKE_LIB:-}" = 1 ] && return 0
+  local lib="$JG_ROOT/bin/jg-wake-lib.sh"
+  [ "${JG_INBOX_WAKE_LIB:-}" = 1 ] && return 0
   [ -r "$lib" ] || return 1
   # shellcheck source=bin/jg-wake-lib.sh
-  FM_ROOT_OVERRIDE="$FM_ROOT" FM_HOME="$FM_HOME" STATE="$STATE" . "$lib"
-  FM_INBOX_WAKE_LIB=1
+  JG_ROOT_OVERRIDE="$JG_ROOT" JG_HOME="$JG_HOME" STATE="$STATE" . "$lib"
+  JG_INBOX_WAKE_LIB=1
 }
 
 need_python() {
@@ -340,7 +340,7 @@ PY
 # Returns 2 without waking when the note is no longer pending: firstmate has
 # already acknowledged it, so a wake would only spend a turn on an empty inbox.
 announce_note() {  # <id> <summary>
-  local id=$1 summary=$2 lib="$FM_ROOT/bin/jg-wake-lib.sh" status=0
+  local id=$1 summary=$2 lib="$JG_ROOT/bin/jg-wake-lib.sh" status=0
   if note_announced "$id"; then
     return 0
   fi
@@ -350,13 +350,13 @@ announce_note() {  # <id> <summary>
     return 1
   fi
   load_wake_lib || return 1
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
   if note_announced "$id"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   if [ ! -f "$INBOX/$id.note" ]; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 2
   fi
   if jg_wake_append_locked check "inbox:$id" "check: captain inbox note $id - $summary"; then
@@ -364,7 +364,7 @@ announce_note() {  # <id> <summary>
   else
     status=1
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
@@ -616,7 +616,7 @@ cmd_reply() {
   [ -n "${body//[[:space:]]/}" ] || die "refusing to record an empty reply"
   jg_question_flag_reply "$body"
   mkdir -p "$REPLIES"
-  load_wake_lib || die "the reply sequence needs $FM_ROOT/bin/jg-wake-lib.sh"
+  load_wake_lib || die "the reply sequence needs $JG_ROOT/bin/jg-wake-lib.sh"
   jg_lock_acquire_wait "$REPLY_SEQ_LOCK" || die "could not claim the reply sequence"
   if [ -f "$REPLIES/$id" ]; then
     jg_lock_release "$REPLY_SEQ_LOCK"
@@ -676,7 +676,7 @@ cmd_receipts() {
     esac
   done
   need_python
-  python3 - "$INBOX" "$ANNOUNCED_DIR" "$REPLIES" "$FM_HOME" \
+  python3 - "$INBOX" "$ANNOUNCED_DIR" "$REPLIES" "$JG_HOME" \
     "$RECEIPTS_PENDING_BOUND" "$RECEIPTS_HANDLED_BOUND" "$RECEIPTS_REPLIES_BOUND" \
     "$all_pending" "$all_handled" "$all_replies" "$after" \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" <<'PY'
@@ -861,9 +861,9 @@ cmd_ready() {
   local posture=unknown can_receive=unknown observed
   observed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   jg_session_lock_inspect "$STATE"
-  lock_state=$FM_LOCK_INSPECT_STATE
-  lock_pid=$FM_LOCK_INSPECT_PID
-  live_harness=$FM_LOCK_INSPECT_LIVE_HARNESS
+  lock_state=$JG_LOCK_INSPECT_STATE
+  lock_pid=$JG_LOCK_INSPECT_PID
+  live_harness=$JG_LOCK_INSPECT_LIVE_HARNESS
 
   if [ -e "$STATE/.afk" ]; then
     if command -v jg_afk_mode >/dev/null 2>&1; then
@@ -889,12 +889,12 @@ cmd_ready() {
   fi
 
   # The supervision model belongs to the INSPECTED home, not to whoever ran
-  # this command. An explicit FM_SUPERVISION_MODEL still wins; otherwise
+  # this command. An explicit JG_SUPERVISION_MODEL still wins; otherwise
   # classify the lock-holder pid through jg-harness.sh ancestry. No holder,
   # or a walk that names nothing, is honest unknown - never the caller's
   # own harness, and never a durable per-home model record.
   local resolved_model harness anc
-  resolved_model=${FM_SUPERVISION_MODEL:-}
+  resolved_model=${JG_SUPERVISION_MODEL:-}
   if [ -z "$resolved_model" ] && [ "$lock_state" = held ] && [ -n "$lock_pid" ]; then
     anc=$("$SELF_DIR/jg-harness.sh" ancestry "$lock_pid" 2>/dev/null || true)
     harness=${anc#* }
@@ -913,13 +913,13 @@ cmd_ready() {
     consumer_state=unknown
     consumer_reason="no-wake-lib"
   else
-    FM_SUPERVISION_MODEL=$resolved_model \
-      jg_watcher_supervision_verdict "$STATE" "$watch" "${FM_GUARD_GRACE:-300}" \
-        "$FM_HOME" "$FM_ROOT"
-    if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
+    JG_SUPERVISION_MODEL=$resolved_model \
+      jg_watcher_supervision_verdict "$STATE" "$watch" "${JG_GUARD_GRACE:-300}" \
+        "$JG_HOME" "$JG_ROOT"
+    if [ "$JG_WATCHER_VERDICT_OK" = true ]; then
       consumer_state=healthy
       consumer_reason="supervised"
-    elif [ "$FM_WATCHER_VERDICT_REASON" = no-watcher ]; then
+    elif [ "$JG_WATCHER_VERDICT_REASON" = no-watcher ]; then
       consumer_state=unknown
       consumer_reason="no-watcher"
     elif [ -e "$beat" ]; then
@@ -939,7 +939,7 @@ cmd_ready() {
 
   python3 - "$lock_state" "$lock_pid" "$live_harness" \
     "$consumer_state" "$consumer_reason" "$beacon_age" \
-    "$posture" "$can_receive" "$observed" "$FM_HOME" <<'PY'
+    "$posture" "$can_receive" "$observed" "$JG_HOME" <<'PY'
 import json, sys
 from pathlib import Path
 (lock_state, lock_pid, live_harness, consumer_state, consumer_reason,
@@ -1050,7 +1050,7 @@ cmd_status() {
   [ -d "$INBOX" ] && pending=$(find "$INBOX" -maxdepth 1 -name '*.note' 2>/dev/null | wc -l | tr -d ' ')
 
   printf '=== firstmate status (read-only, no wake sent) ===\n'
-  printf 'home     %s\n' "$FM_HOME"
+  printf 'home     %s\n' "$JG_HOME"
   printf 'time     %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'inbox    %s note(s) waiting for firstmate\n' "$pending"
 

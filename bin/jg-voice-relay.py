@@ -47,13 +47,13 @@ variable, and a missing one refuses with the path to write rather than reaching
 for a value that belongs to another home. That configuration is also the opt-in:
 an unconfigured home cannot start this relay at all.
 
-  config/voice-region   FM_VOICE_REGION   Bedrock region.        required
-  config/voice-model    FM_VOICE_MODEL    Nova Sonic model id.   required
-  config/voice-profile  FM_VOICE_PROFILE  AWS profile.           optional
-  config/voice-id       FM_VOICE_ID       output voice.          default matthew
+  config/voice-region   JG_VOICE_REGION   Bedrock region.        required
+  config/voice-model    JG_VOICE_MODEL    Nova Sonic model id.   required
+  config/voice-profile  JG_VOICE_PROFILE  AWS profile.           optional
+  config/voice-id       JG_VOICE_ID       output voice.          default matthew
 
 An absent profile means the relay uses only credentials that are already in its
-environment. An empty FM_VOICE_PROFILE, or an empty `--profile ""`, forces that
+environment. An empty JG_VOICE_PROFILE, or an empty `--profile ""`, forces that
 even when config/voice-profile exists.
 
 On choosing the model: the first-generation Nova Sonic model is marked legacy by
@@ -70,7 +70,7 @@ Options:
   --model <id>          Nova Sonic model id.         default from config
   --profile <name>      AWS profile.                 default from config
   --voice <id>          output voice.                default matthew
-  --home <dir>          firstmate home for records.  default $FM_HOME or this repo
+  --home <dir>          firstmate home for records.  default $JG_HOME or this repo
   --scope <name>        override the read scope for this run.
   --tail-ms <int>       silence appended on talk end. default 400
   --turn-timeout <sec>  how long --self-test waits.   default 40
@@ -100,10 +100,10 @@ import jg_voice_records as records          # noqa: E402
 # default. The region, the model and the profile do not; see CONFIGURATION above.
 VOICE = "matthew"
 SETTINGS = {
-    "region": ("voice-region", "FM_VOICE_REGION", "Bedrock region"),
-    "model": ("voice-model", "FM_VOICE_MODEL", "Nova Sonic model id"),
-    "profile": ("voice-profile", "FM_VOICE_PROFILE", "AWS profile"),
-    "voice": ("voice-id", "FM_VOICE_ID", "output voice"),
+    "region": ("voice-region", "JG_VOICE_REGION", "Bedrock region"),
+    "model": ("voice-model", "JG_VOICE_MODEL", "Nova Sonic model id"),
+    "profile": ("voice-profile", "JG_VOICE_PROFILE", "AWS profile"),
+    "voice": ("voice-id", "JG_VOICE_ID", "output voice"),
 }
 
 IN_RATE = 16000
@@ -288,7 +288,7 @@ def profile_credentials(profile, verbose=False):
     if not profile:
         raise CredentialError(
             "no credentials in the environment and no AWS profile configured: "
-            "write one into config/voice-profile, set FM_VOICE_PROFILE, or "
+            "write one into config/voice-profile, set JG_VOICE_PROFILE, or "
             "export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
     log(verbose, "exporting credentials from profile {}".format(profile))
     widen_path()
@@ -1177,16 +1177,16 @@ def parse_args(argv):
     parser.add_argument("--self-test", metavar="FILE")
     parser.add_argument("--region",
                         help="Bedrock region; required, from config/voice-region "
-                             "or FM_VOICE_REGION when not given here")
+                             "or JG_VOICE_REGION when not given here")
     parser.add_argument("--model",
                         help="Nova Sonic model id; required, from config/voice-model "
-                             "or FM_VOICE_MODEL when not given here")
+                             "or JG_VOICE_MODEL when not given here")
     parser.add_argument("--profile",
                         help="AWS profile; optional, from config/voice-profile or "
-                             "FM_VOICE_PROFILE, and empty means the credentials "
+                             "JG_VOICE_PROFILE, and empty means the credentials "
                              "already in the environment")
     parser.add_argument("--voice",
-                        help="output voice; from config/voice-id or FM_VOICE_ID, "
+                        help="output voice; from config/voice-id or JG_VOICE_ID, "
                              "default {}".format(VOICE))
     parser.add_argument("--home")
     parser.add_argument("--scope", choices=records.SCOPES)
@@ -1214,7 +1214,7 @@ def resolve_settings(options):
     if not options.model:
         options.model = records.require_setting(home, *SETTINGS["model"])
     if options.profile is None:
-        # Presence, not truthiness: an empty FM_VOICE_PROFILE is the captain
+        # Presence, not truthiness: an empty JG_VOICE_PROFILE is the captain
         # saying "use the credentials I already have" and must not fall through
         # to a configured profile, which is how jg-inbox.sh reads its own
         # equivalent and what docs/configuration.md promises for both. An empty

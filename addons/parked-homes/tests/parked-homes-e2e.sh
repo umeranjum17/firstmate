@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # parked-homes e2e: a fixture fleet of two secondmate homes, one parked, driven
 # through the real supervision producers. The parked home (home-b) must get no
 # message, steer, nudge, relaunch or config push, no pending-reply retry, no
@@ -99,8 +108,8 @@ META
 meta_for home-a 'sx-a'
 meta_for home-b 'sx-b'
 
-export FM_HOME=$P
-export FM_ADDONS_DIR=$addons
+export JG_HOME=$P
+export JG_ADDONS_DIR=$addons
 . "$addons/parked-homes/bin/jg-parked-homes-lib.sh"
 fork() { local script=$1; shift; "$FM/bin/$script" "$@"; }
 
@@ -133,7 +142,7 @@ fi
 
 # --- 3. restart pass: jg-secondmate-restart.sh --------------------------------
 before_a=$(find "$P/state/home-a.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
-out=$(FM_SECONDMATE_PERSIST_WAIT=1 FM_SECONDMATE_IDLE_WAIT=1 fork jg-secondmate-restart.sh home-a home-b 2>&1)
+out=$(JG_SECONDMATE_PERSIST_WAIT=1 JG_SECONDMATE_IDLE_WAIT=1 fork jg-secondmate-restart.sh home-a home-b 2>&1)
 has "restart pass names the parked skip" <(printf "%s" "$out") "parked: home-b"
 lacks "restart pass never reports home-b as restarted" <(printf "%s" "$out") "restarted: home-b"
 now_a=$(find "$P/state/home-a.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')
@@ -153,26 +162,26 @@ has "config push names the parked skip" <(printf "%s" "$out") "home-b: skipped -
 # --- 5. pending-reply retries: jg_pending_reply_tick --------------------------
 cat > "$work/recovery-hook.sh" <<'HOOK'
 #!/usr/bin/env bash
-printf '%s\n' "$1" >> "${FM_HOME:?}/state/recovery-hook.log"
+printf '%s\n' "$1" >> "${JG_HOME:?}/state/recovery-hook.log"
 exit 0
 HOOK
 chmod +x "$work/recovery-hook.sh"
-export FM_PENDING_REPLY_GRACE_SECS=1
-export FM_PENDING_REPLY_SEND_HOOK=$work/recovery-hook.sh
+export JG_PENDING_REPLY_GRACE_SECS=1
+export JG_PENDING_REPLY_SEND_HOOK=$work/recovery-hook.sh
 bash -c '
   . "$1/bin/jg-pending-reply-lib.sh"
-  c_a=$(jg_pending_reply_create "$FM_HOME" "$FM_HOME/state" home-a "please report") || exit 2
-  c_b=$(jg_pending_reply_create "$FM_HOME" "$FM_HOME/state" home-b "please report") || exit 2
-  jg_pending_reply_confirm_delivery "$FM_HOME/state" "$c_a" || exit 2
-  jg_pending_reply_confirm_delivery "$FM_HOME/state" "$c_b" || exit 2
+  c_a=$(jg_pending_reply_create "$JG_HOME" "$JG_HOME/state" home-a "please report") || exit 2
+  c_b=$(jg_pending_reply_create "$JG_HOME" "$JG_HOME/state" home-b "please report") || exit 2
+  jg_pending_reply_confirm_delivery "$JG_HOME/state" "$c_a" || exit 2
+  jg_pending_reply_confirm_delivery "$JG_HOME/state" "$c_b" || exit 2
   past=$(( $(date +%s) - 60 ))
-  jg_pending_reply_set "$(jg_pending_reply_path "$FM_HOME/state" "$c_a")" request_turn_completed_epoch "$past"
-  jg_pending_reply_set "$(jg_pending_reply_path "$FM_HOME/state" "$c_b")" request_turn_completed_epoch "$past"
+  jg_pending_reply_set "$(jg_pending_reply_path "$JG_HOME/state" "$c_a")" request_turn_completed_epoch "$past"
+  jg_pending_reply_set "$(jg_pending_reply_path "$JG_HOME/state" "$c_b")" request_turn_completed_epoch "$past"
 ' _ "$FM" || no "pending-reply fixture records could not be created"
-FM_WAKE_QUEUE=$P/state/.wake-queue FM_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock STATE=$P/state \
+JG_WAKE_QUEUE=$P/state/.wake-queue JG_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock STATE=$P/state \
   bash -c '
   . "$1/bin/jg-pending-reply-lib.sh"
-  jg_pending_reply_tick "$FM_HOME/state"
+  jg_pending_reply_tick "$JG_HOME/state"
 ' _ "$FM" || no "pending-reply tick failed"
 has "unparked record got its recovery resend" "$P/state/recovery-hook.log" "home-a"
 if grep -q "home-b" "$P/state/recovery-hook.log" 2>/dev/null; then
@@ -198,8 +207,8 @@ for id in home-a home-b; do
   printf '%s\t1\tcheck\tfixture-row\tstalled row for %s\n' "$row_epoch" "$id" >> "$work/$id/state/.wake-queue"
   printf '%s %s-1\n' "$((row_epoch - 120))" "$row_epoch" > "$P/state/.secondmate-wake-progress-$id"
 done
-FM_STATE_OVERRIDE=$P/state STATE=$P/state SECONDMATE_WAKE_STALL_SECS=60 FM_WAKE_QUEUE=$P/state/.wake-queue \
-  FM_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock bash -c '
+JG_STATE_OVERRIDE=$P/state STATE=$P/state SECONDMATE_WAKE_STALL_SECS=60 JG_WAKE_QUEUE=$P/state/.wake-queue \
+  JG_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock bash -c '
   . "$1/bin/jg-watch.sh"
   wake() { :; }
   secondmate_wake_stall_tick
@@ -240,8 +249,8 @@ backend=tmux
 home=$work/home-b
 META
 : > "$P/state/.wake-queue"
-FM_STATE_OVERRIDE=$P/state STATE=$P/state FM_WAKE_QUEUE=$P/state/.wake-queue \
-  FM_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock bash -c '
+JG_STATE_OVERRIDE=$P/state STATE=$P/state JG_WAKE_QUEUE=$P/state/.wake-queue \
+  JG_WAKE_QUEUE_LOCK=$P/state/.wake-queue.lock bash -c '
   . "$1/bin/jg-backend.sh"
   . "$1/bin/jg-busy-lib.sh"
   . "$1/bin/jg-wake-lib.sh"
@@ -271,10 +280,10 @@ for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-li
     'jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }' \
     'jg_backend_of_meta() { echo fixture; }' \
     'jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }' \
-    'jg_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }' \
+    'jg_backend_visible_capture() { [ -f "$JG_HOME/state/$2.screen" ] && cat "$JG_HOME/state/$2.screen"; return 0; }' \
     'jg_busy_classify_meta() { echo "idle no-busy-record"; }' \
     'jg_busy_record_read() { echo ""; }' \
-    'FM_QUOTA_ROW_JQ="def quota_lane(\$harness; \$model): \"\"; def quota_row(\$snapshot; \$provider; \$lane): null;"' \
+    'JG_QUOTA_ROW_JQ="def quota_lane(\$harness; \$model): \"\"; def quota_row(\$snapshot; \$provider; \$lane): null;"' \
     'jg_quota_json_valid() { jq -e ".schemaVersion == 5 and (.providers | type) == \"array\"" >/dev/null 2>&1; }' \
     'jg_quota_single_provider_for_harness() { return 1; }' \
     'jg_parent_channel_report() { printf "%s\n" "$3" >>"$1/state/parent-channel.log"; }' > "$Q/bin/$lib"
@@ -285,11 +294,11 @@ echo 'state: working · source: fixture'
 CS
 cat > "$Q/bin/jg-control.sh" <<'FC'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/jg-control.log"
+printf '%s\n' "$*" >>"$JG_HOME/state/jg-control.log"
 [ "${2:-}" = relaunch ] || exit 0
 id=${1:-}
-rm -f "$FM_HOME/state/$id.screen"
-date +%s >"$FM_HOME/state/$id.status"
+rm -f "$JG_HOME/state/$id.screen"
+date +%s >"$JG_HOME/state/$id.status"
 FC
 chmod +x "$Q/bin/jg-crew-state.sh" "$Q/bin/jg-control.sh"
 printf '#!/usr/bin/env bash\necho PONG\n' > "$Q/stub/opencode"
@@ -332,7 +341,7 @@ printf 'worktree=/x\n' > "$M-ship"        # no kind= line at all
 bash -c '
   set -u
   . "$1/parked-homes/bin/jg-parked-homes-lib.sh"
-  FM_CONFIG_OVERRIDE=$2   # the override IS the config directory (fork convention)
+  JG_CONFIG_OVERRIDE=$2   # the override IS the config directory (fork convention)
   jg_parked_meta "$3" t1 && echo parked || echo not-parked
   err=$(jg_parked_meta "$4" t2 2>&1)
   rc=$?

@@ -38,7 +38,7 @@ CORR2=7ab3e5dd13c9a993
 # (which decisions are open) rather than about the section's layout.
 drain_open() {  # <state> <out>
   local state=$1 out=$2
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$out" || fail "drain failed over $state"
+  JG_STATE_OVERRIDE="$state" "$DRAIN" > "$out" || fail "drain failed over $state"
   grep -F 'OPEN DECISIONS' "$out" >/dev/null || return 0
   cat "$out"
 }
@@ -415,9 +415,9 @@ test_incremental_and_whole_file_folds_agree_over_correlated_lines() {
   while [ "$round" -lt 6 ]; do
     printf 'needs-decision corr=%s [key=k%s]: decision %s\n' "$CORR" "$round" "$round" >> "$status"
     printf 'working corr=%s: routine progress %s\n' "$CORR2" "$round" >> "$status"
-    whole=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions "$2"' _ \
+    whole=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions "$2"' _ \
       "$ROOT/bin/jg-classify-lib.sh" "$status")
-    inc=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions_incremental "$2"' _ \
+    inc=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions_incremental "$2"' _ \
       "$ROOT/bin/jg-classify-lib.sh" "$status")
     [ "$whole" = "$inc" ] \
       || fail "folds disagreed after opening k$round: whole=[$whole] incremental=[$inc]"
@@ -435,9 +435,9 @@ test_incremental_and_whole_file_folds_agree_over_correlated_lines() {
   round=0
   while [ "$round" -lt 6 ]; do
     printf 'resolved corr=%s [key=k%s]: answered %s\n' "$CORR" "$round" "$round" >> "$status"
-    whole=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions "$2"' _ \
+    whole=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions "$2"' _ \
       "$ROOT/bin/jg-classify-lib.sh" "$status")
-    inc=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions_incremental "$2"' _ \
+    inc=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; status_open_decisions_incremental "$2"' _ \
       "$ROOT/bin/jg-classify-lib.sh" "$status")
     [ "$whole" = "$inc" ] \
       || fail "folds disagreed after closing k$round: whole=[$whole] incremental=[$inc]"
@@ -523,7 +523,7 @@ schema=jg-secondmate-parent.v1
 route=local
 parent_home=$parent
 EOF
-  FM_HOME="$mate" "$REPORT" "done" "$corr" "audit clean" \
+  JG_HOME="$mate" "$REPORT" "done" "$corr" "audit clean" \
     || fail "$REPORT failed writing a correlated report"
   helper_line=$(tail -1 "$state/pinned.status")
   status_line_at_epoch "$helper_line" >/dev/null || fail "report helper emitted no time"
@@ -533,7 +533,7 @@ EOF
   status_is_terminal_verb "$helper_line" \
     || fail "the helper's own line is not seen as a terminal captain verb"
 
-  FM_HOME="$mate" "$REPORT" --doc needs-decision "$corr" data/x/report.md "see the report" \
+  JG_HOME="$mate" "$REPORT" --doc needs-decision "$corr" data/x/report.md "see the report" \
     || fail "$REPORT failed writing a correlated doc-pointer report"
   helper_line=$(tail -1 "$state/pinned.status")
   status_line_at_epoch "$helper_line" >/dev/null || fail "doc report helper emitted no time"
@@ -665,7 +665,7 @@ test_optional_event_time() {
 
 test_captain_override_ignores_event_time() {
   local dir verb line event
-  local FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
+  local JG_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
   dir=$(make_case captain-override-time)
   for verb in 'done' needs-decision blocked failed; do
     for line in "$verb: audit complete" "$verb [at=1700000000]: audit complete" \
@@ -678,7 +678,7 @@ test_captain_override_ignores_event_time() {
       [ "$(cat "$dir/state/task.status")" = "$line" ] || fail "classification rewrote stored event"
     done
   done
-  FM_CAPTAIN_RE='done:'
+  JG_CAPTAIN_RE='done:'
   for line in 'blocked: waiting' 'blocked [at=1700000000]: waiting'; do
     status_is_captain_relevant "$line" && fail "override admitted excluded event: $line"
     printf '%s\n' "$line" > "$dir/state/task.status"
@@ -690,7 +690,7 @@ test_captain_override_ignores_event_time() {
       status_is_captain_relevant "$line" && fail "override bypassed nonterminal suppression: $line"
     done
   done
-  FM_CAPTAIN_RE='^custom-verb: audit complete$'
+  JG_CAPTAIN_RE='^custom-verb: audit complete$'
   for line in 'custom-verb: audit complete' 'custom-verb [at=1700000000]: audit complete' \
     'custom-verb [at=<epoch>]: audit complete'; do
     status_is_captain_relevant "$line" || fail "timestamp broke custom verb override: $line"
@@ -698,7 +698,7 @@ test_captain_override_ignores_event_time() {
     [ "$(last_status_line "$dir/state/task.status")" = "$line" ] \
       || fail "event scan skipped the stamped custom-verb event: $line"
   done
-  FM_CAPTAIN_RE="^done \\[corr=$CORR\\]: literal \\[at=1700000000\\]$"
+  JG_CAPTAIN_RE="^done \\[corr=$CORR\\]: literal \\[at=1700000000\\]$"
   for line in "done [corr=$CORR]: literal [at=1700000000]" \
     "done [at=1700000000] [corr=$CORR]: literal [at=1700000000]" \
     "done [corr=$CORR] [at=1700000000]: literal [at=1700000000]"; do
@@ -708,7 +708,7 @@ test_captain_override_ignores_event_time() {
 }
 
 # A malformed time tag is never read as a time: relevance, verb, and note all see
-# the same ordinary bytes, so a FM_CAPTAIN_RE override matching "<verb>:" does not
+# the same ordinary bytes, so a JG_CAPTAIN_RE override matching "<verb>:" does not
 # find a separator the line does not have, while the terminal-verb default still
 # surfaces the event.
 test_malformed_event_time_is_ordinary_bytes() {
@@ -739,13 +739,13 @@ test_malformed_event_time_is_ordinary_bytes() {
       # whether the supervisor sees a terminal event - including a readable
       # timestamp whose colons would otherwise swallow the head/note separator.
       (
-        FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
+        JG_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
         status_is_captain_relevant "$line" || exit 1
         exit 0
       ) || fail "override lost a terminal event to a malformed tag: $line"
       printf '%s\n' "$line" > "$dir/state/scan.status"
       (
-        FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
+        JG_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:'
         event=$(last_status_line "$dir/state/scan.status")
         [ "$event" = "$line" ] || exit 1
       ) || fail "event scan lost a terminal event to a malformed tag: $line"

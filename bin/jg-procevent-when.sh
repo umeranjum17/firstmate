@@ -53,7 +53,7 @@
 #            handled acknowledgements are never touched. Warns when the action
 #            had already fired without a captured outcome.
 # rebind-all Refresh the trust binding of every registered watch whose action
-#            executable lives under this repo (FM_ROOT), re-hashing it against
+#            executable lives under this repo (JG_ROOT), re-hashing it against
 #            its CURRENT on-disk bytes. A self-update fast-forwards bin/ in
 #            place, which changes those bytes with no tampering involved; left
 #            alone, the next fire is refused as not matching the registered
@@ -62,7 +62,7 @@
 #            existing spec and trust chain exactly as an ordinary fire would
 #            (a watch already broken for some other reason is reported, not
 #            silently patched over), and it never touches an action executable
-#            outside FM_ROOT: rebinding follows this repo's own tracked
+#            outside JG_ROOT: rebinding follows this repo's own tracked
 #            update, never an arbitrary swapped action. Idempotent: a watch
 #            whose action bytes already match its binding is left alone.
 # run        The blocking child the generic runner executes; never run it in a
@@ -91,10 +91,10 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-FM_ROOT_REAL=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || FM_ROOT_REAL=$FM_ROOT
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+JG_ROOT_REAL=$(cd "$JG_ROOT" 2>/dev/null && pwd -P) || JG_ROOT_REAL=$JG_ROOT
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -106,7 +106,7 @@ FM_ROOT_REAL=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || FM_ROOT_REAL=$FM_ROOT
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 
 WHEN_DIR="$STATE/when"
-OUTPUT_TAIL_BYTES=${FM_WHEN_OUTPUT_TAIL_BYTES:-8192}
+OUTPUT_TAIL_BYTES=${JG_WHEN_OUTPUT_TAIL_BYTES:-8192}
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
 usage() { sed -n '2,72p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -362,7 +362,7 @@ cmd_run() {
   fired=$(fired_file "$sid")
 
   if ! positive_int "$OUTPUT_TAIL_BYTES"; then
-    emit_doc "$sid" rejected "FM_WHEN_OUTPUT_TAIL_BYTES must be a positive integer; nothing was executed" 0 '' ''
+    emit_doc "$sid" rejected "JG_WHEN_OUTPUT_TAIL_BYTES must be a positive integer; nothing was executed" 0 '' ''
     exit 0
   fi
 
@@ -544,7 +544,7 @@ publish_spec() {
 }
 
 # rebind_one <source-id>: 0 = rebound, 1 = failed (reported to stderr), 2 =
-# unchanged or the action lives outside FM_ROOT (skipped, not an error).
+# unchanged or the action lives outside JG_ROOT (skipped, not an error).
 rebind_one() {
   local sid=$1 action_path action_hash device
   if ! jg_procevent_source_lock_acquire "$sid"; then
@@ -562,7 +562,7 @@ rebind_one() {
     return 1
   fi
   case "$action_path" in
-    "$FM_ROOT_REAL"/*) ;;
+    "$JG_ROOT_REAL"/*) ;;
     *) jg_procevent_source_lock_release "$sid"; return 2 ;;
   esac
   if ! action_hash=$(jg_pr_sha256 "$action_path"); then

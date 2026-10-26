@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End to end: install the delete, kill and read guards and this adapter into a throwaway HOME, then run commands the way
 # Codex 0.159 does (bash -lc '<snapshot wrapper>' ending in exec bash -c '<command>', BASH_ENV from config.toml).
 # Only this test's own sleep is signalled, and every command the guards must block is harmless if it ran.
 # shellcheck disable=SC2016 # the cases are literal commands
-set -euo pipefail; unset FM_TASK_ID FM_TASK_INBOX FM_HOME XDG_DATA_HOME CODEX_HOME
+set -euo pipefail; unset JG_TASK_ID JG_TASK_INBOX JG_HOME XDG_DATA_HOME CODEX_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P); ROOT=$(dirname "$ADDON")
 T=$(mktemp -d); SLEEP=
 trap '[ -z "$SLEEP" ] || kill "$SLEEP" 2>/dev/null || true; rm -rf -- "$T"' EXIT
@@ -26,7 +35,7 @@ ENV=$(python3 -c 'import sys, tomllib; c = tomllib.load(open(sys.argv[1], "rb"))
 as_codex() { # <command>: run it as Codex runs an agent command, from the worktree root; sets rc, out, err
   local wrapper
   wrapper=$(printf '__CODEX_SNAPSHOT_OVERRIDE_SET_0="${BASH_ENV+x}"\nexec bash -c %q' "$1")
-  rc=0; out=$(cd "$W" && HOME=$H BASH_ENV=$ENV FM_TASK_ID=codex-guard-test bash -lc "$wrapper" 2>"$T/err") || rc=$?; err=$(cat "$T/err")
+  rc=0; out=$(cd "$W" && HOME=$H BASH_ENV=$ENV JG_TASK_ID=codex-guard-test bash -lc "$wrapper" 2>"$T/err") || rc=$?; err=$(cat "$T/err")
 }
 blocked() { as_codex "$1"; [ "$rc" -eq 2 ] && [[ "$err" == *"$2"* && "$out" != *FIXTURE* ]] && ok "blocked: $1" || no "not blocked: $1 (rc=$rc) $out $err"; }
 

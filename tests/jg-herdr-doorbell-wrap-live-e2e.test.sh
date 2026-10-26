@@ -16,10 +16,10 @@
 # the operator's Claude configuration or credentials.
 # Every Herdr call is routed through bin/jg-herdr-lab.sh; HERDR_LAB_HELPER and
 # HERDR_LAB_SESSION select the helper and an already-named lab session.
-# FM_DOORBELL_WRAP_CODE_ROOT sources the libraries from another tree (for
+# JG_DOORBELL_WRAP_CODE_ROOT sources the libraries from another tree (for
 # example a pre-fix export) as a negative control.
 #
-# Run explicitly with FM_HERDR_DOORBELL_WRAP_LIVE=1.
+# Run explicitly with JG_HERDR_DOORBELL_WRAP_LIVE=1.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -27,12 +27,12 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
-CODE_ROOT=${FM_DOORBELL_WRAP_CODE_ROOT:-$ROOT}
+CODE_ROOT=${JG_DOORBELL_WRAP_CODE_ROOT:-$ROOT}
 
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
-jg_live_gate opt-in FM_HERDR_DOORBELL_WRAP_LIVE herdr jq claude
+jg_live_gate opt-in JG_HERDR_DOORBELL_WRAP_LIVE herdr jq claude
 
 [ -x "$LAB_HELPER" ] || fail "the Herdr lab helper is not executable at $LAB_HELPER"
 
@@ -130,11 +130,11 @@ line=$(jg_task_inbox_doorbell_line "$REC") || fail "could not render the doorbel
 width=$(printf '%s\n' "$screen" | awk '{ if (length($0) > w) w = length($0) } END { print w }')
 [ "${#line}" -gt "$width" ] || fail "the ${#line}-character doorbell fits the ${width}-column viewport, so it cannot prove a wrap"
 
-FM_TASK_INBOX_RING_REASON=
+JG_TASK_INBOX_RING_REASON=
 rc=0
 jg_task_inbox_ring herdr "$TARGET" "$REC" || rc=$?
 screen=$(lab pane read "$PANE" --source visible 2>/dev/null || true)
-[ "$rc" -eq 0 ] || fail "Claude Code ($VERSION) on $HERDR_VER: the wrapped doorbell ring returned $rc (reason: ${FM_TASK_INBOX_RING_REASON:-none reported}); viewport:"$'\n'"$screen"
+[ "$rc" -eq 0 ] || fail "Claude Code ($VERSION) on $HERDR_VER: the wrapped doorbell ring returned $rc (reason: ${JG_TASK_INBOX_RING_REASON:-none reported}); viewport:"$'\n'"$screen"
 printf '%s\n' "$screen" | grep -q 'Firstmate instruction waiting' \
   || fail "the rang doorbell is not on screen; viewport:"$'\n'"$screen"
 left=unknown

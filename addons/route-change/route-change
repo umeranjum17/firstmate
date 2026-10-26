@@ -42,14 +42,14 @@ dry=0
 [ "${1:-}" = --dry-run ] && { dry=1; shift; }
 [ $# -eq 2 ] || die "usage: route-change [--dry-run] <jg-home> <route>"
 [ -d "$1/config" ] && [ -d "$1/state" ] || die "$1 is not a firstmate home (no config/ or state/)"
-FM_HOME=$(cd "$1" && pwd) route=$2
-CONFIG=$FM_HOME/config STATE=$FM_HOME/state
+JG_HOME=$(cd "$1" && pwd) route=$2
+CONFIG=$JG_HOME/config STATE=$JG_HOME/state
 DISPATCH=$CONFIG/crew-dispatch.json
 NM=${NM_CONFIG:-$HOME/.no-mistakes/config.yaml}
 [ -f "$DISPATCH" ] || die "no $DISPATCH"
 [ -f "$NM" ] || die "no no-mistakes config at $NM"
 # shellcheck source=/dev/null
-. "$FM_HOME/bin/jg-quota-axi-lib.sh" || die "cannot load $FM_HOME/bin/jg-quota-axi-lib.sh"
+. "$JG_HOME/bin/jg-quota-axi-lib.sh" || die "cannot load $JG_HOME/bin/jg-quota-axi-lib.sh"
 
 exec 9>"$STATE/.quota-failover.lock" && flock -w 120 9 || die "quota-failover holds its lock; try again"
 
@@ -80,7 +80,7 @@ quota=$(quota-axi --json --no-credential-refresh --max-age "${ROUTE_CHANGE_MAX_A
   && jg_quota_json_valid <<<"$quota" || die "quota-axi gave no reading: $(head -c 300 "$tmp/err")"
 # Scope matching is quota-failover's exhausted(): the model's bare name against
 # a model: or product: scope, and the account-wide scopes.
-why=$(jq -r --arg p "$provider" --arg m "$route" "$FM_QUOTA_ROW_JQ"'
+why=$(jq -r --arg p "$provider" --arg m "$route" "$JG_QUOTA_ROW_JQ"'
   ($m | split("/") | last) as $b
   | [(quota_row(.; $p; quota_lane("pi"; $m)) // {}).quotaSemantics.effectiveAvailability[]?
     | select(.runway.status == "exhausted_now") | .scope as $s

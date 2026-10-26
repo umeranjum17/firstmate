@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Shared "what belongs in Recently Landed" rule.
-# Usage: . bin/jg-landed-lib.sh; splice "$FM_LANDED_JQ_DEFS" ahead of a jq
+# Usage: . bin/jg-landed-lib.sh; splice "$JG_LANDED_JQ_DEFS" ahead of a jq
 # program, then select backlog rows with `landed_record`.
 #
 # ONE OWNER for the landed selector. Recently Landed is assembled from two
@@ -39,7 +39,7 @@
 # tests/jg-bearings-snapshot.test.sh covers both fresh and cached v1 summaries.
 
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-FM_LANDED_JQ_DEFS='
+JG_LANDED_JQ_DEFS='
   def scout_report:
     .kind == "scout"
     and (.report_path // null) != null;

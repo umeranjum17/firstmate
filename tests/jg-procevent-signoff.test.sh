@@ -25,8 +25,8 @@ mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
 FAKEBIN="$TMP_ROOT/fakebin"
-FM_HOME_DIR="$TMP_ROOT/fmhome"
-mkdir -p "$FAKEBIN" "$FM_HOME_DIR/state"
+JG_HOME_DIR="$TMP_ROOT/fmhome"
+mkdir -p "$FAKEBIN" "$JG_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \
   INTAKE_LOG="$TMP_ROOT/intake.log" INTAKE_RC="$TMP_ROOT/intake.rc"
 printf '{}\n' > "$SIGNOFF_BOARD"
@@ -79,14 +79,14 @@ SH
 chmod +x "$ROOTCOPY/bin/jg-captain-hold.sh"
 
 adapter() {
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+    JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/jg-procevent-signoff.sh" "$@"
 }
 
 runner() {
-  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+    JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/jg-procevent.sh" "$@"
 }
 
@@ -97,7 +97,7 @@ answer_card() {  # <key> <answer> <at>
     "$SIGNOFF_BOARD" > "$SIGNOFF_BOARD.tmp" && mv "$SIGNOFF_BOARD.tmp" "$SIGNOFF_BOARD"
 }
 
-delivered() { cat "$FM_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
+delivered() { cat "$JG_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
 
 runner register signoff signoff -- "$ROOTCOPY/bin/jg-procevent-signoff.sh" poll >/dev/null 2>&1 \
   || fail "could not register the sign-off source for the runner"
@@ -118,7 +118,7 @@ out=$(adapter poll 2>/dev/null) || fail "poll found no answer for the re-held ta
   || fail "poll offered the earlier card's answer: $out"
 pass "a task held again after an answered card gets a live card of its own"
 
-rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
+rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$JG_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
 hold_as '2026-10-12T12:00:00Z#0'
 adapter raise T2 'Ship T2' 'needs a call' "done" >/dev/null 2>&1 || fail "hold T2 raised no card"
@@ -155,8 +155,8 @@ if command -v sign-off-axi >/dev/null 2>&1; then
   ln -s "$real_signoff" "$TMP_ROOT/realbin/sign-off-axi"
   hold_as '2026-10-12T13:00:00Z#0'
   # The tool is armed by the source file alone; $HOME is the throwaway one, so its default board is private.
-  PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  PATH="$TMP_ROOT/realbin:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+    JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/jg-procevent-signoff.sh" raise live 'Live contract' \
     'Does the live contract hold up? More detail follows.' 'done' >/dev/null 2>"$TMP_ROOT/real-stderr" \
     || fail "the installed sign-off-axi refused the card: $(cat "$TMP_ROOT/real-stderr")"
@@ -165,8 +165,8 @@ if command -v sign-off-axi >/dev/null 2>&1; then
   pass "the installed sign-off-axi accepts the card a hold raises"
 
   raise_live() {  # <task-id> <reason>
-    PATH="$TMP_ROOT/realbin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-      FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+    PATH="$TMP_ROOT/realbin:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+      JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
       "$ROOTCOPY/bin/jg-procevent-signoff.sh" raise "$1" 'Live task' "$2" 'done' >/dev/null 2>"$TMP_ROOT/real-stderr"
   }
   card_titled() { jq -e --arg t "$1" '[.. | objects | select(.title? == $t)] | length > 0' "$HOME/.sign-off/decisions.json" >/dev/null; }
@@ -192,8 +192,8 @@ cat > "$TMP_ROOT/refusebin-sign-off-axi" <<'SH'
 echo 'error: --why is required'; exit 1
 SH
 mkdir -p "$TMP_ROOT/refusebin"; mv "$TMP_ROOT/refusebin-sign-off-axi" "$TMP_ROOT/refusebin/sign-off-axi"; chmod +x "$TMP_ROOT/refusebin/sign-off-axi"
-out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-  FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+out=$(PATH="$TMP_ROOT/refusebin:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+  JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
   "$ROOTCOPY/bin/jg-procevent-signoff.sh" raise T9 'Ship T9' 'needs a call' 'done' 2>&1) \
   && fail "a refused raise exited zero"
 case "$out" in *"--why is required"*) : ;; *) fail "the refusal text was lost: $out" ;; esac
@@ -203,8 +203,8 @@ cat > "$TMP_ROOT/refusebin/sign-off-axi" <<'SH'
 #!/usr/bin/env bash
 echo 'error: key already holds a different question'; exit 1
 SH
-out=$(PATH="$TMP_ROOT/refusebin:$PATH" FM_ROOT_OVERRIDE="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-  FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+out=$(PATH="$TMP_ROOT/refusebin:$PATH" JG_ROOT_OVERRIDE="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+  JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
   "$ROOTCOPY/bin/jg-procevent-signoff.sh" raise T9 'Ship T9' 'Changed reason?' 'done' 2>&1) \
   || fail "a re-raise of an existing card with a changed question exited nonzero: $out"
 case "$out" in *"already exists with another question"*) : ;; *) fail "the kept card was not reported: $out" ;; esac
@@ -230,8 +230,8 @@ else
   printf '# Backlog\n\n## Backlog\n\n## In flight\n\n## Done\n' > "$md_home/data/backlog.md"
   printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$md_home/.tasks.toml"
   md_env() {
-    PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$md_home" FM_STATE_OVERRIDE="$md_home/state" \
-      FM_DATA_OVERRIDE="$md_home/data" FM_CONFIG_OVERRIDE="$md_home/config" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/md-claims" "$@"
+    PATH="$FAKEBIN:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$md_home" JG_STATE_OVERRIDE="$md_home/state" \
+      JG_DATA_OVERRIDE="$md_home/data" JG_CONFIG_OVERRIDE="$md_home/config" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/md-claims" "$@"
   }
   md_env "$ROOT/bin/jg-procevent-signoff.sh" arm >/dev/null || fail "the markdown home did not arm the sign-off adapter"
   (cd "$md_home" && BEADS_ACTOR=fixture tasks-axi add jg-sample-refused "Refused card") >/dev/null 2>&1 \
@@ -296,9 +296,9 @@ EOF
 real_env() {  # <home> <command args...>; the real adapter, hold, runner and intake
   local home=$1
   shift
-  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
+  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
 }
 
 jg_fake_exit0 "$FAKEBIN" tmux treehouse no-mistakes gh gh-axi

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # limit-prompt-move live proof: the INSTALLED limit-prompt-move runs against a real tmux pane that shows a
 # captured Claude usage-limit menu (tests/weekly-limit-menu.screen). The pane reads one key like Claude's menu
 # does; jg-control is a stub that sends the interrupt as a real Escape key to that pane and records the
@@ -12,7 +21,7 @@ sock=lpm-live-$$
 trap 'tmux -L "$sock" kill-server 2>/dev/null || true; rm -rf -- "$tmp"' EXIT
 home=$tmp/home S=$tmp/home/state
 mkdir -p "$S" "$home/config" "$home/bin" "$tmp/pool/pa_most_room"
-export TMUX_SOCK=$sock FM_HOME=$home
+export TMUX_SOCK=$sock JG_HOME=$home
 printf '#!/bin/sh\n' >"$home/bin/jg-check-register.sh"; chmod +x "$home/bin/jg-check-register.sh"
 printf 'jg_run_timed() { shift; "$@"; }\n' >"$home/bin/jg-timeout-lib.sh"
 cat >"$home/bin/jg-backend.sh" <<'LIB'
@@ -23,8 +32,8 @@ LIB
 cat >"$home/bin/jg-control.sh" <<'CTL'
 #!/usr/bin/env bash
 case $2 in
-  interrupt) tmux -L "$TMUX_SOCK" send-keys -t lead Escape; echo "jg-control $1 interrupt: sent key Escape to the pane" >>"$FM_HOME/state/control.log" ;;
-  relaunch) echo "jg-control $1 relaunch --account $4" >>"$FM_HOME/state/control.log"; cp "$6" "$FM_HOME/state/note"; echo "$4" >"$FM_HOME/state/relaunched"; printf "account=%s\nspawn_gen=s2\n" "$4" >>"$FM_HOME/state/$1.meta" ;;
+  interrupt) tmux -L "$TMUX_SOCK" send-keys -t lead Escape; echo "jg-control $1 interrupt: sent key Escape to the pane" >>"$JG_HOME/state/control.log" ;;
+  relaunch) echo "jg-control $1 relaunch --account $4" >>"$JG_HOME/state/control.log"; cp "$6" "$JG_HOME/state/note"; echo "$4" >"$JG_HOME/state/relaunched"; printf "account=%s\nspawn_gen=s2\n" "$4" >>"$JG_HOME/state/$1.meta" ;;
 esac
 CTL
 chmod +x "$home/bin/jg-control.sh"

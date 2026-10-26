@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 command -v npm >/dev/null 2>&1 || { echo "skip: Pi extension typecheck prerequisite not found: npm"; exit 0; }
 command -v tsc >/dev/null 2>&1 || { echo "skip: Pi extension typecheck prerequisite not found: tsc"; exit 0; }
 
-PI_PACKAGE_DIR=${FM_PI_PACKAGE_DIR:-"$(npm root -g)/@earendil-works/pi-coding-agent"}
+PI_PACKAGE_DIR=${JG_PI_PACKAGE_DIR:-"$(npm root -g)/@earendil-works/pi-coding-agent"}
 if [ ! -f "$PI_PACKAGE_DIR/package.json" ]; then
   echo "skip: Pi extension typecheck prerequisite not found: installed @earendil-works/pi-coding-agent package"
   exit 0

@@ -105,26 +105,26 @@
 # jg_backend_required_tools only when cmux is the resolved backend; this adapter
 # also gates them again before spawning.
 
-# FM_HOME fallback: every real caller already sets FM_HOME as a global before
+# JG_HOME fallback: every real caller already sets JG_HOME as a global before
 # sourcing jg-backend.sh (which sources this file); this exists only so this
 # file's own unit tests, which source it directly, resolve sanely. Mirrors
 # bin/backends/zellij.sh's identical fallback.
-FM_BACKEND_CMUX_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_CMUX_ROOT}}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_BACKEND_CMUX_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-${JG_ROOT:-$JG_BACKEND_CMUX_ROOT}}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # shellcheck source=bin/jg-backend-hometag-lib.sh
-. "$FM_BACKEND_CMUX_ROOT/bin/jg-backend-hometag-lib.sh"
+. "$JG_BACKEND_CMUX_ROOT/bin/jg-backend-hometag-lib.sh"
 
 # Shared composer-content classifier (empty|pending|unknown, and the fleet-wide
 # dead-shell-vs-agent-composer rule). Owned by bin/jg-composer-lib.sh, reused by
 # every backend so the decision cannot drift.
 # shellcheck source=bin/jg-composer-lib.sh
-. "$FM_BACKEND_CMUX_ROOT/bin/jg-composer-lib.sh"
+. "$JG_BACKEND_CMUX_ROOT/bin/jg-composer-lib.sh"
 
 # Verified minimum: the version the live pass ran against (docs/cmux-backend.md).
-FM_BACKEND_CMUX_MIN_MAJOR=0
-FM_BACKEND_CMUX_MIN_MINOR=64
+JG_BACKEND_CMUX_MIN_MAJOR=0
+JG_BACKEND_CMUX_MIN_MINOR=64
 
 # jg_backend_cmux_bin: resolve the cmux CLI binary. cmux does not reliably
 # land on PATH after a plain app install - it ships an OPTIONAL "install CLI"
@@ -132,21 +132,21 @@ FM_BACKEND_CMUX_MIN_MINOR=64
 # /usr/local/bin/cmux -> the bundled binary) that a fresh install has not
 # necessarily run. Prefer PATH (respects an operator's own setup, e.g. after
 # running that install action), fall back to the well-known bundle path.
-FM_BACKEND_CMUX_BUNDLE_BIN="${FM_BACKEND_CMUX_BUNDLE_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
+JG_BACKEND_CMUX_BUNDLE_BIN="${JG_BACKEND_CMUX_BUNDLE_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
 jg_backend_cmux_bin() {
   if command -v cmux >/dev/null 2>&1; then
     printf 'cmux'
     return 0
   fi
-  if [ -x "$FM_BACKEND_CMUX_BUNDLE_BIN" ]; then
-    printf '%s' "$FM_BACKEND_CMUX_BUNDLE_BIN"
+  if [ -x "$JG_BACKEND_CMUX_BUNDLE_BIN" ]; then
+    printf '%s' "$JG_BACKEND_CMUX_BUNDLE_BIN"
     return 0
   fi
   return 1
 }
 
 jg_backend_cmux_tool_check() {
-  jg_backend_cmux_bin >/dev/null 2>&1 || { echo "error: backend=cmux selected but the 'cmux' CLI was not found on PATH or at $FM_BACKEND_CMUX_BUNDLE_BIN (https://cmux.com)" >&2; return 1; }
+  jg_backend_cmux_bin >/dev/null 2>&1 || { echo "error: backend=cmux selected but the 'cmux' CLI was not found on PATH or at $JG_BACKEND_CMUX_BUNDLE_BIN (https://cmux.com)" >&2; return 1; }
   command -v jq >/dev/null 2>&1 || { echo "error: backend=cmux selected but 'jq' is not installed (required to parse cmux's JSON output)" >&2; return 1; }
   return 0
 }
@@ -158,7 +158,7 @@ jg_backend_cmux_tool_check() {
 # Never overrides an operator's own ambient CMUX_SOCKET_PASSWORD when the file
 # is absent - jg_backend_cmux_cli only exports this when it resolves non-empty.
 jg_backend_cmux_password() {
-  local config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" f line
+  local config_dir="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" f line
   f="$config_dir/cmux-socket-password"
   [ -f "$f" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
@@ -204,8 +204,8 @@ jg_backend_cmux_version_check() {
   minor=${rest%%.*}
   case "$major" in ''|*[!0-9]*) major=0 ;; esac
   case "$minor" in ''|*[!0-9]*) minor=0 ;; esac
-  if [ "$major" -lt "$FM_BACKEND_CMUX_MIN_MAJOR" ] || { [ "$major" -eq "$FM_BACKEND_CMUX_MIN_MAJOR" ] && [ "$minor" -lt "$FM_BACKEND_CMUX_MIN_MINOR" ]; }; then
-    echo "error: cmux $ver is older than the verified minimum $FM_BACKEND_CMUX_MIN_MAJOR.$FM_BACKEND_CMUX_MIN_MINOR; update cmux before using backend=cmux" >&2
+  if [ "$major" -lt "$JG_BACKEND_CMUX_MIN_MAJOR" ] || { [ "$major" -eq "$JG_BACKEND_CMUX_MIN_MAJOR" ] && [ "$minor" -lt "$JG_BACKEND_CMUX_MIN_MINOR" ]; }; then
+    echo "error: cmux $ver is older than the verified minimum $JG_BACKEND_CMUX_MIN_MAJOR.$JG_BACKEND_CMUX_MIN_MINOR; update cmux before using backend=cmux" >&2
     return 1
   fi
   return 0
@@ -305,7 +305,7 @@ jg_backend_cmux_container_ensure() {
 }
 
 # jg_backend_cmux_home_label: readable home prefix plus a short hash of the
-# resolved FM_ROOT path. cmux has one app-global workspace namespace, so the
+# resolved JG_ROOT path. cmux has one app-global workspace namespace, so the
 # path hash distinguishes every firstmate installation, including multiple
 # primary homes. Moving an installation changes this tag and old cmux titles
 # stop matching; task meta already records absolute worktree paths, so repo
@@ -373,12 +373,12 @@ jg_backend_cmux_create_task() {  # <label> <cwd>
 
 # jg_backend_cmux_parse_target: split "<workspace_uuid>:<surface_uuid>" on the
 # FIRST colon (neither UUID contains a colon, so this is unambiguous). Sets
-# FM_BACKEND_CMUX_WORKSPACE and FM_BACKEND_CMUX_SURFACE for the caller.
+# JG_BACKEND_CMUX_WORKSPACE and JG_BACKEND_CMUX_SURFACE for the caller.
 jg_backend_cmux_parse_target() {  # <target>
   local target=$1
-  FM_BACKEND_CMUX_WORKSPACE=${target%%:*}
-  FM_BACKEND_CMUX_SURFACE=${target#*:}
-  [ -n "$FM_BACKEND_CMUX_WORKSPACE" ] && [ -n "$FM_BACKEND_CMUX_SURFACE" ] && [ "$FM_BACKEND_CMUX_SURFACE" != "$target" ]
+  JG_BACKEND_CMUX_WORKSPACE=${target%%:*}
+  JG_BACKEND_CMUX_SURFACE=${target#*:}
+  [ -n "$JG_BACKEND_CMUX_WORKSPACE" ] && [ -n "$JG_BACKEND_CMUX_SURFACE" ] && [ "$JG_BACKEND_CMUX_SURFACE" != "$target" ]
 }
 
 # jg_backend_cmux_surface_exists: does <surface_id> currently appear as one of
@@ -414,10 +414,10 @@ jg_backend_cmux_target_ready() {  # <target> [expected-label]
   jg_backend_cmux_parse_target "$1" || return 1
   if [ -n "$expected_label" ]; then
     expected_title=$(jg_backend_cmux_scoped_title "$expected_label")
-    title=$(jg_backend_cmux_cli workspace list --json --id-format uuids 2>/dev/null | jq -r --arg id "$FM_BACKEND_CMUX_WORKSPACE" '.workspaces[]? | select(.id == $id) | .title' 2>/dev/null)
+    title=$(jg_backend_cmux_cli workspace list --json --id-format uuids 2>/dev/null | jq -r --arg id "$JG_BACKEND_CMUX_WORKSPACE" '.workspaces[]? | select(.id == $id) | .title' 2>/dev/null)
     if [ "$title" = "$expected_title" ]; then
-      jg_backend_cmux_surface_exists "$FM_BACKEND_CMUX_WORKSPACE" "$FM_BACKEND_CMUX_SURFACE" && return 0
-      wsid=$FM_BACKEND_CMUX_WORKSPACE
+      jg_backend_cmux_surface_exists "$JG_BACKEND_CMUX_WORKSPACE" "$JG_BACKEND_CMUX_SURFACE" && return 0
+      wsid=$JG_BACKEND_CMUX_WORKSPACE
     elif [ -n "$title" ]; then
       return 1
     else
@@ -426,11 +426,11 @@ jg_backend_cmux_target_ready() {  # <target> [expected-label]
     fi
     sfid=$(jg_backend_cmux_surface_id_for_workspace "$wsid")
     [ -n "$sfid" ] || return 1
-    FM_BACKEND_CMUX_WORKSPACE=$wsid
-    FM_BACKEND_CMUX_SURFACE=$sfid
+    JG_BACKEND_CMUX_WORKSPACE=$wsid
+    JG_BACKEND_CMUX_SURFACE=$sfid
     return 0
   fi
-  jg_backend_cmux_surface_exists "$FM_BACKEND_CMUX_WORKSPACE" "$FM_BACKEND_CMUX_SURFACE"
+  jg_backend_cmux_surface_exists "$JG_BACKEND_CMUX_WORKSPACE" "$JG_BACKEND_CMUX_SURFACE"
 }
 
 # jg_backend_cmux_current_path: the live foreground process's cwd, or empty on
@@ -448,7 +448,7 @@ jg_backend_cmux_target_ready() {  # <target> [expected-label]
 # submitted via send_text_line), briefly settle, then capture and read only
 # that marker line. Scoped to jg-spawn.sh's own worktree-discovery poll loop.
 jg_backend_cmux_current_path() {  # <target> [expected-label]
-  local target=$1 expected_label=${2:-} out line marker_begin="__FM_CMUX_CWD_BEGIN__" marker_end="__FM_CMUX_CWD_END__" in_block=0 chunk="" last=""
+  local target=$1 expected_label=${2:-} out line marker_begin="__JG_CMUX_CWD_BEGIN__" marker_end="__JG_CMUX_CWD_END__" in_block=0 chunk="" last=""
   jg_backend_cmux_target_ready "$target" "$expected_label" || return 0
   jg_backend_cmux_send_text_line "$target" "printf '%s\n' '$marker_begin'; pwd; printf '%s\n' '$marker_end'" "$expected_label" || return 0
   sleep 0.3
@@ -476,7 +476,7 @@ EOF
 # auto-submit, matching every other backend's contract exactly.
 jg_backend_cmux_send_literal() {  # <target> <text> [expected-label]
   jg_backend_cmux_target_ready "$1" "${3:-}" || return 1
-  jg_backend_cmux_cli send --workspace "$FM_BACKEND_CMUX_WORKSPACE" --surface "$FM_BACKEND_CMUX_SURFACE" -- "$2" >/dev/null 2>&1
+  jg_backend_cmux_cli send --workspace "$JG_BACKEND_CMUX_WORKSPACE" --surface "$JG_BACKEND_CMUX_SURFACE" -- "$2" >/dev/null 2>&1
 }
 
 # jg_backend_cmux_normalize_key: map firstmate's key vocabulary (Enter,
@@ -503,7 +503,7 @@ jg_backend_cmux_send_key() {  # <target> <key> [expected-label]
   jg_backend_cmux_target_ready "$1" "${3:-}" || return 1
   local key
   key=$(jg_backend_cmux_normalize_key "$2")
-  jg_backend_cmux_cli send-key --workspace "$FM_BACKEND_CMUX_WORKSPACE" --surface "$FM_BACKEND_CMUX_SURFACE" "$key" >/dev/null 2>&1
+  jg_backend_cmux_cli send-key --workspace "$JG_BACKEND_CMUX_WORKSPACE" --surface "$JG_BACKEND_CMUX_SURFACE" "$key" >/dev/null 2>&1
 }
 
 # jg_backend_cmux_send_text_line: send one line of TEXT then submit.
@@ -517,7 +517,7 @@ jg_backend_cmux_send_text_line() {  # <target> <text> [expected-label]
 # jg_backend_cmux_capture: bounded plain-text surface capture. `--scrollback`
 # is this adapter's explicit opt-in to history, so the result can include
 # lines that have scrolled out of view - it is not a viewport read, and no
-# viewport-only primitive is offered for cmux (see FM_BACKEND_VISIBLE_CAPTURE in
+# viewport-only primitive is offered for cmux (see JG_BACKEND_VISIBLE_CAPTURE in
 # bin/jg-backend.sh). Finding #3's viewport-height cap was observed on
 # read-screen calls; whether a call WITHOUT --scrollback is strictly bounded to
 # the viewport is plausible but has not been live-verified. No herdr-style
@@ -530,7 +530,7 @@ jg_backend_cmux_capture() {  # <target> <lines> [expected-label]
   case "$lines" in ''|*[!0-9]*) lines=200 ;; esac
   fetch=$lines
   case "$fetch" in ''|*[!0-9]*) fetch=200 ;; *) [ "$fetch" -ge 200 ] || fetch=200 ;; esac
-  raw=$(jg_backend_cmux_cli read-screen --workspace "$FM_BACKEND_CMUX_WORKSPACE" --surface "$FM_BACKEND_CMUX_SURFACE" --scrollback --lines "$fetch" --json 2>/dev/null) || return 1
+  raw=$(jg_backend_cmux_cli read-screen --workspace "$JG_BACKEND_CMUX_WORKSPACE" --surface "$JG_BACKEND_CMUX_SURFACE" --scrollback --lines "$fetch" --json 2>/dev/null) || return 1
   out=$(printf '%s' "$raw" | jq -r '.text // empty' 2>/dev/null) || return 1
   printf '%s' "$out" | tail -n "$lines"
 }
@@ -542,13 +542,13 @@ jg_backend_cmux_capture() {  # <target> <lines> [expected-label]
 # shared classifier then degrades a glyph row carrying trailing text to
 # `unknown` instead of misreading an idle suggestion as unsent input.
 jg_backend_cmux_composer_capture() {  # <target> [expected-label]
-  jg_backend_cmux_capture "$1" "$FM_COMPOSER_CAPTURE_LINES" "${2:-}"
+  jg_backend_cmux_capture "$1" "$JG_COMPOSER_CAPTURE_LINES" "${2:-}"
 }
 
 # jg_backend_cmux_composer_caps: static capability facts, not logic (see the
 # capability model in bin/jg-composer-lib.sh).
 jg_backend_cmux_composer_caps() {
-  printf 'styled=0\ncursor=0\nidentity=0\nrows=%s\n' "$FM_COMPOSER_CAPTURE_LINES"
+  printf 'styled=0\ncursor=0\nidentity=0\nrows=%s\n' "$JG_COMPOSER_CAPTURE_LINES"
 }
 
 # jg_backend_cmux_composer_state: thin adapter - capture plus capabilities in,
@@ -624,7 +624,7 @@ jg_backend_cmux_kill() {  # <target> [unused] [expected-label]
   else
     jg_backend_cmux_parse_target "$1" || return 0
   fi
-  wsid=$FM_BACKEND_CMUX_WORKSPACE
+  wsid=$JG_BACKEND_CMUX_WORKSPACE
   wininfo=$(jg_backend_cmux_window_of_workspace "$wsid")
   win=${wininfo%% *}
   count=${wininfo##* }

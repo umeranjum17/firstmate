@@ -11,7 +11,7 @@ set -u
 # tests/lib.sh, so exempt them from the gate-lifecycle refusal here too (see
 # tests/lib.sh and bin/jg-gate-refuse-lib.sh for why firstmate's own suite,
 # which the no-mistakes gate runs from a gate worktree, must be exempt).
-export FM_GATE_REFUSE_BYPASS=1
+export JG_GATE_REFUSE_BYPASS=1
 
 HERDR_TEST_SAFETY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null

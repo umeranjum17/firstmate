@@ -10,7 +10,7 @@ set -u
 # its own real ancestry, either of which can decide a case the detection cases
 # meant to control. Drop the ambient markers so the asserted verdict does not
 # depend on which harness launched the suite.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
 
 SPAWN="$ROOT/bin/jg-spawn.sh"
 TEARDOWN="$ROOT/bin/jg-teardown.sh"
@@ -21,12 +21,12 @@ KIMI_RUNTIME_LAUNCH_DIR=
 PYTHON_BIN=$(command -v python3) || fail "test needs python3"
 PYTHON_BIN_DIR=$(dirname "$PYTHON_BIN")
 JQ_BIN=$(command -v jq) || fail "test needs jq"
-BASE_PATH=${FM_TEST_BASE_PATH:-$PYTHON_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-$PYTHON_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
 
 task_inbox_export() {  # <home> <id>
   local state
   state=$(CDPATH='' cd -- "$1/state" && pwd -P) || fail "cannot resolve state dir $1/state"
-  printf "export FM_TASK_INBOX='%s'; " "$state/$2.inbox"
+  printf "export JG_TASK_INBOX='%s'; " "$state/$2.inbox"
 }
 
 
@@ -43,38 +43,38 @@ make_spawn_fakebin() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "$FM_FAKE_TMUX_CALL_LOG"
-state=$(cat "$FM_FAKE_KIMI_STATE" 2>/dev/null || true)
+printf '%s\n' "$*" >> "$JG_FAKE_TMUX_CALL_LOG"
+state=$(cat "$JG_FAKE_KIMI_STATE" 2>/dev/null || true)
 fake_screen() {
   case "$state" in
     ready)
       printf 'Welcome to Kimi Code!\ncontext: 0%% (0/256k)\n╭────────────────────────────────╮\n│ >                              │\n╰────────────────────────────────╯\n'
       ;;
     trust)
-      printf '╭─ Trust this folder? ─╮\n│ ↑↓ navigate · Enter select · Esc exit │\n│ %s │\n│ ❯ Trust this folder │\n│   Don'"'"'t trust │\n╰──────────────────────────────╯\n' "$FM_FAKE_PANE_PATH"
+      printf '╭─ Trust this folder? ─╮\n│ ↑↓ navigate · Enter select · Esc exit │\n│ %s │\n│ ❯ Trust this folder │\n│   Don'"'"'t trust │\n╰──────────────────────────────╯\n' "$JG_FAKE_PANE_PATH"
       ;;
     trust-decoy)
-      printf 'Trust this folder?\n%s\n❯ Trust this folder\nDon'"'"'t trust\n' "$FM_FAKE_PANE_PATH"
+      printf 'Trust this folder?\n%s\n❯ Trust this folder\nDon'"'"'t trust\n' "$JG_FAKE_PANE_PATH"
       ;;
     trust-partial)
-      printf 'Welcome to Kimi Code!\nTrust this folder?\n%s\nDon'"'"'t trust\n' "$FM_FAKE_PANE_PATH"
+      printf 'Welcome to Kimi Code!\nTrust this folder?\n%s\nDon'"'"'t trust\n' "$JG_FAKE_PANE_PATH"
       ;;
     booting)
       printf 'shell starting\n$ \n'
       ;;
     banner-only|banner-first)
-      printf 'Welcome to Kimi Code!\nstarting in %s\n' "$FM_FAKE_PANE_PATH"
+      printf 'Welcome to Kimi Code!\nstarting in %s\n' "$JG_FAKE_PANE_PATH"
       ;;
     blank-frame)
       ;;
     trust-wrapped)
-      printf '╭─ Trust this folder? ─╮\n│ ↑↓ navigate ·        │\n│ Enter select · Esc   │\n│ exit                 │\n│ %s │\n│ ❯ Trust this folder  │\n│   Don'"'"'t trust         │\n╰──────────────────────╯\n' "$FM_FAKE_PANE_PATH"
+      printf '╭─ Trust this folder? ─╮\n│ ↑↓ navigate ·        │\n│ Enter select · Esc   │\n│ exit                 │\n│ %s │\n│ ❯ Trust this folder  │\n│   Don'"'"'t trust         │\n╰──────────────────────╯\n' "$JG_FAKE_PANE_PATH"
       ;;
     pointer-typed)
       printf 'context: 0%% (0/256k)\n╭────────────────────────────────╮\n│ > Read the brief and follow it │\n│                                │\n╰────────────────────────────────╯\n'
       ;;
     delivered)
-      printf '✨ Read the brief at %s and follow it exactly.\ncontext: 1%% (2k/256k)\n╭────────────────────────────────╮\n│ >                              │\n╰────────────────────────────────╯\n' "$FM_FAKE_BRIEF_REAL"
+      printf '✨ Read the brief at %s and follow it exactly.\ncontext: 1%% (2k/256k)\n╭────────────────────────────────╮\n│ >                              │\n╰────────────────────────────────╯\n' "$JG_FAKE_BRIEF_REAL"
       ;;
     *)
       printf 'shell starting\n$ \n'
@@ -82,8 +82,8 @@ fake_screen() {
   esac
 }
 fake_history() {
-  if [ "${FM_FAKE_KIMI_HISTORY_KEEPS_DIALOG:-no}" = yes ] \
-     && [ -s "$FM_FAKE_KIMI_TRUST_ENTER_LOG" ]; then
+  if [ "${JG_FAKE_KIMI_HISTORY_KEEPS_DIALOG:-no}" = yes ] \
+     && [ -s "$JG_FAKE_KIMI_TRUST_ENTER_LOG" ]; then
     printf '╭─ Trust this folder? ─╮\n│ ↑↓ navigate · Enter select · Esc exit │\n│ ❯ Trust this folder │\n│   Don'"'"'t trust │\n╰──────────────────────╯\n'
   fi
 }
@@ -95,7 +95,7 @@ fake_cursor_y() {
   esac
 }
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "$FM_FAKE_PANE_PATH"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "$JG_FAKE_PANE_PATH"; exit 0 ;;
   *"#{cursor_y}"*) fake_cursor_y; exit 0 ;;
 esac
 case "${1:-}" in
@@ -115,14 +115,14 @@ case "${1:-}" in
       esac
       case "$literal" in
         *' --auto')
-          printf '%s\n' "$literal" >> "$FM_FAKE_LAUNCH_LOG"
-          printf 'launched\n' > "$FM_FAKE_KIMI_STATE"
+          printf '%s\n' "$literal" >> "$JG_FAKE_LAUNCH_LOG"
+          printf 'launched\n' > "$JG_FAKE_KIMI_STATE"
           ;;
         *)
-          printf '%s\n' "$literal" >> "$FM_FAKE_POINTER_LOG"
+          printf '%s\n' "$literal" >> "$JG_FAKE_POINTER_LOG"
           case "$state" in
             trust|trust-wrapped|trust-partial|trust-decoy|booting|banner-only|banner-first|blank-frame) ;;
-            *) printf 'pointer-typed\n' > "$FM_FAKE_KIMI_STATE" ;;
+            *) printf 'pointer-typed\n' > "$JG_FAKE_KIMI_STATE" ;;
           esac
           ;;
       esac
@@ -132,41 +132,41 @@ case "${1:-}" in
       *' Enter '*)
         case "$state" in
           launched)
-            if [ "${FM_FAKE_KIMI_READY:-yes}" = yes ]; then
-              case "${FM_FAKE_KIMI_TRUST:-remembered}" in
-                fresh) printf 'trust\n' > "$FM_FAKE_KIMI_STATE" ;;
-                decoy) printf 'trust-decoy\n' > "$FM_FAKE_KIMI_STATE" ;;
-                partial) printf 'trust-partial\n' > "$FM_FAKE_KIMI_STATE" ;;
-                late) printf 'booting\n' > "$FM_FAKE_KIMI_STATE" ;;
-                blink) printf 'banner-first\n' > "$FM_FAKE_KIMI_STATE" ;;
-                wrapped) printf 'trust-wrapped\n' > "$FM_FAKE_KIMI_STATE" ;;
-                *) printf 'ready\n' > "$FM_FAKE_KIMI_STATE" ;;
+            if [ "${JG_FAKE_KIMI_READY:-yes}" = yes ]; then
+              case "${JG_FAKE_KIMI_TRUST:-remembered}" in
+                fresh) printf 'trust\n' > "$JG_FAKE_KIMI_STATE" ;;
+                decoy) printf 'trust-decoy\n' > "$JG_FAKE_KIMI_STATE" ;;
+                partial) printf 'trust-partial\n' > "$JG_FAKE_KIMI_STATE" ;;
+                late) printf 'booting\n' > "$JG_FAKE_KIMI_STATE" ;;
+                blink) printf 'banner-first\n' > "$JG_FAKE_KIMI_STATE" ;;
+                wrapped) printf 'trust-wrapped\n' > "$JG_FAKE_KIMI_STATE" ;;
+                *) printf 'ready\n' > "$JG_FAKE_KIMI_STATE" ;;
               esac
             fi
             ;;
           trust|trust-wrapped)
-            printf 'enter\n' >> "$FM_FAKE_KIMI_TRUST_ENTER_LOG"
-            trust_enters=$(wc -l < "$FM_FAKE_KIMI_TRUST_ENTER_LOG" | tr -d ' ')
-            case "${FM_FAKE_KIMI_TRUST_CLEARS:-yes}" in
-              yes) printf 'ready\n' > "$FM_FAKE_KIMI_STATE" ;;
+            printf 'enter\n' >> "$JG_FAKE_KIMI_TRUST_ENTER_LOG"
+            trust_enters=$(wc -l < "$JG_FAKE_KIMI_TRUST_ENTER_LOG" | tr -d ' ')
+            case "${JG_FAKE_KIMI_TRUST_CLEARS:-yes}" in
+              yes) printf 'ready\n' > "$JG_FAKE_KIMI_STATE" ;;
               after-second)
-                [ "$trust_enters" -lt 2 ] || printf 'ready\n' > "$FM_FAKE_KIMI_STATE"
+                [ "$trust_enters" -lt 2 ] || printf 'ready\n' > "$JG_FAKE_KIMI_STATE"
                 ;;
             esac
             ;;
           ready|delivered)
-            printf 'enter\n' >> "$FM_FAKE_KIMI_STRAY_ENTER_LOG"
+            printf 'enter\n' >> "$JG_FAKE_KIMI_STRAY_ENTER_LOG"
             ;;
           pointer-typed)
-            if [ "${FM_FAKE_KIMI_DELIVERY:-yes}" = yes ]; then
-              if [ "${FM_FAKE_KIMI_SWALLOW_FIRST:-no}" = yes ] \
-                 && [ ! -f "$FM_FAKE_KIMI_SWALLOWED" ]; then
-                : > "$FM_FAKE_KIMI_SWALLOWED"
+            if [ "${JG_FAKE_KIMI_DELIVERY:-yes}" = yes ]; then
+              if [ "${JG_FAKE_KIMI_SWALLOW_FIRST:-no}" = yes ] \
+                 && [ ! -f "$JG_FAKE_KIMI_SWALLOWED" ]; then
+                : > "$JG_FAKE_KIMI_SWALLOWED"
               else
-                printf 'delivered\n' > "$FM_FAKE_KIMI_STATE"
+                printf 'delivered\n' > "$JG_FAKE_KIMI_STATE"
               fi
             else
-              printf 'ready\n' > "$FM_FAKE_KIMI_STATE"
+              printf 'ready\n' > "$JG_FAKE_KIMI_STATE"
             fi
             ;;
         esac
@@ -183,23 +183,23 @@ case "${1:-}" in
       esac
       case "$arg" in -S|-E) prev=$arg ;; *) prev= ;; esac
     done
-    if [ "$start" = -0 ] && [ "${FM_FAKE_TMUX_VISIBLE_FAILS:-no}" = yes ]; then
+    if [ "$start" = -0 ] && [ "${JG_FAKE_TMUX_VISIBLE_FAILS:-no}" = yes ]; then
       echo "can't find pane" >&2
       exit 1
     fi
     case "$start" in
       -0|-120)
         case "$state" in
-          booting) printf 'banner-only\n' > "$FM_FAKE_KIMI_STATE" ;;
-          banner-first) printf 'blank-frame\n' > "$FM_FAKE_KIMI_STATE" ;;
-          blank-frame) printf 'banner-only\n' > "$FM_FAKE_KIMI_STATE" ;;
-          banner-only) printf 'trust\n' > "$FM_FAKE_KIMI_STATE" ;;
+          booting) printf 'banner-only\n' > "$JG_FAKE_KIMI_STATE" ;;
+          banner-first) printf 'blank-frame\n' > "$JG_FAKE_KIMI_STATE" ;;
+          blank-frame) printf 'banner-only\n' > "$JG_FAKE_KIMI_STATE" ;;
+          banner-only) printf 'trust\n' > "$JG_FAKE_KIMI_STATE" ;;
         esac
         ;;
     esac
-    if [ "$start" = -0 ] && [ "${FM_FAKE_KIMI_BLANK_AFTER_TRUST:-no}" = yes ] \
-       && [ -s "$FM_FAKE_KIMI_TRUST_ENTER_LOG" ] && [ ! -f "$FM_FAKE_KIMI_BLANKED" ]; then
-      : > "$FM_FAKE_KIMI_BLANKED"
+    if [ "$start" = -0 ] && [ "${JG_FAKE_KIMI_BLANK_AFTER_TRUST:-no}" = yes ] \
+       && [ -s "$JG_FAKE_KIMI_TRUST_ENTER_LOG" ] && [ ! -f "$JG_FAKE_KIMI_BLANKED" ]; then
+      : > "$JG_FAKE_KIMI_BLANKED"
       exit 0
     fi
     [ "$start" != -120 ] || fake_history
@@ -252,26 +252,26 @@ EOF
 run_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6
   shift 6
-  HOME="$home" FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    FM_FAKE_POINTER_LOG="$case_dir/pointer.log" \
-    FM_FAKE_KIMI_STATE="$case_dir/kimi.state" \
-    FM_FAKE_KIMI_TRUST_ENTER_LOG="$case_dir/trust-enter.log" \
-    FM_FAKE_KIMI_TRUST="${FM_FAKE_KIMI_TRUST:-remembered}" \
-    FM_FAKE_KIMI_TRUST_CLEARS="${FM_FAKE_KIMI_TRUST_CLEARS:-yes}" \
-    FM_FAKE_KIMI_HISTORY_KEEPS_DIALOG="${FM_FAKE_KIMI_HISTORY_KEEPS_DIALOG:-no}" \
-    FM_FAKE_KIMI_STRAY_ENTER_LOG="$case_dir/stray-enter.log" \
-    FM_FAKE_KIMI_BLANK_AFTER_TRUST="${FM_FAKE_KIMI_BLANK_AFTER_TRUST:-no}" \
-    FM_FAKE_KIMI_BLANKED="$case_dir/kimi.blanked" \
-    FM_FAKE_TMUX_VISIBLE_FAILS="${FM_FAKE_TMUX_VISIBLE_FAILS:-no}" \
-    FM_FAKE_KIMI_SWALLOWED="$case_dir/kimi.swallowed" \
-    FM_FAKE_KIMI_SWALLOW_FIRST="${FM_FAKE_KIMI_SWALLOW_FIRST:-no}" \
-    FM_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
-    FM_FAKE_BRIEF_REAL="$(cd "$home/data/$id" && pwd -P)/launch-brief.md" \
-    FM_KIMI_READY_POLLS="${FM_KIMI_READY_POLLS:-2}" FM_KIMI_DELIVERY_POLLS=2 FM_KIMI_POLL_INTERVAL=0 \
+  HOME="$home" JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+    JG_FAKE_POINTER_LOG="$case_dir/pointer.log" \
+    JG_FAKE_KIMI_STATE="$case_dir/kimi.state" \
+    JG_FAKE_KIMI_TRUST_ENTER_LOG="$case_dir/trust-enter.log" \
+    JG_FAKE_KIMI_TRUST="${JG_FAKE_KIMI_TRUST:-remembered}" \
+    JG_FAKE_KIMI_TRUST_CLEARS="${JG_FAKE_KIMI_TRUST_CLEARS:-yes}" \
+    JG_FAKE_KIMI_HISTORY_KEEPS_DIALOG="${JG_FAKE_KIMI_HISTORY_KEEPS_DIALOG:-no}" \
+    JG_FAKE_KIMI_STRAY_ENTER_LOG="$case_dir/stray-enter.log" \
+    JG_FAKE_KIMI_BLANK_AFTER_TRUST="${JG_FAKE_KIMI_BLANK_AFTER_TRUST:-no}" \
+    JG_FAKE_KIMI_BLANKED="$case_dir/kimi.blanked" \
+    JG_FAKE_TMUX_VISIBLE_FAILS="${JG_FAKE_TMUX_VISIBLE_FAILS:-no}" \
+    JG_FAKE_KIMI_SWALLOWED="$case_dir/kimi.swallowed" \
+    JG_FAKE_KIMI_SWALLOW_FIRST="${JG_FAKE_KIMI_SWALLOW_FIRST:-no}" \
+    JG_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
+    JG_FAKE_BRIEF_REAL="$(cd "$home/data/$id" && pwd -P)/launch-brief.md" \
+    JG_KIMI_READY_POLLS="${JG_KIMI_READY_POLLS:-2}" JG_KIMI_DELIVERY_POLLS=2 JG_KIMI_POLL_INTERVAL=0 \
     PATH="$fakebin:$BASE_PATH" \
     "$SPAWN" "$id" "$proj" --harness kimi --mode no-mistakes --yolo off "$@" 2>&1
 }
@@ -293,7 +293,7 @@ test_kimi_launch_then_send_is_verified() {
   launch_dir=$(kimi_launch_dir "$id" "$HOME_DIR")
   KIMI_RUNTIME_LAUNCH_DIR=$launch_dir
   rm -rf "$launch_dir"
-  out=$(FM_FAKE_KIMI_SWALLOW_FIRST=yes run_spawn \
+  out=$(JG_FAKE_KIMI_SWALLOW_FIRST=yes run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" \
     --model kimi-code/k3 --effort high)
   rc=$?
@@ -336,7 +336,7 @@ test_kimi_launch_then_send_is_verified() {
     || fail "kimi spawn did not type a short line sourcing its staged launch command"
   assert_grep "export GOTMPDIR=$task_tmp/gotmp" "$CASE_DIR/tmux-calls.log" \
     "kimi spawn did not export its Go temp directory into the pane"
-  assert_grep "export FM_TASK_ID=$id" "$CASE_DIR/tmux-calls.log" \
+  assert_grep "export JG_TASK_ID=$id" "$CASE_DIR/tmux-calls.log" \
     "kimi spawn did not mark the pane with its task id"
   assert_grep 'BEGIN FIRSTMATE KIMI TURN-END HOOK' "$HOME_DIR/.kimi-code/config.toml" \
     "kimi spawn did not install its guarded global hook region"
@@ -647,10 +647,10 @@ test_kimi_teardown_removes_pointer_and_registry_token() {
   mkdir -p "$foreign_dir"
   printf 'other home\n' > "$foreign_dir/launch.sh"
 
-  HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
+  HOME="$HOME_DIR" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
     "$TEARDOWN" "$id" --force >/dev/null 2>&1 || fail "Kimi teardown failed"
   assert_absent "$WT_DIR/.jg-kimi-turnend" "Kimi token pointer survived teardown"
   assert_absent "$HOME_DIR/.kimi-code/jg-turn-end.d/$token" "Kimi registry token survived teardown"
@@ -706,7 +706,7 @@ test_kimi_unconfirmed_delivery_fails_loudly() {
   rec=$(make_spawn_case drop "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_KIMI_DELIVERY=no run_spawn \
+  out=$(JG_FAKE_KIMI_DELIVERY=no run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "an unconfirmed kimi delivery should fail"
   assert_contains "$out" "kimi brief pointer delivery was not confirmed" \
@@ -722,7 +722,7 @@ test_kimi_readiness_gate_precedes_pointer() {
   rec=$(make_spawn_case not-ready "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_KIMI_READY=no run_spawn \
+  out=$(JG_FAKE_KIMI_READY=no run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "kimi spawn without a ready signal should fail"
   assert_contains "$out" "kimi did not show a verified ready signal" \
@@ -740,7 +740,7 @@ test_kimi_fresh_worktree_trust_is_answered_and_verified() {
   rec=$(make_spawn_case trust "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=3 FM_FAKE_KIMI_TRUST=fresh run_spawn \
+  out=$(JG_KIMI_READY_POLLS=3 JG_FAKE_KIMI_TRUST=fresh run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "fresh Kimi trust dialog should advance into verified delivery"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -758,7 +758,7 @@ test_kimi_swallowed_trust_enter_is_retried_until_the_dialog_clears() {
   rec=$(make_spawn_case trust-swallow "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=5 FM_FAKE_KIMI_TRUST=fresh FM_FAKE_KIMI_TRUST_CLEARS=after-second run_spawn \
+  out=$(JG_KIMI_READY_POLLS=5 JG_FAKE_KIMI_TRUST=fresh JG_FAKE_KIMI_TRUST_CLEARS=after-second run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "a swallowed first trust Enter should be retried into a verified spawn"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -776,7 +776,7 @@ test_kimi_banner_before_the_dialog_paints_does_not_pass_readiness() {
   rec=$(make_spawn_case trust-late "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=5 FM_FAKE_KIMI_TRUST=late run_spawn \
+  out=$(JG_KIMI_READY_POLLS=5 JG_FAKE_KIMI_TRUST=late run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "a banner captured before the dialog painted should wait, then trust and deliver"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -796,7 +796,7 @@ test_kimi_answered_dialog_left_in_history_does_not_restart_the_answer() {
   rec=$(make_spawn_case trust-history "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=3 FM_FAKE_KIMI_TRUST=fresh FM_FAKE_KIMI_HISTORY_KEEPS_DIALOG=yes run_spawn \
+  out=$(JG_KIMI_READY_POLLS=3 JG_FAKE_KIMI_TRUST=fresh JG_FAKE_KIMI_HISTORY_KEEPS_DIALOG=yes run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "an answered trust dialog still in scrollback should not block the spawn"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -817,8 +817,8 @@ test_kimi_blank_viewport_frame_costs_only_its_poll() {
   rec=$(make_spawn_case trust-blank "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=4 FM_FAKE_KIMI_TRUST=fresh FM_FAKE_KIMI_BLANK_AFTER_TRUST=yes \
-    FM_FAKE_KIMI_HISTORY_KEEPS_DIALOG=yes run_spawn \
+  out=$(JG_KIMI_READY_POLLS=4 JG_FAKE_KIMI_TRUST=fresh JG_FAKE_KIMI_BLANK_AFTER_TRUST=yes \
+    JG_FAKE_KIMI_HISTORY_KEEPS_DIALOG=yes run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "a blank viewport frame should cost one poll, not the spawn"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -842,7 +842,7 @@ test_kimi_refuses_a_backend_without_a_viewport_capture() {
   read_spawn_record "$rec"
   jg_fake_exit0 "$FAKEBIN_DIR" cmux
   rc=0
-  out=$(FM_BACKEND=cmux run_spawn \
+  out=$(JG_BACKEND=cmux run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "a Kimi spawn on a backend without a viewport capture should refuse"
   assert_contains "$out" "backend 'cmux' has no verified viewport-bounded capture" \
@@ -860,7 +860,7 @@ test_kimi_answers_a_trust_dialog_with_a_wrapped_hint() {
   rec=$(make_spawn_case trust-wrapped "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=3 FM_FAKE_KIMI_TRUST=wrapped run_spawn \
+  out=$(JG_KIMI_READY_POLLS=3 JG_FAKE_KIMI_TRUST=wrapped run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "a trust dialog whose hint wrapped in a narrow pane should be answered"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -878,7 +878,7 @@ test_kimi_blank_frame_between_banners_restarts_the_ready_count() {
   rec=$(make_spawn_case trust-blink "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=6 FM_FAKE_KIMI_TRUST=blink run_spawn \
+  out=$(JG_KIMI_READY_POLLS=6 JG_FAKE_KIMI_TRUST=blink run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   expect_code 0 "$rc" "banners split by a blank frame should not read as two ready captures"
   assert_contains "$out" "spawned $id harness=kimi" \
@@ -896,7 +896,7 @@ test_kimi_failed_viewport_read_fails_readiness_at_once() {
   rec=$(make_spawn_case viewport-fail "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_KIMI_READY_POLLS=3 FM_FAKE_TMUX_VISIBLE_FAILS=yes FM_FAKE_KIMI_TRUST=fresh run_spawn \
+  out=$(JG_KIMI_READY_POLLS=3 JG_FAKE_TMUX_VISIBLE_FAILS=yes JG_FAKE_KIMI_TRUST=fresh run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "a Kimi spawn whose viewport read fails should fail"
   assert_contains "$out" "could not read the visible viewport of backend 'tmux'" \
@@ -913,7 +913,7 @@ test_kimi_partial_trust_dialog_blocks_the_ready_verdict() {
   rec=$(make_spawn_case trust-partial "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_KIMI_TRUST=partial run_spawn \
+  out=$(JG_FAKE_KIMI_TRUST=partial run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "a banner above an unanswered trust dialog should not pass readiness"
   assert_contains "$out" "trust dialog text stayed on screen without the complete dialog" \
@@ -931,7 +931,7 @@ test_kimi_stuck_trust_dialog_fails_before_delivery() {
   rec=$(make_spawn_case trust-stuck "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_KIMI_TRUST=fresh FM_FAKE_KIMI_TRUST_CLEARS=no run_spawn \
+  out=$(JG_FAKE_KIMI_TRUST=fresh JG_FAKE_KIMI_TRUST_CLEARS=no run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "a Kimi trust dialog that never clears should fail"
   assert_contains "$out" "kimi trust dialog did not clear after selecting 'Trust this folder'" \
@@ -952,7 +952,7 @@ test_kimi_trust_detection_requires_the_complete_dialog() {
   rec=$(make_spawn_case trust-decoy "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_KIMI_TRUST=decoy run_spawn \
+  out=$(JG_FAKE_KIMI_TRUST=decoy run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "an incomplete Kimi trust lookalike should not pass readiness"
   assert_contains "$out" "trust dialog text stayed on screen without the complete dialog" \
@@ -990,15 +990,15 @@ esac
 SH
   chmod +x "$fakebin/ps"
 
-  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI \
-    PATH="$fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    PATH="$fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = kimi ] || fail "kimi ancestry detection returned '$out'"
   # Kimi publishes no identity marker, so an inherited CLAUDECODE used to rename
   # it outright. A structural kimi ancestor now outranks that marker;
   # tests/jg-harness-precedence.test.sh owns the general boundary.
   out=$(env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI \
-    CLAUDECODE=1 PATH="$fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    CLAUDECODE=1 PATH="$fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = kimi ] || fail "an inherited CLAUDECODE renamed markerless kimi, got '$out'"
   pass "jg-harness: markerless kimi keeps its ancestry identity under an inherited marker"
 }
@@ -1018,13 +1018,13 @@ exit 1
 SH
   chmod +x "$fakebin/ps"
 
-  FM_HOME="$home" PATH="$fakebin:$BASE_PATH" "$ROOT/bin/jg-lock.sh" \
+  JG_HOME="$home" PATH="$fakebin:$BASE_PATH" "$ROOT/bin/jg-lock.sh" \
     || fail "jg-lock did not acquire from Kimi ancestry"
   case "$(cat "$home/state/.lock")" in
     ''|*[!0-9]*) fail "jg-lock did not record the Kimi harness ancestor" ;;
   esac
   printf '%s\n' "$$" > "$home/state/.lock"
-  out=$(FM_HOME="$home" PATH="$fakebin:$BASE_PATH" "$ROOT/bin/jg-lock.sh" status)
+  out=$(JG_HOME="$home" PATH="$fakebin:$BASE_PATH" "$ROOT/bin/jg-lock.sh" status)
   assert_contains "$out" "lock: held by live harness pid" \
     "jg-lock did not recognize Kimi as a live holder"
   pass "jg-lock recognizes Kimi ancestry and live lock holders"
@@ -1034,7 +1034,7 @@ test_kimi_busy_signature_is_scoped_to_spinner_lines() {
   local capture
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-tmux-lib.sh"
-  unset FM_BUSY_REGEX
+  unset JG_BUSY_REGEX
   capture="$TMP_ROOT/busy-pane"
   tmux() {
     case "${1:-}" in
@@ -1081,10 +1081,10 @@ test_watcher_never_classifies_kimi_from_its_spinner() (
   local state="$TMP_ROOT/watch-state" busy_capture='  🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
   mkdir -p "$state"
   printf 'window=fake\nharness=kimi\n' > "$state/kimi-watch.meta"
-  unset FM_BUSY_REGEX
-  FM_HOME="$TMP_ROOT/watch-home"
-  FM_STATE_OVERRIDE="$state"
-  export FM_HOME FM_STATE_OVERRIDE
+  unset JG_BUSY_REGEX
+  JG_HOME="$TMP_ROOT/watch-home"
+  JG_STATE_OVERRIDE="$state"
+  export JG_HOME JG_STATE_OVERRIDE
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-watch.sh"
   # shellcheck disable=SC2329 # Runtime override called by the sourced watcher.

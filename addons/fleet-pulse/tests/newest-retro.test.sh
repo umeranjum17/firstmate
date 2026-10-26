@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Fixture homes: older report in main + newer in a sibling -> not due;
 # none or all old -> due. Uses disposable treehouse + homes only.
 set -euo pipefail
@@ -10,7 +19,7 @@ trap 'rm -rf -- "$d"' EXIT
 main=$d/main
 sib=$d/treehouse/firstmate-test/1/firstmate
 mkdir -p "$main/data" "$main/state" "$sib/data" "$sib/state"
-export HOME=$d/user FM_TREEHOUSE=$d/treehouse
+export HOME=$d/user JG_TREEHOUSE=$d/treehouse
 mkdir -p "$HOME"
 
 # Fixed "now": 2026-10-25T12:00:00Z
@@ -48,7 +57,7 @@ check() {
 
 # 1) none -> due
 rm -f "$main"/state/.fleet-retro.last
-check none-due due env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
+check none-due due env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 2) older in main, newer in sibling treehouse home -> not due
 stamp "$main/data/jg-retro-old/report.md" "$old"
@@ -57,7 +66,7 @@ rm -f "$main"/state/.fleet-retro.last
 got=$("$bin/newest-retro-report.sh" "$main")
 [ "$got" = "$sib/data/ljg-fleet-retro-new/report.md" ] && echo ok newest-picks-sibling \
   || { echo "FAIL newest-picks-sibling got=$(printf %q "$got")" >&2; fail=1; }
-check newer-elsewhere-quiet quiet env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
+check newer-elsewhere-quiet quiet env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 3) all old -> due (also via secondmates.md home, no treehouse hit required)
 sib2=$d/other-home
@@ -67,11 +76,11 @@ printf -- '- other - note (home: %s; scope: x)\n' "$sib2" >"$main/data/secondmat
 # Hide treehouse sibling so only main+secondmates (both old) remain newest.
 mv "$d/treehouse" "$d/treehouse.hide"
 rm -f "$main"/state/.fleet-retro.last
-check all-old-due due env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
+check all-old-due due env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 mv "$d/treehouse.hide" "$d/treehouse"
 
 # 4) wake mark suppresses a second due within 12 h
-check wake-suppressed quiet env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
+check wake-suppressed quiet env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 5) folder name must contain retro; plain report.md dirs are ignored
 rm -f "$sib/data/ljg-fleet-retro-new/report.md"
@@ -79,7 +88,7 @@ stamp "$main/data/not-a-match/report.md" "$fresh"
 stamp "$sib/data/still-old-retro/report.md" "$old"
 rm -f "$main"/state/.fleet-retro.last
 # newest among *retro* is still old (not-a-match ignored) -> due
-check ignore-non-retro-dir due env FM_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
+check ignore-non-retro-dir due env JG_RETRO_NOW=$now "$bin/fleet-retro-due.sh" "$main"
 
 # 6) install retargets an old-style pulse check onto fleet-retro-due.sh
 mkdir -p "$main/bin" "$main/state"

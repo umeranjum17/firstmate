@@ -7,18 +7,18 @@
 # worker scheduler: it is that each mate still emits its own SECONDMATE_LIVENESS
 # / SECONDMATE_SYNC line, that those lines cannot splice into each other, and
 # that a dirty or unreachable mate still refuses rather than proceeding. This
-# suite drives bin/jg-bootstrap.sh's network-only phase through FM_SSH_BIN, so
+# suite drives bin/jg-bootstrap.sh's network-only phase through JG_SSH_BIN, so
 # it exercises the same remote probe path a real session start uses.
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-bootstrap-network-parallel)
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 mkdir -p "$TMP_ROOT/no-addons"
-export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
+export JG_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 unset TMUX TMUX_PANE HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH \
   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_SOCKET_PATH CMUX_TAB_ID CMUX_PANEL_ID \
   2>/dev/null || true
@@ -30,7 +30,7 @@ REAL_GIT=$(command -v git) || fail "git is required"
 REAL_MKTEMP=$(command -v mktemp) || fail "mktemp is required"
 jg_git_identity fmtest fmtest@example.invalid
 
-[ -z "${FM_TEST_EVIDENCE_FILE:-}" ] || : > "$FM_TEST_EVIDENCE_FILE"
+[ -z "${JG_TEST_EVIDENCE_FILE:-}" ] || : > "$JG_TEST_EVIDENCE_FILE"
 
 write_remote_registry_line() { # <file> <id> <host> <root> <home>
   printf -- '- %s - %s delivery (host: %s; root: %s; home: %s; scope: test work; projects: alpha; added 2026-08-02)\n' \
@@ -42,8 +42,8 @@ install_fake_ssh() {
   cat > "$fakebin/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-log=${FM_FAKE_SSH_LOG:?}
-sleep_s=${FM_FAKE_SSH_SLEEP:-0.4}
+log=${JG_FAKE_SSH_LOG:?}
+sleep_s=${JG_FAKE_SSH_SLEEP:-0.4}
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) shift 2 ;;
@@ -89,7 +89,7 @@ else
   printf 'QUICK %s %s %s\n' "$host" "$command_name" "$subcommand" >> "$log"
 fi
 case "$host" in
-  "${FM_FAKE_SSH_UNREACHABLE_HOST:-host-bravo}")
+  "${JG_FAKE_SSH_UNREACHABLE_HOST:-host-bravo}")
     exit 255
     ;;
 esac
@@ -109,11 +109,11 @@ case "$command_name" in
         ;;
       sync)
         case "$host" in
-          "${FM_FAKE_SSH_FAIL_HOST:-host-alpha}")
+          "${JG_FAKE_SSH_FAIL_HOST:-host-alpha}")
             printf 'synthetic tracked-file sync refusal for %s\n' "$host"
             exit 1
             ;;
-          "${FM_FAKE_SSH_DIRTY_HOST:-host-charlie}")
+          "${JG_FAKE_SSH_DIRTY_HOST:-host-charlie}")
             printf 'remote secondmate checkout is dirty; sync skipped\n'
             exit 1
             ;;
@@ -155,7 +155,7 @@ if [ "\$slow" -eq 1 ]; then
     sleep 0.01
     waited=\$((waited + 1))
   done
-  sleep "\${FM_FAKE_GIT_FETCH_SLEEP:-0.4}"
+  sleep "\${JG_FAKE_GIT_FETCH_SLEEP:-0.4}"
   printf 'END fleet-fetch git fetch\n' >> '$log'
 fi
 exec '$real_git' "\$@"
@@ -228,18 +228,18 @@ SH
 
   out=$(
     PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" \
-    FM_ROOT_OVERRIDE="$primary" \
-    FM_BOOTSTRAP_NETWORK=only \
-    FM_SSH_BIN="$fakebin/fake-ssh" \
-    FM_FAKE_SSH_LOG="$log" \
-    FM_FAKE_SSH_SLEEP=0.4 \
-    FM_FAKE_SSH_UNREACHABLE_HOST=host-bravo \
-    FM_FAKE_SSH_FAIL_HOST=host-alpha \
-    FM_FAKE_SSH_DIRTY_HOST=host-charlie \
-    FM_FAKE_GIT_FETCH_SLEEP=0.4 \
-    FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG='' \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    JG_HOME="$home" \
+    JG_ROOT_OVERRIDE="$primary" \
+    JG_BOOTSTRAP_NETWORK=only \
+    JG_SSH_BIN="$fakebin/fake-ssh" \
+    JG_FAKE_SSH_LOG="$log" \
+    JG_FAKE_SSH_SLEEP=0.4 \
+    JG_FAKE_SSH_UNREACHABLE_HOST=host-bravo \
+    JG_FAKE_SSH_FAIL_HOST=host-alpha \
+    JG_FAKE_SSH_DIRTY_HOST=host-charlie \
+    JG_FAKE_GIT_FETCH_SLEEP=0.4 \
+    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG='' \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1
   )
 
@@ -318,12 +318,12 @@ EOF
     END { exit !(last_liveness && first_sync && last_liveness < first_sync) }
   ' "$log" || fail "convergence began before all liveness probes finished"$'\n'"$(cat "$log")"
 
-  if [ -n "${FM_TEST_EVIDENCE_FILE:-}" ]; then
+  if [ -n "${JG_TEST_EVIDENCE_FILE:-}" ]; then
     {
       printf '=== %s bootstrap network output ===\n%s\n' "$mode" "$out"
       printf '=== %s remote operation timeline ===\n' "$mode"
       cat "$log"
-    } >> "$FM_TEST_EVIDENCE_FILE"
+    } >> "$JG_TEST_EVIDENCE_FILE"
   fi
 
   pass "bootstrap network ($mode): per-mate output stays intact, fail-closed, and correctly sequenced"
@@ -373,15 +373,15 @@ EOF
 
   out=$(
     PATH="$fakebin:$BASE_PATH" \
-    FM_HOME="$home" \
-    FM_ROOT_OVERRIDE="$primary" \
-    FM_BOOTSTRAP_NETWORK=only \
-    FM_SSH_BIN="$fakebin/fake-ssh" \
-    FM_FAKE_SSH_LOG="$log" \
-    FM_FAKE_SSH_SLEEP=0 \
-    FM_FAKE_GIT_FETCH_SLEEP=0 \
-    FM_INHERITABLE_CONFIG='crew-dispatch.json crew-harness' \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    JG_HOME="$home" \
+    JG_ROOT_OVERRIDE="$primary" \
+    JG_BOOTSTRAP_NETWORK=only \
+    JG_SSH_BIN="$fakebin/fake-ssh" \
+    JG_FAKE_SSH_LOG="$log" \
+    JG_FAKE_SSH_SLEEP=0 \
+    JG_FAKE_GIT_FETCH_SLEEP=0 \
+    JG_INHERITABLE_CONFIG='crew-dispatch.json crew-harness' \
+    JG_FAKE_TREEHOUSE_LEASE_HELP=1 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1
   )
 
@@ -395,8 +395,8 @@ EOF
     *"unchanged:"*) fail "the failure reason must not report an earlier unchanged item, got: $line" ;;
   esac
 
-  if [ -n "${FM_TEST_EVIDENCE_FILE:-}" ]; then
-    printf '=== inherit-failure bootstrap output ===\n%s\n' "$out" >> "$FM_TEST_EVIDENCE_FILE"
+  if [ -n "${JG_TEST_EVIDENCE_FILE:-}" ]; then
+    printf '=== inherit-failure bootstrap output ===\n%s\n' "$out" >> "$JG_TEST_EVIDENCE_FILE"
   fi
 
   pass "a remote inheritance failure reports its own error line, not an earlier unchanged item"

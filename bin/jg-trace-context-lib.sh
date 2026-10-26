@@ -30,7 +30,7 @@
 #
 # Public entry points:
 #   jg_trace_context_session_start <config-dir> <effective-state-file>
-#     Resolves config/trace-context plus FM_TRACE_CONTEXT once and atomically
+#     Resolves config/trace-context plus JG_TRACE_CONTEXT once and atomically
 #     writes the normalized on/off decision bound to the locked home session.
 #   jg_trace_context_session_effective <effective-state-file>
 #     Echoes the normalized frozen decision only when its session binding matches
@@ -44,7 +44,7 @@
 #
 # Enablement (see docs/configuration.md for the schema):
 #   config/trace-context   presence flag under the home's config dir enables it.
-#   FM_TRACE_CONTEXT        env override: 1/on/true/yes enables, any other
+#   JG_TRACE_CONTEXT        env override: 1/on/true/yes enables, any other
 #                           non-empty value disables, and unset OR empty defers
 #                           to the file.
 #   Each locked home session resolves these inputs once into
@@ -54,8 +54,8 @@
 #   on/off value, so later config and environment edits take effect only after a
 #   new home session starts.
 #   At launch, the primary propagates config/trace-context into the secondmate
-#   home (FM_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh) and passes its
-#   frozen on/off decision into the new process as a non-empty FM_TRACE_CONTEXT
+#   home (JG_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh) and passes its
+#   frozen on/off decision into the new process as a non-empty JG_TRACE_CONTEXT
 #   value in the launch prefix (bin/jg-spawn.sh). The Secondmate freezes that
 #   inherited decision when its own home session starts.
 #   A REMOTE secondmate route resolves here too, in the PARENT process that owns
@@ -127,8 +127,8 @@ jg_trace_context_enabled() {  # <config-dir>
   local config_dir=$1 v
   # A non-empty value is an explicit override; unset OR empty defers to the file
   # (the conventional "empty is like unset" behavior).
-  if [ -n "${FM_TRACE_CONTEXT:-}" ]; then
-    v=$(printf '%s' "$FM_TRACE_CONTEXT" | tr '[:upper:]' '[:lower:]')
+  if [ -n "${JG_TRACE_CONTEXT:-}" ]; then
+    v=$(printf '%s' "$JG_TRACE_CONTEXT" | tr '[:upper:]' '[:lower:]')
     case "$v" in
       1 | on | true | yes) return 0 ;;
       *) return 1 ;;

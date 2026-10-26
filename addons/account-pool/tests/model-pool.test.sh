@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Forced-limit journey for jg-model-pool: fixture Umer A/B, A=70% B=40%, A limit then B,
 # all Claude under floor then Sol -> Goat -> Cursor, no repeated attempted id, credits refused.
 # No network, no real login copy, no real model CLI.
@@ -17,8 +26,8 @@ is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2]
 cat >"$w/bin/pool-cmd" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$w/log/pool-cmd.log"
-exec env FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=999999 \
-  FM_ACCOUNT_POOL_REST_FLOOR=15 FM_MODEL_POOL_FLOOR=15 "$pool" "\$@"
+exec env JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" JG_CLAUDE_ACCOUNTS_FRESH=999999 \
+  JG_ACCOUNT_POOL_REST_FLOOR=15 JG_MODEL_POOL_FLOOR=15 "$pool" "\$@"
 SH
 chmod +x "$w/bin/pool-cmd"
 # Refuse any real model binary if PATH leaks.
@@ -54,9 +63,9 @@ reading() { # fiveA sevenA fiveB sevenB [fiveC sevenC]
 run() { # verb json -> sets out/rc; network blocked via empty SSL and no net helpers needed (local only)
   local verb=$1 json=$2
   out=$(printf '%s' "$json" | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" \
-    FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
-    FM_MODEL_POOL_FLOOR=15 FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_LOW=5 \
-    FM_CLAUDE_ACCOUNTS_FRESH=999999 \
+    JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
+    JG_MODEL_POOL_FLOOR=15 JG_ACCOUNT_POOL_REST_FLOOR=15 JG_CLAUDE_ACCOUNTS_LOW=5 \
+    JG_CLAUDE_ACCOUNTS_FRESH=999999 \
     "$helper" "$verb" --json 2>"$w/err"); rc=$?
 }
 
@@ -132,20 +141,20 @@ is "past deadline refuses" "$rc" 2
 is "deadline reason" "$(jq -r .reason <<<"$out")" "overall deadline passed"
 
 # Default pool_config (lfm account_picker omits it): three cases.
-# 1) FM_HOME/config/account-pool when readable.
+# 1) JG_HOME/config/account-pool when readable.
 nopool=$(jq -nc '{v:1,purpose:"work",capabilities:["text"],attempted:[]}')
 reading 70 70 40 40
 run pick "$nopool"
-is "no pool_config uses FM_HOME default" "$(jq -r .id <<<"$out")" pa_umer_a
+is "no pool_config uses JG_HOME default" "$(jq -r .id <<<"$out")" pa_umer_a
 is "no pool_config pick ok" "$(jq -r .ok <<<"$out")" true
 
-# 2) Explicit pool_config still wins over the FM_HOME default (relative state=
-# would never come from the good FM_HOME file; using it proves the request path).
+# 2) Explicit pool_config still wins over the JG_HOME default (relative state=
+# would never come from the good JG_HOME file; using it proves the request path).
 mkdir -p "$w/explicit"
 printf 'state=not-absolute\ncommand=%s\n' "$w/bin/pool-cmd" >"$w/explicit/account-pool"
 explicit=$(jq -nc --arg p "$w/explicit/account-pool" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')
 run pick "$explicit"
-is "explicit pool_config wins over FM_HOME default" "$rc" 1
+is "explicit pool_config wins over JG_HOME default" "$rc" 1
 is "explicit config is what was parsed" "$(jq -r .reason <<<"$out")" \
   "config/account-pool must name absolute state="
 
@@ -153,8 +162,8 @@ is "explicit config is what was parsed" "$(jq -r .reason <<<"$out")" \
 run_nodefault() {
   local verb=$1 json=$2
   out=$(printf '%s' "$json" | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w/emptyhome" TMPDIR="$w" \
-    FM_MODEL_POOL_FLOOR=15 FM_ACCOUNT_POOL_REST_FLOOR=15 FM_CLAUDE_ACCOUNTS_LOW=5 \
-    FM_CLAUDE_ACCOUNTS_FRESH=999999 \
+    JG_MODEL_POOL_FLOOR=15 JG_ACCOUNT_POOL_REST_FLOOR=15 JG_CLAUDE_ACCOUNTS_LOW=5 \
+    JG_CLAUDE_ACCOUNTS_FRESH=999999 \
     "$helper" "$verb" --json 2>"$w/err"); rc=$?
 }
 mkdir -p "$w/emptyhome"

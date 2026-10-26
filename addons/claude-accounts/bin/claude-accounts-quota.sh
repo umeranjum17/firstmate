@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # claude-accounts-quota.sh - one quota view of every Claude account the owner has signed in.
 # Reads the account list from the muxr registry, asks `quota-axi --profile-only` about each profile
 # folder (the folder path is the only thing passed; nothing inside a login folder is opened), and writes
 # <home>/state/claude-accounts.json for the dashboard card and for dispatch input.
 # Usage: claude-accounts-quota.sh [--print]     (--print: also show the file on stdout)
-# Env:   FM_HOME (required), FM_CLAUDE_ACCOUNTS_REGISTRY
-#        (default: ~/.muxr/plans/accounts-v1.json), FM_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).
-#        FM_ACCOUNTS_PROVIDER=claude|codex (default claude); writes <provider>-accounts.json.
+# Env:   JG_HOME (required), JG_CLAUDE_ACCOUNTS_REGISTRY
+#        (default: ~/.muxr/plans/accounts-v1.json), JG_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).
+#        JG_ACCOUNTS_PROVIDER=claude|codex (default claude); writes <provider>-accounts.json.
 set -uo pipefail
 
-FM_HOME=${FM_HOME:?set FM_HOME to the Firstmate home}
-REGISTRY=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
-SECONDS_MAX=${FM_CLAUDE_ACCOUNTS_SECONDS:-60}
-PROVIDER=${FM_ACCOUNTS_PROVIDER:-claude}
+JG_HOME=${JG_HOME:?set JG_HOME to the Firstmate home}
+REGISTRY=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+SECONDS_MAX=${JG_CLAUDE_ACCOUNTS_SECONDS:-60}
+PROVIDER=${JG_ACCOUNTS_PROVIDER:-claude}
 case "$PROVIDER" in claude | codex) ;; *) echo "error: unsupported quota provider $PROVIDER" >&2; exit 1 ;; esac
-OUT=$FM_HOME/state/$PROVIDER-accounts.json
-REST_STATE=$(sed -n 's/^state=//p' "$FM_HOME/config/account-pool" 2>/dev/null | head -n 1)
-case "$REST_STATE" in /*) ;; *) REST_STATE=$FM_HOME/state ;; esac
+OUT=$JG_HOME/state/$PROVIDER-accounts.json
+REST_STATE=$(sed -n 's/^state=//p' "$JG_HOME/config/account-pool" 2>/dev/null | head -n 1)
+case "$REST_STATE" in /*) ;; *) REST_STATE=$JG_HOME/state ;; esac
 PRINT=0
 [ "${1:-}" = --print ] && PRINT=1
 for tool in jq quota-axi; do
@@ -59,7 +68,7 @@ for row in "${ROWS[@]}"; do
   ACCOUNTS+=("$(read_one "$id" "$name" "$folder")") || exit 1
 done
 JSON=$(printf '%s\n' "${ACCOUNTS[@]}" | jq -sc --argjson at "$(date +%s)" '{schema: 1, generated_at: $at, accounts: .}') || exit 1
-mkdir -p "$FM_HOME/state"
+mkdir -p "$JG_HOME/state"
 tmp=$(mktemp "$OUT.XXXXXX") && printf '%s\n' "$JSON" >"$tmp" && mv -f "$tmp" "$OUT" || { echo "error: cannot write $OUT" >&2; exit 1; }
 [ "$PRINT" -eq 0 ] || printf '%s\n' "$JSON"
 jq -e 'any(.accounts[]; .problem == null)' "$OUT" >/dev/null

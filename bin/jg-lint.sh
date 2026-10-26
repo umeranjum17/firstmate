@@ -46,7 +46,7 @@
 # Lint defaults to two concurrency-limited workers over two stable logical
 # shards, and each worker runs ONE canonical root per ShellCheck process, so a
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
-# in stable shard/root order. FM_LINT_JOBS=1 changes concurrency, not diagnostics
+# in stable shard/root order. JG_LINT_JOBS=1 changes concurrency, not diagnostics
 # or exit selection.
 # --partition 1of2/2of2 splits the entire canonical inventory across
 # two CI runners, each with those same concurrency-limited workers.
@@ -57,11 +57,11 @@
 # workflow lint and backend-purity checks, keeping either invocation
 # independently useful.
 #
-# With FM_LINT_REQUIRE_BOUNDS=1, which CI sets, every per-root ShellCheck
+# With JG_LINT_REQUIRE_BOUNDS=1, which CI sets, every per-root ShellCheck
 # process runs under an enforced envelope: a wall deadline
-# (FM_LINT_ROOT_SECONDS, default 1200), a terminate-then-kill cleanup grace
-# (FM_LINT_ROOT_GRACE, default 5), and a per-process address-space limit
-# (FM_LINT_ROOT_MEMORY_KIB, default 12582912 = 12 GiB of virtual address
+# (JG_LINT_ROOT_SECONDS, default 1200), a terminate-then-kill cleanup grace
+# (JG_LINT_ROOT_GRACE, default 5), and a per-process address-space limit
+# (JG_LINT_ROOT_MEMORY_KIB, default 12582912 = 12 GiB of virtual address
 # space per analysis process). The sizing rationale and RSS reduction threshold
 # live beside ROOT_MEMORY_KIB below. This is not a resident-memory ceiling;
 # check aggregate runner RSS in CI. The watchdog uses the shared
@@ -70,7 +70,7 @@
 # actually bound a probe command and that the host accepts the memory limit
 # BEFORE any root starts; when either check fails the run refuses with a
 # named error, so a required-bounds run never lints uncapped. Without
-# FM_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
+# JG_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
 # cannot apply the address-space limit at all) each root still runs in its
 # own ShellCheck process with identical diagnostics, just unbounded.
 #
@@ -126,21 +126,21 @@ ROOT="$(cd "$SELF_DIR/.." && pwd -P)"
 cd "$ROOT" || exit 1
 
 # The sibling timeout library supplies the shared group-kill watchdog that
-# bounds each root when FM_LINT_REQUIRE_BOUNDS=1 requires it; without the
+# bounds each root when JG_LINT_REQUIRE_BOUNDS=1 requires it; without the
 # library a required-bounds run refuses in preflight rather than lint uncapped.
 if [ -r "$SELF_DIR/jg-timeout-lib.sh" ]; then
   # shellcheck source=bin/jg-timeout-lib.sh
   . "$SELF_DIR/jg-timeout-lib.sh"
 fi
 
-FM_LINT_WORKER_RUN_PID=
-FM_LINT_WORKER_ARGS=()
+JG_LINT_WORKER_RUN_PID=
+JG_LINT_WORKER_ARGS=()
 # shellcheck disable=SC2329 # Registered by the private worker's signal traps.
 jg_lint_worker_stop() {
-  [ -n "$FM_LINT_WORKER_RUN_PID" ] || return 0
-  kill "$FM_LINT_WORKER_RUN_PID" 2>/dev/null || true
-  wait "$FM_LINT_WORKER_RUN_PID" 2>/dev/null || true
-  FM_LINT_WORKER_RUN_PID=
+  [ -n "$JG_LINT_WORKER_RUN_PID" ] || return 0
+  kill "$JG_LINT_WORKER_RUN_PID" 2>/dev/null || true
+  wait "$JG_LINT_WORKER_RUN_PID" 2>/dev/null || true
+  JG_LINT_WORKER_RUN_PID=
 }
 
 jg_lint_now_ms() {
@@ -202,7 +202,7 @@ jg_lint_classify_root() {  # <rc> <root-stderr-file>
     97) printf 'limit-unavailable\n'; return 0 ;;
     251) printf 'memory\n'; return 0 ;;
   esac
-  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
+  if [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
     printf 'timeout\n'; return 0
   fi
   if grep -qE '^[^[:space:]:]+: (out of memory \(requested [0-9]+ bytes\)|Heap exhausted;)$|: resource exhausted \((Cannot allocate memory|out of memory)\)$' "$err" 2>/dev/null; then
@@ -211,13 +211,13 @@ jg_lint_classify_root() {  # <rc> <root-stderr-file>
   if [ "$rc" = 1 ]; then
     printf 'findings\n'; return 0
   fi
-  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
+  if [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     case "$rc" in
       137)
         # The perl watchdog exits 124 on its own bound, so a bare 137 is a real
         # SIGKILL of the child; GNU/BSD timeout instead report 137 when their
         # configured kill had to fire at the bound.
-        if [ "${FM_LINT_INTERNAL_BOUNDED:-}" = perl ]; then
+        if [ "${JG_LINT_INTERNAL_BOUNDED:-}" = perl ]; then
           printf 'signal:KILL\n'; return 0
         fi
         printf 'timeout\n'; return 0
@@ -237,11 +237,11 @@ jg_lint_classify_root() {  # <rc> <root-stderr-file>
 }
 
 # Run one ShellCheck invocation under the given deadline and the per-root
-# address-space limit, returning its exit status in FM_LINT_LAST_RC.
+# address-space limit, returning its exit status in JG_LINT_LAST_RC.
 jg_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <args...>
   local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0
   shift 5
-  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
+  if [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
     # workers use), so the owner's TERM-then-KILL group sweep cannot kill it
     # before it has forwarded the signal to the root's own group. If the worker
@@ -249,21 +249,21 @@ jg_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     # check still starts the same terminate-then-kill escalation; the worker
     # names itself as that owner before the launch, so a worker that dies while
     # the watchdog is still starting is detected too.
-    ( FM_EXEC_TIMED_OWNER_PID=$$ exec "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
+    ( JG_EXEC_TIMED_OWNER_PID=$$ exec "${JG_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
-        "$seconds" "$FM_LINT_INTERNAL_GRACE" \
-        "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
-        "$FM_LINT_SHELLCHECK" "$@" -- "$path" ) > "$root_out" 2> "$root_err" &
-    FM_LINT_WORKER_RUN_PID=$!
-    wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
-    FM_LINT_WORKER_RUN_PID=
+        "$seconds" "$JG_LINT_INTERNAL_GRACE" \
+        "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$JG_LINT_INTERNAL_MEMORY_KIB" \
+        "$JG_LINT_SHELLCHECK" "$@" -- "$path" ) > "$root_out" 2> "$root_err" &
+    JG_LINT_WORKER_RUN_PID=$!
+    wait "$JG_LINT_WORKER_RUN_PID" || invocation_rc=$?
+    JG_LINT_WORKER_RUN_PID=
   else
-    "$FM_LINT_SHELLCHECK" "$@" -- "$path" > "$root_out" 2> "$root_err" &
-    FM_LINT_WORKER_RUN_PID=$!
-    wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
-    FM_LINT_WORKER_RUN_PID=
+    "$JG_LINT_SHELLCHECK" "$@" -- "$path" > "$root_out" 2> "$root_err" &
+    JG_LINT_WORKER_RUN_PID=$!
+    wait "$JG_LINT_WORKER_RUN_PID" || invocation_rc=$?
+    JG_LINT_WORKER_RUN_PID=
   fi
-  FM_LINT_LAST_RC=$invocation_rc
+  JG_LINT_LAST_RC=$invocation_rc
 }
 
 # Run one selected root, retry memory failures without source following, record
@@ -278,47 +278,47 @@ jg_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   local fallback_rss="$output_dir/root.$shard_index.$index.fallback.rss"
   local start_ms end_ms duration_ms invocation_rc=0 reason rss_kib initial_rc initial_reason
   local fallback_secs
-  local final_follow_sources=${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}
+  local final_follow_sources=${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}
   local -a fallback_args
   start_ms=$(jg_lint_now_ms)
-  if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
+  if [ -n "${JG_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'begin\t%s\t%s\t%s\t%s\t%s\n' \
-      "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" "$start_ms" \
-      >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$index" "$path" "$shard_index" "${JG_LINT_INTERNAL_MODE:-}" "$start_ms" \
+      >> "$JG_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ]; then
+  if [ "${JG_LINT_INTERNAL_PROGRESS:-0}" = 1 ]; then
     printf 'jg-lint: begin %s (shard %s, %s mode)\n' \
-      "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-unknown}" >&2
+      "$path" "$shard_index" "${JG_LINT_INTERNAL_MODE:-unknown}" >&2
   fi
   jg_lint_exec_root "$path" "$root_out" "$root_err" "$rss_file" \
-    "$FM_LINT_INTERNAL_ROOT_SECS" "${FM_LINT_WORKER_ARGS[@]}"
-  invocation_rc=$FM_LINT_LAST_RC
+    "$JG_LINT_INTERNAL_ROOT_SECS" "${JG_LINT_WORKER_ARGS[@]}"
+  invocation_rc=$JG_LINT_LAST_RC
   reason=$(jg_lint_classify_root "$invocation_rc" "$root_err")
   initial_rc=$invocation_rc
   initial_reason=$reason
   # The retry spends what is left of this root's one deadline rather than a
   # fresh one, so both attempts together still fit the budget CI sized its job
   # timeout around.
-  fallback_secs=$(( (start_ms + FM_LINT_INTERNAL_ROOT_SECS * 1000 - $(jg_lint_now_ms)) / 1000 ))
+  fallback_secs=$(( (start_ms + JG_LINT_INTERNAL_ROOT_SECS * 1000 - $(jg_lint_now_ms)) / 1000 ))
   if [ "$reason" = memory ] \
-    && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
-    && [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] \
+    && [ "${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
+    && [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ] \
     && [ "$fallback_secs" -lt 1 ]; then
     printf 'jg-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s); no time left in its %ss deadline to retry without it\n' \
-      "$path" "$initial_reason" "$initial_rc" "$FM_LINT_INTERNAL_ROOT_SECS" >> "$output_dir/shard.$shard_index.out"
+      "$path" "$initial_reason" "$initial_rc" "$JG_LINT_INTERNAL_ROOT_SECS" >> "$output_dir/shard.$shard_index.out"
     rss_kib=$(jg_lint_root_rss "$rss_file")
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
   elif [ "$reason" = memory ] \
-    && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
+    && [ "${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
     fallback_args=()
-    for arg in "${FM_LINT_WORKER_ARGS[@]}"; do
+    for arg in "${JG_LINT_WORKER_ARGS[@]}"; do
       [ "$arg" = --external-sources ] || fallback_args+=("$arg")
     done
     [ -z "$LOCAL_NOX_EXCLUDE" ] || fallback_args+=("--exclude=$LOCAL_NOX_EXCLUDE")
     jg_lint_exec_root "$path" "$fallback_out" "$fallback_err" "$fallback_rss" \
       "$fallback_secs" "${fallback_args[@]}"
     final_follow_sources=0
-    invocation_rc=$FM_LINT_LAST_RC
+    invocation_rc=$JG_LINT_LAST_RC
     reason=$(jg_lint_classify_root "$invocation_rc" "$fallback_err")
     rss_kib=$(jg_lint_max_root_rss \
       "$(jg_lint_root_rss "$rss_file")" "$(jg_lint_root_rss "$fallback_rss")")
@@ -340,13 +340,13 @@ jg_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   fi
   end_ms=$(jg_lint_now_ms)
   duration_ms=$((end_ms - start_ms))
-  if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
+  if [ -n "${JG_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
+      "$index" "$path" "$shard_index" "${JG_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" \
-      >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      >> "$JG_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
+  if [ "${JG_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'jg-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
       "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" >&2
   fi
@@ -367,15 +367,15 @@ jg_lint_worker() {  # <manifest> <output-dir> <shard-index>
     trap 'jg_lint_worker_stop; exit 129' HUP
     trap 'jg_lint_worker_stop; exit 130' INT
     trap 'jg_lint_worker_stop; exit 143' TERM
-    FM_LINT_WORKER_ARGS=(--norc)
-    if [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
-      FM_LINT_WORKER_ARGS+=(--external-sources)
+    JG_LINT_WORKER_ARGS=(--norc)
+    if [ "${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
+      JG_LINT_WORKER_ARGS+=(--external-sources)
     fi
-    if [ -n "${FM_LINT_INTERNAL_EXCLUDE:-}" ]; then
-      FM_LINT_WORKER_ARGS+=(--exclude="$FM_LINT_INTERNAL_EXCLUDE")
+    if [ -n "${JG_LINT_INTERNAL_EXCLUDE:-}" ]; then
+      JG_LINT_WORKER_ARGS+=(--exclude="$JG_LINT_INTERNAL_EXCLUDE")
     fi
-    if [ "${FM_LINT_INTERNAL_FAST:-0}" -eq 1 ]; then
-      FM_LINT_WORKER_ARGS+=(--extended-analysis=false)
+    if [ "${JG_LINT_INTERNAL_FAST:-0}" -eq 1 ]; then
+      JG_LINT_WORKER_ARGS+=(--extended-analysis=false)
     fi
     : > "$output.out"
     for entry in "${root_entries[@]}"; do
@@ -397,11 +397,11 @@ jg_lint_worker() {  # <manifest> <output-dir> <shard-index>
 
 # Private subprocess mode used only by the bounded parent above.
 if [ "${1:-}" = "--internal-worker" ]; then
-  [ "${FM_LINT_INTERNAL:-}" = 1 ] || {
+  [ "${JG_LINT_INTERNAL:-}" = 1 ] || {
     printf 'jg-lint.sh: --internal-worker is private to the lint owner.\n' >&2
     exit 2
   }
-  [ "$#" -eq 4 ] && [ -n "${FM_LINT_SHELLCHECK:-}" ] || exit 2
+  [ "$#" -eq 4 ] && [ -n "${JG_LINT_SHELLCHECK:-}" ] || exit 2
   jg_lint_worker "$2" "$3" "$4"
   exit $?
 fi
@@ -412,7 +412,7 @@ fi
 # tool itself. A limit the host cannot apply exits 97 so the parent reports
 # limit-unavailable instead of running uncapped.
 if [ "${1:-}" = "--internal-root" ]; then
-  [ "${FM_LINT_INTERNAL:-}" = 1 ] || {
+  [ "${JG_LINT_INTERNAL:-}" = 1 ] || {
     printf 'jg-lint.sh: --internal-root is private to the lint owner.\n' >&2
     exit 2
   }
@@ -446,7 +446,7 @@ fi
 # keeps the watchdog out of the worker's killable group while resolving the
 # shared jg_exec_timed implementation through the same source path.
 if [ "${1:-}" = "--internal-timed" ]; then
-  [ "${FM_LINT_INTERNAL:-}" = 1 ] || {
+  [ "${JG_LINT_INTERNAL:-}" = 1 ] || {
     printf 'jg-lint.sh: --internal-timed is private to the lint owner.\n' >&2
     exit 2
   }
@@ -711,8 +711,8 @@ jg_lint_run_backend_purity() {
   }
 }
 
-JOBS=${FM_LINT_JOBS:-2}
-TELEMETRY=${FM_LINT_TELEMETRY:-}
+JOBS=${JG_LINT_JOBS:-2}
+TELEMETRY=${JG_LINT_TELEMETRY:-}
 FAST=0
 ANALYSIS_MODE=full
 PARTITION=
@@ -952,13 +952,13 @@ if [ -n "$TELEMETRY" ]; then
   }
 fi
 
-# Per-root bounded-execution envelope. Under FM_LINT_REQUIRE_BOUNDS=1 the
+# Per-root bounded-execution envelope. Under JG_LINT_REQUIRE_BOUNDS=1 the
 # watchdog is probed and the host's acceptance of ulimit -v is checked before
 # any root starts; failed checks refuse with a named error. A required-bounds run
 # never lints uncapped. Without it each root still runs alone in its own
 # ShellCheck process, unbounded, for local developer lint.
-ROOT_SECONDS=${FM_LINT_ROOT_SECONDS:-1200}
-ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
+ROOT_SECONDS=${JG_LINT_ROOT_SECONDS:-1200}
+ROOT_GRACE=${JG_LINT_ROOT_GRACE:-5}
 # 12 GiB of virtual address space per analysis process. ulimit -v caps
 # address space, not resident memory; ShellCheck's GHC runtime reserves about
 # a third of that space, leaving ~8 GiB usable heap per root. Measured x86_64
@@ -968,17 +968,17 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # tests/jg-launch-prompt-signals-live-e2e.test.sh. CI runs one root per
 # lint job, so worst-case resident demand is ~8 GiB plus runner overhead,
 # inside the 16 GiB runner. Local lint defaults to two workers; two such
-# caps allow ~16 GiB resident plus host overhead, so use FM_LINT_JOBS=1 on
+# caps allow ~16 GiB resident plus host overhead, so use JG_LINT_JOBS=1 on
 # smaller local machines. A root that exceeds its cap fails by name.
 # Never disable, narrow, or redirect source-following to fit a root under
 # the cap. The roots sidecar records each root's peak RSS; roots peaking
 # above about 3 GiB resident are reduction candidates,
 # bin/jg-pending-reply-lib.sh first (its separate dedup fix is PR 5753).
-ROOT_MEMORY_KIB=${FM_LINT_ROOT_MEMORY_KIB:-12582912}
+ROOT_MEMORY_KIB=${JG_LINT_ROOT_MEMORY_KIB:-12582912}
 for bound_pair in \
-  "FM_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
-  "FM_LINT_ROOT_GRACE=$ROOT_GRACE" \
-  "FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB"; do
+  "JG_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
+  "JG_LINT_ROOT_GRACE=$ROOT_GRACE" \
+  "JG_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB"; do
   case "${bound_pair#*=}" in
     ''|0*|*[!0-9]*)
       printf 'jg-lint.sh: %s must be a positive integer, got %s.\n' \
@@ -989,7 +989,7 @@ for bound_pair in \
 done
 
 BOUND_MECH=none
-if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
+if [ "${JG_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
   bounds_problems=()
   if declare -F jg_exec_timed >/dev/null 2>&1; then
     # perl is mandatory above, so jg_exec_timed always takes its perl watchdog.
@@ -1017,12 +1017,12 @@ if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
     fi
   fi
   ( ulimit -v "$ROOT_MEMORY_KIB" ) 2>/dev/null \
-    || bounds_problems+=("per-root memory limit FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB KiB is not enforceable on this host (ulimit -v)")
+    || bounds_problems+=("per-root memory limit JG_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB KiB is not enforceable on this host (ulimit -v)")
   if [ "${#bounds_problems[@]}" -gt 0 ]; then
     for problem in "${bounds_problems[@]}"; do
       printf 'jg-lint.sh: bounds required but %s.\n' "$problem" >&2
     done
-    printf 'jg-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.\n' >&2
+    printf 'jg-lint.sh: refusing to lint uncapped under JG_LINT_REQUIRE_BOUNDS=1.\n' >&2
     exit 2
   fi
 fi
@@ -1165,19 +1165,19 @@ jg_lint_run_worker() {  # <worker-index>
   manifest="$TMP_ROOT/manifest.$worker_index"
   timing="$TMP_ROOT/timing.$worker_index"
   worker_env=(
-    FM_LINT_INTERNAL=1
-    FM_LINT_INTERNAL_FAST="$FAST"
-    FM_LINT_INTERNAL_FOLLOW_SOURCES="$FOLLOW_SOURCES"
-    FM_LINT_INTERNAL_EXCLUDE="$EXCLUDE_CODES"
-    FM_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
-    FM_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
-    FM_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
-    FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
-    FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
-    FM_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
-    FM_LINT_INTERNAL_PROGRESS="$PROGRESS"
-    FM_LINT_SHELLCHECK="$SHELLCHECK_BIN"
-    FM_LINT_PERL_BIN="$PERL_BIN"
+    JG_LINT_INTERNAL=1
+    JG_LINT_INTERNAL_FAST="$FAST"
+    JG_LINT_INTERNAL_FOLLOW_SOURCES="$FOLLOW_SOURCES"
+    JG_LINT_INTERNAL_EXCLUDE="$EXCLUDE_CODES"
+    JG_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
+    JG_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
+    JG_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
+    JG_LINT_INTERNAL_GRACE="$ROOT_GRACE"
+    JG_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"
+    JG_LINT_INTERNAL_MODE="$ANALYSIS_MODE"
+    JG_LINT_INTERNAL_PROGRESS="$PROGRESS"
+    JG_LINT_SHELLCHECK="$SHELLCHECK_BIN"
+    JG_LINT_PERL_BIN="$PERL_BIN"
   )
   if [ -n "$TELEMETRY" ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then

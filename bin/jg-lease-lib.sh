@@ -22,14 +22,14 @@
 #     refresh), with inspection and mutation serialized by the home-local
 #     lease-command lock; leases never coordinate across firstmate homes.
 #   - Actors: exactly "main" and "branch". The current actor is
-#     $FM_SUPERVISION_ACTOR when set, else "main". The branch's shell gets
-#     FM_SUPERVISION_ACTOR=branch injected deterministically by the process
+#     $JG_SUPERVISION_ACTOR when set, else "main". The branch's shell gets
+#     JG_SUPERVISION_ACTOR=branch injected deterministically by the process
 #     hosting it (on Pi, the branch extension's bash tool; elsewhere, the
 #     supervision host's engine environment), not by agent memory. Any other
 #     value is refused loudly - an unknown actor is a wiring bug, not a third
 #     role.
 #   - Staleness: the recorded pid is the long-lived supervising process (the
-#     session-lock holder, or FM_LEASE_HOLDER_PID - see bin/jg-lease.sh), so a
+#     session-lock holder, or JG_LEASE_HOLDER_PID - see bin/jg-lease.sh), so a
 #     dead recorded pid means the supervising session died; the lease is
 #     cleared at the next claim, guard, or sweep. Liveness is the pure record
 #     test, identical in every calling context: the recorded pid is alive and
@@ -56,7 +56,7 @@
 # ACCIDENTAL override fails loudly inside the branch's own shell as well.
 #   - Guard semantics (jg_lease_guard): no lease, a same-actor lease, or a
 #     provably stale lease passes; a live lease held by the OTHER actor
-#     refuses with exit FM_LEASE_REFUSE_EXIT. Whenever the guard engages - a
+#     refuses with exit JG_LEASE_REFUSE_EXIT. Whenever the guard engages - a
 #     supervision context (Pi, or an explicit actor), a home that runs the
 #     supervision host (jg_supervision_host_enabled, whose host can claim a
 #     task that has no lease yet), or any lease file for the task - it retains the
@@ -102,9 +102,9 @@
 # Distinct from usage errors (2), the gate refusal (3), and jg-send's
 # unconfirmed submit (3): recognizable as "the other supervision actor holds
 # this task right now - retry after the lease clears".
-FM_LEASE_REFUSE_EXIT=6
-FM_LEASE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-FM_LEASE_GUARD_LOCK=
+JG_LEASE_REFUSE_EXIT=6
+JG_LEASE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+JG_LEASE_GUARD_LOCK=
 
 jg_lease_lock_helpers() {
   if ! command -v jg_lock_acquire_wait >/dev/null 2>&1; then
@@ -113,13 +113,13 @@ jg_lease_lock_helpers() {
     # analysis boundary so ShellCheck's external-source traversal does not
     # recursively duplicate that large graph for every lease-lib consumer.
     # shellcheck source=/dev/null
-    . "$FM_LEASE_LIB_DIR/jg-wake-lib.sh"
+    . "$JG_LEASE_LIB_DIR/jg-wake-lib.sh"
   fi
   if ! command -v jg_lock_age >/dev/null 2>&1; then
     # jg-lock-lib.sh is a side-effect-free leaf that owns the lock-age read
     # used by the bounded lease-command acquire below.
     # shellcheck source=bin/jg-lock-lib.sh
-    . "$FM_LEASE_LIB_DIR/jg-lock-lib.sh"
+    . "$JG_LEASE_LIB_DIR/jg-lock-lib.sh"
   fi
 }
 
@@ -134,13 +134,13 @@ jg_lease_lock_helpers() {
 # bound is never preempted. 300s is the fleet's usual guard grace and sits far
 # above any real lease-command hold (claim, release, and steer are sub-second;
 # a relaunch or teardown is the longest and still finishes in seconds).
-FM_LEASE_COMMAND_LOCK_MAX_AGE_SECS=${FM_LEASE_COMMAND_LOCK_MAX_AGE_SECS:-300}
+JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS=${JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS:-300}
 
 # jg_lease_command_lock_max_age: echo the validated bound (invalid -> 300).
 # Read at call time because this is a sourced library serving many commands in
 # one shell.
 jg_lease_command_lock_max_age() {
-  local age=${FM_LEASE_COMMAND_LOCK_MAX_AGE_SECS:-300}
+  local age=${JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS:-300}
   case "$age" in '' | *[!0-9]* | 0) age=300 ;; esac
   printf '%s\n' "$age"
 }
@@ -172,7 +172,7 @@ jg_lease_command_lock_reclaim() {
 # jg_lock_acquire_wait on the lease-command lock (used by bin/jg-lease.sh and
 # jg_lease_guard). The ordinary stale-owner recovery still clears a provably
 # dead holder; beyond that the wait is bounded by the lock's age, so an alive
-# holder past FM_LEASE_COMMAND_LOCK_MAX_AGE_SECS is reclaimed instead of
+# holder past JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS is reclaimed instead of
 # blocking forever. One stuck relaunch can therefore never wedge every relaunch
 # and steer in the home.
 jg_lease_command_lock_acquire() {
@@ -189,19 +189,19 @@ jg_lease_command_lock_acquire() {
 jg_lease_home_runs_host() {
   if ! command -v jg_supervision_host_enabled >/dev/null 2>&1; then
     # shellcheck source=bin/jg-supervision-engine-lib.sh
-    . "$FM_LEASE_LIB_DIR/jg-supervision-engine-lib.sh"
+    . "$JG_LEASE_LIB_DIR/jg-supervision-engine-lib.sh"
   fi
-  jg_supervision_host_enabled "${FM_CONFIG_OVERRIDE:-${FM_HOME:-$STATE/..}/config}"
+  jg_supervision_host_enabled "${JG_CONFIG_OVERRIDE:-${JG_HOME:-$STATE/..}/config}"
 }
 
 # jg_lease_actor: print the current actor after validating it. Returns 1 (with
-# stderr) for an unknown FM_SUPERVISION_ACTOR value.
+# stderr) for an unknown JG_SUPERVISION_ACTOR value.
 jg_lease_actor() {
-  local actor=${FM_SUPERVISION_ACTOR:-main}
+  local actor=${JG_SUPERVISION_ACTOR:-main}
   case "$actor" in
     main|branch) printf '%s\n' "$actor" ;;
     *)
-      echo "error: unknown FM_SUPERVISION_ACTOR '$actor' (expected main or branch)" >&2
+      echo "error: unknown JG_SUPERVISION_ACTOR '$actor' (expected main or branch)" >&2
       return 1
       ;;
   esac
@@ -220,28 +220,28 @@ jg_lease_path() {
   printf '%s/.lease-%s\n' "$STATE" "$1"
 }
 
-# jg_lease_read <task>: read the lease into FM_LEASE_ACTOR/FM_LEASE_PID/
-# FM_LEASE_EPOCH. Returns 1 when no lease file exists. A malformed lease
+# jg_lease_read <task>: read the lease into JG_LEASE_ACTOR/JG_LEASE_PID/
+# JG_LEASE_EPOCH. Returns 1 when no lease file exists. A malformed lease
 # (unreadable actor or pid) reads as actor "" so callers treat it as stale
 # rather than blocking forever on a torn record.
 jg_lease_read() {
   local file line
   file=$(jg_lease_path "$1")
-  FM_LEASE_ACTOR=
-  FM_LEASE_PID=
-  FM_LEASE_EPOCH=
+  JG_LEASE_ACTOR=
+  JG_LEASE_PID=
+  JG_LEASE_EPOCH=
   [ -e "$file" ] || return 1
   IFS= read -r line < "$file" 2>/dev/null || line=
-  FM_LEASE_ACTOR=$(printf '%s' "$line" | cut -f1)
-  FM_LEASE_PID=$(printf '%s' "$line" | cut -f2)
+  JG_LEASE_ACTOR=$(printf '%s' "$line" | cut -f1)
+  JG_LEASE_PID=$(printf '%s' "$line" | cut -f2)
   # shellcheck disable=SC2034 # Consumed by sourcing callers (bin/jg-lease.sh check).
-  FM_LEASE_EPOCH=$(printf '%s' "$line" | cut -f3)
-  case "$FM_LEASE_ACTOR" in
+  JG_LEASE_EPOCH=$(printf '%s' "$line" | cut -f3)
+  case "$JG_LEASE_ACTOR" in
     main|branch) ;;
-    *) FM_LEASE_ACTOR= ;;
+    *) JG_LEASE_ACTOR= ;;
   esac
-  case "$FM_LEASE_PID" in
-    '' | *[!0-9]*) FM_LEASE_PID= ;;
+  case "$JG_LEASE_PID" in
+    '' | *[!0-9]*) JG_LEASE_PID= ;;
   esac
   return 0
 }
@@ -252,12 +252,12 @@ jg_lease_read() {
 jg_lease_live() {
   local lock_pid
   jg_lease_read "$1" || return 1
-  [ -n "$FM_LEASE_ACTOR" ] || return 1
-  [ -n "$FM_LEASE_PID" ] || return 1
-  kill -0 "$FM_LEASE_PID" 2>/dev/null || return 1
+  [ -n "$JG_LEASE_ACTOR" ] || return 1
+  [ -n "$JG_LEASE_PID" ] || return 1
+  kill -0 "$JG_LEASE_PID" 2>/dev/null || return 1
   lock_pid=$(head -n 1 "$STATE/.lock" 2>/dev/null || true)
   case "$lock_pid" in ''|0|1|*[!0-9]*) return 1 ;; esac
-  [ "$FM_LEASE_PID" = "$lock_pid" ]
+  [ "$JG_LEASE_PID" = "$lock_pid" ]
 }
 
 # jg_lease_clear_stale <task>: remove the lease file when it exists but is not
@@ -270,7 +270,7 @@ jg_lease_clear_stale() {
   rm -f -- "$file"
 }
 
-# jg_lease_guard <task> <action-label>: refuse (exit FM_LEASE_REFUSE_EXIT) when
+# jg_lease_guard <task> <action-label>: refuse (exit JG_LEASE_REFUSE_EXIT) when
 # a live lease held by the OTHER actor exists for <task>. Once engaged (the
 # guard semantics above), a successful guard retains the command lock across
 # the caller's mutation; the caller must invoke jg_lease_guard_release from its
@@ -278,8 +278,8 @@ jg_lease_clear_stale() {
 jg_lease_guard() {
   local task=$1 action=$2 actor lock lease_actor
   jg_lease_valid_id "$task" || return 0
-  actor=$(jg_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
-  case "${PI_CODING_AGENT:-}:${FM_SUPERVISION_ACTOR:-}" in
+  actor=$(jg_lease_actor) || exit "$JG_LEASE_REFUSE_EXIT"
+  case "${PI_CODING_AGENT:-}:${JG_SUPERVISION_ACTOR:-}" in
     true:*|*:main|*:branch) ;;
     *)
       [ -e "$(jg_lease_path "$task")" ] || jg_lease_home_runs_host || return 0
@@ -289,28 +289,28 @@ jg_lease_guard() {
   lock="$STATE/.jg-lease-command.lock"
   # A caller with more than one guarded phase already excludes claims until
   # its shared cleanup; do not recursively acquire the non-reentrant lock.
-  if [ "$FM_LEASE_GUARD_LOCK" != "$lock" ]; then
+  if [ "$JG_LEASE_GUARD_LOCK" != "$lock" ]; then
     jg_lease_command_lock_acquire "$lock"
-    FM_LEASE_GUARD_LOCK=$lock
+    JG_LEASE_GUARD_LOCK=$lock
   fi
   if ! jg_lease_live "$task"; then
     jg_lease_clear_stale "$task" || { jg_lease_guard_release; return 1; }
     return 0
   fi
-  lease_actor=$FM_LEASE_ACTOR
+  lease_actor=$JG_LEASE_ACTOR
   if [ "$lease_actor" != "$actor" ]; then
     jg_lease_guard_release
     echo "error: $action refused - task '$task' is leased to the $lease_actor supervision actor (state/.lease-$task), which is handling that task right now; leave the lease alone (never remove or clear it) and retry after that actor releases it, which it does when its handling ends" >&2
-    exit "$FM_LEASE_REFUSE_EXIT"
+    exit "$JG_LEASE_REFUSE_EXIT"
   fi
 }
 
 # Release the claim/guard serialization lock retained by jg_lease_guard.
 # Idempotent so callers can use it unconditionally from existing EXIT cleanup.
 jg_lease_guard_release() {
-  local lock=$FM_LEASE_GUARD_LOCK
+  local lock=$JG_LEASE_GUARD_LOCK
   [ -n "$lock" ] || return 0
-  FM_LEASE_GUARD_LOCK=
+  JG_LEASE_GUARD_LOCK=
   jg_lock_release "$lock"
 }
 
@@ -321,12 +321,12 @@ jg_lease_guard_release() {
 # cached, because the record can be archived between two guarded actions.
 jg_lease_away_relocated() {
   [ -f "$STATE/.afk-contract" ] || return 1
-  FM_STATE_OVERRIDE="$STATE" "$FM_LEASE_LIB_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1 || return 1
-  [ "$(FM_STATE_OVERRIDE="$STATE" "$FM_LEASE_LIB_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]
+  JG_STATE_OVERRIDE="$STATE" "$JG_LEASE_LIB_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1 || return 1
+  [ "$(JG_STATE_OVERRIDE="$STATE" "$JG_LEASE_LIB_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]
 }
 
 # jg_lease_forbid_branch <action-label> [--away-relocated]: refuse (exit
-# FM_LEASE_REFUSE_EXIT) when the current actor is the supervision branch.
+# JG_LEASE_REFUSE_EXIT) when the current actor is the supervision branch.
 # Guards the main-owned role partition; a home with no branch never sets the
 # actor and always passes. With --away-relocated, the branch passes instead
 # while jg_lease_away_relocated holds (main is parked under the away-posture
@@ -334,12 +334,12 @@ jg_lease_away_relocated() {
 # without the flag the action is never relocated in any posture.
 jg_lease_forbid_branch() {
   local action=$1 relocatable=${2:-} actor
-  actor=$(jg_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
+  actor=$(jg_lease_actor) || exit "$JG_LEASE_REFUSE_EXIT"
   [ "$actor" = branch ] || return 0
   if [ "$relocatable" = --away-relocated ] && jg_lease_away_relocated; then
     echo "note: $action proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md \"Postures\")" >&2
     return 0
   fi
   echo "error: $action refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)" >&2
-  exit "$FM_LEASE_REFUSE_EXIT"
+  exit "$JG_LEASE_REFUSE_EXIT"
 }

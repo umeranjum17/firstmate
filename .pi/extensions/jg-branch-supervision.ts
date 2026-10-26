@@ -115,7 +115,7 @@ import {
   awayPostureTailFor,
   branchWakePrompt,
   deactivateEligibleRowsOwner,
-  FM_BRANCH_DISPATCH_EVENT,
+  JG_BRANCH_DISPATCH_EVENT,
   releaseEligibleRowsSnapshot,
   scopeForUnreadWake,
   writeEligibleRowsSnapshot,
@@ -129,6 +129,10 @@ import {
   type BranchPickerItem,
 } from "./lib/jg-branch-model-picker.ts";
 import {
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
   classifyFirstmateOperationalText,
   encodeFirstmateOperationalInputWith,
 } from "./lib/jg-operational-input.ts";
@@ -136,10 +140,10 @@ import {
 const extensionFile = fileURLToPath(import.meta.url);
 const extensionDir = dirname(extensionFile);
 const root = resolve(extensionDir, "../..");
-const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
-const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
-const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
+const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
+const fmRoot = process.env.JG_ROOT_OVERRIDE || root;
+const state = process.env.JG_STATE_OVERRIDE || `${fmHome}/state`;
+const config = process.env.JG_CONFIG_OVERRIDE || `${fmHome}/config`;
 const sessionsDir = join(state, "branch-session");
 const sessionPointer = join(state, ".branch-session");
 const mirrorCursorFile = join(state, ".branch-mirror-cursor");
@@ -220,10 +224,10 @@ type ProviderRecovery = {
 
 const scriptEnv = {
   ...process.env,
-  FM_HOME: fmHome,
-  FM_ROOT_OVERRIDE: fmRoot,
-  FM_STATE_OVERRIDE: state,
-  FM_CONFIG_OVERRIDE: config,
+  JG_HOME: fmHome,
+  JG_ROOT_OVERRIDE: fmRoot,
+  JG_STATE_OVERRIDE: state,
+  JG_CONFIG_OVERRIDE: config,
 };
 
 function offerEligible(offer: BranchDispatchOffer): boolean {
@@ -926,7 +930,7 @@ export default function (pi: ExtensionAPI) {
     if (!(await generationOwnsLock(expectedGeneration))) return false;
     const result = await runCommandAsync("bash", [leaseScript, "release-actor", "--actor", "branch"], {
       cwd: fmRoot,
-      env: { ...scriptEnv, FM_SUPERVISION_ACTOR: "branch" },
+      env: { ...scriptEnv, JG_SUPERVISION_ACTOR: "branch" },
     });
     return result.status === 0;
   }
@@ -1364,15 +1368,15 @@ export default function (pi: ExtensionAPI) {
           // accidental in-shell reassignment fails loudly instead of silently
           // impersonating main. Confused-agent-grade by design; the threat
           // model lives in bin/jg-lease-lib.sh.
-          command: `readonly FM_SUPERVISION_ACTOR FM_LEASE_HOLDER_PID
+          command: `readonly JG_SUPERVISION_ACTOR JG_LEASE_HOLDER_PID
 (
 ${context.command}
 )`,
           env: {
             ...context.env,
             ...scriptEnv,
-            FM_SUPERVISION_ACTOR: "branch",
-            FM_LEASE_HOLDER_PID: leaseHolderPid,
+            JG_SUPERVISION_ACTOR: "branch",
+            JG_LEASE_HOLDER_PID: leaseHolderPid,
           },
         };
       },
@@ -1645,7 +1649,7 @@ ${context.command}
   // side effects and the unread reconcile, both of which now run as the
   // settlement's first steps and reject to the watcher's main path if they
   // fail, exactly as a refused offer would.
-  pi.events?.on?.(FM_BRANCH_DISPATCH_EVENT, (data) => {
+  pi.events?.on?.(JG_BRANCH_DISPATCH_EVENT, (data) => {
     const offer = data as BranchDispatchOffer;
     if (!offer || typeof offer.accept !== "function") return;
     // Check eligibility before the ownership read so an out-of-scope wake
@@ -2182,7 +2186,7 @@ ${context.command}
     if (stockOutcomesPreviewLines !== undefined) return stockOutcomesPreviewLines ?? undefined;
     const probeTokens = Array.from(
       { length: 64 },
-      (_, index) => `FM_OUTCOMES_PREVIEW_PROBE_${String(index).padStart(2, "0")}`,
+      (_, index) => `JG_OUTCOMES_PREVIEW_PROBE_${String(index).padStart(2, "0")}`,
     );
     try {
       const probeDefinition: ToolDefinition = {

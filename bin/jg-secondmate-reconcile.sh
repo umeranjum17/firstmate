@@ -37,7 +37,7 @@
 #     here re-parses another home's state or runs a second child summary;
 #   - the cooldown. One durable per-home timestamp records the last nudge, and a
 #     home is nudged only when that timestamp is older than the cooldown window
-#     (FM_RECONCILE_COOLDOWN_SECONDS, four hours). A recap or digest loop
+#     (JG_RECONCILE_COOLDOWN_SECONDS, four hours). A recap or digest loop
 #     therefore cannot nag, while a mismatch still sitting there hours later
 #     earns one gentle re-nudge. Deliberately coarse: a timestamp cannot go
 #     stale, cannot mis-order against a concurrent snapshot, and cannot
@@ -88,8 +88,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
@@ -99,13 +99,13 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
 
 # One nudge per home per four hours.
-FM_RECONCILE_COOLDOWN_SECONDS=${FM_RECONCILE_COOLDOWN_SECONDS:-14400}
-FM_RECONCILE_REQUEST_MAX_BYTES=${FM_RECONCILE_REQUEST_MAX_BYTES:-1048576}
-case "$FM_RECONCILE_COOLDOWN_SECONDS" in
-  ''|*[!0-9]*) echo "jg-secondmate-reconcile: FM_RECONCILE_COOLDOWN_SECONDS must be a whole number of seconds" >&2; exit 2 ;;
+JG_RECONCILE_COOLDOWN_SECONDS=${JG_RECONCILE_COOLDOWN_SECONDS:-14400}
+JG_RECONCILE_REQUEST_MAX_BYTES=${JG_RECONCILE_REQUEST_MAX_BYTES:-1048576}
+case "$JG_RECONCILE_COOLDOWN_SECONDS" in
+  ''|*[!0-9]*) echo "jg-secondmate-reconcile: JG_RECONCILE_COOLDOWN_SECONDS must be a whole number of seconds" >&2; exit 2 ;;
 esac
-case "$FM_RECONCILE_REQUEST_MAX_BYTES" in
-  ''|*[!0-9]*|0) echo "jg-secondmate-reconcile: FM_RECONCILE_REQUEST_MAX_BYTES must be a positive whole number" >&2; exit 2 ;;
+case "$JG_RECONCILE_REQUEST_MAX_BYTES" in
+  ''|*[!0-9]*|0) echo "jg-secondmate-reconcile: JG_RECONCILE_REQUEST_MAX_BYTES must be a positive whole number" >&2; exit 2 ;;
 esac
 
 REQUEST_DIR="$STATE/reconcile-notify"
@@ -268,19 +268,19 @@ cmd_request() {
   tmp=$(umask 077; mktemp "$REQUEST_DIR/.request.XXXXXX") \
     || fail "cannot create a reconcile notify request"
   if [ "$snapshot_src" = - ]; then
-    LC_ALL=C head -c "$((FM_RECONCILE_REQUEST_MAX_BYTES + 1))" > "$tmp" \
+    LC_ALL=C head -c "$((JG_RECONCILE_REQUEST_MAX_BYTES + 1))" > "$tmp" \
       || { rm -f -- "$tmp"; fail "cannot capture the snapshot"; }
   else
     [ -f "$snapshot_src" ] && [ ! -L "$snapshot_src" ] \
       || { rm -f -- "$tmp"; fail "snapshot does not exist or is unsafe: $snapshot_src"; }
-    LC_ALL=C head -c "$((FM_RECONCILE_REQUEST_MAX_BYTES + 1))" "$snapshot_src" > "$tmp" \
+    LC_ALL=C head -c "$((JG_RECONCILE_REQUEST_MAX_BYTES + 1))" "$snapshot_src" > "$tmp" \
       || { rm -f -- "$tmp"; fail "cannot capture the snapshot"; }
   fi
   bytes=$(LC_ALL=C wc -c < "$tmp" | tr -d ' ')
   case "$bytes" in ''|*[!0-9]*) rm -f -- "$tmp"; fail "cannot size the captured snapshot" ;; esac
-  if [ "$bytes" -gt "$FM_RECONCILE_REQUEST_MAX_BYTES" ]; then
+  if [ "$bytes" -gt "$JG_RECONCILE_REQUEST_MAX_BYTES" ]; then
     rm -f -- "$tmp"
-    fail "captured snapshot exceeds FM_RECONCILE_REQUEST_MAX_BYTES"
+    fail "captured snapshot exceeds JG_RECONCILE_REQUEST_MAX_BYTES"
   fi
   if ! jq -e -s '
     length == 1
@@ -386,7 +386,7 @@ cmd_process_requests() {
         ;;
     esac
     rc=0
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-secondmate-reconcile.sh" notify --snapshot "$claimed" \
       > "$output" 2>&1 || rc=$?
     if [ "$rc" -eq 0 ] \
@@ -486,7 +486,7 @@ cmd_notify() {
     if [ -n "$last" ]; then
       age=$((now - last))
       # A clock that moved backwards must not silence the home forever.
-      if [ "$age" -ge 0 ] && [ "$age" -lt "$FM_RECONCILE_COOLDOWN_SECONDS" ]; then
+      if [ "$age" -ge 0 ] && [ "$age" -lt "$JG_RECONCILE_COOLDOWN_SECONDS" ]; then
         printf 'cooldown: %s %s\n' "$id" "$age"
         release_active_locks
         continue
@@ -531,8 +531,8 @@ cmd_notify() {
     [ -n "$sampled_spawn_gen" ] || expected_remote_host=$sampled_host
     release_active_locks
     send_rc=0
-    FM_TASK_INBOX_LOCK_WAIT_SECS=0 FM_SEND_EXPECTED_SPAWN_GEN="$sampled_spawn_gen" \
-      FM_SEND_EXPECTED_REMOTE_HOST="$expected_remote_host" \
+    JG_TASK_INBOX_LOCK_WAIT_SECS=0 JG_SEND_EXPECTED_SPAWN_GEN="$sampled_spawn_gen" \
+      JG_SEND_EXPECTED_REMOTE_HOST="$expected_remote_host" \
       "$SCRIPT_DIR/jg-send.sh" "$id" --fire-and-forget "$did" \
       "$(reconcile_text)" >/dev/null 2>&1 || send_rc=$?
     # exit 3 is "typed but unconfirmed": the mate may already hold the ask, so

@@ -21,7 +21,7 @@ TMP_ROOT=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/jg-herdr-session-cleanup
 FAKEBIN="$TMP_ROOT/fakebin"
 HOME_DIR="$TMP_ROOT/home"
 mkdir -p "$FAKEBIN" "$HOME_DIR/state" "$HOME_DIR/config"
-export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/lab-state"
+export JG_HERDR_LAB_STATE_DIR="$TMP_ROOT/lab-state"
 CALLER_HOME=$HOME
 touch "$HOME_DIR/config/herdr-presentation-spaces"
 printf '%s\n' herdr > "$HOME_DIR/config/backend"
@@ -43,15 +43,15 @@ reject_lab() {
     fail "unsafe lab operation succeeded: $*"
   fi
 }
-mkdir -m 755 "$FM_HERDR_LAB_STATE_DIR"
+mkdir -m 755 "$JG_HERDR_LAB_STATE_DIR"
 reject_lab provision "$HERDR_LAB_SESSION"
-chmod 700 "$FM_HERDR_LAB_STATE_DIR"
-mv "$FM_HERDR_LAB_STATE_DIR" "$TMP_ROOT/private-state"
-ln -s "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
+chmod 700 "$JG_HERDR_LAB_STATE_DIR"
+mv "$JG_HERDR_LAB_STATE_DIR" "$TMP_ROOT/private-state"
+ln -s "$TMP_ROOT/private-state" "$JG_HERDR_LAB_STATE_DIR"
 reject_lab provision "$HERDR_LAB_SESSION"
-rm "$FM_HERDR_LAB_STATE_DIR"
-mv "$TMP_ROOT/private-state" "$FM_HERDR_LAB_STATE_DIR"
-mkdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+rm "$JG_HERDR_LAB_STATE_DIR"
+mv "$TMP_ROOT/private-state" "$JG_HERDR_LAB_STATE_DIR"
+mkdir "$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
 for action in prepare provision 'run status --json' 'viewer start' 'viewer stop' stop teardown; do
   case "$action" in
     'run status --json') reject_lab run "$HERDR_LAB_SESSION" status --json ;;
@@ -60,12 +60,12 @@ for action in prepare provision 'run status --json' 'viewer start' 'viewer stop'
     *) reject_lab "$action" "$HERDR_LAB_SESSION" ;;
   esac
 done
-rmdir "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
+rmdir "$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg"
 export CLAUDE_CONFIG_DIR="$HOME_DIR/owner-claude" PI_CODING_AGENT_DIR="$HOME_DIR/owner-pi"
 export CODEX_HOME="$HOME_DIR/owner-codex" OPENAI_API_KEY=lab-synthetic-openai
 export ANTHROPIC_API_KEY=lab-synthetic-key ANTHROPIC_AUTH_TOKEN=lab-synthetic-token
 export CLAUDE_CODE_OAUTH_TOKEN=lab-synthetic-oauth CLAUDE_CODE_USE_BEDROCK=1
-export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME"
+export JG_HERDR_LAB_FLEET_HOME="$CALLER_HOME"
 (
   . "$ROOT/tests/herdr-test-safety.sh"
   PREPARED_SESSION=$(jg_herdr_lab_name prepare-proof)
@@ -93,8 +93,8 @@ export FM_HERDR_LAB_FLEET_HOME="$CALLER_HOME"
 [ "$HOME" = "$CALLER_HOME" ] || fail 'prepared journey changed caller context'
 pass 'real prepare-based adapter startup and restart use disposable HOME and shed authentication'
 "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not provision isolated lab'
-LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
-printf '%s\n' "$HOME_DIR" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+LAB_BASE=$(<"$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+printf '%s\n' "$HOME_DIR" > "$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
 for action in prepare provision run stop teardown; do
   if [ "$action" = run ]; then
     reject_lab run "$HERDR_LAB_SESSION" status --json
@@ -105,7 +105,7 @@ done
 reject_lab viewer start "$HERDR_LAB_SESSION"
 reject_lab viewer stop "$HERDR_LAB_SESSION"
 [ -f "$HOME_DIR/config/backend" ] || fail 'invalid pointer deleted unrelated home'
-printf '%s\n' "$LAB_BASE" > "$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
+printf '%s\n' "$LAB_BASE" > "$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root"
 # Stop the owned server before redirecting a directory it can recreate.
 "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" || fail 'could not stop lab before directory redirection'
 mv "$LAB_BASE/config" "$LAB_BASE/saved-config"
@@ -143,8 +143,8 @@ chmod +x "$FAKEBIN/herdr"
 
 lab() { env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"; }
 production_process_proof() {
-  FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
-    FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY=1 PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" \
+  JG_HOME="$HOME_DIR" JG_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
+    JG_HERDR_SESSION_CLEANUP_SOURCE_ONLY=1 PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" \
     bash -c '. "$1"; jg_backend_herdr_pane_idle_shell_pid "$2" "$3" >/dev/null' \
       _ "$ROOT/bin/jg-herdr-session-cleanup.sh" "$HERDR_LAB_SESSION" "$PANE"
 }
@@ -170,7 +170,7 @@ while [ ! -s "$HOME_PROOF" ] && [ "$attempt" -lt 100 ]; do
   attempt=$((attempt + 1))
 done
 [ -s "$HOME_PROOF" ] || fail 'lab pane did not write HOME evidence'
-LAB_BASE=$(<"$FM_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
+LAB_BASE=$(<"$JG_HERDR_LAB_STATE_DIR/$HERDR_LAB_SESSION.xdg-root")
 SOCKET_PATH=$(lab session list --json | jq -r --arg name "$HERDR_LAB_SESSION" '.sessions[] | select(.name == $name) | .socket_path')
 printf 'evidence: socket_path=%s bytes=%s\n' "$SOCKET_PATH" "${#SOCKET_PATH}"
 [ "${#SOCKET_PATH}" -lt 100 ] || fail 'lab socket path is not safely below Unix socket capacity'
@@ -236,7 +236,7 @@ done
 [ "$attempt" -lt 50 ] || fail 'restored child did not converge to the exact childless idle-shell process-group shape'
 pass 'real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape'
 
-FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
+JG_HOME="$HOME_DIR" JG_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
   PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" "$ROOT/bin/jg-herdr-session-cleanup.sh" \
   || fail 'session-start cleanup command failed'
 AFTER_FOCUS=$(focus_snapshot) || fail 'could not capture exact post-cleanup focus'
@@ -250,7 +250,7 @@ fi
 [ ! -e "$HOME_DIR/state/$ID.herdr-presentation" ] || fail 'matching journal survived confirmed exact pane closure'
 pass 'real named lab cleanup closes only the exact stale pane and preserves exact focus'
 
-FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
+JG_HOME="$HOME_DIR" JG_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
   PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" "$ROOT/bin/jg-herdr-session-cleanup.sh" \
   || fail 'idempotent repeat failed'
 [ "$(focus_snapshot)" = "$BEFORE_FOCUS" ] || fail 'idempotent repeat changed focus'

@@ -21,9 +21,9 @@ TASKS_AXI_BIN=$(command -v tasks-axi || true)
 TMP_ROOT=$(jg_test_tmproot jg-bearings)
 # Keep disposable homes outside the snapshot's fixture repo boundary even when
 # TMPDIR is inside an isolated source worktree.
-FM_ROOT_OVERRIDE="$TMP_ROOT/fixture-root"
-mkdir -p "$FM_ROOT_OVERRIDE"
-export FM_ROOT_OVERRIDE
+JG_ROOT_OVERRIDE="$TMP_ROOT/fixture-root"
+mkdir -p "$JG_ROOT_OVERRIDE"
+export JG_ROOT_OVERRIDE
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 
@@ -201,8 +201,8 @@ refresh_local_secondmate_ledgers() {  # <parent-home>
     mate=$SECONDMATE_REGISTRY_HOME
     [ -f "$mate/.jg-secondmate-home" ] && [ -f "$mate/AGENTS.md" ] \
       && [ -d "$mate/bin" ] && [ -d "$mate/data" ] && [ -d "$mate/state" ] || continue
-    PATH="$refresh_path" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
-      FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z FM_SNAPSHOT_NOW_EPOCH=1783792800 \
+    PATH="$refresh_path" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$mate" \
+      JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z JG_SNAPSHOT_NOW_EPOCH=1783792800 \
       "$ROOT/bin/jg-home-summary-refresh.sh" >/dev/null 2>&1 || true
   done < "$registry"
 }
@@ -210,18 +210,18 @@ refresh_local_secondmate_ledgers() {  # <parent-home>
 run() {  # <home> <fakebin> <args...>
   local home=$1 fakebin=$2; shift 2
   case " $* " in
-    *" --all-landed "*) PATH="$fakebin:$PATH" FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 refresh_local_secondmate_ledgers "$home" ;;
+    *" --all-landed "*) PATH="$fakebin:$PATH" JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 refresh_local_secondmate_ledgers "$home" ;;
     *) PATH="$fakebin:$PATH" refresh_local_secondmate_ledgers "$home" ;;
   esac
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_BEARINGS_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" "$BEARINGS" "$@"
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_BEARINGS_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" "$BEARINGS" "$@"
 }
 
 run_captain() {  # <home> <fakebin> <command args...>
   local home=$1 fakebin=$2
   shift 2
-  PATH="$fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" "$@"
+  PATH="$fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" "$@"
 }
 
 write_remote_home_summary() {  # <remote-home> <generated-epoch>
@@ -280,22 +280,22 @@ remote_home=$(perl -MMIME::Base64=decode_base64 -e 'print decode_base64($ARGV[0]
 args=()
 while IFS= read -r -d '' arg; do args+=("$arg"); done \
   < <(perl -MMIME::Base64=decode_base64 -e 'print decode_base64($ARGV[0])' "$4")
-printf '%s\t%s\n' "$remote_home" "${args[0]:-}" >> "$FM_TEST_LEDGER_CALL_LOG"
+printf '%s\t%s\n' "$remote_home" "${args[0]:-}" >> "$JG_TEST_LEDGER_CALL_LOG"
 if [ -f "$remote_home/state/slow-ledger-read" ]; then
-  active_marker="$FM_TEST_LEDGER_ACTIVE_DIR/collector-$$"
+  active_marker="$JG_TEST_LEDGER_ACTIVE_DIR/collector-$$"
   : > "$active_marker"
   trap 'rm -f "$active_marker"' EXIT
-  while [ ! -f "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ]; do
-    set -- "$FM_TEST_LEDGER_ACTIVE_DIR"/collector-*
+  while [ ! -f "$JG_TEST_LEDGER_ACTIVE_DIR/overlap-proved" ]; do
+    set -- "$JG_TEST_LEDGER_ACTIVE_DIR"/collector-*
     if [ "$#" -ge 5 ] && [ -e "$1" ]; then
-      : > "$FM_TEST_LEDGER_ACTIVE_DIR/overlap-proved"
+      : > "$JG_TEST_LEDGER_ACTIVE_DIR/overlap-proved"
       break
     fi
     sleep 0.05
   done
   sleep 30 &
   sleeper=$!
-  printf '%s %s\n' "$$" "$sleeper" >> "$FM_TEST_LEDGER_PID_LOG"
+  printf '%s %s\n' "$$" "$sleeper" >> "$JG_TEST_LEDGER_PID_LOG"
   wait "$sleeper"
 fi
 case "${args[0]:-}" in
@@ -318,13 +318,13 @@ run_remote_ledger_bearings() {  # <parent-home> <fakebin> <epoch>
   local parent=$1 fakebin=$2 epoch=$3
   # Allow process startup on loaded hosts; the 30-second fake reads still
   # exceed this shared deadline and must be cancelled.
-  FM_HOME="$parent" FM_ROOT_OVERRIDE="$ROOT" FM_SSH_BIN="$fakebin/fake-ssh" \
-    FM_TEST_LEDGER_CALL_LOG="$parent/ledger-calls.log" \
-    FM_TEST_LEDGER_PID_LOG="$parent/ledger-pids.log" \
-    FM_TEST_LEDGER_ACTIVE_DIR="$parent/ledger-active" \
-    FM_SNAPSHOT_CACHE_DIR="$parent/state/summary-cache" \
-    FM_SNAPSHOT_BUDGET=15 FM_SNAPSHOT_NOW_EPOCH="$epoch" \
-    FM_BEARINGS_NOW=2026-09-01T22:00:00Z "$BEARINGS" --json
+  JG_HOME="$parent" JG_ROOT_OVERRIDE="$ROOT" JG_SSH_BIN="$fakebin/fake-ssh" \
+    JG_TEST_LEDGER_CALL_LOG="$parent/ledger-calls.log" \
+    JG_TEST_LEDGER_PID_LOG="$parent/ledger-pids.log" \
+    JG_TEST_LEDGER_ACTIVE_DIR="$parent/ledger-active" \
+    JG_SNAPSHOT_CACHE_DIR="$parent/state/summary-cache" \
+    JG_SNAPSHOT_BUDGET=15 JG_SNAPSHOT_NOW_EPOCH="$epoch" \
+    JG_BEARINGS_NOW=2026-09-01T22:00:00Z "$BEARINGS" --json
 }
 
 # End-to-end Domain Alpha regression fixture.
@@ -376,8 +376,8 @@ test_domain_alpha_stale_parent_event_does_not_become_current_work() {
       and (.gates | any(.[]; .id == "legal-release" and .owner == "domain-alpha"))
       and (.landed | any(.[]; .id == "phase7" and .owner == "domain-alpha"))
   ' >/dev/null || fail "stale parent Phase 7 event overrode authoritative Domain Alpha state: $json"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_NOW_EPOCH=1783792800 FM_SNAPSHOT_TERMINAL_LINES=2 FM_SNAPSHOT_TERMINAL_BYTES=64 \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_NOW_EPOCH=1783792800 JG_SNAPSHOT_TERMINAL_LINES=2 JG_SNAPSHOT_TERMINAL_BYTES=64 \
     NET_LOG="$home/net.log" FAKE_GH_FAIL=1 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "domain-alpha")
@@ -425,8 +425,8 @@ case "$1 $2" in
 esac
 SH
   chmod +x "$fakebin/uname" "$fakebin/stat"
-  canonical=$(PATH="$fakebin:$PATH" STAT_LOG="$stat_log" FM_HOME="$home" \
-    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z FM_SNAPSHOT_NOW_EPOCH=1783792800 \
+  canonical=$(PATH="$fakebin:$PATH" STAT_LOG="$stat_log" JG_HOME="$home" \
+    JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z JG_SNAPSHOT_NOW_EPOCH=1783792800 \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "domain-alpha")
@@ -458,9 +458,9 @@ test_parent_activity_evidence_is_bounded_and_disclosed() {
     i=$((i + 1))
   done
   fakebin=$(make_fakebin "$home")
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_PARENT_ACTIVITY_LINES=4 FM_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
-    FM_SNAPSHOT_PARENT_ACTIVITIES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_PARENT_ACTIVITY_LINES=4 JG_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
+    JG_SNAPSHOT_PARENT_ACTIVITIES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "domain-alpha")
     | .parent_event.activity_scan.available == true
@@ -471,8 +471,8 @@ test_parent_activity_evidence_is_bounded_and_disclosed() {
       and .parent_event.activity_scan.reasons == ["line_limit", "activity_limit"]
       and (.parent_event.open_activities | map(.key)) == ["phase5", "phase6"]
   ' >/dev/null || fail "parent activity evidence was not bounded and disclosed: $canonical"
-  json=$(FM_SNAPSHOT_PARENT_ACTIVITY_LINES=4 FM_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
-    FM_SNAPSHOT_PARENT_ACTIVITIES=2 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_PARENT_ACTIVITY_LINES=4 JG_SNAPSHOT_PARENT_ACTIVITY_BYTES=4096 \
+    JG_SNAPSHOT_PARENT_ACTIVITIES=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     .omitted | any(.surface == "secondmate parent activity evidence truncated for 1 record(s)")
   ' >/dev/null || fail "bearings did not disclose bounded parent activity evidence: $json"
@@ -506,7 +506,7 @@ EOF
       and (.doing | contains("release A or B") | not)))
       and (.decisions_open | any(.owner == "domain-alpha") | not)
   ' >/dev/null || fail "status-only child decision leaked into Bearings: $json"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "domain-alpha") | .endpoints[] | select(.id == "phase8")
@@ -671,7 +671,7 @@ EOF
     i=$((i + 1))
   done
   fakebin=$(make_fakebin "$home")
-  json=$(FM_SNAPSHOT_SECONDMATE_MAX_BYTES=512 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SECONDMATE_MAX_BYTES=512 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.secondmates | any(.id == "oversized" and .state == "unknown"
       and .provenance == "parent-event-fallback"
@@ -709,9 +709,9 @@ test_secondmate_and_child_bounds_are_disclosed() {
   done
   printf '\n## Queued\n\n## Done\n' >> "$mate/data/backlog.md"
   fakebin=$(make_fakebin "$home")
-  PATH="$fakebin:$PATH" FM_SNAPSHOT_SECONDMATE_CHILDREN=2 refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_SECONDMATES=2 FM_SNAPSHOT_SECONDMATE_CHILDREN=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  PATH="$fakebin:$PATH" JG_SNAPSHOT_SECONDMATE_CHILDREN=2 refresh_local_secondmate_ledgers "$home"
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_SECONDMATES=2 JG_SNAPSHOT_SECONDMATE_CHILDREN=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.total_registered == 3
       and .secondmate_current.shown == 2
@@ -721,7 +721,7 @@ test_secondmate_and_child_bounds_are_disclosed() {
           and (.omitted | any(.surface == "active_children" and .count == 1)))
       and (.secondmate_current.records | any(.id == "b" and .current.state == "no_active_work"))
   ' >/dev/null || fail "canonical secondmate or child bounds were not enforced: $canonical"
-  json=$(FM_SNAPSHOT_SECONDMATES=2 FM_SNAPSHOT_SECONDMATE_CHILDREN=2 FM_BEARINGS_SECONDMATES=1 \
+  json=$(JG_SNAPSHOT_SECONDMATES=2 JG_SNAPSHOT_SECONDMATE_CHILDREN=2 JG_BEARINGS_SECONDMATES=1 \
     run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.secondmates | length) == 1
@@ -730,7 +730,7 @@ test_secondmate_and_child_bounds_are_disclosed() {
       and ([.omitted[].surface] | any(test("secondmates showing 1 of 2")))
       and ([.omitted[].surface] | any(test("registered secondmates omitted by snapshot bound: 1")))
   ' >/dev/null || fail "bearings secondmate or child bound was not disclosed: $json"
-  expanded=$(FM_SNAPSHOT_SECONDMATE_CHILDREN=2 FM_BEARINGS_SECONDMATES=1 \
+  expanded=$(JG_SNAPSHOT_SECONDMATE_CHILDREN=2 JG_BEARINGS_SECONDMATES=1 \
     run "$home" "$fakebin" --json --all-secondmates)
   printf '%s' "$expanded" | jq -e '
     (.secondmates | length) == 3
@@ -749,7 +749,7 @@ test_parent_decision_is_untrusted_contradiction_only() {
   printf 'needs-decision [key=stale]: old parent question\n' > "$home/state/authority.status"
   fakebin=$(make_fakebin "$home")
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "authority")
@@ -821,7 +821,7 @@ EOF
   printf 'needs-decision [key=live-route]: choose the current route\n' > "$decision/state/$child.status"
   fakebin=$(make_fakebin "$home")
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     (.secondmate_current.records[] | select(.id == "hold")
@@ -875,7 +875,7 @@ EOF
   printf 'needs-decision [key=parked]: choose a route\n' > "$mate/state/parked.status"
   fakebin=$(make_fakebin "$home")
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "states")
@@ -891,7 +891,7 @@ EOF
 ## Done
 EOF
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "states")
@@ -924,7 +924,7 @@ EOF
   printf 'failed: stopped\n' > "$mate/state/failed.status"
   rm "$mate/state/parked.meta" "$mate/state/parked.status"
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "states")
@@ -948,7 +948,7 @@ test_registry_unavailability_and_bounds_are_explicit() {
   jg_write_secondmate_meta "$home/state/hidden.meta" "$mate" "firstmate:jg-hidden" sample
   chmod 000 "$home/data/secondmates.md"
   fakebin=$(make_fakebin "$home")
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   json=$(run "$home" "$fakebin" --json)
   chmod 600 "$home/data/secondmates.md"
@@ -972,8 +972,8 @@ test_registry_unavailability_and_bounds_are_explicit() {
   done
   fakebin=$(make_fakebin "$home")
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_REGISTRY_RECORDS=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_REGISTRY_RECORDS=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.registry
     | .available == true and .provenance == "registered-table"
@@ -981,30 +981,30 @@ test_registry_unavailability_and_bounds_are_explicit() {
       and .records_in_window == 3 and (.records | length) == 2
       and (.reasons | index("record_limit") != null)
   ' >/dev/null || fail "registry record bound was not enforced or disclosed: $canonical"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_REGISTRY_LINES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_REGISTRY_LINES=2 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.registry
     | .input_truncated == true and .records_truncated == false
       and .lines_in_window == 2 and (.records | length) == 2
       and .reasons == ["line_limit"]
   ' >/dev/null || fail "registry line bound was not enforced or disclosed: $canonical"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_REGISTRY_BYTES=100 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_REGISTRY_BYTES=100 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.registry
     | .input_truncated == true and (.reasons | index("byte_limit") != null)
       and .records_in_window < 3
   ' >/dev/null || fail "registry byte bound was not enforced or disclosed: $canonical"
   boundary=$(LC_ALL=C head -n 1 "$home/data/secondmates.md" | wc -c | tr -d ' ')
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_REGISTRY_BYTES="$((boundary - 1))" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_REGISTRY_BYTES="$((boundary - 1))" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.registry
     | .input_truncated == true and .complete == false
       and (.reasons | index("byte_limit") != null)
   ' >/dev/null || fail "registry newline byte boundary hid truncation: $canonical"
-  json=$(FM_SNAPSHOT_REGISTRY_RECORDS=2 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_REGISTRY_RECORDS=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     .omitted | any(.surface == "secondmate registry records omitted by bounded read")
   ' >/dev/null || fail "bearings omitted registry truncation disclosure: $json"
@@ -1013,8 +1013,8 @@ test_registry_unavailability_and_bounds_are_explicit() {
   append_secondmate_registry "$home" z-hidden "$mate"
   jg_write_secondmate_meta "$home/state/z-hidden.meta" "$mate" "firstmate:jg-z-hidden" sample
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_REGISTRY_RECORDS=3 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_REGISTRY_RECORDS=3 "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.registry.complete == false
       and (.secondmate_current.records[] | select(.id == "z-hidden")
@@ -1062,7 +1062,7 @@ test_default_is_bounded_and_local_only() {
   # Bound: well under the ~50 KB tool-display limit.
   [ "${#toon}" -lt 50000 ] || fail "default TOON must stay under the display bound, got ${#toon}"
   # TOON is materially smaller than the canonical snapshot it projects.
-  local canon; canon=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  local canon; canon=$(PATH="$fakebin:$PATH" JG_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   [ "${#toon}" -lt "${#canon}" ] || fail "projection must be smaller than the canonical snapshot"
   # Local-only: no GitHub/network call on the default path.
   [ ! -s "$home/net.log" ] || fail "default run must make no gh/gh-axi call, got: $(cat "$home/net.log")"
@@ -1332,7 +1332,7 @@ EOF
           or .id == "mate-due-not-required" or .id == "mate-future-parked"
           or .id == "mate-blocked-parked") | not)
   ' >/dev/null || fail "--all-decisions must reveal every captain hold without duplicating its gate: $json"
-  json=$(FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=50 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=50 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.decisions_open | any(.[]; .id == "aged-call"))
       and (.gates | any(.[]; .id == "aged-call") | not)
@@ -1483,8 +1483,8 @@ test_perl_fallback_bounds_github_call() {
     ln -s "$(command -v "$cmd")" "$toolbin/$cmd"
   done
   started=$(date +%s)
-  json=$(PATH="$fakebin:$toolbin" FM_HOME="$home" FM_BEARINGS_NOW=2026-07-11T18:00:00Z \
-    FM_BEARINGS_PR_TIMEOUT=1 NET_LOG="$home/net.log" FAKE_GH_SLEEP=1 "$BEARINGS" --include-prs --json)
+  json=$(PATH="$fakebin:$toolbin" JG_HOME="$home" JG_BEARINGS_NOW=2026-07-11T18:00:00Z \
+    JG_BEARINGS_PR_TIMEOUT=1 NET_LOG="$home/net.log" FAKE_GH_SLEEP=1 "$BEARINGS" --include-prs --json)
   elapsed=$(( $(date +%s) - started ))
   [ "$elapsed" -lt 10 ] || fail "Perl fallback did not bound a stalled gh call (${elapsed}s)"
   printf '%s' "$json" | jq -e '.prs | test("unavailable")' >/dev/null \
@@ -1520,8 +1520,8 @@ test_section_caps_and_expansion_flags() {
   local home fakebin json expanded
   home=$(make_home caps); write_large_fixture "$home" 5
   fakebin=$(make_fakebin "$home")
-  json=$(FM_BEARINGS_IN_FLIGHT=2 FM_BEARINGS_DECISIONS=2 FM_BEARINGS_GATES=2 \
-    FM_BEARINGS_REPORTS=2 FM_BEARINGS_RECORDED_PRS=2 FM_BEARINGS_UNHEALTHY=2 \
+  json=$(JG_BEARINGS_IN_FLIGHT=2 JG_BEARINGS_DECISIONS=2 JG_BEARINGS_GATES=2 \
+    JG_BEARINGS_REPORTS=2 JG_BEARINGS_RECORDED_PRS=2 JG_BEARINGS_UNHEALTHY=2 \
     run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.in_flight|length) == 2 and (.decisions_open|length) == 2 and (.gates|length) == 2
@@ -1533,8 +1533,8 @@ test_section_caps_and_expansion_flags() {
     and ([.omitted[].surface] | index("recorded_prs showing 2 of 5") != null)
     and ([.omitted[].surface] | index("unhealthy_endpoints showing 2 of 5") != null)
   ' >/dev/null || fail "section caps or counted omissions are wrong: $json"
-  expanded=$(FM_BEARINGS_IN_FLIGHT=2 FM_BEARINGS_DECISIONS=2 FM_BEARINGS_GATES=2 \
-    FM_BEARINGS_REPORTS=2 FM_BEARINGS_RECORDED_PRS=2 FM_BEARINGS_UNHEALTHY=2 \
+  expanded=$(JG_BEARINGS_IN_FLIGHT=2 JG_BEARINGS_DECISIONS=2 JG_BEARINGS_GATES=2 \
+    JG_BEARINGS_REPORTS=2 JG_BEARINGS_RECORDED_PRS=2 JG_BEARINGS_UNHEALTHY=2 \
     run "$home" "$fakebin" --json --all-in-flight --all-decisions --all-queued \
       --all-reports --all-recorded-prs --all-unhealthy)
   printf '%s' "$expanded" | jq -e '
@@ -1548,13 +1548,13 @@ test_pr_repository_cap_and_expansion() {
   local home fakebin json expanded
   home=$(make_home repo-caps); write_large_fixture "$home" 5
   fakebin=$(make_fakebin "$home"); : > "$home/net.log"
-  json=$(FM_BEARINGS_PR_REPOS=2 run "$home" "$fakebin" --include-prs --json)
+  json=$(JG_BEARINGS_PR_REPOS=2 run "$home" "$fakebin" --include-prs --json)
   [ "$(grep -c '^gh pr list ' "$home/net.log")" = 2 ] || fail "default PR repository cap was not enforced"
   printf '%s' "$json" | jq -e '
     [.omitted[] | select(.surface == "PR repositories showing 2 of 5" and .reveal == "--all-pr-repos")] | length == 1
   ' >/dev/null || fail "PR repository truncation was not recorded: $json"
   : > "$home/net.log"
-  expanded=$(FM_BEARINGS_PR_REPOS=2 run "$home" "$fakebin" --include-prs --all-pr-repos --json)
+  expanded=$(JG_BEARINGS_PR_REPOS=2 run "$home" "$fakebin" --include-prs --all-pr-repos --json)
   [ "$(grep -c '^gh pr list ' "$home/net.log")" = 5 ] || fail "--all-pr-repos did not reveal every repository"
   printf '%s' "$expanded" | jq -e '.candidate_prs | length == 5' >/dev/null \
     || fail "expanded PR repository set did not enrich every repository: $expanded"
@@ -1565,12 +1565,12 @@ test_per_repository_pr_cap_is_disclosed() {
   local home fakebin json toon
   home=$(make_home pr-row-cap); write_fixture "$home"
   fakebin=$(make_fakebin "$home")
-  json=$(FM_BEARINGS_PR_LIMIT=2 FAKE_GH_MANY=1 run "$home" "$fakebin" --include-prs --json)
-  toon=$(FM_BEARINGS_PR_LIMIT=2 FAKE_GH_MANY=1 run "$home" "$fakebin" --include-prs)
+  json=$(JG_BEARINGS_PR_LIMIT=2 FAKE_GH_MANY=1 run "$home" "$fakebin" --include-prs --json)
+  toon=$(JG_BEARINGS_PR_LIMIT=2 FAKE_GH_MANY=1 run "$home" "$fakebin" --include-prs)
   printf '%s' "$json" | jq -e '
     (.candidate_prs | length) == 2
     and (.prs | test("2 shown, at least 3 open; capped in 1 repo"))
-    and ([.omitted[] | select(.surface == "candidate_prs showing 2 of at least 3; capped in 1 repo(s)" and .reveal == "raise FM_BEARINGS_PR_LIMIT")] | length) == 1
+    and ([.omitted[] | select(.surface == "candidate_prs showing 2 of at least 3; capped in 1 repo(s)" and .reveal == "raise JG_BEARINGS_PR_LIMIT")] | length) == 1
   ' >/dev/null || fail "per-repository PR truncation was not disclosed: $json"
   assert_contains "$toon" 'candidate_prs showing 2 of at least 3' "TOON did not preserve PR truncation disclosure"
   pass "per-repository open-PR caps are disclosed with an expansion knob"
@@ -1660,7 +1660,7 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
   local keyword_report shipping_report fleet_json created_kind failures=''
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the landed-selector regression"
   jg_tasks_axi_compatible || {
-    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    echo "skip: installed tasks-axi predates ${JG_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
     return 0
   }
   home=$(make_home kind-owned-landed)
@@ -1748,8 +1748,8 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
 EOF
 
   : > "$home/net.log"
-  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" \
-    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
+  fleet_json=$(PATH="$fakebin:$PATH" JG_HOME="$home" \
+    JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) \
     || fail "Fleet snapshot failed for canonical kind keywords"
   printf '%s' "$fleet_json" | jq -e '
@@ -1816,7 +1816,7 @@ test_kind_fallback_matches_tasks_axi_word_boundaries() {
   local home fakebin id title kind producer_kind fleet_json json
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the kind-boundary regression"
   jg_tasks_axi_compatible || {
-    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    echo "skip: installed tasks-axi predates ${JG_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
     return 0
   }
   home=$(make_home kind-word-boundaries)
@@ -1845,7 +1845,7 @@ ship-colon|SHIP: implement|ship
 ship-unicode|SHIPé implement|ship
 ship-longer|SHIPPING implement|-
 EOF
-  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" NET_LOG="$home/net.log" \
+  fleet_json=$(PATH="$fakebin:$PATH" JG_HOME="$home" NET_LOG="$home/net.log" \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "keyword fleet snapshot failed"
   printf '%s' "$fleet_json" | jq -e --slurpfile expected "$home/expected.jsonl" \
     '(.backlog.records | length) == ($expected | length)' >/dev/null \
@@ -2039,7 +2039,7 @@ test_all_landed_keeps_complete_global_order() {
   append_landed_row "$beta" beta-new "Beta new" 2026-07-10
   append_landed_row "$beta" beta-mid "Beta mid" 2026-07-05
   fakebin=$(make_fakebin "$home")
-  json=$(FM_BEARINGS_LANDED=1 run "$home" "$fakebin" --json --all-landed)
+  json=$(JG_BEARINGS_LANDED=1 run "$home" "$fakebin" --json --all-landed)
   actual=$(printf '%s' "$json" | jq -r '.landed[] | "\(.owner)/\(.id)"')
   expected='beta/beta-new
 alpha/alpha-new
@@ -2072,12 +2072,12 @@ test_landed_bounded_and_disclosed() {
     i=$((i + 1))
   done
   fakebin=$(make_fakebin "$home")
-  json=$(FM_BEARINGS_LANDED=20 run "$home" "$fakebin" --json)
+  json=$(JG_BEARINGS_LANDED=20 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     ([.landed[].id | select(startswith("mate-landed-"))] | length) == 10
       and ([.omitted[].surface] | any(test("snapshot layer")))
   ' >/dev/null || fail "default landed path must retain and disclose the snapshot per-home cap: $json"
-  json=$(FM_BEARINGS_LANDED=1 run "$home" "$fakebin" --json --all-landed)
+  json=$(JG_BEARINGS_LANDED=1 run "$home" "$fakebin" --json --all-landed)
   expected=done-a
   i=1
   while [ "$i" -le 12 ]; do
@@ -2125,7 +2125,7 @@ test_captains_call_anti_leak() {
   home=$(make_home anti-leak); write_fixture "$home"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   jq -n -e --argjson bearings "$json" --argjson canonical "$canonical" '
     ([$bearings.decisions_open[].id] == ["mate/mate-decision-race"])
       and ($canonical.secondmate_current.records[] | select(.id == "mate")
@@ -2158,7 +2158,7 @@ test_main_orphan_in_flight_is_disclosed_not_invented() {
 ## Done
 EOF
   fakebin=$(make_fakebin "$home")
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .main_inventory.valid == false
@@ -2204,7 +2204,7 @@ EOF
     "mode=no-mistakes"
   printf 'working: structured sibling still projects\n' > "$home/state/structured-ship.status"
   fakebin=$(make_fakebin "$home")
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .main_inventory.valid == false
@@ -2325,8 +2325,8 @@ EOF
   home=$(make_home working-hold-buckets)
   fakebin=$(make_fakebin "$home")
 
-  summary=$(PATH="$fakebin:$PATH" FM_HOME="$mate" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_SECONDMATE_DECISIONS=1 \
+  summary=$(PATH="$fakebin:$PATH" JG_HOME="$mate" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_SECONDMATE_DECISIONS=1 \
     "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary)
   printf '%s' "$summary" | jq -e '
     ([.decisions_open[].id] == ["working-live"])
@@ -2334,7 +2334,7 @@ EOF
       and ([.queued[] | select(.hold_bucket != null)] | length) == 5
   ' >/dev/null || fail "working captain holds were filtered from the secondmate summary: $summary"
 
-  json=$(FM_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     ([.in_flight[].id] | contains([
       "working-live", "working-live-two", "working-blocked", "working-dated", "working-aged",
@@ -2357,7 +2357,7 @@ EOF
       and ([.gates[] | select(.id == "working-aged" and .owner == "working-mate")] | length) == 1
   ' >/dev/null || fail "working captain holds did not surface in Underway and exactly one default decision bucket: $json"
 
-  expanded=$(FM_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json --all-decisions --all-queued)
+  expanded=$(JG_SNAPSHOT_SECONDMATE_DECISIONS=1 run "$home" "$fakebin" --json --all-decisions --all-queued)
   printf '%s' "$expanded" | jq -e '
     ([.in_flight[].id] | contains([
       "working-live", "working-live-two", "working-blocked", "working-dated", "working-aged",
@@ -2515,7 +2515,7 @@ test_newest_filed_gates_are_selected_before_snapshot_bounds() {
 
 ## Done
 EOF
-  json=$(FM_SNAPSHOT_SECONDMATE_QUEUED=2 run "$home" "$fakebin" --json)
+  json=$(JG_SNAPSHOT_SECONDMATE_QUEUED=2 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     [.gates[].id] == ["mate-eligible"]
       and (.decisions_open | any(.id == "bounded-mate/mate-call-one"))
@@ -2661,7 +2661,7 @@ EOF
 
   fakebin=$(make_fakebin "$home")
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     (.secondmate_current.records[] | select(.id == "hibit")
@@ -2720,7 +2720,7 @@ EOF
     "$sshhip/data/backlog.md" > "$sshhip/data/backlog.next"
   mv "$sshhip/data/backlog.next" "$sshhip/data/backlog.md"
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "sshhip")
@@ -2741,7 +2741,7 @@ EOF
   sed '/unreadable-child/d' "$sshhip/data/backlog.md" > "$sshhip/data/backlog.next"
   mv "$sshhip/data/backlog.next" "$sshhip/data/backlog.md"
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "sshhip")
@@ -2766,7 +2766,7 @@ EOF
   record_claude_state "$wheel/state" production-observation idle
   printf 'paused: observation is deliberately held\n' > "$wheel/state/production-observation.status"
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "wheel")
@@ -2830,7 +2830,7 @@ EOF
   sed 's/(kind: program)/(kind: mystery)/' "$hibit/data/backlog.md" > "$hibit/data/backlog.next"
   mv "$hibit/data/backlog.next" "$hibit/data/backlog.md"
   refresh_local_secondmate_ledgers "$home"
-  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+  canonical=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json)
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "hibit")
@@ -3004,8 +3004,8 @@ done
 SH
   chmod +x "$fakebin/cp"
 
-  json=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" REAL_CP="$real_cp" \
+  json=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" REAL_CP="$real_cp" \
     RACE_ONCE="$home/status-race-once" RACE_STATUS="$home/state/captured-status.status" \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) \
     || fail "fleet snapshot failed during captured status race"
@@ -3066,8 +3066,8 @@ exit 0
 SH
   chmod +x "$fakebin/tmux"
 
-  json=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" \
+  json=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    JG_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" \
     RACE_ONCE="$home/relaunch-once" RACE_META="$home/state/generation-race.meta" \
     RACE_STATUS="$home/state/generation-race.status" \
     RACE_REPORT="$home/data/generation-race/report.md" RACE_WORKTREE="$worktree" \
@@ -3132,7 +3132,7 @@ SH
     i=$((i + 1))
   done
 
-  serial=$(FAKE_NM_DELAY=0 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 run "$home" "$fakebin" --json)
+  serial=$(FAKE_NM_DELAY=0 JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 run "$home" "$fakebin" --json)
 
   # Serialized reads pay every worker's delay end to end while concurrent reads
   # overlap them. Time both runs and compare, because the two pay the same
@@ -3140,7 +3140,7 @@ SH
   # delivers, where an absolute wall-clock budget would instead measure how
   # loaded the host happens to be and flake on a busy runner.
   serial_started=$(date +%s)
-  FAKE_NM_DELAY=1 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 \
+  FAKE_NM_DELAY=1 JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=1 \
     run "$home" "$fakebin" --json >/dev/null \
     || fail "serialized local snapshot failed"
   serial_elapsed=$(( $(date +%s) - serial_started ))
@@ -3148,7 +3148,7 @@ SH
   parallel_started=$(date +%s)
   parallel_file="$home/parallel-snapshot.json"
   FAKE_NM_DELAY=1 FAKE_NM_SIGNAL="$home/nm-started" \
-    FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=8 \
+    JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=8 \
     run "$home" "$fakebin" --json > "$parallel_file" &
   snapshot_pid=$!
   i=0

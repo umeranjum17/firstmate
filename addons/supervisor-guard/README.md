@@ -52,6 +52,6 @@ both with no merge here.
 
 ## Checks
 
-- `FM_CODE_ROOT=<checkout> bash supervisor-guard/tests/jg-supervisor-work-guard.test.sh`
+- `JG_CODE_ROOT=<checkout> bash supervisor-guard/tests/jg-supervisor-work-guard.test.sh`
 - `shellcheck -x -e SC2015,SC1091 supervisor-guard/*.sh supervisor-guard/bin/*.sh supervisor-guard/tests/*.sh`
 - `node --check` on each `.mjs`, and `bash -n` on each script.

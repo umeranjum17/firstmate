@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # brief-inherit e2e: the shared worker-instruction include through the real jg-brief.sh and
 # jg-config-push.sh of a firstmate checkout.
 # Usage: brief-inherit/tests/brief-inherit-e2e.sh <firstmate-checkout>
@@ -7,7 +16,7 @@
 #   already carries the seam runs as is. Present must equal the pre-seam fork's output, the
 #   reference: the checkout itself when it lacks the seam, else a temp copy with
 #   pre-seam-reference.patch (fork PR 114 reversed, committed) applied. Absent (an empty
-#   FM_ADDONS_DIR) must be Kun's behavior: local include only, no error, also under set -e.
+#   JG_ADDONS_DIR) must be Kun's behavior: local include only, no error, also under set -e.
 # shellcheck disable=SC2016 # literal backticks and $ in fixture text
 set -u
 
@@ -24,8 +33,8 @@ no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 same() { if cmp -s "$2" "$3"; then ok "$1"; else no "$1: $2 differs from $3"; diff "$2" "$3" | head -5; fi; }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
 
-SEAM_BRIEF='_bi="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }'
-SEAM_LIST='_bi="${FM_ADDONS_DIR:-${FM_HOME:-$HOME}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }'
+SEAM_BRIEF='_bi="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }'
+SEAM_LIST='_bi="${JG_ADDONS_DIR:-${JG_HOME:-$HOME}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }'
 
 # The seam root: the checkout itself when it has the seam, else a step-B copy of it.
 root=$FM
@@ -49,7 +58,7 @@ if [ "$seamed" = 0 ]; then
     skip { if ($0 == "fi") skip = 0; next }
     { print }' "$FM/bin/jg-brief.sh" > "$root/bin/jg-brief.sh"
   sed -i -e 's/ brief-include-shared\.md//' \
-    -e "/^FM_INHERITABLE_CONFIG=/a\\$SEAM_LIST" "$root/bin/jg-config-inherit-lib.sh"
+    -e "/^JG_INHERITABLE_CONFIG=/a\\$SEAM_LIST" "$root/bin/jg-config-inherit-lib.sh"
 fi
 grep -q jg_brief_inherit_shared "$root/bin/jg-brief.sh" && grep -q jg_brief_inherit_config "$root/bin/jg-config-inherit-lib.sh" \
   && ok "seam applied" || { no "seam not applied to the checkout copy"; exit 1; }
@@ -67,7 +76,7 @@ empty=$work/no-addon; mkdir -p "$empty"
 scaffold() {
   local r=$1 a=$2 h=$3 id=$4 kind=$5 args out rc
   [ "$kind" = scout ] && args=(--scout) || args=(--mode no-mistakes)
-  out=$(FM_HOME=$h FM_ADDONS_DIR=$([ "$a" = - ] && echo "$empty" || echo "$a") bash "$r/bin/jg-brief.sh" "$id" sample "${args[@]}" 2>&1 >/dev/null); rc=$?
+  out=$(JG_HOME=$h JG_ADDONS_DIR=$([ "$a" = - ] && echo "$empty" || echo "$a") bash "$r/bin/jg-brief.sh" "$id" sample "${args[@]}" 2>&1 >/dev/null); rc=$?
   printf '%s\nrc=%s\n' "$out" "$rc"
 }
 tail_of() { sed -n '/^# Home brief additions/,$p' "$1/data/$2/brief.md"; }
@@ -98,7 +107,7 @@ for kind in ship scout; do
   grep -q 'Shared fleet rule' "$work/absent/data/b-$kind/brief.md" && no "absent: $kind brief leaked the shared include"
 done
 lib=$root/bin/jg-config-inherit-lib.sh
-out=$(FM_HOME=$work/absent FM_ADDONS_DIR=$empty bash -e -c ". '$lib'; echo \"\$FM_INHERITABLE_CONFIG\"" 2>&1)
+out=$(JG_HOME=$work/absent JG_ADDONS_DIR=$empty bash -e -c ". '$lib'; echo \"\$JG_INHERITABLE_CONFIG\"" 2>&1)
 case " $out " in *" brief-include-shared.md "*) no "absent: inheritable list still names the shared include" ;; *) ok "absent: inheritable list is Kun's, sourcing under set -e is silent" ;; esac
 
 # refusals match the fork's, name the shared file, and leave no partial scaffold
@@ -117,7 +126,7 @@ done
 
 # charters never take an include
 mkhome "$work/sm"; cp "$work/present/config/brief-include-shared.md" "$work/sm/config/"
-FM_HOME=$work/sm FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=sample bash "$root/bin/jg-brief.sh" c --secondmate --no-projects >/dev/null 2>&1
+JG_HOME=$work/sm JG_ADDONS_DIR=$addons JG_SECONDMATE_CHARTER=sample bash "$root/bin/jg-brief.sh" c --secondmate --no-projects >/dev/null 2>&1
 grep -q 'Home brief additions' "$work/sm/data/c/brief.md" && no "charter took the shared include" || ok "charter takes no include"
 
 # config-push: exact bytes propagate, then absence converges (present); nothing propagates (absent)
@@ -128,10 +137,10 @@ push_case() { # <addons-dir> <label> <expect-pushed 1|0>
   git init -q "$sm"; printf '%s\n' pm > "$sm/.jg-secondmate-home"
   printf 'kind=secondmate\nbackend=tmux\nwindow=bi-e2e:absent\nhome=%s\n' "$sm" > "$p/state/pm.meta"
   touch "$p/state/.last-watcher-beat"; printf '%s\n' "$shared" > "$p/config/brief-include-shared.md"
-  out=$(FM_HOME=$p FM_ROOT_OVERRIDE=$root FM_ADDONS_DIR=$a bash "$root/bin/jg-config-push.sh" 2>&1)
+  out=$(JG_HOME=$p JG_ROOT_OVERRIDE=$root JG_ADDONS_DIR=$a bash "$root/bin/jg-config-push.sh" 2>&1)
   if [ "$3" = 1 ]; then
     cmp -s "$p/config/brief-include-shared.md" "$sm/config/brief-include-shared.md" && ok "$2: shared include propagated byte-exactly" || no "$2: not propagated: $out"
-    rm "$p/config/brief-include-shared.md"; FM_HOME=$p FM_ROOT_OVERRIDE=$root FM_ADDONS_DIR=$a bash "$root/bin/jg-config-push.sh" >/dev/null 2>&1
+    rm "$p/config/brief-include-shared.md"; JG_HOME=$p JG_ROOT_OVERRIDE=$root JG_ADDONS_DIR=$a bash "$root/bin/jg-config-push.sh" >/dev/null 2>&1
     [ ! -e "$sm/config/brief-include-shared.md" ] && ok "$2: absence converged" || no "$2: stale shared include survived"
   else
     [ ! -e "$sm/config/brief-include-shared.md" ] && ok "$2: nothing propagated" || no "$2: shared include propagated without the add-on"

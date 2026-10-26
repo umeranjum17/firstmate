@@ -17,7 +17,7 @@ make_fakebin() {  # <dir>
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n' ;;
@@ -54,11 +54,11 @@ EOF
 }
 
 in_home() {  # <command...>: run one real script against the case home
-  env -u FM_TRACE_CONTEXT FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
+  env -u JG_TRACE_CONTEXT JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
     HOME="$HOME_DIR/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
     PATH="$FAKEBIN:$PATH" "$@"
 }
 
@@ -73,7 +73,7 @@ run_lifecycle() {
     printf 'resolved: [key=pick-one]  chose a\n'
     printf 'partial line without its newline'
   } >> "$HOME_DIR/state/$TASK.status"
-  out=$(in_home env FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+  out=$(in_home env JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds 2 2>&1)
   case "$out" in *"checkpoint:"*|*"signal:"*) ;; *) fail "watcher checkpoint did not run: $out" ;; esac
   LEDGER_AFTER_POLL=$(cat "$HOME_DIR/state/fleet-ledger.jsonl" 2>/dev/null || true)
@@ -124,9 +124,9 @@ test_flag_on_records_a_pr_merge_once() {
   (
     # shellcheck source=bin/jg-merge-outcome-lib.sh
     . "$ROOT/bin/jg-merge-outcome-lib.sh"
-    FM_CONFIG_OVERRIDE="$HOME_DIR/config" jg_merge_outcome_report "$HOME_DIR" "$HOME_DIR/state" "$TASK" "$pr_url" self \
+    JG_CONFIG_OVERRIDE="$HOME_DIR/config" jg_merge_outcome_report "$HOME_DIR" "$HOME_DIR/state" "$TASK" "$pr_url" self \
       || fail "the merge outcome was not recorded"
-    FM_CONFIG_OVERRIDE="$HOME_DIR/config" jg_merge_outcome_report "$HOME_DIR" "$HOME_DIR/state" "$TASK" "$pr_url" poll \
+    JG_CONFIG_OVERRIDE="$HOME_DIR/config" jg_merge_outcome_report "$HOME_DIR" "$HOME_DIR/state" "$TASK" "$pr_url" poll \
       || fail "the repeated merge outcome failed"
   ) || exit 1
   rows=$(ledger_rows '[.event, .state, .via, .pr]')
@@ -148,7 +148,7 @@ test_flag_on_records_a_pr_registration() {
     || fail "spawn failed: $out"
   printf 'done: PR %s\n' "$pr_url" >> "$HOME_DIR/state/$TASK.status"
   out=$(in_home "$ROOT/bin/jg-pr-check.sh" "$TASK" "$pr_url" 2>&1) || fail "PR registration failed: $out"
-  out=$(in_home env FM_PR_CHECK_MERGE=1 "$ROOT/bin/jg-pr-check.sh" "$TASK" "$pr_url" 2>&1) \
+  out=$(in_home env JG_PR_CHECK_MERGE=1 "$ROOT/bin/jg-pr-check.sh" "$TASK" "$pr_url" 2>&1) \
     || fail "merge-time PR re-record failed: $out"
   rows=$(ledger_rows '[.event, .state, .pr]')
   assert_equals "$(cat <<EOF
@@ -167,8 +167,8 @@ EOF
 worker_status_command() {  # <state> <note> [<state-dir> [<config-dir>]]
   local cmd
   rm -rf "${HOME_DIR:?}/data/$TASK"
-  (cd "$HOME_DIR" && in_home env FM_STATE_OVERRIDE="${3:-$HOME_DIR/state}" \
-    FM_CONFIG_OVERRIDE="${4:-$HOME_DIR/config}" \
+  (cd "$HOME_DIR" && in_home env JG_STATE_OVERRIDE="${3:-$HOME_DIR/state}" \
+    JG_CONFIG_OVERRIDE="${4:-$HOME_DIR/config}" \
     "$ROOT/bin/jg-brief.sh" "$TASK" sample --mode no-mistakes >/dev/null) \
     || fail "brief scaffold failed"
   # shellcheck disable=SC2016 # Match literal backticks in the generated brief.

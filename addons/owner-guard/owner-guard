@@ -18,7 +18,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # recorded at install (the install dir is per user, so a lane home without
 # a file falls back to the installing home).
 patterns_path() {
-  local cand=${FM_HOME:-}
+  local cand=${JG_HOME:-}
   if [ -z "$cand" ] || [ ! -s "$cand/config/owner-details-patterns" ]; then
     cand=$(cat "$HERE/home" 2>/dev/null || true)
   fi

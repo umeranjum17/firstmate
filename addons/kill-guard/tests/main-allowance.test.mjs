@@ -5,6 +5,10 @@ import { syncBuiltinESMExports } from 'node:module';
 import { execFileSync, spawn } from 'node:child_process';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 const original = Object.fromEntries(['readFileSync', 'realpathSync', 'readdirSync', 'lstatSync', 'appendFileSync', 'mkdirSync', 'existsSync'].map(k => [k, fs[k]]));
 const temp = fs.mkdtempSync(join(tmpdir(), 'kill-main-'));
 const account = userInfo().homedir, home = `${account}/firstmate`, audit = join(temp, 'audit.jsonl');
@@ -69,7 +73,7 @@ try {
   assert(!fs.readFileSync(audit, 'utf8').includes('private'));
   const before = fs.readFileSync(audit, 'utf8'); deny('kill 5001; kill 1'); assert.equal(fs.readFileSync(audit, 'utf8'), before);
   put(4002, 'codex', '/outside'); put(process.pid, 'node', '/outside', 4002);
-  process.env.FM_HOME = home; process.env.FM_ROLE = 'main'; process.env.FM_MAIN_PID = '4001';
+  process.env.JG_HOME = home; process.env.JG_ROLE = 'main'; process.env.JG_MAIN_PID = '4001';
   deny('kill 5001'); deny('kill 5001', { caller: 4001 });
   // Even a worker launched below Main must not inherit its fleet allowance.
   procs.get(4002).ppid = 4001; deny('kill 5001'); deny('kill 5001', { caller: 4001 });

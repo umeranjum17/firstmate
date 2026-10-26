@@ -142,14 +142,14 @@ Some digest work remains local but unbounded:
 - Tool version probes.
 - The backlog listing.
 
-So the whole digest still runs as one bounded child, default 120s via `FM_SESSION_START_TIMEOUT`.
+So the whole digest still runs as one bounded child, default 120s via `JG_SESSION_START_TIMEOUT`.
 
-Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `FM_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
+Each per-task endpoint liveness read runs serially in its own crash-isolated child, bounded by `JG_SESSION_START_ENDPOINT_TIMEOUT` (default 10s; a non-numeric or zero value falls back to the default).
 So a read that hangs or dies becomes that task's own `endpoint: error` line and the digest continues.
 With a wedged backend the stage's ceiling is tasks times that per-read bound and can itself reach the digest bound.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
-Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/jg-backlog-transition-lib.sh`.
+Each of those reads is bounded by `JG_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/jg-backlog-transition-lib.sh`.
 The first bound hit latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 
@@ -442,7 +442,7 @@ It uses a TERM-resistant digest that exceeds its budget and proves that the dige
 - It lets the run wrapper stand down on the Cursor-delivered duplicate.
 - It keeps `preCompact` unregistered, so the deferred surface cannot be reintroduced unnoticed.
 
-`FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` proves the injected digest actually reaches model context in a real cursor-agent session.
+`JG_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` proves the injected digest actually reaches model context in a real cursor-agent session.
 
 ### Live run-tier guards
 
@@ -450,7 +450,7 @@ It uses a TERM-resistant digest that exceeds its budget and proves that the dige
 It confirms each installed adapter in that suite invokes the run wrapper and delivers its output into context.
 It verifies context-preserving reopen sources for those adapters, and context-reset delivery wherever their tracked TUI surface is reachable.
 
-Its separate `FM_PI_SESSIONSTART_RACE_LIVE_E2E=1` mode uses real Pi with an offline deterministic provider and a barrier-controlled `/new` digest.
+Its separate `JG_PI_SESSIONSTART_RACE_LIVE_E2E=1` mode uses real Pi with an offline deterministic provider and a barrier-controlled `/new` digest.
 That mode proves both an immediate prompt and a completed-before-prompt control make their first provider call with exactly one native startup context and no manual execution.
 
 Cursor uses the separate primary live guard named in [Cursor tests](#cursor-tests) because its source-free `sessionStart` and stop-hook park are validated together.

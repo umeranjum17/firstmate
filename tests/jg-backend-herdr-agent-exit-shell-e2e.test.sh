@@ -14,7 +14,7 @@ set -u
 . "$ROOT/tests/herdr-test-safety.sh"
 
 herdr_forget_inherited_pane
-jg_live_gate default-on FM_HERDR_AGENT_EXIT_SHELL_E2E herdr jq pi
+jg_live_gate default-on JG_HERDR_AGENT_EXIT_SHELL_E2E herdr jq pi
 
 HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
 [ -x "$HERDR_LAB_HELPER" ] || { echo "skip: live: Herdr lab helper not executable at $HERDR_LAB_HELPER"; exit 0; }

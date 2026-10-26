@@ -2,8 +2,8 @@
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
-FM_CUSTOM_CHECK_HASH=
-FM_CUSTOM_CHECK_SNAPSHOT=
+JG_CUSTOM_CHECK_HASH=
+JG_CUSTOM_CHECK_SNAPSHOT=
 
 jg_custom_check_sha256() {
   local file=$1
@@ -18,7 +18,7 @@ jg_custom_check_sha256() {
 
 jg_custom_check_trust_read() {
   local state=$1 id=$2 trust state_device version hash
-  FM_CUSTOM_CHECK_HASH=
+  JG_CUSTOM_CHECK_HASH=
   jg_pr_task_id_valid "$id" || return 1
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
   state_device=$(jg_pr_file_device "$state") || return 1
@@ -34,7 +34,7 @@ jg_custom_check_trust_read() {
   exec 9<&-
   [ "$version" = jg-custom-check-v1 ] || return 1
   [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || return 1
-  FM_CUSTOM_CHECK_HASH=$hash
+  JG_CUSTOM_CHECK_HASH=$hash
 }
 
 jg_custom_check_registered() {
@@ -44,7 +44,7 @@ jg_custom_check_registered() {
   state_device=$(jg_pr_file_device "$state") || return 1
   jg_pr_private_file_valid "$check" 700 "$state_device" || return 1
   hash=$(jg_custom_check_sha256 "$check") || return 1
-  [ "$hash" = "$FM_CUSTOM_CHECK_HASH" ]
+  [ "$hash" = "$JG_CUSTOM_CHECK_HASH" ]
 }
 
 jg_custom_check_snapshot_prepare() {
@@ -54,23 +54,23 @@ jg_custom_check_snapshot_prepare() {
   jg_custom_check_trust_read "$state" "$id" || return 1
   state_device=$(jg_pr_file_device "$state") || return 1
   jg_pr_private_file_valid "$check" 700 "$state_device" || return 1
-  FM_CUSTOM_CHECK_SNAPSHOT=$(mktemp "$state/.jg-custom-check.XXXXXX") || return 1
-  cp "$check" "$FM_CUSTOM_CHECK_SNAPSHOT" || { jg_custom_check_snapshot_cleanup; return 1; }
-  chmod 0600 "$FM_CUSTOM_CHECK_SNAPSHOT" || { jg_custom_check_snapshot_cleanup; return 1; }
-  [ -f "$FM_CUSTOM_CHECK_SNAPSHOT" ] && [ ! -L "$FM_CUSTOM_CHECK_SNAPSHOT" ] \
+  JG_CUSTOM_CHECK_SNAPSHOT=$(mktemp "$state/.jg-custom-check.XXXXXX") || return 1
+  cp "$check" "$JG_CUSTOM_CHECK_SNAPSHOT" || { jg_custom_check_snapshot_cleanup; return 1; }
+  chmod 0600 "$JG_CUSTOM_CHECK_SNAPSHOT" || { jg_custom_check_snapshot_cleanup; return 1; }
+  [ -f "$JG_CUSTOM_CHECK_SNAPSHOT" ] && [ ! -L "$JG_CUSTOM_CHECK_SNAPSHOT" ] \
     || { jg_custom_check_snapshot_cleanup; return 1; }
-  [ "$(jg_pr_file_mode "$FM_CUSTOM_CHECK_SNAPSHOT")" = 600 ] \
+  [ "$(jg_pr_file_mode "$JG_CUSTOM_CHECK_SNAPSHOT")" = 600 ] \
     || { jg_custom_check_snapshot_cleanup; return 1; }
-  [ "$(jg_pr_file_device "$FM_CUSTOM_CHECK_SNAPSHOT")" = "$state_device" ] \
+  [ "$(jg_pr_file_device "$JG_CUSTOM_CHECK_SNAPSHOT")" = "$state_device" ] \
     || { jg_custom_check_snapshot_cleanup; return 1; }
-  [ "$(jg_pr_file_link_count "$FM_CUSTOM_CHECK_SNAPSHOT")" = 1 ] \
+  [ "$(jg_pr_file_link_count "$JG_CUSTOM_CHECK_SNAPSHOT")" = 1 ] \
     || { jg_custom_check_snapshot_cleanup; return 1; }
-  hash=$(jg_custom_check_sha256 "$FM_CUSTOM_CHECK_SNAPSHOT") \
+  hash=$(jg_custom_check_sha256 "$JG_CUSTOM_CHECK_SNAPSHOT") \
     || { jg_custom_check_snapshot_cleanup; return 1; }
-  [ "$hash" = "$FM_CUSTOM_CHECK_HASH" ] || { jg_custom_check_snapshot_cleanup; return 1; }
+  [ "$hash" = "$JG_CUSTOM_CHECK_HASH" ] || { jg_custom_check_snapshot_cleanup; return 1; }
 }
 
 jg_custom_check_snapshot_cleanup() {
-  [ -z "$FM_CUSTOM_CHECK_SNAPSHOT" ] || rm -f -- "$FM_CUSTOM_CHECK_SNAPSHOT"
-  FM_CUSTOM_CHECK_SNAPSHOT=
+  [ -z "$JG_CUSTOM_CHECK_SNAPSHOT" ] || rm -f -- "$JG_CUSTOM_CHECK_SNAPSHOT"
+  JG_CUSTOM_CHECK_SNAPSHOT=
 }

@@ -250,10 +250,10 @@ check(policy.calmPreferencePath({}, plugin) === "/repo/config/calm", "plugin-roo
 check(policy.calmPreferencePath({}, "/repo/.claude/skills/firstmate-calm/") === "/repo/config/calm", "trailing slash on the plugin root");
 check(policy.calmPreferencePath({}, "/repo/.agents/skills/firstmate-calm") === "/repo/config/calm", ".agents/skills spelling of the plugin root");
 check(policy.calmCodeRootFromPluginRoot("C:\\\\fm\\\\.claude\\\\mods\\\\firstmate-calm") === "C:\\\\fm", "Windows separators");
-check(policy.calmPreferencePath({ FM_ROOT_OVERRIDE: "/override/root" }, plugin) === "/override/root/config/calm", "FM_ROOT_OVERRIDE");
-check(policy.calmPreferencePath({ FM_HOME: "/home/fm", FM_ROOT_OVERRIDE: "/override/root" }, plugin) === "/home/fm/config/calm", "FM_HOME beats FM_ROOT_OVERRIDE");
-check(policy.calmPreferencePath({ FM_HOME: "/home/fm", FM_CONFIG_OVERRIDE: "/cfg" }, plugin) === "/cfg/calm", "FM_CONFIG_OVERRIDE beats the home");
-check(policy.calmPreferencePath({ FM_HOME: "" }, plugin) === "/repo/config/calm", "an empty FM_HOME reads as unset");
+check(policy.calmPreferencePath({ JG_ROOT_OVERRIDE: "/override/root" }, plugin) === "/override/root/config/calm", "JG_ROOT_OVERRIDE");
+check(policy.calmPreferencePath({ JG_HOME: "/home/fm", JG_ROOT_OVERRIDE: "/override/root" }, plugin) === "/home/fm/config/calm", "JG_HOME beats JG_ROOT_OVERRIDE");
+check(policy.calmPreferencePath({ JG_HOME: "/home/fm", JG_CONFIG_OVERRIDE: "/cfg" }, plugin) === "/cfg/calm", "JG_CONFIG_OVERRIDE beats the home");
+check(policy.calmPreferencePath({ JG_HOME: "" }, plugin) === "/repo/config/calm", "an empty JG_HOME reads as unset");
 for (const [stored, expected] of [["on\\n", true], ["on", true], [" on \\n", true], ["max\\n", true], ["off\\n", false], ["", false], [undefined, false], ["ON", false], ["maybe", false]]) {
   check(policy.parseCalmPreference(stored) === expected, \`preference \${JSON.stringify(stored)}\`);
 }
@@ -325,7 +325,7 @@ test_branch_notes_over_the_store_owner() {
   home="$TMP_ROOT/notes-home"
   state="$home/state"
   mkdir -p "$state"
-  outcome() { FM_HOME="$home" bash "$ROOT/bin/jg-branch-outcome.sh" "$@" >/dev/null || fail "jg-branch-outcome.sh $1 failed"; }
+  outcome() { JG_HOME="$home" bash "$ROOT/bin/jg-branch-outcome.sh" "$@" >/dev/null || fail "jg-branch-outcome.sh $1 failed"; }
   outcome append --task jg-a --verdict routine --summary 'worker healthy, "quoted"'
   outcome append --task jg-b --verdict routine --summary 'no change' --silent true
   outcome append --task jg-c --verdict captain --summary $'PR https://example.test/pr/3 green\nmerge?'
@@ -350,8 +350,8 @@ const state = process.env.NOTES_STATE;
 const read = (name) => readFileSync(`${state}/${name}`, "utf8");
 const plugin = "/repo/.claude/mods/firstmate-calm";
 same(notes.firstmateStateDirectory({}, plugin), "/repo/state", "code-root fallback");
-same(notes.firstmateStateDirectory({ FM_ROOT_OVERRIDE: "/r", FM_HOME: "/h" }, plugin), "/h/state", "FM_HOME beats FM_ROOT_OVERRIDE");
-same(notes.firstmateStateDirectory({ FM_HOME: "/h", FM_STATE_OVERRIDE: "/s" }, plugin), "/s", "FM_STATE_OVERRIDE beats the home");
+same(notes.firstmateStateDirectory({ JG_ROOT_OVERRIDE: "/r", JG_HOME: "/h" }, plugin), "/h/state", "JG_HOME beats JG_ROOT_OVERRIDE");
+same(notes.firstmateStateDirectory({ JG_HOME: "/h", JG_STATE_OVERRIDE: "/s" }, plugin), "/s", "JG_STATE_OVERRIDE beats the home");
 // A torn last line, as a reader racing a writer that is not atomic would see, is skipped.
 const rows = notes.parseOutcomeTail(read(".branch-outcomes-tail.jsonl") + '{"seq":6,"epoch":');
 same(rows.map((row) => row.seq), [1, 2, 3, 4, 5], "rows the store owner wrote");
@@ -417,7 +417,7 @@ JS
 # The classifier parity corpus: envelopes the shell owner encodes itself, its legacy
 # shapes, and near misses. Each case is one file so multi-line bodies stay exact.
 canonical_generic_kinds() {
-  bash -c '. "$1"; printf "%s\n" "$FM_OPERATIONAL_KINDS"' firstmate "$OPERATIONAL_INPUT"
+  bash -c '. "$1"; printf "%s\n" "$JG_OPERATIONAL_KINDS"' firstmate "$OPERATIONAL_INPUT"
 }
 
 write_parity_corpus() {
@@ -531,7 +531,7 @@ test_doorbell_parity_with_shell_owner() {
   mkdir -p "$state"
   for kind in $(canonical_generic_kinds); do
     index=$((index + 1))
-    printf 'body for %s' "$kind" | FM_STATE_OVERRIDE="$state" "$OPERATIONAL_INPUT" record "$kind" \
+    printf 'body for %s' "$kind" | JG_STATE_OVERRIDE="$state" "$OPERATIONAL_INPUT" record "$kind" \
       | tr -d '\n' >"$dir/case-$index.txt" || fail "the owner could not publish a $kind record"
   done
   doorbell=$(cat "$dir/case-1.txt")

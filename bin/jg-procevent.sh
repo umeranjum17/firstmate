@@ -81,7 +81,7 @@
 #            observed owned or its launch-pacing stamp has moved, `failed`
 #            otherwise, and any failure also makes this command exit non-zero.
 #            One bounded window covers a whole cycle's launches
-#            (FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS; docs/configuration.md).
+#            (JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS; docs/configuration.md).
 #            A launch that fails to confirm is also announced as a durable
 #            `check` wake, once per failure episode - keyed by the registration
 #            identity it ran under and ended by a later launch of that source
@@ -226,7 +226,7 @@
 # group once that lease can no longer be proved fresh. Owner-presence operations
 # refresh the lease, an attached public start keeps it fresh while its caller
 # remains attached, and the watcher's reconcile cycle keeps it fresh in a live
-# home. A runner exports the inherited FM_PROCEVENT_IN_RUNNER marker and every
+# home. A runner exports the inherited JG_PROCEVENT_IN_RUNNER marker and every
 # refresh is skipped under it, so a runner and its ordinary children do not
 # certify their own owner. That rule is CONFUSED-AGENT-GRADE, the grade
 # bin/jg-lease-lib.sh documents: a source that DELIBERATELY strips the marker
@@ -249,9 +249,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -270,7 +270,7 @@ usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//';
 case "${1-}" in ''|-h|--help|help) usage ;; esac
 
 REG=$(jg_procevent_registry_dir "$STATE")
-MAX_OUTPUT_BYTES=${FM_PROCEVENT_MAX_OUTPUT_BYTES:-1048576}
+MAX_OUTPUT_BYTES=${JG_PROCEVENT_MAX_OUTPUT_BYTES:-1048576}
 EXTENSION_HOST="$SCRIPT_DIR/jg-extension.mjs"
 EXTENSION_LIFECYCLE_LOCK="$REG/.extension-binding-lifecycle.lock"
 
@@ -282,15 +282,15 @@ state_root_bind() {  # [create]
   STATE=$(jg_procevent_state_root_resolve "$STATE") || return 1
   REG=$(jg_procevent_registry_dir "$STATE")
   EXTENSION_LIFECYCLE_LOCK="$REG/.extension-binding-lifecycle.lock"
-  FM_STATE_OVERRIDE=$STATE
-  export FM_STATE_OVERRIDE
+  JG_STATE_OVERRIDE=$STATE
+  export JG_STATE_OVERRIDE
 }
 
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   state_root_bind || die "process-event state root is not a private directory"
 fi
 
-adapter_script() { printf '%s/bin/jg-procevent-%s.sh\n' "$FM_ROOT" "$1"; }
+adapter_script() { printf '%s/bin/jg-procevent-%s.sh\n' "$JG_ROOT" "$1"; }
 
 extension_lifecycle_lock_acquire() {
   state_root_bind create || return 1
@@ -305,11 +305,11 @@ extension_lifecycle_lock_release() {
 
 run_extension_invocation_cleanup() {  # [cleanup selector...]
   [ -x "$EXTENSION_HOST" ] && [ ! -L "$EXTENSION_HOST" ] || return 1
-  if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  if [ -n "${JG_STATE_OVERRIDE:-}" ]; then
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$EXTENSION_HOST" cleanup-invocations "$@" >/dev/null 2>&1
   else
-    FM_HOME="$FM_HOME" "$EXTENSION_HOST" cleanup-invocations "$@" >/dev/null 2>&1
+    JG_HOME="$JG_HOME" "$EXTENSION_HOST" cleanup-invocations "$@" >/dev/null 2>&1
   fi
 }
 
@@ -322,7 +322,7 @@ cleanup_extension_registration_invocations_locked() {  # <source-id>
   jg_procevent_extension_registration_load_locked "$STATE" "$1"
   owner_state=$?
   case "$owner_state" in
-    0) cleanup_extension_binding_invocations "$FM_PROCEVENT_EXTENSION_BINDING_DIGEST" ;;
+    0) cleanup_extension_binding_invocations "$JG_PROCEVENT_EXTENSION_BINDING_DIGEST" ;;
     1) return 0 ;;
     *) return 1 ;;
   esac
@@ -338,27 +338,27 @@ extension_result_command() {  # <adapter> <operation> <result-file>
   [ "$owner_state" -eq 0 ] || return 1
   [ -x "$EXTENSION_HOST" ] && [ ! -L "$EXTENSION_HOST" ] || return 1
   case "$operation" in
-    result.terminal) reservation=${FM_PROCEVENT_CAPTURE_RESERVATION_TERMINAL:-} ;;
-    result.silent) reservation=${FM_PROCEVENT_CAPTURE_RESERVATION_SILENT:-} ;;
+    result.terminal) reservation=${JG_PROCEVENT_CAPTURE_RESERVATION_TERMINAL:-} ;;
+    result.silent) reservation=${JG_PROCEVENT_CAPTURE_RESERVATION_SILENT:-} ;;
   esac
   local -a command=("$EXTENSION_HOST" process-event "$adapter" "$operation"
     --result-file "$result"
-    --expect-extension "$FM_PROCEVENT_RESULT_EXTENSION_ID"
-    --expect-version "$FM_PROCEVENT_RESULT_EXTENSION_VERSION"
-    --expect-capability-version "$FM_PROCEVENT_RESULT_EXTENSION_CAPABILITY_VERSION"
-    --expect-package-digest "$FM_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST"
-    --expect-binding-digest "$FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST")
+    --expect-extension "$JG_PROCEVENT_RESULT_EXTENSION_ID"
+    --expect-version "$JG_PROCEVENT_RESULT_EXTENSION_VERSION"
+    --expect-capability-version "$JG_PROCEVENT_RESULT_EXTENSION_CAPABILITY_VERSION"
+    --expect-package-digest "$JG_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST"
+    --expect-binding-digest "$JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST")
   if [ -n "$reservation" ]; then
     extension_lifecycle_lock_acquire || return 1
-    owner=${FM_LOCK_OWNER_DIR:-}
+    owner=${JG_LOCK_OWNER_DIR:-}
     [ -n "$owner" ] || { extension_lifecycle_lock_release; return 1; }
     claim_path=$(jg_procevent_claim_path "$CLAIM_ID") || { extension_lifecycle_lock_release; return 1; }
-    FM_EXTENSION_RETIREMENT_MODE=process-event \
-      FM_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK" \
-      FM_EXTENSION_LIFECYCLE_OWNER="$owner" \
+    JG_EXTENSION_RETIREMENT_MODE=process-event \
+      JG_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK" \
+      JG_EXTENSION_LIFECYCLE_OWNER="$owner" \
       perl "$SCRIPT_DIR/jg-procevent-extension-capture.pl" handoff \
         8 6 "$claim_path" "$CLAIM_HOME" "$CLAIM_ID" "$CLAIM_TOKEN" "$CLAIM_PID" \
-        "$(jg_pid_identity "$CLAIM_PID")" "$FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" "$reservation" \
+        "$(jg_pid_identity "$CLAIM_PID")" "$JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" "$reservation" \
         "$operation" "$result" "$EXTENSION_HOST" -- "${command[@]:1}"
     handoff_status=$?
     extension_lifecycle_lock_release
@@ -833,9 +833,9 @@ publish_result() {  # <result-file>
       if adapter_result_is_terminal "$adapter" "$result"; then
         message="Lavish review result $id sequence $seq is terminal at $result. Read it with bin/jg-procevent-lavish.sh read $result, stop and conclude the review, and do not re-arm the board. The board stays yours until you acknowledge this round with bin/jg-procevent.sh handled $id $seq, which retires it."
       else
-        export FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD=1
+        export JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD=1
         if adapter_result_is_silent "$adapter" "$result"; then
-          unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
+          unset JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
           jg_procevent_mark_handled "$STATE" "$id" "$seq"
           case "$?" in
             0|1)
@@ -844,7 +844,7 @@ publish_result() {  # <result-file>
               ;;
           esac
         fi
-        unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
+        unset JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
         message="Lavish review feedback is captured for task $owner_task at $result. Read it with bin/jg-procevent-lavish.sh read $result, apply the round, and re-arm the board with the reply."
       fi
       # Snapshot the records that already exist (active and handled) before
@@ -887,9 +887,9 @@ EOF
     # caller already wrote (1) settle it; only an unrecordable silence (2)
     # falls through and announces, because a silence nothing remembers would
     # otherwise be re-evaluated on every reconcile forever.
-    export FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD=1
+    export JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD=1
     if adapter_result_is_silent "$adapter" "$result"; then
-      unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
+      unset JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
       jg_procevent_mark_handled "$STATE" "$id" "$seq"
       case "$?" in
         0|1)
@@ -898,7 +898,7 @@ EOF
           ;;
       esac
     fi
-    unset FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
+    unset JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
     if jg_wake_append check "procevent:$id:$seq" "check: $line"; then
       status=0
     fi
@@ -933,7 +933,7 @@ isolate_process() {  # <wait|detach> <command> [argv...]
     defined(my $pid = fork) or exit 125;
     if ($pid == 0) {
       setpgrp(0, 0) or exit 125;
-      $ENV{FM_PROCEVENT_RUNNER_GROUP} = $$;
+      $ENV{JG_PROCEVENT_RUNNER_GROUP} = $$;
       exec @ARGV;
       exit 125;
     }
@@ -955,24 +955,24 @@ isolate_runner() {  # <wait|detach> <source-id>
 
 require_isolated_group() {  # <role>
   local role=$1 pgid
-  [ "${FM_PROCEVENT_RUNNER_GROUP:-}" = "$$" ] \
+  [ "${JG_PROCEVENT_RUNNER_GROUP:-}" = "$$" ] \
     || die "$role process group was not isolated"
   pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d '[:space:]') \
     || die "cannot inspect $role process group"
   [ -n "$pgid" ] || die "cannot inspect $role process group"
   [ "$pgid" = "$$" ] || die "$role does not lead its process group"
-  unset FM_PROCEVENT_RUNNER_GROUP
+  unset JG_PROCEVENT_RUNNER_GROUP
 }
 
 require_runner_group() { require_isolated_group runner; }
 
 # Record owner-presence activity for this home. Skipped under the inherited
-# FM_PROCEVENT_IN_RUNNER marker, so a runner and its ordinary children do not
+# JG_PROCEVENT_IN_RUNNER marker, so a runner and its ordinary children do not
 # keep refreshing their own lease after the home goes away.
 # Confused-agent-grade: a source that deliberately unsets the marker can still
 # refresh, and that is out of scope (see docs/configuration.md).
 owner_lease_refresh() {
-  [ "${FM_PROCEVENT_IN_RUNNER:-0}" = 1 ] && return 0
+  [ "${JG_PROCEVENT_IN_RUNNER:-0}" = 1 ] && return 0
   jg_procevent_owner_lease_touch "$STATE" 2>/dev/null || true
 }
 
@@ -1037,7 +1037,7 @@ cmd_start() {
   case "$extension_load_state" in
     0)
       extension_owner=1
-      [ "$FM_PROCEVENT_EXTENSION_ADAPTER" = "$adapter" ] || {
+      [ "$JG_PROCEVENT_EXTENSION_ADAPTER" = "$adapter" ] || {
         jg_procevent_source_lock_release "$id"
         die "extension registration adapter identity is inconsistent: $id"
       }
@@ -1048,16 +1048,16 @@ cmd_start() {
       extension_sequence=$(next_result_sequence "$id") \
         || { jg_procevent_source_lock_release "$id"; die "cannot derive extension request sequence: $id"; }
       extension_request_id=$(extension_source_request_id "$adapter" "$id" "$extension_sequence" \
-        "$FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" "$FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST") \
+        "$JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" "$JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST") \
         || { jg_procevent_source_lock_release "$id"; die "cannot derive extension request identity: $id"; }
       ARGV=("$EXTENSION_HOST" process-event "$adapter" source.poll \
-        --source-id "$id" --config-ref "$FM_PROCEVENT_EXTENSION_CONFIG_REF" \
+        --source-id "$id" --config-ref "$JG_PROCEVENT_EXTENSION_CONFIG_REF" \
         --request-id "$extension_request_id" \
-        --expect-extension "$FM_PROCEVENT_EXTENSION_ID" \
-        --expect-version "$FM_PROCEVENT_EXTENSION_VERSION" \
-        --expect-capability-version "$FM_PROCEVENT_EXTENSION_CAPABILITY_VERSION" \
-        --expect-package-digest "$FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST" \
-        --expect-binding-digest "$FM_PROCEVENT_EXTENSION_BINDING_DIGEST")
+        --expect-extension "$JG_PROCEVENT_EXTENSION_ID" \
+        --expect-version "$JG_PROCEVENT_EXTENSION_VERSION" \
+        --expect-capability-version "$JG_PROCEVENT_EXTENSION_CAPABILITY_VERSION" \
+        --expect-package-digest "$JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST" \
+        --expect-binding-digest "$JG_PROCEVENT_EXTENSION_BINDING_DIGEST")
       ;;
     1)
       if ! read_argv "$id"; then
@@ -1074,7 +1074,7 @@ cmd_start() {
     jg_procevent_source_lock_release "$id"
     die "cannot retain registration identity: $id"
   }
-  jg_procevent_claim_acquire_locked "$id" "$FM_HOME" "$$" "$(source_file "$id")" "$STATE"
+  jg_procevent_claim_acquire_locked "$id" "$JG_HOME" "$$" "$(source_file "$id")" "$STATE"
   claimed=$?
   jg_procevent_source_lock_release "$id"
   case "$claimed" in
@@ -1083,12 +1083,12 @@ cmd_start() {
     *) die "cannot claim source: $id" ;;
   esac
   CLAIM_ID=$id
-  CLAIM_HOME=$FM_HOME
+  CLAIM_HOME=$JG_HOME
   CLAIM_PID=$$
-  CLAIM_TOKEN=$FM_PROCEVENT_CLAIM_TOKEN
-  CLAIM_REG_IDENTITY=$FM_PROCEVENT_CLAIM_REG_IDENTITY
-  CLAIM_STATE_DEVICE=$FM_PROCEVENT_CLAIM_STATE_DEVICE
-  CLAIM_STATE_INODE=$FM_PROCEVENT_CLAIM_STATE_INODE
+  CLAIM_TOKEN=$JG_PROCEVENT_CLAIM_TOKEN
+  CLAIM_REG_IDENTITY=$JG_PROCEVENT_CLAIM_REG_IDENTITY
+  CLAIM_STATE_DEVICE=$JG_PROCEVENT_CLAIM_STATE_DEVICE
+  CLAIM_STATE_INODE=$JG_PROCEVENT_CLAIM_STATE_INODE
   STAGED_OUTPUT=
   # Exit cleanup must not wait for the source lock: retire and reconcile hold it
   # while waiting for this runner, so blocking here creates a circular wait
@@ -1099,10 +1099,10 @@ cmd_start() {
     [ -z "$STAGED_OUTPUT" ] || rm -f -- "$STAGED_OUTPUT"
     jg_procevent_source_lock_try_acquire "$CLAIM_ID" 2>/dev/null || return 0
     if jg_procevent_claim_load_locked "$CLAIM_ID" 2>/dev/null \
-      && [ "$FM_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
-      && [ "$FM_PROCEVENT_CLAIM_PID" = "$CLAIM_PID" ] \
-      && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$CLAIM_TOKEN" ] \
-      && [ "$FM_PROCEVENT_CLAIM_TERMINAL" = terminal ]; then
+      && [ "$JG_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
+      && [ "$JG_PROCEVENT_CLAIM_PID" = "$CLAIM_PID" ] \
+      && [ "$JG_PROCEVENT_CLAIM_TOKEN" = "$CLAIM_TOKEN" ] \
+      && [ "$JG_PROCEVENT_CLAIM_TERMINAL" = terminal ]; then
       jg_procevent_source_lock_release "$CLAIM_ID" 2>/dev/null || true
       return 0
     fi
@@ -1124,10 +1124,10 @@ cmd_start() {
     [ -f "$registration" ] && [ ! -L "$registration" ] || return 1
     jg_procevent_source_lock_acquire "$id" || return 1
     if ! jg_procevent_claim_load_locked "$id" 2>/dev/null \
-      || [ "$FM_PROCEVENT_CLAIM_HOME" != "$CLAIM_HOME" ] \
-      || [ "$FM_PROCEVENT_CLAIM_PID" != "$CLAIM_PID" ] \
-      || [ "$FM_PROCEVENT_CLAIM_TOKEN" != "$CLAIM_TOKEN" ] \
-      || [ "$FM_PROCEVENT_CLAIM_TERMINAL" != active ]; then
+      || [ "$JG_PROCEVENT_CLAIM_HOME" != "$CLAIM_HOME" ] \
+      || [ "$JG_PROCEVENT_CLAIM_PID" != "$CLAIM_PID" ] \
+      || [ "$JG_PROCEVENT_CLAIM_TOKEN" != "$CLAIM_TOKEN" ] \
+      || [ "$JG_PROCEVENT_CLAIM_TERMINAL" != active ]; then
       jg_procevent_source_lock_release "$id"
       return 1
     fi
@@ -1166,11 +1166,11 @@ cmd_start() {
   # The inherited marker keeps the runner and its ordinary children from
   # accidentally refreshing the owner lease. A source that deliberately strips
   # it is outside this confused-agent-grade boundary.
-  export FM_PROCEVENT_IN_RUNNER=1
+  export JG_PROCEVENT_IN_RUNNER=1
   start_owner_guard "$id" || die "cannot start the runner's owner guard: $id"
   local launch_floor runner inbox reservation_dir staging launch_ready launch_reply launch_pid
   launch_floor=$(jg_procevent_launch_floor_seconds) \
-    || die "FM_PROCEVENT_LAUNCH_FLOOR_SECONDS must be whole seconds from $FM_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS to $FM_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS"
+    || die "JG_PROCEVENT_LAUNCH_FLOOR_SECONDS must be whole seconds from $JG_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS to $JG_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS"
   if [ "$extension_owner" -eq 1 ]; then
     staging=$(jg_procevent_extension_staging_prepare "$STATE") \
       || die "cannot safely prepare the external registry staging boundary"
@@ -1189,14 +1189,14 @@ cmd_start() {
     reservation_dir=$(jg_procevent_capture_reservation_prepare "$STATE") \
       || die "cannot retain the external capture reservation boundary"
     exec 6<"$reservation_dir" || die "cannot retain the external capture reservation boundary"
-    FM_PROCEVENT_CAPTURE_PINNED_INBOX=1
-    export FM_PROCEVENT_CAPTURE_INBOX_FD=8
+    JG_PROCEVENT_CAPTURE_PINNED_INBOX=1
+    export JG_PROCEVENT_CAPTURE_INBOX_FD=8
     runner="$id.runner"
   else
     runner=$(runner_file "$id")
   fi
 
-  case "$MAX_OUTPUT_BYTES" in ''|*[!0-9]*) die "FM_PROCEVENT_MAX_OUTPUT_BYTES must be a nonnegative integer" ;; esac
+  case "$MAX_OUTPUT_BYTES" in ''|*[!0-9]*) die "JG_PROCEVENT_MAX_OUTPUT_BYTES must be a nonnegative integer" ;; esac
   if [ "$extension_owner" -eq 1 ]; then
     out=".$id.$CLAIM_TOKEN.output"
   else
@@ -1241,9 +1241,9 @@ cmd_start() {
       die "cannot prepare the source launch boundary: $id"
     }
     perl "$SCRIPT_DIR/jg-procevent-extension-capture.pl" \
-      9 8 6 "$id" "$adapter" "$FM_PROCEVENT_EXTENSION_ID" \
-      "$FM_PROCEVENT_EXTENSION_VERSION" "$FM_PROCEVENT_EXTENSION_CAPABILITY_VERSION" \
-      "$FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST" "$FM_PROCEVENT_EXTENSION_BINDING_DIGEST" \
+      9 8 6 "$id" "$adapter" "$JG_PROCEVENT_EXTENSION_ID" \
+      "$JG_PROCEVENT_EXTENSION_VERSION" "$JG_PROCEVENT_EXTENSION_CAPABILITY_VERSION" \
+      "$JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST" "$JG_PROCEVENT_EXTENSION_BINDING_DIGEST" \
       "$CLAIM_TOKEN" "$runner" "$out" "$$" "$(jg_pid_identity "$$")" "$MAX_OUTPUT_BYTES" \
       "$launch_ready" -- "${ARGV[@]}" > "$launch_reply" &
     launch_pid=$!
@@ -1270,8 +1270,8 @@ EOF
       *) die "cannot safely stage the extension result" ;;
     esac
     if [ "$capture_state" = captured ]; then
-      FM_PROCEVENT_CAPTURE_RESERVATION_TERMINAL=$reservation_terminal
-      FM_PROCEVENT_CAPTURE_RESERVATION_SILENT=$reservation_silent
+      JG_PROCEVENT_CAPTURE_RESERVATION_TERMINAL=$reservation_terminal
+      JG_PROCEVENT_CAPTURE_RESERVATION_SILENT=$reservation_silent
     fi
   else
     [ ! -e "$out" ] && [ ! -L "$out" ] || {
@@ -1462,10 +1462,10 @@ retire_owned_terminal_source() {  # <source-id>
     return 2
   fi
   if jg_procevent_claim_load_locked "$id" 2>/dev/null \
-    && [ "$FM_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
-    && [ "$FM_PROCEVENT_CLAIM_PID" = "$CLAIM_PID" ] \
-    && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$CLAIM_TOKEN" ] \
-    && [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" = "$CLAIM_REG_IDENTITY" ] \
+    && [ "$JG_PROCEVENT_CLAIM_HOME" = "$CLAIM_HOME" ] \
+    && [ "$JG_PROCEVENT_CLAIM_PID" = "$CLAIM_PID" ] \
+    && [ "$JG_PROCEVENT_CLAIM_TOKEN" = "$CLAIM_TOKEN" ] \
+    && [ "$JG_PROCEVENT_CLAIM_REG_IDENTITY" = "$CLAIM_REG_IDENTITY" ] \
     && current_identity=$(jg_pr_file_identity "$registration" 2>/dev/null) \
     && [ "$current_identity" = "$CLAIM_REG_IDENTITY" ] \
     && jg_procevent_claim_mark_terminal_locked "$id" "$CLAIM_HOME" "$CLAIM_PID" "$CLAIM_TOKEN"; then
@@ -1541,9 +1541,9 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
   trap 'printf "failed\n" > "$ready" 2>/dev/null || true' EXIT
   require_isolated_group guard
   lease=$(jg_procevent_owner_lease_seconds) \
-    || die "FM_PROCEVENT_OWNER_LEASE_SECONDS must be whole seconds from $FM_PROCEVENT_OWNER_LEASE_MIN_SECONDS to $FM_PROCEVENT_OWNER_LEASE_MAX_SECONDS"
+    || die "JG_PROCEVENT_OWNER_LEASE_SECONDS must be whole seconds from $JG_PROCEVENT_OWNER_LEASE_MIN_SECONDS to $JG_PROCEVENT_OWNER_LEASE_MAX_SECONDS"
   tick=$(jg_procevent_owner_check_seconds) \
-    || die "FM_PROCEVENT_OWNER_CHECK_SECONDS must be whole seconds from $FM_PROCEVENT_OWNER_CHECK_MIN_SECONDS to $FM_PROCEVENT_OWNER_CHECK_MAX_SECONDS"
+    || die "JG_PROCEVENT_OWNER_CHECK_SECONDS must be whole seconds from $JG_PROCEVENT_OWNER_CHECK_MIN_SECONDS to $JG_PROCEVENT_OWNER_CHECK_MAX_SECONDS"
   # Force base ten before any arithmetic. The validator accepts a zero-prefixed
   # value and `[` reads it as decimal, but `$(( ))` would read it as octal: 010
   # would halve to 4 rather than 5, and 08 would not be a number at all and
@@ -1658,7 +1658,7 @@ report_launch_failure() {  # <source-id> <registration-identity>
   nonce="$RANDOM$RANDOM"
   announce_source_once "$(launch_failed_file "$id")" "$episode" \
     "procevent:$id:launch-failed:$episode-$nonce" \
-    "check: process-event source $id is registered but its launch did not prove it took the source's claim within FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/jg-procevent.sh start $id to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you." \
+    "check: process-event source $id is registered but its launch did not prove it took the source's claim within JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS, so nothing is confirmed to be collecting from it; reconcile reports that as failed= and keeps launching it every supervision cycle. If it stays that way, check the source command and the adapter binary the registration names, and run an attached bin/jg-procevent.sh start $id to reproduce a refusal on its stderr - the detached launch discards it, and a hand-run reconcile only counts it as failed=. A later cycle that finds the source owned ends this episode on its own, so a runner that was merely slow to claim needs nothing from you." \
     "$episode $nonce"
 }
 
@@ -1705,7 +1705,7 @@ cmd_reconcile() {
   # cannot use makes every launch unconfirmable, so validating it later would
   # report a fleet of perfectly healthy runners as `failed=` and blame nothing.
   jg_procevent_launch_confirm_seconds >/dev/null \
-    || die "FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $FM_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
+    || die "JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $JG_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $JG_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
   owner_lease_refresh
   published=$(publish_pending)
 
@@ -1726,11 +1726,11 @@ cmd_reconcile() {
       jg_procevent_source_lock_release "$id"
       continue
     fi
-    owner=$FM_PROCEVENT_CLAIM_HOME
-    pid=$FM_PROCEVENT_CLAIM_PID
-    token=$FM_PROCEVENT_CLAIM_TOKEN
-    identity=$FM_PROCEVENT_CLAIM_IDENTITY
-    if ! jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+    owner=$JG_PROCEVENT_CLAIM_HOME
+    pid=$JG_PROCEVENT_CLAIM_PID
+    token=$JG_PROCEVENT_CLAIM_TOKEN
+    identity=$JG_PROCEVENT_CLAIM_IDENTITY
+    if ! jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME"; then
       jg_procevent_source_lock_release "$id"
       continue
     fi
@@ -1777,7 +1777,7 @@ cmd_reconcile() {
           # so report the strand durably rather than leaving it to whoever
           # happens to run this command.
           uncertain=$((uncertain + 1))
-          report_stranded_source "$id" "$FM_PROCEVENT_CLAIM_TOKEN" \
+          report_stranded_source "$id" "$JG_PROCEVENT_CLAIM_TOKEN" \
             "$(stranded_reused_pid_detail "$id")" || true
         elif [ "$claim_state" -eq 1 ]; then
           if ! cleanup_extension_registration_invocations_locked "$id"; then
@@ -1802,10 +1802,10 @@ cmd_reconcile() {
           launched+=("$id"$'\t'"$launch_identity"$'\t'"$launch_mark")
           continue
         elif [ "$claim_state" -eq 4 ]; then
-          owner=$FM_PROCEVENT_CLAIM_HOME
-          pid=$FM_PROCEVENT_CLAIM_PID
-          token=$FM_PROCEVENT_CLAIM_TOKEN
-          if jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME" \
+          owner=$JG_PROCEVENT_CLAIM_HOME
+          pid=$JG_PROCEVENT_CLAIM_PID
+          token=$JG_PROCEVENT_CLAIM_TOKEN
+          if jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME" \
             && rm -f -- "$(source_file "$id")" \
             && [ ! -e "$(source_file "$id")" ] \
             && [ ! -L "$(source_file "$id")" ] \
@@ -1821,7 +1821,7 @@ cmd_reconcile() {
           # either, so it is announced the same way as the reused-pid strand
           # above but naming what a human should check rather than a command.
           uncertain=$((uncertain + 1))
-          report_stranded_source "$id" "$FM_PROCEVENT_CLAIM_TOKEN" \
+          report_stranded_source "$id" "$JG_PROCEVENT_CLAIM_TOKEN" \
             "$(stranded_leaderless_detail "$id")" || true
         elif [ "$claim_state" -eq 2 ]; then
           uncertain=$((uncertain + 1))
@@ -1941,7 +1941,7 @@ generation_is_listening() {  # <source-id> <registration-identity>
   state=$?
   if [ "$state" -eq 0 ]; then
     result=3
-    [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
+    [ "$JG_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
   fi
   jg_procevent_source_lock_release "$id"
   return "$result"
@@ -1970,7 +1970,7 @@ cmd_ensure_listening() {
   [ "$#" -eq 1 ] || usage
   jg_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   window=$(jg_procevent_launch_confirm_seconds) \
-    || die "FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $FM_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
+    || die "JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $JG_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $JG_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
   [ -f "$(source_file "$id")" ] && [ ! -L "$(source_file "$id")" ] \
     || die "source is not registered: $id"
   identity=$(jg_pr_file_identity "$(source_file "$id")" 2>/dev/null) \
@@ -2200,11 +2200,11 @@ cmd_retire() {
         jg_procevent_extension_registration_load_locked "$STATE" "$id"
         owner_state=$?
         if [ "$owner_state" -ne 0 ] \
-          || [ "$FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" != "$expected_owner" ]; then
+          || [ "$JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" != "$expected_owner" ]; then
           jg_procevent_source_lock_release "$id"
           die "source registration does not match the expected owner: $id"
         fi
-        extension_binding_digest=$FM_PROCEVENT_EXTENSION_BINDING_DIGEST
+        extension_binding_digest=$JG_PROCEVENT_EXTENSION_BINDING_DIGEST
         ;;
     esac
   elif [ "$condition" = --if-owner ] \
@@ -2217,11 +2217,11 @@ cmd_retire() {
       jg_procevent_source_lock_release "$id"
       die "cannot safely read source ownership: $id"
     fi
-    if jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
-      owner=$FM_PROCEVENT_CLAIM_HOME
-      pid=$FM_PROCEVENT_CLAIM_PID
-      token=$FM_PROCEVENT_CLAIM_TOKEN
-      identity=$FM_PROCEVENT_CLAIM_IDENTITY
+    if jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME"; then
+      owner=$JG_PROCEVENT_CLAIM_HOME
+      pid=$JG_PROCEVENT_CLAIM_PID
+      token=$JG_PROCEVENT_CLAIM_TOKEN
+      identity=$JG_PROCEVENT_CLAIM_IDENTITY
       stop_runner_pid "$pid" "$identity"
       stop_state=$?
       if [ "$stop_state" -eq 2 ]; then
@@ -2284,7 +2284,7 @@ sweep_relevant_state() {
       jg_procevent_source_lock_release "$owner"
       return 0
     fi
-    if jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+    if jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME"; then
       jg_procevent_source_lock_release "$owner"
       return 0
     fi
@@ -2301,8 +2301,8 @@ sweep_source_preflight() {
       jg_procevent_source_lock_release "$id"
       return 1
     fi
-    if jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
-      jg_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY"
+    if jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME"; then
+      jg_procevent_pid_state "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_IDENTITY"
       state=$?
       if [ "$state" -eq 2 ]; then
         jg_procevent_source_lock_release "$id"
@@ -2320,17 +2320,17 @@ sweep_retire_source() {  # <source-id>
     jg_procevent_extension_registration_load_locked "$STATE" "$id"
     owner_state=$?
     case "$owner_state" in
-      0) expected_owner=$FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN ;;
+      0) expected_owner=$JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN ;;
       1) ;;
       *) jg_procevent_source_lock_release "$id"; return 1 ;;
     esac
     jg_procevent_source_lock_release "$id"
   fi
   if [ -n "$expected_owner" ]; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-procevent.sh" retire "$id" --if-owner "$expected_owner"
   else
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-procevent.sh" retire "$id"
   fi
 }
@@ -2365,7 +2365,7 @@ cmd_sweep_home() {
       jg_procevent_source_lock_release "$id"
       continue
     fi
-    if jg_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+    if jg_procevent_claim_owned_by_state "$STATE" "$JG_HOME"; then
       sweep_add_id "$id"
     fi
     jg_procevent_source_lock_release "$id"
@@ -2476,7 +2476,7 @@ cmd_binding_retirement_preflight() {
     owner_state=$?
     jg_lock_release "$(jg_procevent_source_lock_path "$id")"
     case "$owner_state" in
-      0) [ "$FM_PROCEVENT_EXTENSION_BINDING_DIGEST" != "$digest" ] \
+      0) [ "$JG_PROCEVENT_EXTENSION_BINDING_DIGEST" != "$digest" ] \
         || die "binding still owns process-event registration: $id" ;;
       1) ;;
       *) die "binding retirement found malformed extension registration: $id" ;;
@@ -2492,7 +2492,7 @@ cmd_binding_retirement_preflight() {
     jg_procevent_result_extension_load "$result"
     owner_state=$?
     case "$owner_state" in
-      0) [ "$FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" != "$digest" ] \
+      0) [ "$JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" != "$digest" ] \
         || die "binding still owns unhandled process-event result: ${result##*/}" ;;
       1) ;;
       *) die "binding retirement found malformed extension result: ${result##*/}" ;;
@@ -2507,11 +2507,11 @@ cmd_extension_retirement() {
   shift
   case "$mode" in binding|transfer) ;; *) die "unsupported extension retirement mode: $mode" ;; esac
   extension_lifecycle_lock_acquire || die "cannot lock the extension lifecycle"
-  owner=${FM_LOCK_OWNER_DIR:-}
+  owner=${JG_LOCK_OWNER_DIR:-}
   [ -n "$owner" ] || die "extension lifecycle lock has no owner identity"
-  export FM_EXTENSION_RETIREMENT_MODE="$mode"
-  export FM_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
-  export FM_EXTENSION_LIFECYCLE_OWNER="$owner"
+  export JG_EXTENSION_RETIREMENT_MODE="$mode"
+  export JG_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
+  export JG_EXTENSION_LIFECYCLE_OWNER="$owner"
   exec "$EXTENSION_HOST" "$@"
 }
 
@@ -2519,11 +2519,11 @@ cmd_extension_bind() {
   local binding_command=${1-} owner
   case "$binding_command" in bind|receive-transfer-bind) ;; *) die "unsupported extension binding command: $binding_command" ;; esac
   extension_lifecycle_lock_acquire || die "cannot lock the extension lifecycle"
-  owner=${FM_LOCK_OWNER_DIR:-}
+  owner=${JG_LOCK_OWNER_DIR:-}
   [ -n "$owner" ] || die "extension lifecycle lock has no owner identity"
-  export FM_EXTENSION_RETIREMENT_MODE=bind
-  export FM_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
-  export FM_EXTENSION_LIFECYCLE_OWNER="$owner"
+  export JG_EXTENSION_RETIREMENT_MODE=bind
+  export JG_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
+  export JG_EXTENSION_LIFECYCLE_OWNER="$owner"
   exec "$EXTENSION_HOST" "$@"
 }
 
@@ -2534,11 +2534,11 @@ cmd_extension_process_event() {
     [ "$arg" != --capture-reservation ] || die "capture reservation is internal"
   done
   extension_lifecycle_lock_acquire || die "cannot lock the extension lifecycle"
-  owner=${FM_LOCK_OWNER_DIR:-}
+  owner=${JG_LOCK_OWNER_DIR:-}
   [ -n "$owner" ] || die "extension lifecycle lock has no owner identity"
-  export FM_EXTENSION_RETIREMENT_MODE=process-event
-  export FM_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
-  export FM_EXTENSION_LIFECYCLE_OWNER="$owner"
+  export JG_EXTENSION_RETIREMENT_MODE=process-event
+  export JG_EXTENSION_LIFECYCLE_LOCK="$EXTENSION_LIFECYCLE_LOCK"
+  export JG_EXTENSION_LIFECYCLE_OWNER="$owner"
   # These descriptors are reserved for the direct, internal capture handoff.
   # The public lifecycle path must not let unrelated descriptors acquired while
   # obtaining its lock look like a malformed handoff to the host.
@@ -2549,9 +2549,9 @@ cmd_extension_process_event() {
   exec "$EXTENSION_HOST" process-event "$@"
 }
 
-unset FM_PROCEVENT_CAPTURE_PINNED_INBOX FM_PROCEVENT_CAPTURE_ABSOLUTE_INBOX \
-  FM_PROCEVENT_CAPTURE_RESERVATION_TERMINAL \
-  FM_PROCEVENT_CAPTURE_RESERVATION_SILENT
+unset JG_PROCEVENT_CAPTURE_PINNED_INBOX JG_PROCEVENT_CAPTURE_ABSOLUTE_INBOX \
+  JG_PROCEVENT_CAPTURE_RESERVATION_TERMINAL \
+  JG_PROCEVENT_CAPTURE_RESERVATION_SILENT
 { exec 7<&-; } 2>/dev/null || true
 { exec 6<&-; } 2>/dev/null || true
 { exec 8<&-; } 2>/dev/null || true

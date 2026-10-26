@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|-> - the merge-gate half of owner-rules.
-# config/merge-gate runs this first, with the gate args and FM_HOME set. It refuses (exit 1, one line naming
+# config/merge-gate runs this first, with the gate args and JG_HOME set. It refuses (exit 1, one line naming
 # the PR) a merge with no passed-proof receipt: no sealed clean done-done run at the merge head in the task's
 # folder, or no checks-lint `pass` row (data/checks-gate.log) for the PR at the merge head. A merge whose
 # Checks block declares `screen: none` opens with one line saying it takes the text-only Evidence card path, so
@@ -9,7 +18,7 @@
 # config/owner-rules is absent. Reuses merge-card's own checks.
 set -u
 [ "$#" -eq 4 ] || { echo "usage: jg-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|->" >&2; exit 2; }
-[ -n "${FM_HOME:-}" ] && [ -e "$FM_HOME/config/owner-rules" ] || exit 0
+[ -n "${JG_HOME:-}" ] && [ -e "$JG_HOME/config/owner-rules" ] || exit 0
 mc=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../merge-card" && pwd -P)/merge-card
 what=$4; [ "$4" != - ] || what="local merge $3"
 none=0
@@ -19,8 +28,8 @@ none=0
 # canary_enforced: 0 when this home is in the canary rollout (or no canary file exists) and no active UTC waiver
 # covers it. The screen-free receipt refusal honors it; the other refusals are not canary-gated.
 canary_enforced() {
-  local canary=$FM_HOME/config/owner-rules-canary waiver=$FM_HOME/config/owner-rules-canary-waiver expires
-  [ ! -r "$canary" ] || grep -Fqx -- "$FM_HOME" "$canary" || return 1
+  local canary=$JG_HOME/config/owner-rules-canary waiver=$JG_HOME/config/owner-rules-canary-waiver expires
+  [ ! -r "$canary" ] || grep -Fqx -- "$JG_HOME" "$canary" || return 1
   if [ -r "$waiver" ]; then
     IFS= read -r expires < "$waiver"
     if [[ $expires =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}Z$ ]] && [[ $(date -u +%Y-%m-%dT%H:%MZ) < $expires ]]; then return 1; fi
@@ -45,31 +54,31 @@ awk -F'\t' -v pr="$4" -v head="$3" -v task="$1" '
   $4 != "pass" { next }
   pr != "-" { if ($2 == pr && $3 == head) f = 1; next }
   $3 == head || ($3 == "-" && $2 !~ /^https?:/ && $2 ~ ("/" task "/[^/]*$")) { f = 1 }
-  END { exit !f }' "$FM_HOME/data/checks-gate.log" 2>/dev/null || {
+  END { exit !f }' "$JG_HOME/data/checks-gate.log" 2>/dev/null || {
   src=$4; [ "$4" != - ] || src="<report file>"
-  lint=${FM_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-merge-on-green/checks-lint.sh}
-  [ -x "$lint" ] || lint=${FM_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
-  echo "owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME $lint $src $FM_HOME/data/$1 then merge again"
+  lint=${JG_CHECKS_LINT:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-merge-on-green/checks-lint.sh}
+  [ -x "$lint" ] || lint=${JG_MAIN_HOME:-$HOME/firstmate}/config/jg-checks-lint.sh
+  echo "owner-rules: no checks-lint PASS for $src at $3; run JG_HOME=$JG_HOME $lint $src $JG_HOME/data/$1 then merge again"
   exit 1
 }
 # Local merges retain the existing receipt/lint behavior; only PRs have board keys.
 [ "$4" != - ] || exit 0
-# Canary config lists exact FM_HOME paths; without it every home keeps today's gate behavior.
+# Canary config lists exact JG_HOME paths; without it every home keeps today's gate behavior.
 canary_enforced || exit 0
-board=${FM_FLEET_BOARD:-}
-if [ -z "$board" ] && [ -r "$FM_HOME/config/fleet-board" ]; then
-  IFS= read -r board < "$FM_HOME/config/fleet-board"
+board=${JG_FLEET_BOARD:-}
+if [ -z "$board" ] && [ -r "$JG_HOME/config/fleet-board" ]; then
+  IFS= read -r board < "$JG_HOME/config/fleet-board"
 fi
-main_home=${FM_MAIN_HOME:-$HOME/firstmate}
+main_home=${JG_MAIN_HOME:-$HOME/firstmate}
 if [ -z "$board" ] && [ -r "$main_home/config/fleet-board" ]; then
   IFS= read -r board < "$main_home/config/fleet-board"
 fi
 if [ -z "$board" ]; then
-  echo "owner-rules: fleet board is not configured for $what (set FM_FLEET_BOARD, or write its path with: echo <board.json> > $FM_HOME/config/fleet-board; the main home's $main_home/config/fleet-board is the fallback)"
+  echo "owner-rules: fleet board is not configured for $what (set JG_FLEET_BOARD, or write its path with: echo <board.json> > $JG_HOME/config/fleet-board; the main home's $main_home/config/fleet-board is the fallback)"
   exit 1
 fi
 if [ ! -r "$board" ] || ! jq -e '.items | type == "array"' "$board" >/dev/null 2>&1; then
-  echo "owner-rules: cannot read fleet board $board for $what: set FM_FLEET_BOARD or $FM_HOME/config/fleet-board to a board.json holding {\"items\": [...]}"
+  echo "owner-rules: cannot read fleet board $board for $what: set JG_FLEET_BOARD or $JG_HOME/config/fleet-board to a board.json holding {\"items\": [...]}"
   exit 1
 fi
 key=merge-$(printf '%s' "${4#*://}" | sed 's|^[^/]*/||' | tr -c 'A-Za-z0-9._-' -)
@@ -85,5 +94,5 @@ if [ "$none" -eq 1 ] && "$mc" receipt "$1" "$3"; then
   }
   jq -e --arg k "$key" --arg h "$3" 'any(.items[]?; (.key == $k or (.key | startswith($k + "-"))) and .kind == "evidence" and ((.run.commit? // .evidence.commit?) == $h) and ((.run.commit? == null) or .run.commit == $h) and ((.evidence.commit? == null) or .evidence.commit == $h))' "$board" >/dev/null && exit 0
 fi
-echo "owner-rules: no passed-proof Evidence card for $what; post it with: FM_HOME=$FM_HOME $mc post --board $board $1 $2 $3 $4"
+echo "owner-rules: no passed-proof Evidence card for $what; post it with: JG_HOME=$JG_HOME $mc post --board $board $1 $2 $3 $4"
 exit 1

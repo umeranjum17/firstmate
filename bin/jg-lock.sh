@@ -30,9 +30,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 LOCK="$STATE/.lock"
 LOCK_SESSION="$STATE/.lock-session"
 mkdir -p "$STATE" 2>/dev/null || {
@@ -40,7 +40,7 @@ mkdir -p "$STATE" 2>/dev/null || {
   exit 1
 }
 
-# Harness identity (FM_HARNESS_RE, ancestry walk, holder liveness, trusted
+# Harness identity (JG_HARNESS_RE, ancestry walk, holder liveness, trusted
 # session id, anchor pid) is owned by the shared session-lock lib so the Claude
 # Stop auto-arm applies the exact same identity contract.
 # shellcheck source=bin/jg-session-lock-lib.sh
@@ -48,11 +48,11 @@ mkdir -p "$STATE" 2>/dev/null || {
 
 if [ "${1:-}" = "status" ]; then
   jg_session_lock_inspect "$STATE"
-  case "$FM_LOCK_INSPECT_STATE" in
+  case "$JG_LOCK_INSPECT_STATE" in
     free) echo "lock: free" ;;
     unreadable) echo "lock: unreadable" ;;
-    held) echo "lock: held by live harness pid $FM_LOCK_INSPECT_PID" ;;
-    *) echo "lock: stale (pid $FM_LOCK_INSPECT_PID dead or not a harness)" ;;
+    held) echo "lock: held by live harness pid $JG_LOCK_INSPECT_PID" ;;
+    *) echo "lock: stale (pid $JG_LOCK_INSPECT_PID dead or not a harness)" ;;
   esac
   exit 0
 fi
@@ -204,7 +204,7 @@ fi
 
 if ! jg_lock_try_acquire "$CLAIM_LOCK"; then
   sweep_pid=$(sed -n 's/^pid=//p' "$STATE/.startup-network.status" 2>/dev/null | tail -1)
-  if [ -n "${FM_LOCK_HELD_PID:-}" ] && [ "$FM_LOCK_HELD_PID" = "$sweep_pid" ]; then
+  if [ -n "${JG_LOCK_HELD_PID:-}" ] && [ "$JG_LOCK_HELD_PID" = "$sweep_pid" ]; then
     echo "error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock" >&2
     exit 1
   fi

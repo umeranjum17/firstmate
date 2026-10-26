@@ -10,7 +10,7 @@
 # in how the per-session process is named and what its parent is. Those trees are
 # orphaned before the hook fires, so the ancestry walk terminates inside the
 # fixture and can never escape into the session running this suite.
-# shellcheck disable=SC2016 # single quotes are deliberate: $FM_HOME and $$ expand inside the fixture child
+# shellcheck disable=SC2016 # single quotes are deliberate: $JG_HOME and $$ expand inside the fixture child
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -35,19 +35,19 @@ NAMED_CLAUDE="$FAKEBIN/claude"
 # --- unit layer: identity behind a deterministic process table ---------------
 
 # Run one library expression with <fakebin> shadowing ps. kill is stubbed so
-# liveness questions are decided by the process table alone (FM_TEST_KILL_RC=1
+# liveness questions are decided by the process table alone (JG_TEST_KILL_RC=1
 # makes every pid dead). The suite itself may run inside a Claude session whose
 # CLAUDE_CODE_SESSION_ID and CLAUDE_PID would leak into the expression, so both
-# are scrubbed and only FM_TEST_SESSION_ID and FM_TEST_CLAUDE_PID reach it.
+# are scrubbed and only JG_TEST_SESSION_ID and JG_TEST_CLAUDE_PID reach it.
 lib_eval() {  # <fakebin> <expression>
   local fakebin=$1 expr=$2
   local -a session_env=()
-  [ -z "${FM_TEST_SESSION_ID:-}" ] || session_env+=("CLAUDE_CODE_SESSION_ID=$FM_TEST_SESSION_ID")
-  [ -z "${FM_TEST_CLAUDE_PID:-}" ] || session_env+=("CLAUDE_PID=$FM_TEST_CLAUDE_PID")
+  [ -z "${JG_TEST_SESSION_ID:-}" ] || session_env+=("CLAUDE_CODE_SESSION_ID=$JG_TEST_SESSION_ID")
+  [ -z "${JG_TEST_CLAUDE_PID:-}" ] || session_env+=("CLAUDE_PID=$JG_TEST_CLAUDE_PID")
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID ${session_env[@]+"${session_env[@]}"} \
     PATH="$fakebin:$PATH" bash -c "
     . \"\$0\"
-    kill() { return \${FM_TEST_KILL_RC:-0}; }
+    kill() { return \${JG_TEST_KILL_RC:-0}; }
     $expr
   " "$LIB"
 }
@@ -68,7 +68,7 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-case "$pid:$field:${FM_TEST_CLAUDE_SHAPE:-linux}" in
+case "$pid:$field:${JG_TEST_CLAUDE_SHAPE:-linux}" in
   700:comm=:linux) printf '%s\n' '2.1.220' ;;
   700:args=:linux) printf '%s\n' '/opt/claude/versions/2.1.220 --resume' ;;
   700:comm=:macos) printf '%s\n' '/Users/u/.local/share/claude/versions/2.1.220' ;;
@@ -83,12 +83,12 @@ SH
   printf '700\n' > "$dir/state/.lock"
 
   for shape in linux macos; do
-    got=$(FM_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_ancestry_pid') \
+    got=$(JG_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_ancestry_pid') \
       || fail "$shape: the version-named session was not found in the ancestry at all"
     [ "$got" = 700 ] || fail "$shape: ancestry resolved '$got', expected the version-named session pid 700"
-    FM_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_pid_alive 700' \
+    JG_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_pid_alive 700' \
       || fail "$shape: a live version-named session was not recognized as a harness"
-    FM_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" "jg_session_lock_owned_by_self '$dir/state'" \
+    JG_TEST_CLAUDE_SHAPE="$shape" lib_eval "$fakebin" "jg_session_lock_owned_by_self '$dir/state'" \
       || fail "$shape: the session holding the lock did not recognize itself as the owner"
   done
   pass "session-lock: a version-named Claude Code session is identified from its install path and argv[0]"
@@ -115,8 +115,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$pid:$field" in
-  1:comm=) printf '%s\n' "${FM_TEST_PID1_COMM:-claude}" ;;
-  1:args=) printf '%s\n' "${FM_TEST_PID1_COMM:-claude}" ;;
+  1:comm=) printf '%s\n' "${JG_TEST_PID1_COMM:-claude}" ;;
+  1:args=) printf '%s\n' "${JG_TEST_PID1_COMM:-claude}" ;;
   1:ppid=) printf '%s\n' 0 ;;
   *:comm=) printf '%s\n' bash ;;
   *:args=) printf '%s\n' 'bash /repo/bin/jg-watch.sh' ;;
@@ -128,7 +128,7 @@ SH
 
   # Non-vacuity: with a host-shaped pid 1 the same table must find nothing, so
   # this case cannot pass by the walk matching everything it reaches.
-  if FM_TEST_PID1_COMM=systemd lib_eval "$fakebin" 'jg_harness_ancestry_pid' >/dev/null 2>&1; then
+  if JG_TEST_PID1_COMM=systemd lib_eval "$fakebin" 'jg_harness_ancestry_pid' >/dev/null 2>&1; then
     fail "a host-shaped pid 1 was read as a harness process"
   fi
 
@@ -156,7 +156,7 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-case "$pid:$field:${FM_TEST_PATH_SHAPE:-hookdir}" in
+case "$pid:$field:${JG_TEST_PATH_SHAPE:-hookdir}" in
   810:comm=:hookdir) printf '%s\n' '/home/u/.claude/hooks/notify.sh' ;;
   810:args=:hookdir) printf '%s\n' '/home/u/.claude/hooks/notify.sh --quiet' ;;
   810:comm=:piprefix) printf '%s\n' '/opt/pipeline/bin/runner' ;;
@@ -174,13 +174,13 @@ SH
   # components: anything merely living under ~/.claude, and any component that
   # merely starts with a harness name, must stay outside the harness identity.
   for shape in hookdir piprefix; do
-    if FM_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_ancestry_pid'; then
+    if JG_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_ancestry_pid'; then
       fail "$shape: an ordinary script path was treated as a harness process"
     fi
-    if FM_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_pid_alive 810'; then
+    if JG_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" 'jg_harness_pid_alive 810'; then
       fail "$shape: an ordinary script path passed the harness-liveness predicate"
     fi
-    if FM_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" "jg_session_lock_owned_by_self '$dir/state'"; then
+    if JG_TEST_PATH_SHAPE="$shape" lib_eval "$fakebin" "jg_session_lock_owned_by_self '$dir/state'"; then
       fail "$shape: an ordinary script path claimed the home's session lock"
     fi
   done
@@ -277,7 +277,7 @@ SH
 # `claude bg-spare` (710), whose parent is `claude bg-pty-host` (720). With the
 # transient daemon gone the pty-host is reparented to launchd, so the contiguous
 # claude-named run from the hook ends at 720 and the live front-end 700 that
-# holds the lock is no longer an ancestor at all. FM_TEST_DAEMON_PRESENT=1 puts
+# holds the lock is no longer an ancestor at all. JG_TEST_DAEMON_PRESENT=1 puts
 # the daemon (730) back between 720 and 700: the healthy topology.
 write_background_session_ps() {  # <fakebin>
   cat > "$1/ps" <<'SH'
@@ -291,7 +291,7 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-case "$pid:$field:${FM_TEST_DAEMON_PRESENT:-0}" in
+case "$pid:$field:${JG_TEST_DAEMON_PRESENT:-0}" in
   700:comm=:*) printf '%s\n' claude ;;
   700:args=:*) printf '%s\n' 'claude --resume' ;;
   700:ppid=:*) printf '%s\n' 1 ;;
@@ -318,7 +318,7 @@ owned() {  # <fakebin> <state>
 }
 
 foreign_owner() {  # <fakebin> <state>  -> prints the foreign pid
-  lib_eval "$1" "jg_session_lock_foreign_owner_live '$2' && printf '%s' \"\$FM_SESSION_LOCK_FOREIGN_OWNER_PID\""
+  lib_eval "$1" "jg_session_lock_foreign_owner_live '$2' && printf '%s' \"\$JG_SESSION_LOCK_FOREIGN_OWNER_PID\""
 }
 
 test_same_session_id_owns_a_recycled_background_chain() {
@@ -336,39 +336,39 @@ test_same_session_id_owns_a_recycled_background_chain() {
   if lib_eval "$fakebin" 'jg_harness_ancestry_pids' | grep -qx 700; then
     fail "the recycled chain still reached the front-end, so the id cases would prove nothing"
   fi
-  FM_TEST_DAEMON_PRESENT=1 lib_eval "$fakebin" 'jg_harness_ancestry_pids' | grep -qx 700 \
+  JG_TEST_DAEMON_PRESENT=1 lib_eval "$fakebin" 'jg_harness_ancestry_pids' | grep -qx 700 \
     || fail "the healthy chain did not reach the front-end"
 
   # 1. The session's own id from its model-loop process: owned, not foreign.
-  FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
+  JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
     || fail "the same session's trusted id did not own the lock after the helper chain was recycled"
-  if FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
+  if JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
     fail "the session's own live front-end was reported as a foreign owner despite the matching id"
   fi
   # 2. A different id: the existing refusal, naming the live owner.
-  if FM_TEST_SESSION_ID=S2 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
+  if JG_TEST_SESSION_ID=S2 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
     fail "a different session id claimed a live owner's lock"
   fi
-  got=$(FM_TEST_SESSION_ID=S2 FM_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state") \
+  got=$(JG_TEST_SESSION_ID=S2 JG_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state") \
     || fail "a different session id did not see the live owner as foreign"
   [ "$got" = 700 ] || fail "the foreign owner pid was '$got', expected 700"
   # 3. The trust gate: the right id carried by a CLAUDE_PID outside the run.
-  if FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=700 owned "$fakebin" "$state"; then
+  if JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=700 owned "$fakebin" "$state"; then
     fail "an id whose CLAUDE_PID is outside the current Claude run was trusted"
   fi
-  FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=700 foreign_owner "$fakebin" "$state" >/dev/null \
+  JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=700 foreign_owner "$fakebin" "$state" >/dev/null \
     || fail "an untrusted id suppressed the foreign-owner verdict"
   printf 'S1:x\n' > "$state/.lock-session"
-  FM_TEST_SESSION_ID='S1:x' FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
+  JG_TEST_SESSION_ID='S1:x' JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
     || fail "a trusted id containing a colon did not own the lock"
-  if FM_TEST_SESSION_ID='S1:x' FM_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
+  if JG_TEST_SESSION_ID='S1:x' JG_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
     fail "a matching id containing a colon was reported as a foreign owner"
   fi
   printf 'S1\r' > "$state/.lock-session"
-  if FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
+  if JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
     fail "a recorded id containing a carriage return was treated as a session id"
   fi
-  FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null \
+  JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null \
     || fail "a carriage-return sidecar suppressed the foreign-owner verdict"
   printf 'S1\n' > "$state/.lock-session"
   # 4. No id at all: the legacy ancestry verdict, unchanged.
@@ -378,27 +378,27 @@ test_same_session_id_owns_a_recycled_background_chain() {
   foreign_owner "$fakebin" "$state" >/dev/null \
     || fail "with no session id the live owner was not reported as foreign"
   # 5. The healthy chain owns by ancestry whatever the environment says.
-  FM_TEST_DAEMON_PRESENT=1 FM_TEST_SESSION_ID=S2 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
+  JG_TEST_DAEMON_PRESENT=1 JG_TEST_SESSION_ID=S2 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state" \
     || fail "ancestry membership lost to a different session id"
-  FM_TEST_DAEMON_PRESENT=1 owned "$fakebin" "$state" \
+  JG_TEST_DAEMON_PRESENT=1 owned "$fakebin" "$state" \
     || fail "ancestry membership lost with no session id"
-  if FM_TEST_DAEMON_PRESENT=1 FM_TEST_SESSION_ID=S2 FM_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
+  if JG_TEST_DAEMON_PRESENT=1 JG_TEST_SESSION_ID=S2 JG_TEST_CLAUDE_PID=710 foreign_owner "$fakebin" "$state" >/dev/null; then
     fail "an ancestor was reported as a foreign owner"
   fi
   # 6. Never fail open: no sidecar, a symlinked sidecar, and a dead recorded pid
   # are all ancestry-only, so the dead one is left for the ordinary reclaim.
   rm -f "$state/.lock-session"
-  if FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
+  if JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
     fail "a lock with no recorded session id was owned through the environment id"
   fi
   printf 'S1\n' > "$dir/elsewhere"
   ln -s "$dir/elsewhere" "$state/.lock-session"
-  if FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
+  if JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
     fail "a symlinked sidecar was trusted"
   fi
   rm -f "$state/.lock-session"
   printf 'S1\n' > "$state/.lock-session"
-  if FM_TEST_KILL_RC=1 FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
+  if JG_TEST_KILL_RC=1 JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 owned "$fakebin" "$state"; then
     fail "a same-session lock whose recorded pid is dead was owned instead of left for reclaim"
   fi
   pass "session-lock: a trusted same-session id keeps owning a recycled background chain, and nothing weaker does"
@@ -410,18 +410,18 @@ test_anchor_pid_is_the_model_loop_process_only_for_a_trusted_id() {
   fakebin=$(jg_fakebin "$dir")
   write_background_session_ps "$fakebin"
 
-  got=$(FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
+  got=$(JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
     || fail "no anchor pid was resolved for a trusted id"
   [ "$got" = 710 ] || fail "a trusted id anchored '$got', expected the model-loop process 710"
   got=$(lib_eval "$fakebin" 'jg_session_lock_anchor_pid') || fail "no anchor pid was resolved without an id"
   [ "$got" = 720 ] || fail "without an id the anchor was '$got', expected the outermost pid 720"
-  got=$(FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=700 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
+  got=$(JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=700 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
     || fail "no anchor pid was resolved for an untrusted id"
   [ "$got" = 720 ] || fail "an untrusted id anchored '$got', expected the outermost pid 720"
-  got=$(FM_TEST_DAEMON_PRESENT=1 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
+  got=$(JG_TEST_DAEMON_PRESENT=1 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
     || fail "no anchor pid was resolved for the healthy chain"
   [ "$got" = 700 ] || fail "the healthy chain without an id anchored '$got', expected the outermost pid 700"
-  got=$(FM_TEST_DAEMON_PRESENT=1 FM_TEST_SESSION_ID=S1 FM_TEST_CLAUDE_PID=710 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
+  got=$(JG_TEST_DAEMON_PRESENT=1 JG_TEST_SESSION_ID=S1 JG_TEST_CLAUDE_PID=710 lib_eval "$fakebin" 'jg_session_lock_anchor_pid') \
     || fail "no anchor pid was resolved for the healthy chain with a trusted id"
   [ "$got" = 710 ] || fail "the healthy chain with a trusted id anchored '$got', expected 710 rather than the front-end"
   pass "session-lock: a trusted id anchors the lock on the model-loop process, anything else on the outermost pid"
@@ -449,9 +449,9 @@ install_autoarm_scripts() {
   : > "$dir/config/supervision-host-off"
   cat > "$dir/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-echo "$$" >> "$FM_HOME/state/arm-ran"
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+echo "$$" >> "$JG_HOME/state/arm-ran"
+printf 'pending:downtime:fixture-generation\n' > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-win actionable\n'
 exit 0
@@ -473,17 +473,17 @@ make_primary_home() {  # <dir>
   # owner, exactly as a real session does at session start.
   cat > "$dir/session.sh" <<'SH'
 #!/usr/bin/env bash
-if [ "${FM_FIXTURE_ORPHAN_HERE:-0}" = 1 ]; then
+if [ "${JG_FIXTURE_ORPHAN_HERE:-0}" = 1 ]; then
   i=0
   while [ "$i" -lt 200 ] && [ "$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')" != 1 ]; do
     sleep 0.05
     i=$((i + 1))
   done
 fi
-printf '%s\n' "$$" > "$FM_HOME/state/session-pid"
-printf '%s\n' "$$" > "$FM_HOME/state/.lock"
-"$FM_HOME/bin/jg-claude-stop-autoarm.sh" </dev/null > "$FM_HOME/state/hook.out" 2>&1
-printf '%s\n' "$?" > "$FM_HOME/state/hook.rc"
+printf '%s\n' "$$" > "$JG_HOME/state/session-pid"
+printf '%s\n' "$$" > "$JG_HOME/state/.lock"
+"$JG_HOME/bin/jg-claude-stop-autoarm.sh" </dev/null > "$JG_HOME/state/hook.out" 2>&1
+printf '%s\n' "$?" > "$JG_HOME/state/hook.rc"
 SH
   cat > "$dir/daemon.sh" <<'SH'
 #!/usr/bin/env bash
@@ -492,8 +492,8 @@ while [ "$i" -lt 200 ] && [ "$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')" != 1 
   sleep 0.05
   i=$((i + 1))
 done
-printf '%s\n' "$$" > "$FM_HOME/state/daemon-pid"
-"$FM_SESSION_BIN" "$FM_HOME/session.sh"
+printf '%s\n' "$$" > "$JG_HOME/state/daemon-pid"
+"$JG_SESSION_BIN" "$JG_HOME/session.sh"
 exit 0
 SH
   chmod +x "$dir/session.sh" "$dir/daemon.sh"
@@ -507,11 +507,11 @@ run_fixture_tree() {  # <dir> <session-bin> [<daemon-bin>]
   local dir=$1 session_bin=$2 daemon_bin=${3:-} i
   if [ -n "$daemon_bin" ]; then
     env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-      FM_HOME="$dir" FM_SESSION_BIN="$session_bin" FM_FIXTURE_ORPHAN_HERE=0 \
+      JG_HOME="$dir" JG_SESSION_BIN="$session_bin" JG_FIXTURE_ORPHAN_HERE=0 \
       bash -c '"$0" "$1" &' "$daemon_bin" "$dir/daemon.sh"
   else
     env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-      FM_HOME="$dir" FM_FIXTURE_ORPHAN_HERE=1 \
+      JG_HOME="$dir" JG_FIXTURE_ORPHAN_HERE=1 \
       bash -c '"$0" "$1" &' "$session_bin" "$dir/session.sh"
   fi
   i=0
@@ -616,51 +616,51 @@ while [ "$i" -lt 200 ] && [ "$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ')" != 1 
   sleep 0.05
   i=$((i + 1))
 done
-printf '%s\n' "$$" > "$FM_HOME/state/frontend-pid"
-CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$FM_HOME/bin/jg-lock.sh" > "$FM_HOME/state/frontend-lock.out" 2>&1
-printf '%s\n' "$?" > "$FM_HOME/state/frontend-lock.rc"
-"$FM_FIXTURE_CLAUDE" "$FM_HOME/daemon.sh" &
+printf '%s\n' "$$" > "$JG_HOME/state/frontend-pid"
+CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$JG_HOME/bin/jg-lock.sh" > "$JG_HOME/state/frontend-lock.out" 2>&1
+printf '%s\n' "$?" > "$JG_HOME/state/frontend-lock.rc"
+"$JG_FIXTURE_CLAUDE" "$JG_HOME/daemon.sh" &
 disown
-while [ ! -e "$FM_HOME/state/stop-frontend" ]; do sleep 0.05; done
+while [ ! -e "$JG_HOME/state/stop-frontend" ]; do sleep 0.05; done
 exit 0
 SH
   cat > "$dir/daemon.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$$" > "$FM_HOME/state/daemon-pid"
-exec -a 'claude bg-pty-host' "$FM_FIXTURE_CLAUDE" "$FM_HOME/ptyhost.sh" &
+printf '%s\n' "$$" > "$JG_HOME/state/daemon-pid"
+exec -a 'claude bg-pty-host' "$JG_FIXTURE_CLAUDE" "$JG_HOME/ptyhost.sh" &
 while :; do sleep 0.1; done
 exit 0
 SH
   cat > "$dir/ptyhost.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$$" > "$FM_HOME/state/ptyhost-pid"
-exec -a 'claude bg-spare' "$FM_FIXTURE_CLAUDE" "$FM_HOME/spare.sh" &
-while [ ! -e "$FM_HOME/state/stop-spare" ]; do sleep 0.1; done
+printf '%s\n' "$$" > "$JG_HOME/state/ptyhost-pid"
+exec -a 'claude bg-spare' "$JG_FIXTURE_CLAUDE" "$JG_HOME/spare.sh" &
+while [ ! -e "$JG_HOME/state/stop-spare" ]; do sleep 0.1; done
 exit 0
 SH
   cat > "$dir/spare.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$$" > "$FM_HOME/state/spare-pid"
+printf '%s\n' "$$" > "$JG_HOME/state/spare-pid"
 n=1
-while [ ! -e "$FM_HOME/state/stop-spare" ]; do
-  req="$FM_HOME/state/fire-$n"
+while [ ! -e "$JG_HOME/state/stop-spare" ]; do
+  req="$JG_HOME/state/fire-$n"
   if [ -f "$req" ]; then
-    out="$FM_HOME/state/phase-$n"
+    out="$JG_HOME/state/phase-$n"
     mkdir -p "$out"
     unset CLAUDE_CODE_SESSION_ID CLAUDE_PID
     # shellcheck disable=SC1090
     . "$req"
-    ( . "$FM_HOME/bin/jg-session-lock-lib.sh" && jg_harness_ancestry_pids ) > "$out/ancestry" 2>/dev/null
+    ( . "$JG_HOME/bin/jg-session-lock-lib.sh" && jg_harness_ancestry_pids ) > "$out/ancestry" 2>/dev/null
     printf '%s\n' '{"session_id":"fixture","stop_hook_active":true}' \
-      | "$FM_HOME/bin/jg-claude-stop-autoarm.sh" > "$out/hook.out" 2>&1
+      | "$JG_HOME/bin/jg-claude-stop-autoarm.sh" > "$out/hook.out" 2>&1
     printf '%s\n' "$?" > "$out/hook.rc"
     printf '%s\n' '{"session_id":"fixture","stop_hook_active":true}' \
-      | "$FM_HOME/bin/jg-turnend-guard.sh" --claude > "$out/guard.out" 2>&1
+      | "$JG_HOME/bin/jg-turnend-guard.sh" --claude > "$out/guard.out" 2>&1
     printf '%s\n' "$?" > "$out/guard.rc"
-    "$FM_HOME/bin/jg-lock.sh" > "$out/lock.out" 2>&1
+    "$JG_HOME/bin/jg-lock.sh" > "$out/lock.out" 2>&1
     printf '%s\n' "$?" > "$out/lock.rc"
-    cp "$FM_HOME/state/.lock" "$out/lock-after"
-    [ ! -e "$FM_HOME/state/.lock-session" ] || cp "$FM_HOME/state/.lock-session" "$out/session-after"
+    cp "$JG_HOME/state/.lock" "$out/lock-after"
+    [ ! -e "$JG_HOME/state/.lock-session" ] || cp "$JG_HOME/state/.lock-session" "$out/session-after"
     : > "$out/done"
     n=$((n + 1))
   fi
@@ -743,8 +743,8 @@ test_e2e_background_session_keeps_its_lock_across_a_recycled_chain() {
   dir="$TMP_ROOT/e2e-background-session"
   make_background_session_home "$dir"
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_FIXTURE_CLAUDE="$NAMED_CLAUDE" FM_POLL=1 FM_HEARTBEAT=999999 \
-    FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 \
+    JG_HOME="$dir" JG_FIXTURE_CLAUDE="$NAMED_CLAUDE" JG_POLL=1 JG_HEARTBEAT=999999 \
+    JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 \
     bash -c '"$0" "$1" &' "$NAMED_CLAUDE" "$dir/frontend.sh"
   wait_for_file "$dir/state/frontend-lock.rc" "the front-end's lock result"
   wait_for_file "$dir/state/spare-pid" "the bg-spare"
@@ -821,41 +821,41 @@ test_same_session_confirmation_refreshes_rekeyed_id_under_claim_lock() {
   cat > "$dir/run.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$$" > "$FM_HOME/state/session-pid"
-CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/acquire.out" 2>&1
+printf '%s\n' "$$" > "$JG_HOME/state/session-pid"
+CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/acquire.out" 2>&1
 acquire_rc=$?
 if [ "$acquire_rc" != 0 ]; then
-  printf '%s\n' "$acquire_rc" > "$FM_HOME/state/acquire.rc"
-  printf '%s\n' 1 > "$FM_HOME/state/confirm.rc"
+  printf '%s\n' "$acquire_rc" > "$JG_HOME/state/acquire.rc"
+  printf '%s\n' 1 > "$JG_HOME/state/confirm.rc"
   exit 1
 fi
-cp "$FM_HOME/state/.lock-session" "$FM_HOME/state/sidecar-after-acquire"
-printf '%s\n' 0 > "$FM_HOME/state/acquire.rc"
+cp "$JG_HOME/state/.lock-session" "$JG_HOME/state/sidecar-after-acquire"
+printf '%s\n' 0 > "$JG_HOME/state/acquire.rc"
 
 bash -c '
   set -u
   . "$1"
   jg_lock_try_acquire "$2/.lock.acquire" || exit 1
   : > "$2/holder-ready"
-  while [ ! -e "$2/release-holder" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+  while [ ! -e "$2/release-holder" ] && [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     sleep 0.05
   done
   jg_lock_release "$2/.lock.acquire"
-' _ "$FM_WAKE" "$FM_HOME/state" &
-printf '%s\n' "$!" > "$FM_HOME/state/holder-pid"
+' _ "$JG_WAKE" "$JG_HOME/state" &
+printf '%s\n' "$!" > "$JG_HOME/state/holder-pid"
 
 i=0
-while [ "$i" -lt 400 ] && [ ! -e "$FM_HOME/state/holder-ready" ]; do
+while [ "$i" -lt 400 ] && [ ! -e "$JG_HOME/state/holder-ready" ]; do
   sleep 0.05
   i=$((i + 1))
 done
-if [ ! -e "$FM_HOME/state/holder-ready" ]; then
-  printf '%s\n' 2 > "$FM_HOME/state/confirm.rc"
+if [ ! -e "$JG_HOME/state/holder-ready" ]; then
+  printf '%s\n' 2 > "$JG_HOME/state/confirm.rc"
   exit 2
 fi
 
-CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/confirm.out" 2>&1 &
-printf '%s\n' "$!" > "$FM_HOME/state/confirm-pid"
+CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/confirm.out" 2>&1 &
+printf '%s\n' "$!" > "$JG_HOME/state/confirm-pid"
 
 i=0
 while [ "$i" -lt 20 ]; do
@@ -863,15 +863,15 @@ while [ "$i" -lt 20 ]; do
   i=$((i + 1))
 done
 
-: > "$FM_HOME/state/release-holder"
-wait "$(tr -d '[:space:]' < "$FM_HOME/state/confirm-pid")"
-printf '%s\n' "$?" > "$FM_HOME/state/confirm.rc"
-wait "$(tr -d '[:space:]' < "$FM_HOME/state/holder-pid")" || true
+: > "$JG_HOME/state/release-holder"
+wait "$(tr -d '[:space:]' < "$JG_HOME/state/confirm-pid")"
+printf '%s\n' "$?" > "$JG_HOME/state/confirm.rc"
+wait "$(tr -d '[:space:]' < "$JG_HOME/state/holder-pid")" || true
 SH
   chmod +x "$dir/run.sh"
 
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" FM_WAKE="$ROOT/bin/jg-wake-lib.sh" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" JG_WAKE="$ROOT/bin/jg-wake-lib.sh" \
     "$NAMED_CLAUDE" "$dir/run.sh" &
   session_pid=$!
   BG_FIXTURE_PIDS+=("$session_pid")
@@ -908,31 +908,31 @@ test_same_session_confirmation_does_not_steal_after_wait() {
   cat > "$dir/run.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$$" > "$FM_HOME/state/session-pid"
-CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/acquire.out" 2>&1
+printf '%s\n' "$$" > "$JG_HOME/state/session-pid"
+CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/acquire.out" 2>&1
 acquire_rc=$?
 if [ "$acquire_rc" != 0 ]; then
-  printf '%s\n' "$acquire_rc" > "$FM_HOME/state/acquire.rc"
-  printf '%s\n' 1 > "$FM_HOME/state/confirm.rc"
+  printf '%s\n' "$acquire_rc" > "$JG_HOME/state/acquire.rc"
+  printf '%s\n' 1 > "$JG_HOME/state/confirm.rc"
   exit 1
 fi
-cp "$FM_HOME/state/.lock-session" "$FM_HOME/state/sidecar-after-acquire"
-printf '%s\n' 0 > "$FM_HOME/state/acquire.rc"
+cp "$JG_HOME/state/.lock-session" "$JG_HOME/state/sidecar-after-acquire"
+printf '%s\n' 0 > "$JG_HOME/state/acquire.rc"
 
-"$FM_CLAUDE" -c '
-  printf "%s\n" "$$" > "$FM_HOME/state/other-pid"
-  while [ ! -e "$FM_HOME/state/stop-other" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+"$JG_CLAUDE" -c '
+  printf "%s\n" "$$" > "$JG_HOME/state/other-pid"
+  while [ ! -e "$JG_HOME/state/stop-other" ] && [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     sleep 0.05
   done
 ' &
-printf '%s\n' "$!" > "$FM_HOME/state/other-bash-pid"
+printf '%s\n' "$!" > "$JG_HOME/state/other-bash-pid"
 i=0
-while [ "$i" -lt 400 ] && [ ! -s "$FM_HOME/state/other-pid" ]; do
+while [ "$i" -lt 400 ] && [ ! -s "$JG_HOME/state/other-pid" ]; do
   sleep 0.05
   i=$((i + 1))
 done
-[ -s "$FM_HOME/state/other-pid" ] || {
-  printf '%s\n' 2 > "$FM_HOME/state/confirm.rc"
+[ -s "$JG_HOME/state/other-pid" ] || {
+  printf '%s\n' 2 > "$JG_HOME/state/confirm.rc"
   exit 2
 }
 
@@ -941,25 +941,25 @@ bash -c '
   . "$1"
   jg_lock_try_acquire "$2/.lock.acquire" || exit 1
   : > "$2/holder-ready"
-  while [ ! -e "$2/release-holder" ] && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+  while [ ! -e "$2/release-holder" ] && [ "$SECONDS" -lt "${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
     sleep 0.05
   done
   jg_lock_release "$2/.lock.acquire"
-' _ "$FM_WAKE" "$FM_HOME/state" &
-printf '%s\n' "$!" > "$FM_HOME/state/holder-pid"
+' _ "$JG_WAKE" "$JG_HOME/state" &
+printf '%s\n' "$!" > "$JG_HOME/state/holder-pid"
 
 i=0
-while [ "$i" -lt 400 ] && [ ! -e "$FM_HOME/state/holder-ready" ]; do
+while [ "$i" -lt 400 ] && [ ! -e "$JG_HOME/state/holder-ready" ]; do
   sleep 0.05
   i=$((i + 1))
 done
-if [ ! -e "$FM_HOME/state/holder-ready" ]; then
-  printf '%s\n' 2 > "$FM_HOME/state/confirm.rc"
+if [ ! -e "$JG_HOME/state/holder-ready" ]; then
+  printf '%s\n' 2 > "$JG_HOME/state/confirm.rc"
   exit 2
 fi
 
-CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/confirm.out" 2>&1 &
-printf '%s\n' "$!" > "$FM_HOME/state/confirm-pid"
+CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/confirm.out" 2>&1 &
+printf '%s\n' "$!" > "$JG_HOME/state/confirm-pid"
 
 i=0
 while [ "$i" -lt 20 ]; do
@@ -967,20 +967,20 @@ while [ "$i" -lt 20 ]; do
   i=$((i + 1))
 done
 
-cp "$FM_HOME/state/other-pid" "$FM_HOME/state/.lock"
-printf '%s\n' OTHER > "$FM_HOME/state/.lock-session"
-: > "$FM_HOME/state/release-holder"
-wait "$(tr -d '[:space:]' < "$FM_HOME/state/confirm-pid")"
-printf '%s\n' "$?" > "$FM_HOME/state/confirm.rc"
-wait "$(tr -d '[:space:]' < "$FM_HOME/state/holder-pid")" || true
-: > "$FM_HOME/state/stop-other"
-wait "$(tr -d '[:space:]' < "$FM_HOME/state/other-bash-pid")" || true
+cp "$JG_HOME/state/other-pid" "$JG_HOME/state/.lock"
+printf '%s\n' OTHER > "$JG_HOME/state/.lock-session"
+: > "$JG_HOME/state/release-holder"
+wait "$(tr -d '[:space:]' < "$JG_HOME/state/confirm-pid")"
+printf '%s\n' "$?" > "$JG_HOME/state/confirm.rc"
+wait "$(tr -d '[:space:]' < "$JG_HOME/state/holder-pid")" || true
+: > "$JG_HOME/state/stop-other"
+wait "$(tr -d '[:space:]' < "$JG_HOME/state/other-bash-pid")" || true
 SH
   chmod +x "$dir/run.sh"
 
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" FM_WAKE="$ROOT/bin/jg-wake-lib.sh" \
-    FM_CLAUDE="$NAMED_CLAUDE" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" JG_WAKE="$ROOT/bin/jg-wake-lib.sh" \
+    JG_CLAUDE="$NAMED_CLAUDE" \
     "$NAMED_CLAUDE" "$dir/run.sh" &
   session_pid=$!
   BG_FIXTURE_PIDS+=("$session_pid")
@@ -1016,11 +1016,11 @@ test_failed_lock_write_restores_previous_sidecar() {
   dir="$TMP_ROOT/restore-sidecar"
   mkdir -p "$dir/state"
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" \
     "$NAMED_CLAUDE" -c '
-      CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/acquire.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/state/acquire.rc"
-      printf "%s\n" "$$" > "$FM_HOME/state/stale-pid"
+      CLAUDE_CODE_SESSION_ID=S1 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/acquire.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/state/acquire.rc"
+      printf "%s\n" "$$" > "$JG_HOME/state/stale-pid"
     '
   expect_code 0 "$(tr -d '[:space:]' < "$dir/state/acquire.rc")" \
     "the first session could not acquire its lock: $(cat "$dir/state/acquire.out")"
@@ -1030,10 +1030,10 @@ test_failed_lock_write_restores_previous_sidecar() {
   cp "$dir/state/.lock" "$dir/state/lock-before-reclaim"
   chmod a-w "$dir/state/.lock" || fail "could not make the stale lock read-only"
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" \
     "$NAMED_CLAUDE" -c '
-      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/reclaim.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/state/reclaim.rc"
+      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/reclaim.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/state/reclaim.rc"
     '
   chmod u+w "$dir/state/.lock" 2>/dev/null || true
   [ "$(tr -d '[:space:]' < "$dir/state/reclaim.rc")" != 0 ] \
@@ -1058,10 +1058,10 @@ test_failed_lock_write_removes_new_sidecar_when_none_existed() {
   printf '1\n' > "$dir/state/.lock"
   chmod a-w "$dir/state/.lock" || fail "could not make the stale lock read-only"
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" \
     "$NAMED_CLAUDE" -c '
-      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/reclaim.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/state/reclaim.rc"
+      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/reclaim.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/state/reclaim.rc"
     '
   chmod u+w "$dir/state/.lock" 2>/dev/null || true
   [ "$(tr -d '[:space:]' < "$dir/state/reclaim.rc")" != 0 ] \
@@ -1084,11 +1084,11 @@ test_verified_reclaim_keeps_new_sidecar() {
   printf '1\n' > "$dir/state/.lock"
   printf 'S1\n' > "$dir/state/.lock-session"
   env -u CLAUDE_CODE_SESSION_ID -u CLAUDE_PID \
-    FM_HOME="$dir" FM_LOCK="$ROOT/bin/jg-lock.sh" \
+    JG_HOME="$dir" JG_LOCK="$ROOT/bin/jg-lock.sh" \
     "$NAMED_CLAUDE" -c '
-      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$FM_LOCK" > "$FM_HOME/state/reclaim.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/state/reclaim.rc"
-      printf "%s\n" "$$" > "$FM_HOME/state/new-pid"
+      CLAUDE_CODE_SESSION_ID=S2 CLAUDE_PID=$$ "$JG_LOCK" > "$JG_HOME/state/reclaim.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/state/reclaim.rc"
+      printf "%s\n" "$$" > "$JG_HOME/state/new-pid"
     '
   expect_code 0 "$(tr -d '[:space:]' < "$dir/state/reclaim.rc")" \
     "the reclaim failed: $(cat "$dir/state/reclaim.out")"

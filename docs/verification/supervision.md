@@ -50,7 +50,7 @@ The installed pi-signed 0.82.0 wrapper repeated the shared Pi primary extension 
 
 ### omp (Oh My Pi) native delivery, 2026-09-05
 
-The omp Run-tier adapter was verified on 2026-09-05 with omp 18.1.11 and the openai-codex `gpt-6-astra` model through `FM_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh`, which drives a real omp in its JSON-RPC stdio mode inside an isolated lab clone.
+The omp Run-tier adapter was verified on 2026-09-05 with omp 18.1.11 and the openai-codex `gpt-6-astra` model through `JG_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh`, which drives a real omp in its JSON-RPC stdio mode inside an isolated lab clone.
 Both tracked `.omp/extensions/*.ts` files loaded by auto-discovery alone (no `-e`, no trust dialog), `before_agent_start` returned the digest as a persistent context message, the model quoted the lab's `SESSION START -` heading back on its first turn, `state/.session-start-complete` was recorded, and `state/.lock` named the omp process, so ancestry detection identified the markerless binary.
 omp's `session_start` payload carries no reason field, so the adapter derives the source: the first start of the process is `startup` (or `resume` from a `--continue`/`--resume` launch line) and a later in-process start is `clear`; `tests/jg-omp-harness.test.sh` pins that mapping over a fake omp API.
 A file named both by `-e` and by auto-discovery loads twice (two factory calls, doubled `session_stop` continuations), which is why a secondmate launch never names its auto-discovered primary extensions with `-e` and the per-task busy extension lives in `state/`.
@@ -97,7 +97,7 @@ The provider makes no HTTP request and requires no user credential.
 Its missing-native branch deliberately requests `bin/jg-session-start.sh`, so an escaped first call reproduces the duplicate-producing manual path rather than passing vacuously.
 
 ```sh
-FM_PI_SESSIONSTART_RACE_LIVE_E2E=1 \
+JG_PI_SESSIONSTART_RACE_LIVE_E2E=1 \
   tests/jg-sessionstart-hook-live-e2e.test.sh
 ```
 
@@ -117,19 +117,19 @@ Pi and pi-signed load the same tracked extension bytes; pi-signed was not instal
 ### Post-start instruction refresh
 
 The isolated real-Pi instruction-refresh regression ran on 2026-08-11 with Pi 0.84.0.
-It used a scratch `FM_HOME`, a private tmux socket, and a disposable Juggernaut checkout.
+It used a scratch `JG_HOME`, a private tmux socket, and a disposable Juggernaut checkout.
 The historical `origin/main` implementation first reproduced the stale original marker after a real compaction.
 The current implementation then recorded `source=startup`, changed and committed the lab's `AGENTS.md`, compacted the same real Pi session, and answered with the replacement marker.
 The fixed run also proved that the true-start baseline remained different from the updated file after compaction.
 
 ```sh
-FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
-FM_SESSIONSTART_INSTRUCTION_REFRESH_REF=origin/main \
-FM_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=stale \
+JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
+JG_SESSIONSTART_INSTRUCTION_REFRESH_REF=origin/main \
+JG_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=stale \
 tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
 # ok - Pi 0.84.0 reproduces stale AGENTS.md after a real compact
 
-FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
+JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
 tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
 # ok - Pi 0.84.0 re-injects updated AGENTS.md after a real compact in an isolated session
 ```
@@ -156,7 +156,7 @@ finished=1786048723
 
 The worker started before the harness exited and published 6s after it was gone.
 
-The latency this buys was re-measured on 2026-08-06 against default-branch tip `8398d31`, in a throwaway home holding one remote secondmate whose host hangs 25s per SSH connection (an `FM_SSH_BIN`-shaped stub; no real host was contacted).
+The latency this buys was re-measured on 2026-08-06 against default-branch tip `8398d31`, in a throwaway home holding one remote secondmate whose host hangs 25s per SSH connection (an `JG_SSH_BIN`-shaped stub; no real host was contacted).
 Both runs used the same fixture and the same `bin/jg-session-start.sh` invocation, differing only in which checkout supplied the script:
 
 ```text
@@ -188,16 +188,16 @@ Current deterministic and live entry points:
 tests/jg-sessionstart-nudge.test.sh
 tests/jg-session-start.test.sh
 tests/jg-startup-network.test.sh
-FM_SESSIONSTART_HOOK_LIVE_E2E=1 tests/jg-sessionstart-hook-live-e2e.test.sh
-FM_PI_SESSIONSTART_RACE_LIVE_E2E=1 tests/jg-sessionstart-hook-live-e2e.test.sh
-FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
-FM_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
-FM_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh
+JG_SESSIONSTART_HOOK_LIVE_E2E=1 tests/jg-sessionstart-hook-live-e2e.test.sh
+JG_PI_SESSIONSTART_RACE_LIVE_E2E=1 tests/jg-sessionstart-hook-live-e2e.test.sh
+JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
+JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
+JG_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh
 ```
 
 `tests/jg-sessionstart-hook-live-e2e.test.sh` is the command that refreshes the Claude, Codex exec, and Pi table above; run it after upgrading any of those harnesses.
 It reports an absent adapter explicitly, asserts Pi compaction rather than noting it, and refuses to pass when none of those three adapters was installed.
-Cursor's refresh command is `FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh`, recorded under [Cursor primary park](#cursor-primary-park-2026-08-13).
+Cursor's refresh command is `JG_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh`, recorded under [Cursor primary park](#cursor-primary-park-2026-08-13).
 
 The Ahoy first-message boundary was reverified on 2026-07-22 with Pi 0.81.1 and OpenCode 1.17.18.
 Marked current operational input and the two exact legacy compatibility shapes selected Bearings, while genuine near-miss captain messages remained real boundaries.
@@ -206,7 +206,7 @@ The detailed reconciliation and task chronology stay in the private audit report
 ### Per-task endpoint reads cannot truncate the digest
 
 A per-task backend endpoint liveness read that dies mid-read inside the digest process takes every later stage with it, and a parent wrapper that banners only the runtime-bound exit stays silent about the missing sections.
-The digest now runs each per-task endpoint read in its own bounded child (`FM_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose death, hang, or nonzero surprise becomes that task's own `endpoint: error` line, and the parent wrapper banners ANY nonzero child exit, naming the stage and the abnormal exit status.
+The digest now runs each per-task endpoint read in its own bounded child (`JG_SESSION_START_ENDPOINT_TIMEOUT`, default 10s) whose death, hang, or nonzero surprise becomes that task's own `endpoint: error` line, and the parent wrapper banners ANY nonzero child exit, naming the stage and the abnormal exit status.
 Verified on 2026-09-27 with the deterministic process-tree tests that reproduce both failure shapes with real processes and no harness:
 
 ```sh
@@ -265,7 +265,7 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 | Codex | 0.142.1 | Blocking `Stop` hook | Hook process root stayed anchored to the trusted checkout and one continuation ran. |
 | OpenCode | 1.17.6 | Passive `session.idle` callback | Throwing could not block, while `promptAsync` scheduled one TUI follow-up; headless remained fail-open. |
 | Pi | 0.80.5 | Passive `agent_settled` callback | Exactly one guard follow-up ran for an unhealthy cycle, with no recursion across tool turns. |
-| omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `FM_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `jg_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
+| omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `JG_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `jg_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
 
@@ -288,7 +288,7 @@ Mechanism facts established first, in a separate throwaway workspace:
 The integration itself is exercised by the opt-in guard:
 
 ```sh
-FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh
+JG_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh
 ```
 
 Observed output:
@@ -320,9 +320,9 @@ It is therefore recorded as uncovered in the same sense as the Codex interactive
 The Grok adaptive matrix ran on 2026-07-28 with separate scratch repositories and homes, dedicated tmux sockets, one target plus one control window, ambient tmux variables removed, and a socket-bound wrapper first in `PATH`.
 
 ```sh
-FM_GROK_STOP_LIVE_E2E=1 \
-  FM_GROK_NATIVE_BIN="$native_grok_0_2_112" \
-  FM_GROK_LEGACY_BIN="$official_pre_native_grok_0_2_73" \
+JG_GROK_STOP_LIVE_E2E=1 \
+  JG_GROK_NATIVE_BIN="$native_grok_0_2_112" \
+  JG_GROK_LEGACY_BIN="$official_pre_native_grok_0_2_73" \
   tests/jg-grok-stop-live-e2e.test.sh
 ```
 
@@ -377,7 +377,7 @@ The same guard also passed once under Claude Code 2.1.236 and 2.1.219 during thi
 
 ```sh
 claude --version
-FM_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh
+JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh
 ```
 
 Observed output:
@@ -392,8 +392,8 @@ Current entry points:
 ```sh
 tests/jg-turnend-guard.test.sh
 tests/jg-supervision-instructions.test.sh
-FM_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
-FM_GROK_STOP_LIVE_E2E=1 FM_GROK_NATIVE_BIN="$native_grok" FM_GROK_LEGACY_BIN="$pre_native_grok" tests/jg-grok-stop-live-e2e.test.sh
+JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
+JG_GROK_STOP_LIVE_E2E=1 JG_GROK_NATIVE_BIN="$native_grok" JG_GROK_LEGACY_BIN="$pre_native_grok" tests/jg-grok-stop-live-e2e.test.sh
 ```
 
 The Claude auto-arm false-failure, guard-predicate, and monotonic bounded fail-open correction was verified on 2026-08-02 with the installed ShellCheck 0.11.0 and isolated behavior suites.
@@ -409,7 +409,7 @@ Observed output:
 ```text
 jg-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
 jg-doc-audience-check: ok surfaces=61 local_links=174
-FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=102585
+JG_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=102585
 ```
 
 The fresh-beacon portion of the model-aware pull-guard predicate (`bin/jg-guard.sh` accepts a beacon within grace without a live watcher under the Claude Stop auto-arm model) was verified on 2026-08-04 with the installed ShellCheck 0.11.0 and the same isolated behavior suites.
@@ -425,7 +425,7 @@ Observed output:
 ```text
 jg-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
 jg-doc-audience-check: ok surfaces=64 local_links=188
-FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=80078
+JG_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=80078
 ```
 
 The Pi extension-model pull-guard correction (`bin/jg-guard.sh` no longer reports a false watcher-down on a Pi primary during the extension's own watcher hand-off) was verified on 2026-08-13 with the installed ShellCheck 0.11.0 and isolated behavior suites.
@@ -442,7 +442,7 @@ Observed output:
 ```text
 jg-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
 jg-doc-audience-check: ok surfaces=67 local_links=243
-FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=280160
+JG_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=280160
 ```
 
 The same correction was verified against a live Pi primary's own supervision evidence on 2026-08-13.
@@ -450,8 +450,8 @@ The hand-off was captured live at beacon age 63s, then the home's `state/.lock`,
 The fixture's copied beacon was fresh at 0s in the output below; the deterministic stale-beacon case separately verifies the grace boundary.
 
 ```sh
-FM_SUPERVISION_MODEL=persistent FM_GUARD_READ_ONLY=1 bin/jg-guard.sh
-FM_SUPERVISION_MODEL=extension FM_GUARD_READ_ONLY=1 bin/jg-guard.sh
+JG_SUPERVISION_MODEL=persistent JG_GUARD_READ_ONLY=1 bin/jg-guard.sh
+JG_SUPERVISION_MODEL=extension JG_GUARD_READ_ONLY=1 bin/jg-guard.sh
 ```
 
 Observed output, before and after the model correction, then with the recorded Pi session pid replaced by a dead one:
@@ -473,7 +473,7 @@ bin/jg-test-run.sh tests/jg-watch-triage.test.sh tests/jg-watcher-lock.test.sh t
 Observed output:
 
 ```text
-FM_TEST_SUMMARY total=8 failed=0 skipped_gate=0 duration_ms=617507
+JG_TEST_SUMMARY total=8 failed=0 skipped_gate=0 duration_ms=617507
 ```
 
 The actionable-close ordering correction was reverified on 2026-08-02 against an identity-matched live successor.
@@ -521,19 +521,19 @@ grok 0.2.103 (89c3d36fb6f1) [stable]
 
 | Harness | Exact opt-in command | Observed guarantee |
 | --- | --- | --- |
-| Claude | `FM_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | The tracked `SessionStart` hook reclaimed a stale owner before two Stop-owned cycles, and a competing live owner prevented arm, rewake, epoch write, or lock replacement. |
-| Codex | `FM_CODEX_LIVE_E2E=1 tests/jg-codex-continuity-live-e2e.test.sh` | The one-second foreground checkpoint returned without switching to the arm wrapper. |
-| OpenCode | `FM_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh` | A verified successor existed before prompt handling, with no model re-arm or turn-end fallback. |
-| Pi | `FM_PI_LIVE_E2E=1 FM_PI_LIVE_WATCH_ONLY=1 tests/jg-pi-primary-live-e2e.test.sh` | Three consecutive actionable closes each produced a ledger-linked successor, and an intentional stopped-chain failure still raised the outage alarm. |
-| omp | `FM_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh` | One initial `jg_watch_arm_omp` invocation (the openai-codex model reaches extension tools through omp's `xd://` virtual-file bridge, a `write` to `xd://jg_watch_arm_omp`, counted as the same invocation) started a live watcher; an actionable close spawned a ledger-linked successor and woke main exactly once; the lab is reaped by path, and omp 18.1.11 did not exit within 30s of its rpc stdin closing, recorded as a note. omp 18.1.11, 2026-09-05. |
-| Grok | `FM_GROK_LIVE_E2E=1 tests/jg-grok-continuity-live-e2e.test.sh` | Native task completion surfaced the actionable close and the cycle ledger recorded `reason=actionable-signal`. |
+| Claude | `JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | The tracked `SessionStart` hook reclaimed a stale owner before two Stop-owned cycles, and a competing live owner prevented arm, rewake, epoch write, or lock replacement. |
+| Codex | `JG_CODEX_LIVE_E2E=1 tests/jg-codex-continuity-live-e2e.test.sh` | The one-second foreground checkpoint returned without switching to the arm wrapper. |
+| OpenCode | `JG_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh` | A verified successor existed before prompt handling, with no model re-arm or turn-end fallback. |
+| Pi | `JG_PI_LIVE_E2E=1 JG_PI_LIVE_WATCH_ONLY=1 tests/jg-pi-primary-live-e2e.test.sh` | Three consecutive actionable closes each produced a ledger-linked successor, and an intentional stopped-chain failure still raised the outage alarm. |
+| omp | `JG_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh` | One initial `jg_watch_arm_omp` invocation (the openai-codex model reaches extension tools through omp's `xd://` virtual-file bridge, a `write` to `xd://jg_watch_arm_omp`, counted as the same invocation) started a live watcher; an actionable close spawned a ledger-linked successor and woke main exactly once; the lab is reaped by path, and omp 18.1.11 did not exit within 30s of its rpc stdin closing, recorded as a note. omp 18.1.11, 2026-09-05. |
+| Grok | `JG_GROK_LIVE_E2E=1 tests/jg-grok-continuity-live-e2e.test.sh` | Native task completion surfaced the actionable close and the cycle ledger recorded `reason=actionable-signal`. |
 
 Pi 0.81.1 repeated the continuity and clean-exit lifecycle on 2026-07-23 after the Calm presentation changes.
 
 Pi 0.86.1 repeated the isolated watcher-only live check on 2026-09-22:
 
 ```sh
-FM_PI_LIVE_E2E=1 FM_PI_LIVE_WATCH_ONLY=1 tests/jg-pi-primary-live-e2e.test.sh
+JG_PI_LIVE_E2E=1 JG_PI_LIVE_WATCH_ONLY=1 tests/jg-pi-primary-live-e2e.test.sh
 ```
 
 Observed output:
@@ -575,7 +575,7 @@ Observed output:
 ```text
 ok - a resurfacing handling successor stays alive and supervises instead of going blind
 ok - unacknowledged recovery is announced at most once per generation and the successor stays alive
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=59357
+JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=59357
 ```
 
 The Codex foreground-checkpoint behavior was exercised hermetically on 2026-09-14 with real watcher processes and isolated home state.
@@ -593,12 +593,12 @@ Observed output:
 ok - an announced recovery is not reannounced by the next foreground checkpoint
 ok - a never-announced recovery still surfaces once from a foreground checkpoint
 ok - a queue append during a foreground checkpoint still resurfaces
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=11750
+JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=11750
 ```
 
 On 2026-10-07 the announced-recovery fixture was revised so it reproduces the original failure.
 It appends a durable queue row, lets a first checkpoint announce that recovery generation while the row stays unacknowledged, then runs a second checkpoint and asserts it supervises for its full bound with the generation and row unchanged.
-The fixture was run on its own in an isolated copy of the test file, once with the checkpoint wrapper as committed and once with its `FM_WATCH_FOREGROUND_CHECKPOINT=1` export removed.
+The fixture was run on its own in an isolated copy of the test file, once with the checkpoint wrapper as committed and once with its `JG_WATCH_FOREGROUND_CHECKPOINT=1` export removed.
 From the repository root, this command isolates that test function, runs it against the committed wrapper, then runs it against a temporary control wrapper with the checkpoint export removed:
 
 ```sh
@@ -612,21 +612,21 @@ for source in "$root"/bin/*; do
   name=${source##*/}
   [ "$name" = jg-watch-checkpoint.sh ] || ln -s "$source" "$control_bin/$name"
 done
-sed '/^export FM_WATCH_FOREGROUND_CHECKPOINT=1$/d' \
+sed '/^export JG_WATCH_FOREGROUND_CHECKPOINT=1$/d' \
   "$root/bin/jg-watch-checkpoint.sh" > "$control_bin/jg-watch-checkpoint.sh"
 chmod +x "$control_bin/jg-watch-checkpoint.sh"
 awk '
   /^test_quiet_checkpoint_exits_124_cleanly$/ { exit }
   /^CHECKPOINT=/ {
-    print "CHECKPOINT=\"${FM_TEST_CHECKPOINT:-$ROOT/bin/jg-watch-checkpoint.sh}\""
+    print "CHECKPOINT=\"${JG_TEST_CHECKPOINT:-$ROOT/bin/jg-watch-checkpoint.sh}\""
     next
   }
   { print }
 ' "$root/tests/jg-watch-checkpoint.test.sh" > "$runner"
 printf '%s\n' 'test_announced_recovery_is_not_reannounced_by_next_checkpoint' >> "$runner"
-FM_TEST_CHECKPOINT= bash "$runner"
+JG_TEST_CHECKPOINT= bash "$runner"
 status=0
-FM_TEST_CHECKPOINT="$control_bin/jg-watch-checkpoint.sh" bash "$runner" \
+JG_TEST_CHECKPOINT="$control_bin/jg-watch-checkpoint.sh" bash "$runner" \
   > "$control_bin/control.out" 2>&1 || status=$?
 cat "$control_bin/control.out"
 [ "$status" -eq 1 ] \
@@ -677,7 +677,7 @@ It was measured on 2026-09-23 on macOS 26.6.2 arm64 with Claude Code 2.1.281 as 
 The opt-in live guard refreshes the engine evidence:
 
 ```text
-$ FM_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh
+$ JG_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh
 # first turn: handled	turn=host-66707-1790213279.1	rc=0	reports=1
 # second turn: handled	turn=host-66707-1790213279.2	rc=0	reports=1
 ok - supervision host live (2.1.281 (Claude Code)): a real engine handles and resumes away wakes under the branch contract without waking main
@@ -706,10 +706,10 @@ Before the Claude default-on flip, without `config/supervision-host`, the same l
 | Claude primary: dispatch, worker done, Stop-hook rewake, landing, cleanup | ok | ok |
 | Pi primary in a Herdr lab, attended: branch outcome, main lands | ok | ok |
 | Pi primary in a Herdr lab, away: branch handles the finish, main parked, return brief | ok | ok |
-| `FM_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | ok | ok |
-| `FM_PI_BRANCH_LIVE_E2E=1 tests/jg-pi-branch-live-e2e.test.sh` | 5 of 5 ok | 5 of 5 ok |
+| `JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | ok | ok |
+| `JG_PI_BRANCH_LIVE_E2E=1 tests/jg-pi-branch-live-e2e.test.sh` | 5 of 5 ok | 5 of 5 ok |
 | `tests/jg-pi-branch-responsiveness-live-e2e.test.sh` | ok | ok |
-| `FM_AFK_PI_HERDR_E2E=1 tests/jg-afk-pi-herdr-return-e2e.test.sh` | 4 of 4 ok | 4 of 4 ok |
+| `JG_AFK_PI_HERDR_E2E=1 tests/jg-afk-pi-herdr-return-e2e.test.sh` | 4 of 4 ok | 4 of 4 ok |
 
 The Herdr return guard needs the operator's login shell: under `SHELL=/bin/bash` its lab pane's login profile drops `pi` from `PATH` and the guard reports that the primary never became idle, in both trees.
 
@@ -736,7 +736,7 @@ The lab opened the gates, interrupted a worker mid-turn, tried a main-actor stee
 
 | Case | Observed |
 | --- | --- |
-| Away entry | every primary wrote the away record and started no daemon; Codex's checkpoint reported its raised bound under `FM_CODEX_WATCH_CHECKPOINT_AWAY=900` (bound 900, limit 2130) |
+| Away entry | every primary wrote the away record and started no daemon; Codex's checkpoint reported its raised bound under `JG_CODEX_WATCH_CHECKPOINT_AWAY=900` (bound 900, limit 2130) |
 | Decision the words pre-answered | the engine answered it on all five primaries and reported `per your away instructions:`; main stayed parked |
 | Steer the words named | the engine delivered it on all five, and the finished work carries it |
 | Worker stopped mid-task | the engine told it to continue and confirmed it working again (Codex, Cursor, Grok, OpenCode) |
@@ -756,13 +756,13 @@ The live guards gave the same results in both trees:
 
 | Guard | Before | After |
 | --- | --- | --- |
-| `FM_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | ok | ok |
-| `FM_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh` | ok | ok |
-| `FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` | 7 of 7 ok | 7 of 7 ok |
-| `FM_CODEX_LIVE_E2E=1 tests/jg-codex-continuity-live-e2e.test.sh` | ok | ok |
-| `FM_GROK_LIVE_E2E=1 tests/jg-grok-continuity-live-e2e.test.sh` | ok | ok |
-| `FM_GROK_STOP_LIVE_E2E=1 tests/jg-grok-stop-live-e2e.test.sh` (native 1.0.41, legacy 0.2.102) | `not ok - native path expected two Stop payloads, got 3` | same |
-| `FM_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh` | `not ok - ... "The usage limit has been reached","statusCode":429` | same |
+| `JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh` | ok | ok |
+| `JG_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh` | ok | ok |
+| `JG_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` | 7 of 7 ok | 7 of 7 ok |
+| `JG_CODEX_LIVE_E2E=1 tests/jg-codex-continuity-live-e2e.test.sh` | ok | ok |
+| `JG_GROK_LIVE_E2E=1 tests/jg-grok-continuity-live-e2e.test.sh` | ok | ok |
+| `JG_GROK_STOP_LIVE_E2E=1 tests/jg-grok-stop-live-e2e.test.sh` (native 1.0.41, legacy 0.2.102) | `not ok - native path expected two Stop payloads, got 3` | same |
+| `JG_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh` | `not ok - ... "The usage limit has been reached","statusCode":429` | same |
 
 The Grok stop guard was last verified on 0.2.112 and has drifted from Grok 1.0.41 in both trees.
 
@@ -785,7 +785,7 @@ This supports [The dialog mirror](../supervision-host.md#the-dialog-mirror): the
 It was measured on 2026-09-25 on macOS 26.5.2 arm64 with Claude Code 2.1.282 (`haiku`) and cursor-agent 2026.09.23-86fc751, each in a disposable lab primary on a private tmux socket.
 
 ```text
-$ FM_HOST_MIRROR_LIVE_E2E=1 tests/jg-host-mirror-live-e2e.test.sh
+$ JG_HOST_MIRROR_LIVE_E2E=1 tests/jg-host-mirror-live-e2e.test.sh
 ok - claude 2.1.282 (Claude Code): a turn the harness started itself was not mirrored as the captain's words
 ok - claude 2.1.282 (Claude Code): the tracked registrations mirrored the captain prompt and main reply
 ok - cursor 2026.09.23-86fc751: the tracked registrations mirrored the captain prompt and main reply
@@ -796,7 +796,7 @@ On 2026-10-07, the Claude path passed again on Linux 7.0.0-34-generic x86_64 wit
 The guard ran in its private tmux socket and required both an idle verdict from the Claude-scoped rendered busy-state check and an empty composer before submitting its prompt.
 
 ```text
-$ FM_HOST_MIRROR_LIVE_E2E=1 FM_HOST_MIRROR_LIVE_HARNESSES=claude bash tests/jg-host-mirror-live-e2e.test.sh
+$ JG_HOST_MIRROR_LIVE_E2E=1 JG_HOST_MIRROR_LIVE_HARNESSES=claude bash tests/jg-host-mirror-live-e2e.test.sh
 ok - claude 2.1.293 (Claude Code): a turn the harness started itself was not mirrored as the captain's words
 ok - claude 2.1.293 (Claude Code): the tracked registrations mirrored the captain prompt and main reply
 ok - host mirror live: 1 harness(es) proved their writers
@@ -832,7 +832,7 @@ Counted on a copy of that window's store, draining as main until the section is 
 A Pi primary without `config/supervision-host` ran the same gated-worker session with the changed branch prompt: routine row 1, captain row 2 for the finished work, landing, and `jg_branch_processed` through 2, with no `BRANCH OUTCOMES` line in either conversation.
 
 ```text
-$ FM_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh
+$ JG_SUPERVISION_HOST_LIVE_E2E=1 tests/jg-supervision-host-live-e2e.test.sh
 # first turn: handled	turn=host-85573-1790386456.1	posture=away	rc=0
 # second turn: handled	turn=host-85573-1790386456.2	posture=away	rc=0
 ok - supervision host live (2.1.283 (Claude Code)): a real engine handles and resumes away wakes under the branch contract without waking main

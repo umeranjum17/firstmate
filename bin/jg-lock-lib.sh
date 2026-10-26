@@ -15,11 +15,11 @@
 #      lock might belong to a process lsof has not yet reflected.
 # ANY uncertainty - lsof missing, an lsof error, an unreadable mtime - returns
 # non-zero (NOT stale): fail safe, never remove a lock that cannot be proven dead.
-# Diagnostics print to stderr prefixed by ${FM_LOCK_LOG_PREFIX:-jg-lock} so each
+# Diagnostics print to stderr prefixed by ${JG_LOCK_LOG_PREFIX:-jg-lock} so each
 # caller's output stays recognizable.
 
 jg_lock_log() {
-  echo "${FM_LOCK_LOG_PREFIX:-jg-lock}: $*" >&2
+  echo "${JG_LOCK_LOG_PREFIX:-jg-lock}: $*" >&2
 }
 
 # Portable mtime in epoch seconds. Kept self-contained so this leaf lib drags in

@@ -11,7 +11,7 @@
 # none for the lane that already acted after the restart. Repeat passes and a
 # second restart must not nudge again while the lane's state is unchanged.
 # Every Herdr call goes through bin/jg-herdr-lab.sh; the default session is
-# never touched. Set FM_SENTINEL_RESUME_EVIDENCE=<dir> to keep the outputs.
+# never touched. Set JG_SENTINEL_RESUME_EVIDENCE=<dir> to keep the outputs.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -19,11 +19,11 @@ set -u
 
 command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
 
-jg_live_gate default-on FM_SENTINEL_RESUME_E2E herdr jq git
+jg_live_gate default-on JG_SENTINEL_RESUME_E2E herdr jq git
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER=$ROOT/bin/jg-herdr-lab.sh
-EVID=${FM_SENTINEL_RESUME_EVIDENCE:-}
+EVID=${JG_SENTINEL_RESUME_EVIDENCE:-}
 REAL_PATH=$PATH
 LAB=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/jg-resume.XXXXXX")
 S=$("$HELPER" name jg-restart-resume)
@@ -59,8 +59,8 @@ SH
 chmod +x "$LAB/bin/herdr"
 lab() { PATH="$REAL_PATH" "$HELPER" run "$S" "$@"; }
 
-FM_HOME=$("$ROOT/bin/jg-lab-home.sh" create "$HOME_DIR") || fail "could not create the lab home"
-STATE=$FM_HOME/state
+JG_HOME=$("$ROOT/bin/jg-lab-home.sh" create "$HOME_DIR") || fail "could not create the lab home"
+STATE=$JG_HOME/state
 READY=1
 PATH="$REAL_PATH" "$HELPER" provision "$S" >/dev/null || fail "could not provision the lab session"
 
@@ -110,7 +110,7 @@ restart() {
   done
 }
 reconcile() {
-  PATH="$LAB/bin:$REAL_PATH" FM_HOME="$FM_HOME" FM_SENTINEL_HERDR_SESSION="$S" \
+  PATH="$LAB/bin:$REAL_PATH" JG_HOME="$JG_HOME" JG_SENTINEL_HERDR_SESSION="$S" \
     "$ROOT/bin/jg-sentinel.sh" reconcile
 }
 nudges() { find "$STATE/$1.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' '; }

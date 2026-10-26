@@ -23,15 +23,15 @@
 # Anything else is reported as "skipped: not a clone root" naming the repository
 # that would have been touched.
 # Pruning never deletes the checked-out branch or a branch that still has a
-# worktree, so it cannot discard unlanded work; set FM_FLEET_PRUNE=0 to disable it.
+# worktree, so it cannot discard unlanded work; set JG_FLEET_PRUNE=0 to disable it.
 # When the fetch fails on an orphaned .git/packed-refs.lock (left by a ref rewrite
 # killed mid-write - e.g. a timed-out bootstrap sync or a teardown process kill),
 # it is retried with a bounded wait and removed only when provably stale; see
-# fetch_with_packed_refs_lock_guard and the FM_FLEET_SYNC_PACKED_REFS_LOCK_* knobs.
+# fetch_with_packed_refs_lock_guard and the JG_FLEET_SYNC_PACKED_REFS_LOCK_* knobs.
 # Usage: jg-fleet-sync.sh [<project-dir-or-name>]
 # The single-project form accepts either a path (absolute, or relative to the
 # caller's cwd) or a bare "<name>"/"projects/<name>" form, resolved against
-# this home's projects dir ($FM_HOME/projects, or $FM_PROJECTS_OVERRIDE).
+# this home's projects dir ($JG_HOME/projects, or $JG_PROJECTS_OVERRIDE).
 # Bare names and "projects/<name>" forms prefer this home's projects dir before
 # falling back to an explicit path. Example: from anywhere,
 # `jg-fleet-sync.sh dotfiles-private` syncs just that one clone, same as
@@ -39,12 +39,12 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
 # shellcheck source=bin/jg-lock-lib.sh
 . "$SCRIPT_DIR/jg-lock-lib.sh"
-# Inert unless FM_TIMING_LOG names a file; only the deferred network stage sets it.
+# Inert unless JG_TIMING_LOG names a file; only the deferred network stage sets it.
 # shellcheck source=bin/jg-timing-lib.sh
 . "$SCRIPT_DIR/jg-timing-lib.sh"
 # Reuse jg-ff-lib.sh's one stale-index.lock recovery (ff_maybe_clear_stale_index_lock)
@@ -52,8 +52,8 @@ PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 # process self-heals exactly as the secondmate sync already does.
 # shellcheck source=bin/jg-ff-lib.sh
 . "$SCRIPT_DIR/jg-ff-lib.sh"
-FM_LOCK_LOG_PREFIX=fleet-sync
-"$FM_ROOT/bin/jg-guard.sh" || true
+JG_LOCK_LOG_PREFIX=fleet-sync
+"$JG_ROOT/bin/jg-guard.sh" || true
 
 # Bounded recovery for an orphaned .git/packed-refs.lock. A git ref rewrite
 # (fetch --prune, branch -D, pack-refs) killed after creating the lock but before
@@ -61,9 +61,9 @@ FM_LOCK_LOG_PREFIX=fleet-sync
 # kills - leaves a lock that makes the next sync's fetch fail with Git's
 # "Unable to create '...packed-refs.lock': File exists". These knobs bound the
 # patience-then-provably-stale-clear recovery; see fetch_with_packed_refs_lock_guard.
-FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=${FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES:-3}
-FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=${FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS:-1}
-FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=${FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS:-30}
+FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=${JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES:-3}
+FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=${JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS:-1}
+FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=${JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS:-30}
 case "$FLEET_SYNC_PACKED_REFS_LOCK_RETRIES" in ''|*[!0-9]*) FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3 ;; esac
 case "$FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS" in ''|*[!0-9]*) FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30 ;; esac
 if ! [[ "$FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]; then
@@ -237,8 +237,8 @@ prune_gone_branches() {
   # do NOT also require the branch to be an ancestor of origin/<default> - PRs in
   # this fleet are squash-merged, so a merged branch is never an ancestor and
   # such a check would prune nothing. The no-worktree guard is the real safety
-  # net. Set FM_FLEET_PRUNE=0 to skip pruning entirely.
-  [ "${FM_FLEET_PRUNE:-1}" != "0" ] || return 0
+  # net. Set JG_FLEET_PRUNE=0 to skip pruning entirely.
+  [ "${JG_FLEET_PRUNE:-1}" != "0" ] || return 0
 
   local worktree_branches current refline branch track
   worktree_branches=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null \
@@ -335,7 +335,7 @@ sync_project() {
     echo "$label: skipped: not a clone root (git would act on $proj_top)"
     return 0
   fi
-  if ! mode_line=$("$FM_ROOT/bin/jg-project-mode.sh" "$label" 2>/dev/null); then
+  if ! mode_line=$("$JG_ROOT/bin/jg-project-mode.sh" "$label" 2>/dev/null); then
     echo "$label: skipped: registry entry does not resolve to a delivery posture (run bin/jg-project-mode.sh $label for the refusal)"
     return 0
   fi

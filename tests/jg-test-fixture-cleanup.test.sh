@@ -86,7 +86,7 @@ test_fixture_registration_failure_rolls_back_root() {
   registry_dir="$harness/registry-dir"
   mkdir -p "$failure_tmp" "$registry_dir"
 
-  if output=$(TMPDIR="$failure_tmp" FM_TEST_CLEANUP_REGISTRY="$registry_dir" \
+  if output=$(TMPDIR="$failure_tmp" JG_TEST_CLEANUP_REGISTRY="$registry_dir" \
     jg_test_tmproot jg-test-cleanup-registration-failure 2>/dev/null); then
     fail "jg_test_tmproot succeeded after its cleanup registry rejected registration"
   fi
@@ -119,10 +119,10 @@ test_orphan_sweep_respects_fixture_ownership() {
   active_dir=$(cat "$dirfile")
   touch -t 202001010000 "$active_dir/.jg-test-fixture"
 
-  stale_dir=$(mktemp -d "$FM_TEST_TMPDIR/jg-test-cleanup-stale.XXXXXX")
+  stale_dir=$(mktemp -d "$JG_TEST_TMPDIR/jg-test-cleanup-stale.XXXXXX")
   printf '%s\n%s\n' "$$" reused-process-identity > "$stale_dir/.jg-test-fixture"
   touch -t 202001010000 "$stale_dir/.jg-test-fixture"
-  fresh_dir=$(mktemp -d "$FM_TEST_TMPDIR/jg-test-cleanup-fresh.XXXXXX")
+  fresh_dir=$(mktemp -d "$JG_TEST_TMPDIR/jg-test-cleanup-fresh.XXXXXX")
   : > "$fresh_dir/.jg-test-fixture"
 
   bash -c '
@@ -146,7 +146,7 @@ test_orphan_sweep_respects_fixture_ownership() {
 
 test_orphan_sweep_reaps_read_only_package_tree() {
   local stale_dir package_dir
-  stale_dir=$(mktemp -d "$FM_TEST_TMPDIR/jg-test-cleanup-read-only.XXXXXX")
+  stale_dir=$(mktemp -d "$JG_TEST_TMPDIR/jg-test-cleanup-read-only.XXXXXX")
   package_dir="$stale_dir/packages/extension"
   mkdir -p "$package_dir"
   printf '%s\n%s\n' "$$" reused-process-identity > "$stale_dir/.jg-test-fixture"

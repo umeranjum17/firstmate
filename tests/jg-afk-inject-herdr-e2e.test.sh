@@ -10,7 +10,7 @@
 # Unlike the tmux e2e (which redirects a bare `tmux` PATH shim to a private
 # socket), herdr already supports named-session isolation via --session, so no
 # PATH redirection is needed for the happy path - the daemon is simply pointed
-# at FM_SUPERVISOR_BACKEND=herdr, FM_SUPERVISOR_TARGET="<session>:<pane-id>",
+# at JG_SUPERVISOR_BACKEND=herdr, JG_SUPERVISOR_TARGET="<session>:<pane-id>",
 # and HERDR_SESSION="<the isolated session>". A thin herdr SHIM is still used,
 # but only to simulate a swallowed Enter (Scenario B) - herdr's real CLI has no
 # built-in way to drop a keystroke, so the shim intercepts exactly one
@@ -72,7 +72,7 @@ cleanup_all() {
 trap cleanup_all EXIT
 herdr_prepare_runtime "$SESSION" || fail "could not prepare isolated Herdr lab session"
 
-# --- source the daemon (for afk_enter/afk_exit/FM_INJECT_MARK) + the backend -
+# --- source the daemon (for afk_enter/afk_exit/JG_INJECT_MARK) + the backend -
 # shellcheck source=/dev/null
 . "$DAEMON"
 jg_backend_source herdr || fail "jg_backend_source herdr failed"
@@ -207,7 +207,7 @@ submit_line() {
   # Report a real idle->working->idle cycle around the submission, exactly
   # like a real harness's agent_status - this is the signal
   # jg_backend_herdr_send_text_submit now confirms against. The 0.6s "working"
-  # window comfortably covers the daemon's FM_INJECT_CONFIRM_SLEEP=0.5
+  # window comfortably covers the daemon's JG_INJECT_CONFIRM_SLEEP=0.5
   # per-attempt budget used by the scenarios below.
   report_agent_state working
   sleep 0.6
@@ -276,21 +276,21 @@ wait_daemon_started() {
 start_daemon() {
   local log_start=0
   [ ! -f "$STATE_DIR/.supervise-daemon.log" ] || log_start=$(wc -l < "$STATE_DIR/.supervise-daemon.log")
-  FM_DAEMON_PRIMARY_HARNESS=unknown \
+  JG_DAEMON_PRIMARY_HARNESS=unknown \
   PATH="$HERDR_SHIM_DIR:$PATH" \
   HERDR_SESSION="$SESSION" \
-  FM_STATE_OVERRIDE="$STATE_DIR" \
-  FM_SUPERVISOR_BACKEND=herdr \
-  FM_SUPERVISOR_TARGET="$SUPERVISOR_TARGET" \
-  FM_ESCALATE_BATCH_SECS=0 \
-  FM_HOUSEKEEPING_TICK=1 \
-  FM_POLL=1 \
-  FM_SIGNAL_GRACE=1 \
-  FM_HEARTBEAT=999999 \
-  FM_CHECK_INTERVAL=999999 \
-  FM_INJECT_CONFIRM_SLEEP=0.5 \
-  FM_INJECT_CONFIRM_RETRIES=6 \
-  FM_STALE_ESCALATE_SECS=999999 \
+  JG_STATE_OVERRIDE="$STATE_DIR" \
+  JG_SUPERVISOR_BACKEND=herdr \
+  JG_SUPERVISOR_TARGET="$SUPERVISOR_TARGET" \
+  JG_ESCALATE_BATCH_SECS=0 \
+  JG_HOUSEKEEPING_TICK=1 \
+  JG_POLL=1 \
+  JG_SIGNAL_GRACE=1 \
+  JG_HEARTBEAT=999999 \
+  JG_CHECK_INTERVAL=999999 \
+  JG_INJECT_CONFIRM_SLEEP=0.5 \
+  JG_INJECT_CONFIRM_RETRIES=6 \
+  JG_STALE_ESCALATE_SECS=999999 \
   nohup "$DAEMON" >"$STATE_DIR/daemon.out" 2>"$STATE_DIR/daemon.err" &
   DAEMON_PID=$!
   wait_daemon_started daemon "$log_start"
@@ -488,22 +488,22 @@ test_scenario_d_max_defer() {
   jg_backend_herdr_send_literal "$SUPERVISOR_TARGET" "stuck-in-the-box"
   sleep 0.5
 
-  FM_DAEMON_PRIMARY_HARNESS=unknown \
+  JG_DAEMON_PRIMARY_HARNESS=unknown \
   PATH="$HERDR_SHIM_DIR:$PATH" \
   HERDR_SESSION="$SESSION" \
-  FM_STATE_OVERRIDE="$STATE_DIR" \
-  FM_SUPERVISOR_BACKEND=herdr \
-  FM_SUPERVISOR_TARGET="$SUPERVISOR_TARGET" \
-  FM_ESCALATE_BATCH_SECS=99999 \
-  FM_HOUSEKEEPING_TICK=1 \
-  FM_POLL=1 \
-  FM_SIGNAL_GRACE=1 \
-  FM_HEARTBEAT=999999 \
-  FM_CHECK_INTERVAL=999999 \
-  FM_MAX_DEFER_SECS=3 \
-  FM_INJECT_CONFIRM_SLEEP=0.3 \
-  FM_INJECT_CONFIRM_RETRIES=2 \
-  FM_STALE_ESCALATE_SECS=999999 \
+  JG_STATE_OVERRIDE="$STATE_DIR" \
+  JG_SUPERVISOR_BACKEND=herdr \
+  JG_SUPERVISOR_TARGET="$SUPERVISOR_TARGET" \
+  JG_ESCALATE_BATCH_SECS=99999 \
+  JG_HOUSEKEEPING_TICK=1 \
+  JG_POLL=1 \
+  JG_SIGNAL_GRACE=1 \
+  JG_HEARTBEAT=999999 \
+  JG_CHECK_INTERVAL=999999 \
+  JG_MAX_DEFER_SECS=3 \
+  JG_INJECT_CONFIRM_SLEEP=0.3 \
+  JG_INJECT_CONFIRM_RETRIES=2 \
+  JG_STALE_ESCALATE_SECS=999999 \
   nohup "$DAEMON" >"$STATE_DIR/daemon.out" 2>"$STATE_DIR/daemon.err" &
   DAEMON_PID=$!
   wait_daemon_started "Scenario D daemon" "$log_start"

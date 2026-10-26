@@ -27,7 +27,7 @@
 #
 # IN-BAND OPERATIONAL INPUT. bin/jg-operational-input.sh constructs every
 # current daemon injection as the typed away-supervisor kind after the stable
-# FM_OPERATIONAL_PREFIX. A human cannot type its leading U+2063 from a normal
+# JG_OPERATIONAL_PREFIX. A human cannot type its leading U+2063 from a normal
 # keyboard at the start of a message, and Herdr transports it as text.
 # A primary harness that strips invisible characters from submitted prompts
 # (jg_operational_harness_needs_record, Claude Code) instead receives the
@@ -64,7 +64,7 @@
 #     Crewmates are autonomous, so a delayed stale response does not stall a
 #     healthy crewmate's own progress.
 #     Buffered escalation delivery also has a max-defer alarm: if a digest stays
-#     undelivered past FM_MAX_DEFER_SECS, the daemon retries a normal flush and
+#     undelivered past JG_MAX_DEFER_SECS, the daemon retries a normal flush and
 #     writes state/.subsuper-inject-wedged and attempts a configurable active
 #     alert if submit still cannot be confirmed.
 #   - Cheap heartbeat catch-all: every HEARTBEAT_SCAN_SECS the daemon greps the
@@ -80,15 +80,15 @@
 # Usage: jg-supervise-daemon.sh
 #          Long-lived background loop. Normally started by the /afk skill, which
 #          sets state/.afk first. Env knobs:
-#          FM_SUPERVISOR_TARGET     supervisor pane target (override; otherwise
+#          JG_SUPERVISOR_TARGET     supervisor pane target (override; otherwise
 #                                   auto-discovered per backend - $TMUX_PANE
 #                                   under tmux, "<session>:<pane-id>" from
 #                                   $HERDR_PANE_ID under herdr - then
 #                                   firstmate:0 fallback). Accepts either a
 #                                   tmux target or a herdr "<session>:<pane-id>"
 #                                   target; which one it's read as is decided by
-#                                   FM_SUPERVISOR_BACKEND (below), independently.
-#          FM_SUPERVISOR_BACKEND    supervisor pane BACKEND (tmux|herdr;
+#                                   JG_SUPERVISOR_BACKEND (below), independently.
+#          JG_SUPERVISOR_BACKEND    supervisor pane BACKEND (tmux|herdr;
 #                                   override; otherwise auto-discovered the same
 #                                   way bin/jg-backend.sh's jg_backend_detect
 #                                   resolves the runtime firstmate itself is
@@ -98,41 +98,41 @@
 #                                   supported as supervisor backends; the daemon
 #                                   refuses loudly at startup rather than trying
 #                                   tmux primitives against a non-tmux pane.
-#          FM_INJECT_SKIP           |-prefixes force-self-handle bypassing
+#          JG_INJECT_SKIP           |-prefixes force-self-handle bypassing
 #                                   classification (default "heartbeat"); empty
 #                                   disables. Use sparingly: it overrides the
 #                                   captain-relevant escalation for matching
 #                                   kinds.
-#          FM_STALE_ESCALATE_SECS   idle seconds before a stale pane escalates
+#          JG_STALE_ESCALATE_SECS   idle seconds before a stale pane escalates
 #                                   as a possible wedge (default 240)
-#          FM_PAUSE_RESURFACE_SECS  seconds a declared wait stays declared,
+#          JG_PAUSE_RESURFACE_SECS  seconds a declared wait stays declared,
 #                                   idle or busy, before it re-surfaces as a
 #                                   recheck (default 14400, four hours); an
 #                                   `until` time cannot extend this bound, and a
 #                                   captain-held transfer is never rechecked
 #                                   while an away record exists
-#          FM_ESCALATE_BATCH_SECS   buffer window for batched escalation
+#          JG_ESCALATE_BATCH_SECS   buffer window for batched escalation
 #                                   digests; 0 = flush immediately (default 90)
-#          FM_HEARTBEAT_SCAN_SECS   cadence for the catch-all status scan
+#          JG_HEARTBEAT_SCAN_SECS   cadence for the catch-all status scan
 #                                   (default 300)
-#          FM_HOUSEKEEPING_TICK     seconds between housekeeping passes while
+#          JG_HOUSEKEEPING_TICK     seconds between housekeeping passes while
 #                                   the watcher is mid-cycle (default 15)
-#          FM_BUSY_REGEX            optional rendered busy-signature override
+#          JG_BUSY_REGEX            optional rendered busy-signature override
 #                                   for delivery guards and Grok's fallback
-#          FM_COMPOSER_IDLE_RE      optional shared classifier override; see
+#          JG_COMPOSER_IDLE_RE      optional shared classifier override; see
 #                                   docs/configuration.md for its safety gates
-#          FM_MAX_DEFER_SECS        max seconds a buffered escalation may sit
+#          JG_MAX_DEFER_SECS        max seconds a buffered escalation may sit
 #                                   undelivered before one normal flush attempt;
 #                                   if that cannot confirm a submit, a wedge
 #                                   alarm fires (default 300; 0 disables)
-#          FM_WEDGE_ALARM_CHANNEL   override config/wedge-alarm with a single
+#          JG_WEDGE_ALARM_CHANNEL   override config/wedge-alarm with a single
 #                                   active-alert directive for that wedge alarm
 #                                   (off|auto|osascript|herdr|command:<cmd>). An
 #                                   absent file/var means auto: on macOS that is
 #                                   an OS-level notification, so the alarm is
 #                                   never silent. See wedge_alarm_notify below
 #                                   and docs/configuration.md.
-#          FM_WEDGE_ALARM_EXEC      notifier seam: when set, every notifier
+#          JG_WEDGE_ALARM_EXEC      notifier seam: when set, every notifier
 #                                   channel routes through this command as
 #                                   `<cmd> <channel> <summary>` instead of
 #                                   invoking its real notifier; "discard" fires
@@ -140,11 +140,11 @@
 #                                   daemon defaults this to "discard" so no test
 #                                   can post a real notification (wedge_alarm_emit
 #                                   and the library-mode guard at the foot).
-#          FM_WEDGE_ALARM_TIMEOUT_SECS seconds allowed for each notifier before
+#          JG_WEDGE_ALARM_TIMEOUT_SECS seconds allowed for each notifier before
 #                                   its watchdog terminates it and continues to the
 #                                   next channel (default 10; invalid/zero uses the
 #                                   default).
-#          FM_INJECT_CONFIRM_RETRIES Enter-retry attempts on a swallowed Enter
+#          JG_INJECT_CONFIRM_RETRIES Enter-retry attempts on a swallowed Enter
 #                                   (default 3); the digest is typed once, only
 #                                   Enter is retried. Composer-empty detection is
 #                                   structural and style-aware (bin/jg-tmux-lib.sh):
@@ -152,10 +152,10 @@
 #                                   harness's box borders before deciding, so a
 #                                   ghost-only or bordered-but-empty composer is
 #                                   not misread as pending input.
-#          FM_INJECT_CONFIRM_SLEEP  seconds between daemon submit checks
+#          JG_INJECT_CONFIRM_SLEEP  seconds between daemon submit checks
 #                                   (default 0.5)
-#          FM_LOG_MAX_BYTES / FM_LOG_KEEP_LINES / FM_CRASH_*  log + crash guards
-#          FM_STATE_OVERRIDE        alternate state dir (testing)
+#          JG_LOG_MAX_BYTES / JG_LOG_KEEP_LINES / JG_CRASH_*  log + crash guards
+#          JG_STATE_OVERRIDE        alternate state dir (testing)
 #          Logs each wake to state/.supervise-daemon.log (size-capped). Single
 #          instance via portable lock on state/.supervise-daemon.lock. Trapped
 #          SIGTERM/SIGINT shut down within ~1s, flush escalations, release the
@@ -163,46 +163,46 @@
 #          the daemon; a tight crash-restart spin is detected and backed off.
 set -u
 
-FM_DAEMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_DAEMON_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_DAEMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$JG_DAEMON_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # Shared tmux pane primitives for supervisor injection (busy/composer detection
 # + verify-retry submit). Sourced at top level so BOTH the executed daemon and
 # the unit tests (which source this file for its pure functions) get the
 # corrected composer detection. Stale task rechecks use jg-backend.sh below.
 # shellcheck source=bin/jg-tmux-lib.sh
-. "$FM_DAEMON_DIR/jg-tmux-lib.sh"
+. "$JG_DAEMON_DIR/jg-tmux-lib.sh"
 
 # shellcheck source=bin/jg-backend.sh
-. "$FM_DAEMON_DIR/jg-backend.sh"
+. "$JG_DAEMON_DIR/jg-backend.sh"
 
 # Canonical construction and parsing for every Firstmate operational input.
 # shellcheck source=bin/jg-operational-input.sh
-. "$FM_DAEMON_DIR/jg-operational-input.sh"
+. "$JG_DAEMON_DIR/jg-operational-input.sh"
 
 # Shared wake classifier (last_status_line, status_is_captain_relevant,
 # window_to_task, and the status-span reader). The SAME library backs the
 # always-on watcher's triage, so the captain-relevant verb set and the
 # classification predicates have exactly one definition.
 # shellcheck source=bin/jg-classify-lib.sh
-. "$FM_DAEMON_DIR/jg-classify-lib.sh"
+. "$JG_DAEMON_DIR/jg-classify-lib.sh"
 # The away-posture record owner: while state/.afk-contract exists an item held
 # for the captain is never rechecked (the watcher applies the same rule).
 # shellcheck source=bin/jg-afk-contract.sh
-. "$FM_DAEMON_DIR/jg-afk-contract.sh"
+. "$JG_DAEMON_DIR/jg-afk-contract.sh"
 
-# Supervisor-pane discovery (FM_SUPERVISOR_TARGET_DEFAULT,
-# FM_SUPERVISOR_BACKEND_DEFAULT, discover_supervisor_target,
+# Supervisor-pane discovery (JG_SUPERVISOR_TARGET_DEFAULT,
+# JG_SUPERVISOR_BACKEND_DEFAULT, discover_supervisor_target,
 # discover_supervisor_backend). Shared with the script-owned away launcher
 # (bin/jg-afk-launch.sh) so the captain-pane resolution has exactly one owner.
 # shellcheck source=bin/jg-supervisor-target-lib.sh
-. "$FM_DAEMON_DIR/jg-supervisor-target-lib.sh"
+. "$JG_DAEMON_DIR/jg-supervisor-target-lib.sh"
 
 # The single owner of semantic busy state for recorded tasks
 # (jg_busy_classify).
 # shellcheck source=bin/jg-busy-lib.sh
-. "$FM_DAEMON_DIR/jg-busy-lib.sh"
+. "$JG_DAEMON_DIR/jg-busy-lib.sh"
 
 # --- tunables ---------------------------------------------------------------
 # Supervisor backends this daemon knows how to inject into today. zellij, orca,
@@ -212,7 +212,7 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 # harness-verification discipline. Selecting one refuses loudly at startup
 # instead of silently running tmux primitives against a pane that is not a tmux
 # pane.
-FM_SUPERVISOR_SUPPORTED_BACKENDS="tmux herdr"
+JG_SUPERVISOR_SUPPORTED_BACKENDS="tmux herdr"
 INJECT_SKIP_DEFAULT="heartbeat"
 STALE_ESCALATE_SECS_DEFAULT=240
 ESCALATE_BATCH_SECS_DEFAULT=90
@@ -234,7 +234,7 @@ INJECT_SUBMIT_ATTEMPTED=0
 # live in bin/jg-classify-lib.sh, shared with the always-on watcher.
 # Composer-empty detection, submit acknowledgement, and the harness-scoped
 # supervisor-pane busy guard live in bin/jg-tmux-lib.sh.
-# FM_BUSY_REGEX also overrides Grok's isolated task-state fallback.
+# JG_BUSY_REGEX also overrides Grok's isolated task-state fallback.
 INJECT_FAIL_SLEEP_DEFAULT=30
 INJECT_CONFIRM_RETRIES_DEFAULT=3
 INJECT_CONFIRM_SLEEP_DEFAULT=0.5
@@ -251,10 +251,10 @@ LOG_KEEP_LINES_DEFAULT=2000
 # its landed leading-U+2063 compatibility behavior.
 AFK_FLAG_NAME=".afk"
 
-# Resolve the effective state dir. FM_STATE_OVERRIDE wins (testing); otherwise
-# $FM_HOME/state. Kept as a function so the pure
+# Resolve the effective state dir. JG_STATE_OVERRIDE wins (testing); otherwise
+# $JG_HOME/state. Kept as a function so the pure
 # classifiers can take an explicit state arg without depending on globals.
-_state_root() { printf '%s' "${FM_STATE_OVERRIDE:-$FM_HOME/state}"; }
+_state_root() { printf '%s' "${JG_STATE_OVERRIDE:-$JG_HOME/state}"; }
 
 # --- portable stat (same trap as jg-watch.sh: no `stat -f || stat -c`) -------
 if [ "$(uname)" = Darwin ]; then
@@ -324,7 +324,7 @@ message_is_injection() {  # <message-text> [state]
   local msg=$1 state=${2:-$(_state_root)} record_kind
   [ -n "$msg" ] || return 1
   case "$msg" in
-    "$FM_INJECT_MARK"*) return 0 ;;
+    "$JG_INJECT_MARK"*) return 0 ;;
   esac
   jg_operational_doorbell_kind "$msg" "$state" record_kind
 }
@@ -339,8 +339,8 @@ strip_injection_marker() {  # <message-text>
     return
   fi
   case "$msg" in
-    "$FM_OPERATIONAL_PREFIX"*) msg=${msg#"$FM_OPERATIONAL_PREFIX"} ;;
-    "$FM_INJECT_MARK"*) msg=${msg#"$FM_INJECT_MARK"} ;;
+    "$JG_OPERATIONAL_PREFIX"*) msg=${msg#"$JG_OPERATIONAL_PREFIX"} ;;
+    "$JG_INJECT_MARK"*) msg=${msg#"$JG_INJECT_MARK"} ;;
   esac
   printf '%s' "$msg"
 }
@@ -357,7 +357,7 @@ _collapse_newlines() {  # <text>
 # discover_supervisor_target / discover_supervisor_backend are owned by
 # bin/jg-supervisor-target-lib.sh (sourced above). jg_super_main below calls
 # them exactly as before; the away launcher reuses the identical resolution to
-# pass the captain pane in as FM_SUPERVISOR_TARGET.
+# pass the captain pane in as JG_SUPERVISOR_TARGET.
 
 # --- classification helpers (PURE: no side effects, testable) ---------------
 # last_status_line, status_is_captain_relevant, window_to_task, and the
@@ -385,15 +385,15 @@ classify_signal() {  # <reason-after-colon> <state>
       marker=$(_seen_status_path "$state" "$task")
       status_presentation_marker_reported_matches "$marker" "$sig" && continue
       distilled="${distilled}$(basename "$f"): unreadable status span | "
-      [ -n "${FM_STATUS_SPAN_ENDPOINT_FILE:-}" ] \
-        && printf 'ERROR\t%s\t%s\n' "$task" "$sig" >> "$FM_STATUS_SPAN_ENDPOINT_FILE"
+      [ -n "${JG_STATUS_SPAN_ENDPOINT_FILE:-}" ] \
+        && printf 'ERROR\t%s\t%s\n' "$task" "$sig" >> "$JG_STATUS_SPAN_ENDPOINT_FILE"
       rel=1
       continue
     fi
     endpoint=${record%%$'\t'*}
     rest=${record#*$'\t'}; ident=${rest%%$'\t'*}
-    [ -n "${FM_STATUS_SPAN_ENDPOINT_FILE:-}" ] \
-      && printf '%s\t%s\t%s\n' "$task" "$endpoint" "$ident" >> "$FM_STATUS_SPAN_ENDPOINT_FILE"
+    [ -n "${JG_STATUS_SPAN_ENDPOINT_FILE:-}" ] \
+      && printf '%s\t%s\t%s\n' "$task" "$endpoint" "$ident" >> "$JG_STATUS_SPAN_ENDPOINT_FILE"
     if [ "$rc" -eq 0 ]; then
       event=${rest#*$'\t'}
       distilled="${distilled}$(basename "$f"): ${event} | "
@@ -683,16 +683,16 @@ mark_escalated_seen() {  # <state> <captured-endpoint-file>
 #
 # A daemon launched in its own terminal (bin/jg-afk-launch.sh) is outside the
 # captain's process tree, so the launcher names the captain's harness in
-# FM_DAEMON_PRIMARY_HARNESS; detection covers a harness-native daemon.
+# JG_DAEMON_PRIMARY_HARNESS; detection covers a harness-native daemon.
 # Resolved lazily and memoized: harness detection walks process ancestry, which
 # is too heavy to pay on every source of this library (the unit tests and the
 # launcher source it purely for its pure functions).
 jg_daemon_primary_harness() {
-  if [ -z "${FM_DAEMON_PRIMARY_HARNESS:-}" ]; then
-    FM_DAEMON_PRIMARY_HARNESS=$("$FM_DAEMON_DIR/jg-harness.sh" 2>/dev/null || printf 'unknown')
-    [ -n "$FM_DAEMON_PRIMARY_HARNESS" ] || FM_DAEMON_PRIMARY_HARNESS=unknown
+  if [ -z "${JG_DAEMON_PRIMARY_HARNESS:-}" ]; then
+    JG_DAEMON_PRIMARY_HARNESS=$("$JG_DAEMON_DIR/jg-harness.sh" 2>/dev/null || printf 'unknown')
+    [ -n "$JG_DAEMON_PRIMARY_HARNESS" ] || JG_DAEMON_PRIMARY_HARNESS=unknown
   fi
-  printf '%s' "$FM_DAEMON_PRIMARY_HARNESS"
+  printf '%s' "$JG_DAEMON_PRIMARY_HARNESS"
 }
 
 pane_is_busy() {  # <target> [backend]
@@ -898,7 +898,7 @@ escalate_flush() {  # <state>
 # flash stay exactly as before.
 #
 # Config: config/wedge-alarm (local, gitignored), one channel directive per
-# non-empty, non-comment line. FM_WEDGE_ALARM_CHANNEL overrides the file with a
+# non-empty, non-comment line. JG_WEDGE_ALARM_CHANNEL overrides the file with a
 # single directive. Directives:
 #   off              disable the active alert entirely, regardless of position
 #                    (marker + flash remain)
@@ -910,16 +910,16 @@ escalate_flush() {  # <state>
 # purpose is to never be silent, so the reachable OS channel fires unless the
 # captain explicitly disables it.
 
-# Print the configured channel directives, one per line. FM_WEDGE_ALARM_CHANNEL
+# Print the configured channel directives, one per line. JG_WEDGE_ALARM_CHANNEL
 # wins (a single directive); else each non-empty, non-comment line of
 # config/wedge-alarm; else "auto".
 wedge_alarm_configured_channels() {
   local cfg line found=
-  if [ -n "${FM_WEDGE_ALARM_CHANNEL:-}" ]; then
-    printf '%s\n' "$FM_WEDGE_ALARM_CHANNEL"
+  if [ -n "${JG_WEDGE_ALARM_CHANNEL:-}" ]; then
+    printf '%s\n' "$JG_WEDGE_ALARM_CHANNEL"
     return 0
   fi
-  cfg="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/wedge-alarm"
+  cfg="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/wedge-alarm"
   if [ -f "$cfg" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
       line="${line#"${line%%[![:space:]]*}"}"
@@ -947,7 +947,7 @@ wedge_alarm_platform_default() {
 wedge_alarm_run_bounded() {
   local channel=$1 timeout monitor_was_on=0 pid start elapsed rc
   shift
-  timeout=${FM_WEDGE_ALARM_TIMEOUT_SECS:-$WEDGE_ALARM_TIMEOUT_SECS_DEFAULT}
+  timeout=${JG_WEDGE_ALARM_TIMEOUT_SECS:-$WEDGE_ALARM_TIMEOUT_SECS_DEFAULT}
   case "$timeout" in
     ''|*[!0-9]*) timeout=$WEDGE_ALARM_TIMEOUT_SECS_DEFAULT ;;
     *) [ "$timeout" -gt 0 ] 2>/dev/null || timeout=$WEDGE_ALARM_TIMEOUT_SECS_DEFAULT ;;
@@ -989,7 +989,7 @@ wedge_alarm_stop_active_notifier() {
 }
 
 # The single execution seam for every configured notifier channel.
-# FM_WEDGE_ALARM_EXEC, when set, REPLACES the real notifier: the resolved channel
+# JG_WEDGE_ALARM_EXEC, when set, REPLACES the real notifier: the resolved channel
 # name and summary are handed to that command instead of ever invoking osascript
 # or herdr or a captain-supplied command. This is the one injection point the test harness forces to a recorder
 # so no test can post a real desktop notification - the library-mode guard at the
@@ -998,7 +998,7 @@ wedge_alarm_stop_active_notifier() {
 # special value "discard" fires nothing; unset means production (the executed
 # daemon), so the real channels fire.
 wedge_alarm_os_notifier_override() {  # <channel> <summary>
-  local channel=$1 summary=$2 rc exec_override=${FM_WEDGE_ALARM_EXEC:-}
+  local channel=$1 summary=$2 rc exec_override=${JG_WEDGE_ALARM_EXEC:-}
   case "$exec_override" in
     '') return 2 ;;
     discard) return 0 ;;
@@ -1069,7 +1069,7 @@ wedge_alarm_via_command() {  # <cmd> <summary>
 }
 
 wedge_alarm_emit() {  # <channel> <summary>
-  local channel=$1 summary=$2 cmd=${3:-} rc exec_override=${FM_WEDGE_ALARM_EXEC:-} WEDGE_ALARM_EMIT_ACTIVE=1
+  local channel=$1 summary=$2 cmd=${3:-} rc exec_override=${JG_WEDGE_ALARM_EXEC:-} WEDGE_ALARM_EMIT_ACTIVE=1
   case "$exec_override" in
     '') ;;
     discard) return 0 ;;
@@ -1126,7 +1126,7 @@ wedge_alarm_notify() {  # <summary> <marker>
 inject_wedge_alarm() {  # <state> <age-seconds>
   local state=$1 age=$2 marker target backend max_defer now notify=1
   marker="$state/.subsuper-inject-wedged"
-  max_defer="${FM_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}"
+  max_defer="${JG_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}"
   # Re-alarm at most once per max-defer window so a long wedge does not spam.
   if [ "$(_file_age "$marker")" -lt "$max_defer" ]; then
     return 0
@@ -1144,8 +1144,8 @@ inject_wedge_alarm() {  # <state> <age-seconds>
     printf 'The supervisor pane could not accept an escalation. Buffered items:\n'
     cat "$state/.subsuper-escalations" 2>/dev/null
   } 2>/dev/null > "$marker" || true
-  target="${FM_SUPERVISOR_TARGET:-$FM_SUPERVISOR_TARGET_DEFAULT}"
-  backend="${FM_SUPERVISOR_BACKEND:-$FM_SUPERVISOR_BACKEND_DEFAULT}"
+  target="${JG_SUPERVISOR_TARGET:-$JG_SUPERVISOR_TARGET_DEFAULT}"
+  backend="${JG_SUPERVISOR_BACKEND:-$JG_SUPERVISOR_BACKEND_DEFAULT}"
   # Best-effort status-line flash. tmux's display-message is a client-side OSD
   # with no herdr equivalent; the log line + durable marker above are already
   # the primary, backend-independent signal, so a non-tmux backend just skips
@@ -1195,11 +1195,11 @@ housekeeping() {  # <state>
   migrate_watcher_pause_markers "$state"
 
   # (1) batch flush
-  if [ "${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ]; then
+  if [ "${JG_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ]; then
     escalate_flush "$state" || true
   else
     due=$(_oldest_line_age "$state/.subsuper-escalations")
-    if [ "$due" -ge "${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" ]; then
+    if [ "$due" -ge "${JG_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" ]; then
       escalate_flush "$state" || true
     fi
   fi
@@ -1207,7 +1207,7 @@ housekeeping() {  # <state>
   # (1b) max-defer escape. If anything is still buffered past MAX_DEFER_SECS,
   # retry the normal delivery path. If that still cannot confirm, raise a loud
   # wedge alarm while preserving the buffer.
-  max_defer=${FM_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}
+  max_defer=${JG_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}
   if afk_active "$state" && [ "$max_defer" -gt 0 ] && [ -s "$state/.subsuper-escalations" ]; then
     oldest=$(_oldest_line_age "$state/.subsuper-escalations")
     # Throttle the alarm to once per max-defer window (the wedge marker doubles
@@ -1242,7 +1242,7 @@ housekeeping() {  # <state>
       continue
     fi
     age=$(( now - $(cat "$marker" 2>/dev/null || echo "$now") ))
-    [ "$age" -ge "${FM_STALE_ESCALATE_SECS:-$STALE_ESCALATE_SECS_DEFAULT}" ] || continue
+    [ "$age" -ge "${JG_STALE_ESCALATE_SECS:-$STALE_ESCALATE_SECS_DEFAULT}" ] || continue
     stale_window_is_busy "$win" "$state"
     case "$?" in
       0) rm -f "$marker" ;;
@@ -1268,7 +1268,7 @@ housekeeping() {  # <state>
   # exactly the declaration that needs it. The crew's own latest status line is the
   # authority, and the loop head above already drops the marker the moment that line
   # stops declaring the wait.
-  pause_secs=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
+  pause_secs=${JG_PAUSE_RESURFACE_SECS:-$JG_PAUSE_RESURFACE_SECS_DEFAULT}
   for marker in "$state"/.subsuper-paused-*; do
     [ -e "$marker" ] || continue
     key="${marker##*.subsuper-paused-}"
@@ -1346,7 +1346,7 @@ housekeeping() {  # <state>
   #     so it is excluded here exactly as in the watcher's twin backstop
   #     (jg-watch.sh heartbeat_scan_finds_actionable); the home-shape-aware
   #     resolution lives in status_scan_parent_channel_exclude.
-  if [ "$(_file_age "$state/.subsuper-last-scan")" -ge "${FM_HEARTBEAT_SCAN_SECS:-$HEARTBEAT_SCAN_SECS_DEFAULT}" ]; then
+  if [ "$(_file_age "$state/.subsuper-last-scan")" -ge "${JG_HEARTBEAT_SCAN_SECS:-$HEARTBEAT_SCAN_SECS_DEFAULT}" ]; then
     _now > "$state/.subsuper-last-scan"
     local event record rest endpoint ident rc exclude
     exclude=$(status_scan_parent_channel_exclude "$state")
@@ -1436,13 +1436,13 @@ inject_msg() {  # <message> [state]
     || { INJECT_LAST_FAILURE="the digest could not be encoded"; log "inject failed: $INJECT_LAST_FAILURE"; return 1; }
   body=$msg
   msg=$encoded
-  target="${FM_SUPERVISOR_TARGET:-$FM_SUPERVISOR_TARGET_DEFAULT}"
+  target="${JG_SUPERVISOR_TARGET:-$JG_SUPERVISOR_TARGET_DEFAULT}"
   # BACKEND-AWARE (previously a raw `tmux display-message` pane-exists probe):
   # dispatches through bin/jg-backend.sh so a herdr supervisor pane is checked
   # via the herdr adapter instead of always assuming tmux. Falls back to tmux
   # when unset (sourced/test contexts that never ran jg_super_main's startup
   # discovery), matching this function's pre-existing default assumption.
-  backend="${FM_SUPERVISOR_BACKEND:-tmux}"
+  backend="${JG_SUPERVISOR_BACKEND:-tmux}"
   jg_backend_target_exists "$backend" "$target" \
     || { INJECT_LAST_FAILURE="supervisor target $target not found on $backend"; return 1; }
   # (3) Busy-guard: never inject into an in-use supervisor pane.
@@ -1488,8 +1488,8 @@ inject_msg() {  # <message> [state]
   # means the text was never confirmed typed, or (herdr) it was typed but no
   # Enter could be sent, so no confirmation retry ran; every other non-empty
   # verdict is an Enter-confirmation failure.
-  retries=${FM_INJECT_CONFIRM_RETRIES:-$INJECT_CONFIRM_RETRIES_DEFAULT}
-  sleep_s=${FM_INJECT_CONFIRM_SLEEP:-$INJECT_CONFIRM_SLEEP_DEFAULT}
+  retries=${JG_INJECT_CONFIRM_RETRIES:-$INJECT_CONFIRM_RETRIES_DEFAULT}
+  sleep_s=${JG_INJECT_CONFIRM_SLEEP:-$INJECT_CONFIRM_SLEEP_DEFAULT}
   bytes=$(LC_ALL=C; printf '%s' "${#msg}")
   errf=$(mktemp "$state/.subsuper-inject-err.XXXXXX" 2>/dev/null) || errf=
   INJECT_SUBMIT_ATTEMPTED=1
@@ -1514,7 +1514,7 @@ inject_msg() {  # <message> [state]
 
 # --- INJECT_SKIP prefix match (literal prefixes, no regex) ------------------
 should_force_self() {  # <reason>
-  local reason=$1 skip="${FM_INJECT_SKIP:-$INJECT_SKIP_DEFAULT}" prefix
+  local reason=$1 skip="${JG_INJECT_SKIP:-$INJECT_SKIP_DEFAULT}" prefix
   [ -n "$skip" ] || return 1
   local -a prefixes
   IFS='|' read -ra prefixes <<<"$skip"
@@ -1552,7 +1552,7 @@ handle_wake() {  # <reason> <state>
   local kind="" arg="" classification_failed=0 span_failure_repeat=0
   : > "$capture" || return 1
   if should_force_self "$reason"; then
-    log "wake force-self (FM_INJECT_SKIP): $reason"
+    log "wake force-self (JG_INJECT_SKIP): $reason"
     rm -f "$capture"
     return
   fi
@@ -1563,7 +1563,7 @@ handle_wake() {  # <reason> <state>
                 needs-decision:*) arg="${reason#needs-decision: }" ;;
                 *) arg="${reason#signal: }" ;;
               esac
-              decision=$(FM_STATUS_SPAN_ENDPOINT_FILE="$capture" classify_signal "$arg" "$state") ;;
+              decision=$(JG_STATUS_SPAN_ENDPOINT_FILE="$capture" classify_signal "$arg" "$state") ;;
     stale:*" (unread firstmate instruction: stuck-busy "*|stale:*" (steering-inbox busy bookkeeping unwritable: "*)
               decision="escalate|${reason#stale: }" ;;
     stale:*)  kind=stale; arg="${reason#stale: }"; stale_detail="${arg#"$arg"}"
@@ -1636,7 +1636,7 @@ handle_wake() {  # <reason> <state>
         # housekeeping re-escalates the same pane as a false wedge later.
         [ "$kind" = "stale" ] && stale_marker_remove "$arg" "$state"
         mark_escalated_seen "$state" "$capture" || classification_failed=1
-        [ "${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ] && { escalate_flush "$state" || true; }
+        [ "${JG_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}" -le 0 ] && { escalate_flush "$state" || true; }
       else
         classification_failed=1
       fi
@@ -1696,7 +1696,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
   local handled=0 failed=0 ack_through ack_generation
   out=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || return 1
   err=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || { rm -f "$out"; return 1; }
-  if ! "$FM_DAEMON_DIR/jg-wake-drain.sh" > "$out" 2> "$err"; then
+  if ! "$JG_DAEMON_DIR/jg-wake-drain.sh" > "$out" 2> "$err"; then
     cat "$err" >&2
     rm -f "$out" "$err"
     return 1
@@ -1724,7 +1724,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     log "wake drain omitted its generation-bound acknowledgement; retaining durable wakes"
     return 1
   fi
-  "$FM_DAEMON_DIR/jg-wake-drain.sh" --ack-through "$ack_through" \
+  "$JG_DAEMON_DIR/jg-wake-drain.sh" --ack-through "$ack_through" \
     --recovery-generation "$ack_generation"
 }
 
@@ -1737,9 +1737,9 @@ trim_log() {
   local sz tmp
   [ -n "${LOG:-}" ] || return 0
   sz=$(wc -c < "$LOG" 2>/dev/null) || return 0
-  [ "$sz" -ge "${FM_LOG_MAX_BYTES:-$LOG_MAX_BYTES_DEFAULT}" ] || return 0
+  [ "$sz" -ge "${JG_LOG_MAX_BYTES:-$LOG_MAX_BYTES_DEFAULT}" ] || return 0
   tmp=$(mktemp "${TMPDIR:-/tmp}/jg-daemon-log.XXXXXX") || return 0
-  tail -n "${FM_LOG_KEEP_LINES:-$LOG_KEEP_LINES_DEFAULT}" "$LOG" >"$tmp" 2>/dev/null && mv -f "$tmp" "$LOG"
+  tail -n "${JG_LOG_KEEP_LINES:-$LOG_KEEP_LINES_DEFAULT}" "$LOG" >"$tmp" 2>/dev/null && mv -f "$tmp" "$LOG"
 }
 
 # ============================================================================
@@ -1753,27 +1753,27 @@ jg_super_main() {
   mkdir -p "$STATE"
 
   # Source the portable lock helpers (works on macOS where flock is absent).
-  # Export FM_STATE_OVERRIDE so the lib resolves the same state dir.
+  # Export JG_STATE_OVERRIDE so the lib resolves the same state dir.
   # shellcheck source=bin/jg-wake-lib.sh
-  FM_STATE_OVERRIDE="$STATE" . "$FM_DAEMON_DIR/jg-wake-lib.sh"
+  JG_STATE_OVERRIDE="$STATE" . "$JG_DAEMON_DIR/jg-wake-lib.sh"
 
-  local WATCH="$FM_DAEMON_DIR/jg-watch.sh"
+  local WATCH="$JG_DAEMON_DIR/jg-watch.sh"
   local LOG="$STATE/.supervise-daemon.log"
   local WATCH_ERR="$STATE/.supervise-daemon.watcher.err"
   local LOCK="$STATE/.supervise-daemon.lock"
   local PIDFILE="$STATE/.supervise-daemon.pid"
-  local INJECT_FAIL_SLEEP=${FM_INJECT_FAIL_SLEEP:-$INJECT_FAIL_SLEEP_DEFAULT}
-  local CRASH_THRESHOLD=${FM_CRASH_THRESHOLD:-$CRASH_THRESHOLD_DEFAULT}
-  local CRASH_WINDOW=${FM_CRASH_WINDOW:-$CRASH_WINDOW_DEFAULT}
-  local CRASH_BACKOFF=${FM_CRASH_BACKOFF:-$CRASH_BACKOFF_DEFAULT}
-  local CRASH_NORMAL_SLEEP=${FM_CRASH_NORMAL_SLEEP:-$CRASH_NORMAL_SLEEP_DEFAULT}
+  local INJECT_FAIL_SLEEP=${JG_INJECT_FAIL_SLEEP:-$INJECT_FAIL_SLEEP_DEFAULT}
+  local CRASH_THRESHOLD=${JG_CRASH_THRESHOLD:-$CRASH_THRESHOLD_DEFAULT}
+  local CRASH_WINDOW=${JG_CRASH_WINDOW:-$CRASH_WINDOW_DEFAULT}
+  local CRASH_BACKOFF=${JG_CRASH_BACKOFF:-$CRASH_BACKOFF_DEFAULT}
+  local CRASH_NORMAL_SLEEP=${JG_CRASH_NORMAL_SLEEP:-$CRASH_NORMAL_SLEEP_DEFAULT}
 
   [ -x "$WATCH" ] || { echo "error: watcher not found or not executable: $WATCH" >&2; exit 1; }
 
   # --- single instance (portable lock, no flock dependency) ------------------
   if ! jg_lock_try_acquire "$LOCK"; then
-    if [ -n "${FM_LOCK_HELD_PID:-}" ]; then
-      echo "error: another jg-supervise-daemon is already running (pid $FM_LOCK_HELD_PID, lock $LOCK held)" >&2
+    if [ -n "${JG_LOCK_HELD_PID:-}" ]; then
+      echo "error: another jg-supervise-daemon is already running (pid $JG_LOCK_HELD_PID, lock $LOCK held)" >&2
     else
       echo "error: another jg-supervise-daemon is already running (lock $LOCK held)" >&2
     fi
@@ -1791,35 +1791,35 @@ jg_super_main() {
   fi
 
   # --- auto-discover the supervisor BACKEND (tmux vs herdr) first -----------
-  # Priority: FM_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > $HERDR_ENV=1
+  # Priority: JG_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > $HERDR_ENV=1
   # (herdr) > tmux fallback. Resolved before the target below, since target
   # discovery composes a herdr "<session>:<pane-id>" string using the same
   # $HERDR_PANE_ID/$HERDR_SESSION markers this checks. Exporting the result
-  # into FM_SUPERVISOR_BACKEND makes inject_msg/pane_is_busy/pane_input_pending
+  # into JG_SUPERVISOR_BACKEND makes inject_msg/pane_is_busy/pane_input_pending
   # (which read that env var) dispatch through the right backend without an
   # extra global thread-through.
   local discovered_backend backend_source
-  backend_source="FM_SUPERVISOR_BACKEND"
-  if [ -z "${FM_SUPERVISOR_BACKEND:-}" ]; then
+  backend_source="JG_SUPERVISOR_BACKEND"
+  if [ -z "${JG_SUPERVISOR_BACKEND:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       backend_source="TMUX_PANE"
     elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
       backend_source="HERDR_ENV"
     else
-      backend_source="FALLBACK($FM_SUPERVISOR_BACKEND_DEFAULT)"
+      backend_source="FALLBACK($JG_SUPERVISOR_BACKEND_DEFAULT)"
     fi
   fi
   discovered_backend=$(discover_supervisor_backend) || true
-  FM_SUPERVISOR_BACKEND="$discovered_backend"
-  local BACKEND="$FM_SUPERVISOR_BACKEND"
+  JG_SUPERVISOR_BACKEND="$discovered_backend"
+  local BACKEND="$JG_SUPERVISOR_BACKEND"
 
   # --- refuse an unsupported supervisor backend loudly, before ever trying a
   # tmux/herdr-specific call against it (zellij, orca, and cmux have no verified
   # composer/busy primitives wired up for this daemon yet - AGENTS.md section 4
   # harness-verification discipline). This is the clear refusal the task calls
   # for, instead of a confusing "does not resolve to a tmux pane" error.
-  if ! jg_backend_list_contains "$FM_SUPERVISOR_SUPPORTED_BACKENDS" "$BACKEND"; then
-    echo "error: away-mode daemon does not support supervisor backend '$BACKEND' yet (supported: $FM_SUPERVISOR_SUPPORTED_BACKENDS); set FM_SUPERVISOR_BACKEND=tmux|herdr and FM_SUPERVISOR_TARGET to run firstmate's own pane under a supported backend" >&2
+  if ! jg_backend_list_contains "$JG_SUPERVISOR_SUPPORTED_BACKENDS" "$BACKEND"; then
+    echo "error: away-mode daemon does not support supervisor backend '$BACKEND' yet (supported: $JG_SUPERVISOR_SUPPORTED_BACKENDS); set JG_SUPERVISOR_BACKEND=tmux|herdr and JG_SUPERVISOR_TARGET to run firstmate's own pane under a supported backend" >&2
     log "startup failed: unsupported supervisor backend '$BACKEND' (source=$backend_source)"
     jg_lock_release "$LOCK" 2>/dev/null || true
     rm -f "$PIDFILE" 2>/dev/null || true
@@ -1827,14 +1827,14 @@ jg_super_main() {
   fi
 
   # --- auto-discover the supervisor target (the pane running firstmate) -----
-  # Priority: FM_SUPERVISOR_TARGET override > $TMUX_PANE (tmux; inherited from
+  # Priority: JG_SUPERVISOR_TARGET override > $TMUX_PANE (tmux; inherited from
   # the pane that launched the daemon, normally firstmate's own) >
   # $HERDR_PANE_ID (herdr, composed into "<session>:<pane-id>") > firstmate:0
-  # fallback. Exporting the result into FM_SUPERVISOR_TARGET makes inject_msg
+  # fallback. Exporting the result into JG_SUPERVISOR_TARGET makes inject_msg
   # (which reads that env var) use the discovered pane without an extra global.
   local discovered target_source
-  target_source="FM_SUPERVISOR_TARGET"
-  if [ -z "${FM_SUPERVISOR_TARGET:-}" ]; then
+  target_source="JG_SUPERVISOR_TARGET"
+  if [ -z "${JG_SUPERVISOR_TARGET:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       target_source="TMUX_PANE"
     elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
@@ -1846,10 +1846,10 @@ jg_super_main() {
   if discovered=$(discover_supervisor_target); then
     : # resolved cleanly
   else
-    echo "warn: could not auto-discover supervisor pane (no FM_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
+    echo "warn: could not auto-discover supervisor pane (no JG_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
   fi
-  FM_SUPERVISOR_TARGET="$discovered"
-  local TARGET="$FM_SUPERVISOR_TARGET"
+  JG_SUPERVISOR_TARGET="$discovered"
+  local TARGET="$JG_SUPERVISOR_TARGET"
 
   # --- validate supervisor target at startup (a missing target is a typo) ---
   # Dispatches through bin/jg-backend.sh instead of a raw `tmux display-message`
@@ -1857,7 +1857,7 @@ jg_super_main() {
   # backend=tmux this runs the exact same `tmux display-message -p -t "$TARGET"
   # '#{pane_id}'` call as before.
   if ! jg_backend_target_exists "$BACKEND" "$TARGET"; then
-    echo "error: supervisor target '$TARGET' does not resolve to a $BACKEND pane; set FM_SUPERVISOR_TARGET" >&2
+    echo "error: supervisor target '$TARGET' does not resolve to a $BACKEND pane; set JG_SUPERVISOR_TARGET" >&2
     log "startup failed: target '$TARGET' not found (backend=$BACKEND)"
     jg_lock_release "$LOCK" 2>/dev/null || true
     rm -f "$PIDFILE" 2>/dev/null || true
@@ -1866,7 +1866,7 @@ jg_super_main() {
 
   local afk_status="off"
   afk_active "$STATE" && afk_status="on"
-  log "daemon starting (pid $$); target=$TARGET; target_source=$target_source; backend=$BACKEND; backend_source=$backend_source; afk=$afk_status; inject_skip='${FM_INJECT_SKIP:-$INJECT_SKIP_DEFAULT}'; stale_escalate=${FM_STALE_ESCALATE_SECS:-$STALE_ESCALATE_SECS_DEFAULT}s; batch=${FM_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}s"
+  log "daemon starting (pid $$); target=$TARGET; target_source=$target_source; backend=$BACKEND; backend_source=$backend_source; afk=$afk_status; inject_skip='${JG_INJECT_SKIP:-$INJECT_SKIP_DEFAULT}'; stale_escalate=${JG_STALE_ESCALATE_SECS:-$STALE_ESCALATE_SECS_DEFAULT}s; batch=${JG_ESCALATE_BATCH_SECS:-$ESCALATE_BATCH_SECS_DEFAULT}s"
   migrate_watcher_pause_markers "$STATE"
 
   # --- shutdown: flush buffered escalations, reap child, release lock -------
@@ -1971,12 +1971,12 @@ jg_super_main() {
     fi
 
     # --- one housekeeping tick (gated to HOUSEKEEPING_TICK), then poll -------
-    # The watcher child runs on its own FM_POLL cadence internally; we only need
+    # The watcher child runs on its own JG_POLL cadence internally; we only need
     # to detect its exit (the kill -0 above) promptly and run housekeeping often
     # enough that batch flushes, stale rechecks, and the catch-all scan fire on
     # cadence. Gating keeps a large fleet cheap between ticks.
     sleep 1
-    if [ "$(_file_age "$STATE/.subsuper-last-housekeep")" -ge "${FM_HOUSEKEEPING_TICK:-$HOUSEKEEPING_TICK_DEFAULT}" ]; then
+    if [ "$(_file_age "$STATE/.subsuper-last-housekeep")" -ge "${JG_HOUSEKEEPING_TICK:-$HOUSEKEEPING_TICK_DEFAULT}" ]; then
       _now > "$STATE/.subsuper-last-housekeep"
       housekeeping "$STATE"
     fi
@@ -1990,10 +1990,10 @@ else
   # Library mode: these functions were SOURCED (only tests do this - production
   # execs the daemon, see bin/jg-afk-start.sh). Make it structurally impossible
   # for a sourced context to fire a real desktop notification from the wedge
-  # alarm: default the FM_WEDGE_ALARM_EXEC notifier seam to "discard" unless the
+  # alarm: default the JG_WEDGE_ALARM_EXEC notifier seam to "discard" unless the
   # embedder already wired one (e.g. a recorder in tests/wake-helpers.sh). It is
   # exported so a real daemon a test later spawns inherits the safe default too.
   # The executed branch above never runs this, so production is untouched.
-  : "${FM_WEDGE_ALARM_EXEC:=discard}"
-  export FM_WEDGE_ALARM_EXEC
+  : "${JG_WEDGE_ALARM_EXEC:=discard}"
+  export JG_WEDGE_ALARM_EXEC
 fi

@@ -100,7 +100,7 @@ spawn_ship() {
   jg_test_spawn_brief "$HOME_DIR" "$id"
   signed_in_claude_root "$CASE/ambient-claude"
   : > "$CASE/launch.log"
-  FM_FAKE_LAUNCH_LOG="$CASE/launch.log" FM_TEST_CLAUDE_CONFIG_DIR="$CASE/ambient-claude" \
+  JG_FAKE_LAUNCH_LOG="$CASE/launch.log" JG_TEST_CLAUDE_CONFIG_DIR="$CASE/ambient-claude" \
     ANTHROPIC_API_KEY=ambient-invoker-key \
     jg_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$PROJ" --mode no-mistakes --yolo off "$@"
 }
@@ -372,7 +372,7 @@ test_local_secondmate_reads_the_launching_home_pin() {
   printf 'charter for %s\n' "$id" > "$sm/data/charter.md"
   printf '%s\n' "$CASE/sm-own" > "$sm/config/claude-account"
   signed_in_claude_root "$CASE/ambient-claude"
-  out=$(FM_FAKE_LAUNCH_LOG="$CASE/launch.log" FM_TEST_CLAUDE_CONFIG_DIR="$CASE/ambient-claude" \
+  out=$(JG_FAKE_LAUNCH_LOG="$CASE/launch.log" JG_TEST_CLAUDE_CONFIG_DIR="$CASE/ambient-claude" \
     jg_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$sm" --secondmate); rc=$?
   expect_code 0 "$rc" "a local secondmate spawn under the launching home's pin should succeed: $out"
   assert_contains "$out" "account=$CASE/work" "the secondmate spawn should report the launching home's pin"

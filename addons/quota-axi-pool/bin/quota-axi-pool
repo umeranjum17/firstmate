@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# PATH wrapper: with FM_HOME/config/account-pool, --json Claude row uses jg-model-pool's
+# PATH wrapper: with JG_HOME/config/account-pool, --json Claude row uses jg-model-pool's
 # claude-accounts reading (same pick/floors/credits refusal). Else exec upstream.
-# Env: FM_QUOTA_AXI_REAL, FM_MODEL_POOL, FM_QUOTA_AXI_POOL_UPSTREAM, FM_QUOTA_AXI_POOL_ATTEMPTED.
+# Env: JG_QUOTA_AXI_REAL, JG_MODEL_POOL, JG_QUOTA_AXI_POOL_UPSTREAM, JG_QUOTA_AXI_POOL_ATTEMPTED.
 set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 addons=$(cd "$here/../.." && pwd)
-model_pool=${FM_MODEL_POOL:-${FM_ADDONS_DIR:-$addons}/account-pool/bin/jg-model-pool}
-upstream_file=${FM_QUOTA_AXI_POOL_UPSTREAM:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-quota-axi-pool/upstream}
+model_pool=${JG_MODEL_POOL:-${JG_ADDONS_DIR:-$addons}/account-pool/bin/jg-model-pool}
+upstream_file=${JG_QUOTA_AXI_POOL_UPSTREAM:-${XDG_DATA_HOME:-$HOME/.local/share}/jg-quota-axi-pool/upstream}
 
 find_upstream() {
-  if [ -n "${FM_QUOTA_AXI_REAL:-}" ] && [ -x "$FM_QUOTA_AXI_REAL" ]; then printf '%s\n' "$FM_QUOTA_AXI_REAL"; return 0; fi
+  if [ -n "${JG_QUOTA_AXI_REAL:-}" ] && [ -x "$JG_QUOTA_AXI_REAL" ]; then printf '%s\n' "$JG_QUOTA_AXI_REAL"; return 0; fi
   if [ -r "$upstream_file" ]; then
     local s; s=$(head -n 1 "$upstream_file")
     [ -n "$s" ] && [ -x "$s" ] && { printf '%s\n' "$s"; return 0; }
@@ -27,13 +27,13 @@ find_upstream() {
 
 want_json=0 passthru=0
 for a in "$@"; do case "$a" in --json) want_json=1 ;; --version|-v|-V|--help|-h) passthru=1 ;; esac; done
-upstream=$(find_upstream) || { echo "quota-axi-pool: upstream quota-axi not found (set FM_QUOTA_AXI_REAL)" >&2; exit 127; }
-pool_config=${FM_HOME:+$FM_HOME/config/account-pool}
-if [ "$passthru" = 1 ] || [ -z "${FM_HOME:-}" ] || [ ! -f "${pool_config:-}" ] || [ ! -x "$model_pool" ]; then
+upstream=$(find_upstream) || { echo "quota-axi-pool: upstream quota-axi not found (set JG_QUOTA_AXI_REAL)" >&2; exit 127; }
+pool_config=${JG_HOME:+$JG_HOME/config/account-pool}
+if [ "$passthru" = 1 ] || [ -z "${JG_HOME:-}" ] || [ ! -f "${pool_config:-}" ] || [ ! -x "$model_pool" ]; then
   exec "$upstream" "$@"
 fi
 
-attempted=${FM_QUOTA_AXI_POOL_ATTEMPTED:-[]}
+attempted=${JG_QUOTA_AXI_POOL_ATTEMPTED:-[]}
 case "$attempted" in \[*\]) ;; *) attempted='[]' ;; esac
 req=$(jq -nc --arg p "$pool_config" --argjson a "$attempted" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:$a}')
 pick=$(printf '%s' "$req" | "$model_pool" pick --json 2>/dev/null) || pick=''
@@ -56,7 +56,7 @@ fi
 state=
 while IFS= read -r line || [ -n "$line" ]; do case "$line" in state=*) state=${line#state=} ;; esac; done <"$pool_config"
 reading=
-for cand in ${FM_HOME:+"$FM_HOME/state/claude-accounts.json"} ${state:+"$state/claude-accounts.json"}; do
+for cand in ${JG_HOME:+"$JG_HOME/state/claude-accounts.json"} ${state:+"$state/claude-accounts.json"}; do
   [ -n "${cand:-}" ] && [ -r "$cand" ] || continue
   reading=$cand; break
 done

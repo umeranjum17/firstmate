@@ -11,14 +11,14 @@ irreversible or security-sensitive work, and on work waiting for your own review
 whose evidence-gate PASS is a not-proven PASS — the installed `checks-lint.sh` reads the PR's newest `## Checks`
 block itself (filing the proof gap stays with the lead). Then it runs, in this order and as separate sequential commands, never piped and never in parallel:
 
-1. `FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task>` — the PR's changed-file count is read first:
+1. `JG_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task>` — the PR's changed-file count is read first:
    one page (100 files or fewer) runs pinned done-done-axi 0.6.17 with the Firstmate size rules, while a
    bigger PR, or one whose count cannot be read, runs the add-on `jg-checks-lint.sh`, which measures every
    pull-files page; the legacy lint stays the last fallback when done-done is unavailable;
    the evidence gate must print PASS.
 2. `state/<task>.run-receipt.json` must read verdict PASS, head == the meta's `pr_head`, and
    spawn_gen == the meta's `spawn_gen`.
-3. `FM_HOME=<home> <home>/bin/jg-pr-merge.sh <task> <PR URL>` — the merge goes through
+3. `JG_HOME=<home> <home>/bin/jg-pr-merge.sh <task> <PR URL>` — the merge goes through
    `bin/jg-pr-merge.sh` only, so its live green check, head pin and refusal rules stay in charge.
    No `--auto` is ever passed, `gh merge` is never called directly, and a refusal is never
    bypassed.
@@ -34,7 +34,7 @@ teardown), and appends the normal `done [at=<epoch>]: merged <PR URL>` line to `
 so the lead relays it. Nothing is printed
 when nothing happened. One merge attempt per task per head: the attempted head is remembered in
 `<home>/data/jg-merge-on-green/<task>.head`, so a refused head stays quiet until the lead pushes a
-new one. Every command is bounded with `timeout` (a third of `FM_CHECK_TIMEOUT` each, floor 5 s):
+new one. Every command is bounded with `timeout` (a third of `JG_CHECK_TIMEOUT` each, floor 5 s):
 gate commands start only before 80% of the bound, a merge only when it fits inside the whole bound,
 so the watcher's kill can at worst cut a gate command (harmlessly retried next sweep), never a
 merge.
@@ -63,11 +63,11 @@ installs it from merged main, never from a branch.
 
 `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end against a fixture home
 with a stub `jg-crew-state.sh` and `jg-pr-merge.sh` in the home's `bin/` and a stub
-`jg-checks-lint.sh` behind `FM_MOG_CHECKS_LINT`. It covers: `yolo=off`, `merge=manual` skipped with
+`jg-checks-lint.sh` behind `JG_MOG_CHECKS_LINT`. It covers: `yolo=off`, `merge=manual` skipped with
 nothing linted or merged, a "not proven" gate PASS skipping the task silently before the receipt or
 merge and merging once the gate returns a plain PASS, lint FAIL -> no
 merge and one wake line, receipt head mismatch -> no merge, all gates pass -> `jg-pr-merge` called
 once with exactly the task and PR URL and the merged line written, the same head never retried after a merge or a refusal, a
 gate refusal waking once per task+head+reason+receipt state with repeats silent and a changed
 reason, receipt or head waking again, and `install.sh` in both `--dry-run` and real mode (register
-runs with `FM_STATE_OVERRIDE` unset, the shim execs the installed script with the home).
+runs with `JG_STATE_OVERRIDE` unset, the shim execs the installed script with the home).

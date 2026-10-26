@@ -34,9 +34,9 @@ pass() {
   printf 'ok - %s\n' "$1"
 }
 
-jg_live_gate opt-in FM_ROVO_SIGNALS_LIVE python3
+jg_live_gate opt-in JG_ROVO_SIGNALS_LIVE python3
 
-[ -x "$ROVO_BIN" ] || fail "FM_ROVO_SIGNALS_LIVE=1 but no real rovo executable is installed"
+[ -x "$ROVO_BIN" ] || fail "JG_ROVO_SIGNALS_LIVE=1 but no real rovo executable is installed"
 
 VERSION_OUT=$("$ROVO_BIN" --version 2>&1) || fail "rovo --version failed: $VERSION_OUT"
 echo "BOOTSTRAP_INFO: live rovo version: $VERSION_OUT"

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update the limit-prompt-move check for this user and point a firstmate home's
 # state/limit-prompt-move.check.sh at it through an exec shim (a replaced check is backed up), then register it.
 # --all reaches every active home from <jg-home>: the home itself and each local secondmate home its
@@ -27,7 +36,7 @@ homes() {
     [[ $line =~ $re ]] || continue
     name=${BASH_REMATCH[1]} dir=${BASH_REMATCH[3]}
     if [ -n "${BASH_REMATCH[2]}" ]; then echo "skipped: $name: a remote home, install it on its host" >&2
-    elif FM_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
+    elif JG_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
     else printf '%s\t%s\n' "$name" "$dir"
     fi
   done <"$FMH/data/secondmates.md"
@@ -50,7 +59,7 @@ while IFS=$'\t' read -r name home; do
   fi
   printf '%s\n' "$shim" >"$check"
   chmod 700 "$check"
-  if env -u FM_STATE_OVERRIDE FM_HOME="$home" "$home/bin/jg-check-register.sh" "$ID" >/dev/null; then
+  if env -u JG_STATE_OVERRIDE JG_HOME="$home" "$home/bin/jg-check-register.sh" "$ID" >/dev/null; then
     echo "installed: $name: $check -> $DEST/$ID/check.sh"
   else
     echo "failed: $name: $home/bin/jg-check-register.sh $ID refused the check" >&2; fails=$((fails + 1))

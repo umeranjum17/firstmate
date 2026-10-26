@@ -28,9 +28,9 @@ jg_install_stub_uname() {
   cat > "$fakebin/uname" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  -s) printf '%s\n' "${FM_TEST_UNAME_S:-Linux}" ;;
-  -m) printf '%s\n' "${FM_TEST_UNAME_M:-x86_64}" ;;
-  *) printf '%s\n' "${FM_TEST_UNAME_S:-Linux}" ;;
+  -s) printf '%s\n' "${JG_TEST_UNAME_S:-Linux}" ;;
+  -m) printf '%s\n' "${JG_TEST_UNAME_M:-x86_64}" ;;
+  *) printf '%s\n' "${JG_TEST_UNAME_S:-Linux}" ;;
 esac
 SH
   chmod +x "$fakebin/uname"
@@ -306,7 +306,7 @@ test_installer_retries_transient_download_failure() {
 
   out=$(CURL_COUNT="$tmp/curl-count" CURL_FAIL_UNTIL=3 \
     SHA256_STUB_HASH="$ACTIONLINT_SHA_LINUX_AMD64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) \
     || fail "installer did not recover from a transient download failure"$'\n'"$out"
   [ "$(cat "$tmp/curl-count")" -eq 4 ] || fail "installer did not recover after three failed downloads"
@@ -333,7 +333,7 @@ test_installer_selects_platform_archive_url_and_checksum() {
     rm -rf "$destination"
     : > "$url_log"
     out=$(CURL_URL_LOG="$url_log" SHA256_STUB_HASH="$sha" \
-      FM_TEST_UNAME_S="$uname_s" FM_TEST_UNAME_M="$uname_m" \
+      JG_TEST_UNAME_S="$uname_s" JG_TEST_UNAME_M="$uname_m" \
       PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) \
       || fail "installer failed for ${uname_s}/${uname_m}"$'\n'"$out"
     assert_contains "$(cat "$url_log")" "$archive" \
@@ -369,7 +369,7 @@ test_installer_rejects_wrong_checksum() {
 
   rc=0
   out=$(SHA256_STUB_HASH=0000000000000000000000000000000000000000000000000000000000000000 \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted a wrong checksum"$'\n'"$out"
   assert_contains "$out" "checksum mismatch" "installer did not report a checksum mismatch"
@@ -400,7 +400,7 @@ test_installer_falls_back_to_shasum() {
   : > "$hasher_log"
   out=$(CURL_URL_LOG="$tmp/curl-url.log" HASHER_LOG="$hasher_log" \
     SHA256_STUB_HASH="$ACTIONLINT_SHA_LINUX_AMD64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin" "$INSTALLER" "$destination" 2>&1) \
     || fail "installer did not fall back to shasum -a 256"$'\n'"$out"
   assert_grep 'shasum -a 256' "$hasher_log" "installer did not invoke shasum -a 256"
@@ -425,7 +425,7 @@ test_installer_prefers_sha256sum_over_shasum() {
   : > "$hasher_log"
   PATH="$fakebin:$PATH" HASHER_LOG="$hasher_log" \
     SHA256_STUB_HASH="$ACTIONLINT_SHA_LINUX_AMD64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     "$INSTALLER" "$destination" >/dev/null \
     || fail "installer failed when both hashers were present"
   assert_grep 'sha256sum' "$hasher_log" "installer did not prefer sha256sum"
@@ -445,14 +445,14 @@ test_installer_rejects_unsupported_platform() {
   jg_install_stub_curl "$fakebin"
 
   rc=0
-  out=$(FM_TEST_UNAME_S=FreeBSD FM_TEST_UNAME_M=amd64 \
+  out=$(JG_TEST_UNAME_S=FreeBSD JG_TEST_UNAME_M=amd64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted an unsupported OS"$'\n'"$out"
   assert_contains "$out" "unsupported platform" "installer did not name the unsupported platform"
   assert_contains "$out" "FreeBSD-amd64" "installer did not report the detected OS/arch"
 
   rc=0
-  out=$(FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=ppc64le \
+  out=$(JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=ppc64le \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted an unsupported architecture"$'\n'"$out"
   assert_contains "$out" "unsupported platform" "installer did not reject linux/ppc64le"
@@ -481,7 +481,7 @@ case "$*" in
   "rev-parse --verify -q origin/main") exit 0 ;;
   "merge-base "*) printf 'fakebase123\n'; exit 0 ;;
   "diff --name-only --diff-filter=ACMR -z fakebase123 --")
-    [ -n "${FM_TEST_GIT_DIFF_FILE:-}" ] && cat "${FM_TEST_GIT_DIFF_FILE}"
+    [ -n "${JG_TEST_GIT_DIFF_FILE:-}" ] && cat "${JG_TEST_GIT_DIFF_FILE}"
     exit 0
     ;;
   *) exit 0 ;;
@@ -504,8 +504,8 @@ SH
   : > "$diff_file"
 
   rc=0
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$tmp/bin/jg-lint.sh" 2>&1) || rc=$?
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" "$tmp/bin/jg-lint.sh" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "jg-lint.sh default path missed a broken ci.yml"$'\n'"$out"
   assert_contains "$out" "could not parse as YAML" \
     "jg-lint.sh default path did not surface the workflow YAML error"

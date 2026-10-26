@@ -84,7 +84,7 @@ if (@ARGV && $ARGV[0] eq 'handoff') {
   dup2(fileno($inbox), 8) >= 0 or die "cannot install inbox descriptor\n";
   dup2(fileno($result), 9) >= 0 or die "cannot install result descriptor\n";
   chdir($inbox) or die "cannot restore inbox\n";
-  delete @ENV{grep { /^FM_PROCEVENT_INTERNAL_CAPTURE_/ } keys %ENV};
+  delete @ENV{grep { /^JG_PROCEVENT_INTERNAL_CAPTURE_/ } keys %ENV};
   exec {$host} $host, @command;
   die "cannot execute host\n";
 }

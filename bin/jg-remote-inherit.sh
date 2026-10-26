@@ -12,7 +12,7 @@
 # quarantined before removal or before replacing bytes not last published here.
 set -eu
 
-FM_HOME=${FM_HOME:?FM_HOME is required}
+JG_HOME=${JG_HOME:?JG_HOME is required}
 MAX_BYTES=1048576
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -30,7 +30,7 @@ sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi
 }
 # Writable set, derived from the ONE declared inherited-material owner
-# (FM_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh), so this code root's
+# (JG_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh), so this code root's
 # receiver and sender cannot drift silently. This runs under the remote
 # entrypoint's fixed empty environment, so the declaration is this code root's
 # own, never something the caller can widen over SSH; a caller from a different
@@ -60,13 +60,13 @@ case "$EXPECTED_HASH" in ''|*[!A-Fa-f0-9]*) die "expected SHA-256 is invalid" ;;
 EXPECTED_HASH=$(printf '%s' "$EXPECTED_HASH" | tr 'A-F' 'a-f')
 case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;; esac
 [ "${#GENERATION}" -le 18 ] && [ "$GENERATION" -ge 1 ] || die "generation is outside the supported range"
-HOME_REAL=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || die "FM_HOME is unavailable"
+HOME_REAL=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || die "JG_HOME is unavailable"
 PARENT="$HOME_REAL/$(dirname "$REL")"
 # The captain accepts this config/data parent TOCTOU within Firstmate's single-user trust boundary.
 [ ! -L "$PARENT" ] || die "inherited destination parent is a symlink"
 mkdir -p "$PARENT" || die "cannot create inherited destination parent"
 PARENT_REAL=$(CDPATH='' cd -- "$PARENT" && pwd -P)
-case "$PARENT_REAL" in "$HOME_REAL/config"|"$HOME_REAL/data") ;; *) die "inherited destination escapes FM_HOME" ;; esac
+case "$PARENT_REAL" in "$HOME_REAL/config"|"$HOME_REAL/data") ;; *) die "inherited destination escapes JG_HOME" ;; esac
 DEST="$PARENT_REAL/$(basename "$REL")"
 [ ! -L "$DEST" ] || die "inherited destination is a symlink"
 if [ -e "$DEST" ]; then

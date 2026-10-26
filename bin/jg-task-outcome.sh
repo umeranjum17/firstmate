@@ -31,13 +31,13 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ "$#" -eq 0 ] || [ -f "${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}/$1.meta" ] || exit 0
+[ "$#" -eq 0 ] || [ -f "${JG_STATE_OVERRIDE:-${JG_HOME:-${JG_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}/$1.meta" ] || exit 0
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 usage() {
   echo "usage: jg-task-outcome.sh <task-id> [--force]" >&2
@@ -80,8 +80,8 @@ PROJECT=${PROJECT##*/}
 
 PR=$(awk -F= '$1 == "pr" { sub(/^[^=]*=/, ""); v=$0 } END { print v }' "$META" 2>/dev/null || true)
 
-if [ -f "$FM_HOME/.jg-secondmate-home" ] && [ ! -L "$FM_HOME/.jg-secondmate-home" ]; then
-  HOME_NAME=$(head -n 1 "$FM_HOME/.jg-secondmate-home" 2>/dev/null | tr -d '\r\n')
+if [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ]; then
+  HOME_NAME=$(head -n 1 "$JG_HOME/.jg-secondmate-home" 2>/dev/null | tr -d '\r\n')
 else
   HOME_NAME=main
 fi

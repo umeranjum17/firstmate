@@ -467,7 +467,7 @@ The Bearings inventory-reconcile hook therefore handles these markerless routes 
 Send routed requests normally:
 
 ```sh
-FM_HOME=<primary-home> bin/jg-send.sh jg-<id> '<request>'
+JG_HOME=<primary-home> bin/jg-send.sh jg-<id> '<request>'
 ```
 
 The [`jg-send.sh` header](../bin/jg-send.sh) owns the exact delivery-status contract.
@@ -477,7 +477,7 @@ Exit 0 means the record durably exists.
 
 ### Retries and safe resends
 
-Every remote transport attempt is bounded by `FM_SEND_REMOTE_BUDGET`.
+Every remote transport attempt is bounded by `JG_SEND_REMOTE_BUDGET`.
 The `jg-send.sh` header owns the setting's default and validation contract.
 
 | Outcome | Retry behavior |
@@ -487,7 +487,7 @@ The `jg-send.sh` header owns the setting's default and validation contract.
 
 Either outcome preserves this ordinary reply-bearing request's pending-reply expectation for the record that may have landed.
 
-If delivery remains unconfirmed, only the exact `FM_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe to run later.
+If delivery remains unconfirmed, only the exact `JG_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe to run later.
 That command preserves the request body and lets the remote enqueue deduplicate onto the same record.
 A plain rerun mints a different correlation and is not idempotent.
 When deduplication finds that the worker already moved the matching record into `handled/`, the resend exits successfully without ringing the doorbell again.

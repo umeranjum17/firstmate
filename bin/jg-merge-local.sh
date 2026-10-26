@@ -21,9 +21,9 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-dod-lib.sh
@@ -36,14 +36,14 @@ if [ "$#" -ne 1 ] || ! jg_pr_task_id_valid "$1"; then
 fi
 ID=$1
 jg_backlog_directory_present "$STATE" "state directory" || {
-  echo "error: local merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: local merge refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 }
 META="$STATE/$ID.meta"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
-"$FM_ROOT/bin/jg-guard.sh" || true
+"$JG_ROOT/bin/jg-guard.sh" || true
 # Role partition: landing local-only work is MAIN-owned; the Pi supervision
 # branch reports readiness and never lands (contract: bin/jg-lease-lib.sh;
 # no-op in homes without a branch actor). This action is deliberately NOT
@@ -57,10 +57,10 @@ jg_lease_forbid_branch "local-only landing (jg-merge-local)"
 
 [ -f "$META" ] || { echo "error: no meta for task $ID at $META" >&2; exit 1; }
 if ! jg_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: local merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: local merge refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 fi
-MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
+MERGE_EXPECTED_SPAWN_GEN=$JG_BACKLOG_META_SPAWN_GEN
 
 MERGE_CONTROL_LOCK=
 merge_control_cleanup() {
@@ -70,10 +70,10 @@ trap merge_control_cleanup EXIT
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 jg_lock_acquire_wait "$MERGE_CONTROL_LOCK"
 if ! jg_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
+  echo "error: task $ID changed while waiting to merge; refusing: $JG_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
 fi
-if [ "$FM_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
+if [ "$JG_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
   echo "error: task $ID changed incarnation while waiting to merge; refusing" >&2
   exit 1
 fi
@@ -126,7 +126,7 @@ fi
 
 before=$(git -C "$PROJ" rev-parse --short "$DEFAULT")
 hold_status=0
-FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
   "$SCRIPT_DIR/jg-captain-hold.sh" open "$ID" --distinguish-absent || hold_status=$?
 case "$hold_status" in
   0)
@@ -141,7 +141,7 @@ case "$hold_status" in
 esac
 candidate=$(git -C "$PROJ" rev-parse --verify "refs/heads/$BRANCH^{commit}")
 if declare -F jg_dod_receipt_accept >/dev/null; then jg_dod_receipt_accept "$STATE" "$ID" "$META" "$candidate" >&2 || exit 1; fi
-if declare -F jg_dod_merge_gate >/dev/null; then jg_dod_merge_gate "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$FM_HOME" "$ID" "$META" "$candidate" - >&2 || exit 1; fi
+if declare -F jg_dod_merge_gate >/dev/null; then jg_dod_merge_gate "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$JG_HOME" "$ID" "$META" "$candidate" - >&2 || exit 1; fi
 merge_status=0
 git -C "$PROJ" merge --ff-only "$candidate" >/dev/null || merge_status=$?
 jg_lock_release "$MERGE_CONTROL_LOCK" || true
@@ -149,8 +149,8 @@ MERGE_CONTROL_LOCK=
 [ "$merge_status" -eq 0 ] || exit "$merge_status"
 after=$(git -C "$PROJ" rev-parse --short "$DEFAULT")
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
-[ ! -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-fleet-ledger.sh" merged "$ID" local || true
+[ ! -e "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-fleet-ledger.sh" merged "$ID" local || true
 # A local-only landing has no PR; the ticket closes here instead of at the next poll.
-FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" || true
-if [ "$before" != "$after" ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$FM_HOME" "$ID" "$META" "$candidate" - >&2; fi
+JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage "done" --state "done" || true
+if [ "$before" != "$after" ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$JG_HOME" "$ID" "$META" "$candidate" - >&2; fi
 echo "merged $BRANCH into local $DEFAULT ($before -> $after) in $PROJ"

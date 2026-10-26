@@ -22,7 +22,7 @@
 # Mark the pull request ready for review, then arm again; a lane that keeps a
 # draft on purpose declares a wait instead of reporting done. An unreadable
 # draft state does not refuse, matching how the head read below is optional.
-# bin/jg-pr-merge.sh records through this script with FM_PR_CHECK_MERGE=1 and
+# bin/jg-pr-merge.sh records through this script with JG_PR_CHECK_MERGE=1 and
 # skips this refusal, because its own merge-time draft refusal is authoritative.
 # The recorded pr= also frees the task's place in a declared project capacity
 # (bin/jg-project-capacity-lib.sh).
@@ -30,9 +30,9 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -53,11 +53,11 @@ if ! jg_pr_task_id_valid "$ID" || ! jg_pr_url_parse "$RAW_URL"; then
   echo "error: invalid PR check request" >&2
   exit 2
 fi
-URL=$FM_PR_URL
-PROVIDER=$FM_PR_PROVIDER
-HOST=$FM_PR_HOST
-PROJECT_PATH=$FM_PR_PATH
-NUMBER=$FM_PR_NUMBER
+URL=$JG_PR_URL
+PROVIDER=$JG_PR_PROVIDER
+HOST=$JG_PR_HOST
+PROJECT_PATH=$JG_PR_PATH
+NUMBER=$JG_PR_NUMBER
 
 # Task-derived paths are constructed only after the canonical ID validation.
 META="$STATE/$ID.meta"
@@ -129,7 +129,7 @@ fi
 
 # The draft state is read before anything is recorded or armed. Only a positive
 # draft reading refuses, because an unreadable one must not block arming.
-if [ "$PROVIDER" = github ] && [ "${FM_PR_CHECK_MERGE:-}" != 1 ] && command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+if [ "$PROVIDER" = github ] && [ "${JG_PR_CHECK_MERGE:-}" != 1 ] && command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
   DRAFT_JSON=$(gh pr view "$URL" --json isDraft 2>/dev/null || true)
   if [ "$(jg_pr_json_draft_state "$DRAFT_JSON")" = true ]; then
     echo "error: $URL is a draft pull request; a draft cannot be merged, so merge monitoring would wait for an event that cannot occur - mark it ready for review and arm again, or declare a wait instead of done if the draft is deliberate" >&2
@@ -137,7 +137,7 @@ if [ "$PROVIDER" = github ] && [ "${FM_PR_CHECK_MERGE:-}" != 1 ] && command -v g
   fi
 fi
 
-"$FM_ROOT/bin/jg-guard.sh" || true
+"$JG_ROOT/bin/jg-guard.sh" || true
 
 # pr_head is recorded only when the forge's CLI can supply it. gh exposes the
 # head commit as a selectable field; plain glab exposes it only inside its JSON
@@ -237,17 +237,17 @@ printf 'pr=%s\n' "$URL" >> "$META_TMP" || exit 1
 chmod 0600 "$META_TMP" || exit 1
 jg_pr_private_file_valid "$META_TMP" 600 "$STATE_DEVICE" || exit 1
 jg_pr_metadata_identity_parse "$META_TMP" || exit 1
-[ "$FM_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$FM_PR_META_URL" = "$URL" ] \
-  && [ "$FM_PR_META_HOST" = "$HOST" ] && [ "$FM_PR_META_PATH" = "$PROJECT_PATH" ] \
-  && [ "$FM_PR_META_NUMBER" = "$NUMBER" ] || exit 1
+[ "$JG_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$JG_PR_META_URL" = "$URL" ] \
+  && [ "$JG_PR_META_HOST" = "$HOST" ] && [ "$JG_PR_META_PATH" = "$PROJECT_PATH" ] \
+  && [ "$JG_PR_META_NUMBER" = "$NUMBER" ] || exit 1
 jg_pr_regular_destination_on_device_or_absent "$META" "$STATE_DEVICE" || exit 1
 mv -f -- "$META_TMP" "$META" || exit 1
 META_TMP=
 jg_pr_private_file_valid "$META" 600 "$STATE_DEVICE" || exit 1
 jg_pr_metadata_identity_parse "$META" || exit 1
-[ "$FM_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$FM_PR_META_URL" = "$URL" ] \
-  && [ "$FM_PR_META_HOST" = "$HOST" ] && [ "$FM_PR_META_PATH" = "$PROJECT_PATH" ] \
-  && [ "$FM_PR_META_NUMBER" = "$NUMBER" ] || exit 1
+[ "$JG_PR_META_PROVIDER" = "$PROVIDER" ] && [ "$JG_PR_META_URL" = "$URL" ] \
+  && [ "$JG_PR_META_HOST" = "$HOST" ] && [ "$JG_PR_META_PATH" = "$PROJECT_PATH" ] \
+  && [ "$JG_PR_META_NUMBER" = "$NUMBER" ] || exit 1
 jg_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 
@@ -265,8 +265,8 @@ else
 fi
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 # The merge-time re-record is not a new review-ready PR, so it writes nothing.
-[ ! -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] || [ "${FM_PR_CHECK_MERGE:-}" = 1 ] \
-  || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-fleet-ledger.sh" pr_ready "$ID" "$URL" || true
+[ ! -e "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/fleet-ledger" ] || [ "${JG_PR_CHECK_MERGE:-}" = 1 ] \
+  || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-fleet-ledger.sh" pr_ready "$ID" "$URL" || true
 # The contribution observer uses the same authenticated check mechanism and
 # owns verdict freshness, required actors and external feedback separately from
 # the exact merged-state poll. Registration is local and performs no forge read.
@@ -289,7 +289,7 @@ PR_YOLO=$(grep '^yolo=' "$META" | tail -1 | cut -d= -f2- || true)
 [ -z "$PR_MODE" ] || READY_LINE="$READY_LINE mode=$(jg_parent_channel_clean_note "$PR_MODE")"
 [ -z "$PR_YOLO" ] || READY_LINE="$READY_LINE yolo=$(jg_parent_channel_clean_note "$PR_YOLO")"
 READY_RC=0
-jg_parent_channel_report "$FM_HOME" "$STATE" "$READY_LINE" || READY_RC=$?
+jg_parent_channel_report "$JG_HOME" "$STATE" "$READY_LINE" || READY_RC=$?
 case "$READY_RC" in
   0|1) ;;
   *) printf 'actionable: PR %s is registered but its ready line did not reach the parent channel (rc=%s)\n' "$URL" "$READY_RC" >&2 ;;

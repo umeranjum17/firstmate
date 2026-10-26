@@ -7,7 +7,7 @@
 #
 # The caller must already own this Firstmate home's session lock. This script is
 # home-local and considers only the current named Herdr session and ordinary
-# state/*.herdr-presentation journals in the effective FM_HOME. Each candidate
+# state/*.herdr-presentation journals in the effective JG_HOME. Each candidate
 # is additionally serialized by the existing state/.spawn-<task>.lock and the
 # shared named-session Herdr presentation lock, in that order.
 #
@@ -26,9 +26,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
@@ -60,67 +60,67 @@ jg_herdr_cleanup_title_token() { # <workspace-title>
 }
 
 jg_herdr_cleanup_home_identity() {
-  [ -d "$FM_HOME" ] && [ ! -L "$FM_HOME" ] || return 1
-  (cd "$FM_HOME" 2>/dev/null && pwd -P)
+  [ -d "$JG_HOME" ] && [ ! -L "$JG_HOME" ] || return 1
+  (cd "$JG_HOME" 2>/dev/null && pwd -P)
 }
 
 jg_herdr_cleanup_journal_matches() { # <title> <session> <home-real>
   local title=$1 session=$2 home_real=$3 journal id expected journal_home
   [ -d "$STATE" ] && [ ! -L "$STATE" ] || return 1
-  for journal in "$STATE"/*"$FM_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX"; do
+  for journal in "$STATE"/*"$JG_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX"; do
     [ -f "$journal" ] && [ ! -L "$journal" ] || continue
-    id=$(basename "$journal" "$FM_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX")
+    id=$(basename "$journal" "$JG_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX")
     jg_task_id_creation_valid "$id" || continue
     jg_backend_herdr_projection_journal_snapshot "$journal" "$id" || continue
-    if [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 2 ]; then
+    if [ "$JG_BACKEND_HERDR_JOURNAL_VERSION" = 2 ]; then
       journal_home=$(jg_backend_herdr_projection_home_identity \
-        "$FM_BACKEND_HERDR_JOURNAL_HOME" 2>/dev/null) || continue
+        "$JG_BACKEND_HERDR_JOURNAL_HOME" 2>/dev/null) || continue
       [ "$journal_home" = "$home_real" ] \
-        && [ "$FM_BACKEND_HERDR_JOURNAL_SESSION" = "$session" ] || continue
+        && [ "$JG_BACKEND_HERDR_JOURNAL_SESSION" = "$session" ] || continue
     fi
     expected=$(jg_backend_herdr_projection_workspace_label \
-      "$id" "$FM_BACKEND_HERDR_JOURNAL_PROJECTION_ID")
+      "$id" "$JG_BACKEND_HERDR_JOURNAL_PROJECTION_ID")
     [ "$expected" = "$title" ] || continue
-    printf '%s\t%s\t%s\n' "$journal" "$id" "$FM_BACKEND_HERDR_JOURNAL_PROJECTION_ID"
+    printf '%s\t%s\t%s\n' "$journal" "$id" "$JG_BACKEND_HERDR_JOURNAL_PROJECTION_ID"
   done
 }
 
 jg_herdr_cleanup_unique_match() { # <title> <session> <home-real>
   local title=$1 session=$2 home_real=$3 matches count record
-  FM_HERDR_CLEANUP_JOURNAL=
-  FM_HERDR_CLEANUP_ID=
-  FM_HERDR_CLEANUP_TOKEN=
-  FM_HERDR_CLEANUP_VERSION=
-  FM_HERDR_CLEANUP_BOUND_WORKSPACE=
-  FM_HERDR_CLEANUP_BOUND_TAB=
-  FM_HERDR_CLEANUP_BOUND_PANE=
+  JG_HERDR_CLEANUP_JOURNAL=
+  JG_HERDR_CLEANUP_ID=
+  JG_HERDR_CLEANUP_TOKEN=
+  JG_HERDR_CLEANUP_VERSION=
+  JG_HERDR_CLEANUP_BOUND_WORKSPACE=
+  JG_HERDR_CLEANUP_BOUND_TAB=
+  JG_HERDR_CLEANUP_BOUND_PANE=
   matches=$(jg_herdr_cleanup_journal_matches "$title" "$session" "$home_real") || return 1
   count=$(printf '%s\n' "$matches" | awk 'NF { n++ } END { print n+0 }')
   [ "$count" -eq 1 ] || return 1
   record=$(printf '%s\n' "$matches" | awk 'NF { print; exit }')
-  FM_HERDR_CLEANUP_JOURNAL=${record%%$'\t'*}
+  JG_HERDR_CLEANUP_JOURNAL=${record%%$'\t'*}
   record=${record#*$'\t'}
-  FM_HERDR_CLEANUP_ID=${record%%$'\t'*}
-  FM_HERDR_CLEANUP_TOKEN=${record#*$'\t'}
-  [ -n "$FM_HERDR_CLEANUP_JOURNAL" ] \
-    && [ -n "$FM_HERDR_CLEANUP_ID" ] \
-    && [ -n "$FM_HERDR_CLEANUP_TOKEN" ] || return 1
+  JG_HERDR_CLEANUP_ID=${record%%$'\t'*}
+  JG_HERDR_CLEANUP_TOKEN=${record#*$'\t'}
+  [ -n "$JG_HERDR_CLEANUP_JOURNAL" ] \
+    && [ -n "$JG_HERDR_CLEANUP_ID" ] \
+    && [ -n "$JG_HERDR_CLEANUP_TOKEN" ] || return 1
   jg_backend_herdr_projection_journal_snapshot \
-    "$FM_HERDR_CLEANUP_JOURNAL" "$FM_HERDR_CLEANUP_ID" || return 1
-  [ "$FM_BACKEND_HERDR_JOURNAL_PROJECTION_ID" = "$FM_HERDR_CLEANUP_TOKEN" ] || return 1
-  FM_HERDR_CLEANUP_VERSION=$FM_BACKEND_HERDR_JOURNAL_VERSION
-  if [ "$FM_HERDR_CLEANUP_VERSION" = 2 ]; then
-    FM_HERDR_CLEANUP_BOUND_WORKSPACE=$FM_BACKEND_HERDR_JOURNAL_WORKSPACE_ID
-    FM_HERDR_CLEANUP_BOUND_TAB=$FM_BACKEND_HERDR_JOURNAL_TAB_ID
-    FM_HERDR_CLEANUP_BOUND_PANE=$FM_BACKEND_HERDR_JOURNAL_PANE_ID
+    "$JG_HERDR_CLEANUP_JOURNAL" "$JG_HERDR_CLEANUP_ID" || return 1
+  [ "$JG_BACKEND_HERDR_JOURNAL_PROJECTION_ID" = "$JG_HERDR_CLEANUP_TOKEN" ] || return 1
+  JG_HERDR_CLEANUP_VERSION=$JG_BACKEND_HERDR_JOURNAL_VERSION
+  if [ "$JG_HERDR_CLEANUP_VERSION" = 2 ]; then
+    JG_HERDR_CLEANUP_BOUND_WORKSPACE=$JG_BACKEND_HERDR_JOURNAL_WORKSPACE_ID
+    JG_HERDR_CLEANUP_BOUND_TAB=$JG_BACKEND_HERDR_JOURNAL_TAB_ID
+    JG_HERDR_CLEANUP_BOUND_PANE=$JG_BACKEND_HERDR_JOURNAL_PANE_ID
   fi
 }
 
 jg_herdr_cleanup_snapshot_candidate() { # <snapshot> <workspace> <title> <token> <bound-workspace> <bound-tab> <bound-pane>
   local snapshot=$1 workspace=$2 title=$3 token=$4
   local bound_workspace=$5 bound_tab=$6 bound_pane=$7 record
-  FM_HERDR_CLEANUP_TAB=
-  FM_HERDR_CLEANUP_PANE=
+  JG_HERDR_CLEANUP_TAB=
+  JG_HERDR_CLEANUP_PANE=
   record=$(printf '%s' "$snapshot" | jq -er \
     --arg workspace "$workspace" --arg title "$title" --arg token "$token" \
     --arg bound_workspace "$bound_workspace" --arg bound_tab "$bound_tab" \
@@ -148,9 +148,9 @@ jg_herdr_cleanup_snapshot_candidate() { # <snapshot> <workspace> <title> <token>
     | [$tabs[0].tab_id, $panes[0].pane_id] | @tsv
   ' 2>/dev/null) || return 1
   [ -n "$record" ] && [ "${record#*$'\t'}" != "$record" ] || return 1
-  FM_HERDR_CLEANUP_TAB=${record%%$'\t'*}
-  FM_HERDR_CLEANUP_PANE=${record#*$'\t'}
-  [ -n "$FM_HERDR_CLEANUP_TAB" ] && [ -n "$FM_HERDR_CLEANUP_PANE" ]
+  JG_HERDR_CLEANUP_TAB=${record%%$'\t'*}
+  JG_HERDR_CLEANUP_PANE=${record#*$'\t'}
+  [ -n "$JG_HERDR_CLEANUP_TAB" ] && [ -n "$JG_HERDR_CLEANUP_PANE" ]
 }
 
 jg_herdr_cleanup_revalidate() { # <session> <workspace> <tab> <pane> <title> <token> <home-real> <journal> <task-id> <version> <bound-workspace> <bound-tab> <bound-pane>
@@ -159,13 +159,13 @@ jg_herdr_cleanup_revalidate() { # <session> <workspace> <tab> <pane> <title> <to
   local workspaces workspace_info tabs panes focus
   [ ! -e "$STATE/$id.meta" ] && [ ! -L "$STATE/$id.meta" ] || return 1
   jg_herdr_cleanup_unique_match "$title" "$session" "$home_real" || return 1
-  [ "$FM_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
-    && [ "$FM_HERDR_CLEANUP_ID" = "$id" ] \
-    && [ "$FM_HERDR_CLEANUP_TOKEN" = "$token" ] \
-    && [ "$FM_HERDR_CLEANUP_VERSION" = "$version" ] \
-    && [ "$FM_HERDR_CLEANUP_BOUND_WORKSPACE" = "$bound_workspace" ] \
-    && [ "$FM_HERDR_CLEANUP_BOUND_TAB" = "$bound_tab" ] \
-    && [ "$FM_HERDR_CLEANUP_BOUND_PANE" = "$bound_pane" ] || return 1
+  [ "$JG_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
+    && [ "$JG_HERDR_CLEANUP_ID" = "$id" ] \
+    && [ "$JG_HERDR_CLEANUP_TOKEN" = "$token" ] \
+    && [ "$JG_HERDR_CLEANUP_VERSION" = "$version" ] \
+    && [ "$JG_HERDR_CLEANUP_BOUND_WORKSPACE" = "$bound_workspace" ] \
+    && [ "$JG_HERDR_CLEANUP_BOUND_TAB" = "$bound_tab" ] \
+    && [ "$JG_HERDR_CLEANUP_BOUND_PANE" = "$bound_pane" ] || return 1
 
   workspaces=$(jg_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
   printf '%s' "$workspaces" | jq -e --arg workspace "$workspace" --arg title "$title" --arg token "$token" '
@@ -209,13 +209,13 @@ jg_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
   if ! jg_herdr_cleanup_unique_match "$title" "$session" "$home_real"; then
     return 0
   fi
-  journal=$FM_HERDR_CLEANUP_JOURNAL
-  id=$FM_HERDR_CLEANUP_ID
-  version=$FM_HERDR_CLEANUP_VERSION
-  bound_workspace=$FM_HERDR_CLEANUP_BOUND_WORKSPACE
-  bound_tab=$FM_HERDR_CLEANUP_BOUND_TAB
-  bound_pane=$FM_HERDR_CLEANUP_BOUND_PANE
-  [ "$FM_HERDR_CLEANUP_TOKEN" = "$token" ] || return 0
+  journal=$JG_HERDR_CLEANUP_JOURNAL
+  id=$JG_HERDR_CLEANUP_ID
+  version=$JG_HERDR_CLEANUP_VERSION
+  bound_workspace=$JG_HERDR_CLEANUP_BOUND_WORKSPACE
+  bound_tab=$JG_HERDR_CLEANUP_BOUND_TAB
+  bound_pane=$JG_HERDR_CLEANUP_BOUND_PANE
+  [ "$JG_HERDR_CLEANUP_TOKEN" = "$token" ] || return 0
   task_lock="$STATE/.spawn-$id.lock"
   if ! jg_lock_try_acquire "$task_lock"; then
     jg_herdr_cleanup_warn "$id skipped because its task lock is busy"
@@ -247,8 +247,8 @@ jg_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
     jg_lock_release "$task_lock" || true
     return 0
   fi
-  tab=$FM_HERDR_CLEANUP_TAB
-  pane=$FM_HERDR_CLEANUP_PANE
+  tab=$JG_HERDR_CLEANUP_TAB
+  pane=$JG_HERDR_CLEANUP_PANE
   if [ "$(jg_backend_herdr_pane_agent_state "$session" "$pane")" != no-agent ] \
     || ! jg_backend_herdr_pane_idle_shell_pid "$session" "$pane" >/dev/null; then
     jg_herdr_cleanup_warn "$id preserved because its pane is not a provably idle childless shell"
@@ -273,12 +273,12 @@ jg_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
   if [ "$state" = dead ]; then
     if [ -f "$journal" ] && [ ! -L "$journal" ] \
       && jg_herdr_cleanup_unique_match "$title" "$session" "$home_real" \
-      && [ "$FM_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
-      && [ "$FM_HERDR_CLEANUP_ID" = "$id" ] \
-      && [ "$FM_HERDR_CLEANUP_VERSION" = "$version" ] \
-      && [ "$FM_HERDR_CLEANUP_BOUND_WORKSPACE" = "$bound_workspace" ] \
-      && [ "$FM_HERDR_CLEANUP_BOUND_TAB" = "$bound_tab" ] \
-      && [ "$FM_HERDR_CLEANUP_BOUND_PANE" = "$bound_pane" ] \
+      && [ "$JG_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
+      && [ "$JG_HERDR_CLEANUP_ID" = "$id" ] \
+      && [ "$JG_HERDR_CLEANUP_VERSION" = "$version" ] \
+      && [ "$JG_HERDR_CLEANUP_BOUND_WORKSPACE" = "$bound_workspace" ] \
+      && [ "$JG_HERDR_CLEANUP_BOUND_TAB" = "$bound_tab" ] \
+      && [ "$JG_HERDR_CLEANUP_BOUND_PANE" = "$bound_pane" ] \
       && [ ! -e "$STATE/$id.meta" ] && [ ! -L "$STATE/$id.meta" ]; then
       rm -f -- "$journal" || jg_herdr_cleanup_warn "$id pane closed but its journal could not be retired"
     else
@@ -297,7 +297,7 @@ jg_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
 jg_herdr_session_cleanup() {
   local session home_real list candidates workspace title journal found=0
   [ -d "$STATE" ] && [ ! -L "$STATE" ] || return 0
-  for journal in "$STATE"/*"$FM_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX"; do
+  for journal in "$STATE"/*"$JG_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX"; do
     if [ -f "$journal" ] && [ ! -L "$journal" ]; then
       found=1
       break
@@ -333,7 +333,7 @@ jg_herdr_session_cleanup() {
   return 0
 }
 
-if [ "${FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY:-0}" != 1 ]; then
+if [ "${JG_HERDR_SESSION_CLEANUP_SOURCE_ONLY:-0}" != 1 ]; then
   jg_herdr_session_cleanup
   exit 0
 fi

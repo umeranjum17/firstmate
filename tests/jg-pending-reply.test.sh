@@ -49,8 +49,8 @@ SEND="$ROOT/bin/jg-send.sh"
 REPORT="$ROOT/bin/jg-secondmate-report.sh"
 TMP_ROOT=$(jg_test_tmproot jg-pending-reply)
 
-export FM_PENDING_REPLY_GRACE_SECS=0
-export FM_SEND_SETTLE=0
+export JG_PENDING_REPLY_GRACE_SECS=0
+export JG_SEND_SETTLE=0
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -72,7 +72,7 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "${1:-}" >> "$FM_SEND_LOG"
+      printf '%s' "${1:-}" >> "$JG_SEND_LOG"
     fi
     exit 0 ;;
   display-message)
@@ -116,8 +116,8 @@ run_send() {
   local fb=$1 home=$2 log=$3; shift 3
   : > "$log"
   env PATH="$fb:$PATH" \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
-    FM_PENDING_REPLY_GRACE_SECS=0 \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
+    JG_PENDING_REPLY_GRACE_SECS=0 \
     "$SEND" "$@" 2>/dev/null
 }
 
@@ -141,7 +141,7 @@ test_normal_correlated_reply_resolves_once() {
   local home state corr status rec
   home=$(setup_parent resolve-once)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=1000
+  export JG_PENDING_REPLY_NOW=1000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "audit the ledger")
   jg_pending_reply_mark_delivered "$state" "$corr"
   status="$state/hibit.status"
@@ -166,16 +166,16 @@ test_completed_turn_no_report_triggers_one_recovery() {
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-hook.log"
   : > "$hook_log"
-  export FM_PENDING_REPLY_NOW=2000
-  export FM_PENDING_REPLY_SEND_HOOK='printf "%s\t%s\n" >>"'"$hook_log"'"'
+  export JG_PENDING_REPLY_NOW=2000
+  export JG_PENDING_REPLY_SEND_HOOK='printf "%s\t%s\n" >>"'"$hook_log"'"'
   # The hook above is wrong for eval form - use a function.
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() {
     printf '%s\t%s\n' "$1" "$2" >> "$hook_log"
   }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "status of phase 7")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -213,17 +213,17 @@ test_recovery_waits_while_the_mate_has_an_open_decision() {
   state="$home/state"
   hook_log="$TMP_ROOT/decision-wait-hook.log"
   : > "$hook_log"
-  export FM_PENDING_REPLY_NOW=2500
+  export JG_PENDING_REPLY_NOW=2500
   mkdir -p "$home/config"
   : > "$home/config/wait-no-turns"
-  FM_CONFIG_OVERRIDE="$home/config"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  JG_CONFIG_OVERRIDE="$home/config"
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   decision_wait_hook() {
     printf '%s\n' "$1" >> "$hook_log"
   }
   export -f decision_wait_hook
-  export FM_PENDING_REPLY_SEND_HOOK=decision_wait_hook
+  export JG_PENDING_REPLY_SEND_HOOK=decision_wait_hook
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "status of phase 8")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -240,8 +240,8 @@ test_recovery_waits_while_the_mate_has_an_open_decision() {
   printf 'resolved [key=scope]: answered: narrow\n' >> "$state/hibit.status"
   jg_pending_reply_send_recovery "$state" "$corr" || fail "recovery should send once the decision closes"
   [ "$(wc -l < "$hook_log" | tr -d ' ')" = 1 ] || fail "expected exactly one recovery send"
-  unset FM_PENDING_REPLY_SEND_HOOK
-  unset FM_CONFIG_OVERRIDE
+  unset JG_PENDING_REPLY_SEND_HOOK
+  unset JG_CONFIG_OVERRIDE
   pass "recovery never pokes a mate waiting on its own decision, and runs once it closes"
 }
 
@@ -253,14 +253,14 @@ test_recovery_sends_during_an_open_decision_without_the_flag() {
   hook_log="$TMP_ROOT/decision-wait-off-hook.log"
   : > "$hook_log"
   mkdir -p "$home/config"
-  FM_CONFIG_OVERRIDE="$home/config"
-  export FM_PENDING_REPLY_NOW=2500
+  JG_CONFIG_OVERRIDE="$home/config"
+  export JG_PENDING_REPLY_NOW=2500
   # shellcheck disable=SC2329
   decision_wait_off_hook() {
     printf '%s\n' "$1" >> "$hook_log"
   }
   export -f decision_wait_off_hook
-  export FM_PENDING_REPLY_SEND_HOOK=decision_wait_off_hook
+  export JG_PENDING_REPLY_SEND_HOOK=decision_wait_off_hook
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "status of phase 8")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_observe_busy "$state" "$corr" busy
@@ -269,8 +269,8 @@ test_recovery_sends_during_an_open_decision_without_the_flag() {
   jg_pending_reply_send_recovery "$state" "$corr" \
     || fail "recovery should send while a decision is open when the flag is absent"
   [ "$(wc -l < "$hook_log" | tr -d ' ')" = 1 ] || fail "expected the recovery to send"
-  unset FM_PENDING_REPLY_SEND_HOOK
-  unset FM_CONFIG_OVERRIDE
+  unset JG_PENDING_REPLY_SEND_HOOK
+  unset JG_CONFIG_OVERRIDE
   pass "recovery sends during an open decision when config/wait-no-turns is absent"
 }
 
@@ -280,20 +280,20 @@ test_recovery_grace_measures_from_turn_completion() {
   state="$home/state"
   hook_log="$TMP_ROOT/grace-from-completion.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf '%s\n' ok >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
-  export FM_PENDING_REPLY_GRACE_SECS=120
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_GRACE_SECS=120
 
-  export FM_PENDING_REPLY_NOW=20000
+  export JG_PENDING_REPLY_NOW=20000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "long turn then missed report")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_observe_busy "$state" "$corr" busy
   # The request turn runs long: it completes 300s after delivery, well past
   # the 120s grace if grace were still measured from delivery.
-  export FM_PENDING_REPLY_NOW=20300
+  export JG_PENDING_REPLY_NOW=20300
   jg_pending_reply_observe_busy "$state" "$corr" idle
   [ "$(jg_pending_reply_get "$(jg_pending_reply_path "$state" "$corr")" request_turn_completed_epoch)" = 20300 ] \
     || fail "setup: turn should complete at 20300"
@@ -302,7 +302,7 @@ test_recovery_grace_measures_from_turn_completion() {
   # completion (age 1), even though it long ago elapsed from delivery (age
   # 301). On the tip this fires immediately because grace is measured from
   # delivery.
-  export FM_PENDING_REPLY_NOW=20301
+  export JG_PENDING_REPLY_NOW=20301
   if jg_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
     fail "recovery must not fire before grace elapses from the turn's completion"
   fi
@@ -311,7 +311,7 @@ test_recovery_grace_measures_from_turn_completion() {
     || fail "phase must stay awaiting_report before completion grace elapsed"
 
   # 121s after completion: grace has now elapsed from the turn's completion.
-  export FM_PENDING_REPLY_NOW=20421
+  export JG_PENDING_REPLY_NOW=20421
   jg_pending_reply_send_recovery "$state" "$corr" \
     || fail "recovery should fire once grace elapses from the turn's completion"
   lines=$(wc -l < "$hook_log" | tr -d ' ')
@@ -319,7 +319,7 @@ test_recovery_grace_measures_from_turn_completion() {
   [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
     || fail "phase should be recovery_sent, got $(phase_of "$state" "$corr")"
 
-  export FM_PENDING_REPLY_GRACE_SECS=0
+  export JG_PENDING_REPLY_GRACE_SECS=0
   pass "recovery grace is measured from the request turn's completion, not delivery"
 }
 
@@ -328,13 +328,13 @@ test_recovery_fresh_status_read_resolves_before_firing() {
   home=$(setup_parent fresh-read-before-fire)
   state="$home/state"
   status="$state/hibit.status"
-  export FM_PENDING_REPLY_SEND_HOOK=true
-  export FM_PENDING_REPLY_GRACE_SECS=120
-  export FM_PENDING_REPLY_NOW=30000
+  export JG_PENDING_REPLY_SEND_HOOK=true
+  export JG_PENDING_REPLY_GRACE_SECS=120
+  export JG_PENDING_REPLY_NOW=30000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "reply lands just before the demand fires")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_observe_busy "$state" "$corr" busy
-  export FM_PENDING_REPLY_NOW=30300
+  export JG_PENDING_REPLY_NOW=30300
   jg_pending_reply_observe_busy "$state" "$corr" idle
 
   # An earlier resolve attempt with nothing to find caches the current status
@@ -356,7 +356,7 @@ test_recovery_fresh_status_read_resolves_before_firing() {
 
   # Grace has elapsed from the turn's completion, so the demand is otherwise
   # eligible to fire; its own fresh, uncached read must catch the reply first.
-  export FM_PENDING_REPLY_NOW=30421
+  export JG_PENDING_REPLY_NOW=30421
   if jg_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
     fail "recovery must not fire once a correlated reply has landed"
   fi
@@ -366,17 +366,17 @@ test_recovery_fresh_status_read_resolves_before_firing() {
     || fail "resolved_via should be status"
 
   # The missed-report escalation takes the same fresh read before firing.
-  export FM_PENDING_REPLY_NOW=31000
+  export JG_PENDING_REPLY_NOW=31000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "reply lands just before the escalation fires")
   rec=$(jg_pending_reply_path "$state" "$corr")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
-  export FM_PENDING_REPLY_NOW=31120
+  export JG_PENDING_REPLY_NOW=31120
   jg_pending_reply_send_recovery "$state" "$corr" || fail "setup: recovery send failed"
   jg_pending_reply_mark_turn_completed "$state" "$corr" recovery
   printf 'working [corr=%s]: still wrapping up\n' "$corr" >> "$status"
   jg_pending_reply_set "$rec" parent_status_scan_signature "$(jg_pending_reply_file_signature "$status")"
-  export FM_PENDING_REPLY_NOW=31240
+  export JG_PENDING_REPLY_NOW=31240
   jg_pending_reply_maybe_escalate "$state" "$corr" 2>/dev/null \
     || fail "the escalation's fresh read should resolve the record"
   [ "$(phase_of "$state" "$corr")" = resolved ] \
@@ -385,8 +385,8 @@ test_recovery_fresh_status_read_resolves_before_firing() {
     fail "escalation must not publish once a correlated reply has landed"
   fi
 
-  unset FM_PENDING_REPLY_SEND_HOOK
-  export FM_PENDING_REPLY_GRACE_SECS=0
+  unset JG_PENDING_REPLY_SEND_HOOK
+  export JG_PENDING_REPLY_GRACE_SECS=0
   pass "one fresh status read immediately before firing catches a just-landed reply, any verb"
 }
 
@@ -401,7 +401,7 @@ test_partial_resolve_write_blocks_firing() {
   # must still stop the repost and the escalation. Run in a subshell so the
   # injected write failure cannot leak into later tests.
   (
-    # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+    # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
     # shellcheck disable=SC2329
     recovery_hook() { printf '%s\n' sent >> "$hook_log"; }
     eval "_orig_$(declare -f jg_pending_reply_set)"
@@ -414,7 +414,7 @@ test_partial_resolve_write_blocks_firing() {
     jg_pending_reply_mark_delivered "$state" "$corr"
     jg_pending_reply_mark_turn_completed "$state" "$corr" request
     printf 'working [corr=%s]: still wrapping up\n' "$corr" >> "$status"
-    if FAIL_RESOLVED_EPOCH=1 FM_PENDING_REPLY_SEND_HOOK=recovery_hook jg_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
+    if FAIL_RESOLVED_EPOCH=1 JG_PENDING_REPLY_SEND_HOOK=recovery_hook jg_pending_reply_send_recovery "$state" "$corr" 2>/dev/null; then
       fail "recovery must not fire after a partial resolve"
     fi
     [ "$(phase_of "$state" "$corr")" = resolved ] \
@@ -424,7 +424,7 @@ test_partial_resolve_write_blocks_firing() {
     corr=$(jg_pending_reply_create "$home" "$state" "hibit" "partial resolve before escalation")
     jg_pending_reply_mark_delivered "$state" "$corr"
     jg_pending_reply_mark_turn_completed "$state" "$corr" request
-    FM_PENDING_REPLY_SEND_HOOK=true jg_pending_reply_send_recovery "$state" "$corr" \
+    JG_PENDING_REPLY_SEND_HOOK=true jg_pending_reply_send_recovery "$state" "$corr" \
       || fail "setup: recovery send failed"
     jg_pending_reply_mark_turn_completed "$state" "$corr" recovery
     printf 'working [corr=%s]: still wrapping up\n' "$corr" >> "$status"
@@ -444,30 +444,30 @@ test_escalation_grace_measures_from_recovery_turn_completion() {
   state="$home/state"
   hook_log="$TMP_ROOT/escalation-grace-from-completion.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf '%s\n' ok >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
-  export FM_PENDING_REPLY_GRACE_SECS=120
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_GRACE_SECS=120
 
-  export FM_PENDING_REPLY_NOW=40000
+  export JG_PENDING_REPLY_NOW=40000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "recovery also runs long")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
-  export FM_PENDING_REPLY_NOW=40120
+  export JG_PENDING_REPLY_NOW=40120
   jg_pending_reply_send_recovery "$state" "$corr" || fail "recovery send failed"
   [ "$(phase_of "$state" "$corr")" = recovery_sent ] || fail "phase should be recovery_sent"
 
   # The recovery turn also runs long: it completes 300s after the recovery
   # was sent.
-  export FM_PENDING_REPLY_NOW=40420
+  export JG_PENDING_REPLY_NOW=40420
   jg_pending_reply_mark_turn_completed "$state" "$corr" recovery
 
   # One second after the recovery turn completed: grace has not elapsed from
   # that completion. On the tip nothing gates this at all, so escalation
   # fires the instant completion is observed.
-  export FM_PENDING_REPLY_NOW=40421
+  export JG_PENDING_REPLY_NOW=40421
   if jg_pending_reply_maybe_escalate "$state" "$corr" 2>/dev/null; then
     fail "escalation must not fire before grace elapses from the recovery turn's completion"
   fi
@@ -478,7 +478,7 @@ test_escalation_grace_measures_from_recovery_turn_completion() {
   fi
 
   # 121s after the recovery turn completed: grace has now elapsed.
-  export FM_PENDING_REPLY_NOW=40541
+  export JG_PENDING_REPLY_NOW=40541
   jg_pending_reply_maybe_escalate "$state" "$corr" || fail "escalation should fire once grace elapses"
   [ "$(phase_of "$state" "$corr")" = escalated ] || fail "phase should be escalated"
   status_line=$(tail -1 "$state/hibit.status")
@@ -489,7 +489,7 @@ test_escalation_grace_measures_from_recovery_turn_completion() {
   escalations=$(grep -Fc "blocked [key=pending-reply-$corr]" "$state/hibit.status")
   [ "$escalations" = 1 ] || fail "missed recovery should publish exactly one escalation, got $escalations"
 
-  export FM_PENDING_REPLY_GRACE_SECS=0
+  export JG_PENDING_REPLY_GRACE_SECS=0
   pass "missed-report escalation grace is measured from the recovery turn's completion"
 }
 
@@ -499,13 +499,13 @@ test_recovery_attempt_is_never_reinjected() {
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-at-most-once.log"
   : > "$hook_log"
-  export FM_PENDING_REPLY_NOW=2500
+  export JG_PENDING_REPLY_NOW=2500
   recovery_fail_hook() {
     printf 'attempted\n' >> "$hook_log"
     return 1
   }
   export -f recovery_fail_hook
-  export FM_PENDING_REPLY_SEND_HOOK=recovery_fail_hook
+  export JG_PENDING_REPLY_SEND_HOOK=recovery_fail_hook
   corr=$(jg_pending_reply_create "$home" "$state" hibit "at most once")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
@@ -557,7 +557,7 @@ test_recovery_attempt_is_never_reinjected() {
     || fail "unknown recovery escalation should name delivery uncertainty"
   lines=$(wc -l < "$hook_log" | tr -d ' ')
   [ "$lines" = 1 ] || fail "reconciliation must not call recovery transport, got $lines attempts"
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "recovery attempts reconcile without reinjection"
 }
 
@@ -567,12 +567,12 @@ test_recovery_reply_resolves_original() {
   state="$home/state"
   hook_log="$TMP_ROOT/recovery-resolve-hook.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf '%s\n' "$2" >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
-  export FM_PENDING_REPLY_NOW=3000
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_NOW=3000
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "phase 7 status")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -590,14 +590,14 @@ test_second_missed_turn_escalates_once_and_stays_durable() {
   state="$home/state"
   hook_log="$TMP_ROOT/escalate-hook.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf '%s\n' ok >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
-  export FM_PENDING_REPLY_NOW=4000
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_NOW=4000
   # Do not export STATE into the test process: jg-send resolves
-  # FM_STATE_OVERRIDE/STATE from the environment and a leak breaks later cases.
+  # JG_STATE_OVERRIDE/STATE from the environment and a leak breaks later cases.
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "why is phase 7 stuck")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -638,11 +638,11 @@ test_second_missed_turn_escalates_once_and_stays_durable() {
 # Wake-gate helpers reading the production seen-signature owner directly, so
 # these assertions consume the exact gate the watcher's signal scan uses.
 seen_gate() {  # <state> <file>: 0 when every byte is already announced
-  FM_STATE_OVERRIDE="$1" bash -c '. "$1"; jg_wake_signal_seen_current "$2" "$3"' \
+  JG_STATE_OVERRIDE="$1" bash -c '. "$1"; jg_wake_signal_seen_current "$2" "$3"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$1" "$2"
 }
 prime_seen() {  # <state> <file>
-  FM_STATE_OVERRIDE="$1" bash -c '
+  JG_STATE_OVERRIDE="$1" bash -c '
     . "$1"; jg_wake_status_mark_current "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$1" "$2"
 }
@@ -651,8 +651,8 @@ test_escalation_wakes_and_its_close_stays_quiet() {
   local home state corr
   home=$(setup_parent escalation-wake-gate)
   state="$home/state"
-  export FM_PENDING_REPLY_SEND_HOOK='true'
-  export FM_PENDING_REPLY_NOW=4200
+  export JG_PENDING_REPLY_SEND_HOOK='true'
+  export JG_PENDING_REPLY_NOW=4200
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "confirm the notarization")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
@@ -685,11 +685,11 @@ test_escalation_publication_failure_retries() {
   local home state corr rec target escalations
   home=$(setup_parent escalation-retry)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4500
+  export JG_PENDING_REPLY_NOW=4500
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "retry escalation")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
-  export FM_PENDING_REPLY_SEND_HOOK='true'
+  export JG_PENDING_REPLY_SEND_HOOK='true'
   jg_pending_reply_send_recovery "$state" "$corr" || fail "recovery send failed"
   jg_pending_reply_mark_turn_completed "$state" "$corr" recovery
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -713,7 +713,7 @@ test_legacy_escalation_closes_default_decision() {
   local home state corr rec open
   home=$(setup_parent legacy-close)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4725
+  export JG_PENDING_REPLY_NOW=4725
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "legacy close")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -737,7 +737,7 @@ test_legacy_escalation_does_not_close_taken_default_decision() {
   local home state corr rec open
   home=$(setup_parent legacy-escalation)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4750
+  export JG_PENDING_REPLY_NOW=4750
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "legacy escalation")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -763,8 +763,8 @@ test_foreign_blocker_is_not_selected_as_escalation() {
   local home state corr rec open
   home=$(setup_parent foreign-blocker)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4775
-  export FM_PENDING_REPLY_SEND_HOOK=true
+  export JG_PENDING_REPLY_NOW=4775
+  export JG_PENDING_REPLY_SEND_HOOK=true
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "foreign blocker")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_pending_reply_mark_turn_completed "$state" "$corr" request
@@ -792,7 +792,7 @@ test_concurrent_resolution_closes_escalation_once() {
   local home state corr rec
   home=$(setup_parent concurrent-resolution)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4800
+  export JG_PENDING_REPLY_NOW=4800
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "concurrent resolution")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -820,7 +820,7 @@ test_concurrent_escalation_yields_to_late_reply() {
   local home state corr rec
   home=$(setup_parent concurrent-escalation)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=4900
+  export JG_PENDING_REPLY_NOW=4900
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "concurrent escalation")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -847,7 +847,7 @@ test_transport_success_is_not_reply_success() {
   local home state corr
   home=$(setup_parent transport-not-reply)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=5000
+  export JG_PENDING_REPLY_NOW=5000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "ping")
   jg_pending_reply_mark_delivered "$state" "$corr" || fail "mark delivered failed"
   [ "$(phase_of "$state" "$corr")" = awaiting_report ] \
@@ -867,7 +867,7 @@ test_undelivered_records_are_scan_immutable() {
     mkdir -p "$sm_home/state"
     # This fixture clock is intentionally scoped to the isolated subshell.
     # shellcheck disable=SC2030,SC2031
-    export FM_PENDING_REPLY_NOW=5500
+    export JG_PENDING_REPLY_NOW=5500
     corr=$(jg_pending_reply_create "$home" "$state" hibit "not delivered yet")
     rec=$(jg_pending_reply_path "$state" "$corr")
     printf 'done [corr=%s]: arrived too early\n' "$corr" > "$state/hibit.status"
@@ -904,7 +904,7 @@ test_delivery_confirmation_fallback_reconciles() {
     state="$home/state"
     # This fixture clock is intentionally scoped to the isolated subshell.
     # shellcheck disable=SC2030,SC2031
-    export FM_PENDING_REPLY_NOW=5750
+    export JG_PENDING_REPLY_NOW=5750
     corr=$(jg_pending_reply_create "$home" "$state" hibit "confirmed delivery")
     rec=$(jg_pending_reply_path "$state" "$corr")
     jg_pending_reply_mark_delivered() { return 1; }
@@ -939,7 +939,7 @@ test_delivery_confirmation_fallback_reconciles() {
     [ -z "$(jg_pending_reply_get "$prepared_rec" delivered_epoch)" ] \
       || fail "attempted delivery must never be promoted without confirmation"
     [ -e "$prepared_marker" ] || fail "unknown delivery marker should remain durable"
-    export FM_PENDING_REPLY_NOW=5760
+    export JG_PENDING_REPLY_NOW=5760
     jg_pending_reply_write_delivery_confirmation \
       "$state" "$prepared_corr" attempted 5750 \
       || fail "orphaned attempt fixture should persist"
@@ -967,7 +967,7 @@ test_delivery_confirmation_fallback_reconciles() {
     jg_pending_reply_tick "$state" || fail "resolved late report should remain idempotent"
     [ "$(phase_of "$state" "$prepared_corr")" = resolved ] \
       || fail "late report resolution should remain durable"
-    export FM_PENDING_REPLY_NOW=5800
+    export JG_PENDING_REPLY_NOW=5800
     reported_corr=$(jg_pending_reply_create "$home" "$state" hibit "reported delivery")
     reported_rec=$(jg_pending_reply_path "$state" "$reported_corr")
     jg_pending_reply_prepare_delivery "$state" "$reported_corr" \
@@ -997,7 +997,7 @@ test_delivery_confirmation_serializes_with_reconciliation() {
     state="$home/state"
     # This fixture clock is intentionally scoped to the isolated subshell.
     # shellcheck disable=SC2030,SC2031
-    export FM_PENDING_REPLY_NOW=5900
+    export JG_PENDING_REPLY_NOW=5900
     corr=$(jg_pending_reply_create "$home" "$state" hibit "serialized delivery")
     rec=$(jg_pending_reply_path "$state" "$corr")
     calls="$home/mark-delivered.calls"
@@ -1050,7 +1050,7 @@ test_unrelated_and_stale_corr_cannot_resolve() {
   state="$home/state"
   # Reset the fixture clock after isolated subshell tests.
   # shellcheck disable=SC2031
-  export FM_PENDING_REPLY_NOW=6000
+  export JG_PENDING_REPLY_NOW=6000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "need answer")
   jg_pending_reply_mark_delivered "$state" "$corr"
   other=$(jg_pending_reply_new_id)
@@ -1075,7 +1075,7 @@ test_another_mates_echo_cannot_resolve() {
   home=$(setup_parent two-mates)
   state="$home/state"
   # shellcheck disable=SC2031
-  export FM_PENDING_REPLY_NOW=6100
+  export JG_PENDING_REPLY_NOW=6100
   corr_a=$(jg_pending_reply_create "$home" "$state" "alpha" "need alpha's answer")
   corr_b=$(jg_pending_reply_create "$home" "$state" "beta" "need beta's answer")
   jg_pending_reply_mark_delivered "$state" "$corr_a"
@@ -1105,7 +1105,7 @@ test_restart_preserves_expectation_and_parent_destination() {
   local home state corr rec parent_status parent_home
   home=$(setup_parent restart)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=7000
+  export JG_PENDING_REPLY_NOW=7000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "survive restart")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -1134,7 +1134,7 @@ test_wrong_home_detected_not_acknowledged() {
   state="$home/state"
   sm_home="$TMP_ROOT/sm-home-$RANDOM"
   mkdir -p "$sm_home/state"
-  export FM_PENDING_REPLY_NOW=8000
+  export JG_PENDING_REPLY_NOW=8000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "report to parent")
   jg_pending_reply_mark_delivered "$state" "$corr"
   # Historical incident shape: report written under the secondmate home.
@@ -1193,7 +1193,7 @@ test_jg_send_marked_secondmate_creates_pending_and_embeds_corr() {
   expect_code 0 "$rc" "secondmate send should succeed"
   got=$(latest_record_body "$home" hibit)
   case "$got" in
-    "$FM_FROMFIRST_MARK"corr=*) : ;;
+    "$JG_FROMFIRST_MARK"corr=*) : ;;
     *) fail "secondmate steer record must embed marker+corr"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   corr=$(jg_pending_reply_extract_corr "$got")
@@ -1213,7 +1213,7 @@ test_document_pointer_resolves() {
   local home state corr
   home=$(setup_parent doc-pointer)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=9000
+  export JG_PENDING_REPLY_NOW=9000
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "deep audit")
   jg_pending_reply_mark_delivered "$state" "$corr"
   printf 'done [corr=%s]: see data/hibit/report.md\n' "$corr" > "$state/hibit.status"
@@ -1228,10 +1228,10 @@ test_helper_report_resolves() {
   home=$(setup_parent helper)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" hibit)
-  export FM_PENDING_REPLY_NOW=9100
+  export JG_PENDING_REPLY_NOW=9100
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "quick answer")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  FM_HOME="$sm_home" "$REPORT" "done" "$corr" "all good" \
+  JG_HOME="$sm_home" "$REPORT" "done" "$corr" "all good" \
     || fail "helper report failed"
   [ -f "$state/hibit.status" ] || fail "helper must write the parent channel"
   if grep -Fq "corr=$corr" "$sm_home/state/hibit.status" 2>/dev/null; then
@@ -1248,7 +1248,7 @@ test_helper_blocked_wait_hook_is_optional() {
   home=$(setup_parent wait-hook)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" hibit)
-  env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
+  env -u JG_ADDONS_DIR JG_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
     || fail "missing add-on hook should be a no-op"
   addons="$home/addons"
   hook="$addons/status-wait-check/status-wait-check"
@@ -1262,7 +1262,7 @@ exit 1
 EOF
   chmod +x "$hook"
   before=$(cat "$state/hibit.status")
-  if out=$(FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
+  if out=$(JG_HOME="$sm_home" JG_ADDONS_DIR="$addons" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
     fail "nonzero add-on hook should refuse report"
   else
     rc=$?
@@ -1271,11 +1271,11 @@ EOF
   assert_contains "$out" 'add-on refused wait' "hook refusal message was lost"
   [ "$(cat "$capture")" = 'blocked|waiting for CI' ] || fail "hook must receive verb and text"
   [ "$(cat "$state/hibit.status")" = "$before" ] || fail "refused report must not reach the parent status file"
-  if FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" --doc blocked abcdef0123456789 data/x/report.md 'waiting for CI' >/dev/null 2>&1; then
+  if JG_HOME="$sm_home" JG_ADDONS_DIR="$addons" "$REPORT" --doc blocked abcdef0123456789 data/x/report.md 'waiting for CI' >/dev/null 2>&1; then
     fail "refused --doc report should exit nonzero"
   fi
   [ "$(cat "$state/hibit.status")" = "$before" ] || fail "refused --doc report must not reach the parent status file"
-  if FM_HOME="$sm_home" FM_ADDONS_DIR="$addons" "$REPORT" blocked: abcdef0123456789 'waiting for CI' >/dev/null 2>&1; then
+  if JG_HOME="$sm_home" JG_ADDONS_DIR="$addons" "$REPORT" blocked: abcdef0123456789 'waiting for CI' >/dev/null 2>&1; then
     fail "colon-suffixed blocked verb should be refused"
   fi
   [ "$(cat "$capture")" = 'blocked:|waiting for CI' ] || fail "hook must receive the verb exactly as typed"
@@ -1296,7 +1296,7 @@ echo "default-path add-on refused wait" >&2
 exit 1
 EOF
   chmod +x "$hook"
-  if out=$(env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
+  if out=$(env -u JG_ADDONS_DIR JG_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
     fail "default-path add-on should refuse blocked report"
   else
     rc=$?
@@ -1311,7 +1311,7 @@ test_busy_idle_observation_via_backend_abstraction() {
   local home state corr
   home=$(setup_parent busy-idle)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=9200
+  export JG_PENDING_REPLY_NOW=9200
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "backend turn")
   jg_pending_reply_mark_delivered "$state" "$corr"
   # Simulates Pi/Claude secondmate busy_state from jg_backend_busy_state without
@@ -1335,30 +1335,30 @@ test_unknown_backend_state_uses_capture_fallback() {
       state="$home/state"
       sm_home="$home/sm"
       mkdir -p "$sm_home/state"
-      export FM_PENDING_REPLY_GRACE_SECS=10
+      export JG_PENDING_REPLY_GRACE_SECS=10
       # These fixture overrides are intentionally scoped to the isolated subshell.
       # shellcheck disable=SC2030,SC2031
-      export FM_PENDING_REPLY_NOW=10000
+      export JG_PENDING_REPLY_NOW=10000
       corr=$(jg_pending_reply_create "$home" "$state" "hibit" "$backend fallback")
       jg_pending_reply_mark_delivered "$state" "$corr"
       jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha pi
       [ "$backend" = tmux ] || printf 'backend=%s\n' "$backend" >> "$state/hibit.meta"
       jg_backend_busy_state() { printf 'unknown'; }
-      jg_backend_capture() { printf '%s' "$FM_PENDING_TEST_CAPTURE"; }
-      # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+      jg_backend_capture() { printf '%s' "$JG_PENDING_TEST_CAPTURE"; }
+      # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
       # shellcheck disable=SC2329
       recovery_hook() { :; }
       # This hook override is intentionally scoped to the isolated subshell.
       # shellcheck disable=SC2030,SC2031
-      export FM_PENDING_REPLY_SEND_HOOK=recovery_hook
-      export FM_PENDING_TEST_CAPTURE='idle footer'
+      export JG_PENDING_REPLY_SEND_HOOK=recovery_hook
+      export JG_PENDING_TEST_CAPTURE='idle footer'
       jg_pending_reply_tick "$state"
       rec=$(jg_pending_reply_path "$state" "$corr")
       [ -z "$(jg_pending_reply_get "$rec" request_turn_completed_epoch)" ] \
         || fail "$backend fallback must not accept stale idle before grace"
       # Continue advancing the subshell-local fixture clock.
       # shellcheck disable=SC2030,SC2031
-      export FM_PENDING_REPLY_NOW=10010
+      export JG_PENDING_REPLY_NOW=10010
       jg_pending_reply_tick "$state"
       [ "$(jg_pending_reply_get "$rec" request_turn_completed_epoch)" = 10010 ] \
         || fail "$backend fallback idle past grace should complete the request turn"
@@ -1366,20 +1366,20 @@ test_unknown_backend_state_uses_capture_fallback() {
         || fail "$backend recovery must wait a fresh grace period after the turn completes, not fire the moment it completes"
       # Recovery grace runs from that completion, not from delivery: only once
       # a further grace period has elapsed does the repost fire.
-      export FM_PENDING_REPLY_NOW=10020
+      export JG_PENDING_REPLY_NOW=10020
       jg_pending_reply_tick "$state"
       [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
         || fail "$backend fallback idle should trigger recovery after its own grace period"
-      export FM_PENDING_REPLY_NOW=10021
-      export FM_PENDING_TEST_CAPTURE='Working...'
+      export JG_PENDING_REPLY_NOW=10021
+      export JG_PENDING_TEST_CAPTURE='Working...'
       jg_pending_reply_tick "$state"
-      export FM_PENDING_REPLY_NOW=10022
-      export FM_PENDING_TEST_CAPTURE='idle footer'
+      export JG_PENDING_REPLY_NOW=10022
+      export JG_PENDING_TEST_CAPTURE='idle footer'
       jg_pending_reply_tick "$state"
       [ "$(phase_of "$state" "$corr")" = recovery_sent ] \
         || fail "$backend escalation must wait a fresh grace period after the recovery turn completes, not fire the moment it completes"
       # Escalation grace runs from the recovery turn's own completion.
-      export FM_PENDING_REPLY_NOW=10032
+      export JG_PENDING_REPLY_NOW=10032
       jg_pending_reply_tick "$state"
       [ "$(phase_of "$state" "$corr")" = escalated ] \
         || fail "$backend capture busy-to-idle should complete recovery turn"
@@ -1396,20 +1396,20 @@ test_kimi_capture_fallback_uses_recorded_harness() (
   mkdir -p "$sm_home/state"
   # This fixture clock is intentionally scoped to the isolated subshell.
   # shellcheck disable=SC2030,SC2031
-  export FM_PENDING_REPLY_NOW=10020
+  export JG_PENDING_REPLY_NOW=10020
   corr=$(jg_pending_reply_create "$home" "$state" hibit "kimi fallback")
   jg_pending_reply_mark_delivered "$state" "$corr"
   jg_write_secondmate_meta "$state/hibit.meta" "$sm_home" "session:jg-hibit" alpha kimi
   jg_backend_busy_state() { printf 'unknown'; }
-  jg_backend_capture() { printf '%s' "$FM_PENDING_KIMI_CAPTURE"; }
-  export FM_PENDING_KIMI_CAPTURE=' 🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
+  jg_backend_capture() { printf '%s' "$JG_PENDING_KIMI_CAPTURE"; }
+  export JG_PENDING_KIMI_CAPTURE=' 🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
 
   [ "$(jg_pending_reply_backend_observation tmux session:jg-hibit jg-hibit codex)" = fallback-idle ] \
     || fail "Kimi spinner leaked into another harness"
-  export FM_PENDING_KIMI_CAPTURE='Ctrl+c:cancel'
+  export JG_PENDING_KIMI_CAPTURE='Ctrl+c:cancel'
   [ "$(jg_pending_reply_backend_observation tmux session:jg-hibit jg-hibit kimi)" = fallback-idle ] \
     || fail "Grok's exact busy token leaked into Kimi pending-reply observation"
-  export FM_PENDING_KIMI_CAPTURE=' 🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
+  export JG_PENDING_KIMI_CAPTURE=' 🌑 · Tip: ask Kimi to schedule tasks, e.g. "remind me at 5pm"'
   jg_pending_reply_tick "$state"
   rec=$(jg_pending_reply_path "$state" "$corr")
   [ "$(jg_pending_reply_get "$rec" turn_seen_busy)" = 1 ] \
@@ -1430,7 +1430,7 @@ test_tick_skips_terminal_and_reuses_target_observation() {
     : > "$scan_log"
     # This fixture clock is intentionally scoped to the isolated subshell.
     # shellcheck disable=SC2030,SC2031
-    export FM_PENDING_REPLY_NOW=10100
+    export JG_PENDING_REPLY_NOW=10100
     open1=$(jg_pending_reply_create "$home" "$state" hibit "first open request")
     open2=$(jg_pending_reply_create "$home" "$state" hibit "second open request")
     jg_pending_reply_mark_delivered "$state" "$open1"
@@ -1501,7 +1501,7 @@ test_tick_leaves_settled_records_alone() {
   state="$home/state"
   # Reset the fixture clock after isolated subshell tests.
   # shellcheck disable=SC2031
-  export FM_PENDING_REPLY_NOW=5200
+  export JG_PENDING_REPLY_NOW=5200
   # A resolved record that never escalated, and one whose escalation closed.
   settled=$(jg_pending_reply_create "$home" "$state" hibit "settled request")
   jg_pending_reply_mark_delivered "$state" "$settled"
@@ -1589,11 +1589,11 @@ test_correlations_reuse_only_for_matching_open_task() {
   run_send "$fb" "$home" "$log" domain "first request" || fail "first marked send failed"
   got=$(latest_record_body "$home" domain)
   corr1=$(jg_pending_reply_extract_corr "$got")
-  export FM_PENDING_REPLY_EXISTING_CORR=$corr1
+  export JG_PENDING_REPLY_EXISTING_CORR=$corr1
   if run_send "$fb" "$home" "$log" other "forwarded request"; then
     fail "an explicit cross-task correlation must be refused"
   fi
-  unset FM_PENDING_REPLY_EXISTING_CORR
+  unset JG_PENDING_REPLY_EXISTING_CORR
   if latest_record_body "$home" other >/dev/null 2>&1; then
     fail "a refused cross-task correlation must not enqueue a steer"
   fi
@@ -1607,7 +1607,7 @@ test_correlations_reuse_only_for_matching_open_task() {
     || fail "cross-task expectation must belong to the new target"
   printf 'done [corr=%s]: complete\n' "$corr1" > "$state/domain.status"
   jg_pending_reply_try_resolve "$state" "$corr1" || fail "first expectation should resolve"
-  run_send "$fb" "$home" "$log" domain "${FM_FROMFIRST_MARK}corr=${corr1} follow-up" \
+  run_send "$fb" "$home" "$log" domain "${JG_FROMFIRST_MARK}corr=${corr1} follow-up" \
     || fail "resolved-correlation follow-up failed"
   corr3=$(jg_pending_reply_extract_corr "$(latest_record_body "$home" domain)")
   [ -n "$corr3" ] && [ "$corr3" != "$corr1" ] \
@@ -1626,15 +1626,15 @@ test_tick_end_to_end_missed_then_escalate() {
   mkdir -p "$sm_home/state"
   hook_log="$TMP_ROOT/tick-hook.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf 'recovered\n' >> "$hook_log"; }
   export -f recovery_hook
   # Reset hook and clock fixtures after isolated subshell tests.
   # shellcheck disable=SC2031
-  export FM_PENDING_REPLY_SEND_HOOK='recovery_hook'
+  export JG_PENDING_REPLY_SEND_HOOK='recovery_hook'
   # shellcheck disable=SC2031
-  export FM_PENDING_REPLY_NOW=9300
+  export JG_PENDING_REPLY_NOW=9300
 
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "e2e miss")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1651,7 +1651,7 @@ test_tick_end_to_end_missed_then_escalate() {
   [ "$(phase_of "$state" "$corr")" = escalated ] \
     || fail "tick should escalate after second miss, got $(phase_of "$state" "$corr")"
   # Expired age must not erase the unresolved record.
-  export FM_PENDING_REPLY_NOW=999999
+  export JG_PENDING_REPLY_NOW=999999
   jg_pending_reply_tick_one "$state" "$corr" idle "$sm_home"
   [ -f "$(jg_pending_reply_path "$state" "$corr")" ] \
     || fail "expiration must never silently erase an unresolved reply"
@@ -1665,14 +1665,14 @@ test_remote_repost_waits_for_the_reply_channel() {
   state="$home/state"
   hook_log="$TMP_ROOT/remote-repost.log"
   : > "$hook_log"
-  export FM_PENDING_REPLY_NOW=5000
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  export JG_PENDING_REPLY_NOW=5000
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   remote_repost_hook() {
     printf '%s\t%s\n' "$1" "$2" >> "$hook_log"
   }
   export -f remote_repost_hook
-  export FM_PENDING_REPLY_SEND_HOOK=remote_repost_hook
+  export JG_PENDING_REPLY_SEND_HOOK=remote_repost_hook
 
   jg_write_meta "$state/ios.meta" \
     "window=jg-remote:w1:p1" "harness=claude" "kind=secondmate" "mode=secondmate" \
@@ -1713,7 +1713,7 @@ test_remote_repost_waits_for_the_reply_channel() {
     *REPOST\ REQUIRED*) : ;;
     *) fail "the recovery message must ask for a repost"$'\n'"$(cat "$hook_log")" ;;
   esac
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "a remote repost waits for the reply channel and still fires on a real miss"
 }
 
@@ -1723,14 +1723,14 @@ test_mirrored_remote_reply_never_triggers_a_repost() {
   state="$home/state"
   hook_log="$TMP_ROOT/remote-mirrored-reply.log"
   : > "$hook_log"
-  export FM_PENDING_REPLY_NOW=6000
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  export JG_PENDING_REPLY_NOW=6000
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   mirrored_reply_hook() {
     printf '%s\t%s\n' "$1" "$2" >> "$hook_log"
   }
   export -f mirrored_reply_hook
-  export FM_PENDING_REPLY_SEND_HOOK=mirrored_reply_hook
+  export JG_PENDING_REPLY_SEND_HOOK=mirrored_reply_hook
 
   jg_write_meta "$state/ios.meta" \
     "window=jg-remote:w1:p1" "harness=claude" "kind=secondmate" "mode=secondmate" \
@@ -1746,7 +1746,7 @@ test_mirrored_remote_reply_never_triggers_a_repost() {
   [ "$(phase_of "$state" "$corr")" = resolved ] \
     || fail "a mirrored correlated reply must resolve, got $(phase_of "$state" "$corr")"
   [ ! -s "$hook_log" ] || fail "a correlated remote reply must never trigger a repost"
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "a mirrored correlated remote reply resolves without any repost"
 }
 
@@ -1757,12 +1757,12 @@ test_same_basename_self_home_corr_resolves_on_tick() {
   sm_home=$(bind_local_mate "$home" mate)
   hook_log="$TMP_ROOT/same-basename-repair.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf 'recovered\n' >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK=recovery_hook
-  export FM_PENDING_REPLY_NOW=11000
+  export JG_PENDING_REPLY_SEND_HOOK=recovery_hook
+  export JG_PENDING_REPLY_NOW=11000
 
   corr=$(jg_pending_reply_create "$home" "$state" mate "status of the audit")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1810,7 +1810,7 @@ test_same_basename_self_home_corr_resolves_on_tick() {
     || fail "recovery and retries must preserve the legacy reply bytes without duplicates"
   jg_write_secondmate_meta "$state/mate.meta" "$sm_home"
   fb=$(make_stubs "$home")
-  out=$(PATH="$fb:$PATH" FM_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json) \
+  out=$(PATH="$fb:$PATH" JG_HOME="$home" "$ROOT/bin/jg-fleet-snapshot.sh" --json) \
     || fail "snapshot of the recovered reply should succeed"
   printf '%s' "$out" | jq -e '
     .tasks[] | select(.id == "mate") | .paths.status_log.last_event
@@ -1827,7 +1827,7 @@ test_same_basename_self_home_corr_resolves_on_tick() {
   jg_parent_channel_report "$sm_home" "$sm_home/state" 'done: new report' \
     || fail "new publication retry should succeed"
   [ "$(wc -l < "$parent_status")" -eq 2 ] || fail "new publication retry must not duplicate the event"
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "same-basename self-home corr= is restated onto the parent channel and resolves"
 }
 
@@ -1836,8 +1836,8 @@ test_same_basename_reply_resolves_after_recovery_failure() {
   home=$(setup_parent same-basename-after-recovery-failure)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" mate)
-  export FM_PENDING_REPLY_NOW=11050
-  export FM_PENDING_REPLY_SEND_HOOK=false
+  export JG_PENDING_REPLY_NOW=11050
+  export JG_PENDING_REPLY_SEND_HOOK=false
 
   corr=$(jg_pending_reply_create "$home" "$state" mate "status after failed recovery")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1863,7 +1863,7 @@ test_same_basename_reply_resolves_after_recovery_failure() {
   if grep -Fq pending-reply-recovery-delivery "$parent_status"; then
     fail "authorized late reply must prevent recovery delivery escalation"
   fi
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "same-basename reply resolves at the recovery failure boundary"
 }
 
@@ -1875,12 +1875,12 @@ test_child_status_wrong_home_is_not_copied() {
   mkdir -p "$sm_home/state"
   hook_log="$TMP_ROOT/child-wrong-home.log"
   : > "$hook_log"
-  # Invoked indirectly through FM_PENDING_REPLY_SEND_HOOK.
+  # Invoked indirectly through JG_PENDING_REPLY_SEND_HOOK.
   # shellcheck disable=SC2329
   recovery_hook() { printf 'recovered\n' >> "$hook_log"; }
   export -f recovery_hook
-  export FM_PENDING_REPLY_SEND_HOOK=recovery_hook
-  export FM_PENDING_REPLY_NOW=11100
+  export JG_PENDING_REPLY_SEND_HOOK=recovery_hook
+  export JG_PENDING_REPLY_NOW=11100
 
   corr=$(jg_pending_reply_create "$home" "$state" mate "status of the audit")
   jg_pending_reply_mark_delivered "$state" "$corr"
@@ -1912,7 +1912,7 @@ test_child_status_wrong_home_is_not_copied() {
   fi
   [ "$(jg_pending_reply_get "$rec" wrong_home_hits)" = 1 ] \
     || fail "the child file should count as one wrong-home sighting"
-  unset FM_PENDING_REPLY_SEND_HOOK
+  unset JG_PENDING_REPLY_SEND_HOOK
   pass "a child-file mate-home sighting is not copied and still escalates"
 }
 
@@ -1921,10 +1921,10 @@ test_mechanical_helper_writes_parent_channel() {
   home=$(setup_parent mechanical-helper)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" mate)
-  export FM_PENDING_REPLY_NOW=11200
+  export JG_PENDING_REPLY_NOW=11200
   corr=$(jg_pending_reply_create "$home" "$state" mate "status of the audit")
   jg_pending_reply_mark_delivered "$state" "$corr"
-  FM_HOME="$sm_home" "$REPORT" "done" "$corr" "audit clean" \
+  JG_HOME="$sm_home" "$REPORT" "done" "$corr" "audit clean" \
     || fail "mechanical helper should succeed from a seeded mate home"
   grep -Fq "corr=$corr" "$state/mate.status" \
     || fail "mechanical helper must append to the parent channel"
@@ -1937,17 +1937,17 @@ test_mechanical_helper_writes_parent_channel() {
   empty_corr=$(jg_pending_reply_create "$home" "$state" mate "answer must not be empty")
   jg_pending_reply_mark_delivered "$state" "$empty_corr"
   rc=0
-  FM_HOME="$sm_home" "$REPORT" "done" "$empty_corr" "" 2>/dev/null || rc=$?
+  JG_HOME="$sm_home" "$REPORT" "done" "$empty_corr" "" 2>/dev/null || rc=$?
   [ "$rc" -ne 0 ] || fail "helper must reject an empty status note"
   if jg_pending_reply_try_resolve "$state" "$empty_corr"; then
     fail "an empty helper report must not resolve an expectation"
   fi
   rc=0
-  env -u FM_HOME "$REPORT" "done" "$empty_corr" "must require FM_HOME" \
+  env -u JG_HOME "$REPORT" "done" "$empty_corr" "must require JG_HOME" \
     2>/dev/null || rc=$?
-  [ "$rc" -ne 0 ] || fail "helper must require FM_HOME"
+  [ "$rc" -ne 0 ] || fail "helper must require JG_HOME"
   rc=0
-  FM_HOME="$home" "$REPORT" "done" "$corr" "from a main home" 2>/dev/null || rc=$?
+  JG_HOME="$home" "$REPORT" "done" "$corr" "from a main home" 2>/dev/null || rc=$?
   [ "$rc" -ne 0 ] || fail "helper must refuse a main home that has no parent channel"
   pass "mechanical helper writes the parent channel from verb, corr, and note"
 }
@@ -1964,7 +1964,7 @@ schema=jg-secondmate-parent.v1
 route=remote
 parent_host=remote.example
 EOF
-  export FM_PENDING_REPLY_NOW=11300
+  export JG_PENDING_REPLY_NOW=11300
   corr=$(jg_pending_reply_create "$home" "$state" mate "did the build go green")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -1988,7 +1988,7 @@ test_local_parent_replies_is_wrong_home_evidence() {
   home=$(setup_parent local-parent-replies)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" mate)
-  export FM_PENDING_REPLY_NOW=11350
+  export JG_PENDING_REPLY_NOW=11350
   corr=$(jg_pending_reply_create "$home" "$state" mate "did the build go green")
   jg_pending_reply_mark_delivered "$state" "$corr"
   rec=$(jg_pending_reply_path "$state" "$corr")
@@ -2012,7 +2012,7 @@ test_failed_send_discards_undelivered_expectation() {
   local home state corr
   home=$(setup_parent discard)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=9400
+  export JG_PENDING_REPLY_NOW=9400
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "never lands")
   # Not delivered: discard is allowed.
   jg_pending_reply_discard_undelivered "$state" "$corr" || fail "discard undelivered failed"
@@ -2032,7 +2032,7 @@ test_escalated_undelivered_correlation_stays_retryable() {
   local home state corr rec marker delivered_corr delivered_rec open
   home=$(setup_parent escalated-retry)
   state="$home/state"
-  export FM_PENDING_REPLY_NOW=9600
+  export JG_PENDING_REPLY_NOW=9600
   corr=$(jg_pending_reply_create "$home" "$state" "hibit" "wake after lost transport")
   rec=$(jg_pending_reply_path "$state" "$corr")
   marker=$(jg_pending_reply_delivery_confirmation_path "$state" "$corr")
@@ -2062,7 +2062,7 @@ test_escalated_undelivered_correlation_stays_retryable() {
     || fail "the published escalation must stay open until the record resolves, got '$open'"
   # The resend lands and the mate reports: the ordinary resolve closes the
   # delivery-unknown decision the retry left open.
-  export FM_PENDING_REPLY_NOW=9601
+  export JG_PENDING_REPLY_NOW=9601
   jg_pending_reply_prepare_delivery "$state" "$corr" || fail "resend prepare failed"
   jg_pending_reply_confirm_delivery "$state" "$corr" || fail "resend confirm failed"
   [ -n "$(jg_pending_reply_get "$rec" delivered_epoch)" ] || fail "resend should confirm delivery"
@@ -2072,7 +2072,7 @@ test_escalated_undelivered_correlation_stays_retryable() {
   open=$(status_open_decisions "$state/hibit.status")
   [ -z "$open" ] || fail "resolution left the delivery-unknown decision open: $open"
   # A delivered record escalated for a genuine missed report is never reset.
-  export FM_PENDING_REPLY_NOW=9700
+  export JG_PENDING_REPLY_NOW=9700
   delivered_corr=$(jg_pending_reply_create "$home" "$state" "hibit" "delivered then missed")
   delivered_rec=$(jg_pending_reply_path "$state" "$delivered_corr")
   jg_pending_reply_mark_delivered "$state" "$delivered_corr" || fail "mark delivered failed"
@@ -2088,7 +2088,7 @@ test_escalated_undelivered_correlation_stays_retryable() {
     || fail "refused reset must leave the delivered escalation untouched"
   [ "$(jg_pending_reply_get "$delivered_rec" delivered_epoch)" = 9700 ] \
     || fail "refused reset must keep the confirmed delivery"
-  unset FM_PENDING_REPLY_NOW
+  unset JG_PENDING_REPLY_NOW
   pass "an escalated correlation stays retryable only while undelivered"
 }
 
@@ -2102,7 +2102,7 @@ test_same_kind_escalation_reopens_after_operator_close() {
     home=$(setup_parent same-kind)
     state="$home/state"
     jg_write_secondmate_meta "$state/mate.meta" "$home/sm" "sess:jg-mate"
-    export FM_PENDING_REPLY_NOW=10000
+    export JG_PENDING_REPLY_NOW=10000
     corr=$(jg_pending_reply_create "$home" "$state" mate "wake after lost transport")
     status="$state/mate.status"
     jg_pending_reply_prepare_delivery "$state" "$corr" \
@@ -2118,7 +2118,7 @@ test_same_kind_escalation_reopens_after_operator_close() {
       || fail "reset before close failed"
     jg_pending_reply_prepare_delivery "$state" "$corr" \
       || fail "retry prepare failed"
-    export FM_PENDING_REPLY_NOW=15000
+    export JG_PENDING_REPLY_NOW=15000
     jg_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "retry tick failed"
     [ "$(phase_of "$state" "$corr")" = escalated ] \
@@ -2138,7 +2138,7 @@ test_same_kind_escalation_reopens_after_operator_close() {
       || fail "reset after close failed"
     jg_pending_reply_prepare_delivery "$state" "$corr" \
       || fail "second-episode prepare failed"
-    export FM_PENDING_REPLY_NOW=20000
+    export JG_PENDING_REPLY_NOW=20000
     jg_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "second episode tick failed"
     [ "$(phase_of "$state" "$corr")" = escalated ] \
@@ -2153,7 +2153,7 @@ test_same_kind_escalation_reopens_after_operator_close() {
       || fail "reset of the reopened decision failed"
     jg_pending_reply_prepare_delivery "$state" "$corr" \
       || fail "reopened retry prepare failed"
-    export FM_PENDING_REPLY_NOW=25000
+    export JG_PENDING_REPLY_NOW=25000
     jg_pending_reply_tick_one "$state" "$corr" unknown \
       || fail "reopened retry tick failed"
     blocked=$(grep -cF "blocked [key=pending-reply-$corr]" "$status")

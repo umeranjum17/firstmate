@@ -22,7 +22,7 @@ FAKEBIN=$(jg_fakebin "$TMP_ROOT/fakebin")
 ln -s /bin/bash "$FAKEBIN/claude"
 FAKE_CLAUDE="$FAKEBIN/claude"
 trap jg_test_cleanup EXIT
-unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE CLAUDE_PROJECT_DIR CURSOR_PROJECT_DIR
+unset JG_ROOT_OVERRIDE JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE CLAUDE_PROJECT_DIR CURSOR_PROJECT_DIR
 
 # A primary checkout: git, AGENTS.md, and this repo's bin.
 PRIMARY_ROOT="$TMP_ROOT/primary"
@@ -44,8 +44,8 @@ make_home() {  # <name> [1 (empty config/supervision-host) | 0 (none) | off (con
 # Run a shell script as the lock-owning primary session of <home>: the script
 # runs under the fake harness whose pid it records as the session lock.
 as_session() {  # <home> <script>
-  FM_HOME="$1" PRIMARY_ROOT="$PRIMARY_ROOT" MIRROR="$MIRROR" "$FAKE_CLAUDE" -c \
-    'printf "%s\n" "$$" > "$FM_HOME/state/.lock"; '"$2"
+  JG_HOME="$1" PRIMARY_ROOT="$PRIMARY_ROOT" MIRROR="$MIRROR" "$FAKE_CLAUDE" -c \
+    'printf "%s\n" "$$" > "$JG_HOME/state/.lock"; '"$2"
 }
 
 # The command string one tracked registration runs.
@@ -59,7 +59,7 @@ SAY='say() {  # <captain|main> <text> [<id>]
     jq -cn --arg t "$2" --arg id "${3:-}" "{hook_event_name: \"UserPromptSubmit\", prompt_id: \$id, prompt: \$t}"
   else
     jq -cn --arg t "$2" --arg id "${3:-}" "{hook_event_name: \"Stop\", prompt_id: \$id, last_assistant_message: \$t}"
-  fi | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+  fi | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
 }
 '
 
@@ -148,7 +148,7 @@ test_writers_are_inert_on_a_home_that_opted_out() {
   assert_absent "$home/state/.host-mirror.jsonl" "a home opted out by config/supervision-host-off must mirror nothing"
   crew="$TMP_ROOT/crew-worktree"
   mkdir -p "$crew"
-  out=$(printf '%s' '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}' | FM_HOME="$crew" "$MIRROR" hook claude 2>&1)
+  out=$(printf '%s' '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}' | JG_HOME="$crew" "$MIRROR" hook claude 2>&1)
   [ -z "$out" ] || fail "an inert writer printed: $out"
   assert_absent "$crew/state" "an inert writer must create nothing in a home without config/ or state/"
   pass "mirror: writers stay silent and write nothing on a home that opted out or has no state"
@@ -159,15 +159,15 @@ test_operational_foreign_and_unowned_input_is_dropped() {
   home=$(make_home dropped)
   as_session "$home" '
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"\342\201\243FIRSTMATE_OP: v1 watcher: signal: demo.status\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"from cursor\",\"cursor_version\":\"x\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"PreToolUse\",\"prompt\":\"not dialog\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"\\n\\n<task-notification>\\n<summary>Stop hook feedback</summary>\\n</task-notification>\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"kept\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
   ' || fail "a writer failed"
   assert_equals "captain|kept" "$(entries "$home")" \
     "operational input, a harness-started turn, a Cursor payload on the Claude registration, and a non-dialog event must not be mirrored"
@@ -176,7 +176,7 @@ test_operational_foreign_and_unowned_input_is_dropped() {
   sleep 30 &
   printf '%s\n' "$!" > "$other/state/.lock"
   printf '%s' '{"hook_event_name":"UserPromptSubmit","prompt":"not the owner"}' \
-    | FM_HOME="$other" FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$FAKE_CLAUDE" -c '"$0" hook claude' "$MIRROR"
+    | JG_HOME="$other" JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$FAKE_CLAUDE" -c '"$0" hook claude' "$MIRROR"
   kill "$(cat "$other/state/.lock")" 2>/dev/null || true
   assert_absent "$other/state/.host-mirror.jsonl" "a session that does not hold the fleet lock must mirror nothing"
   pass "mirror: operational input, a harness-started turn, a foreign host's payload, other events, and a session without the lock are never mirrored"
@@ -209,7 +209,7 @@ test_entries_are_deduplicated_and_capped() {
   long=$(awk 'BEGIN { for (i = 0; i < 5000; i++) printf "x" }')
   LONG=$long as_session "$home" "$SAY"'
     for n in 1 2; do printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt_id\":\"p1\",\"prompt\":\"once\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude; done
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude; done
     say main "$LONG" long
   ' || fail "a writer failed"
   [ "$(grep -c '"text":"once"' "$home/state/.host-mirror.jsonl")" -eq 1 ] || fail "an entry whose id is already recorded must not be appended again"
@@ -246,7 +246,7 @@ test_a_later_session_may_reuse_an_entry_id() {
   as_session "$home" "$SAY"'say captain "asked in the first session" p1' || fail "the first session failed"
   as_session "$home" "$SAY"'
     say captain "asked in the second session" p1
-    "$MIRROR" feed s1 new > "$FM_HOME/feed.second"
+    "$MIRROR" feed s1 new > "$JG_HOME/feed.second"
   ' || fail "the second session failed"
   assert_equals "[captain] asked in the second session" "$(cat "$home/feed.second")" \
     "a later session's entry must be recorded even when an earlier session used its id"
@@ -261,10 +261,10 @@ test_a_failed_append_leaves_the_mirror_valid() {
   as_session "$home" "$SAY"'
     say captain "asked before the disk filled" p1
     big=$(awk "BEGIN { for (i = 0; i < 3000; i++) printf \"z\" }")
-    (ulimit -f 1; trap "" XFSZ; say main "$big" p1) > "$FM_HOME/full.out" 2>&1
-    printf "%s\n" "$?" > "$FM_HOME/full.rc"
+    (ulimit -f 1; trap "" XFSZ; say main "$big" p1) > "$JG_HOME/full.out" 2>&1
+    printf "%s\n" "$?" > "$JG_HOME/full.rc"
     say captain "asked once space returned" p2
-    "$MIRROR" feed s1 new > "$FM_HOME/feed.after"
+    "$MIRROR" feed s1 new > "$JG_HOME/feed.after"
   ' || fail "the mirror did not stay valid across a failed append"
   assert_equals "0" "$(cat "$home/full.rc")" "a failed append must still exit 0"
   assert_equals "" "$(cat "$home/full.out")" "a failed append must print nothing"
@@ -288,14 +288,14 @@ test_mirror_is_owner_only_under_an_open_umask() {
   pass "mirror: the captain's dialog lands only in an owner-only mirror, even when the file already existed readable by others"
 }
 
-# A jq on PATH that appends its own argv to $FM_HOME/jq-argv.log, then runs
+# A jq on PATH that appends its own argv to $JG_HOME/jq-argv.log, then runs
 # the real jq.
 JQ_SHIM="$TMP_ROOT/jq-shim"
 mkdir -p "$JQ_SHIM"
 {
   printf '#!/usr/bin/env bash\nREAL_JQ=%q\n' "$(command -v jq)"
   cat <<'SH'
-printf '%s\n' "$@" >> "$FM_HOME/jq-argv.log"
+printf '%s\n' "$@" >> "$JG_HOME/jq-argv.log"
 exec "$REAL_JQ" "$@"
 SH
 } > "$JQ_SHIM/jq"
@@ -306,9 +306,9 @@ test_dialog_text_never_enters_process_arguments() {
   home=$(make_home argv)
   PATH="$JQ_SHIM:$PATH" as_session "$home" '
     printf "%s" "{\"hook_event_name\":\"UserPromptSubmit\",\"prompt_id\":\"p1\",\"prompt\":\"captain-secret-7f3a\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
     printf "%s" "{\"hook_event_name\":\"Stop\",\"prompt_id\":\"p1\",\"last_assistant_message\":\"main-secret-9c1e\"}" \
-      | FM_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
+      | JG_ROOT_OVERRIDE="$PRIMARY_ROOT" "$MIRROR" hook claude
   ' || fail "a writer failed"
   assert_equals "captain|captain-secret-7f3a
 main|main-secret-9c1e" "$(entries "$home")" "both entries must be recorded"
@@ -322,12 +322,12 @@ test_feed_resumes_reanchors_and_is_bounded() {
   home=$(make_home feed)
   as_session "$home" "$SAY"'
     say captain "first ask"; say main "first answer"
-    "$MIRROR" feed s1 new > "$FM_HOME/feed.1" && "$MIRROR" commit
+    "$MIRROR" feed s1 new > "$JG_HOME/feed.1" && "$MIRROR" commit
     say captain "second ask"
-    "$MIRROR" feed s1 resume > "$FM_HOME/feed.uncommitted"
-    "$MIRROR" feed s1 resume > "$FM_HOME/feed.2" && "$MIRROR" commit
-    "$MIRROR" feed s1 resume > "$FM_HOME/feed.3" && "$MIRROR" commit
-    "$MIRROR" feed s2 resume > "$FM_HOME/feed.4"
+    "$MIRROR" feed s1 resume > "$JG_HOME/feed.uncommitted"
+    "$MIRROR" feed s1 resume > "$JG_HOME/feed.2" && "$MIRROR" commit
+    "$MIRROR" feed s1 resume > "$JG_HOME/feed.3" && "$MIRROR" commit
+    "$MIRROR" feed s2 resume > "$JG_HOME/feed.4"
   ' || fail "the first session failed"
   assert_equals "[captain] first ask
 [main] first answer" "$(cat "$home/feed.1")" "a new conversation must be fed this session's dialog"
@@ -340,10 +340,10 @@ test_feed_resumes_reanchors_and_is_bounded() {
 
   as_session "$home" "$SAY"'
     say captain "a later session"
-    "$MIRROR" feed s3 new > "$FM_HOME/feed.5"
+    "$MIRROR" feed s3 new > "$JG_HOME/feed.5"
     big=$(awk "BEGIN { for (i = 0; i < 3000; i++) printf \"y\" }")
     for n in 1 2 3 4 5 6 7; do say main "$n $big"; done
-    "$MIRROR" feed s4 new > "$FM_HOME/feed.6"
+    "$MIRROR" feed s4 new > "$JG_HOME/feed.6"
   ' || fail "the second session failed"
   assert_equals "[captain] a later session" "$(cat "$home/feed.5")" "a new main session must never be fed an earlier session's dialog"
   out=$(cat "$home/feed.6")
@@ -363,7 +363,7 @@ test_feed_bound_includes_its_omitted_note() {
     say captain "the oldest ask"
     big=$(awk "BEGIN { for (i = 0; i < 3988; i++) printf \"y\" }")
     for n in 1 2 3 4; do say main "$n $big"; done
-    "$MIRROR" feed s1 new > "$FM_HOME/feed"
+    "$MIRROR" feed s1 new > "$JG_HOME/feed"
   ' || fail "the session failed"
   out=$(cat "$home/feed")
   [ "$(wc -c < "$home/feed")" -le 16000 ] || fail "the feed and its note must fit 16000 characters, got $(wc -c < "$home/feed")"
@@ -382,15 +382,15 @@ test_recycled_lock_pid_is_a_new_main_session() {
       printf "%s (claude) S 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 %s 0 0\n" "$$" "$2" > "$1/$$/stat"
       printf "claude\0" > "$1/$$/cmdline"
     }
-    fake_proc "$FM_HOME/proc.first" 1000
-    fake_proc "$FM_HOME/proc.recycled" 2000
-    export FM_PROC_ROOT_OVERRIDE="$FM_HOME/proc.first"
+    fake_proc "$JG_HOME/proc.first" 1000
+    fake_proc "$JG_HOME/proc.recycled" 2000
+    export JG_PROC_ROOT_OVERRIDE="$JG_HOME/proc.first"
     say captain "asked in the first session"
-    "$MIRROR" feed s1 new > "$FM_HOME/feed.first" && "$MIRROR" commit
-    export FM_PROC_ROOT_OVERRIDE="$FM_HOME/proc.recycled"
-    "$MIRROR" feed s2 new > "$FM_HOME/feed.recycled"
+    "$MIRROR" feed s1 new > "$JG_HOME/feed.first" && "$MIRROR" commit
+    export JG_PROC_ROOT_OVERRIDE="$JG_HOME/proc.recycled"
+    "$MIRROR" feed s2 new > "$JG_HOME/feed.recycled"
     say captain "asked in the recycled session"
-    "$MIRROR" feed s3 new > "$FM_HOME/feed.second"
+    "$MIRROR" feed s3 new > "$JG_HOME/feed.second"
   ' || fail "the session failed"
   assert_equals "[captain] asked in the first session" "$(cat "$home/feed.first")" \
     "one lock holder must keep one key across its writes and feeds"
@@ -426,13 +426,13 @@ test_recreated_mirror_continues_past_both_cursors() {
   as_session "$home" "$SAY"'
     for n in 1 2 3 4 5; do say captain "earlier ask $n"; done
     "$MIRROR" feed s1 new > /dev/null && "$MIRROR" commit
-    rm "$FM_HOME/state/.host-mirror.jsonl"
+    rm "$JG_HOME/state/.host-mirror.jsonl"
     say captain "asked after the mirror was lost"
-    "$MIRROR" feed s1 resume > "$FM_HOME/feed.recreated"
-    rm "$FM_HOME/state/.host-mirror.jsonl"
+    "$MIRROR" feed s1 resume > "$JG_HOME/feed.recreated"
+    rm "$JG_HOME/state/.host-mirror.jsonl"
     say captain "asked while that turn ran"
     "$MIRROR" commit
-    "$MIRROR" feed s1 resume > "$FM_HOME/feed.after-commit"
+    "$MIRROR" feed s1 resume > "$JG_HOME/feed.after-commit"
   ' || fail "the session failed"
   assert_equals "[captain] asked after the mirror was lost" "$(cat "$home/feed.recreated")" \
     "a recreated mirror must not number new dialog at or below the committed cursor"

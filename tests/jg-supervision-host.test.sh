@@ -6,7 +6,7 @@
 # The loop cases run the real host, arm, watcher, wake grant, drain, outcome
 # store, and lease scripts in a fixture home. The host runs as a child of a fake
 # harness (a bash symlink named "claude") whose pid is the home's session lock,
-# and its engine is a stub named by FM_SUPERVISION_ENGINE_CLAUDE_BIN that does
+# and its engine is a stub named by JG_SUPERVISION_ENGINE_CLAUDE_BIN that does
 # what a branch turn does through the same scripts, so the real argument
 # construction, bounding, and reaping are exercised without a model. A real
 # status append drives each wake through the real watcher.
@@ -34,7 +34,7 @@ ln -s /bin/bash "$FAKEBIN/claude"
 FAKE_CLAUDE="$FAKEBIN/claude"
 
 # The stub engine. It records its environment and arguments, then acts like a
-# branch turn through the real scripts according to $FM_HOME/stub-mode:
+# branch turn through the real scripts according to $JG_HOME/stub-mode:
 #   handle      drain, claim the task's lease, report, acknowledge, release
 #   captain     the same as handle, but report verdict captain naming the rows
 #               the drain presented
@@ -50,7 +50,7 @@ FAKE_CLAUDE="$FAKEBIN/claude"
 #   return-first the captain returns first, then handle, then block until the
 #               host is stopped (an owner killing its host at the turn's end)
 #   noack       the same as handle, but skip the acknowledgement
-#   held        handle, but first block reading the $FM_HOME/stub-release FIFO
+#   held        handle, but first block reading the $JG_HOME/stub-release FIFO
 #               until the test writes to it, so the test chooses when the turn
 #               ends
 #   captain-held the same, but record a captain outcome before the turn ends
@@ -66,28 +66,28 @@ STUB="$TMP_ROOT/engine-stub"
 cat > "$STUB" <<'SH'
 #!/usr/bin/env bash
 set -u
-STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
-mode=$(cat "$FM_HOME/stub-mode" 2>/dev/null || echo handle)
-n=$(( $(ls "$FM_HOME"/engine-call.* 2>/dev/null | wc -l) + 1 ))
+STATE=${JG_STATE_OVERRIDE:-$JG_HOME/state}
+mode=$(cat "$JG_HOME/stub-mode" 2>/dev/null || echo handle)
+n=$(( $(ls "$JG_HOME"/engine-call.* 2>/dev/null | wc -l) + 1 ))
 {
-  printf 'mode=%s\nactor=%s\nholder=%s\nprimary=%s\nturn=%s\n' "$mode" "${FM_SUPERVISION_ACTOR:-}" \
-    "${FM_LEASE_HOLDER_PID:-}" "${FM_SUPERVISION_PRIMARY_HARNESS:-}" "${FM_BRANCH_REPORT_TURN:-}"
+  printf 'mode=%s\nactor=%s\nholder=%s\nprimary=%s\nturn=%s\n' "$mode" "${JG_SUPERVISION_ACTOR:-}" \
+    "${JG_LEASE_HOLDER_PID:-}" "${JG_SUPERVISION_PRIMARY_HARNESS:-}" "${JG_BRANCH_REPORT_TURN:-}"
   for a in "$@"; do printf 'arg=%s\n' "$a"; done
-} > "$FM_HOME/engine-call.$n"
-case "$mode" in held|captain-held) printf 'ready\n' > "$FM_HOME/stub-ready" ;; esac
+} > "$JG_HOME/engine-call.$n"
+case "$mode" in held|captain-held) printf 'ready\n' > "$JG_HOME/stub-ready" ;; esac
 # Like Claude, the reported cost is the conversation's running total.
 result() {
   printf '{"type":"result","subtype":"success","is_error":false,"num_turns":3,"total_cost_usd":%s,' "$(awk -v n="$n" 'BEGIN { print n * 0.25 }')"
   printf '"usage":{"input_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":10,"output_tokens":20},"session_id":"stub"}\n'
 }
 if [ "$mode" = hang ]; then
-  perl -e 'setpgrp(0, 0); exec "sleep", $ARGV[0]' "$FM_TEST_STUB_MAX_BLOCK_SECONDS" &
-  printf '%s\n' "$!" > "$FM_HOME/orphan-pid"
-  sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS"
+  perl -e 'setpgrp(0, 0); exec "sleep", $ARGV[0]' "$JG_TEST_STUB_MAX_BLOCK_SECONDS" &
+  printf '%s\n' "$!" > "$JG_HOME/orphan-pid"
+  sleep "$JG_TEST_STUB_MAX_BLOCK_SECONDS"
   exit 0
 fi
-drain=$("$FM_REPO/bin/jg-wake-drain.sh" 2>&1)
-printf '%s\n' "$drain" > "$FM_HOME/engine-drain.$n"
+drain=$("$JG_REPO/bin/jg-wake-drain.sh" 2>&1)
+printf '%s\n' "$drain" > "$JG_HOME/engine-drain.$n"
 ack=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/jg-wake-drain.sh //p' | tail -1)
 task=$(sed -n 's/^tasks=//p' "$STATE/.supervision-host-turn" | awk '{ print $1 }')
 [ -n "$task" ] || task=fleet
@@ -96,15 +96,15 @@ verdict=routine
 case "$mode" in
   fail) exit 3 ;;
   handle|captain|captain-close-before-return|held|captain-held|hold-lease|return|return-silent|return-fail|return-fail-silent|return-many|return-lookup-fail|return-first|noack|emptyresult|go-away)
-    case "$mode" in held|captain-held) read -r _ < "$FM_HOME/stub-release" ;; esac
-    [ "$mode" != return-first ] || "$FM_REPO/bin/jg-afk-contract.sh" archive >> "$FM_HOME/engine-return.log" 2>&1
-    [ "$mode" != go-away ] || "$FM_REPO/bin/jg-afk-contract.sh" enter --words 'gone mid-turn' >> "$FM_HOME/engine-return.log" 2>&1
-    "$FM_REPO/bin/jg-lease.sh" claim "$task" >> "$FM_HOME/engine-lease.log" 2>&1
+    case "$mode" in held|captain-held) read -r _ < "$JG_HOME/stub-release" ;; esac
+    [ "$mode" != return-first ] || "$JG_REPO/bin/jg-afk-contract.sh" archive >> "$JG_HOME/engine-return.log" 2>&1
+    [ "$mode" != go-away ] || "$JG_REPO/bin/jg-afk-contract.sh" enter --words 'gone mid-turn' >> "$JG_HOME/engine-return.log" 2>&1
+    "$JG_REPO/bin/jg-lease.sh" claim "$task" >> "$JG_HOME/engine-lease.log" 2>&1
     if [ "$mode" = captain ] || [ "$mode" = captain-held ] \
       || [ "$mode" = captain-close-before-return ]; then
-      "$FM_REPO/bin/jg-branch-report.sh" --task "$task" --verdict captain \
+      "$JG_REPO/bin/jg-branch-report.sh" --task "$task" --verdict captain \
         --summary "stub escalated: $(printf '%s\n' "$drain" | grep -v '^WAKE_' | tr '\n' ' ' | cut -c1-400)" \
-        >> "$FM_HOME/engine-report.log" 2>&1
+        >> "$JG_HOME/engine-report.log" 2>&1
     else
       report_args=(--task "$task" --verdict "$verdict" --summary "stub handled $task")
       case "$mode" in
@@ -112,13 +112,13 @@ case "$mode" in
           report_args=(--task "$task" --verdict routine --summary 'still working; nothing new has happened; no action was taken' --silent true)
           ;;
       esac
-      "$FM_REPO/bin/jg-branch-report.sh" "${report_args[@]}" >> "$FM_HOME/engine-report.log" 2>&1
+      "$JG_REPO/bin/jg-branch-report.sh" "${report_args[@]}" >> "$JG_HOME/engine-report.log" 2>&1
     fi
     if [ "$mode" = return-many ]; then
       awk -v task="$task" 'BEGIN { for (seq = 2; seq <= 1001; seq++)
         printf "{\"seq\":%d,\"epoch\":1,\"task\":\"%s\",\"wake\":\"host test\",\"verdict\":\"routine\",\"summary\":\"bulk silent fixture\",\"silent\":true}\n", seq, task
       }' >> "$STATE/branch-outcomes.jsonl"
-      awk -v turn="$FM_BRANCH_REPORT_TURN" -v task="$task" 'BEGIN { for (seq = 2; seq <= 1001; seq++)
+      awk -v turn="$JG_BRANCH_REPORT_TURN" -v task="$task" 'BEGIN { for (seq = 2; seq <= 1001; seq++)
         printf "%s\t%d\troutine\t%s\n", turn, seq, task
       }' >> "$STATE/.supervision-host-receipts"
     fi
@@ -126,7 +126,7 @@ case "$mode" in
       printf 'not-json\n' >> "$STATE/branch-outcomes.jsonl"
     fi
     # shellcheck disable=SC2086 # the printed acknowledgement arguments
-    [ -z "$ack" ] || [ "$mode" = noack ] || "$FM_REPO/bin/jg-wake-drain.sh" $ack >> "$FM_HOME/engine-ack.log" 2>&1
+    [ -z "$ack" ] || [ "$mode" = noack ] || "$JG_REPO/bin/jg-wake-drain.sh" $ack >> "$JG_HOME/engine-ack.log" 2>&1
     case "$mode" in captain-close-before-return)
       watcher=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
       [ -z "$watcher" ] || kill -TERM "$watcher" 2>/dev/null || true
@@ -137,12 +137,12 @@ case "$mode" in
       done
       ;;
     esac
-    [ "$mode" = hold-lease ] || "$FM_REPO/bin/jg-lease.sh" release "$task" >> "$FM_HOME/engine-lease.log" 2>&1
+    [ "$mode" = hold-lease ] || "$JG_REPO/bin/jg-lease.sh" release "$task" >> "$JG_HOME/engine-lease.log" 2>&1
     case "$mode" in
-      return|return-silent|return-fail|return-fail-silent|return-many|return-lookup-fail) "$FM_REPO/bin/jg-afk-contract.sh" archive >> "$FM_HOME/engine-return.log" 2>&1 ;;
+      return|return-silent|return-fail|return-fail-silent|return-many|return-lookup-fail) "$JG_REPO/bin/jg-afk-contract.sh" archive >> "$JG_HOME/engine-return.log" 2>&1 ;;
     esac
     case "$mode" in return-fail|return-fail-silent) exit 3 ;; esac
-    [ "$mode" != return-first ] || sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS"
+    [ "$mode" != return-first ] || sleep "$JG_TEST_STUB_MAX_BLOCK_SECONDS"
     [ "$mode" != emptyresult ] || { printf '{}\n'; exit 0; }
     result
     ;;
@@ -151,14 +151,14 @@ esac
 SH
 chmod +x "$STUB"
 
-export FM_REPO="$ROOT"
-export FM_SUPERVISION_ENGINE_CLAUDE_BIN="$STUB"
-export FM_SUPERVISION_HOST_PRIMARY=claude
-export FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
+export JG_REPO="$ROOT"
+export JG_SUPERVISION_ENGINE_CLAUDE_BIN="$STUB"
+export JG_SUPERVISION_HOST_PRIMARY=claude
+export JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999
 # Keep the real engine watchdog/reaping path, but not its production grace in fixtures.
-export FM_SUPERVISION_ENGINE_GRACE=1
-export FM_ARM_CONFIRM_TIMEOUT=30
-unset FM_SUPERVISION_ACTOR FM_BRANCH_REPORT_TURN FM_LEASE_HOLDER_PID PI_CODING_AGENT
+export JG_SUPERVISION_ENGINE_GRACE=1
+export JG_ARM_CONFIRM_TIMEOUT=30
+unset JG_SUPERVISION_ACTOR JG_BRANCH_REPORT_TURN JG_LEASE_HOLDER_PID PI_CODING_AGENT
 
 # Homes are registered in a file: make_home runs in a command substitution,
 # whose variables never reach this shell.
@@ -216,15 +216,15 @@ make_home() {  # <name> <attended|away|quiet> [config line]
   [ "$2" = away ] \
     || printf '{"hook_event_name":"UserPromptSubmit","prompt_id":"p0","prompt":"watch the fleet for me"}' > "$home/mirror-seed.0"
   if [ "$2" = away ]; then
-    FM_HOME="$home" "$CONTRACT" enter --words 'watch the fleet; merge nothing' >/dev/null 2>&1 \
+    JG_HOME="$home" "$CONTRACT" enter --words 'watch the fleet; merge nothing' >/dev/null 2>&1 \
       || fail "fixture: could not record the away posture"
   fi
   # Quiet mode's record with no daemon flag: a quiet entry whose daemon never
   # started or stopped, left beside a present captain.
   if [ "$2" = quiet ]; then
-    FM_HOME="$home" FM_AFK_MODE=quiet "$CONTRACT" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    JG_HOME="$home" JG_AFK_MODE=quiet "$CONTRACT" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
       || fail "fixture: could not record quiet mode"
-    [ "$(FM_HOME="$home" "$CONTRACT" mode)" = quiet ] || fail "fixture: the record is not quiet mode's"
+    [ "$(JG_HOME="$home" "$CONTRACT" mode)" = quiet ] || fail "fixture: the record is not quiet mode's"
   fi
   printf '%s\n' "$home" >> "$HOMES_FILE"
   printf '%s\n' "$home"
@@ -244,17 +244,17 @@ ln -s "$ROOT/bin" "$MIRROR_ROOT/bin"
 start_host() {  # <home> [park options...]
   local home=$1
   shift
-  FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
+  JG_HOME="$home" JG_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
     MIRROR_ROOT="$MIRROR_ROOT" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      rm -f "$FM_HOME/host.rc"
-      for seed in "$FM_HOME"/mirror-seed.*; do
+      printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$JG_HOME/claude-pids"
+      rm -f "$JG_HOME/host.rc"
+      for seed in "$JG_HOME"/mirror-seed.*; do
         [ -f "$seed" ] || continue
-        FM_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/jg-host-mirror.sh" hook claude < "$seed"
+        JG_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/jg-host-mirror.sh" hook claude < "$seed"
       done
-      "$0" park "$@" > "$FM_HOME/host.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/host.rc"
+      "$0" park "$@" > "$JG_HOME/host.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/host.rc"
     ' "$HOST" "$@" 2>> "$home/claude.err" &
 }
 
@@ -286,10 +286,10 @@ host_exited() { [ -s "$1/host.rc" ]; }
 # The recovery marker's episode kind (downtime or handling), read through its
 # owner's parser; the Claude re-arm owner delivers a close only on downtime.
 marker_kind() {  # <home>
-  FM_HOME="$1" bash -c '
+  JG_HOME="$1" bash -c '
     . "$1"
     jg_recovery_marker_read "$2" || exit 1
-    kind=${FM_RECOVERY_MARKER_TOKEN#*:}
+    kind=${JG_RECOVERY_MARKER_TOKEN#*:}
     printf "%s\n" "${kind%%:*}"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$1/state/.watcher-down"
 }
@@ -309,25 +309,25 @@ test_report_surface_enforces_actor_turn_and_scope() {
   mkdir -p "$state"
   printf 'turn=t1\nrows=4\ntasks=alpha\nunscoped=0\nwake=signal: alpha.status\n' > "$state/.supervision-host-turn"
 
-  out=$(FM_HOME="$home" "$REPORT" --task alpha --verdict routine --summary ok 2>&1); rc=$?
+  out=$(JG_HOME="$home" "$REPORT" --task alpha --verdict routine --summary ok 2>&1); rc=$?
   expect_code 3 "$rc" "a report outside the branch actor must be refused"
   assert_contains "$out" "only the supervision branch reports outcomes" "actor refusal must say why"
 
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t0 "$REPORT" --task alpha --verdict routine --summary ok 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t0 "$REPORT" --task alpha --verdict routine --summary ok 2>&1); rc=$?
   expect_code 3 "$rc" "a report for an ended turn must be refused"
 
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task beta --verdict captain --summary 'from memory' 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task beta --verdict captain --summary 'from memory' 2>&1); rc=$?
   expect_code 3 "$rc" "a report for a task the wake did not name must be refused"
   assert_contains "$out" "names alpha, not beta" "scope refusal must name the wake's task"
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task fleet --verdict routine --summary quiet 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task fleet --verdict routine --summary quiet 2>&1); rc=$?
   expect_code 3 "$rc" "a fleet report on a task-scoped wake must be refused"
   [ ! -e "$state/branch-outcomes.jsonl" ] || fail "a refused report touched the outcome store"
 
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready' --silent true 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready' --silent true 2>&1); rc=$?
   expect_code 2 "$rc" "a captain outcome with --silent true must be refused"
   [ ! -e "$state/branch-outcomes.jsonl" ] || fail "a refused silent captain outcome changed the durable store"
 
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready' 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready' 2>&1); rc=$?
   expect_code 0 "$rc" "an in-scope report must be recorded"
   assert_contains "$out" "recorded seq 1 [captain]" "the report must name its store sequence"
   assert_grep '"task":"alpha"' "$state/branch-outcomes.jsonl" "the outcome store did not receive the report"
@@ -336,7 +336,7 @@ test_report_surface_enforces_actor_turn_and_scope() {
     || fail "the host receipt was not written: $(cat "$state/.supervision-host-receipts")"
   local wake_queue_before
   wake_queue_before=$(cat "$state/.wake-queue" 2>/dev/null || true)
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" \
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" \
     --task alpha --verdict routine --summary 'still busy, nothing new, no action taken' --silent true 2>&1); rc=$?
   expect_code 0 "$rc" "a task-level routine no-change outcome may be silent"
   assert_contains "$out" "silent outcome remains in the outcome store" "silent task outcome response lost its durability note"
@@ -346,7 +346,7 @@ test_report_surface_enforces_actor_turn_and_scope() {
     || fail "a silent task outcome queued a captain notification"
 
   printf 'turn=t2\nrows=5\ntasks=\nunscoped=1\nwake=heartbeat\n' > "$state/.supervision-host-turn"
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t2 "$REPORT" --task fleet --verdict routine --summary quiet --silent true 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t2 "$REPORT" --task fleet --verdict routine --summary quiet --silent true 2>&1); rc=$?
   expect_code 0 "$rc" "an unscoped heartbeat turn must accept a silent fleet report"
   pass "report surface: only the branch actor's current turn may report, and only on the tasks its wake names"
 }
@@ -359,30 +359,30 @@ test_report_after_the_return_is_queued_for_main() {
   home="$TMP_ROOT/report-return"
   state="$home/state"
   mkdir -p "$state"
-  FM_HOME="$home" "$CONTRACT" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "fixture: could not record the away posture"
+  JG_HOME="$home" "$CONTRACT" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "fixture: could not record the away posture"
   printf 'turn=t1\nrows=4\ntasks=alpha\nunscoped=0\nwake=signal: alpha.status\n' > "$state/.supervision-host-turn"
 
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict routine --summary 'steered while away' 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict routine --summary 'steered while away' 2>&1); rc=$?
   expect_code 0 "$rc" "a report during the away window must be recorded"
   assert_contains "$out" "it waits in the outcome store for MAIN" "a report during the away window waits for the return brief"
   ! grep -qs 'supervision-host-return' "$state/.wake-queue" || fail "a report during the away window must not be queued for main"
 
-  FM_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready for review' 2>&1); rc=$?
+  JG_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" --task alpha --verdict captain --summary 'PR ready for review' 2>&1); rc=$?
   expect_code 0 "$rc" "a report after the return must be recorded"
   assert_contains "$out" "recorded seq 2 [captain]; the captain has returned, so it is queued for MAIN to relay" \
     "a report after the return must say it is queued for main"
   assert_re $'\tcheck\tsupervision-host-return:2\tcheck: supervision-host outcome 2 for alpha \\[captain\\] was recorded after the captain returned.*relay it to the captain: PR ready for review$' \
     "$state/.wake-queue" "the late outcome must be a durable check wake for main"
   queue_before=$(cat "$state/.wake-queue")
-  out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_BRANCH_REPORT_TURN=t1 "$REPORT" \
+  out=$(JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_BRANCH_REPORT_TURN=t1 "$REPORT" \
     --task alpha --verdict routine --summary 'still building; nothing new has happened; no action was taken' --silent true 2>&1); rc=$?
   expect_code 0 "$rc" "a silent report after the return must be recorded"
   assert_contains "$out" "silent outcome remains in the outcome store" "the post-return silent report lost its durability note"
   assert_grep '"task":"alpha","wake":"signal: alpha.status","verdict":"routine","summary":"still building; nothing new has happened; no action was taken","silent":true' \
     "$state/branch-outcomes.jsonl" "the post-return silent outcome was not retained"
   [ "$(cat "$state/.wake-queue")" = "$queue_before" ] || fail "a silent report after the return queued another check wake"
-  drained=$(FM_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
+  drained=$(JG_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
   assert_contains "$drained" "supervision-host outcome 2 for alpha [captain] was recorded after the captain returned" \
     "main's drain must present the late outcome"
   assert_not_contains "$drained" 'still building; nothing new has happened' "main's drain rendered the post-return silent note"
@@ -400,40 +400,40 @@ test_dispatch_entry_scopes_rows_and_renders_the_away_tail() {
   append_wake "$state" signal demo.status "signal: $state/demo.status"
   append_wake "$state" check merge "check: merge landed: fixture"
 
-  out=$(FM_HOME="$home" node "$DISPATCH" scope)
+  out=$(JG_HOME="$home" node "$DISPATCH" scope)
   assert_contains "$out" "status=safe" "an attended scan with a resolvable row must be safe"
   assert_contains "$out" "rows=1" "an attended scan must leave the check row to main"
   assert_contains "$out" "tasks=demo" "the signal row must resolve to its task"
   assert_contains "$out" "unscoped=0" "a task-local claim must be scoped"
 
-  out=$(FM_HOME="$home" node "$DISPATCH" scope --afk)
+  out=$(JG_HOME="$home" node "$DISPATCH" scope --afk)
   assert_contains "$out" "rows=1 2" "an away scan must claim the check row too"
   assert_contains "$out" "unscoped=1" "a claimed check row names no task, so the claim is unscoped"
 
-  out=$(printf 'check: merge landed: fixture\n' | FM_HOME="$home" node "$DISPATCH" offer)
+  out=$(printf 'check: merge landed: fixture\n' | JG_HOME="$home" node "$DISPATCH" offer)
   assert_contains "$out" "eligible=0" "an attended check trigger must stay main's"
-  out=$(printf 'check: merge landed: fixture\n' | FM_HOME="$home" node "$DISPATCH" offer --afk)
+  out=$(printf 'check: merge landed: fixture\n' | JG_HOME="$home" node "$DISPATCH" offer --afk)
   assert_contains "$out" "eligible=1" "an away check trigger must be the branch's"
-  out=$(printf 'signal: %s\n' "$state/demo.status" | FM_HOME="$home" node "$DISPATCH" offer)
+  out=$(printf 'signal: %s\n' "$state/demo.status" | JG_HOME="$home" node "$DISPATCH" offer)
   assert_contains "$out" "eligible=1" "an attended signal trigger with a claimable row must be the branch's"
   assert_contains "$out" "rows=1" "the offer must carry the scope it judged"
 
   printf '[captain] keep it small\n[main] Will do.\n' > "$home/mirror"
-  out=$(printf 'signal: demo.status\n' | FM_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror")
+  out=$(printf 'signal: demo.status\n' | JG_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror")
   assert_contains "$out" "MAIN DIALOG MIRROR (read-only context" "an attended wake prompt must open with the mirror header"
   assert_contains "$out" "[captain] keep it small" "the mirror must carry the captain's words"
   assert_not_contains "$out" "POSTURE: AWAY" "an attended wake prompt must carry no away tail"
   : > "$home/mirror"
-  out=$(printf 'signal: demo.status\n' | FM_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror")
+  out=$(printf 'signal: demo.status\n' | JG_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror")
   assert_not_contains "$out" "MAIN DIALOG MIRROR" "an empty feed must add nothing"
   rm -f "$home/mirror"
   rc=0
-  out=$(printf 'signal: demo.status\n' | FM_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror" 2>/dev/null) || rc=$?
+  out=$(printf 'signal: demo.status\n' | JG_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --mirror-file "$home/mirror" 2>/dev/null) || rc=$?
   [ "$rc" -eq 3 ] || fail "a supplied mirror feed that cannot be read must exit 3, got $rc"
   [ -z "$out" ] || fail "a supplied mirror feed that cannot be read must render no prompt: $out"
 
   printf 'Away posture (recorded):\n  your words (verbatim):\n    merge nothing\n' > "$home/readback"
-  out=$(printf 'signal: demo.status\n' | FM_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --away --readback-file "$home/readback")
+  out=$(printf 'signal: demo.status\n' | JG_HOME="$home" node "$DISPATCH" wake-prompt --report 'the bin/jg-branch-report.sh command' --away --readback-file "$home/readback")
   assert_contains "$out" "FIRSTMATE SUPERVISION WAKE: signal: demo.status" "the wake prompt must carry the reason"
   assert_contains "$out" "finish with the bin/jg-branch-report.sh command." "the wake prompt must name the host's report surface"
   assert_contains "$out" "POSTURE: AWAY." "an away wake prompt must carry the posture tail"
@@ -456,7 +456,7 @@ test_branch_outcomes_only_on_a_host_home_off_pi() {
   local home drained fakes
   home="$TMP_ROOT/drain-scope"
   mkdir -p "$home/state" "$home/config"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict captain --summary 'PR ready for review' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict captain --summary 'PR ready for review' >/dev/null \
     || fail "fixture: could not record a captain outcome"
   fakes="$TMP_ROOT/drain-scope-fakes"
   mkdir -p "$fakes"
@@ -464,23 +464,23 @@ test_branch_outcomes_only_on_a_host_home_off_pi() {
   ln -sf /bin/bash "$fakes/codex"
 
   : > "$home/config/supervision-host-off"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a Claude home opted out by config/supervision-host-off must not present branch outcomes"
   assert_absent "$home/state/.branch-outcomes-cursor" "a Claude home opted out by config/supervision-host-off must keep the store's read cursor untouched"
 
   rm -f "$home/config/supervision-host" "$home/config/supervision-host-off"
-  drained=$(FM_HOME="$home" "$fakes/codex" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$fakes/codex" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a Codex home without config/supervision-host must not present branch outcomes"
   assert_absent "$home/state/.branch-outcomes-cursor" "a Codex home without config/supervision-host must keep the store's read cursor untouched"
-  drained=$(FM_HOME="$home" "$fakes/pi" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$fakes/pi" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a Pi primary's drain must leave captain outcomes to the branch extension"
   assert_absent "$home/state/.branch-outcomes-cursor" "a Pi primary's drain must not advance the store's read cursor"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1, recorded 0m ago] demo: PR ready for review" "a Claude home without config/supervision-host must present the captain outcome"
 
   : > "$home/config/supervision-host"
-  drained=$(FM_HOME="$home" "$fakes/codex" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$fakes/codex" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1, recorded 0m ago] demo: PR ready for review" "a Codex home with config/supervision-host must present the captain outcome"
   pass "drain: BRANCH OUTCOMES runs on a Claude home by default and on another primary with the file, never with off, and never on Pi"
 }
@@ -496,13 +496,13 @@ test_branch_outcomes_put_captain_first_and_collapse_routine_overflow() {
   : > "$home/config/supervision-host"
   pad=$(awk 'BEGIN { for (i = 0; i < 400; i++) printf "x" }')
   for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
-    FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary "routine $n $pad" >/dev/null \
+    JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary "routine $n $pad" >/dev/null \
       || fail "fixture: could not record routine outcome $n"
   done
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict captain --summary 'PR ready for review' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict captain --summary 'PR ready for review' >/dev/null \
     || fail "fixture: could not record the captain outcome"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 13, recorded 0m ago] demo: PR ready for review" "the captain outcome must be presented despite the routine backlog"
   assert_contains "$drained" "run bin/jg-branch-outcome.sh mark-processed --through 13" "the captain outcome must carry its acknowledgement"
   [ "$(printf '%s\n' "$drained" | grep -n 'PR ready for review' | cut -d: -f1)" -lt "$(printf '%s\n' "$drained" | grep -n 'routine 12' | cut -d: -f1)" ] \
@@ -511,10 +511,10 @@ test_branch_outcomes_put_captain_first_and_collapse_routine_overflow() {
   assert_not_contains "$drained" "routine 1 " "the oldest routine outcome must collapse into the count"
   assert_re '^\([0-9]+ earlier routine outcome\(s\) not shown; bin/jg-branch-outcome.sh list keeps them\)$' <(printf '%s\n' "$drained") \
     "the routine overflow must collapse into one count"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 13 >/dev/null 2>&1 \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 13 >/dev/null 2>&1 \
     || fail "main's acknowledgement of the presented captain outcome was refused"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "one drain must clear the routine backlog, and an acknowledged store must present nothing"
   pass "drain: captain outcomes come first, and routine overflow collapses into a count one drain clears"
 }
@@ -530,41 +530,41 @@ test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
   for n in 1 2 3; do
-    FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task alpha --verdict captain --summary "alpha still blocked $n" >/dev/null \
+    JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task alpha --verdict captain --summary "alpha still blocked $n" >/dev/null \
       || fail "fixture: could not record alpha outcome $n"
   done
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task beta --verdict captain --summary 'beta ready to merge' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task beta --verdict captain --summary 'beta ready to merge' >/dev/null \
     || fail "fixture: could not record the beta outcome"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 3, newest of 3 for this task, recorded 0m ago] alpha: alpha still blocked 3" "repeated outcomes for one task must collapse to its newest"
   assert_not_contains "$drained" "alpha still blocked 1" "an older outcome for the same task must not be repeated"
   assert_contains "$drained" "[seq 4, recorded 0m ago] beta: beta ready to merge" "another task's outcome must keep its own line"
   assert_contains "$drained" "mark-processed --through 4;" "one acknowledgement must cover every presented task"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 4 >/dev/null 2>&1 || fail "the acknowledgement was refused"
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 4 >/dev/null 2>&1 || fail "the acknowledgement was refused"
 
   pad=$(awk 'BEGIN { for (i = 0; i < 535; i++) printf "y" }')
   for n in 1 2 3 4 5 6 7 8; do
     task=task-$n
-    FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "$task" --verdict captain --summary "$task $pad" >/dev/null \
+    JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "$task" --verdict captain --summary "$task $pad" >/dev/null \
       || fail "fixture: could not record $task"
   done
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task task-1 --verdict captain --summary 'task-1 changed again' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task task-1 --verdict captain --summary 'task-1 changed again' >/dev/null \
     || fail "fixture: could not record the later task-1 outcome"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES: 3 newer captain outcome(s) are held back (byte cap); they follow on the next drain once these are acknowledged" \
     "the section must count every held-back captain row"
   assert_contains "$drained" "[seq 5, recorded 0m ago] task-1: task-1 $pad" "the first task must show its newest outcome the acknowledgement covers"
   assert_not_contains "$drained" "task-1 changed again" "a row after a held-back one must wait, since the acknowledgement cannot cover it"
   assert_not_contains "$drained" "task-7:" "the cap must hold back the rows past the contiguous run"
   assert_contains "$drained" "mark-processed --through 10;" "the acknowledgement must cover exactly the presented run"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 10 >/dev/null 2>&1 || fail "the acknowledgement was refused"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 10 >/dev/null 2>&1 || fail "the acknowledgement was refused"
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "task-8: task-8" "a held-back task must follow once the shown tasks are acknowledged"
   assert_contains "$drained" "[seq 13, recorded 0m ago] task-1: task-1 changed again" "the held-back row of a shown task must follow once the run is acknowledged"
   assert_not_contains "$drained" "held back" "the rest must fit once the run is acknowledged"
   assert_contains "$drained" "mark-processed --through 13;" "the acknowledgement must cover the rest"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 13 >/dev/null 2>&1 || fail "the acknowledgement was refused"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 13 >/dev/null 2>&1 || fail "the acknowledgement was refused"
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "an acknowledged situation must not be presented again"
   pass "drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers"
 }
@@ -579,25 +579,25 @@ test_branch_outcomes_present_a_long_away_window_once() {
   home="$TMP_ROOT/drain-away-window"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter --words 'watch the fleet' >/dev/null 2>&1 \
+  JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter --words 'watch the fleet' >/dev/null 2>&1 \
     || fail "fixture: could not record the away posture"
   pad=$(awk 'BEGIN { for (i = 0; i < 200; i++) printf "z" }')
   for n in $(seq 1 40); do
-    FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "task-$((n % 4))" --verdict routine --summary "routine $n $pad" >/dev/null \
+    JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "task-$((n % 4))" --verdict routine --summary "routine $n $pad" >/dev/null \
       || fail "fixture: could not record routine outcome $n"
     case "$n" in
       10|20|30)
-        FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task alpha --verdict captain --summary "alpha still needs review $n" >/dev/null \
+        JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task alpha --verdict captain --summary "alpha still needs review $n" >/dev/null \
           || fail "fixture: could not record alpha outcome $n" ;;
     esac
   done
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task beta --verdict captain --summary 'beta ready to merge' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task beta --verdict captain --summary 'beta ready to merge' >/dev/null \
     || fail "fixture: could not record the beta outcome"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a drain while away must leave the window's outcomes for the return"
-  FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
+  JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 33, newest of 3 for this task, recorded 0m ago] alpha: alpha still needs review 30" "a task's repeated captain outcomes must collapse to its newest"
   [ "$(printf '%s\n' "$drained" | grep -c '] alpha: ')" -eq 1 ] || fail "a task's captain outcomes must take one line: $drained"
   assert_contains "$drained" "[seq 44, recorded 0m ago] beta: beta ready to merge" "another task's captain outcome must keep its own line"
@@ -608,9 +608,9 @@ test_branch_outcomes_present_a_long_away_window_once() {
   [ "${#drained}" -lt 8000 ] || fail "a long away window must cost one short drain, got ${#drained} bytes"
   target=$(printf '%s\n' "$drained" | sed -n 's/.*mark-processed --through \([0-9]*\);.*/\1/p')
   [ "$target" = 44 ] || fail "one acknowledgement must cover every captain outcome of the window, got '${target:-none}'"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through "$target" >/dev/null 2>&1 || fail "the acknowledgement was refused"
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through "$target" >/dev/null 2>&1 || fail "the acknowledgement was refused"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a second drain must show nothing from the window"
   pass "drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again"
 }
@@ -625,12 +625,12 @@ test_branch_outcomes_budgets_count_bytes() {
     mkdir -p "$home/state" "$home/config"
     : > "$home/config/supervision-host"
     for n in 1 2 3 4 5 6; do
-      FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "wide-$n" --verdict routine --summary "$wide" >/dev/null \
+      JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task "wide-$n" --verdict routine --summary "$wide" >/dev/null \
         || fail "fixture: could not record routine outcome $n"
     done
-    FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task wide-cap --verdict captain --summary "$wide" >/dev/null \
+    JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task wide-cap --verdict captain --summary "$wide" >/dev/null \
       || fail "fixture: could not record the captain outcome"
-    drained=$(LC_ALL=$locale FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+    drained=$(LC_ALL=$locale JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
     assert_contains "$drained" "wide-cap: " "the captain outcome must be presented (locale '$locale')"
     printf '%s\n' "$drained" | LC_ALL=C awk '/^\[seq [0-9]+[^]]*\] wide-/ && length($0) > 599 { bad = 1 } END { exit bad }' \
       || fail "an item exceeded its 599-byte cap (locale '$locale'): $drained"
@@ -656,16 +656,16 @@ test_branch_outcomes_stay_unread_when_a_projection_fails() {
   : > "$home/config/supervision-host"
   printf '#!/usr/bin/env bash\ncase "$*" in *"newest of"*) exit 5 ;; esac\nexec %q "$@"\n' "$(command -v jq)" > "$home/bin/jq"
   chmod +x "$home/bin/jq"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task cap --verdict captain --summary 'needs your merge call' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task cap --verdict captain --summary 'needs your merge call' >/dev/null \
     || fail "fixture: could not record the captain outcome"
   rc=0
-  drained=$(PATH="$home/bin:$PATH" FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh") || rc=$?
+  drained=$(PATH="$home/bin:$PATH" JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh") || rc=$?
   [ "$rc" -ne 0 ] || fail "a drain whose projection failed must exit nonzero: $drained"
   assert_contains "$drained" "BRANCH OUTCOMES SKIPPED: the outcome store could not be projected safely" \
     "a failed projection must be reported"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1] demo: merged the docs fix" "a routine outcome behind a failed projection must follow on the next drain"
   assert_contains "$drained" "[seq 2, recorded 0m ago] cap: needs your merge call" "a captain outcome behind a failed projection must follow on the next drain"
   pass "drain: branch outcomes stay unread when a projection of the store fails"
@@ -678,7 +678,7 @@ test_branch_outcomes_stay_unread_without_jq() {
   home="$TMP_ROOT/drain-no-jq"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
   while IFS= read -r dir; do
     [ -n "$dir" ] || continue
@@ -695,10 +695,10 @@ $(printf '%s\n' "$PATH" | tr ':' '\n')
 DIRS
   PATH="$path" command -v jq >/dev/null 2>&1 && fail "fixture: jq is still reachable"
   rc=0
-  drained=$(PATH="$path" FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh") || rc=$?
+  drained=$(PATH="$path" JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh") || rc=$?
   [ "$rc" -ne 0 ] || fail "a drain without jq over a non-empty store must exit nonzero: $drained"
   assert_contains "$drained" "BRANCH OUTCOMES SKIPPED: jq is not installed" "a drain without jq must say it could not present the store"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1] demo: merged the docs fix" "an outcome a drain without jq could not present must follow on the next drain"
   pass "drain: branch outcomes stay unread and the drain fails when jq is missing"
 }
@@ -710,12 +710,12 @@ test_branch_outcomes_stay_unread_when_the_drain_cannot_print() {
   home="$TMP_ROOT/drain-closed"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task demo --verdict routine --summary 'merged the docs fix' >/dev/null \
     || fail "fixture: could not record the routine outcome"
-  FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" >&- 2>/dev/null' "$ROOT/bin/jg-wake-drain.sh" || true
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" >&- 2>/dev/null' "$ROOT/bin/jg-wake-drain.sh" || true
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1] demo: merged the docs fix" "a routine outcome a drain could not print must follow on the next drain"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "merged the docs fix" "a routine outcome a drain printed must not repeat"
   pass "drain: branch outcomes stay unread when the drain cannot print them"
 }
@@ -744,7 +744,7 @@ test_branch_outcomes_date_a_legacy_backlog_without_adopting_it() {
     outcome_row 2 $((now - 6 * 86400 + 60)) alpha routine 'alpha rebased'
     outcome_row 3 $((now - 3 * 86400)) beta captain 'beta PR https://github.com/example/repo/pull/102 is green and ready to merge'
   } > "$home/state/branch-outcomes.jsonl"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1, recorded 6d ago] alpha: alpha PR https://github.com/example/repo/pull/101" \
     "a days-old captain outcome must say when it was recorded"
   assert_contains "$drained" "[seq 3, recorded 3d ago] beta: beta PR" "every captain outcome must say when it was recorded"
@@ -752,7 +752,7 @@ test_branch_outcomes_date_a_legacy_backlog_without_adopting_it() {
   assert_contains "$drained" "your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement" \
     "the section must keep settled outcomes out of the reply to the captain"
   assert_contains "$drained" "mark-processed --through 3;" "the backlog must still carry its acknowledgement"
-  [ -n "$(FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" ] \
+  [ -n "$(JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" ] \
     || fail "the drain adopted a legacy captain outcome as processed"
   pass "drain: a legacy backlog is presented with each outcome's age and a check-first instruction, never adopted"
 }
@@ -764,15 +764,15 @@ test_branch_ack_keeps_older_keyed_decision_open() {
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
   printf 'needs-decision [key=merge-153]: merge PR 153 now or hold?\n' > "$home/state/held.status"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task held --verdict captain --summary 'needs merge decision' >/dev/null || fail "fixture: older outcome"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task held --verdict captain --summary 'CI is now green' >/dev/null || fail "fixture: newer outcome"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task held --verdict captain --summary 'needs merge decision' >/dev/null || fail "fixture: older outcome"
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task held --verdict captain --summary 'CI is now green' >/dev/null || fail "fixture: newer outcome"
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" 'OPEN DECISIONS' "the status decision must appear in the first drain"
   assert_contains "$drained" 'held [key=merge-153] needs-decision: merge PR 153 now or hold?' "the older decision must remain open"
   assert_contains "$drained" '[seq 2, newest of 2 for this task' "the branch line must collapse to the newest outcome"
   assert_contains "$drained" "including its still-open decisions listed above under OPEN DECISIONS" "the check-first instruction must include the older keyed decision"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 2 >/dev/null || fail "fixture: acknowledgement refused"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 2 >/dev/null || fail "fixture: acknowledgement refused"
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" 'held [key=merge-153] needs-decision: merge PR 153 now or hold?' "acknowledging the newer branch line closed the older keyed decision"
   assert_not_contains "$drained" 'CI is now green' "acknowledged branch outcome repeated"
   pass "drain: a keyed decision survives acknowledgement through a newer outcome for its task"
@@ -791,14 +791,14 @@ test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi() {
   ln -sf /bin/bash "$fakepi/pi"
   outcome_row 1 $(( $(date +%s) - 2 * 86400 )) gamma captain 'gamma needs your decision on the schema migration' \
     > "$home/state/branch-outcomes.jsonl"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-read --through 1 \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-read --through 1 \
     || fail "fixture: could not record the Pi branch's delivery"
-  drained=$(FM_HOME="$home" "$fakepi/pi" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$fakepi/pi" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "a Pi primary's drain must leave the outcome to the branch extension"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "[seq 1, recorded 2d ago] gamma: gamma needs your decision" \
     "an outcome delivered on Pi but never acknowledged must come back with its age"
-  [ -n "$(FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" ] \
+  [ -n "$(JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" ] \
     || fail "the switch adopted an unacknowledged captain outcome as processed"
   pass "drain: an outcome carried across a switch off Pi comes back with its age, never adopted"
 }
@@ -812,20 +812,20 @@ test_branch_outcomes_keep_an_unshown_outcome_until_acknowledged() {
   home="$TMP_ROOT/drain-unshown"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task delta --verdict captain --summary 'delta failed CI twice; needs a call' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append --task delta --verdict captain --summary 'delta failed CI twice; needs a call' >/dev/null \
     || fail "fixture: could not record the captain outcome"
   assert_absent "$home/state/.branch-outcomes-cursor" "fixture: the read cursor must start absent"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "delta: delta failed CI twice; needs a call" "the first drain must present an outcome nothing has shown"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "delta: delta failed CI twice; needs a call" "an unacknowledged outcome must keep coming back"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null 2>&1 \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null 2>&1 \
     || fail "the acknowledgement was refused"
   rc=0
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null 2>&1 || rc=$?
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail "a repeated acknowledgement must be refused, not re-applied"
   [ "$(cat "$home/state/.branch-outcomes-processed")" = 1 ] || fail "a repeated acknowledgement moved the processed marker"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "an acknowledged outcome must not come back"
   pass "drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing"
 }
@@ -838,10 +838,10 @@ present_unacknowledged_outcome_twice() {  # <name>
   PRESENTED_HOME="$TMP_ROOT/$1"
   mkdir -p "$PRESENTED_HOME/state" "$PRESENTED_HOME/config"
   : > "$PRESENTED_HOME/config/supervision-host"
-  FM_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" append --task epsilon --verdict captain \
+  JG_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" append --task epsilon --verdict captain \
     --summary 'epsilon PR is ready to merge' >/dev/null || fail "fixture: could not record the captain outcome"
   for _ in 1 2; do
-    drained=$(FM_HOME="$PRESENTED_HOME" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+    drained=$(JG_HOME="$PRESENTED_HOME" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
     assert_contains "$drained" "epsilon: epsilon PR is ready to merge" "fixture: the drain must present the captain outcome"
   done
   [ "$(cat "$PRESENTED_HOME/state/.branch-outcomes-cursor")" = 1 ] || fail "fixture: the drain did not advance the read cursor"
@@ -853,9 +853,9 @@ present_unacknowledged_outcome_twice() {  # <name>
 # rather than being adopted from the read cursor.
 test_branch_outcomes_keep_a_drain_presented_outcome_across_a_switch_to_pi() {
   present_unacknowledged_outcome_twice drain-switch-to-pi
-  FM_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" processed-init \
+  JG_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" processed-init \
     || fail "processed-init failed as the Pi reconciliation runs it"
-  assert_contains "$(FM_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" '"seq":1' \
+  assert_contains "$(JG_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" '"seq":1' \
     "a switch to Pi adopted a drain-presented, unacknowledged outcome as processed"
   pass "drain: an outcome the host drain presented but main never acknowledged stays unprocessed across a switch to Pi"
 }
@@ -868,11 +868,11 @@ test_branch_outcomes_keep_a_drain_presented_outcome_across_an_index_repair() {
   present_unacknowledged_outcome_twice drain-index-repair
   rm -f "$PRESENTED_HOME/state/.branch-outcome-index-ready"
   printf 'working: rebasing onto main\n' > "$PRESENTED_HOME/state/epsilon.status"
-  drained=$(FM_HOME="$PRESENTED_HOME" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$PRESENTED_HOME" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   [ -f "$PRESENTED_HOME/state/.branch-outcome-index-ready" ] || fail "the drain's status backstop did not repair the outcome index"
   assert_contains "$drained" "epsilon: epsilon PR is ready to merge" \
     "an index repair adopted a drain-presented, unacknowledged outcome as processed"
-  assert_contains "$(FM_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" '"seq":1' \
+  assert_contains "$(JG_HOME="$PRESENTED_HOME" "$ROOT/bin/jg-branch-outcome.sh" unprocessed)" '"seq":1' \
     "an index repair left the unacknowledged outcome processed"
   pass "drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair"
 }
@@ -898,12 +898,12 @@ test_attended_routine_wake_is_handled_on_the_engine_and_stays_off_main() {
   [ "$(grep -cv '^watcher: started pid=' "$home/host.out")" -eq 0 ] \
     || fail "a routine attended outcome printed more than the first cycle's status to main: $(cat "$home/host.out")"
   watcher_live "$home" || fail "the host is not parked on a live successor after an attended wake"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES, ROUTINE (handled by the supervision session since your last drain" \
     "main's next drain must list the routine outcome for awareness"
   assert_contains "$drained" "[seq 1] demo: stub handled demo" "the routine listing must carry the outcome"
   assert_not_contains "$drained" "mark-processed" "a routine outcome must ask for no acknowledgement"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "[seq 1]" "a routine outcome must be listed only once"
   pass "host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main"
 }
@@ -925,16 +925,16 @@ test_attended_captain_outcome_reaches_main_through_branch_outcomes() {
   assert_no_grep 'supervision-host-return' "$home/state/.wake-queue" "an attended captain report must queue no return wake"
   watcher_live "$home" && fail "the host left its successor cycle running when it woke main"
 
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES (captain outcomes the supervision session recorded for you" "main's drain must present the captain outcome"
   assert_contains "$drained" "[seq 1, recorded " "the section must carry the outcome's row and when it was recorded"
   assert_contains "$drained" " ago] demo: stub escalated: " "the section must carry the outcome's task and summary"
   assert_contains "$drained" "run bin/jg-branch-outcome.sh mark-processed --through 1" "the section must print its exact acknowledgement"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" " ago] demo: stub escalated: " "an unacknowledged captain outcome must be presented again"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-processed --through 1 >/dev/null \
     || fail "main's acknowledgement of the presented outcome was refused"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "an acknowledged captain outcome must not be presented again"
   pass "host: an attended captain outcome wakes main once and stays in its drain until main acknowledges it"
 }
@@ -950,10 +950,10 @@ test_captain_leaving_mid_turn_keeps_its_captain_outcome_for_the_return() {
   [ -f "$home/state/.afk-contract" ] || fail "fixture: the stub did not record the away posture"
   [ ! -s "$home/host.rc" ] || fail "a captain outcome recorded after the captain left woke main: $(cat "$home/host.out")"
   assert_grep '"verdict":"captain"' "$home/state/branch-outcomes.jsonl" "fixture: the stub did not report a captain outcome"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_not_contains "$drained" "BRANCH OUTCOMES" "captain outcomes must wait for the return while the away record exists"
-  FM_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  JG_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" " ago] demo: stub handled demo" "after the return the drain must present the away window's captain outcome"
   pass "host: a captain outcome recorded after the captain left waits for the return, then reaches main's drain"
 }
@@ -976,7 +976,7 @@ test_quiet_record_without_its_daemon_is_a_present_captain() {
   assert_grep 'MAIN processes it from its next drain' "$home/engine-report.log" "a captain report beside a quiet record must say main processes it"
   assert_re '^supervision-host: branch-outcome: .*\(store rows 1\); run bin/jg-wake-drain.sh' "$home/host.out" \
     "the exit must name the captain outcome's store row for the present captain"
-  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  drained=$(JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES (captain outcomes the supervision session recorded for you" "main's drain must present the captain outcome beside a quiet record"
   assert_contains "$drained" " ago] demo: stub escalated: " "the section must carry the outcome"
   [ -f "$home/state/.afk-contract" ] || fail "the host must leave quiet mode's record in place"
@@ -1060,16 +1060,16 @@ test_main_only_pass_through_leaves_the_successor_watcher_running() {
 test_attended_close_with_unidentified_main_session_passes_to_main() {
   local home
   home=$(make_home attended-unidentified attended)
-  FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
+  JG_HOME="$home" JG_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
     "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      mkdir -p "$FM_HOME/proc/$$"
-      printf "%s (claude) S\n" "$$" > "$FM_HOME/proc/$$/stat"
-      printf "claude\0" > "$FM_HOME/proc/$$/cmdline"
-      export FM_PROC_ROOT_OVERRIDE="$FM_HOME/proc"
-      "$0" park > "$FM_HOME/host.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/host.rc"
+      printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$JG_HOME/claude-pids"
+      mkdir -p "$JG_HOME/proc/$$"
+      printf "%s (claude) S\n" "$$" > "$JG_HOME/proc/$$/stat"
+      printf "claude\0" > "$JG_HOME/proc/$$/cmdline"
+      export JG_PROC_ROOT_OVERRIDE="$JG_HOME/proc"
+      "$0" park > "$JG_HOME/host.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/host.rc"
     ' "$HOST" 2>> "$home/claude.err" &
   wait_until 150 watcher_live "$home" || fail "unidentified: the host never started a watcher cycle: $(cat "$home/host.out")"
   append_status "$home" 'step one'
@@ -1093,7 +1093,7 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
 # turn-boundary offer must see the new main-owned decision.
 turn_main_only_at_second_offer() {  # <home> [quiet]
   local turn
-  turn='printf '"'"'needs-decision [at=%s]: which export format?\n'"'"' "$(date +%s)" >> "$FM_HOME/state/demo.status"'
+  turn='printf '"'"'needs-decision [at=%s]: which export format?\n'"'"' "$(date +%s)" >> "$JG_HOME/state/demo.status"'
   # Quiet: the offer alone turns main-only, with no status line for the
   # successor watcher to close on.
   [ "${2:-}" != quiet ] || turn='echo eligible=0; exit 0'
@@ -1101,17 +1101,17 @@ turn_main_only_at_second_offer() {  # <home> [quiet]
 #!/usr/bin/env bash
 case "\$*" in
   *jg-branch-dispatch.mjs\ offer*)
-    count=\$(cat "\$FM_HOME/offer-count" 2>/dev/null || echo 0)
+    count=\$(cat "\$JG_HOME/offer-count" 2>/dev/null || echo 0)
     count=\$((count + 1))
-    printf '%s\n' "\$count" > "\$FM_HOME/offer-count"
+    printf '%s\n' "\$count" > "\$JG_HOME/offer-count"
     if [ "\$count" -eq 2 ]; then
       # Keep the accepted routine queue for the per-row Pi comparison; the
       # successor may enqueue the new decision before the host exits.
-      mkdir -p "\$FM_HOME/pi-offer-state"
-      cp "\$FM_HOME/state/.wake-queue" "\$FM_HOME/pi-offer-state/.wake-queue"
-      cp "\$FM_HOME/state/demo.meta" "\$FM_HOME/pi-offer-state/demo.meta"
+      mkdir -p "\$JG_HOME/pi-offer-state"
+      cp "\$JG_HOME/state/.wake-queue" "\$JG_HOME/pi-offer-state/.wake-queue"
+      cp "\$JG_HOME/state/demo.meta" "\$JG_HOME/pi-offer-state/demo.meta"
       $turn
-      cp "\$FM_HOME/state/demo.status" "\$FM_HOME/pi-offer-state/demo.status"
+      cp "\$JG_HOME/state/demo.status" "\$JG_HOME/pi-offer-state/demo.status"
     fi ;;
 esac
 exec "$NODE_BIN" "\$@"
@@ -1163,31 +1163,31 @@ make_primary_home() {  # <name>
 # status and stderr (the rewake banner Claude delivers on exit 2).
 start_hook_session() {  # <home>
   local home=$1
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$home" JG_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" \
     PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
+      printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$JG_HOME/claude-pids"
+      for seed in "$JG_HOME"/mirror-seed.*; do
         [ -f "$seed" ] || continue
-        "$FM_HOME/bin/jg-host-mirror.sh" hook claude < "$seed"
+        "$JG_HOME/bin/jg-host-mirror.sh" hook claude < "$seed"
       done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
+      while [ ! -e "$JG_HOME/session.stop" ]; do
+        if [ -e "$JG_HOME/stop.go" ]; then
+          rm -f "$JG_HOME/stop.go"
+          if [ -e "$JG_HOME/hook.own-group" ]; then
             # Claude owns the hook as a process group of its own and tears the
             # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
+            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$JG_HOME/hook.stdin"
             set -m
-            "$FM_HOME/bin/jg-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
+            "$JG_HOME/bin/jg-claude-stop-autoarm.sh" < "$JG_HOME/hook.stdin" > "$JG_HOME/hook.out" 2> "$JG_HOME/hook.err" &
+            printf "%s\n" "$!" > "$JG_HOME/hook.pgid"
             wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
+            printf "%s\n" "$?" > "$JG_HOME/hook.rc"
             set +m
           else
             printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/jg-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
+              | "$JG_HOME/bin/jg-claude-stop-autoarm.sh" > "$JG_HOME/hook.out" 2> "$JG_HOME/hook.err"
+            printf "%s\n" "$?" > "$JG_HOME/hook.rc"
           fi
         fi
         sleep 0.1
@@ -1201,7 +1201,7 @@ hook_exited() { [ -s "$1/hook.rc" ]; }
 # (MAIN_ACK) when that turn's handling is done.
 main_drain() {  # <home>; prints the drain and sets MAIN_ACK
   local out
-  out=$(FM_HOME="$1" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
+  out=$(JG_HOME="$1" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/jg-wake-drain.sh")
   MAIN_ACK=$(printf '%s\n' "$out" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/jg-wake-drain.sh //p' | tail -1)
   printf '%s\n' "$out"
 }
@@ -1260,7 +1260,7 @@ assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() 
   cat > "$home/fakebin/mktemp" <<SH
 #!/usr/bin/env bash
 case "\$*" in
-  *'/.watcher-down.tmp.'*) [ ! -e "\$FM_HOME/fail-downtime-write" ] || exit 1 ;;
+  *'/.watcher-down.tmp.'*) [ ! -e "\$JG_HOME/fail-downtime-write" ] || exit 1 ;;
 esac
 exec "$real_mktemp" "\$@"
 SH
@@ -1274,11 +1274,11 @@ SH
   append_status "$home" 'wake while the engine is handling'
   wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" \
     || fail "restore failure: its watcher did not close during the engine turn"
-  FM_HOME="$home" bash -c '. "$1"; jg_recovery_marker_begin_handling "$2"' _ \
+  JG_HOME="$home" bash -c '. "$1"; jg_recovery_marker_begin_handling "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$home/state/.watcher-down" \
     || fail "fixture: could not model the queued successor wake entering handling"
   if [ "$status" = announced ]; then
-    FM_HOME="$home" bash -c '. "$1"; jg_recovery_marker_read "$2" && _jg_recovery_marker_write_locked "$2" handling "${FM_RECOVERY_MARKER_TOKEN##*:}" announced' _ \
+    JG_HOME="$home" bash -c '. "$1"; jg_recovery_marker_read "$2" && _jg_recovery_marker_write_locked "$2" handling "${JG_RECOVERY_MARKER_TOKEN##*:}" announced' _ \
       "$ROOT/bin/jg-wake-lib.sh" "$home/state/.watcher-down" \
       || fail "fixture: could not model the handling episode as announced"
   fi
@@ -1318,7 +1318,7 @@ test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn() {
   append_status "$home" 'wake while the engine is handling'
   wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" \
     || fail "closed successor: its watcher did not close during the engine turn"
-  FM_HOME="$home" bash -c '. "$1"; jg_recovery_marker_begin_handling "$2"' _ \
+  JG_HOME="$home" bash -c '. "$1"; jg_recovery_marker_begin_handling "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$home/state/.watcher-down" \
     || fail "fixture: could not model the queued successor wake entering handling"
   assert_re '^pending:handling:' "$home/state/.watcher-down" \
@@ -1342,7 +1342,7 @@ test_claude_stop_hook_rewakes_a_present_captain_beside_a_quiet_record() {
   home=$(make_primary_home hook-quiet-record)
   # This case runs an engine turn from the primary root, whose prompt reads the skills.
   ln -s "$ROOT/.agents" "$home/.agents"
-  FM_HOME="$home" FM_AFK_MODE=quiet "$CONTRACT" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+  JG_HOME="$home" JG_AFK_MODE=quiet "$CONTRACT" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
     || fail "fixture: could not record quiet mode"
   echo captain > "$home/stub-mode"
   start_hook_session "$home"
@@ -1453,7 +1453,7 @@ test_claude_stop_hook_notifies_when_at_turn_downtime_write_fails() {
 #!/usr/bin/env bash
 case "\$*" in
   *'/state/.watcher-down.tmp.'*)
-    [ "\$(cat "\$FM_HOME/offer-count" 2>/dev/null)" != 2 ] || exit 1 ;;
+    [ "\$(cat "\$JG_HOME/offer-count" 2>/dev/null)" != 2 ] || exit 1 ;;
 esac
 exec "$real_mktemp" "\$@"
 SH
@@ -1489,7 +1489,7 @@ test_successor_close_during_main_turn_is_delivered_at_the_next_turn_end() {
   append_status "$home" 'which region?' needs-decision
   wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" || fail "fixture: the successor did not close on the later decision"
   # shellcheck disable=SC2086 # the printed acknowledgement arguments
-  [ -z "$MAIN_ACK" ] || FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
+  [ -z "$MAIN_ACK" ] || JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
     || fail "successor close: main's acknowledgement failed: $MAIN_ACK"
   turn_end "$home"
   wait_until 250 hook_exited "$home" || fail "successor close: the next turn end never closed: $(cat "$home/state/.supervision-host.log")"
@@ -1578,7 +1578,7 @@ leave_a_cycle_for_main_and_restart() {  # <home>
   [ -n "$LEFT_ARM" ] && [ "$LEFT_ARM" != 1 ] || fail "fixture: the successor watcher has no arm of its own"
   main_drain "$home" >/dev/null
   # shellcheck disable=SC2086 # the printed acknowledgement arguments
-  [ -z "$MAIN_ACK" ] || FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
+  [ -z "$MAIN_ACK" ] || JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
     || fail "takeover: main's acknowledgement failed: $MAIN_ACK"
   # The session restarts: the old one ends, and a new one holds the lock.
   first_session=$(tail -n 1 "$home/claude-pids")
@@ -1620,7 +1620,7 @@ test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   local home holder host
   home=$(make_primary_home hook-takeover-interrupted)
   leave_a_cycle_for_main_and_restart "$home"
-  FM_STATE_OVERRIDE="$home/state" bash -c '
+  JG_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
     jg_lock_acquire_wait "$2" || exit 1
     : > "$3"
@@ -1670,7 +1670,7 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
     || fail "unrecorded successor: the record left inside the directory was not removed: $(ls -A "$home/state/.supervision-host-left")"
   main_drain "$home" >/dev/null
   # shellcheck disable=SC2086 # the printed acknowledgement arguments
-  [ -z "$MAIN_ACK" ] || FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
+  [ -z "$MAIN_ACK" ] || JG_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/jg-wake-drain.sh" $MAIN_ACK \
     || fail "unrecorded successor: main's acknowledgement failed: $MAIN_ACK"
   turn_end "$home"
   wait_until 150 host_owns_the_only_cycle "$home" \
@@ -1692,8 +1692,8 @@ test_close_accepted_away_that_turns_attended_passes_to_main() {
 #!/usr/bin/env bash
 case "\$*" in
   *.supervision-host-arm.*)
-    ! grep -q 'which export format?' "\$FM_HOME/state/demo.status" 2>/dev/null \
-      || "\$FM_REPO/bin/jg-afk-contract.sh" archive >> "\$FM_HOME/engine-return.log" 2>&1 ;;
+    ! grep -q 'which export format?' "\$JG_HOME/state/demo.status" 2>/dev/null \
+      || "\$JG_REPO/bin/jg-afk-contract.sh" archive >> "\$JG_HOME/engine-return.log" 2>&1 ;;
 esac
 exec "$real_mktemp" "\$@"
 SH
@@ -1723,7 +1723,7 @@ test_primary_without_a_verified_mirror_runs_away_only() {
   local home harness
   for harness in grok opencode omp codex; do
     home=$(make_home "attended-$harness" attended claude)
-    FM_SUPERVISION_HOST_PRIMARY=$harness start_host "$home"
+    JG_SUPERVISION_HOST_PRIMARY=$harness start_host "$home"
     wait_until 150 watcher_live "$home" || fail "$harness: the host never started a watcher cycle"
     append_status "$home" 'fixture finished' 'done'
     wait_until 200 host_exited "$home" || fail "$harness: the host did not hand the attended close to main"
@@ -1734,7 +1734,7 @@ test_primary_without_a_verified_mirror_runs_away_only() {
       "the ledger must record that no verified mirror kept the close on main"
   done
   home=$(make_home away-grok away claude)
-  FM_SUPERVISION_HOST_PRIMARY=grok start_host "$home"
+  JG_SUPERVISION_HOST_PRIMARY=grok start_host "$home"
   wait_until 150 watcher_live "$home" || fail "away grok: the host never started a watcher cycle"
   append_status "$home" 'step one'
   wait_until 250 handled_at_least "$home" 1 \
@@ -1783,7 +1783,7 @@ test_dialog_bearing_files_are_owner_only() {
     cat <<'SH'
 prev=
 for a in "$@"; do
-  [ "$prev" != --mirror-file ] || { stat -c %a "$a" 2>/dev/null || stat -f %Lp "$a"; } >> "$FM_HOME/feed-modes"
+  [ "$prev" != --mirror-file ] || { stat -c %a "$a" 2>/dev/null || stat -f %Lp "$a"; } >> "$JG_HOME/feed-modes"
   prev=$a
 done
 exec "$REAL_NODE" "$@"
@@ -1831,7 +1831,7 @@ quiet_pass_through_successor() {  # <home>
   gen=$(cat "$home/state/.watcher-down" 2>/dev/null || true)
   gen=${gen##*:}
   [ -n "$gen" ] || return 0
-  FM_HOME="$home" bash -c '
+  JG_HOME="$home" bash -c '
     . "$1"
     jg_recovery_marker_ack "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$home/state/.watcher-down" "$gen" \
@@ -1858,7 +1858,7 @@ test_undelivered_dialog_is_fed_again_on_the_next_turn() {
   home=$(make_home mirror-boundary attended)
   cat > "$home/fakebin/node" <<SH
 #!/usr/bin/env bash
-if [ "\${2:-}" = wake-prompt ] && [ -e "\$FM_HOME/slow-render" ]; then echo 120 > "\$FM_HOME/park-clock"; fi
+if [ "\${2:-}" = wake-prompt ] && [ -e "\$JG_HOME/slow-render" ]; then echo 120 > "\$JG_HOME/park-clock"; fi
 exec "$NODE_BIN" "\$@"
 SH
   chmod +x "$home/fakebin/node"
@@ -1866,7 +1866,7 @@ SH
   echo 0 > "$home/park-clock"
   # The park bound sits past every wall-clock check below, so a host that
   # ignored the test clock could never reach a boundary inside this case.
-  FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" FM_SUPERVISION_HOST_PARK_SECONDS=120 FM_SUPERVISION_HOST_TURN_TIMEOUT=20 FM_SUPERVISION_ENGINE_GRACE=1 start_session "$home"
+  JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" JG_SUPERVISION_HOST_PARK_SECONDS=120 JG_SUPERVISION_HOST_TURN_TIMEOUT=20 JG_SUPERVISION_ENGINE_GRACE=1 start_session "$home"
   park_again "$home"
   append_status "$home" 'first'
   wait_until 250 handled_at_least "$home" 1 || fail "mirror boundary: the first wake was not handled: $(cat "$home/state/.supervision-host.log")"
@@ -2088,8 +2088,8 @@ test_away_wake_is_handled_on_the_engine_and_never_reaches_main() {
   assert_absent "$home/state/.host-mirror-cursor.next" "an away wake must stage no mirror cursor"
   assert_grep '"task":"demo"' "$home/state/branch-outcomes.jsonl" "the engine's report did not reach the outcome store"
   assert_no_grep 'demo.status' "$home/state/.wake-queue" "the engine's acknowledgement did not consume the wake"
-  if FM_HOME="$home" "$LEASE" check demo >/dev/null 2>&1; then
-    fail "the host did not release the lease the engine left held: $(FM_HOME="$home" "$LEASE" check demo)"
+  if JG_HOME="$home" "$LEASE" check demo >/dev/null 2>&1; then
+    fail "the host did not release the lease the engine left held: $(JG_HOME="$home" "$LEASE" check demo)"
   fi
   [ ! -s "$home/host.rc" ] || fail "a handled away wake reached main: $(cat "$home/host.out")"
   [ "$(grep -cv '^watcher: started pid=' "$home/host.out")" -eq 0 ] \
@@ -2253,7 +2253,7 @@ test_outcome_after_the_return_survives_a_host_killed_at_the_turn_end() {
   wait_until 250 host_exited "$home" || fail "return-first: the next host did not resurface the queued outcome"
   assert_re '^check: rearm-resurface$' "$home/host.out" "the next host's first cycle must resurface the queue"
   assert_re '	pass-through	attended	main-only	check: rearm-resurface' "$home/state/.supervision-host.log" "the attended resurface must reach main"
-  drained=$(FM_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
+  drained=$(JG_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
   assert_contains "$drained" "supervision-host outcome 1 for demo [routine] was recorded after the captain returned" \
     "main's drain must present the outcome the killed host never handed off"
   pass "host: an outcome recorded after the return reaches main even when its host dies at the turn's end"
@@ -2349,7 +2349,7 @@ test_engine_turn_is_bounded_and_its_descendants_reaped() {
   local home orphan
   home=$(make_home away-hang away)
   echo hang > "$home/stub-mode"
-  FM_SUPERVISION_HOST_TURN_TIMEOUT=3 FM_SUPERVISION_ENGINE_GRACE=1 start_host "$home"
+  JG_SUPERVISION_HOST_TURN_TIMEOUT=3 JG_SUPERVISION_ENGINE_GRACE=1 start_host "$home"
   wait_until 150 watcher_live "$home" || fail "hang: the host never started a watcher cycle"
   append_status "$home" 'slow one'
   wait_until 300 host_exited "$home" || fail "hang: the bounded turn did not end"
@@ -2385,10 +2385,10 @@ test_park_exit_probe_uses_half_second_child_sleeps() {
   cat > "$home/fakebin/sleep" <<'SH'
 #!/bin/bash
 pid=''
-if [ -f "$FM_HOME/probe-host" ]; then
-  IFS= read -r pid < "$FM_HOME/probe-host" || true
+if [ -f "$JG_HOME/probe-host" ]; then
+  IFS= read -r pid < "$JG_HOME/probe-host" || true
   if [ "$PPID" = "$pid" ]; then
-    printf '%s\n' "$1" >> "$FM_HOME/park-sleeps"
+    printf '%s\n' "$1" >> "$JG_HOME/park-sleeps"
   fi
 fi
 exec /bin/sleep "$@"
@@ -2411,7 +2411,7 @@ test_park_boundary_ends_the_park_before_the_hook_timeout() {
   # The wall-clock bound must sit past the exit check: only the injected clock
   # can reach the boundary in time, so a host ignoring it fails instead of
   # passing on real elapsed seconds.
-  FM_SUPERVISION_HOST_PARK_SECONDS=60 FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+  JG_SUPERVISION_HOST_PARK_SECONDS=60 JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
   wait_until 150 watcher_live "$home" || fail "boundary: the host never started a watcher cycle"
   echo 60 > "$home/park-clock"
   wait_until 150 host_exited "$home" || fail "boundary: the host did not end its park"
@@ -2427,7 +2427,7 @@ test_park_boundary_ends_the_park_before_the_hook_timeout() {
 
 # A close that lands while a turn is running can only wait: the host ends its
 # park at the bound regardless of how many closes are queued behind it. The
-# park runs on the test clock (FM_TEST_SUPERVISION_HOST_CLOCK), which the test
+# park runs on the test clock (JG_TEST_SUPERVISION_HOST_CLOCK), which the test
 # moves to the refusal window's opening (park bound minus the turn bound and
 # grace) before it releases the held turn, so the second close can never take
 # a turn of its own on any machine speed. The bound also stays well past every
@@ -2441,8 +2441,8 @@ test_park_boundary_holds_under_back_to_back_closes() {
   echo held > "$home/stub-mode"
   mkfifo "$home/stub-release"
   echo 0 > "$home/park-clock"
-  FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" FM_SUPERVISION_HOST_PARK_SECONDS=$park \
-    FM_SUPERVISION_HOST_TURN_TIMEOUT=$turn FM_SUPERVISION_ENGINE_GRACE=$grace start_host "$home"
+  JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" JG_SUPERVISION_HOST_PARK_SECONDS=$park \
+    JG_SUPERVISION_HOST_TURN_TIMEOUT=$turn JG_SUPERVISION_ENGINE_GRACE=$grace start_host "$home"
   wait_until 150 watcher_live "$home" || fail "boundary-busy: the host never started a watcher cycle: $(cat "$home/host.out")"
   append_status "$home" 'the first of many'
   wait_until 450 sh -c '[ -e "$1/engine-call.1" ] || [ -s "$1/host.rc" ]' _ "$home" \
@@ -2483,14 +2483,14 @@ test_park_boundary_rechecked_just_before_the_engine_turn() {
   cat > "$home/fakebin/node" <<SH
 #!/usr/bin/env bash
 if [ "\${2:-}" = wake-prompt ]; then
-  cp "\$FM_HOME/state/.supervision-host" "\$FM_HOME/host-record-at-render" 2>/dev/null
-  read -r _ < "\$FM_HOME/render-release"
+  cp "\$JG_HOME/state/.supervision-host" "\$JG_HOME/host-record-at-render" 2>/dev/null
+  read -r _ < "\$JG_HOME/render-release"
 fi
 exec "$NODE_BIN" "\$@"
 SH
   chmod +x "$home/fakebin/node"
-  FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" FM_SUPERVISION_HOST_PARK_SECONDS=$park \
-    FM_SUPERVISION_HOST_TURN_TIMEOUT=$turn FM_SUPERVISION_ENGINE_GRACE=$grace start_host "$home"
+  JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" JG_SUPERVISION_HOST_PARK_SECONDS=$park \
+    JG_SUPERVISION_HOST_TURN_TIMEOUT=$turn JG_SUPERVISION_ENGINE_GRACE=$grace start_host "$home"
   wait_until 150 watcher_live "$home" || fail "boundary-late: the host never started a watcher cycle"
   append_status "$home" 'arrives with just enough margin'
   wait_until 300 sh -c '[ -s "$1/host-record-at-render" ] || [ -s "$1/host.rc" ]' _ "$home" \
@@ -2516,24 +2516,24 @@ SH
 }
 
 # A leaked test clock in a real primary's environment must stay inert: the
-# host reads it only alongside the FM_TEST_SEAM marker that test suites set.
+# host reads it only alongside the JG_TEST_SEAM marker that test suites set.
 test_park_test_clock_requires_the_marker() {
   local home
   home=$(make_home clock-armed away)
   echo 99999 > "$home/park-clock"
-  FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+  JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
   wait_until 150 host_exited "$home" || fail "clock-armed: the marked test clock did not end the park"
   assert_re '^supervision-host: cycle boundary - ' "$home/host.out" "the marked test clock must drive the boundary"
 
   home=$(make_home clock-unmarked away)
   echo 99999 > "$home/park-clock"
-  FM_TEST_SEAM='' FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+  JG_TEST_SEAM='' JG_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
   wait_until 150 watcher_live "$home" || fail "clock-unmarked: the host never started a watcher cycle: $(cat "$home/host.out")"
   append_status "$home" 'handled on the wall clock'
   wait_until 250 handled_at_least "$home" 1 \
-    || fail "a test clock without FM_TEST_SEAM changed the park: $(cat "$home/host.out" "$home/state/.supervision-host.log")"
-  [ ! -s "$home/host.rc" ] || fail "a test clock without FM_TEST_SEAM ended the park: $(cat "$home/host.out")"
-  assert_no_re 'cycle boundary' "$home/host.out" "a test clock without FM_TEST_SEAM reached the boundary"
+    || fail "a test clock without JG_TEST_SEAM changed the park: $(cat "$home/host.out" "$home/state/.supervision-host.log")"
+  [ ! -s "$home/host.rc" ] || fail "a test clock without JG_TEST_SEAM ended the park: $(cat "$home/host.out")"
+  assert_no_re 'cycle boundary' "$home/host.out" "a test clock without JG_TEST_SEAM reached the boundary"
   pass "host: the park's test clock is inert without the test marker"
 }
 
@@ -2544,7 +2544,7 @@ test_park_test_clock_requires_the_marker() {
 park_outcome() {  # <name> <park-seconds>; sets PARK_OUTCOME to boundary or handled
   local home
   home=$(make_home "$1" away)
-  FM_SUPERVISION_HOST_PARK_SECONDS=$2 FM_SUPERVISION_HOST_TURN_TIMEOUT=26990 FM_SUPERVISION_ENGINE_GRACE=10 start_host "$home"
+  JG_SUPERVISION_HOST_PARK_SECONDS=$2 JG_SUPERVISION_HOST_TURN_TIMEOUT=26990 JG_SUPERVISION_ENGINE_GRACE=10 start_host "$home"
   wait_until 150 watcher_live "$home" || fail "$1: the host never started a watcher cycle"
   append_status "$home" 'one close'
   wait_until 250 sh -c '[ -s "$1/host.rc" ] || grep -q "	handled	" "$1/state/.supervision-host.log" 2>/dev/null' _ "$home" \
@@ -2578,8 +2578,8 @@ test_park_limit_lets_a_turn_outlive_the_boundary() {
   for c in $cases; do
     name=${c%%:*}; limit=${c#*:}; want=${limit#*:}; limit=${limit%%:*}
     home=$(make_home "$name" away)
-    FM_SUPERVISION_HOST_PARK_SECONDS=100 FM_SUPERVISION_HOST_PARK_LIMIT=$limit FM_SUPERVISION_HOST_TURN_TIMEOUT=200 \
-      FM_SUPERVISION_ENGINE_GRACE=10 start_host "$home"
+    JG_SUPERVISION_HOST_PARK_SECONDS=100 JG_SUPERVISION_HOST_PARK_LIMIT=$limit JG_SUPERVISION_HOST_TURN_TIMEOUT=200 \
+      JG_SUPERVISION_ENGINE_GRACE=10 start_host "$home"
     wait_until 150 watcher_live "$home" || fail "$name: the host never started a watcher cycle"
     append_status "$home" 'one close'
     wait_until 250 sh -c '[ -s "$1/host.rc" ] || grep -q "	handled	" "$1/state/.supervision-host.log" 2>/dev/null' _ "$home" \
@@ -2613,14 +2613,14 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   [ "$(sed -n '1p' "$home/host.out" | cut -c1-17)" = 'watcher: started ' ] || fail "stream: the status line must come first"
   assert_re '^signal: .*demo.status' "$home/host.out" "stream: the close must follow the status line"
   # Main handles that close, so the next cycle has no episode to resurface.
-  FM_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2> "$home/drain.err" || fail "stream: main's drain failed"
+  JG_HOME="$home" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2> "$home/drain.err" || fail "stream: main's drain failed"
   ack_drain_err "$home/state" "$home/drain.err" >/dev/null 2>&1 || fail "stream: main's acknowledgement failed: $(cat "$home/drain.err")"
   # Pass-through can leave a successor watcher running. Retire that cycle so
   # the orphan-arm fixture below owns the watcher we later ask --restart to replace.
-  FM_HOME="$home" "$ROOT/bin/jg-watch-arm.sh" --stop >/dev/null || fail "stream: could not stop the prior cycle"
+  JG_HOME="$home" "$ROOT/bin/jg-watch-arm.sh" --stop >/dev/null || fail "stream: could not stop the prior cycle"
 
   # A watcher a dead arm left behind, holding this home's watcher lock.
-  FM_HOME="$home" PATH="$home/fakebin:$PATH" perl -e 'setpgrp(0, 0); exec @ARGV' "$ROOT/bin/jg-watch-arm.sh" \
+  JG_HOME="$home" PATH="$home/fakebin:$PATH" perl -e 'setpgrp(0, 0); exec @ARGV' "$ROOT/bin/jg-watch-arm.sh" \
     > "$home/stale-arm.out" 2>&1 &
   wait_until 150 grep -qs '^watcher: started pid=' "$home/stale-arm.out" \
     || fail "stream: the fixture arm never started its watcher: $(cat "$home/stale-arm.out")"
@@ -2649,7 +2649,7 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   [ -n "$generation" ] || fail "fixture: the close left no downtime episode: $(cat "$home/state/.watcher-down")"
   predecessor=$(sed -n '1p' "$home/claude-pids")
   rm -f "$home/host.out" "$home/host.rc"
-  FM_WATCH_PREDECESSOR_ARM_PID=$predecessor start_host "$home" --restart
+  JG_WATCH_PREDECESSOR_ARM_PID=$predecessor start_host "$home" --restart
   wait_until 150 grep -qs '^watcher: started pid=' "$home/host.out" || fail "stream: the successor host never reported its cycle"
   assert_re "^watcher: started pid=[0-9]+ \\(beacon fresh\\) recovery-generation=$generation\$" "$home/host.out" \
     "the owner's predecessor must make the first cycle a handling successor of the pending generation"
@@ -2663,10 +2663,10 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
 # Main's side of a handed-back wake: drain, then run the printed acknowledgement.
 main_drain_and_ack() {  # <home>
   local out ack
-  out=$(FM_HOME="$1" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
+  out=$(JG_HOME="$1" "$ROOT/bin/jg-wake-drain.sh" 2>&1)
   ack=$(printf '%s\n' "$out" | sed -n 's/^WAKE_ACK_REQUIRED: after handling completes run bin\/jg-wake-drain.sh //p' | tail -1)
   # shellcheck disable=SC2086 # the printed acknowledgement arguments
-  [ -z "$ack" ] || FM_HOME="$1" "$ROOT/bin/jg-wake-drain.sh" $ack >/dev/null 2>&1 || fail "main's acknowledgement failed: $ack"
+  [ -z "$ack" ] || JG_HOME="$1" "$ROOT/bin/jg-wake-drain.sh" $ack >/dev/null 2>&1 || fail "main's acknowledgement failed: $ack"
 }
 
 # One main session across several parks, as a primary's arm owner runs the host
@@ -2676,19 +2676,19 @@ main_drain_and_ack() {  # <home>
 # start_host.
 start_session() {  # <home>
   local home=$1
-  FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
+  JG_HOME="$home" JG_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
     MIRROR_ROOT="$MIRROR_ROOT" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/park.go" ]; then
-          rm -f "$FM_HOME/park.go"
-          for seed in "$FM_HOME"/mirror-seed.*; do
+      printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$JG_HOME/claude-pids"
+      while [ ! -e "$JG_HOME/session.stop" ]; do
+        if [ -e "$JG_HOME/park.go" ]; then
+          rm -f "$JG_HOME/park.go"
+          for seed in "$JG_HOME"/mirror-seed.*; do
             [ -f "$seed" ] || continue
-            FM_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/jg-host-mirror.sh" hook claude < "$seed"
+            JG_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/jg-host-mirror.sh" hook claude < "$seed"
           done
-          "$0" park > "$FM_HOME/host.out" 2>&1
-          printf "%s\n" "$?" > "$FM_HOME/host.rc"
+          "$0" park > "$JG_HOME/host.out" 2>&1
+          printf "%s\n" "$?" > "$JG_HOME/host.rc"
         fi
         sleep 0.1
       done
@@ -2792,7 +2792,7 @@ test_latch_keeps_attended_closes_on_main_and_skips_unopted_homes() {
   trip_latch "$home"
   health=$(cat "$home/state/.supervision-host-health")
 
-  FM_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
+  JG_HOME="$home" "$CONTRACT" archive >/dev/null 2>&1 || fail "fixture: could not archive the away posture"
   park_again "$home"
   append_status "$home" 'attended while latched'
   wait_until 250 host_exited "$home" || fail "latch scope: the attended close did not reach main"
@@ -2802,7 +2802,7 @@ test_latch_keeps_attended_closes_on_main_and_skips_unopted_homes() {
   main_drain_and_ack "$home"
 
   : > "$home/config/supervision-host-off"
-  FM_HOME="$home" "$CONTRACT" enter --words 'watch the fleet; merge nothing' >/dev/null 2>&1 \
+  JG_HOME="$home" "$CONTRACT" enter --words 'watch the fleet; merge nothing' >/dev/null 2>&1 \
     || fail "fixture: could not record the away posture again"
   park_again "$home"
   append_status "$home" 'away after opting out'
@@ -2857,8 +2857,8 @@ test_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event() {
     || fail "fixture: could not age the held task's records"
   prime_status_seen "$home/state" "$home/state/held.status"
 
-  export FM_FAKE_CREW_STATE_held='state: done · source: fake'
-  export FM_INACTIVE_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" FM_INACTIVE_RECONCILE_SECS=60
+  export JG_FAKE_CREW_STATE_held='state: done · source: fake'
+  export JG_INACTIVE_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" JG_INACTIVE_RECONCILE_SECS=60
   start_host "$home"
   wait_until 250 captain_rows_at_least "$home" 1 \
     || fail "held: the first cadence never escalated the held outcome: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
@@ -2882,9 +2882,9 @@ test_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event() {
   wait_until 250 captain_rows_at_least "$home" 2 \
     || fail "held: the new decision never reached the captain path: $(cat "$home/state/branch-outcomes.jsonl")"
   [ "$(captain_rows "$home")" -eq 2 ] || fail "held: the decision escalated $(captain_rows "$home") rows, not one"
-  [ "$(FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" list --recent 1 | sed -n 's/.*"task":"\([^"]*\)".*"verdict":"\([a-z]*\)".*/\1 \2/p')" = 'held captain' ] \
+  [ "$(JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" list --recent 1 | sed -n 's/.*"task":"\([^"]*\)".*"verdict":"\([a-z]*\)".*/\1 \2/p')" = 'held captain' ] \
     || fail "held: the decision was not recorded as a captain outcome for the held task: $(cat "$home/state/branch-outcomes.jsonl")"
-  unset FM_FAKE_CREW_STATE_held FM_INACTIVE_CREW_STATE_BIN FM_INACTIVE_RECONCILE_SECS
+  unset JG_FAKE_CREW_STATE_held JG_INACTIVE_CREW_STATE_BIN JG_INACTIVE_RECONCILE_SECS
   # Stop the host and its watcher here, so no cadence scan is still writing
   # into this home while the suite's cleanup removes it.
   pid=$(awk -F '\t' '$1 == "host" { print $2 }' "$home/state/.supervision-host")
@@ -2915,7 +2915,7 @@ test_host_outside_the_lock_owner_stands_down() {
   other=$!
   printf '%s\n' "$other" >> "$home/claude-pids"
   printf '%s\n' "$other" > "$home/state/.lock"
-  out=$(FM_HOME="$home" PATH="$home/fakebin:$PATH" "$HOST" park 2>&1); rc=$?
+  out=$(JG_HOME="$home" PATH="$home/fakebin:$PATH" "$HOST" park 2>&1); rc=$?
   expect_code 0 "$rc" "a host that does not own supervision exits 0"
   assert_contains "$out" "supervision-host stood down: this session does not own supervision" "the stand-down must say why"
   watcher_live "$home" && fail "a host that does not own supervision started a watcher"
@@ -2928,14 +2928,14 @@ test_superseded_host_leaves_the_owner_untouched() {
   home=$(make_home superseded away)
   # One fake harness runs the owner host, then, on a signal file, a second host
   # under an auto-arm generation the ledger has already superseded.
-  FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
+  JG_HOME="$home" JG_CREW_STATE_BIN="$home/fakebin/jg-crew-state.sh" PATH="$home/fakebin:$PATH" \
     "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      "$0" park > "$FM_HOME/host.out" 2>&1 &
-      while [ ! -e "$FM_HOME/go-second" ]; do sleep 0.1; done
-      FM_SUPERVISION_HOST_AUTOARM_GEN=1 FM_SUPERVISION_HOST_OWNER_PID=$$ "$0" park > "$FM_HOME/host2.out" 2>&1
-      printf "%s\n" "$?" > "$FM_HOME/host2.rc"
+      printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$JG_HOME/claude-pids"
+      "$0" park > "$JG_HOME/host.out" 2>&1 &
+      while [ ! -e "$JG_HOME/go-second" ]; do sleep 0.1; done
+      JG_SUPERVISION_HOST_AUTOARM_GEN=1 JG_SUPERVISION_HOST_OWNER_PID=$$ "$0" park > "$JG_HOME/host2.out" 2>&1
+      printf "%s\n" "$?" > "$JG_HOME/host2.rc"
       wait
     ' "$HOST" 2>> "$home/claude.err" &
   wait_until 150 watcher_live "$home" || fail "superseded: the owner host never started a watcher cycle"
@@ -2943,7 +2943,7 @@ test_superseded_host_leaves_the_owner_untouched() {
   watcher=$(cat "$home/state/.watch.lock/pid")
   lock_pid=$(cat "$home/state/.lock")
   printf 'epoch=2 owner_pid=%s outcome=arming\n' "$lock_pid" > "$home/state/.claude-autoarm-epoch"
-  FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_LEASE_HOLDER_PID="$lock_pid" "$LEASE" claim demo >/dev/null 2>&1 \
+  JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_LEASE_HOLDER_PID="$lock_pid" "$LEASE" claim demo >/dev/null 2>&1 \
     || fail "fixture: could not hold a branch lease"
   : > "$home/go-second"
   wait_until 200 sh -c '[ -s "$1" ]' _ "$home/host2.rc" || fail "superseded: the second host did not return"
@@ -2955,7 +2955,7 @@ test_superseded_host_leaves_the_owner_untouched() {
   if [ "$(cat "$home/state/.watch.lock/pid" 2>/dev/null)" != "$watcher" ] || ! kill -0 "$watcher" 2>/dev/null; then
     fail "a superseded host stopped the owner's watcher"
   fi
-  FM_HOME="$home" "$LEASE" check demo 2>/dev/null | grep -q '^branch ' || fail "a superseded host released the owner's branch leases"
+  JG_HOME="$home" "$LEASE" check demo 2>/dev/null | grep -q '^branch ' || fail "a superseded host released the owner's branch leases"
   kill -TERM "$owner"
   wait_until 200 sh -c '! kill -0 "$1" 2>/dev/null && ! kill -0 "$2" 2>/dev/null' _ "$owner" "$watcher" \
     || fail "superseded: the owner host did not stop on TERM"

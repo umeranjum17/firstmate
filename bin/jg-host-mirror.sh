@@ -88,12 +88,12 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
-FM_HOST_MIRROR_VERIFIED='claude cursor'
+JG_HOST_MIRROR_VERIFIED='claude cursor'
 MIRROR_CAP=4000
 MIRROR_KEEP=200
 FEED_CAP=16000
@@ -109,7 +109,7 @@ usage() {
 case "${1:-}" in
   verified)
     [ "$#" -eq 2 ] || usage
-    case " $FM_HOST_MIRROR_VERIFIED " in *" $2 "*) exit 0 ;; esac
+    case " $JG_HOST_MIRROR_VERIFIED " in *" $2 "*) exit 0 ;; esac
     exit 1
     ;;
   hook)
@@ -153,7 +153,7 @@ writer_in_scope() {
   . "$SCRIPT_DIR/jg-primary-scope-lib.sh"
   # shellcheck source=bin/jg-session-lock-lib.sh
   . "$SCRIPT_DIR/jg-session-lock-lib.sh"
-  jg_primary_scope_matches "$FM_ROOT" "$STATE" && jg_session_lock_owned_by_self "$STATE"
+  jg_primary_scope_matches "$JG_ROOT" "$STATE" && jg_session_lock_owned_by_self "$STATE"
 }
 
 operational() {  # <text>

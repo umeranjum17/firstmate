@@ -58,13 +58,13 @@
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jg-timeout-lib.sh"
 
-FM_WORKER_ACCOUNT_CHECK_SECONDS=${FM_WORKER_ACCOUNT_CHECK_SECONDS:-30}
+JG_WORKER_ACCOUNT_CHECK_SECONDS=${JG_WORKER_ACCOUNT_CHECK_SECONDS:-30}
 
 # Credentials Claude Code ranks above the /login stored in its config root
 # (code.claude.com/docs/en/authentication, "Authentication precedence"; the
 # Claude Platform on AWS and Bedrock Mantle switches from
 # code.claude.com/docs/en/env-vars).
-FM_WORKER_ACCOUNT_CLAUDE_SHED="CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID"
+JG_WORKER_ACCOUNT_CLAUDE_SHED="CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX CLAUDE_CODE_USE_FOUNDRY CLAUDE_CODE_USE_ANTHROPIC_AWS CLAUDE_CODE_USE_MANTLE ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_PROFILE ANTHROPIC_FEDERATION_RULE_ID"
 
 # jg_worker_account_tuple_field <tuple> <index>
 # Prints field <index> (1-based) of a tab-separated account tuple, empty when
@@ -192,7 +192,7 @@ jg_worker_account_check() {
   case "$harness" in
   claude)
     [ -z "$root" ] || clean+=("CLAUDE_CONFIG_DIR=$root")
-    if jg_run_timed "$FM_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
+    if jg_run_timed "$JG_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
       "$executable" auth status >/dev/null 2>&1 </dev/null; then
       return 0
     fi
@@ -205,7 +205,7 @@ jg_worker_account_check() {
     ;;
   pi | pi-signed)
     clean+=("PI_CODING_AGENT_DIR=$root")
-    out=$(jg_run_timed "$FM_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
+    out=$(jg_run_timed "$JG_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
       "$executable" auth check --provider "$provider" --json --no-refresh 2>/dev/null </dev/null)
     verdict=$(printf '%s\n' "$out" | jq -r '
       if type != "object" or (has("status") | not) then "list"
@@ -216,7 +216,7 @@ jg_worker_account_check() {
     case "${verdict:-list}" in
     ready) return 0 ;;
     list)
-      if out=$(jg_run_timed "$FM_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
+      if out=$(jg_run_timed "$JG_WORKER_ACCOUNT_CHECK_SECONDS" "${clean[@]}" \
         "$executable" --list-models "$provider" 2>/dev/null </dev/null) &&
         printf '%s\n' "$out" | awk -v p="$provider" 'NR > 1 && $1 == p { found = 1; exit } END { exit !found }'; then
         return 0
@@ -251,7 +251,7 @@ jg_worker_account_select() {
     for word in $raw; do
       case "$word" in
       [A-Za-z_]*=*)
-        case " CLAUDE_CONFIG_DIR $FM_WORKER_ACCOUNT_CLAUDE_SHED " in
+        case " CLAUDE_CONFIG_DIR $JG_WORKER_ACCOUNT_CLAUDE_SHED " in
         *" ${word%%=*} "*)
           echo "error: config/claude-account pins Claude workers, but the raw launch command sets ${word%%=*}, which would override the pinned account; remove ${word%%=*} from the raw command, or change or remove config/claude-account" >&2
           return 1
@@ -285,7 +285,7 @@ jg_worker_account_select() {
 # jg_worker_account_claude_shed <names>
 # Prints the `env` launch prefix that unsets the space-separated environment
 # credentials in <names> - the credentials Claude ranks above the selected
-# root's stored login. The caller passes the pin's FM_WORKER_ACCOUNT_CLAUDE_SHED
+# root's stored login. The caller passes the pin's JG_WORKER_ACCOUNT_CLAUDE_SHED
 # list or a pool pick's own unset list, and appends the root assignment (or
 # -u CLAUDE_CONFIG_DIR for the ordinary account).
 jg_worker_account_claude_shed() {

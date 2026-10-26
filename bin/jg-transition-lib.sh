@@ -36,7 +36,7 @@
 
 # Field separator for the normalized record. A literal TAB; every field is
 # scrubbed of TAB/newline by the producer so the record is exactly five fields.
-FM_TRANSITION_FIELD_SEP=$'\t'
+JG_TRANSITION_FIELD_SEP=$'\t'
 
 # jg_transition_record: THE constructor for a normalized transition record.
 # Both a backend's stream normalizer and its level-reconcile read MUST build
@@ -60,7 +60,7 @@ jg_transition_clean_field() {  # <value>
 
 # Field accessors (1-based), so consumers never hardcode the column layout.
 jg_transition_field() {  # <record> <n>
-  printf '%s' "$1" | cut -d"$FM_TRANSITION_FIELD_SEP" -f"$2"
+  printf '%s' "$1" | cut -d"$JG_TRANSITION_FIELD_SEP" -f"$2"
 }
 
 jg_transition_pane_id()      { jg_transition_field "$1" 1; }

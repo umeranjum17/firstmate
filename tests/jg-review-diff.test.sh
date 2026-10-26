@@ -82,8 +82,8 @@ stale_and_pr_commits() {
 run_review_diff() {
   local case_dir=$1
   shift
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
     "$REVIEW_DIFF" "$@"
 }
 

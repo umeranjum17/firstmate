@@ -275,7 +275,7 @@ SH
 chmod +x "$FAKEBIN/herdr" "$FAKEBIN/treehouse"
 chmod +x "$FAKEBIN/herdr-workspace-mover"
 export PATH="$FAKEBIN:$PATH"
-export FM_BACKEND_HERDR_WORKSPACE_MOVER="$FAKEBIN/herdr-workspace-mover"
+export JG_BACKEND_HERDR_WORKSPACE_MOVER="$FAKEBIN/herdr-workspace-mover"
 
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"
@@ -429,7 +429,7 @@ spawn_task() {  # <id> <home> <project> [extra jg-spawn args...]; SPAWN_DEADLINE
   shift 3
   local -a deadline_cmd=()
   [ -z "${SPAWN_DEADLINE_SECONDS:-}" ] || deadline_cmd=(jg_run_timed "$SPAWN_DEADLINE_SECONDS")
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_GATE_REFUSE_BYPASS=1 JG_SPAWN_NO_GUARD=1 JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     ${deadline_cmd[@]+"${deadline_cmd[@]}"} "$ROOT/bin/jg-spawn.sh" "$id" "$project" "sh -c 'while :; do sleep 60; done'" \
     --mode no-mistakes --yolo off --backend herdr "$@"
 }
@@ -455,15 +455,15 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
 
 spawn_secondmate_task() {
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_GATE_REFUSE_BYPASS=1 JG_SPAWN_NO_GUARD=1 JG_HOME="$HOME_DIR" JG_ROOT_OVERRIDE="$ROOT" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$home" "sh -c 'while :; do sleep 60; done'" --secondmate --backend herdr
 }
 
 teardown_task() {  # <id> <home>
   local id=$1 home=$2
-  FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" \
+  JG_GATE_REFUSE_BYPASS=1 JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-teardown.sh" "$id" --force
 }
 
@@ -838,7 +838,7 @@ SH
 chmod +x "$FAIL_MOVER"
 FAIL_START=$(log_line_count)
 FAIL_FOCUS_AUDIT_START=$(focus_audit_line_count)
-FM_BACKEND_HERDR_WORKSPACE_MOVER="$FAIL_MOVER" \
+JG_BACKEND_HERDR_WORKSPACE_MOVER="$FAIL_MOVER" \
   spawn_task order-fail "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/order-fail.out" 2> "$TMP_ROOT/order-fail.err" \
   || fail "move-failure projected spawn should still succeed: $(cat "$TMP_ROOT/order-fail.err")"
 assert_focus_is "$CAPTAIN_FOCUS" "failed presentation ordering"
@@ -986,7 +986,7 @@ done
 pass "real Herdr lab: three repeated concurrent create/order/cleanup waves have zero active workspace or tab drift"
 
 # ------------------------------------------------------------------
-# Multi-home topology: real secondmate FM_HOME spawn paths, inheritance,
+# Multi-home topology: real secondmate JG_HOME spawn paths, inheritance,
 # concurrent cross-home waves, and session-scoped lock contention.
 # ------------------------------------------------------------------
 SECOND_HOME_A="$TMP_ROOT/home-2ndmate-alpha"

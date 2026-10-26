@@ -13,7 +13,7 @@
 #
 # Session shape (report "Zellij implementation choices" #1, unchanged by
 # empirical verification): ONE zellij session (default name "firstmate",
-# overridable via FM_ZELLIJ_SESSION for test isolation - mirrors herdr's
+# overridable via JG_ZELLIJ_SESSION for test isolation - mirrors herdr's
 # HERDR_SESSION), ONE tab per task, with caller-facing label "jg-<id>" and a
 # home-scoped actual title. No per-home workspace split (unlike herdr's later
 # P3 refinement): zellij has no workspace concept, only sessions/tabs/panes,
@@ -107,43 +107,43 @@
 # jg_backend_required_tools only when zellij is the resolved backend; this
 # adapter also gates them again before spawning.
 
-# FM_HOME fallback: every real caller already sets FM_HOME as a global before
+# JG_HOME fallback: every real caller already sets JG_HOME as a global before
 # sourcing jg-backend.sh (which sources this file); this exists only so this
 # file's own unit tests, which source it directly, resolve sanely. Mirrors
 # bin/backends/herdr.sh's identical fallback; unlike herdr this adapter still
 # has no per-home CONTAINER split (one shared session for every home), but
-# FM_HOME/FM_ROOT now also feed jg_backend_zellij_home_label's tab-title tag
+# JG_HOME/JG_ROOT now also feed jg_backend_zellij_home_label's tab-title tag
 # below.
-FM_BACKEND_ZELLIJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_ZELLIJ_ROOT}}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_BACKEND_ZELLIJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-${JG_ROOT:-$JG_BACKEND_ZELLIJ_ROOT}}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # shellcheck source=bin/jg-backend-hometag-lib.sh
-. "$FM_BACKEND_ZELLIJ_ROOT/bin/jg-backend-hometag-lib.sh"
+. "$JG_BACKEND_ZELLIJ_ROOT/bin/jg-backend-hometag-lib.sh"
 
 # Shared composer classification (the fleet-wide shape catalogue and verdict
 # owner; this adapter contributes only capture and capability facts).
 # shellcheck source=bin/jg-composer-lib.sh
-. "$FM_BACKEND_ZELLIJ_ROOT/bin/jg-composer-lib.sh"
+. "$JG_BACKEND_ZELLIJ_ROOT/bin/jg-composer-lib.sh"
 
 # Verified minimum: report.md recommends "likely Zellij 0.44 or newer" for
 # returned pane/tab IDs and dump-screen --pane-id; empirically verified
 # against the installed 0.44.0 (docs/zellij-backend.md).
-FM_BACKEND_ZELLIJ_MIN_MAJOR=0
-FM_BACKEND_ZELLIJ_MIN_MINOR=44
+JG_BACKEND_ZELLIJ_MIN_MAJOR=0
+JG_BACKEND_ZELLIJ_MIN_MINOR=44
 
 # jg_backend_zellij_session: the session name this spawn/op uses.
-# FM_ZELLIJ_SESSION mirrors herdr's HERDR_SESSION ambient-selection knob: an
+# JG_ZELLIJ_SESSION mirrors herdr's HERDR_SESSION ambient-selection knob: an
 # operator (or firstmate's own isolated test harness) sets it explicitly;
 # absent means the shared "firstmate" session. Do not use this alone for
 # destructive test cleanup; tests/zellij-test-safety.sh documents and guards
 # that path (mirrors tests/herdr-test-safety.sh).
 jg_backend_zellij_session() {
-  printf '%s' "${FM_ZELLIJ_SESSION:-firstmate}"
+  printf '%s' "${JG_ZELLIJ_SESSION:-firstmate}"
 }
 
 # jg_backend_zellij_home_label: readable home prefix plus a short hash of the
-# resolved FM_ROOT path (bin/jg-backend-hometag-lib.sh). Zellij has one
+# resolved JG_ROOT path (bin/jg-backend-hometag-lib.sh). Zellij has one
 # session-global tab namespace shared by every firstmate home, so the path
 # hash distinguishes every installation, including multiple primary homes.
 # Moving an installation changes this tag and old zellij tab titles stop
@@ -194,8 +194,8 @@ jg_backend_zellij_version_check() {
   minor=${rest%%.*}
   case "$major" in ''|*[!0-9]*) major=0 ;; esac
   case "$minor" in ''|*[!0-9]*) minor=0 ;; esac
-  if [ "$major" -lt "$FM_BACKEND_ZELLIJ_MIN_MAJOR" ] || { [ "$major" -eq "$FM_BACKEND_ZELLIJ_MIN_MAJOR" ] && [ "$minor" -lt "$FM_BACKEND_ZELLIJ_MIN_MINOR" ]; }; then
-    echo "error: zellij $ver is older than the verified minimum $FM_BACKEND_ZELLIJ_MIN_MAJOR.$FM_BACKEND_ZELLIJ_MIN_MINOR; update zellij before using backend=zellij" >&2
+  if [ "$major" -lt "$JG_BACKEND_ZELLIJ_MIN_MAJOR" ] || { [ "$major" -eq "$JG_BACKEND_ZELLIJ_MIN_MAJOR" ] && [ "$minor" -lt "$JG_BACKEND_ZELLIJ_MIN_MINOR" ]; }; then
+    echo "error: zellij $ver is older than the verified minimum $JG_BACKEND_ZELLIJ_MIN_MAJOR.$JG_BACKEND_ZELLIJ_MIN_MINOR; update zellij before using backend=zellij" >&2
     return 1
   fi
   return 0
@@ -364,12 +364,12 @@ jg_backend_zellij_create_task() {  # <session> <label> <cwd>
 # jg_backend_zellij_parse_target: split "<session>:<pane_id>" on the FIRST
 # colon (the pane id is a bare integer with no embedded colon, so this is
 # simpler than herdr's equivalent but kept structurally parallel). Sets
-# FM_BACKEND_ZELLIJ_SESSION and FM_BACKEND_ZELLIJ_PANE for the caller.
+# JG_BACKEND_ZELLIJ_SESSION and JG_BACKEND_ZELLIJ_PANE for the caller.
 jg_backend_zellij_parse_target() {  # <target>
   local target=$1
-  FM_BACKEND_ZELLIJ_SESSION=${target%%:*}
-  FM_BACKEND_ZELLIJ_PANE=${target#*:}
-  [ -n "$FM_BACKEND_ZELLIJ_SESSION" ] && [ -n "$FM_BACKEND_ZELLIJ_PANE" ] && [ "$FM_BACKEND_ZELLIJ_PANE" != "$target" ]
+  JG_BACKEND_ZELLIJ_SESSION=${target%%:*}
+  JG_BACKEND_ZELLIJ_PANE=${target#*:}
+  [ -n "$JG_BACKEND_ZELLIJ_SESSION" ] && [ -n "$JG_BACKEND_ZELLIJ_PANE" ] && [ "$JG_BACKEND_ZELLIJ_PANE" != "$target" ]
 }
 
 # jg_backend_zellij_target_ready: parse the target and verify its session and
@@ -378,14 +378,14 @@ jg_backend_zellij_parse_target() {  # <target>
 jg_backend_zellij_target_ready() {  # <target> [expected-label]
   local expected_label=${2:-} tab_id
   jg_backend_zellij_parse_target "$1" || return 1
-  jg_backend_zellij_session_exists "$FM_BACKEND_ZELLIJ_SESSION" || return 1
+  jg_backend_zellij_session_exists "$JG_BACKEND_ZELLIJ_SESSION" || return 1
   if [ -n "$expected_label" ]; then
-    tab_id=$(jg_backend_zellij_tab_for_pane "$FM_BACKEND_ZELLIJ_SESSION" "$FM_BACKEND_ZELLIJ_PANE" 2>/dev/null)
+    tab_id=$(jg_backend_zellij_tab_for_pane "$JG_BACKEND_ZELLIJ_SESSION" "$JG_BACKEND_ZELLIJ_PANE" 2>/dev/null)
     [ -n "$tab_id" ] || return 1
-    jg_backend_zellij_tab_matches_label "$FM_BACKEND_ZELLIJ_SESSION" "$tab_id" "$expected_label"
+    jg_backend_zellij_tab_matches_label "$JG_BACKEND_ZELLIJ_SESSION" "$tab_id" "$expected_label"
     return $?
   fi
-  jg_backend_zellij_pane_exists "$FM_BACKEND_ZELLIJ_SESSION" "$FM_BACKEND_ZELLIJ_PANE"
+  jg_backend_zellij_pane_exists "$JG_BACKEND_ZELLIJ_SESSION" "$JG_BACKEND_ZELLIJ_PANE"
 }
 
 # jg_backend_zellij_current_path: the live pane's cwd, or empty on any error.
@@ -407,7 +407,7 @@ jg_backend_zellij_target_ready() {  # <target> [expected-label]
 # command before the harness ever launches is an acceptable trade for a reliable
 # answer.
 jg_backend_zellij_current_path() {  # <target> [expected-label]
-  local target=$1 expected_label=${2:-} out line marker_begin="__FM_ZELLIJ_CWD_BEGIN__" marker_end="__FM_ZELLIJ_CWD_END__" in_block=0 chunk="" last=""
+  local target=$1 expected_label=${2:-} out line marker_begin="__JG_ZELLIJ_CWD_BEGIN__" marker_end="__JG_ZELLIJ_CWD_END__" in_block=0 chunk="" last=""
   jg_backend_zellij_target_ready "$target" "$expected_label" || return 0
   jg_backend_zellij_send_text_line "$target" "printf '%s\n' '$marker_begin'; pwd; printf '%s\n' '$marker_end'" "$expected_label" || return 0
   sleep 0.3
@@ -437,7 +437,7 @@ EOF
 # recommendation over write-chars, for popup-safety parity with tmux/herdr).
 jg_backend_zellij_send_literal() {  # <target> <text> [expected-label]
   jg_backend_zellij_target_ready "$1" "${3:-}" || return 1
-  jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action paste --pane-id "$FM_BACKEND_ZELLIJ_PANE" -- "$2" >/dev/null 2>&1
+  jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action paste --pane-id "$JG_BACKEND_ZELLIJ_PANE" -- "$2" >/dev/null 2>&1
 }
 
 # jg_backend_zellij_normalize_key: map firstmate's key vocabulary (Enter,
@@ -466,7 +466,7 @@ jg_backend_zellij_send_key() {  # <target> <key> [expected-label]
   jg_backend_zellij_target_ready "$1" "${3:-}" || return 1
   local key
   key=$(jg_backend_zellij_normalize_key "$2")
-  jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action send-keys --pane-id "$FM_BACKEND_ZELLIJ_PANE" "$key" >/dev/null 2>&1
+  jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action send-keys --pane-id "$JG_BACKEND_ZELLIJ_PANE" "$key" >/dev/null 2>&1
 }
 
 # jg_backend_zellij_send_text_line: send one line of TEXT then submit.
@@ -487,9 +487,9 @@ jg_backend_zellij_capture() {  # <target> <lines> [expected-label]
   local lines=${2:-40} out
   case "$lines" in ''|*[!0-9]*) lines=40 ;; esac
   if [ "$lines" -le 40 ]; then
-    out=$(jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$FM_BACKEND_ZELLIJ_PANE" 2>/dev/null) || return 1
+    out=$(jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$JG_BACKEND_ZELLIJ_PANE" 2>/dev/null) || return 1
   else
-    out=$(jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$FM_BACKEND_ZELLIJ_PANE" --full 2>/dev/null) || return 1
+    out=$(jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$JG_BACKEND_ZELLIJ_PANE" --full 2>/dev/null) || return 1
   fi
   printf '%s' "$out" | tail -n "$lines"
 }
@@ -499,7 +499,7 @@ jg_backend_zellij_capture() {  # <target> <lines> [expected-label]
 # whole instead of trimming it to a caller's line bound.
 jg_backend_zellij_visible_capture() {  # <target> [expected-label]
   jg_backend_zellij_target_ready "$1" "${2:-}" || return 1
-  jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$FM_BACKEND_ZELLIJ_PANE" 2>/dev/null
+  jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$JG_BACKEND_ZELLIJ_PANE" 2>/dev/null
 }
 
 # --- zellij composer capture and capability primitives ----------------------
@@ -517,9 +517,9 @@ jg_backend_zellij_visible_capture() {  # <target> [expected-label]
 jg_backend_zellij_composer_capture() {  # <target> [expected-label]
   jg_backend_zellij_target_ready "$1" "${2:-}" || return 1
   local out
-  out=$(jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$FM_BACKEND_ZELLIJ_PANE" --ansi 2>/dev/null) || return 1
+  out=$(jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action dump-screen --pane-id "$JG_BACKEND_ZELLIJ_PANE" --ansi 2>/dev/null) || return 1
   [ -n "$out" ] || return 1
-  printf '%s' "$out" | tail -n "$FM_COMPOSER_CAPTURE_LINES"
+  printf '%s' "$out" | tail -n "$JG_COMPOSER_CAPTURE_LINES"
 }
 
 # jg_backend_zellij_composer_state: thin adapter - capture plus capabilities
@@ -533,9 +533,9 @@ jg_backend_zellij_composer_capture() {  # <target> [expected-label]
 jg_backend_zellij_composer_state() {  # <target> [expected-label] -> empty|pending|pending-unproven|unknown
   local target=$1 expected_label=${2:-} cap caps verdict
   if cap=$(jg_backend_zellij_composer_capture "$target" "$expected_label"); then
-    caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
-  elif cap=$(jg_backend_zellij_capture "$target" "$FM_COMPOSER_CAPTURE_LINES" "$expected_label") && [ -n "$cap" ]; then
-    caps=$(printf 'styled=0\ncursor=0\nidentity=0\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
+    caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$JG_COMPOSER_CAPTURE_LINES")
+  elif cap=$(jg_backend_zellij_capture "$target" "$JG_COMPOSER_CAPTURE_LINES" "$expected_label") && [ -n "$cap" ]; then
+    caps=$(printf 'styled=0\ncursor=0\nidentity=0\nrows=%s' "$JG_COMPOSER_CAPTURE_LINES")
   else
     printf 'unknown'
     return 0
@@ -548,7 +548,7 @@ jg_backend_zellij_composer_state() {  # <target> [expected-label] -> empty|pendi
 jg_backend_zellij_composer_content() {  # <target> [expected-label]
   local target=$1 expected_label=${2:-} cap caps
   cap=$(jg_backend_zellij_composer_capture "$target" "$expected_label") || return 1
-  caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
+  caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$JG_COMPOSER_CAPTURE_LINES")
   jg_composer_extract_selected_content "$caps" "$cap"
 }
 
@@ -556,7 +556,7 @@ jg_backend_zellij_composer_observed_append() {  # <target> <before> <text> [expe
   local target=$1 before=$2 text=$3 expected_label=${4:-} cap caps after expected
   [ -n "$text" ] || return 1
   cap=$(jg_backend_zellij_composer_capture "$target" "$expected_label") || return 1
-  caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
+  caps=$(printf 'styled=1\ncursor=0\nidentity=0\nrows=%s' "$JG_COMPOSER_CAPTURE_LINES")
   after=$(jg_composer_extract_selected_content "$caps" "$cap") || return 1
   jg_composer_normalize_spaces_var before
   jg_composer_normalize_spaces_var text
@@ -599,26 +599,26 @@ jg_backend_zellij_send_text_submit() {  # <target> <text> <retries> <enter-sleep
 # tabs. Any tab id is verified against the expected label when one is provided.
 jg_backend_zellij_kill() {  # <target> [tab_id] [expected_label]
   jg_backend_zellij_parse_target "$1" || return 0
-  jg_backend_zellij_session_exists "$FM_BACKEND_ZELLIJ_SESSION" || return 0
+  jg_backend_zellij_session_exists "$JG_BACKEND_ZELLIJ_SESSION" || return 0
   local tab_id fallback_tab_id=${2:-} expected_label=${3:-}
-  tab_id=$(jg_backend_zellij_tab_for_pane "$FM_BACKEND_ZELLIJ_SESSION" "$FM_BACKEND_ZELLIJ_PANE" 2>/dev/null)
-  if [ -n "$tab_id" ] && [ -n "$expected_label" ] && ! jg_backend_zellij_tab_matches_label "$FM_BACKEND_ZELLIJ_SESSION" "$tab_id" "$expected_label"; then
+  tab_id=$(jg_backend_zellij_tab_for_pane "$JG_BACKEND_ZELLIJ_SESSION" "$JG_BACKEND_ZELLIJ_PANE" 2>/dev/null)
+  if [ -n "$tab_id" ] && [ -n "$expected_label" ] && ! jg_backend_zellij_tab_matches_label "$JG_BACKEND_ZELLIJ_SESSION" "$tab_id" "$expected_label"; then
     tab_id=
   fi
   case "$fallback_tab_id" in
     ''|*[!0-9]*) ;;
     *)
       if [ -z "$tab_id" ]; then
-        if [ -z "$expected_label" ] || jg_backend_zellij_tab_matches_label "$FM_BACKEND_ZELLIJ_SESSION" "$fallback_tab_id" "$expected_label"; then
+        if [ -z "$expected_label" ] || jg_backend_zellij_tab_matches_label "$JG_BACKEND_ZELLIJ_SESSION" "$fallback_tab_id" "$expected_label"; then
           tab_id=$fallback_tab_id
         fi
       fi
       ;;
   esac
   if [ -n "$tab_id" ]; then
-    jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action close-tab-by-id "$tab_id" >/dev/null 2>&1 || true
+    jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action close-tab-by-id "$tab_id" >/dev/null 2>&1 || true
   elif [ -z "$expected_label" ]; then
-    jg_backend_zellij_cli "$FM_BACKEND_ZELLIJ_SESSION" action close-pane --pane-id "$FM_BACKEND_ZELLIJ_PANE" >/dev/null 2>&1 || true
+    jg_backend_zellij_cli "$JG_BACKEND_ZELLIJ_SESSION" action close-pane --pane-id "$JG_BACKEND_ZELLIJ_PANE" >/dev/null 2>&1 || true
   fi
 }
 

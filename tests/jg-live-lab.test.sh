@@ -142,7 +142,7 @@ start_watcher() {  # <home>: a live process holding a matching watcher lock
 
 write_pi_markers() {  # <home> <lock-pid>
   local home=$1 pid=$2
-  v() { FM_HOME="$home" bash -c '. "$1/bin/jg-wake-lib.sh"; jg_pi_extension_version "$1/.pi/extensions/$2"' _ "$home" "$1"; }
+  v() { JG_HOME="$home" bash -c '. "$1/bin/jg-wake-lib.sh"; jg_pi_extension_version "$1/.pi/extensions/$2"' _ "$home" "$1"; }
   printf '%s\n%s\ngeneration=1 phase=active\n' "$(v jg-primary-pi-watch.ts)" "$pid" > "$home/state/.pi-watch-extension-loaded"
   printf '%s\n%s\n' "$(v jg-primary-turnend-guard.ts)" "$pid" > "$home/state/.pi-turnend-extension-loaded"
   printf '%s\n' "$pid" > "$home/state/.pi-branch-extension-loaded"
@@ -596,7 +596,7 @@ PARTIAL="$TMP_ROOT/partial-lab"
 mkdir -p "$TMP_ROOT/stub-bin"
 cat > "$TMP_ROOT/stub-bin/claude" <<'SH'
 #!/bin/sh
-: > "$FM_HOME/state/.session-start-complete"
+: > "$JG_HOME/state/.session-start-complete"
 exec sleep 45 >/dev/null 2>&1
 SH
 chmod +x "$TMP_ROOT/stub-bin/claude"
@@ -627,8 +627,8 @@ WORKSRC="$TMP_ROOT/worker-source"
 cp -R "$UPSRC" "$WORKSRC"
 cat > "$WORKSRC/bin/jg-brief.sh" <<'SH'
 #!/usr/bin/env bash
-mkdir -p "$FM_HOME/data/$1"
-printf '{TASK}\n{FIRSTMATE_SPEC}\n' > "$FM_HOME/data/$1/brief.md"
+mkdir -p "$JG_HOME/data/$1"
+printf '{TASK}\n{FIRSTMATE_SPEC}\n' > "$JG_HOME/data/$1/brief.md"
 SH
 # The task-priority add-on refuses an add without --priority, as it does on a
 # real install; the lab worker's add must carry one or spawn never runs.
@@ -642,7 +642,7 @@ SH
 cat > "$WORKSRC/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
 id=$1
-tmux new-window -d -t firstmate: -n "jg-$id" -c "$FM_HOME" 'exec sleep 45 >/dev/null 2>&1' || exit 1
+tmux new-window -d -t firstmate: -n "jg-$id" -c "$JG_HOME" 'exec sleep 45 >/dev/null 2>&1' || exit 1
 # A missing =name can silently resolve to the current window: verify the name.
 for (( n=0; n<30; n++ )); do
   if tmux list-windows -t firstmate -F '#{window_name}' | grep -Fxq "jg-$id"; then
@@ -652,8 +652,8 @@ for (( n=0; n<30; n++ )); do
   sleep 0.1
 done
 [ -n "${pid:-}" ] || exit 1
-printf 'window=firstmate:jg-%s\n' "$id" > "$FM_HOME/state/$id.meta"
-printf 'working [at=1]: setting up\n' > "$FM_HOME/state/$id.status"
+printf 'window=firstmate:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
+printf 'working [at=1]: setting up\n' > "$JG_HOME/state/$id.status"
 SH
 chmod +x "$WORKSRC/bin/"{jg-brief,jg-tasks-axi,jg-spawn}.sh
 git -C "$WORKSRC" add -A
@@ -681,8 +681,8 @@ pass "up launches primary after worker status without weakening final parked rea
 cat > "$WORKSRC/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
 id=$1
-printf 'window=firstmate:jg-%s\n' "$id" > "$FM_HOME/state/$id.meta"
-printf 'working [at=1]: setting up\n' > "$FM_HOME/state/$id.status"
+printf 'window=firstmate:jg-%s\n' "$id" > "$JG_HOME/state/$id.meta"
+printf 'working [at=1]: setting up\n' > "$JG_HOME/state/$id.status"
 SH
 git -C "$WORKSRC" add bin/jg-spawn.sh
 git -C "$WORKSRC" -c user.name=t -c user.email=t@example.invalid commit -qm missing-pane
@@ -700,12 +700,12 @@ mkdir -p "$FAKEBIN"
 cat > "$FAKEBIN/claude" <<'SH'
 #!/usr/bin/env bash
 sleep 1.5
-if node -e 'const [s,k]=process.argv.slice(1);const j=JSON.parse(require("node:fs").readFileSync(s,"utf8"));process.exit(j.projects?.[k]?.hasTrustDialogAccepted===true?0:1)' "$HOME/.claude.json" "$FM_HOME"; then
-  echo present > "$FM_HOME/../claude-launch-trust"
+if node -e 'const [s,k]=process.argv.slice(1);const j=JSON.parse(require("node:fs").readFileSync(s,"utf8"));process.exit(j.projects?.[k]?.hasTrustDialogAccepted===true?0:1)' "$HOME/.claude.json" "$JG_HOME"; then
+  echo present > "$JG_HOME/../claude-launch-trust"
 else
-  echo absent > "$FM_HOME/../claude-launch-trust"
+  echo absent > "$JG_HOME/../claude-launch-trust"
 fi
-: > "$FM_HOME/state/.session-start-complete"
+: > "$JG_HOME/state/.session-start-complete"
 exec sleep 45 >/dev/null 2>&1
 SH
 chmod +x "$FAKEBIN/claude"

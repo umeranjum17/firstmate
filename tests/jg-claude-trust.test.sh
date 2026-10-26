@@ -155,7 +155,7 @@ spawn_secondmate_claude() {
   mkdir -p "$case_dir/claude-config"
   fakebin=$(make_spawn_fakebin "$case_dir/fake" claude)
   jg_test_spawn_home "$primary" claude
-  FM_TEST_CLAUDE_CONFIG_DIR="$case_dir/claude-config" FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+  JG_TEST_CLAUDE_CONFIG_DIR="$case_dir/claude-config" JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
     jg_test_run_spawn "$primary" "$home" "$fakebin" "$id" "$home" claude --secondmate
 }
 
@@ -671,7 +671,7 @@ test_refused_spawn_leaves_no_task_state() {
   jg_test_spawn_home "$home" claude
   jg_git_worktree "$proj" "$wt" wt-refused
   jg_test_spawn_brief "$home" "$id"
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$config" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$config" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" claude \
     --mode no-mistakes --yolo off)
   expect_code 1 $? "a spawn whose trust registration is refused must fail: $out"
@@ -712,7 +712,7 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
   jg_test_spawn_home "$home" claude
   jg_git_worktree "$proj" "$wt" wt-spawn
   jg_test_spawn_brief "$home" trustspawn
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$config" FM_FAKE_LAUNCH_LOG="$launch_log" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$config" JG_FAKE_LAUNCH_LOG="$launch_log" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" trustspawn "$proj" claude \
     --mode no-mistakes --yolo off)
   expect_code 0 $? "the claude spawn must succeed: $out"
@@ -725,9 +725,9 @@ test_claude_spawn_pretrusts_its_worktree_and_reaches_the_brief() {
   doorbell=$(claude_launch_doorbell "$launch")
   record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
   [ -n "$record" ] || fail "the launch command did not carry a brief doorbell"
-  [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
+  [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || fail "the launch command's doorbell did not name a brief record in the receiving home"
-  [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" = "$(cat "$home/data/trustspawn/launch-brief.md")" ] \
+  [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" = "$(cat "$home/data/trustspawn/launch-brief.md")" ] \
     || fail "the worker could not read its launch brief from the record"
   # The worker must read the SAME store the registration wrote, or the trust
   # would land somewhere the pane never looks.
@@ -757,9 +757,9 @@ test_secondmate_standalone_clone_home_is_trusted() {
   doorbell=$(claude_launch_doorbell "$launch")
   record=$(printf '%s' "$doorbell" | sed -n "s/.*: Firstmate operational input waiting: read '\([^']*\)'.*/\1/p")
   [ -n "$record" ] || fail "the secondmate launch command did not carry a brief doorbell"
-  [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
+  [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || fail "the secondmate's doorbell did not name a brief record in its home"
-  [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" = "$(cat "$home/data/charter.md")" ] \
+  [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" = "$(cat "$home/data/charter.md")" ] \
     || fail "the secondmate could not read its charter from the record"
   # The pane must read the SAME store the registration wrote, or the trust would
   # land somewhere it never looks and the dialog would appear anyway.

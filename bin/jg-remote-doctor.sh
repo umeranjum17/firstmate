@@ -62,7 +62,7 @@ SCRIPT_SELF=${BASH_SOURCE[0]}
 SCRIPT_DIR=${SCRIPT_SELF%/*}
 [ "$SCRIPT_DIR" != "$SCRIPT_SELF" ] || SCRIPT_DIR=.
 SCRIPT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR" && pwd -P)
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
 # shellcheck source=bin/jg-remote-job-lib.sh
 . "$SCRIPT_DIR/jg-remote-job-lib.sh"
 # shellcheck source=bin/jg-tasks-axi-lib.sh
@@ -90,7 +90,7 @@ case "${1:-}" in
   '') ;;
   --fix) MODE=fix; shift ;;
   --worker-tool-probe)
-    [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] || { printf 'error: worker tool probe requires the remote job worker\n' >&2; exit 64; }
+    [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] || { printf 'error: worker tool probe requires the remote job worker\n' >&2; exit 64; }
     MODE='worker-tool-probe'
     shift
     ;;
@@ -153,13 +153,13 @@ herdr_cli_available() {
 # either here. Sourced only when both tools resolve, so a bare host still
 # reports its gaps instead of failing to load.
 herdr_adapter_load() {
-  [ -z "${FM_REMOTE_DOCTOR_HERDR_LOADED:-}" ] || return 0
+  [ -z "${JG_REMOTE_DOCTOR_HERDR_LOADED:-}" ] || return 0
   herdr_cli_available || return 1
   [ -f "$SCRIPT_DIR/jg-backend.sh" ] && [ -f "$SCRIPT_DIR/backends/herdr.sh" ] || return 1
   # shellcheck source=bin/jg-backend.sh
   . "$SCRIPT_DIR/jg-backend.sh" || return 1
   jg_backend_source herdr || return 1
-  FM_REMOTE_DOCTOR_HERDR_LOADED=1
+  JG_REMOTE_DOCTOR_HERDR_LOADED=1
 }
 
 herdr_server_status_json() {
@@ -226,8 +226,8 @@ launch_agent_xml_escape() { # <value>
 # /bin/sh. Separate -l and -c so fish accepts the flags.
 resolve_launch_agent_shell() {
   local user raw shell
-  if [ -n "${FM_LAUNCH_AGENT_SHELL:-}" ] && [ -x "$FM_LAUNCH_AGENT_SHELL" ]; then
-    printf '%s' "$FM_LAUNCH_AGENT_SHELL"
+  if [ -n "${JG_LAUNCH_AGENT_SHELL:-}" ] && [ -x "$JG_LAUNCH_AGENT_SHELL" ]; then
+    printf '%s' "$JG_LAUNCH_AGENT_SHELL"
     return 0
   fi
   user=$(id -un 2>/dev/null || true)
@@ -260,7 +260,7 @@ resolve_launch_agent_shell() {
 # forever while a foreign server holds the socket, exactly the loop this guard
 # replaces, and would never let the guard's "nothing to do" verdict rest.
 launch_agent_guard_path() {
-  printf '%s/bin/jg-remote-herdr-guard.sh' "$FM_ROOT"
+  printf '%s/bin/jg-remote-herdr-guard.sh' "$JG_ROOT"
 }
 
 launch_agent_exec_command() { # <resolved-herdr-path>
@@ -342,18 +342,18 @@ launch_agent_loaded_contract_matches() { # <resolved-login-shell>
 
 remote_job_existing_state() {
   local root
-  root=${FM_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}
+  root=${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}
   root=$(jg_remote_job_canonical_existing_dir "$root") || return 1
   jg_remote_job_canonical_existing_dir "$root/jobs" >/dev/null || return 1
   # shellcheck disable=SC2034 # The sourceable worker helpers consume the validated state root.
-  FM_REMOTE_JOB_STATE=$root
+  JG_REMOTE_JOB_STATE=$root
 }
 
 remote_job_probe_ok() {
   local ready mtime now
-  [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
+  [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
   remote_job_existing_state || return 1
-  ready="$FM_REMOTE_JOB_STATE/worker.ready"
+  ready="$JG_REMOTE_JOB_STATE/worker.ready"
   [ -f "$ready" ] && [ ! -L "$ready" ] || return 1
   mtime=$(jg_remote_job_path_mtime "$ready" 2>/dev/null || true)
   case "$mtime" in ''|*[!0-9]*) return 1 ;; esac
@@ -362,14 +362,14 @@ remote_job_probe_ok() {
 }
 
 remote_job_identity_ok() {
-  [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
+  [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
   remote_job_probe_ok || return 1
-  jg_remote_job_worker_identity_matches "$FM_ROOT" "${HOME:-}"
+  jg_remote_job_worker_identity_matches "$JG_ROOT" "${HOME:-}"
 }
 
 check_remote_job_worker() {
   local worker
-  worker="$FM_ROOT/bin/jg-remote-job-worker.sh"
+  worker="$JG_ROOT/bin/jg-remote-job-worker.sh"
   if [ ! -f "$worker" ] || [ -L "$worker" ] || [ ! -x "$worker" ]; then
     record remote-job-worker "human: the configured Firstmate code root has no safe remote job worker" \
       "update the remote Firstmate checkout, then rerun this command with --fix"
@@ -379,28 +379,28 @@ check_remote_job_worker() {
   fi
   if [ "$PLATFORM" = darwin ]; then
     jg_remote_job_launchagent_paths "${HOME:-}"
-    if jg_remote_job_launchagent_contract_matches "$FM_ROOT" "${HOME:-}"; then
-      record remote-job-worker "ok: $FM_REMOTE_JOB_LAUNCH_AGENT_PLIST matches the Firstmate-owned Aqua worker contract"
+    if jg_remote_job_launchagent_contract_matches "$JG_ROOT" "${HOME:-}"; then
+      record remote-job-worker "ok: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST matches the Firstmate-owned Aqua worker contract"
     else
-      record remote-job-worker "fixable: $FM_REMOTE_JOB_LAUNCH_AGENT_PLIST does not match the Firstmate-owned Aqua worker contract" \
+      record remote-job-worker "fixable: $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST does not match the Firstmate-owned Aqua worker contract" \
         "rerun this command with --fix to write dev.firstmate.remote-job"
     fi
     if [ -z "$UID_NUM" ] || ! command -v launchctl >/dev/null 2>&1; then
       record remote-job-worker-loaded "human: the remote job worker cannot be inspected without launchctl and an account uid" \
         "restore launchctl and a readable account uid, then rerun this command"
-    elif jg_remote_job_launchagent_loaded "$FM_ROOT" "${HOME:-}" "$UID_NUM"; then
-      record remote-job-worker-loaded "ok: $FM_REMOTE_JOB_LABEL is loaded in gui/$UID_NUM"
+    elif jg_remote_job_launchagent_loaded "$JG_ROOT" "${HOME:-}" "$UID_NUM"; then
+      record remote-job-worker-loaded "ok: $JG_REMOTE_JOB_LABEL is loaded in gui/$UID_NUM"
     elif check_is_ok gui-session; then
-      record remote-job-worker-loaded "fixable: $FM_REMOTE_JOB_LABEL is not loaded in gui/$UID_NUM" \
+      record remote-job-worker-loaded "fixable: $JG_REMOTE_JOB_LABEL is not loaded in gui/$UID_NUM" \
         "rerun this command with --fix to bootstrap the worker"
     else
-      record remote-job-worker-loaded "human: $FM_REMOTE_JOB_LABEL cannot be loaded because gui/$UID_NUM has no login session" \
+      record remote-job-worker-loaded "human: $JG_REMOTE_JOB_LABEL cannot be loaded because gui/$UID_NUM has no login session" \
         "close the login-session gap first; SSH cannot create an Aqua session"
     fi
   else
     local pid
-    pid=$(cat "${FM_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}/worker.pid" 2>/dev/null || true)
-    if [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] ||
+    pid=$(cat "${JG_REMOTE_JOB_STATE_ROOT:-${HOME:-}/.firstmate/remote-job}/worker.pid" 2>/dev/null || true)
+    if [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] ||
       { remote_job_existing_state && case "$pid" in ''|*[!0-9]*) false ;; *) kill -0 "$pid" 2>/dev/null ;; esac; }; then
       record remote-job-worker "ok: the Linux remote job worker is running"
       record remote-job-worker-loaded "skip: Aqua launch agents do not apply on $PLATFORM"
@@ -454,7 +454,7 @@ report_required_tools() {
 report_required_tools_from_worker() {
   local job_id probe_stdout probe_stderr probe_exit line fact name value
   local expected=6 count=0 valid=1 seen=' '
-  if ! job_id=$(jg_remote_job_stage "${HOME:-}" "$FM_ROOT" "${FM_HOME:-}" \
+  if ! job_id=$(jg_remote_job_stage "${HOME:-}" "$JG_ROOT" "${JG_HOME:-}" \
     jg-remote-doctor.sh --worker-tool-probe </dev/null); then
     set_check remote-job-probe "fixable: the remote job worker could not accept the required-tool probe" \
       "rerun this command with --fix to restart the worker"
@@ -468,9 +468,9 @@ report_required_tools_from_worker() {
     report_required_tools
     return 0
   fi
-  probe_stdout=$FM_REMOTE_JOB_STDOUT
-  probe_stderr=$FM_REMOTE_JOB_STDERR
-  probe_exit=$FM_REMOTE_JOB_EXIT
+  probe_stdout=$JG_REMOTE_JOB_STDOUT
+  probe_stderr=$JG_REMOTE_JOB_STDERR
+  probe_exit=$JG_REMOTE_JOB_EXIT
   MISSING=()
   while IFS= read -r line; do
     case "$line" in required\ *=*) ;; *) valid=0; continue ;; esac
@@ -554,11 +554,11 @@ repair_required_wrappers() {
 }
 
 fix_remote_job_worker() {
-  if jg_remote_job_ensure_worker "$FM_ROOT" "${HOME:-}"; then
-    [ "$FM_REMOTE_JOB_REPAIRED" -eq 0 ] || fix_report remote-job-worker applied "installed or reloaded $FM_REMOTE_JOB_LABEL"
+  if jg_remote_job_ensure_worker "$JG_ROOT" "${HOME:-}"; then
+    [ "$JG_REMOTE_JOB_REPAIRED" -eq 0 ] || fix_report remote-job-worker applied "installed or reloaded $JG_REMOTE_JOB_LABEL"
     return 0
   fi
-  fix_report remote-job-worker failed "${FM_REMOTE_JOB_ERROR:-the remote job worker could not start}"
+  fix_report remote-job-worker failed "${JG_REMOTE_JOB_ERROR:-the remote job worker could not start}"
   return 1
 }
 
@@ -702,11 +702,11 @@ check_herdr_server() {
 
 check_entrypoint_link() {
   local want
-  if [ -z "${FM_ROOT_OVERRIDE:-}" ]; then
+  if [ -z "${JG_ROOT_OVERRIDE:-}" ]; then
     record entrypoint-link "skip: this run did not come through the fixed remote entrypoint"
     return 0
   fi
-  want="$FM_ROOT_OVERRIDE/bin/jg-remote-entrypoint.sh"
+  want="$JG_ROOT_OVERRIDE/bin/jg-remote-entrypoint.sh"
   if [ -L "$ENTRYPOINT_LINK" ] && [ "$(readlink "$ENTRYPOINT_LINK")" = "$want" ]; then
     record entrypoint-link "ok: $ENTRYPOINT_LINK"
     return 0
@@ -820,7 +820,7 @@ start_herdr_server() {
 }
 
 link_entrypoint() {
-  local want="${FM_ROOT_OVERRIDE:-}/bin/jg-remote-entrypoint.sh"
+  local want="${JG_ROOT_OVERRIDE:-}/bin/jg-remote-entrypoint.sh"
   if ! mkdir -p "$(dirname "$ENTRYPOINT_LINK")" 2>/dev/null; then
     fix_report entrypoint-link failed "cannot create $(dirname "$ENTRYPOINT_LINK")"
     return 1
@@ -889,7 +889,7 @@ fi
 
 printf 'mode=%s\n' "$MODE"
 printf 'path=%s\n' "${PATH:-}"
-if [ -n "${FM_ROOT_OVERRIDE:-}" ] && [ "${PATH%%:*}" = "$FM_ROOT_OVERRIDE/bin" ]; then
+if [ -n "${JG_ROOT_OVERRIDE:-}" ] && [ "${PATH%%:*}" = "$JG_ROOT_OVERRIDE/bin" ]; then
   printf 'entrypoint=yes\n'
 else
   printf 'entrypoint=no\n'
@@ -909,7 +909,7 @@ if [ "$MODE" = fix ]; then
   run_checks "$LAUNCH_AGENT_SHELL"
 fi
 
-if [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] || ! remote_job_identity_ok; then
+if [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] || ! remote_job_identity_ok; then
   report_required_tools
 else
   report_required_tools_from_worker

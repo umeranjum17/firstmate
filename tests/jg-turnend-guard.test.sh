@@ -38,7 +38,7 @@ test_predicate_healthy_no_inflight() {
   if jg_supervision_unhealthy "$state" 300; then
     fail "predicate reported unhealthy with zero in-flight tasks"
   fi
-  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "expected zero in-flight, got $FM_SUP_IN_FLIGHT"
+  [ "$JG_SUP_IN_FLIGHT" -eq 0 ] || fail "expected zero in-flight, got $JG_SUP_IN_FLIGHT"
   pass "jg_supervision_unhealthy: false with no state/*.meta at all"
 }
 
@@ -47,9 +47,9 @@ test_predicate_unhealthy_no_beacon() {
   mkdir -p "$state"
   : > "$state/task1.meta"
   jg_supervision_unhealthy "$state" 300 || fail "predicate did not fire: in-flight task, beacon never seen"
-  [ "$FM_SUP_IN_FLIGHT" -eq 1 ] || fail "expected 1 in-flight, got $FM_SUP_IN_FLIGHT"
-  [ "$FM_SUP_WATCHER_FRESH" = false ] || fail "beacon absent must not read as fresh"
-  [ "$FM_SUP_BEACON_DESC" = never ] || fail "beacon description should be 'never', got $FM_SUP_BEACON_DESC"
+  [ "$JG_SUP_IN_FLIGHT" -eq 1 ] || fail "expected 1 in-flight, got $JG_SUP_IN_FLIGHT"
+  [ "$JG_SUP_WATCHER_FRESH" = false ] || fail "beacon absent must not read as fresh"
+  [ "$JG_SUP_BEACON_DESC" = never ] || fail "beacon description should be 'never', got $JG_SUP_BEACON_DESC"
   pass "jg_supervision_unhealthy: true with in-flight task and no beacon ever"
 }
 
@@ -59,7 +59,7 @@ test_predicate_unhealthy_stale_beacon() {
   : > "$state/task1.meta"
   touch -t 202001010000 "$state/.last-watcher-beat"
   jg_supervision_unhealthy "$state" 300 || fail "predicate did not fire: in-flight task, beacon far outside grace"
-  [ "$FM_SUP_WATCHER_FRESH" = false ] || fail "an ancient beacon must not read as fresh"
+  [ "$JG_SUP_WATCHER_FRESH" = false ] || fail "an ancient beacon must not read as fresh"
   pass "jg_supervision_unhealthy: true with in-flight task and a beacon far outside the grace window"
 }
 
@@ -71,7 +71,7 @@ test_predicate_healthy_fresh_beacon() {
   if jg_supervision_unhealthy "$state" 300; then
     fail "predicate fired despite a fresh beacon"
   fi
-  [ "$FM_SUP_WATCHER_FRESH" = true ] || fail "a beacon touched just now must read as fresh"
+  [ "$JG_SUP_WATCHER_FRESH" = true ] || fail "a beacon touched just now must read as fresh"
   pass "jg_supervision_unhealthy: false with in-flight task and a fresh beacon"
 }
 
@@ -79,11 +79,11 @@ test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
   mkdir -p "$state"
   jg_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "empty/absent wake queue must not read as pending"
+  [ "$JG_SUP_QUEUE_PENDING" = false ] || fail "empty/absent wake queue must not read as pending"
   printf 'record\n' > "$state/.wake-queue"
   jg_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "a non-empty wake queue must read as pending"
-  pass "jg_supervision_status: FM_SUP_QUEUE_PENDING tracks state/.wake-queue"
+  [ "$JG_SUP_QUEUE_PENDING" = true ] || fail "a non-empty wake queue must read as pending"
+  pass "jg_supervision_status: JG_SUP_QUEUE_PENDING tracks state/.wake-queue"
 }
 
 test_predicate_x_mode_needs_supervision() {
@@ -91,8 +91,8 @@ test_predicate_x_mode_needs_supervision() {
   mkdir -p "$state"
   : > "$state/x-watch.check.sh"
   jg_supervision_needed "$state" 300 || fail "X-mode relay poll did not register as supervision need"
-  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "X-mode relay poll must not count as an in-flight task"
-  [ "$FM_SUP_NEEDED" = true ] || fail "X-mode relay poll must set FM_SUP_NEEDED"
+  [ "$JG_SUP_IN_FLIGHT" -eq 0 ] || fail "X-mode relay poll must not count as an in-flight task"
+  [ "$JG_SUP_NEEDED" = true ] || fail "X-mode relay poll must set JG_SUP_NEEDED"
   jg_supervision_unhealthy "$state" 300 || fail "X-mode relay poll with no beacon must be unhealthy"
   pass "jg_supervision_needed: X-mode relay poll needs supervision"
 }
@@ -102,8 +102,8 @@ test_predicate_source_needs_supervision() {
   mkdir -p "$state/procevent"
   : > "$state/procevent/source-only.source"
   jg_supervision_unhealthy "$state" 300 || fail "registered source with no beacon must be unhealthy"
-  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "a process-event source must not count as a task"
-  [ "$FM_SUP_SOURCES" -eq 1 ] || fail "expected one registered process-event source"
+  [ "$JG_SUP_IN_FLIGHT" -eq 0 ] || fail "a process-event source must not count as a task"
+  [ "$JG_SUP_SOURCES" -eq 1 ] || fail "expected one registered process-event source"
   pass "jg_supervision_unhealthy: source-only home needs supervision"
 }
 
@@ -114,7 +114,7 @@ register_custom_check() {
   local state=$1 id=$2
   printf '#!/usr/bin/env bash\nexit 0\n' > "$state/$id.check.sh"
   chmod 700 "$state/$id.check.sh"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" "$id" >/dev/null \
+  JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" "$id" >/dev/null \
     || fail "jg-check-register.sh could not register $id"
 }
 
@@ -123,8 +123,8 @@ test_predicate_registered_check_needs_supervision() {
   mkdir -p "$state"
   register_custom_check "$state" issue-comments
   jg_supervision_needed "$state" 300 || fail "a registered custom check did not register as supervision need"
-  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "a registered custom check must not count as an in-flight task"
-  [ "$FM_SUP_CHECKS" -eq 1 ] || fail "expected one registered custom check, got $FM_SUP_CHECKS"
+  [ "$JG_SUP_IN_FLIGHT" -eq 0 ] || fail "a registered custom check must not count as an in-flight task"
+  [ "$JG_SUP_CHECKS" -eq 1 ] || fail "expected one registered custom check, got $JG_SUP_CHECKS"
   jg_supervision_unhealthy "$state" 300 || fail "a registered custom check with no beacon must be unhealthy"
   pass "jg_supervision_needed: a registered custom check needs supervision with no task in flight"
 }
@@ -136,7 +136,7 @@ test_predicate_registered_check_survives_rebinding_drift() {
   printf '#!/usr/bin/env bash\necho drifted\n' > "$state/issue-comments.check.sh"
   jg_supervision_needed "$state" 300 \
     || fail "an edited registered check must keep supervision on so the sweep can report the rejection"
-  [ "$FM_SUP_CHECKS" -eq 1 ] || fail "expected the edited check to stay counted, got $FM_SUP_CHECKS"
+  [ "$JG_SUP_CHECKS" -eq 1 ] || fail "expected the edited check to stay counted, got $JG_SUP_CHECKS"
   pass "jg_supervision_needed: a registered check whose bytes drifted still needs supervision"
 }
 
@@ -148,7 +148,7 @@ test_predicate_unregistered_check_needs_nothing() {
   if jg_supervision_needed "$state" 300; then
     fail "a check with no trust binding must not arm supervision"
   fi
-  [ "$FM_SUP_CHECKS" -eq 0 ] || fail "an unregistered check must not be counted, got $FM_SUP_CHECKS"
+  [ "$JG_SUP_CHECKS" -eq 0 ] || fail "an unregistered check must not be counted, got $JG_SUP_CHECKS"
   pass "jg_supervision_needed: false for a check.sh with no registration binding"
 }
 
@@ -160,8 +160,8 @@ test_predicate_task_pr_poll_is_not_a_custom_check() {
   chmod 700 "$state/task1.check.sh"
   : > "$state/task1.pr-poll"
   jg_supervision_needed "$state" 300 || fail "the in-flight task itself must need supervision"
-  [ "$FM_SUP_IN_FLIGHT" -eq 1 ] || fail "expected the task to be the one in-flight need, got $FM_SUP_IN_FLIGHT"
-  [ "$FM_SUP_CHECKS" -eq 0 ] || fail "a task PR poll must not count as a registered custom check"
+  [ "$JG_SUP_IN_FLIGHT" -eq 1 ] || fail "expected the task to be the one in-flight need, got $JG_SUP_IN_FLIGHT"
+  [ "$JG_SUP_CHECKS" -eq 0 ] || fail "a task PR poll must not count as a registered custom check"
   pass "jg_supervision_needed: a task PR poll without a trust binding is not a registered custom check"
 }
 
@@ -170,14 +170,14 @@ test_predicate_relay_shim_is_not_a_custom_check() {
   mkdir -p "$state"
   : > "$state/x-watch.check.sh"
   jg_supervision_needed "$state" 300 || fail "the relay poll must still need supervision"
-  [ "$FM_SUP_CHECKS" -eq 0 ] || fail "the relay shim keeps its own trust path and must not be counted as a custom check"
+  [ "$JG_SUP_CHECKS" -eq 0 ] || fail "the relay shim keeps its own trust path and must not be counted as a custom check"
   pass "jg_supervision_status: the relay shim is not counted as a registered custom check"
 }
 
 # --- HOOK: bin/jg-turnend-guard.sh ------------------------------------------
 #
 # Each scenario gets its own directory carrying a copy of the two guard scripts
-# under bin/, so the hook (invoked by absolute path) resolves its own FM_ROOT to
+# under bin/, so the hook (invoked by absolute path) resolves its own JG_ROOT to
 # that scenario dir regardless of the test's cwd.
 
 install_guard_scripts() {
@@ -273,7 +273,7 @@ make_secondmate_linked_home_dir() {
 run_hook() {
   local dir=$1 stop_active=$2 home
   home=$(cd "$dir" && pwd)
-  printf '{"stop_hook_active":%s}' "$stop_active" | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 FM_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1
+  printf '{"stop_hook_active":%s}' "$stop_active" | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 JG_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1
 }
 
 nonexistent_pid() {
@@ -286,7 +286,7 @@ nonexistent_pid() {
 
 watcher_identity() {
   local dir=$1 pid=$2
-  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$dir/bin/jg-wake-lib.sh" "$pid"
+  JG_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$dir/bin/jg-wake-lib.sh" "$pid"
 }
 
 record_watcher_lock() {
@@ -387,7 +387,7 @@ test_hook_non_claude_health_ignores_claude_budget_contention() {
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
   while IFS='|' read -r harness payload; do
-    out=$(printf '%s' "$payload" | FM_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+    out=$(printf '%s' "$payload" | JG_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
     expect_code 0 "$status" "$harness healthy path must ignore Claude budget-lock contention"
     [ -z "$out" ] || fail "$harness healthy path produced output: $out"
     [ "$(cat "$dir/state/.turnend-claude-blocks")" = $'session=claude-episode\ncount=3\nepoch=9' ] \
@@ -451,10 +451,10 @@ test_hook_blocks_from_jg_home_state() {
   home="$TMP_ROOT/hook-jg-home-op"
   mkdir -p "$home/state"
   : > "$home/state/task1.meta"
-  out=$(printf '{"stop_hook_active":false}' | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 FM_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
-  expect_code 2 "$status" "hook must inspect the active FM_HOME state dir"
+  out=$(printf '{"stop_hook_active":false}' | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 JG_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+  expect_code 2 "$status" "hook must inspect the active JG_HOME state dir"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
-  pass "jg-turnend-guard: blocks from active FM_HOME state, not only repo-root state"
+  pass "jg-turnend-guard: blocks from active JG_HOME state, not only repo-root state"
 }
 
 test_hook_x_mode_reason_sources_cadence() {
@@ -497,10 +497,10 @@ test_hook_ignores_repo_state_when_jg_home_set() {
   home="$TMP_ROOT/hook-jg-home-quiet"
   mkdir -p "$home/state"
   : > "$dir/state/task1.meta"
-  out=$(printf '{"stop_hook_active":false}' | FM_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
-  expect_code 0 "$status" "hook must ignore repo-root state when FM_HOME selects another state dir"
-  [ -z "$out" ] || fail "hook produced output from stale repo-root state despite FM_HOME: $out"
-  pass "jg-turnend-guard: ignores stale repo-root state when FM_HOME is set"
+  out=$(printf '{"stop_hook_active":false}' | JG_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+  expect_code 0 "$status" "hook must ignore repo-root state when JG_HOME selects another state dir"
+  [ -z "$out" ] || fail "hook produced output from stale repo-root state despite JG_HOME: $out"
+  pass "jg-turnend-guard: ignores stale repo-root state when JG_HOME is set"
 }
 
 test_hook_uses_state_override() {
@@ -510,10 +510,10 @@ test_hook_uses_state_override() {
   state="$TMP_ROOT/hook-state-override-active"
   mkdir -p "$home/state" "$state"
   : > "$state/task1.meta"
-  out=$(printf '{"stop_hook_active":false}' | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 FM_HOME="$home" FM_STATE_OVERRIDE="$state" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
-  expect_code 2 "$status" "hook must let FM_STATE_OVERRIDE win over FM_HOME/state"
+  out=$(printf '{"stop_hook_active":false}' | PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 JG_HOME="$home" JG_STATE_OVERRIDE="$state" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+  expect_code 2 "$status" "hook must let JG_STATE_OVERRIDE win over JG_HOME/state"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
-  pass "jg-turnend-guard: uses FM_STATE_OVERRIDE ahead of FM_HOME/state"
+  pass "jg-turnend-guard: uses JG_STATE_OVERRIDE ahead of JG_HOME/state"
 }
 
 test_hook_loop_guard_allows_retry() {
@@ -1075,7 +1075,7 @@ test_pi_extension_injects_once_per_logical_agent_run() {
   cat > "$repo/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
 cat >/dev/null
-printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard\n' >> "${JG_GUARD_LOG:?}"
 printf 'logical-run guard fired\n' >&2
 exit 2
 SH
@@ -1084,7 +1084,7 @@ SH
 exit 0
 SH
   chmod +x "$repo/bin/jg-turnend-guard.sh" "$repo/bin/jg-arm-pretool-check.sh"
-  out=$(PLUGIN="$ext" FM_HOME="$home" FM_GUARD_LOG="$log" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$ext" JG_HOME="$home" JG_GUARD_LOG="$log" node --input-type=module 2>&1 <<'EOF'
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1119,7 +1119,7 @@ for (let i = 0; i < 3; i += 1) {
 await settled({ type: "agent_settled" }, {});
 if (prompts !== 2) throw new Error(`multi-tool run produced ${prompts - 1} follow-ups`);
 
-const guardRuns = readFileSync(process.env.FM_GUARD_LOG, "utf8").trim().split("\n").length;
+const guardRuns = readFileSync(process.env.JG_GUARD_LOG, "utf8").trim().split("\n").length;
 if (guardRuns !== 2) throw new Error(`guard predicate ran ${guardRuns} times for two logical runs`);
 EOF
 )
@@ -1149,7 +1149,7 @@ SH
 exit 0
 SH
   chmod +x "$repo/bin/jg-turnend-guard.sh" "$repo/bin/jg-arm-pretool-check.sh"
-  out=$(PLUGIN="$ext" FM_HOME="$home" node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$ext" JG_HOME="$home" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 
 const handlers = new Map();
@@ -1187,7 +1187,7 @@ EOF
 run_hook_claude() {
   local dir=$1 stop_active=$2 home
   home=$(cd "$dir" && pwd)
-  printf '{"stop_hook_active":%s,"session_id":"sess-claude-mode"}' "$stop_active" | CLAUDECODE=1 FM_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" --claude 2>&1
+  printf '{"stop_hook_active":%s,"session_id":"sess-claude-mode"}' "$stop_active" | CLAUDECODE=1 JG_HOME="$home" bash "$dir/bin/jg-turnend-guard.sh" --claude 2>&1
 }
 
 seed_claude_failure() {
@@ -1233,11 +1233,11 @@ install_integrated_autoarm() {
 run_integrated_autoarm() {
   local dir=$1 home
   home=$(cd "$dir" && pwd)
-  # shellcheck disable=SC2016 # the fake harness expands FM_HOME inside its child shell.
+  # shellcheck disable=SC2016 # the fake harness expands JG_HOME inside its child shell.
   printf '{"session_id":"sess-claude-mode","stop_hook_active":false}\n' \
-    | FM_HOME="$home" "$dir/fake-claude" -c '
-        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-        "$FM_HOME/bin/jg-claude-stop-autoarm.sh"
+    | JG_HOME="$home" "$dir/fake-claude" -c '
+        printf "%s\n" "$$" > "$JG_HOME/state/.lock"
+        "$JG_HOME/bin/jg-claude-stop-autoarm.sh"
       ' 2>&1
 }
 
@@ -1247,9 +1247,9 @@ run_integrated_autoarm() {
 run_integrated_autoarm_unowned() {
   local dir=$1 home
   home=$(cd "$dir" && pwd)
-  # shellcheck disable=SC2016 # the fake harness expands FM_HOME inside its child shell.
+  # shellcheck disable=SC2016 # the fake harness expands JG_HOME inside its child shell.
   printf '{"session_id":"sess-claude-mode","stop_hook_active":false}\n' \
-    | FM_HOME="$home" "$dir/fake-claude" -c '"$FM_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1
+    | JG_HOME="$home" "$dir/fake-claude" -c '"$JG_HOME/bin/jg-claude-stop-autoarm.sh"' 2>&1
 }
 
 write_integrated_failed_arm() {
@@ -1269,7 +1269,7 @@ test_hook_claude_mode_reblocks_stop_hook_active_when_unhealthy() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-reblock")
   : > "$dir/state/task1.meta"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "--claude mode must re-block a stop_hook_active=true stop while unhealthy with no auto-arm claim"
   assert_contains "$out" "TURN WOULD END BLIND" "--claude re-block must carry the blind-turn banner"
   assert_contains "$out" "Stop-owned auto-arm did not claim" "--claude re-block must explain the missing auto-arm claim"
@@ -1280,7 +1280,7 @@ test_hook_claude_mode_reblocks_x_mode_without_tasks() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-x-mode")
   : > "$dir/state/x-watch.check.sh"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "--claude mode must re-block an X-mode-only stop when no auto-arm claims recovery"
   assert_contains "$out" "X-mode relay polling needs supervision" "--claude X-mode re-block must name the active supervision need"
   [ -f "$dir/state/.turnend-claude-blocks" ] || fail "--claude X-mode re-block must consume the shared block budget"
@@ -1366,11 +1366,11 @@ test_hook_claude_mode_terminal_boundary_excludes_starting_owner() {
   mkfifo "$ready" "$release"
   cat > "$fakebin/cat" <<'SH'
 #!/usr/bin/env bash
-if [ "$1" = "$FM_TERMINAL_ROLE_PATH" ] \
+if [ "$1" = "$JG_TERMINAL_ROLE_PATH" ] \
   && [ "$(/bin/cat "$1" 2>/dev/null || true)" = terminal-check ] \
-  && (set -C; : > "$FM_TERMINAL_ONCE") 2>/dev/null; then
-  printf 'ready\n' > "$FM_TERMINAL_READY"
-  IFS= read -r _ < "$FM_TERMINAL_RELEASE"
+  && (set -C; : > "$JG_TERMINAL_ONCE") 2>/dev/null; then
+  printf 'ready\n' > "$JG_TERMINAL_READY"
+  IFS= read -r _ < "$JG_TERMINAL_RELEASE"
 fi
 exec /bin/cat "$@"
 SH
@@ -1378,11 +1378,11 @@ SH
   (
     printf '{"stop_hook_active":true,"session_id":"sess-claude-mode"}' \
       | PATH="$fakebin:$PATH" \
-        FM_TERMINAL_ROLE_PATH="$dir/state/.claude-autoarm.lock/role" \
-        FM_TERMINAL_READY="$ready" \
-        FM_TERMINAL_RELEASE="$release" \
-        FM_TERMINAL_ONCE="$once" \
-        CLAUDECODE=1 FM_HOME="$dir" bash "$dir/bin/jg-turnend-guard.sh" --claude \
+        JG_TERMINAL_ROLE_PATH="$dir/state/.claude-autoarm.lock/role" \
+        JG_TERMINAL_READY="$ready" \
+        JG_TERMINAL_RELEASE="$release" \
+        JG_TERMINAL_ONCE="$once" \
+        CLAUDECODE=1 JG_HOME="$dir" bash "$dir/bin/jg-turnend-guard.sh" --claude \
           > "$guard_out" 2>&1
     printf '%s\n' "$?" > "$guard_status"
   ) &
@@ -1426,7 +1426,7 @@ test_hook_claude_mode_blocks_on_abandoned_autoarm_claim() {
   record_autoarm_owner "$dir" "$pid"
   printf 'epoch=464 owner_pid=%s outcome=rewake updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "an owner lock left behind by a finished claim must not pass for recovery under way"
@@ -1455,7 +1455,7 @@ test_hook_claude_mode_blocks_on_pid_reused_arming_claim() {
   printf 'epoch=464 owner_pid=%s outcome=arming updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
   : > "$dir/state/.last-watcher-beat"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a claim whose recorded identity no longer matches its live pid must not pass for recovery under way"
@@ -1480,7 +1480,7 @@ test_hook_claude_mode_blocks_on_stuck_arming_claim() {
   printf 'epoch=464 owner_pid=%s outcome=arming updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.last-watcher-beat"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a live owner stuck arming past grace with a stale beacon must not pass for recovery under way"
@@ -1526,7 +1526,7 @@ test_hook_claude_mode_blocks_on_stuck_generation_claim() {
     > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.last-watcher-beat"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a stuck generation claim must not pass for recovery under way"
@@ -1549,7 +1549,7 @@ test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim() {
   record_autoarm_owner "$dir" "$pid"
   printf 'epoch=3 owner_pid=%s outcome=failed-suppressed updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 0 "$status" "the verified attended fail-open still ends the turn once it is spent"
@@ -1591,7 +1591,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
   out=$(run_integrated_autoarm "$dir"); status=$?
   expect_code 2 "$status" "the first exhausted auto-arm cycle must emit its one failure notice"
   assert_contains "$out" "automatic supervision mechanism is broken" "the first integrated failure notice is missing"
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 0 "$guard_status" "the first failed epoch must own its Stop handoff"
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
   [ "$count" = 0 ] || fail "the first owned failure epoch must preserve a zero blocked-stop count, got $count"
@@ -1600,7 +1600,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
     out=$(run_integrated_autoarm "$dir"); status=$?
     expect_code 2 "$status" "failed epoch $i must retain the automatic retry handoff"
     [ -z "$out" ] || fail "failed epoch $i repeated the operator notice: $out"
-    guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+    guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
     if [ "$i" -lt 4 ]; then
       expect_code 2 "$guard_status" "failed epoch $i must consume a bounded blind-stop block"
       assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "fail-open fired before the bounded progression ended"
@@ -1614,7 +1614,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
   out=$(run_integrated_autoarm "$dir"); status=$?
   expect_code 0 "$status" "the auto-arm must not re-trigger continuation after the final fail-open"
   [ -z "$out" ] || fail "post-fail-open auto-arm produced continuation output: $out"
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 2 "$guard_status" "a later unhealthy stop in the same episode must remain attended"
   assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated in the same episode"
 
@@ -1635,7 +1635,7 @@ test_hook_claude_mode_integrated_monotonic_fail_open() {
   assert_absent "$dir/state/.claude-autoarm-failure-notified" "positive recovery left the failure notice marker"
   assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "positive recovery left the attended alarm marker"
   assert_absent "$dir/state/.turnend-claude-blocks" "positive recovery left the bounded block budget"
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); guard_status=$?
   expect_code 2 "$guard_status" "a guard after one-shot recovery must start a fresh failure budget"
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
   [ "$count" = 1 ] || fail "the independent post-recovery failure must start at count 1, got $count"
@@ -1661,7 +1661,7 @@ test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open() {
 
   out=$(run_integrated_autoarm "$dir"); status=$?
   expect_code 2 "$status" "the exhausted auto-arm cycle must emit its one failure notice before going quiet"
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 0 "$guard_status" "the first failed epoch must own its Stop handoff"
   epoch_line=$(sed -n '1p' "$dir/state/.claude-autoarm-epoch")
 
@@ -1674,7 +1674,7 @@ test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open() {
     [ -z "$out" ] || fail "inert auto-arm produced output at stop $i: $out"
     [ "$(sed -n '1p' "$dir/state/.claude-autoarm-epoch")" = "$epoch_line" ] \
       || fail "the ledger epoch advanced at stop $i, so this case no longer drives a frozen epoch"
-    guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+    guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
     if [ "$i" -lt 4 ]; then
       expect_code 2 "$guard_status" "frozen-epoch stop $i must still re-block within the budget"
       assert_contains "$guard_out" "TURN WOULD END BLIND" "frozen-epoch re-block $i lost the blind-turn banner"
@@ -1687,7 +1687,7 @@ test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open() {
     fi
   done
 
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 2 "$guard_status" "a later unhealthy stop after the frozen-epoch alarm must remain attended"
   assert_not_contains "$guard_out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "the attended alarm repeated against the frozen epoch"
 
@@ -1711,7 +1711,7 @@ test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open() {
   assert_absent "$dir/state/.turnend-claude-blocks" "positive recovery left the frozen-epoch block budget"
   assert_absent "$dir/state/.claude-autoarm-failure-notified" "positive recovery left the failure notice"
   assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "positive recovery left the attended alarm"
-  guard_out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
+  guard_out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); guard_status=$?
   expect_code 2 "$guard_status" "a later unhealthy stop must re-block from a fresh budget"
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
   [ "$count" = 1 ] || fail "the post-recovery episode must restart its budget at 1, got $count"
@@ -1728,7 +1728,7 @@ test_hook_claude_mode_frozen_epoch_without_verified_failure_spends_budget_and_ke
   printf 'epoch=7 owner_pid=999 outcome=clean updated_at=1\n' > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
   for i in 1 2 3 4 5; do
-    out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+    out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
     expect_code 2 "$status" "frozen unverified stop $i must keep blocking"
     assert_not_contains "$out" 'systemMessage' "an unverified frozen epoch must never fail open"
     [ "$(sed -n '1p' "$dir/state/.claude-autoarm-epoch")" = 'epoch=7 owner_pid=999 outcome=clean updated_at=1' ] \
@@ -1790,7 +1790,7 @@ test_hook_claude_mode_concurrent_recovery_resets_are_idempotent() {
   touch "$dir/state/.last-watcher-beat"
   (run_integrated_autoarm "$dir" > "$dir/auto.out"; printf '%s\n' "$?" > "$dir/auto.status") &
   auto_pid=$!
-  (FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false > "$dir/guard.out"; printf '%s\n' "$?" > "$dir/guard.status") &
+  (JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false > "$dir/guard.out"; printf '%s\n' "$?" > "$dir/guard.status") &
   guard_pid=$!
   wait "$auto_pid"
   wait "$guard_pid"
@@ -1816,7 +1816,7 @@ test_hook_claude_mode_stale_rewake_epoch_blocks() {
   : > "$dir/state/task1.meta"
   printf 'epoch=3 owner_pid=999 outcome=rewake updated_at=1\n' > "$dir/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "--claude mode must not treat an ancient rewake epoch as this event's recovery"
   pass "jg-turnend-guard --claude: stale rewake epoch does not allow a blind stop"
 }
@@ -1826,7 +1826,7 @@ test_hook_claude_mode_budget_without_verified_failure_keeps_blocking() {
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-budget")
   : > "$dir/state/task1.meta"
   for i in 1 2 3 4; do
-    out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+    out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
     expect_code 2 "$status" "--claude block $i must exit 2 within the budget"
   done
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
@@ -1842,14 +1842,14 @@ test_hook_claude_mode_verified_failure_alarm_is_loud_and_once() {
   : > "$dir/state/task1.meta"
   seed_claude_failure "$dir"
   seed_claude_budget "$dir" 3
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 0 "$status" "verified failure with exhausted budget must take the bounded attended fail-open"
   assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "bounded fail-open alarm was not unmistakable"
   assert_contains "$out" 'Keep this session attended' "bounded fail-open alarm omitted the attended-session action"
   assert_contains "$out" 'diagnose the automatic Stop-hook and watcher startup' "bounded fail-open alarm omitted automatic-mechanism diagnosis"
   assert_not_contains "$out" 'jg-watch-arm.sh' "bounded fail-open alarm assigned a manual watcher launch"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "bounded fail-open did not consume the episode alarm"
-  out2=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status2=$?
+  out2=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status2=$?
   expect_code 2 "$status2" "a consumed attended alarm must make later unhealthy stops block again"
   assert_not_contains "$out2" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "attended failure alarm repeated in one episode"
   pass "jg-turnend-guard --claude: verified fail-open is loud, bounded, attended, and non-repeating"
@@ -1862,14 +1862,14 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch() {
   printf 'epoch=3 owner_pid=999 outcome=failed-suppressed updated_at=1\n' > "$no_notice/state/.claude-autoarm-epoch"
   touch -t 202001010000 "$no_notice/state/.claude-autoarm-epoch"
   seed_claude_budget "$no_notice" 3
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$no_notice" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$no_notice" true); status=$?
   expect_code 2 "$status" "an exhausted failure epoch without the consumed notice must remain blocking"
 
   notice_only=$(make_primary_dir "$TMP_ROOT/hook-claude-alarm-no-epoch")
   : > "$notice_only/state/task1.meta"
   : > "$notice_only/state/.claude-autoarm-failure-notified"
   seed_claude_budget "$notice_only" 3
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$notice_only" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$notice_only" true); status=$?
   expect_code 2 "$status" "a consumed notice without an exhausted failure epoch must remain blocking"
   pass "jg-turnend-guard --claude: fail-open requires both exhausted retries and consumed notice"
 }
@@ -1881,7 +1881,7 @@ test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open() {
   : > "$dir/state/.afk"
   seed_claude_failure "$dir"
   seed_claude_budget "$dir" 3
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "away mode must not use a stale Stop-autoarm failure to fail open"
   assert_contains "$out" 'Away mode owns watcher supervision' "away-mode block lost its daemon ownership guidance"
   assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "away mode consumed the Stop-autoarm attended alarm"
@@ -1892,7 +1892,7 @@ test_hook_claude_mode_allow_resets_budget() {
   local dir pid identity out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-reset")
   : > "$dir/state/task1.meta"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
   expect_code 2 "$status" "first --claude block must exit 2"
   [ -f "$dir/state/.turnend-claude-blocks" ] || fail "--claude block must record the consecutive-block budget"
   : > "$dir/state/.claude-autoarm-failure-notified"
@@ -1914,7 +1914,7 @@ test_hook_claude_mode_allow_resets_budget() {
   [ ! -f "$dir/state/.turnend-claude-blocks" ] || fail "--claude allow must reset the consecutive-block budget"
   [ ! -f "$dir/state/.claude-autoarm-failure-notified" ] || fail "positive watcher recovery must reset the failure notice"
   [ ! -f "$dir/state/.claude-autoarm-failure-alarmed" ] || fail "positive watcher recovery must reset the attended alarm"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
   expect_code 2 "$status" "a later unhealthy chain must re-block from a fresh budget"
   pass "jg-turnend-guard --claude: positive watcher recovery resets failure episode state"
 }
@@ -1931,7 +1931,7 @@ test_hook_claude_mode_waits_for_late_claim() {
     wait
   ) &
   helper=$!
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=3000 run_hook_claude "$dir" false); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=3000 run_hook_claude "$dir" false); status=$?
   holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
   kill "$holder" 2>/dev/null || true
   kill "$helper" 2>/dev/null || true
@@ -1945,7 +1945,7 @@ test_hook_claude_mode_secondmate_reblocks_like_primary() {
   local dir pid out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-claude-sm-reblock")
   : > "$dir/state/task1.meta"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "--claude mode must re-block in a marked secondmate home exactly like the main primary"
   assert_contains "$out" "TURN WOULD END BLIND" "--claude secondmate re-block must carry the blind-turn banner"
   sleep 60 &
@@ -2006,7 +2006,7 @@ test_hook_away_daemon_allows_between_watcher_cycles() {
   out=$(run_hook "$dir" false); status=$?
   expect_code 0 "$status" "away mode with a live daemon must not block between watcher cycles"
   [ -z "$out" ] || fail "away-mode daemon ownership still produced a block banner: $out"
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+  out=$(JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 0 "$status" "--claude away mode with a live daemon must not block between watcher cycles"
@@ -2114,7 +2114,7 @@ test_hook_daemon_lock_is_ignored_without_away_mode() {
 # the previous wake, and that handling can legitimately outrun a flat 300s
 # window under load (a slow registered check, a busy supervisor pane) with the
 # daemon perfectly healthy throughout (jg-turnend-guard-afk-race). The guard
-# must accept a live daemon there once FM_POLL justifies the wider window, but
+# must accept a live daemon there once JG_POLL justifies the wider window, but
 # must still block a dead daemon or a beacon older than that wider grace.
 
 test_hook_away_daemon_allows_beacon_within_poll_derived_grace() {
@@ -2128,11 +2128,11 @@ test_hook_away_daemon_allows_beacon_within_poll_derived_grace() {
     fail "could not identify live away-mode daemon holder"
   }
   # 400s is stale under the flat 300s default, but not under the poll-derived
-  # grace (max(300, FM_POLL + 60) = 660 at FM_POLL=600) - a live daemon that
+  # grace (max(300, JG_POLL + 60) = 660 at JG_POLL=600) - a live daemon that
   # simply has not finished restarting its watcher yet.
   beat=$(( $(date +%s) - 400 ))
   jg_touch_epoch "$beat" "$dir/state/.last-watcher-beat"
-  out=$(FM_GUARD_GRACE='' FM_POLL=600 run_hook "$dir" false); status=$?
+  out=$(JG_GUARD_GRACE='' JG_POLL=600 run_hook "$dir" false); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 0 "$status" "a live daemon with a beacon within the poll-derived grace must not block"
@@ -2145,7 +2145,7 @@ test_hook_away_daemon_blocks_dead_daemon_despite_poll_derived_grace() {
   dir=$(make_away_home_between_cycles "$TMP_ROOT/hook-afk-poll-grace-dead-daemon")
   dead=$(nonexistent_pid)
   record_daemon_lock "$dir" "$dead" "dead daemon identity"
-  out=$(FM_GUARD_GRACE='' FM_POLL=600 run_hook "$dir" false); status=$?
+  out=$(JG_GUARD_GRACE='' JG_POLL=600 run_hook "$dir" false); status=$?
   expect_code 2 "$status" "a wider poll-derived grace must not paper over a dead daemon"
   assert_contains "$out" "$AWAY_REQUIRED_REASON" "away-mode block must point at the daemon, not normal supervision"
   pass "jg-turnend-guard: a dead away-mode daemon still blocks under the poll-derived grace"
@@ -2161,11 +2161,11 @@ test_hook_away_daemon_blocks_beacon_older_than_poll_derived_grace() {
     wait "$pid" 2>/dev/null || true
     fail "could not identify live away-mode daemon holder"
   }
-  # 700s exceeds even the wider poll-derived grace (660 at FM_POLL=600), so a
+  # 700s exceeds even the wider poll-derived grace (660 at JG_POLL=600), so a
   # live daemon that has genuinely stopped restarting its watcher still blocks.
   beat=$(( $(date +%s) - 700 ))
   jg_touch_epoch "$beat" "$dir/state/.last-watcher-beat"
-  out=$(FM_GUARD_GRACE='' FM_POLL=600 run_hook "$dir" false); status=$?
+  out=$(JG_GUARD_GRACE='' JG_POLL=600 run_hook "$dir" false); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "a beacon older than the poll-derived grace must still block"
@@ -2186,13 +2186,13 @@ test_hook_no_afk_ignores_poll_derived_grace() {
   }
   # 400s would be within the poll-derived grace the away-mode branch would
   # accept, but away mode is off here, so the strict watcher predicate and its
-  # flat default govern instead - old behavior, unaffected by FM_POLL.
+  # flat default govern instead - old behavior, unaffected by JG_POLL.
   beat=$(( $(date +%s) - 400 ))
   jg_touch_epoch "$beat" "$dir/state/.last-watcher-beat"
-  out=$(FM_GUARD_GRACE='' FM_POLL=600 run_hook "$dir" false); status=$?
+  out=$(JG_GUARD_GRACE='' JG_POLL=600 run_hook "$dir" false); status=$?
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
-  expect_code 2 "$status" "without .afk, FM_POLL must not widen the strict watcher predicate's grace"
+  expect_code 2 "$status" "without .afk, JG_POLL must not widen the strict watcher predicate's grace"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
   pass "jg-turnend-guard: with away mode off, the poll-derived grace never applies"
 }

@@ -94,7 +94,7 @@ ENTRYPOINT_PPID=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' ' || true)
 # The recorded parent is the ssh session process; when it disappears this
 # process is reparented and the caller is provably gone. An unreadable probe
 # never cancels: only an observed parent change does.
-# shellcheck disable=SC2329 # Invoked by jg_remote_job_wait through FM_REMOTE_JOB_DISCONNECT_PROBE.
+# shellcheck disable=SC2329 # Invoked by jg_remote_job_wait through JG_REMOTE_JOB_DISCONNECT_PROBE.
 entrypoint_caller_connected() {
   local current
   case "$ENTRYPOINT_PPID" in ''|*[!0-9]*) return 0 ;; esac
@@ -157,17 +157,17 @@ if [ "$COMMAND" = jg-remote-doctor.sh ]; then
   jg_remote_job_build_child_path "$ROOT" >/dev/null
   DOCTOR_ENV=(
     /usr/bin/env -i
-    "PATH=$FM_REMOTE_JOB_CHILD_PATH"
+    "PATH=$JG_REMOTE_JOB_CHILD_PATH"
     "HOME=$ACCOUNT_HOME"
-    "FM_HOME=$HOME_PATH"
-    "FM_ROOT_OVERRIDE=$ROOT"
-    FM_REMOTE_DOCTOR_BOOTSTRAP=1
+    "JG_HOME=$HOME_PATH"
+    "JG_ROOT_OVERRIDE=$ROOT"
+    JG_REMOTE_DOCTOR_BOOTSTRAP=1
   )
-  if [ -n "${FM_REMOTE_JOB_PLATFORM_OVERRIDE:-}" ]; then
-    DOCTOR_ENV+=("FM_REMOTE_JOB_PLATFORM_OVERRIDE=$FM_REMOTE_JOB_PLATFORM_OVERRIDE")
+  if [ -n "${JG_REMOTE_JOB_PLATFORM_OVERRIDE:-}" ]; then
+    DOCTOR_ENV+=("JG_REMOTE_JOB_PLATFORM_OVERRIDE=$JG_REMOTE_JOB_PLATFORM_OVERRIDE")
   fi
-  if [ -n "${FM_REMOTE_JOB_STATE_ROOT:-}" ]; then
-    DOCTOR_ENV+=("FM_REMOTE_JOB_STATE_ROOT=$FM_REMOTE_JOB_STATE_ROOT")
+  if [ -n "${JG_REMOTE_JOB_STATE_ROOT:-}" ]; then
+    DOCTOR_ENV+=("JG_REMOTE_JOB_STATE_ROOT=$JG_REMOTE_JOB_STATE_ROOT")
   fi
   trap - EXIT
   rm -rf -- "$TMP"
@@ -175,20 +175,20 @@ if [ "$COMMAND" = jg-remote-doctor.sh ]; then
 fi
 
 if ! jg_remote_job_ensure_worker "$ROOT" "$ACCOUNT_HOME"; then
-  die "${FM_REMOTE_JOB_ERROR:-remote job worker is unavailable; run jg-on.sh <route> jg-remote-doctor.sh --fix}"
+  die "${JG_REMOTE_JOB_ERROR:-remote job worker is unavailable; run jg-on.sh <route> jg-remote-doctor.sh --fix}"
 fi
 if ! JOB_ID=$(jg_remote_job_stage "$ACCOUNT_HOME" "$ROOT" "$HOME_PATH" "$COMMAND" "${ARGV[@]:1}"); then
   JOB_ID=
-  die "${FM_REMOTE_JOB_ERROR:-cannot stage remote job}" 70
+  die "${JG_REMOTE_JOB_ERROR:-cannot stage remote job}" 70
 fi
-FM_REMOTE_JOB_DISCONNECT_PROBE=entrypoint_caller_connected
+JG_REMOTE_JOB_DISCONNECT_PROBE=entrypoint_caller_connected
 if ! jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID"; then
-  die "${FM_REMOTE_JOB_ERROR:-remote job did not complete}" 70
+  die "${JG_REMOTE_JOB_ERROR:-remote job did not complete}" 70
 fi
 JOB_COMPLETED=1
-cat "$FM_REMOTE_JOB_STDOUT"
-cat "$FM_REMOTE_JOB_STDERR" >&2
-RESULT=$FM_REMOTE_JOB_EXIT
+cat "$JG_REMOTE_JOB_STDOUT"
+cat "$JG_REMOTE_JOB_STDERR" >&2
+RESULT=$JG_REMOTE_JOB_EXIT
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || true
 trap - EXIT
 rm -rf -- "$TMP"

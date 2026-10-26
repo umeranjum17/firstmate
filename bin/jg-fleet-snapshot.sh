@@ -36,7 +36,7 @@
 #     mutually exclusive, so every captain hold lands in exactly one and none
 #     can fall through: "blocked" when any blocker is unresolved, else "dated"
 #     when hold_until is still in the future, else "aged" when an undated hold
-#     is at least FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS old (default 14; legacy
+#     is at least JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS old (default 14; legacy
 #     unstamped holds fall back to `since`), else "live". A non-captain or Done
 #     row carries null.
 #     captain_actionable means "waiting on the captain now" and is exactly
@@ -127,16 +127,16 @@ cleanup_json_files() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
 BACKLOG="$DATA/backlog.md"
-SNAPSHOT_NOW=${FM_SNAPSHOT_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
-if [ -n "${FM_SNAPSHOT_NOW_EPOCH:-}" ]; then
-  SNAPSHOT_EPOCH=$FM_SNAPSHOT_NOW_EPOCH
+SNAPSHOT_NOW=${JG_SNAPSHOT_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+if [ -n "${JG_SNAPSHOT_NOW_EPOCH:-}" ]; then
+  SNAPSHOT_EPOCH=$JG_SNAPSHOT_NOW_EPOCH
 else
   SNAPSHOT_EPOCH=$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$SNAPSHOT_NOW" +%s 2>/dev/null \
     || date -u -d "$SNAPSHOT_NOW" +%s 2>/dev/null \
@@ -154,26 +154,26 @@ esac
 
 # Cross-home bounds are explicit so one broken or unexpectedly large home cannot
 # hang or explode the parent snapshot.
-FM_SNAPSHOT_SECONDMATES=${FM_SNAPSHOT_SECONDMATES:-20}
-FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-10}
-FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=${FM_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
-FM_SNAPSHOT_BUDGET=${FM_SNAPSHOT_BUDGET:-5}
-FM_SNAPSHOT_CACHE_DIR=${FM_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
-FM_SNAPSHOT_SECONDMATE_MAX_BYTES=${FM_SNAPSHOT_SECONDMATE_MAX_BYTES:-262144}
-FM_SNAPSHOT_SECONDMATE_CHILDREN=${FM_SNAPSHOT_SECONDMATE_CHILDREN:-20}
-FM_SNAPSHOT_SECONDMATE_QUEUED=${FM_SNAPSHOT_SECONDMATE_QUEUED:-20}
-FM_SNAPSHOT_SECONDMATE_DECISIONS=${FM_SNAPSHOT_SECONDMATE_DECISIONS:-20}
-FM_SNAPSHOT_TERMINAL_LINES=${FM_SNAPSHOT_TERMINAL_LINES:-8}
-FM_SNAPSHOT_TERMINAL_BYTES=${FM_SNAPSHOT_TERMINAL_BYTES:-4096}
-FM_SNAPSHOT_TERMINAL_TIMEOUT=${FM_SNAPSHOT_TERMINAL_TIMEOUT:-2}
-FM_SNAPSHOT_PARENT_ACTIVITY_LINES=${FM_SNAPSHOT_PARENT_ACTIVITY_LINES:-256}
-FM_SNAPSHOT_PARENT_ACTIVITY_BYTES=${FM_SNAPSHOT_PARENT_ACTIVITY_BYTES:-65536}
-FM_SNAPSHOT_PARENT_ACTIVITIES=${FM_SNAPSHOT_PARENT_ACTIVITIES:-20}
-FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=${FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT:-2}
-FM_SNAPSHOT_REGISTRY_LINES=${FM_SNAPSHOT_REGISTRY_LINES:-256}
-FM_SNAPSHOT_REGISTRY_BYTES=${FM_SNAPSHOT_REGISTRY_BYTES:-65536}
-FM_SNAPSHOT_REGISTRY_RECORDS=${FM_SNAPSHOT_REGISTRY_RECORDS:-40}
-FM_SNAPSHOT_REGISTRY_TIMEOUT=${FM_SNAPSHOT_REGISTRY_TIMEOUT:-2}
+JG_SNAPSHOT_SECONDMATES=${JG_SNAPSHOT_SECONDMATES:-20}
+JG_SNAPSHOT_CREW_STATE_TIMEOUT=${JG_SNAPSHOT_CREW_STATE_TIMEOUT:-10}
+JG_SNAPSHOT_LOCAL_READ_CONCURRENCY=${JG_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
+JG_SNAPSHOT_BUDGET=${JG_SNAPSHOT_BUDGET:-5}
+JG_SNAPSHOT_CACHE_DIR=${JG_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
+JG_SNAPSHOT_SECONDMATE_MAX_BYTES=${JG_SNAPSHOT_SECONDMATE_MAX_BYTES:-262144}
+JG_SNAPSHOT_SECONDMATE_CHILDREN=${JG_SNAPSHOT_SECONDMATE_CHILDREN:-20}
+JG_SNAPSHOT_SECONDMATE_QUEUED=${JG_SNAPSHOT_SECONDMATE_QUEUED:-20}
+JG_SNAPSHOT_SECONDMATE_DECISIONS=${JG_SNAPSHOT_SECONDMATE_DECISIONS:-20}
+JG_SNAPSHOT_TERMINAL_LINES=${JG_SNAPSHOT_TERMINAL_LINES:-8}
+JG_SNAPSHOT_TERMINAL_BYTES=${JG_SNAPSHOT_TERMINAL_BYTES:-4096}
+JG_SNAPSHOT_TERMINAL_TIMEOUT=${JG_SNAPSHOT_TERMINAL_TIMEOUT:-2}
+JG_SNAPSHOT_PARENT_ACTIVITY_LINES=${JG_SNAPSHOT_PARENT_ACTIVITY_LINES:-256}
+JG_SNAPSHOT_PARENT_ACTIVITY_BYTES=${JG_SNAPSHOT_PARENT_ACTIVITY_BYTES:-65536}
+JG_SNAPSHOT_PARENT_ACTIVITIES=${JG_SNAPSHOT_PARENT_ACTIVITIES:-20}
+JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=${JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT:-2}
+JG_SNAPSHOT_REGISTRY_LINES=${JG_SNAPSHOT_REGISTRY_LINES:-256}
+JG_SNAPSHOT_REGISTRY_BYTES=${JG_SNAPSHOT_REGISTRY_BYTES:-65536}
+JG_SNAPSHOT_REGISTRY_RECORDS=${JG_SNAPSHOT_REGISTRY_RECORDS:-40}
+JG_SNAPSHOT_REGISTRY_TIMEOUT=${JG_SNAPSHOT_REGISTRY_TIMEOUT:-2}
 validate_positive_bound() {  # <name> <value>
   case "$2" in
     ''|*[!0-9]*|0)
@@ -182,34 +182,34 @@ validate_positive_bound() {  # <name> <value>
       ;;
   esac
 }
-case "$FM_SNAPSHOT_SECONDMATES" in
+case "$JG_SNAPSHOT_SECONDMATES" in
   ''|*[!0-9]*)
-    echo "jg-fleet-snapshot: FM_SNAPSHOT_SECONDMATES must be a non-negative integer" >&2
+    echo "jg-fleet-snapshot: JG_SNAPSHOT_SECONDMATES must be a non-negative integer" >&2
     exit 2
     ;;
 esac
-validate_positive_bound FM_SNAPSHOT_CREW_STATE_TIMEOUT "$FM_SNAPSHOT_CREW_STATE_TIMEOUT"
-validate_positive_bound FM_SNAPSHOT_LOCAL_READ_CONCURRENCY "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY"
-validate_positive_bound FM_SNAPSHOT_BUDGET "$FM_SNAPSHOT_BUDGET"
-validate_positive_bound FM_SNAPSHOT_SECONDMATE_MAX_BYTES "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES"
-validate_positive_bound FM_SNAPSHOT_SECONDMATE_CHILDREN "$FM_SNAPSHOT_SECONDMATE_CHILDREN"
-validate_positive_bound FM_SNAPSHOT_SECONDMATE_QUEUED "$FM_SNAPSHOT_SECONDMATE_QUEUED"
-validate_positive_bound FM_SNAPSHOT_SECONDMATE_DECISIONS "$FM_SNAPSHOT_SECONDMATE_DECISIONS"
-validate_positive_bound FM_SNAPSHOT_TERMINAL_LINES "$FM_SNAPSHOT_TERMINAL_LINES"
-validate_positive_bound FM_SNAPSHOT_TERMINAL_BYTES "$FM_SNAPSHOT_TERMINAL_BYTES"
-validate_positive_bound FM_SNAPSHOT_TERMINAL_TIMEOUT "$FM_SNAPSHOT_TERMINAL_TIMEOUT"
-validate_positive_bound FM_SNAPSHOT_PARENT_ACTIVITY_LINES "$FM_SNAPSHOT_PARENT_ACTIVITY_LINES"
-validate_positive_bound FM_SNAPSHOT_PARENT_ACTIVITY_BYTES "$FM_SNAPSHOT_PARENT_ACTIVITY_BYTES"
-validate_positive_bound FM_SNAPSHOT_PARENT_ACTIVITIES "$FM_SNAPSHOT_PARENT_ACTIVITIES"
-validate_positive_bound FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT "$FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT"
-validate_positive_bound FM_SNAPSHOT_REGISTRY_LINES "$FM_SNAPSHOT_REGISTRY_LINES"
-validate_positive_bound FM_SNAPSHOT_REGISTRY_BYTES "$FM_SNAPSHOT_REGISTRY_BYTES"
-validate_positive_bound FM_SNAPSHOT_REGISTRY_RECORDS "$FM_SNAPSHOT_REGISTRY_RECORDS"
-validate_positive_bound FM_SNAPSHOT_REGISTRY_TIMEOUT "$FM_SNAPSHOT_REGISTRY_TIMEOUT"
-FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=${FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS:-14}
-case "$FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS" in
+validate_positive_bound JG_SNAPSHOT_CREW_STATE_TIMEOUT "$JG_SNAPSHOT_CREW_STATE_TIMEOUT"
+validate_positive_bound JG_SNAPSHOT_LOCAL_READ_CONCURRENCY "$JG_SNAPSHOT_LOCAL_READ_CONCURRENCY"
+validate_positive_bound JG_SNAPSHOT_BUDGET "$JG_SNAPSHOT_BUDGET"
+validate_positive_bound JG_SNAPSHOT_SECONDMATE_MAX_BYTES "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES"
+validate_positive_bound JG_SNAPSHOT_SECONDMATE_CHILDREN "$JG_SNAPSHOT_SECONDMATE_CHILDREN"
+validate_positive_bound JG_SNAPSHOT_SECONDMATE_QUEUED "$JG_SNAPSHOT_SECONDMATE_QUEUED"
+validate_positive_bound JG_SNAPSHOT_SECONDMATE_DECISIONS "$JG_SNAPSHOT_SECONDMATE_DECISIONS"
+validate_positive_bound JG_SNAPSHOT_TERMINAL_LINES "$JG_SNAPSHOT_TERMINAL_LINES"
+validate_positive_bound JG_SNAPSHOT_TERMINAL_BYTES "$JG_SNAPSHOT_TERMINAL_BYTES"
+validate_positive_bound JG_SNAPSHOT_TERMINAL_TIMEOUT "$JG_SNAPSHOT_TERMINAL_TIMEOUT"
+validate_positive_bound JG_SNAPSHOT_PARENT_ACTIVITY_LINES "$JG_SNAPSHOT_PARENT_ACTIVITY_LINES"
+validate_positive_bound JG_SNAPSHOT_PARENT_ACTIVITY_BYTES "$JG_SNAPSHOT_PARENT_ACTIVITY_BYTES"
+validate_positive_bound JG_SNAPSHOT_PARENT_ACTIVITIES "$JG_SNAPSHOT_PARENT_ACTIVITIES"
+validate_positive_bound JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT "$JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT"
+validate_positive_bound JG_SNAPSHOT_REGISTRY_LINES "$JG_SNAPSHOT_REGISTRY_LINES"
+validate_positive_bound JG_SNAPSHOT_REGISTRY_BYTES "$JG_SNAPSHOT_REGISTRY_BYTES"
+validate_positive_bound JG_SNAPSHOT_REGISTRY_RECORDS "$JG_SNAPSHOT_REGISTRY_RECORDS"
+validate_positive_bound JG_SNAPSHOT_REGISTRY_TIMEOUT "$JG_SNAPSHOT_REGISTRY_TIMEOUT"
+JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=${JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS:-14}
+case "$JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS" in
   ''|*[!0-9]*)
-    echo "jg-fleet-snapshot: FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS must be a non-negative integer" >&2
+    echo "jg-fleet-snapshot: JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS must be a non-negative integer" >&2
     exit 2
     ;;
 esac
@@ -228,7 +228,7 @@ esac
 . "$SCRIPT_DIR/jg-timeout-lib.sh"  # jg_run_timed: the shared hard bound
 # shellcheck source=bin/jg-landed-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/jg-landed-lib.sh"  # FM_LANDED_JQ_DEFS: the shared landed selector
+. "$SCRIPT_DIR/jg-landed-lib.sh"  # JG_LANDED_JQ_DEFS: the shared landed selector
 # shellcheck source=bin/jg-merge-authority-lib.sh
 . "$SCRIPT_DIR/jg-merge-authority-lib.sh"
 # shellcheck source=bin/jg-hold-reason-lib.sh
@@ -258,33 +258,33 @@ queued with hold_reason, hold_kind, hold_until,
 hold_bucket, hold_age_days, and plural blocker fields for downstream
 projections. A captain hold is actionable only when every blocker is Done, any
 hold-until date has arrived, and an undated hold remains below the aging threshold.
-Cross-home collection uses FM_SNAPSHOT_SECONDMATES (default 20, 0 lifts the
-count bound) and FM_SNAPSHOT_SECONDMATE_MAX_BYTES.
+Cross-home collection uses JG_SNAPSHOT_SECONDMATES (default 20, 0 lifts the
+count bound) and JG_SNAPSHOT_SECONDMATE_MAX_BYTES.
 Every sampled remote home's state/home-summary.json is fetched concurrently
-under one FM_SNAPSHOT_BUDGET (default 5 seconds), with a valid prior copy under
-FM_SNAPSHOT_CACHE_DIR used when the live read fails, is invalid, or consumes the
+under one JG_SNAPSHOT_BUDGET (default 5 seconds), with a valid prior copy under
+JG_SNAPSHOT_CACHE_DIR used when the live read fails, is invalid, or consumes the
 budget. Every ledger and cached copy must declare the current hold-classifier
 schema, even when it contains no captain holds; older summaries are rejected. A
 home with neither a valid current ledger nor a valid current cached copy is
 reported unreadable with the reason; collection never computes a summary in
 that home.
-Each local per-task current-state read is bounded by FM_SNAPSHOT_CREW_STATE_TIMEOUT
+Each local per-task current-state read is bounded by JG_SNAPSHOT_CREW_STATE_TIMEOUT
 (default 10 seconds); a read that hits the bound reports state unknown. Local task
-observations run concurrently, up to FM_SNAPSHOT_LOCAL_READ_CONCURRENCY (default 8).
+observations run concurrently, up to JG_SNAPSHOT_LOCAL_READ_CONCURRENCY (default 8).
 Remote secondmate endpoint liveness is not probed by this command.
 Terminal contradiction evidence uses
-FM_SNAPSHOT_TERMINAL_LINES, FM_SNAPSHOT_TERMINAL_BYTES, and
-FM_SNAPSHOT_TERMINAL_TIMEOUT and never becomes canonical current state.
-Parent activity evidence uses FM_SNAPSHOT_PARENT_ACTIVITY_LINES,
-FM_SNAPSHOT_PARENT_ACTIVITY_BYTES, FM_SNAPSHOT_PARENT_ACTIVITIES, and
-FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT, with truncation disclosed in the result.
-The registered secondmate table uses FM_SNAPSHOT_REGISTRY_LINES,
-FM_SNAPSHOT_REGISTRY_BYTES, FM_SNAPSHOT_REGISTRY_RECORDS, and
-FM_SNAPSHOT_REGISTRY_TIMEOUT, with unavailability and truncation disclosed.
+JG_SNAPSHOT_TERMINAL_LINES, JG_SNAPSHOT_TERMINAL_BYTES, and
+JG_SNAPSHOT_TERMINAL_TIMEOUT and never becomes canonical current state.
+Parent activity evidence uses JG_SNAPSHOT_PARENT_ACTIVITY_LINES,
+JG_SNAPSHOT_PARENT_ACTIVITY_BYTES, JG_SNAPSHOT_PARENT_ACTIVITIES, and
+JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT, with truncation disclosed in the result.
+The registered secondmate table uses JG_SNAPSHOT_REGISTRY_LINES,
+JG_SNAPSHOT_REGISTRY_BYTES, JG_SNAPSHOT_REGISTRY_RECORDS, and
+JG_SNAPSHOT_REGISTRY_TIMEOUT, with unavailability and truncation disclosed.
 Every captain hold carries hold_bucket, decided only from structured fields and
 never from hold reason or body prose: "blocked", "dated", "aged", or "live".
 An undated hold ages once its hold-set timestamp is at least
-FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS old (default 14; 0 ages every hold with a
+JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS old (default 14; 0 ages every hold with a
 non-negative computed age); legacy holds without a stamp fall back to their
 since date, and re-holding with --until remains the durable deferral.
 EOF
@@ -327,15 +327,15 @@ last_nonempty_line() {  # <file>
 crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
   local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep
   raw=$(
-    jg_run_timed "$FM_SNAPSHOT_CREW_STATE_TIMEOUT" \
-      env FM_ROOT_OVERRIDE="$FM_ROOT" \
-      FM_HOME="$FM_HOME" \
-      FM_STATE_OVERRIDE="$STATE" \
-      FM_CREW_STATE_META_OVERRIDE="$captured_meta" \
-      FM_CREW_STATE_STATUS_OVERRIDE="$captured_status" \
-      FM_DATA_OVERRIDE="$DATA" \
-      FM_PROJECTS_OVERRIDE="$PROJECTS" \
-      FM_CONFIG_OVERRIDE="$CONFIG" \
+    jg_run_timed "$JG_SNAPSHOT_CREW_STATE_TIMEOUT" \
+      env JG_ROOT_OVERRIDE="$JG_ROOT" \
+      JG_HOME="$JG_HOME" \
+      JG_STATE_OVERRIDE="$STATE" \
+      JG_CREW_STATE_META_OVERRIDE="$captured_meta" \
+      JG_CREW_STATE_STATUS_OVERRIDE="$captured_status" \
+      JG_DATA_OVERRIDE="$DATA" \
+      JG_PROJECTS_OVERRIDE="$PROJECTS" \
+      JG_CONFIG_OVERRIDE="$CONFIG" \
       "$SCRIPT_DIR/jg-crew-state.sh" "$id" 2>/dev/null || true
   )
   raw=$(printf '%s\n' "$raw" | head -1)
@@ -395,7 +395,7 @@ backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
   set -o pipefail
   # shellcheck disable=SC2094
   jq -Rn --arg path "$backlog" --arg today "$SNAPSHOT_TODAY" --arg now "$SNAPSHOT_NOW" \
-    --argjson age_days "$FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS" '
+    --argjson age_days "$JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS" '
     def trim: gsub("^[[:space:]]+|[[:space:]]+$"; "");
     def timestamp_epoch($d):
       if ($d | type) != "string" then null
@@ -729,7 +729,7 @@ prefetch_task_current_states() {
     pids[active]=$!
     active=$((active + 1))
     index=$((index + 1))
-    if [ "$active" -ge "$FM_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
+    if [ "$active" -ge "$JG_SNAPSHOT_LOCAL_READ_CONCURRENCY" ]; then
       snapshot_wait_current_reads "${pids[@]}" || rc=1
       pids=()
       active=0
@@ -975,13 +975,13 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
   jq -n \
     --arg generated "$SNAPSHOT_NOW" \
     --argjson generated_epoch "$SNAPSHOT_EPOCH" \
-    --arg home "$FM_HOME" \
-    --argjson child_n "$FM_SNAPSHOT_SECONDMATE_CHILDREN" \
-    --argjson queued_n "$FM_SNAPSHOT_SECONDMATE_QUEUED" \
-    --argjson decisions_n "$FM_SNAPSHOT_SECONDMATE_DECISIONS" \
-    --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
+    --arg home "$JG_HOME" \
+    --argjson child_n "$JG_SNAPSHOT_SECONDMATE_CHILDREN" \
+    --argjson queued_n "$JG_SNAPSHOT_SECONDMATE_QUEUED" \
+    --argjson decisions_n "$JG_SNAPSHOT_SECONDMATE_DECISIONS" \
+    --argjson landed_n "$JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
     --slurpfile backlog "$1" \
-    --slurpfile tasks "$2" --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" "$FM_LANDED_JQ_DEFS"'
+    --slurpfile tasks "$2" --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" "$JG_LANDED_JQ_DEFS"'
     ($backlog[0]) as $backlog
     | ($tasks[0]) as $tasks
     | def trunc($n):
@@ -1158,8 +1158,8 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
 # The validated home summary is canonical.
 # Parent status and bounded terminal capture remain untrusted supplemental evidence
 # with explicit provenance, and can only produce a contradiction or unknown fallback.
-FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=${FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME:-10}
-case "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" in ''|*[!0-9]*) FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=10 ;; esac
+JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=${JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME:-10}
+case "$JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" in ''|*[!0-9]*) JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=10 ;; esac
 
 # GNU stat treats -f as a filesystem-report command, so a BSD-first fallback can
 # pollute arithmetic input before failing. Select the platform syntax once.
@@ -1266,9 +1266,9 @@ JQ
        ],lines_in_window:$lines_in_window,records_in_window:$records_in_window}
 JQ
   )
-  out=$(jg_run_timed "$FM_SNAPSHOT_REGISTRY_TIMEOUT" bash -c "$script" \
-    jg-secondmate-registry "$reg" "$FM_SNAPSHOT_REGISTRY_LINES" \
-    "$FM_SNAPSHOT_REGISTRY_BYTES" "$FM_SNAPSHOT_REGISTRY_RECORDS" "$reg" "$SNAPSHOT_NOW" \
+  out=$(jg_run_timed "$JG_SNAPSHOT_REGISTRY_TIMEOUT" bash -c "$script" \
+    jg-secondmate-registry "$reg" "$JG_SNAPSHOT_REGISTRY_LINES" \
+    "$JG_SNAPSHOT_REGISTRY_BYTES" "$JG_SNAPSHOT_REGISTRY_RECORDS" "$reg" "$SNAPSHOT_NOW" \
     "$parse_filter" "$output_filter" 2>/dev/null)
   rc=$?
   if [ "$rc" -eq 0 ] && printf '%s' "$out" | jq -e '
@@ -1297,7 +1297,7 @@ summary_file_read() {  # <file> <expected-home> <output-file>
   local file=$1 home=$2 output=$3 captured bytes rc
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   captured=$(umask 077; mktemp "$SNAPSHOT_COLLECT_DIR/.selected-summary.XXXXXX") || return 1
-  if ! LC_ALL=C head -c "$((FM_SNAPSHOT_SECONDMATE_MAX_BYTES + 1))" "$file" > "$captured"; then
+  if ! LC_ALL=C head -c "$((JG_SNAPSHOT_SECONDMATE_MAX_BYTES + 1))" "$file" > "$captured"; then
     rm -f -- "$captured"
     return 1
   fi
@@ -1305,7 +1305,7 @@ summary_file_read() {  # <file> <expected-home> <output-file>
   case "$bytes" in
     ''|*[!0-9]*) rm -f -- "$captured"; return 1 ;;
   esac
-  if [ "$bytes" -gt "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES" ] \
+  if [ "$bytes" -gt "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES" ] \
     || ! jq -e -s --arg home "$home" -f "$SNAPSHOT_SUMMARY_FILTER" "$captured" >/dev/null 2>&1; then
     rm -f -- "$captured"
     return 1
@@ -1326,20 +1326,20 @@ summary_file_oversized() {  # <file>
   [ -f "$1" ] && [ ! -L "$1" ] || return 1
   bytes=$(LC_ALL=C wc -c < "$1" | tr -d ' ')
   case "$bytes" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$bytes" -gt "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES" ]
+  [ "$bytes" -gt "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES" ]
 }
 
 snapshot_cache_prepare() {
   local mode
   SNAPSHOT_CACHE_AVAILABLE=0
-  if [ -e "$FM_SNAPSHOT_CACHE_DIR" ] || [ -L "$FM_SNAPSHOT_CACHE_DIR" ]; then
-    [ -d "$FM_SNAPSHOT_CACHE_DIR" ] && [ ! -L "$FM_SNAPSHOT_CACHE_DIR" ] || return 1
-    mode=$(file_mode_octal "$FM_SNAPSHOT_CACHE_DIR")
+  if [ -e "$JG_SNAPSHOT_CACHE_DIR" ] || [ -L "$JG_SNAPSHOT_CACHE_DIR" ]; then
+    [ -d "$JG_SNAPSHOT_CACHE_DIR" ] && [ ! -L "$JG_SNAPSHOT_CACHE_DIR" ] || return 1
+    mode=$(file_mode_octal "$JG_SNAPSHOT_CACHE_DIR")
     case "$mode" in ''|*[!0-7]*) return 1 ;; esac
     [ $((8#$mode & 077)) -eq 0 ] || return 1
   else
-    [ -d "$(dirname "$FM_SNAPSHOT_CACHE_DIR")" ] || return 1
-    (umask 077; mkdir "$FM_SNAPSHOT_CACHE_DIR") 2>/dev/null || return 1
+    [ -d "$(dirname "$JG_SNAPSHOT_CACHE_DIR")" ] || return 1
+    (umask 077; mkdir "$JG_SNAPSHOT_CACHE_DIR") 2>/dev/null || return 1
   fi
   SNAPSHOT_CACHE_AVAILABLE=1
 }
@@ -1357,15 +1357,15 @@ snapshot_route_cache_path() {  # <id> <host> <home>
   fi
   case "$key" in ''|*[!A-Fa-f0-9]*) return 1 ;; esac
   [ "${#key}" -eq 64 ] || return 1
-  printf '%s/%s.json\n' "$FM_SNAPSHOT_CACHE_DIR" "$key"
+  printf '%s/%s.json\n' "$JG_SNAPSHOT_CACHE_DIR" "$key"
 }
 
 snapshot_cache_store() {  # <summary-json-file> <destination>
   local summary_file=$1 destination=$2 tmp
   [ "$SNAPSHOT_CACHE_AVAILABLE" -eq 1 ] || return 1
-  case "$destination" in "$FM_SNAPSHOT_CACHE_DIR"/*) ;; *) return 1 ;; esac
+  case "$destination" in "$JG_SNAPSHOT_CACHE_DIR"/*) ;; *) return 1 ;; esac
   [ ! -L "$destination" ] || return 1
-  tmp=$(umask 077; mktemp "$FM_SNAPSHOT_CACHE_DIR/.summary.XXXXXX") || return 1
+  tmp=$(umask 077; mktemp "$JG_SNAPSHOT_CACHE_DIR/.summary.XXXXXX") || return 1
   if cp -- "$summary_file" "$tmp" && chmod 600 "$tmp" && mv -f -- "$tmp" "$destination"; then
     return 0
   fi
@@ -1473,9 +1473,9 @@ wait
 BASH
   chmod 700 "$collector"
   SNAPSHOT_COLLECTION_TIMED_OUT=0
-  if jg_run_timed "$FM_SNAPSHOT_BUDGET" bash "$collector" \
+  if jg_run_timed "$JG_SNAPSHOT_BUDGET" bash "$collector" \
       "$SCRIPT_DIR" "$manifest" "$SNAPSHOT_COLLECT_DIR" "$SNAPSHOT_SUMMARY_FILTER" \
-      "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES"; then
+      "$JG_SNAPSHOT_SECONDMATE_MAX_BYTES"; then
     :
   else
     rc=$?
@@ -1575,10 +1575,10 @@ bounded_parent_activities_json() {  # <status-file>
          records_in_window:$records_in_window}'
 BASH
   )
-  out=$(jg_run_timed "$FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT" bash -c "$script" \
+  out=$(jg_run_timed "$JG_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT" bash -c "$script" \
     jg-parent-activities "$SCRIPT_DIR/jg-classify-lib.sh" "$f" \
-    "$FM_SNAPSHOT_PARENT_ACTIVITY_LINES" "$FM_SNAPSHOT_PARENT_ACTIVITY_BYTES" \
-    "$FM_SNAPSHOT_PARENT_ACTIVITIES" "$SNAPSHOT_STAT_STYLE" 2>/dev/null)
+    "$JG_SNAPSHOT_PARENT_ACTIVITY_LINES" "$JG_SNAPSHOT_PARENT_ACTIVITY_BYTES" \
+    "$JG_SNAPSHOT_PARENT_ACTIVITIES" "$SNAPSHOT_STAT_STYLE" 2>/dev/null)
   rc=$?
   if [ "$rc" -eq 0 ] && printf '%s' "$out" | jq -e '
     (.records | type) == "array" and (.available | type) == "boolean"
@@ -1617,9 +1617,9 @@ terminal_evidence_json() {  # <parent-task-json> <event-note> <evidence-contradi
     return 0
   fi
   # shellcheck disable=SC2016 # Positional parameters expand inside the child bash, not here.
-  out=$(jg_run_timed "$FM_SNAPSHOT_TERMINAL_TIMEOUT" bash -c \
+  out=$(jg_run_timed "$JG_SNAPSHOT_TERMINAL_TIMEOUT" bash -c \
     '. "$1"; jg_backend_capture "$2" "$3" "$4" "$5" | LC_ALL=C head -c "$6"; rc=${PIPESTATUS[0]}; [ "$rc" -eq 141 ] && rc=0; exit "$rc"' \
-    jg-terminal-capture "$SCRIPT_DIR/jg-backend.sh" "$backend" "$target" "$FM_SNAPSHOT_TERMINAL_LINES" "$expected" "$FM_SNAPSHOT_TERMINAL_BYTES" 2>/dev/null)
+    jg-terminal-capture "$SCRIPT_DIR/jg-backend.sh" "$backend" "$target" "$JG_SNAPSHOT_TERMINAL_LINES" "$expected" "$JG_SNAPSHOT_TERMINAL_BYTES" 2>/dev/null)
   rc=$?
   if [ "$rc" -ne 0 ]; then
     [ "$rc" -eq 124 ] && reason="terminal capture timed out" || reason="terminal capture unavailable"
@@ -1632,7 +1632,7 @@ terminal_evidence_json() {  # <parent-task-json> <event-note> <evidence-contradi
       '{provenance:"parent-direct-report-terminal",trust:"untrusted-supplement",captured:false,observed_at:$observed,freshness:"unknown",reason:"task generation changed during snapshot",lines:0,bytes:0,event_note_seen:false,contradiction:false}'
     return 0
   fi
-  clean=$(printf '%s' "$out" | tail -n "$FM_SNAPSHOT_TERMINAL_LINES" | LC_ALL=C head -c "$FM_SNAPSHOT_TERMINAL_BYTES")
+  clean=$(printf '%s' "$out" | tail -n "$JG_SNAPSHOT_TERMINAL_LINES" | LC_ALL=C head -c "$JG_SNAPSHOT_TERMINAL_BYTES")
   if command -v perl >/dev/null 2>&1; then
     clean=$(printf '%s' "$clean" | perl -pe 's/\e\[[0-?]*[ -\/]*[@-~]//g; s/[^\x09\x0A\x0D\x20-\x7E]//g')
   else
@@ -1750,7 +1750,7 @@ secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
     | {registry:$registry,records:.}' > "$union_file" || return 1
   total_registered=$(jq '[.records[] | select(.registered)] | length' "$union_file")
   total=$(jq '.records | length' "$union_file")
-  rows=$(jq -c --argjson cap "$FM_SNAPSHOT_SECONDMATES" '(if $cap == 0 then .records else .records[:$cap] end)[]' "$union_file")
+  rows=$(jq -c --argjson cap "$JG_SNAPSHOT_SECONDMATES" '(if $cap == 0 then .records else .records[:$cap] end)[]' "$union_file")
   shown=$(printf '%s\n' "$rows" | grep -c . || true)
   truncated=$((total - shown))
   : > "$records_file"
@@ -1984,8 +1984,8 @@ contribution_tasks_json() {
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=$(basename "$meta" .meta)
     merge_authority=unknown
-    if jg_merge_authority_resolve "$FM_HOME" "$STATE" "$meta" "$id"; then
-      merge_authority=$FM_MERGE_AUTHORITY
+    if jg_merge_authority_resolve "$JG_HOME" "$STATE" "$meta" "$id"; then
+      merge_authority=$JG_MERGE_AUTHORITY
     fi
     jq -n --arg id "$id" --arg kind "$(meta_value "$meta" kind)" \
       --arg url "$(meta_value "$meta" pr)" --arg head "$(meta_value "$meta" pr_head)" \
@@ -2041,7 +2041,7 @@ CONTRIBUTION_TASKS_JSON=$(contribution_tasks_json) \
   || { echo "jg-fleet-snapshot: contribution task read failed" >&2; exit 1; }
 # Also writes the canonical backlog transport file every later consumer reads.
 stage_contribution_input "$BACKLOG_JSON" "$CONTRIBUTION_TASKS_JSON" || exit 1
-FM_CONTRIBUTIONS_NOW="$SNAPSHOT_NOW" "$SCRIPT_DIR/jg-contributions.sh" snapshot \
+JG_CONTRIBUTIONS_NOW="$SNAPSHOT_NOW" "$SCRIPT_DIR/jg-contributions.sh" snapshot \
   "$JSON_TRANSPORT_DIR/contribution-input.json" > "$CONTRIBUTIONS_JSON_FILE" \
   || { echo "jg-fleet-snapshot: contribution coverage unavailable" >&2; exit 1; }
 
@@ -2062,8 +2062,8 @@ secondmate_landed_from_current_json "$SECONDMATE_CURRENT_JSON_FILE" "$SECONDMATE
 
 jq -n \
   --arg generated "$SNAPSHOT_NOW" \
-  --arg jg_home "$FM_HOME" \
-  --arg jg_root "$FM_ROOT" \
+  --arg jg_home "$JG_HOME" \
+  --arg jg_root "$JG_ROOT" \
   --arg state "$STATE" \
   --arg data "$DATA" \
   --arg config "$CONFIG" \

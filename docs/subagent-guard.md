@@ -150,7 +150,7 @@ The hook scope is the shipped enforcement boundary, and the linked-worktree nega
 
 ## Escape hatch
 
-`FM_ALLOW_SUBAGENT=1` in the session environment allows the call at the shipped hook.
+`JG_ALLOW_SUBAGENT=1` in the session environment allows the call at the shipped hook.
 This is the only escape hatch and the guard fails closed on every other value, including empty, `0`, `yes`, and `true`.
 
 It is an environment variable rather than a flag, a config file, or a state file because that makes it unforgeable in-session.
@@ -319,7 +319,7 @@ Claude reported:
 I attempted the Workflow tool call as requested. It was blocked by a PreToolUse hook in this repo:
 
 > [subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own
-> delegation tools... (blocked tool: Workflow). Launch the session with FM_ALLOW_SUBAGENT=1 for a
+> delegation tools... (blocked tool: Workflow). Launch the session with JG_ALLOW_SUBAGENT=1 for a
 > deliberate exception.
 ```
 
@@ -339,7 +339,7 @@ This is the scoping contract working end to end rather than a hook that simply n
 
 ### Escape hatch
 
-The same `Workflow` prompt in the scratch primary home, launched as `FM_ALLOW_SUBAGENT=1 claude -p ...`:
+The same `Workflow` prompt in the scratch primary home, launched as `JG_ALLOW_SUBAGENT=1 claude -p ...`:
 
 ```text
 Result: the Workflow tool call was NOT blocked by a hook. It launched and ran to completion.

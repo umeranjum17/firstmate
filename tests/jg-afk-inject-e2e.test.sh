@@ -17,9 +17,9 @@
 #
 # Isolation: all test tmux runs on a dedicated socket (tmux -L afk-e2e-<pid>).
 # A tmux shim first on PATH redirects the daemon's bare `tmux` calls to the
-# private socket. The daemon points at a throwaway state dir (FM_STATE_OVERRIDE)
-# and the test pane (FM_SUPERVISOR_TARGET). Nothing touches the live fleet.
-# FM_SUPERVISOR_BACKEND=tmux is passed explicitly (not left to auto-detection):
+# private socket. The daemon points at a throwaway state dir (JG_STATE_OVERRIDE)
+# and the test pane (JG_SUPERVISOR_TARGET). Nothing touches the live fleet.
+# JG_SUPERVISOR_BACKEND=tmux is passed explicitly (not left to auto-detection):
 # this test's own process may itself be running inside herdr (HERDR_ENV=1 is
 # inherited by every process herdr manages a pane for), which would otherwise
 # leak into the spawned daemon subprocess and misdetect backend=herdr against
@@ -68,7 +68,7 @@ mkdir -p "$STATE_DIR"
 LOG_FILE="$STATE_DIR/submitted.log"
 : > "$LOG_FILE"
 
-# Source the daemon to get FM_INJECT_MARK, afk_enter, afk_exit.
+# Source the daemon to get JG_INJECT_MARK, afk_enter, afk_exit.
 # shellcheck source=/dev/null
 . "$DAEMON"
 
@@ -167,20 +167,20 @@ chmod +x "$TMUX_SHIM_DIR/tmux"
 # "unknown" preserves the typed U+2063 envelope, "claude" selects the
 # record-backed doorbell that a marker-stripping Claude Code primary receives.
 start_daemon() {  # [primary-harness]
-  FM_DAEMON_PRIMARY_HARNESS="${1:-unknown}" \
+  JG_DAEMON_PRIMARY_HARNESS="${1:-unknown}" \
   PATH="$TMUX_SHIM_DIR:$PATH" \
-  FM_STATE_OVERRIDE="$STATE_DIR" \
-  FM_SUPERVISOR_TARGET="$SUPERVISOR_PANE" \
-  FM_SUPERVISOR_BACKEND=tmux \
-  FM_ESCALATE_BATCH_SECS=0 \
-  FM_HOUSEKEEPING_TICK=1 \
-  FM_POLL=1 \
-  FM_SIGNAL_GRACE=1 \
-  FM_HEARTBEAT=999999 \
-  FM_CHECK_INTERVAL=999999 \
-  FM_INJECT_CONFIRM_SLEEP=0.3 \
-  FM_INJECT_CONFIRM_RETRIES=5 \
-  FM_STALE_ESCALATE_SECS=999999 \
+  JG_STATE_OVERRIDE="$STATE_DIR" \
+  JG_SUPERVISOR_TARGET="$SUPERVISOR_PANE" \
+  JG_SUPERVISOR_BACKEND=tmux \
+  JG_ESCALATE_BATCH_SECS=0 \
+  JG_HOUSEKEEPING_TICK=1 \
+  JG_POLL=1 \
+  JG_SIGNAL_GRACE=1 \
+  JG_HEARTBEAT=999999 \
+  JG_CHECK_INTERVAL=999999 \
+  JG_INJECT_CONFIRM_SLEEP=0.3 \
+  JG_INJECT_CONFIRM_RETRIES=5 \
+  JG_STALE_ESCALATE_SECS=999999 \
   nohup "$DAEMON" >"$STATE_DIR/daemon.out" 2>"$STATE_DIR/daemon.err" &
   DAEMON_PID=$!
   # Wait for the daemon to start and acquire the lock.
@@ -449,7 +449,7 @@ test_scenario_d() {
   doorbell=$(cut -f2 "$LOG_FILE" | head -1)
   jg_operational_doorbell_path "$doorbell" record \
     || fail "Scenario D: the submitted line is not a record-backed doorbell: $doorbell"
-  grep -F "${FM_OPERATIONAL_PREFIX}v1 away-supervisor: " "$record" >/dev/null \
+  grep -F "${JG_OPERATIONAL_PREFIX}v1 away-supervisor: " "$record" >/dev/null \
     || fail "Scenario D: the named record lacks the away-supervisor envelope"
   grep -F 'Supervisor escalate' "$record" >/dev/null \
     || fail "Scenario D: the named record lacks the escalation digest"

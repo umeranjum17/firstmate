@@ -143,7 +143,7 @@ case "$CMD" in
 esac
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || exit 0
-FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
+JG_ROOT=${JG_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd -P)} || exit 0
 
 # Scope to a plain, non-worktree firstmate checkout, where git-dir equals
 # git-common-dir. A crewmate/scout task worktree - the shape bin/jg-spawn.sh
@@ -154,14 +154,14 @@ FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pw
 # the turn-end guard's separate marker-aware scope. Any failure to confirm the
 # checkout is inert (exit 0), never a block, so a broken environment never
 # denies a shell command.
-[ -f "$FM_ROOT/AGENTS.md" ] || exit 0
-[ -d "$FM_ROOT/bin" ] || exit 0
+[ -f "$JG_ROOT/AGENTS.md" ] || exit 0
+[ -d "$JG_ROOT/bin" ] || exit 0
 command -v git >/dev/null 2>&1 || exit 0
-GIT_DIR=$(git -C "$FM_ROOT" rev-parse --git-dir 2>/dev/null) || exit 0
-GIT_COMMON_DIR=$(git -C "$FM_ROOT" rev-parse --git-common-dir 2>/dev/null) || exit 0
+GIT_DIR=$(git -C "$JG_ROOT" rev-parse --git-dir 2>/dev/null) || exit 0
+GIT_COMMON_DIR=$(git -C "$JG_ROOT" rev-parse --git-common-dir 2>/dev/null) || exit 0
 [ "$GIT_DIR" = "$GIT_COMMON_DIR" ] || exit 0
 
-POLICY="$FM_ROOT/bin/jg-cd-command-policy.mjs"
+POLICY="$JG_ROOT/bin/jg-cd-command-policy.mjs"
 command -v node >/dev/null 2>&1 || exit 0
 [ -f "$POLICY" ] || exit 0
 

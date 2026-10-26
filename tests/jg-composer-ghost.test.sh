@@ -36,7 +36,7 @@ ESC=$(printf '\033')
 # escape-free line for the plain (peek) path. capture-pane returns the styled
 # fixture verbatim WITH -e (mirrors `tmux capture-pane -e`), and the same content
 # with SGR sequences stripped WITHOUT -e (mirrors a plain capture). cursor_y comes
-# from FM_FAKE_CY. The fake deliberately returns the complete fixture for every
+# from JG_FAKE_CY. The fake deliberately returns the complete fixture for every
 # capture, which exercises the structural scan while preserving the historical
 # single-row fallback fixtures.
 make_fake_tmux() {  # <dir>
@@ -47,7 +47,7 @@ make_fake_tmux() {  # <dir>
 set -u
 case "${1:-}" in
   display-message)
-    for a in "$@"; do case "$a" in *cursor_y*) printf '%s\n' "${FM_FAKE_CY:-0}"; exit 0 ;; esac; done
+    for a in "$@"; do case "$a" in *cursor_y*) printf '%s\n' "${JG_FAKE_CY:-0}"; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
     has_e=0
@@ -60,11 +60,11 @@ case "${1:-}" in
       esac
       prev=$a
     done
-    f="${FM_FAKE_STYLED:-/dev/null}"
-    if [ -n "${FM_FAKE_ROW:-}" ] \
-       && [ "$start" = "${FM_FAKE_CY:-0}" ] \
-       && [ "$end" = "${FM_FAKE_CY:-0}" ]; then
-      f=$FM_FAKE_ROW
+    f="${JG_FAKE_STYLED:-/dev/null}"
+    if [ -n "${JG_FAKE_ROW:-}" ] \
+       && [ "$start" = "${JG_FAKE_CY:-0}" ] \
+       && [ "$end" = "${JG_FAKE_CY:-0}" ]; then
+      f=$JG_FAKE_ROW
     fi
     if [ "$has_e" = 1 ]; then
       cat "$f" 2>/dev/null
@@ -191,7 +191,7 @@ test_dim_ghost_only_composer_is_not_pending() {
   capture="$dir/styled.txt"
   # The exact rendering claude emits: a normal prompt glyph + a DIM predicted prompt.
   printf '\xe2\x9d\xaf \033[2mWhat is the largest country by area?\033[0m\n' > "$capture"
-  if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  if PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
      jg_pane_input_pending "fakepane"; then
     fail "dim ghost-only composer falsely read as pending"
   fi
@@ -205,7 +205,7 @@ test_dim_ghost_inside_bordered_composer_is_not_pending() {
   capture="$dir/styled.txt"
   # Bordered composer (claude box) holding only dim ghost text.
   printf '╭─────────────────────────────────────╮\n│ \033[2mtry the other approach instead\033[0m      │\n╰─────────────────────────────────────╯\n' > "$capture"
-  if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  if PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
      jg_pane_input_pending "fakepane"; then
     fail "dim ghost in a bordered composer falsely read as pending"
   fi
@@ -219,7 +219,7 @@ test_normal_text_still_pending() {
   capture="$dir/styled.txt"
   # Real human text, normal intensity - must still read as pending.
   printf '\xe2\x9d\xaf fix findings 1 and 3, skip 2\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "real typed text was not detected as pending"
   pass "jg_pane_input_pending: normal-intensity typed text is still pending"
@@ -231,19 +231,19 @@ test_colored_text_with_2_payload_still_pending() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '\xe2\x9d\xaf \033[38;5;2mgreen typed\033[0m\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "8-bit colored typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[38;2;224;222;244mtruecolor typed\033[0m\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "bright truecolor typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[58;5;2munderline-color typed\033[0m\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "underline-colored typed text was not detected as pending"
   printf '\xe2\x9d\xaf \033[58::5::2mcolon underline typed\033[0m\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "colon underline typed text was not detected as pending"
   pass "jg_pane_input_pending: bright colored text with 2 payloads is still pending"
@@ -258,7 +258,7 @@ test_dark_truecolor_ghost_only_composer_is_not_pending() {
   # placeholder. It must read NOT pending (the grok TRUECOLOR gap, now covered by
   # the same ANSI-aware owner as claude's dim ghost).
   printf '\xe2\x9d\xaf \033[38;2;50;47;70mType a message...\033[0m\n' > "$capture"
-  if PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  if PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
      jg_pane_input_pending "fakepane"; then
     fail "dark truecolor ghost-only composer falsely read as pending"
   fi
@@ -272,7 +272,7 @@ test_dark_truecolor_bare_shell_prompt_is_unknown() {
   capture="$dir/styled.txt"
   for prompt in '$' 'user@host $'; do
     printf '\033[38;2;50;47;70m%s\033[0m\n' "$prompt" > "$capture"
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = unknown ] \
       || fail "dark truecolor bare shell prompt '$prompt' must read unknown, got '$out'"
@@ -288,7 +288,7 @@ test_real_text_with_trailing_ghost_is_pending() {
   # A human typed "deploy" and claude appended a dim ghost completion. The real
   # text must win - the composer is pending.
   printf '\xe2\x9d\xaf deploy\033[2m the staging environment now\033[0m\n' > "$capture"
-  PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_pane_input_pending "fakepane" \
     || fail "real text with a trailing ghost completion was not detected as pending"
   pass "jg_pane_input_pending: real text plus a trailing ghost run is still pending"
@@ -307,7 +307,7 @@ test_two_row_composer_reads_text_above_empty_cursor_row() {
 │                                                    │
 ╰────────────────────────────────────────────────────╯
 EOF
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=2 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=2 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = pending ] \
     || fail "two-row composer text above the empty cursor row should be pending, got '$out'"
@@ -327,7 +327,7 @@ test_wrapped_composer_reads_all_content_rows() {
 │                                            │
 ╰────────────────────────────────────────────╯
 EOF
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=4 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=4 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = pending ] \
     || fail "a three-row wrapped composer should be pending, got '$out'"
@@ -340,7 +340,7 @@ test_proven_box_bottom_border_cursor_classifies_content() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '╭────────────────────────╮\n│ ❯ \033[38;2;50;47;70mType a message...\033[0m    │\n╰──────── Grok 4.5 ──────╯\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=2 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=2 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = empty ] \
     || fail "a cursor on a proven titled box bottom must classify its content, got '$out'"
@@ -377,7 +377,7 @@ test_bordered_busy_signatures_are_pending() {
   capture="$dir/styled.txt"
   for signature in 'Working...' 'Ctrl+c:cancel'; do
     printf '╭────────────────────╮\n│ %-18s │\n╰────────────────────╯\n' "$signature" > "$capture"
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = pending ] \
       || fail "typed bordered busy signature '$signature' should be pending, got '$out'"
@@ -399,7 +399,7 @@ test_non_bordered_busy_footer_is_unknown_strict() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf 'Working...\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = unknown ] \
     || fail "a non-bordered busy footer must read unknown under the strict rule, got '$out'"
@@ -412,7 +412,7 @@ test_clipped_bordered_box_is_unknown() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '╭────────────────────╮\n│ >                  │\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = unknown ] \
     || fail "a bordered box with no readable bottom border should be unknown, got '$out'"
@@ -426,7 +426,7 @@ test_asymmetric_composer_edges_are_unknown() {
   capture="$dir/styled.txt"
   for row in '│ > text' 'text │' '│ > text ┃' '──────' '+----' 'text +'; do
     printf '%s\n' "$row" > "$capture"
-    out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+    out=$(PATH="$fb:$PATH" LC_ALL=C JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = unknown ] \
       || fail "unbounded composer-edge row '$row' should be unknown, got '$out'"
@@ -440,7 +440,7 @@ test_mismatched_box_families_are_unknown() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '╭────────╮\n┃ >      ┃\n╰────────╯\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = unknown ] \
     || fail "a box with mismatched border families should be unknown, got '$out'"
@@ -457,7 +457,7 @@ test_misaligned_box_is_unknown() {
       offset) printf ' ╭────╮\n │    │\n╰────╯\n' > "$capture" ;;
       width) printf '╭────╮\n│     │\n╰────╯\n' > "$capture" ;;
     esac
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = unknown ] \
       || fail "a box with inconsistent $fixture geometry should be unknown, got '$out'"
@@ -475,19 +475,19 @@ test_unproved_empty_geometry_fails_closed() {
       ghost)
         expected=unknown
         printf '╭────────────╮\n│ \033[2mghost\033[0m │\n╰────────────╯\n' > "$capture"
-        out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+        out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
           jg_tmux_composer_state "fakepane")
         ;;
       idle)
         expected=pending-unproven
         printf '╭────────────╮\n│ idle hint │\n╰────────────╯\n' > "$capture"
-        out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
-          FM_COMPOSER_IDLE_RE='^idle hint$' jg_tmux_composer_state "fakepane")
+        out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
+          JG_COMPOSER_IDLE_RE='^idle hint$' jg_tmux_composer_state "fakepane")
         ;;
       malformed-top)
         expected=unknown
         printf '╭────x───────╮\n│            │\n╰────────────╯\n' > "$capture"
-        out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+        out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
           jg_tmux_composer_state "fakepane")
         ;;
     esac
@@ -503,12 +503,12 @@ test_differing_widths_use_asymmetric_verdicts() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '╭──────────╮\n│ > text │\n╰──────────╯\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = pending-unproven ] \
     || fail "text in a differing-width box should be pending-unproven, got '$out'"
   printf '╭──────────╮\n│        │\n╰──────────╯\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = unknown ] \
     || fail "an empty differing-width box should be unknown, never empty, got '$out'"
@@ -522,7 +522,7 @@ test_wide_composer_text_is_pending() {
   capture="$dir/styled.txt"
   for text in '修复登录问题' 'fix the bug 🔧'; do
     printf '╭────────────────────╮\n│ > %s │\n╰────────────────────╯\n' "$text" > "$capture"
-    out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+    out=$(PATH="$fb:$PATH" LC_ALL=C JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = pending-unproven ] \
       || fail "wide composer text '$text' should be pending-unproven, got '$out'"
@@ -543,7 +543,7 @@ test_all_tmux_harness_composers_share_classification() {
       pi|pi-signed) printf '╭────────────╮\n│            │\n╰────────────╯\n' > "$capture" ;;
       grok) printf '╭────────────╮\n│ ❯ \033[38;2;50;47;70mType\033[0m     │\n╰────────────╯\n' > "$capture" ;;
     esac
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = empty ] \
       || fail "$harness aligned idle composer should be empty, got '$out'"
@@ -552,7 +552,7 @@ test_all_tmux_harness_composers_share_classification() {
       codex) printf '╭────────────╮\n│ › fix      │\n╰────────────╯\n' > "$capture" ;;
       opencode|pi|pi-signed) printf '╭────────────╮\n│ > fix      │\n╰────────────╯\n' > "$capture" ;;
     esac
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = pending ] \
       || fail "$harness composer with text should be pending, got '$out'"
@@ -575,7 +575,7 @@ test_single_capture_leaves_no_fallback_race() {
   # verdict a row the scan never saw. The consolidated reader classifies ONE
   # capture (bin/jg-composer-lib.sh, jg_composer_classify_screen), so the
   # race is structurally gone: a divergent band-capture row (served via
-  # FM_FAKE_ROW, which only a band capture would read) must have no effect on
+  # JG_FAKE_ROW, which only a band capture would read) must have no effect on
   # the verdict.
   local dir fb capture row_capture out
   dir="$TMP_ROOT/fallback-race"; mkdir -p "$dir"
@@ -584,7 +584,7 @@ test_single_capture_leaves_no_fallback_race() {
   row_capture="$dir/row.txt"
   printf '› deploy staging\n' > "$capture"
   printf '│ > │\n' > "$row_capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_ROW="$row_capture" FM_FAKE_CY=0 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_ROW="$row_capture" JG_FAKE_CY=0 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = pending ] \
     || fail "the verdict must come from the one full capture (agent glyph + typed text = pending), got '$out'"
@@ -598,7 +598,7 @@ test_absent_tmux_identity_keeps_enclosed_bare_verdict() {
   capture="$dir/styled.txt"
   nbsp=$(printf '\302\240')
   printf '────────────────────────\n❯%s\n────────────────────────\n' "$nbsp" > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=1 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=1 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = empty ] \
     || fail "an enclosed Claude glyph must keep its bare empty verdict when the Pi-only probe is absent, got '$out'"
@@ -619,7 +619,7 @@ test_legitimate_empty_routes_remain_empty() {
       double-bordered) printf '╔════╗\n║    ║\n╚════╝\n' > "$capture"; cursor=1 ;;
       agent-prompt) printf '›\n' > "$capture"; cursor=0 ;;
     esac
-    out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY="$cursor" \
+    out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY="$cursor" \
       jg_tmux_composer_state "fakepane")
     [ "$out" = empty ] \
       || fail "legitimate empty route '$fixture' should remain empty, got '$out'"
@@ -633,7 +633,7 @@ test_non_bordered_composer_uses_compatibility_fallback() {
   fb=$(make_fake_tmux "$dir")
   capture="$dir/styled.txt"
   printf '› deploy staging\n' > "$capture"
-  out=$(PATH="$fb:$PATH" FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+  out=$(PATH="$fb:$PATH" JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
     jg_tmux_composer_state "fakepane")
   [ "$out" = pending ] \
     || fail "a non-bordered composer should retain cursor-row classification, got '$out'"
@@ -647,7 +647,7 @@ test_non_bordered_interior_edges_are_pending() {
   capture="$dir/styled.txt"
   for row in '› cat file | grep x' '› explain │ this glyph'; do
     printf '%s\n' "$row" > "$capture"
-    out=$(PATH="$fb:$PATH" LC_ALL=C FM_FAKE_STYLED="$capture" FM_FAKE_CY=0 \
+    out=$(PATH="$fb:$PATH" LC_ALL=C JG_FAKE_STYLED="$capture" JG_FAKE_CY=0 \
       jg_tmux_composer_state "fakepane")
     [ "$out" = pending ] \
       || fail "non-bordered interior edge row '$row' should be pending, got '$out'"
@@ -665,10 +665,10 @@ test_peek_output_is_escape_free() {
   # A pane full of styling, including dim ghost text. The plain peek path must
   # surface NONE of these escape codes into firstmate's context.
   printf 'normal output line\n\xe2\x9d\xaf \033[2mpredicted next prompt\033[0m\n' > "$capture"
-  # Empty FM_HOME so jg-guard.sh finds no in-flight task and stays silent.
+  # Empty JG_HOME so jg-guard.sh finds no in-flight task and stays silent.
   home="$dir/home"; mkdir -p "$home/state"
   # Pass an explicit session:window so resolution needs no metadata.
-  out=$(PATH="$fb:$PATH" FM_HOME="$home" FM_FAKE_STYLED="$capture" \
+  out=$(PATH="$fb:$PATH" JG_HOME="$home" JG_FAKE_STYLED="$capture" \
         "$PEEK" "sess:win" 2>/dev/null)
   case "$out" in
     *"$ESC"*) fail "jg-peek surfaced ANSI escape codes into LLM-facing output" ;;

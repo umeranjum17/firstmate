@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Behavior test for this add-on's jg-dashboard.sh: when one home's backlog
 # cannot be read, the fleet's Ready and queue numbers must still show the counts
 # of the homes that were read, marked as a lower bound, and must name the unread
@@ -7,29 +16,29 @@
 # The dashboard runs its readers (jg-tasks-axi.sh, jg-flow.sh, ...) from the
 # directory that holds it, so this builds a scratch copy of a fork tree's bin/
 # with this add-on's jg-dashboard.sh swapped in and drives the real script
-# there. Skipped when that tree or a required tool is absent. FM_FORK points at
+# there. Skipped when that tree or a required tool is absent. JG_FORK points at
 # the fork tree (default ~/firstmate).
 set -u
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ADDON=$(dirname "$HERE")
-FORK=${FM_FORK:-$HOME/firstmate}
+FORK=${JG_FORK:-$HOME/firstmate}
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found"; exit 0; }
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found"; exit 0; }
-[ -f "$FORK/bin/jg-tasks-axi.sh" ] || { echo "skip: no fork tree at $FORK (set FM_FORK)"; exit 0; }
+[ -f "$FORK/bin/jg-tasks-axi.sh" ] || { echo "skip: no fork tree at $FORK (set JG_FORK)"; exit 0; }
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-dashboard-partial.XXXXXX") || exit 1
 trap 'rm -rf "$TMP"' EXIT
 
 # A scratch bin/ copy of the fork's readers with this add-on's script and app
-# swapped in, so the script under test is the one just changed. FM_DASHBOARD_SRC
+# swapped in, so the script under test is the one just changed. JG_DASHBOARD_SRC
 # points the swap at another jg-dashboard.sh (for example the pre-fix one) to
 # reproduce the old blanking behavior.
 mkdir -p "$TMP/bin"
 cp -R "$FORK/bin/." "$TMP/bin/" || { echo "skip: cannot copy $FORK/bin"; exit 0; }
 rm -rf "$TMP/bin/jg-dashboard"
-cp "${FM_DASHBOARD_SRC:-$ADDON/jg-dashboard.sh}" "$TMP/bin/jg-dashboard.sh"
+cp "${JG_DASHBOARD_SRC:-$ADDON/jg-dashboard.sh}" "$TMP/bin/jg-dashboard.sh"
 cp "$ADDON/task_rows.py" "$TMP/bin/task_rows.py"
 cp -R "$ADDON/jg-dashboard" "$TMP/bin/jg-dashboard"
 DASH="$TMP/bin/jg-dashboard.sh"
@@ -86,7 +95,7 @@ EOF
 build() {  # <root> [env...]
   local fix=$1 out
   shift
-  out=$(env PATH="$fix/stubs:$PATH" FM_HOME="$fix" HOME="$fix" FM_DEVICE_LOCK_DIR="$fix/locks" FM_DASHBOARD_PROC="$fix/proc" FM_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
+  out=$(env PATH="$fix/stubs:$PATH" JG_HOME="$fix" HOME="$fix" JG_DEVICE_LOCK_DIR="$fix/locks" JG_DASHBOARD_PROC="$fix/proc" JG_MAC_HOST= "$@" "$DASH" build 2>&1) || fail "build failed: $out"
   [ "$out" = "$fix/state/dashboard/index.html" ] || fail "build did not print the page path: $out"
 }
 
@@ -94,7 +103,7 @@ build() {  # <root> [env...]
 stub_tasks_axi() {  # <stubs-dir> <fail-home> <real-tasks-axi>
   local dir=$1 fail_home=$2 real=$3
   # shellcheck disable=SC2016 # the single-quoted stub expands when it runs
-  printf '#!/bin/sh\n[ "$FM_HOME" = "%s" ] && { echo "tasks-axi: backlog unreadable" >&2; exit 1; }\nexec "%s" "$@"\n' \
+  printf '#!/bin/sh\n[ "$JG_HOME" = "%s" ] && { echo "tasks-axi: backlog unreadable" >&2; exit 1; }\nexec "%s" "$@"\n' \
     "$fail_home" "$real" > "$dir/tasks-axi"
   chmod +x "$dir/tasks-axi"
 }

@@ -23,9 +23,9 @@ export { CALM_PRESERVE_MIN_CHARS } from "./jg-calm-preservation.ts";
 
 /** The environment variables that select the effective Firstmate home, as the mod reads them. */
 export type CalmHomeEnvironment = {
-  readonly FM_HOME?: string | undefined;
-  readonly FM_ROOT_OVERRIDE?: string | undefined;
-  readonly FM_CONFIG_OVERRIDE?: string | undefined;
+  readonly JG_HOME?: string | undefined;
+  readonly JG_ROOT_OVERRIDE?: string | undefined;
+  readonly JG_CONFIG_OVERRIDE?: string | undefined;
 };
 
 /** The parent of a path, with either separator; a bare name resolves to itself. */
@@ -47,13 +47,13 @@ export function calmCodeRootFromPluginRoot(pluginRoot: string): string {
 
 /**
  * The per-home `config/calm` path, resolved exactly as the Pi extension resolves it:
- * `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root, with
- * `FM_CONFIG_OVERRIDE` naming the config directory outright when present.
+ * `JG_HOME`, then `JG_ROOT_OVERRIDE`, then the tracked code root, with
+ * `JG_CONFIG_OVERRIDE` naming the config directory outright when present.
  */
 export function calmPreferencePath(env: CalmHomeEnvironment, pluginRoot: string): string {
   const configDirectory =
-    env.FM_CONFIG_OVERRIDE ||
-    `${env.FM_HOME || env.FM_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/config`;
+    env.JG_CONFIG_OVERRIDE ||
+    `${env.JG_HOME || env.JG_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/config`;
   return `${configDirectory}/calm`;
 }
 

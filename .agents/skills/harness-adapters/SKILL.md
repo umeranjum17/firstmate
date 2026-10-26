@@ -41,8 +41,8 @@ Muse, Gemini, AGY, and Devin are verified only for operator and scout work, neve
 
 `../../../bin/jg-harness.sh` prints Juggernaut's own harness from verified environment markers and process ancestry, and owns how they combine.
 A marker names its harness, but a structural ancestor of a different harness outranks it, because a marker is ordinary environment state a child or a multiplexer can retain while ancestry is what proves who owns the process tree.
-Only `FM_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_AGENT=true` selects Pi-signed; shared unmarked launcher ancestry remains Pi.
-omp publishes no marker of its own; `FM_OMP_HARNESS=omp` is Juggernaut's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
+Only `JG_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_AGENT=true` selects Pi-signed; shared unmarked launcher ancestry remains Pi.
+omp publishes no marker of its own; `JG_OMP_HARNESS=omp` is Juggernaut's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
 `../../../bin/jg-spawn.sh` owns worker marker establishment, while the README launch command owns the signed-primary boundary.
 `../../../bin/jg-harness.sh crew` resolves `config/crew-harness`, where absent or `default` means Juggernaut's own harness.
 `../../../bin/jg-harness.sh secondmate <id>` resolves the mate-specific profile under [`configuration`](../../../docs/configuration.md#choose-the-secondmate-harness).

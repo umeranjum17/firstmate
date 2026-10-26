@@ -48,7 +48,7 @@ $ grep -nE 'muse-bin|exec ' launcher.sh
 
 `ps -o comm= -p <pid>` returns the full executable path, whose basename is `muse-bin-<version>`.
 That is why both `bin/jg-harness.sh` and `bin/backends/tmux.sh` match the anchored prefix `muse-bin-*` rather than an exact name, and why neither can rely on an install-path component: `~/.local/bin/muse-bin-<version>` contains no `muse` path component.
-The Muse launch clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `FM_PI_HARNESS`, `CURSOR_AGENT`, and `CURSOR_INVOKED_AS` before the worker starts, which is the verified launch behavior rather than what detection depends on.
+The Muse launch clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, `JG_PI_HARNESS`, `CURSOR_AGENT`, and `CURSOR_INVOKED_AS` before the worker starts, which is the verified launch behavior rather than what detection depends on.
 [Harness detection precedence](runtime-backends.md#harness-detection-precedence) owns why a retained foreign marker cannot override the versioned ancestry.
 
 [`runtime-backends.md`](runtime-backends.md#agent-liveness-name-sources) owns the resulting tmux liveness verdict and its relationship to the portable decoy regression.
@@ -208,8 +208,8 @@ That is the same terminal shape the `echo`-provider interrupt produced, now conf
 Run both live guards after any muse upgrade, because the version-suffixed process name, session protocol, and styled composer are vendor-controlled surfaces:
 
 ```
-FM_HARNESS_LIVENESS_DRIFT=1 bin/jg-test-run.sh tests/jg-harness-liveness-drift-live-e2e.test.sh
-FM_MUSE_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-muse-signals-live-e2e.test.sh
+JG_HARNESS_LIVENESS_DRIFT=1 bin/jg-test-run.sh tests/jg-harness-liveness-drift-live-e2e.test.sh
+JG_MUSE_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-muse-signals-live-e2e.test.sh
 ```
 
 The Muse signals guard requires a real `muse` binary and tmux but uses `--provider echo`, so it does not require `META_API_KEY` and cannot re-check the real-model turn-to-run relationship on its own.

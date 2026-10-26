@@ -40,7 +40,7 @@
 //           handshakes, then invokes source.poll, result.classify,
 //           result.terminal, or result.silent through strict JSON.
 //
-// Discovery is only $FM_HOME/config/extensions.d/*.json. Current directories,
+// Discovery is only $JG_HOME/config/extensions.d/*.json. Current directories,
 // projects, task copies, environment payloads, worker text, and Pi packages are
 // never searched. Package executables are spawned directly with shell=false,
 // receive one bounded UTF-8 JSON document on stdin, and must return exactly one
@@ -408,7 +408,7 @@ async function maybeLstat(target) {
 }
 
 async function activeHome() {
-  const configured = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || CODE_ROOT;
+  const configured = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || CODE_ROOT;
   const absolute = path.resolve(configured);
   const info = await maybeLstat(absolute);
   if (!info || !info.isDirectory()) fail("home-invalid", `Firstmate home is not a directory: ${absolute}`);
@@ -839,12 +839,12 @@ function sanitizedPath() {
 }
 
 function effectiveStateRoot(home) {
-  return path.resolve(process.env.FM_STATE_OVERRIDE || path.join(home, "state"));
+  return path.resolve(process.env.JG_STATE_OVERRIDE || path.join(home, "state"));
 }
 
 async function ensureExtensionState(home, binding) {
   let root;
-  if (process.env.FM_STATE_OVERRIDE) {
+  if (process.env.JG_STATE_OVERRIDE) {
     const stateRoot = effectiveStateRoot(home);
     await assertOwnedSafeDirectory(stateRoot, "extension state root");
     root = path.join(stateRoot, "extensions");
@@ -1051,7 +1051,7 @@ async function invocationRoot(home, create = false) {
   // Preserve built-in parity: an absent cleanup registry costs one bounded
   // lstat and does not require or canonicalize unrelated state directories.
   if (!info && !create) return root;
-  if (process.env.FM_STATE_OVERRIDE) {
+  if (process.env.JG_STATE_OVERRIDE) {
     const stateInfo = await maybeLstat(stateRoot);
     if (!stateInfo) fail("path-unsafe", "extension state root is unavailable");
     await assertOwnedSafeDirectory(stateRoot, "extension state root");
@@ -2037,12 +2037,12 @@ async function assertLifecycleLockOwned() {
 }
 
 async function claimInheritedLifecycleLock(home) {
-  const mode = process.env.FM_EXTENSION_RETIREMENT_MODE;
+  const mode = process.env.JG_EXTENSION_RETIREMENT_MODE;
   if (mode !== "binding" && mode !== "transfer" && mode !== "bind" && mode !== "process-event") fail("lifecycle-lock-invalid", "extension lifecycle mode is invalid");
   const stateRoot = effectiveStateRoot(home);
   const expectedLock = path.join(stateRoot, "procevent", ".extension-binding-lifecycle.lock");
-  const lockPath = path.resolve(process.env.FM_EXTENSION_LIFECYCLE_LOCK || "");
-  const ownerPath = path.resolve(process.env.FM_EXTENSION_LIFECYCLE_OWNER || "");
+  const lockPath = path.resolve(process.env.JG_EXTENSION_LIFECYCLE_LOCK || "");
+  const ownerPath = path.resolve(process.env.JG_EXTENSION_LIFECYCLE_OWNER || "");
   if (lockPath !== expectedLock || path.dirname(ownerPath) !== path.dirname(lockPath)
       || !path.basename(ownerPath).startsWith(`${path.basename(lockPath)}.owner.`)) {
     fail("lifecycle-lock-invalid", "retirement lifecycle lock identity is invalid");
@@ -2249,10 +2249,10 @@ async function cmdRetireBindingLocked(args) {
 async function runLifecycleRetirement(mode, args) {
   const command = path.join(CODE_ROOT, "bin", "jg-procevent.sh");
   const home = await activeHome();
-  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, FM_HOME: home, FM_ROOT_OVERRIDE: CODE_ROOT };
-  if (process.env.FM_STATE_OVERRIDE) env.FM_STATE_OVERRIDE = process.env.FM_STATE_OVERRIDE;
+  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, JG_HOME: home, JG_ROOT_OVERRIDE: CODE_ROOT };
+  if (process.env.JG_STATE_OVERRIDE) env.JG_STATE_OVERRIDE = process.env.JG_STATE_OVERRIDE;
   if (process.env.XDG_STATE_HOME) env.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
-  if (process.env.FM_PROCEVENT_CLAIM_ROOT) env.FM_PROCEVENT_CLAIM_ROOT = process.env.FM_PROCEVENT_CLAIM_ROOT;
+  if (process.env.JG_PROCEVENT_CLAIM_ROOT) env.JG_PROCEVENT_CLAIM_ROOT = process.env.JG_PROCEVENT_CLAIM_ROOT;
   const child = spawn(command, ["extension-retirement", mode, ...args], {
     cwd: CODE_ROOT,
     env,
@@ -2285,10 +2285,10 @@ async function runLifecycleRetirement(mode, args) {
 async function runLifecycleProcessEvent(args) {
   const command = path.join(CODE_ROOT, "bin", "jg-procevent.sh");
   const home = await activeHome();
-  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, FM_HOME: home, FM_ROOT_OVERRIDE: CODE_ROOT };
-  if (process.env.FM_STATE_OVERRIDE) env.FM_STATE_OVERRIDE = process.env.FM_STATE_OVERRIDE;
+  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, JG_HOME: home, JG_ROOT_OVERRIDE: CODE_ROOT };
+  if (process.env.JG_STATE_OVERRIDE) env.JG_STATE_OVERRIDE = process.env.JG_STATE_OVERRIDE;
   if (process.env.XDG_STATE_HOME) env.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
-  if (process.env.FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD === "1") env.FM_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD = "1";
+  if (process.env.JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD === "1") env.JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD = "1";
   const child = spawn(command, ["extension-process-event", ...args], {
     cwd: CODE_ROOT,
     env,
@@ -2323,10 +2323,10 @@ async function runLifecycleProcessEvent(args) {
 async function runLifecycleBinding(commandName, args) {
   const command = path.join(CODE_ROOT, "bin", "jg-procevent.sh");
   const home = await activeHome();
-  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, FM_HOME: home, FM_ROOT_OVERRIDE: CODE_ROOT };
-  if (process.env.FM_STATE_OVERRIDE) env.FM_STATE_OVERRIDE = process.env.FM_STATE_OVERRIDE;
+  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, JG_HOME: home, JG_ROOT_OVERRIDE: CODE_ROOT };
+  if (process.env.JG_STATE_OVERRIDE) env.JG_STATE_OVERRIDE = process.env.JG_STATE_OVERRIDE;
   if (process.env.XDG_STATE_HOME) env.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
-  if (process.env.FM_PROCEVENT_CLAIM_ROOT) env.FM_PROCEVENT_CLAIM_ROOT = process.env.FM_PROCEVENT_CLAIM_ROOT;
+  if (process.env.JG_PROCEVENT_CLAIM_ROOT) env.JG_PROCEVENT_CLAIM_ROOT = process.env.JG_PROCEVENT_CLAIM_ROOT;
   const child = spawn(command, ["extension-bind", commandName, ...args], {
     cwd: CODE_ROOT,
     env,
@@ -2389,10 +2389,10 @@ async function runInheritedLifecycleRetirement(args) {
 async function bindingRetirementPreflight(home, bindingDigest) {
   await cleanupRecordedInvocations(home, { bindingDigest });
   const command = path.join(CODE_ROOT, "bin", "jg-procevent.sh");
-  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, FM_HOME: home, FM_ROOT_OVERRIDE: CODE_ROOT };
-  if (process.env.FM_STATE_OVERRIDE) env.FM_STATE_OVERRIDE = process.env.FM_STATE_OVERRIDE;
+  const env = { PATH: sanitizedPath(), LANG: "C", LC_ALL: "C", HOME: process.env.HOME || home, JG_HOME: home, JG_ROOT_OVERRIDE: CODE_ROOT };
+  if (process.env.JG_STATE_OVERRIDE) env.JG_STATE_OVERRIDE = process.env.JG_STATE_OVERRIDE;
   if (process.env.XDG_STATE_HOME) env.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
-  if (process.env.FM_PROCEVENT_CLAIM_ROOT) env.FM_PROCEVENT_CLAIM_ROOT = process.env.FM_PROCEVENT_CLAIM_ROOT;
+  if (process.env.JG_PROCEVENT_CLAIM_ROOT) env.JG_PROCEVENT_CLAIM_ROOT = process.env.JG_PROCEVENT_CLAIM_ROOT;
   const child = spawn(command, ["binding-retirement-preflight", bindingDigest], {
     cwd: CODE_ROOT,
     env,
@@ -2518,7 +2518,7 @@ async function cmdProcessEventLocked(args) {
 }
 
 async function cmdProcessEvent(args) {
-  if (process.env.FM_EXTENSION_RETIREMENT_MODE === "process-event") {
+  if (process.env.JG_EXTENSION_RETIREMENT_MODE === "process-event") {
     await cmdProcessEventLocked(args);
     return;
   }
@@ -2543,7 +2543,7 @@ The manifest file is firstmate-extension.json. Supported consent facts are netwo
 }
 
 async function main() {
-  if (process.env.FM_EXTENSION_RETIREMENT_MODE) {
+  if (process.env.JG_EXTENSION_RETIREMENT_MODE) {
     await runInheritedLifecycleRetirement(process.argv.slice(2));
     return;
   }

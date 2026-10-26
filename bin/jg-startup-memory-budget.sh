@@ -15,10 +15,10 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-startup-memory-budget-lib.sh
 . "$SCRIPT_DIR/jg-startup-memory-budget-lib.sh"
@@ -33,10 +33,10 @@ print_error() {
 
 read_budget() {
   if ! jg_startup_memory_budget_read "$CONFIG" >/dev/null; then
-    print_error "invalid config/$FM_STARTUP_MEMORY_BUDGET_FILE - $FM_STARTUP_MEMORY_BUDGET_ERROR"
+    print_error "invalid config/$JG_STARTUP_MEMORY_BUDGET_FILE - $JG_STARTUP_MEMORY_BUDGET_ERROR"
     return 1
   fi
-  printf '%s\n' "$FM_STARTUP_MEMORY_BUDGET_VALUE"
+  printf '%s\n' "$JG_STARTUP_MEMORY_BUDGET_VALUE"
 }
 
 report() {
@@ -45,7 +45,7 @@ report() {
     return 2
   fi
 
-  if [ -e "$FM_HOME/.jg-secondmate-home" ] || [ -L "$FM_HOME/.jg-secondmate-home" ]; then
+  if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
     role=secondmate
   fi
 
@@ -54,12 +54,12 @@ report() {
   printf 'effective_budget_tokens=%s\n' "$budget"
   for file in captain.md captain-shared.md learnings.md; do
     if ! jg_startup_memory_measure_file "$DATA/$file" >/dev/null; then
-      print_error "$FM_STARTUP_MEMORY_BUDGET_ERROR"
+      print_error "$JG_STARTUP_MEMORY_BUDGET_ERROR"
       return 2
     fi
-    bytes=$FM_STARTUP_MEMORY_MEASURE_BYTES
-    tokens=$FM_STARTUP_MEMORY_MEASURE_TOKENS
-    presence=$FM_STARTUP_MEMORY_MEASURE_PRESENCE
+    bytes=$JG_STARTUP_MEMORY_MEASURE_BYTES
+    tokens=$JG_STARTUP_MEMORY_MEASURE_TOKENS
+    presence=$JG_STARTUP_MEMORY_MEASURE_PRESENCE
     total=$((total + tokens))
     [ "$file" != captain-shared.md ] || shared_tokens=$tokens
     printf 'file=data/%s bytes=%s estimated_tokens=%s status=%s\n' \

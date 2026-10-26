@@ -29,7 +29,7 @@ Both layers matter for the same reason cursor's do: marker ordering covers a rov
 
 ## Launch and readiness
 
-The launch template clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, and `FM_PI_HARNESS` inline (rovo's own foreign-marker exposure), and the shared outer wrap clears `CURSOR_AGENT`/`CURSOR_INVOKED_AS` like every other non-cursor harness.
+The launch template clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, and `JG_PI_HARNESS` inline (rovo's own foreign-marker exposure), and the shared outer wrap clears `CURSOR_AGENT`/`CURSOR_INVOKED_AS` like every other non-cursor harness.
 rovo launches BARE (`rovo run --yolo`, plus any `--model`/`--config-override` flags) and takes its brief only after the TUI comes up - the same launch-then-send shape as kimi, wired through the same shared readers (`jg_backend_capture`, `jg_backend_composer_state`, `jg_backend_send_text_submit`):
 
 1. **Readiness gate** (`rovo_wait_for_ready` in `../../../bin/jg-spawn.sh`): poll for the fresh-launch `Welcome to Rovo!` ASCII banner, falling back to composer-empty. The banner is the primary signal because the composer-empty fallback is weaker for rovo than for kimi - rovo's idle composer renders an inline placeholder chip whose luminance sits above the ghost-strip threshold (see "Composer ghost text" below), so it can read non-empty.
@@ -42,7 +42,7 @@ rovo leaves no worktree-resident artifact and no Juggernaut-owned sidecar at all
 ## Composer ghost text: a known, unfixed gap
 
 rovo's empty composer renders an inline placeholder chip (e.g. `Summarize my open tasks`) directly inside the bordered content row, not merely as a separate suggestion list below it.
-Measured live, that placeholder's foreground is `38;2;162;163;165` (luminance ~163), while real typed text in the same box is `38;2;206;207;210` (luminance ~207) - a real gap, but one that sits entirely above `../../../bin/jg-composer-lib.sh`'s default `FM_COMPOSER_GHOST_LUMA_MAX` of 128, so `jg_composer_strip_ghost` does not strip it and a fresh rovo composer can misclassify as `pending` instead of `empty`.
+Measured live, that placeholder's foreground is `38;2;162;163;165` (luminance ~163), while real typed text in the same box is `38;2;206;207;210` (luminance ~207) - a real gap, but one that sits entirely above `../../../bin/jg-composer-lib.sh`'s default `JG_COMPOSER_GHOST_LUMA_MAX` of 128, so `jg_composer_strip_ghost` does not strip it and a fresh rovo composer can misclassify as `pending` instead of `empty`.
 Raising the shared default to catch it is not safe: muse's own real, must-not-be-stripped prompt glyph measures luminance ~149.9, below rovo's ghost luminance, so no single global threshold can keep muse's real glyph while dropping rovo's ghost chip.
 This is deliberately left unfixed rather than patched with a threshold change that would risk muse's already-verified behavior; a real fix needs a harness-scoped signal the shared composer classifier does not currently carry.
 The practical consequence is bounded to composer-emptiness consumers - steering into an idle rovo pane may see a non-empty verdict and retry through the normal doorbell ladder rather than deliver on the first try.

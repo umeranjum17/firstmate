@@ -83,7 +83,7 @@ spawn_send_key() {  # <target> <key>
 }
 
 gate_run() {  # <max-polls> -> rc
-  FM_CLAUDE_IMPORTS_POLLS=$1 FM_CLAUDE_IMPORTS_POLL_INTERVAL=0 \
+  JG_CLAUDE_IMPORTS_POLLS=$1 JG_CLAUDE_IMPORTS_POLL_INTERVAL=0 \
     claude_wait_for_imports_answer
 }
 

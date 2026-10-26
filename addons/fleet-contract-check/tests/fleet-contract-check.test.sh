@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # E2E: fleet-contract-check passes on working callers and names the caller that breaks.
 # Fixture fork home with stub callers and a throwaway HOME: nothing real is touched.
 set -euo pipefail
-unset FM_MAIN_HOME FM_HOME
+unset JG_MAIN_HOME JG_HOME
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
@@ -14,7 +23,7 @@ printf '#!/usr/bin/env bash\necho "checks-lint: PASS: fixture"\n' > "$d/legacy.s
 printf '#!/usr/bin/env bash\n%s/guard/owner-guard merge-gate "$@" || exit $?\n' "$d" > "$fork/config/merge-gate"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$d/guard/owner-guard"
 chmod +x "$fork/bin/jg-dispatch-resolve.sh" "$d/legacy.sh" "$d/guard/owner-guard"
-export FM_MAIN_HOME=$fork FM_DONE_DONE_BIN=$d/no-such-done-done FM_LEGACY_CHECKS_LINT=$d/legacy.sh
+export JG_MAIN_HOME=$fork JG_DONE_DONE_BIN=$d/no-such-done-done JG_LEGACY_CHECKS_LINT=$d/legacy.sh
 run() { bash "$ROOT/fleet-contract-check/fleet-contract-check" "$@" 2>&1; }
 
 out=$(run) || { echo "FAIL healthy fleet: $out"; exit 1; }
@@ -33,7 +42,7 @@ rc=0; out=$(run dispatch-resolve) || rc=$?
 # A candidate package that omits the library the installed mover loads fails the check, without a core library to fall back on.
 cp -R "$ROOT" "$d/addons"
 sed -i '/account-pool-lib.sh/d' "$d/addons/limit-prompt-move/install.sh"
-rc=0; out=$(FM_ADDONS_DIR=$d/addons run limit-prompt-move) || rc=$?
+rc=0; out=$(JG_ADDONS_DIR=$d/addons run limit-prompt-move) || rc=$?
 [ "$rc" -eq 1 ] && grep -q '^FAIL limit-prompt-move: ' <<<"$out" || { echo "FAIL package missing the pool lib: rc=$rc $out"; exit 1; }
 
 rc=0; out=$(run no-such-caller) || rc=$?

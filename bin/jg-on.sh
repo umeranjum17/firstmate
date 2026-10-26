@@ -7,7 +7,7 @@
 #   jg-on.sh [--stdin] <secondmate-id|unambiguous-ssh-alias> <jg-command> [args...]
 #
 # Routes come only from remote records in data/secondmates.md. A record names an
-# SSH config alias, remote Firstmate code root, and remote FM_HOME. A host alias
+# SSH config alias, remote Firstmate code root, and remote JG_HOME. A host alias
 # may be used directly only when exactly one record selects it; an ambiguous
 # alias is refused. The command must be a genuine executable in this checkout's
 # bin/jg-*.sh namespace. No per-command table exists.
@@ -32,14 +32,14 @@
 # instead of an indefinite hang on a half-open TCP connection. The remote
 # sshd answers keepalive probes independently of whatever the remote command
 # is doing, so a legitimately long-but-alive remote command is never falsely
-# killed. FM_SSH_ALIVE_INTERVAL and FM_SSH_ALIVE_COUNT_MAX override the
+# killed. JG_SSH_ALIVE_INTERVAL and JG_SSH_ALIVE_COUNT_MAX override the
 # defaults; the worst-case detection window is roughly interval * count.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 REG="$DATA/secondmates.md"
 PROTOCOL=1
 
@@ -69,10 +69,10 @@ case "$COMMAND" in
   *) die "remote command must be a basename in the jg-*.sh namespace: $COMMAND" ;;
 esac
 case "$COMMAND" in */*|*..*) die "remote command must not contain a path or traversal: $COMMAND" ;; esac
-LOCAL_COMMAND="$FM_ROOT/bin/$COMMAND"
+LOCAL_COMMAND="$JG_ROOT/bin/$COMMAND"
 [ -f "$LOCAL_COMMAND" ] && [ ! -L "$LOCAL_COMMAND" ] && [ -x "$LOCAL_COMMAND" ] \
   || die "remote command is not a genuine tracked executable in this Firstmate checkout: $COMMAND"
-git -C "$FM_ROOT" ls-files --error-unmatch "bin/$COMMAND" >/dev/null 2>&1 \
+git -C "$JG_ROOT" ls-files --error-unmatch "bin/$COMMAND" >/dev/null 2>&1 \
   || die "remote command is not tracked by this Firstmate checkout: $COMMAND"
 [ -f "$REG" ] && [ ! -L "$REG" ] || die "no safe secondmate registry at $REG"
 
@@ -105,13 +105,13 @@ done
 ROOT_B64=$(printf '%s' "$ROOT" | encode_base64)
 HOME_B64=$(printf '%s' "$HOME_PATH" | encode_base64)
 ARGV_B64=$(printf '%s\0' "$COMMAND" "$@" | encode_base64)
-SSH_BIN=${FM_SSH_BIN:-ssh}
-ALIVE_INTERVAL=${FM_SSH_ALIVE_INTERVAL:-15}
-ALIVE_COUNT_MAX=${FM_SSH_ALIVE_COUNT_MAX:-3}
-case "$ALIVE_INTERVAL" in ''|*[!0-9]*) die "FM_SSH_ALIVE_INTERVAL must be a positive integer: $ALIVE_INTERVAL" ;; esac
-case "$ALIVE_COUNT_MAX" in ''|*[!0-9]*) die "FM_SSH_ALIVE_COUNT_MAX must be a positive integer: $ALIVE_COUNT_MAX" ;; esac
-[ "$ALIVE_INTERVAL" -gt 0 ] || die "FM_SSH_ALIVE_INTERVAL must be a positive integer: $ALIVE_INTERVAL"
-[ "$ALIVE_COUNT_MAX" -gt 0 ] || die "FM_SSH_ALIVE_COUNT_MAX must be a positive integer: $ALIVE_COUNT_MAX"
+SSH_BIN=${JG_SSH_BIN:-ssh}
+ALIVE_INTERVAL=${JG_SSH_ALIVE_INTERVAL:-15}
+ALIVE_COUNT_MAX=${JG_SSH_ALIVE_COUNT_MAX:-3}
+case "$ALIVE_INTERVAL" in ''|*[!0-9]*) die "JG_SSH_ALIVE_INTERVAL must be a positive integer: $ALIVE_INTERVAL" ;; esac
+case "$ALIVE_COUNT_MAX" in ''|*[!0-9]*) die "JG_SSH_ALIVE_COUNT_MAX must be a positive integer: $ALIVE_COUNT_MAX" ;; esac
+[ "$ALIVE_INTERVAL" -gt 0 ] || die "JG_SSH_ALIVE_INTERVAL must be a positive integer: $ALIVE_INTERVAL"
+[ "$ALIVE_COUNT_MAX" -gt 0 ] || die "JG_SSH_ALIVE_COUNT_MAX must be a positive integer: $ALIVE_COUNT_MAX"
 
 SSH_ARGS=(
   -o ForwardAgent=no

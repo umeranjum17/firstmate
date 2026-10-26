@@ -3,8 +3,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-BIN="$FM_ROOT/bin"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+BIN="$JG_ROOT/bin"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-procevent-quota.XXXXXX")
 FAKEBIN="$LAB/fakebin"
 NO_QUOTA_BIN="$LAB/no-quota-bin"
@@ -251,7 +251,7 @@ for provider in -- codex-; do
 done
 ok "arm rejects noncanonical provider identities"
 
-out=$(FM_HOME="$LAB/retire-home" FM_STATE_OVERRIDE="$LAB/retire-state" \
+out=$(JG_HOME="$LAB/retire-home" JG_STATE_OVERRIDE="$LAB/retire-state" \
   "$BIN/jg-procevent-quota.sh" retire --provider codex)
 [ "$out" = "retired: quota-codex" ] || fail "provider retire targeted the wrong source: $out"
 ok "provider retire resolves the armed source id"
@@ -281,7 +281,7 @@ fi
 ok "poll rejects a missing option value"
 
 rm -f "$COUNT"
-out=$(FM_TIMEOUT_MECHANISM_OVERRIDE=bash QUOTA_AXI_COUNT="$COUNT" PATH="$FAKEBIN:$PATH" "$BIN/jg-procevent-quota.sh" poll --interval 0.01 --threshold 10 --provider codex --timeout 1)
+out=$(JG_TIMEOUT_MECHANISM_OVERRIDE=bash QUOTA_AXI_COUNT="$COUNT" PATH="$FAKEBIN:$PATH" "$BIN/jg-procevent-quota.sh" poll --interval 0.01 --threshold 10 --provider codex --timeout 1)
 printf '%s\n' "$out" | grep -qx 'status: exhausted' || fail "bash timeout fallback did not poll quota"
 printf '%s\n' "$out" | grep -qx 'condition_polls: 2' || fail "bash timeout fallback stopped before exhaustion"
 ok "quota polling uses the shared bash timeout fallback"

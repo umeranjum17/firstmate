@@ -17,7 +17,7 @@ WORKING_SHIP_SPRITE="$ROOT/.pi/extensions/lib/jg-calm-working-ship-sprite.ts"
 WATCH_EXT="$ROOT/.pi/extensions/jg-primary-pi-watch.ts"
 OPERATIONAL_INPUT="$ROOT/bin/jg-operational-input.sh"
 PI_OPERATIONAL_INPUT="$ROOT/.pi/extensions/lib/jg-operational-input.ts"
-PI_PACKAGE_DIR=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+PI_PACKAGE_DIR=${JG_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
 TMUX_SOCKET="jg-calm-$$"
 TMUX_SESSION="jg-calm-e2e"
 # Verified against Pi 0.81.1 and 0.82.0 (docs/calm-mode-feasibility.md). This is
@@ -66,8 +66,8 @@ fi
 
 find_chrome() {
   local candidate
-  if [ -n "${FM_CHROME_BIN:-}" ] && [ -x "$FM_CHROME_BIN" ]; then
-    printf '%s\n' "$FM_CHROME_BIN"
+  if [ -n "${JG_CHROME_BIN:-}" ] && [ -x "$JG_CHROME_BIN" ]; then
+    printf '%s\n' "$JG_CHROME_BIN"
     return 0
   fi
   for candidate in \
@@ -107,7 +107,7 @@ render_export_dom() {
   local attempt pid status wait_count wait_limit reap_wait log profile report timed_out
   local -a profile_arg
   report="$TMP_ROOT/chrome-render-report.txt"
-  wait_limit=${FM_CHROME_RENDER_WAIT_TICKS:-300}
+  wait_limit=${JG_CHROME_RENDER_WAIT_TICKS:-300}
   : >"$report"
   for attempt in 1 2 3; do
     log="$TMP_ROOT/chrome-render-$attempt.err"
@@ -268,17 +268,17 @@ const context = {
   },
 };
 
-delete process.env.FM_HOME;
-delete process.env.FM_CONFIG_OVERRIDE;
-process.env.FM_ROOT_OVERRIDE = process.env.OVERRIDE_HOME;
+delete process.env.JG_HOME;
+delete process.env.JG_CONFIG_OVERRIDE;
+process.env.JG_ROOT_OVERRIDE = process.env.OVERRIDE_HOME;
 let calm = registerCalm();
 calm.sessionStart({ reason: "startup" }, context);
 await calm.calmCommand.handler("", context);
 if (readFileSync(`${process.env.OVERRIDE_HOME}/config/calm`, "utf8") !== "on\n") {
-  throw new Error("Calm ignored FM_ROOT_OVERRIDE when FM_HOME was unset");
+  throw new Error("Calm ignored JG_ROOT_OVERRIDE when JG_HOME was unset");
 }
 
-delete process.env.FM_ROOT_OVERRIDE;
+delete process.env.JG_ROOT_OVERRIDE;
 calm = registerCalm();
 calm.sessionStart({ reason: "startup" }, context);
 await calm.calmCommand.handler("", context);
@@ -501,15 +501,15 @@ test_queued_operational_rows() {
   # bin/jg-operational-input.sh would.
   cat >"$fixture/operational-input-probe.sh" <<'SH'
 #!/usr/bin/env bash
-[ -e "$FM_CLASSIFIER_DOWN" ] && exit 3
-exec "$FM_OPERATIONAL_INPUT_OWNER" "$@"
+[ -e "$JG_CLASSIFIER_DOWN" ] && exit 3
+exec "$JG_OPERATIONAL_INPUT_OWNER" "$@"
 SH
   chmod +x "$fixture/operational-input-probe.sh"
 
   out=$(cd "$fixture" && \
-    FM_OPERATIONAL_INPUT_SCRIPT="$fixture/operational-input-probe.sh" \
-    FM_OPERATIONAL_INPUT_OWNER="$OPERATIONAL_INPUT" \
-    FM_CLASSIFIER_DOWN="$fixture/classifier-down" \
+    JG_OPERATIONAL_INPUT_SCRIPT="$fixture/operational-input-probe.sh" \
+    JG_OPERATIONAL_INPUT_OWNER="$OPERATIONAL_INPUT" \
+    JG_CLASSIFIER_DOWN="$fixture/classifier-down" \
     PI_PACKAGE_DIR="$PI_PACKAGE_DIR" \
     node --input-type=module 2>&1 <<'JS'
 import { rmSync, writeFileSync } from "node:fs";
@@ -693,11 +693,11 @@ visibility.setCalmPresentation(true);
   const host = makeHost(session);
   session.followUp.push(watcherOne, captainText);
   host.updatePendingMessagesDisplay();
-  writeFileSync(process.env.FM_CLASSIFIER_DOWN, "");
+  writeFileSync(process.env.JG_CLASSIFIER_DOWN, "");
   try {
     host.restoreQueuedMessagesToEditor({ abort: true });
   } finally {
-    rmSync(process.env.FM_CLASSIFIER_DOWN, { force: true });
+    rmSync(process.env.JG_CLASSIFIER_DOWN, { force: true });
   }
   assertNoOperationalText(host.editorText, "editor after Escape with the classifier down");
   await settle();
@@ -850,7 +850,7 @@ function fakePi() {
 
 // Calm-off (config/calm absent for this home): load-time registration must be
 // entirely skipped, so a non-Calm user contests nothing.
-process.env.FM_HOME = process.env.HOME_OFF;
+process.env.JG_HOME = process.env.HOME_OFF;
 const offRun = fakePi();
 const extensionOff = await import(`${pathToFileURL(process.env.EXT).href}?gate-off=${Date.now()}`);
 extensionOff.default(offRun.pi);
@@ -861,7 +861,7 @@ if (offRun.tools.length !== 0) {
 // Calm-on (config/calm="on" for this home): registration must happen synchronously,
 // during this same factory call, exactly the timing /reload's pre-session_start
 // transcript render depends on - not deferred to session_start or later.
-process.env.FM_HOME = process.env.HOME_ON;
+process.env.JG_HOME = process.env.HOME_ON;
 const onRun = fakePi();
 const extensionOn = await import(`${pathToFileURL(process.env.EXT).href}?gate-on=${Date.now()}`);
 extensionOn.default(onRun.pi);
@@ -913,7 +913,7 @@ test_calm_activation_collision_and_regression_bound() {
   (cd "$fixture/project" && \
     EXT="$fixture/project/.pi/extensions/jg-calm.ts" \
     FOREIGN_EXT="$fixture/project/foreign-bash-extension.ts" \
-    FM_HOME="$fixture/home" \
+    JG_HOME="$fixture/home" \
     PI_PACKAGE_DIR="$PI_PACKAGE_DIR" \
     node --input-type=module) >"$output_file" 2>&1 <<'JS'
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1130,13 +1130,13 @@ test_rendering_and_session_lifecycle() {
   printf '%s\n' '{"type":"module"}' >"$fixture/package.json"
   cat >"$fixture/operational-input-probe.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${1-}" >>"$FM_OPERATIONAL_INPUT_CALLS"
-exec "$FM_OPERATIONAL_INPUT_OWNER" "$@"
+printf '%s\n' "${1-}" >>"$JG_OPERATIONAL_INPUT_CALLS"
+exec "$JG_OPERATIONAL_INPUT_OWNER" "$@"
 SH
   chmod +x "$fixture/operational-input-probe.sh"
 
   output_file="$fixture/node-output"
-  (cd "$fixture" && EXT="$fixture/jg-calm.ts" WATCH_EXT="$fixture/jg-primary-pi-watch.ts" FM_HOME="$fixture/home" FM_OPERATIONAL_INPUT_SCRIPT="$fixture/operational-input-probe.sh" FM_OPERATIONAL_INPUT_OWNER="$OPERATIONAL_INPUT" FM_OPERATIONAL_INPUT_CALLS="$fixture/operational-input-calls" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" node --input-type=module) >"$output_file" 2>&1 <<'JS'
+  (cd "$fixture" && EXT="$fixture/jg-calm.ts" WATCH_EXT="$fixture/jg-primary-pi-watch.ts" JG_HOME="$fixture/home" JG_OPERATIONAL_INPUT_SCRIPT="$fixture/operational-input-probe.sh" JG_OPERATIONAL_INPUT_OWNER="$OPERATIONAL_INPUT" JG_OPERATIONAL_INPUT_CALLS="$fixture/operational-input-calls" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" node --input-type=module) >"$output_file" 2>&1 <<'JS'
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -1297,7 +1297,7 @@ const operationalMode = {
     : message.content.filter((item) => item.type === "text").map((item) => item.text).join(""),
   outputPad: 1,
 };
-const callsBeforePlainReplay = readFileSync(process.env.FM_OPERATIONAL_INPUT_CALLS, "utf8");
+const callsBeforePlainReplay = readFileSync(process.env.JG_OPERATIONAL_INPUT_CALLS, "utf8");
 const plainReplayChat = {
   children: [],
   addChild(component) {
@@ -1310,7 +1310,7 @@ for (let index = 0; index < 50; index += 1) {
     { role: "user", content: `ORDINARY_REPLAY_${index}` },
   );
 }
-if (readFileSync(process.env.FM_OPERATIONAL_INPUT_CALLS, "utf8") !== callsBeforePlainReplay) {
+if (readFileSync(process.env.JG_OPERATIONAL_INPUT_CALLS, "utf8") !== callsBeforePlainReplay) {
   throw new Error("ordinary replay rows invoked operational subprocess classification");
 }
 InteractiveMode.prototype.addMessageToChat.call(
@@ -1579,7 +1579,7 @@ await calmCommand.handler("", commandContext);
 if (expanded !== true || workingVisible !== true || hiddenThinkingLabel !== "" || statuses.get("firstmate-calm") !== undefined) {
   throw new Error("Calm did not preserve working visibility or apply its thinking and footer presentation controls");
 }
-if (readFileSync(`${process.env.FM_HOME}/config/calm`, "utf8") !== "on\n") {
+if (readFileSync(`${process.env.JG_HOME}/config/calm`, "utf8") !== "on\n") {
   throw new Error("Calm did not persist the active choice in the effective Firstmate home");
 }
 presentationComponent.setExpanded(!expanded);
@@ -1777,7 +1777,7 @@ if (workingVisible !== true || hiddenThinkingLabel !== undefined || statuses.get
 if (!assistantThinkingTool.render(100).join("\n").includes("Thinking...")) {
   throw new Error("turning Calm off did not restore the collapsed thinking label");
 }
-if (readFileSync(`${process.env.FM_HOME}/config/calm`, "utf8") !== "off\n") {
+if (readFileSync(`${process.env.JG_HOME}/config/calm`, "utf8") !== "off\n") {
   throw new Error("Calm did not persist the inactive choice in the effective Firstmate home");
 }
 presentationComponent.setExpanded(expanded);
@@ -1851,7 +1851,7 @@ test_calm_mid_turn_working_notes() {
   printf '%s\n' '{"type":"module"}' >"$fixture/package.json"
 
   output_file="$fixture/node-output"
-  (cd "$fixture" && EXT="$fixture/jg-calm.ts" FM_HOME="$fixture/home" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" node --input-type=module) >"$output_file" 2>&1 <<'JS'
+  (cd "$fixture" && EXT="$fixture/jg-calm.ts" JG_HOME="$fixture/home" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" node --input-type=module) >"$output_file" 2>&1 <<'JS'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1869,7 +1869,7 @@ setCapabilities({ images: null, trueColor: true, hyperlinks: false });
 // single Pi process does.
 const visibility = await import(pathToFileURL(`${process.cwd()}/lib/jg-calm-visibility.ts`).href);
 const preservation = await import(pathToFileURL(`${process.cwd()}/lib/jg-calm-preservation.ts`).href);
-const calmPreferencePath = `${process.env.FM_HOME}/config/calm`;
+const calmPreferencePath = `${process.env.JG_HOME}/config/calm`;
 const components = [];
 const ui = {
   getEditorText: () => "",
@@ -2305,7 +2305,7 @@ TS
     fi
 
     tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 160 -y 36 \
-      "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' FM_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions $extensions $session_arg; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
+      "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' JG_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions $extensions $session_arg; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
     i=0
     while [ "$i" -lt 120 ]; do
       pane=$(tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" -S - 2>/dev/null || true)
@@ -2444,7 +2444,7 @@ JS
     tmux -L "$TMUX_SOCKET" kill-session -t "$TMUX_SESSION" 2>/dev/null || true
     printf '%s\n' on >"$home/config/calm"
     tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 160 -y 36 \
-      "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' FM_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./followup-e2e.ts --session '$exact_session'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
+      "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' JG_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./followup-e2e.ts --session '$exact_session'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
     i=0
     while [ "$i" -lt 120 ]; do
       pane=$(tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" -S - 2>/dev/null || true)
@@ -2615,7 +2615,7 @@ TS
     printf '%s\n' "$calm_state" >"$home/config/calm"
     mkdir -p "$sessions/$label"
     tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 160 -y 36 \
-      "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' FM_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' QUEUED_ESCAPE_HELD='$held' QUEUED_ESCAPE_STATUS_LOG='$sessions/$label/status.log' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./queued-escape-e2e.ts --session-dir '$sessions/$label'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
+      "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' JG_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' QUEUED_ESCAPE_HELD='$held' QUEUED_ESCAPE_STATUS_LOG='$sessions/$label/status.log' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./queued-escape-e2e.ts --session-dir '$sessions/$label'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
     wait_for_text "$TMP_ROOT/queued-escape-pane" 'queued-escape-e2e.ts' \
       || fail "Pi queued-row $label case did not reach the ready composer"
     tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l "/queued-escape-e2e $label"
@@ -2814,7 +2814,7 @@ TS
     local session_arg=$1
     tmux -L "$TMUX_SOCKET" kill-session -t "$TMUX_SESSION" 2>/dev/null || true
     tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 100 -y 44 \
-      "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./geometry-provider.ts $session_arg; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
+      "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-context-files --no-prompt-templates --no-extensions -e ./.pi/extensions/jg-calm.ts -e ./geometry-provider.ts $session_arg; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 20"
   }
 
   capture_geometry_viewport() {
@@ -2973,7 +2973,7 @@ test_working_ship_geometry_and_lifecycle() {
   # module when it is installed: a rename on either side then renders two boats and
   # fails there, instead of passing against a key this test invented. The pinned slot
   # contract inside the program covers a machine without that extension.
-  standalone_ship=${FM_STANDALONE_CALM_SHIP:-}
+  standalone_ship=${JG_STANDALONE_CALM_SHIP:-}
   if [ -z "$standalone_ship" ] && [ -f "${HOME:-}/.pi/agent/extensions/calm/lib/working-ship.ts" ]; then
     standalone_ship=${HOME:-}/.pi/agent/extensions/calm/lib/working-ship.ts
   fi
@@ -2995,7 +2995,7 @@ test_working_ship_geometry_and_lifecycle() {
   ln -s "$PI_PACKAGE_DIR/node_modules/typebox" "$fixture/node_modules/typebox"
   printf '%s\n' '{"type":"module"}' >"$fixture/package.json"
 
-  out=$(cd "$fixture" && EXT="$fixture/jg-calm.ts" FM_HOME="$fixture/home" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" STANDALONE_CALM_SHIP="$standalone_ship" node --input-type=module 2>&1 <<'JS'
+  out=$(cd "$fixture" && EXT="$fixture/jg-calm.ts" JG_HOME="$fixture/home" PI_PACKAGE_DIR="$PI_PACKAGE_DIR" STANDALONE_CALM_SHIP="$standalone_ship" node --input-type=module 2>&1 <<'JS'
 import { pathToFileURL } from "node:url";
 
 const packageRoot = process.env.PI_PACKAGE_DIR;
@@ -3954,7 +3954,7 @@ JS
   if [ -n "$standalone_ship" ]; then
     pass "Pi Calm dual-install coverage read the installed standalone Pi Calm extension's own working-ship slot from $standalone_ship"
   else
-    pass "SKIP: no standalone Pi Calm extension is installed, so dual-install coverage used the pinned shared-slot contract; set FM_STANDALONE_CALM_SHIP to check one"
+    pass "SKIP: no standalone Pi Calm extension is installed, so dual-install coverage used the pinned shared-slot contract; set JG_STANDALONE_CALM_SHIP to check one"
   fi
 }
 
@@ -3975,14 +3975,14 @@ test_export_dom_render_guard() {
   cat >"$dir/chrome-ok" <<'SH'
 #!/bin/sh
 case "${1:-}" in --version) echo "FakeChrome 1.2.3"; exit 0 ;; esac
-echo attempt >>"$FM_FAKE_CHROME_ATTEMPTS"
+echo attempt >>"$JG_FAKE_CHROME_ATTEMPTS"
 printf '<html><head></head><body>export</body></html>\n'
 SH
   cat >"$dir/chrome-flaky" <<'SH'
 #!/bin/sh
 case "${1:-}" in --version) echo "FakeChrome 1.2.3"; exit 0 ;; esac
-echo attempt >>"$FM_FAKE_CHROME_ATTEMPTS"
-if [ "$(wc -l <"$FM_FAKE_CHROME_ATTEMPTS")" -lt 3 ]; then
+echo attempt >>"$JG_FAKE_CHROME_ATTEMPTS"
+if [ "$(wc -l <"$JG_FAKE_CHROME_ATTEMPTS")" -lt 3 ]; then
   echo "fake chrome start-up crashed" >&2
   exit 1
 fi
@@ -3991,21 +3991,21 @@ SH
   cat >"$dir/chrome-broken" <<'SH'
 #!/bin/sh
 case "${1:-}" in --version) echo "FakeChrome 1.2.3"; exit 0 ;; esac
-echo attempt >>"$FM_FAKE_CHROME_ATTEMPTS"
+echo attempt >>"$JG_FAKE_CHROME_ATTEMPTS"
 echo "FAKE_CHROME_STARTUP_MARKER" >&2
 exit 9
 SH
   cat >"$dir/chrome-hang" <<'SH'
 #!/bin/sh
 case "${1:-}" in --version) echo "FakeChrome 1.2.3"; exit 0 ;; esac
-echo attempt >>"$FM_FAKE_CHROME_ATTEMPTS"
+echo attempt >>"$JG_FAKE_CHROME_ATTEMPTS"
 printf '<html><head></head><body>export'
 exec sleep 30
 SH
   chmod +x "$dir/chrome-ok" "$dir/chrome-flaky" "$dir/chrome-broken" "$dir/chrome-hang"
 
   : >"$dir/attempts-ok"
-  FM_FAKE_CHROME_ATTEMPTS="$dir/attempts-ok" \
+  JG_FAKE_CHROME_ATTEMPTS="$dir/attempts-ok" \
     render_export_dom "$dir/chrome-ok" "$source_file" "$out_file" 9.9.9 >"$dir/report-ok" \
     || fail "render_export_dom rejected a Chrome that dumped a complete DOM"
   grep -Fq '</html>' "$out_file" || fail "render_export_dom did not leave the rendered DOM behind"
@@ -4015,7 +4015,7 @@ SH
 
   : >"$dir/attempts-flaky"
   : >"$out_file"
-  FM_FAKE_CHROME_ATTEMPTS="$dir/attempts-flaky" \
+  JG_FAKE_CHROME_ATTEMPTS="$dir/attempts-flaky" \
     render_export_dom "$dir/chrome-flaky" "$source_file" "$out_file" 9.9.9 >"$dir/report-flaky" \
     || fail "render_export_dom gave up on a Chrome that renders after a start-up failure"
   grep -Fq '</html>' "$out_file" || fail "a retried render left no DOM behind"
@@ -4024,7 +4024,7 @@ SH
 
   : >"$dir/attempts-broken"
   : >"$out_file"
-  if FM_FAKE_CHROME_ATTEMPTS="$dir/attempts-broken" \
+  if JG_FAKE_CHROME_ATTEMPTS="$dir/attempts-broken" \
     render_export_dom "$dir/chrome-broken" "$source_file" "$out_file" 9.9.9 >"$dir/report-broken"
   then
     fail "render_export_dom accepted a Chrome that never rendered the DOM"
@@ -4041,7 +4041,7 @@ SH
 
   : >"$dir/attempts-hang"
   : >"$out_file"
-  if FM_FAKE_CHROME_ATTEMPTS="$dir/attempts-hang" FM_CHROME_RENDER_WAIT_TICKS=3 \
+  if JG_FAKE_CHROME_ATTEMPTS="$dir/attempts-hang" JG_CHROME_RENDER_WAIT_TICKS=3 \
     render_export_dom "$dir/chrome-hang" "$source_file" "$out_file" 9.9.9 >"$dir/report-hang"
   then
     fail "render_export_dom accepted a Chrome that never finished the DOM"
@@ -4303,7 +4303,7 @@ TS
 JSON
 
   tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 180 -y 44 \
-    "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' FM_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-skills --no-prompt-templates --no-context-files --session '$session_file'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 30"
+    "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' JG_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-skills --no-prompt-templates --no-context-files --session '$session_file'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 30"
   wait_for_text "$default_snapshot" "The deterministic tool example is complete." \
     || fail "Pi calm E2E did not reach the restored session transcript"
   assert_contains "$(cat "$default_snapshot")" "CALM_E2E_OUTPUT" "calm mode was not off by default"
@@ -4507,7 +4507,7 @@ const synthetic = entries.find((entry) => entry.type === "custom_message" && ent
 if (!synthetic || synthetic.display) process.exit(1);
 JS
   chrome=$(find_chrome) \
-    || fail "Chrome or Chromium is required for rendered export DOM assertions; set FM_CHROME_BIN to one"
+    || fail "Chrome or Chromium is required for rendered export DOM assertions; set JG_CHROME_BIN to one"
   chrome_report=$(render_export_dom "$chrome" "$export_file" "$export_dom" "$version") \
     || fail "could not render calm-mode HTML export DOM: $chrome_report"
   # Pi 0.99 renders display:false custom messages into the conversation
@@ -4976,7 +4976,7 @@ JS
   tmux -L "$TMUX_SOCKET" kill-session -t "$TMUX_SESSION" 2>/dev/null || true
 
   tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -x 180 -y 44 \
-    "cd '$project' && env FM_HOME='$home' PI_CODING_AGENT_DIR='$config' FM_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-skills --no-prompt-templates --no-context-files --session '$session_file'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 30"
+    "cd '$project' && env JG_HOME='$home' PI_CODING_AGENT_DIR='$config' JG_OPERATIONAL_INPUT_SCRIPT='$OPERATIONAL_INPUT' PI_OFFLINE=1 pi $PI_TUI_MODE_ARGS --approve --no-skills --no-prompt-templates --no-context-files --session '$session_file'; rc=\$?; printf '\nPI_EXIT=%s\n' \"\$rc\"; sleep 30"
   wait_for_text "$restarted_snapshot" "CALM_WORKING_E2E_RESPONSE" \
     || fail "Pi did not restore the persisted session after restart"
   assert_not_contains "$(cat "$restarted_snapshot")" "CALM_E2E_OUTPUT" "restart/resume reset Calm and restored a tool row"

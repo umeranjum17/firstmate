@@ -141,8 +141,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -190,7 +190,7 @@ apply_session_host() {  # <artifact>
 
 lavish_reply_compatible() {
   local status=0
-  "$FM_ROOT/bin/jg-bootstrap.sh" lavish-reply-compatible >/dev/null 2>&1 || status=$?
+  "$JG_ROOT/bin/jg-bootstrap.sh" lavish-reply-compatible >/dev/null 2>&1 || status=$?
   case "$status" in
     0|1) return "$status" ;;
   esac
@@ -255,20 +255,20 @@ cmd_arm() {
   listener=("$SCRIPT_DIR/jg-procevent-lavish.sh" poll "$real")
   [ -z "$reply_file" ] || listener+=(--agent-reply-file "$reply_file")
   if [ -n "$task" ]; then
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" register-task lavish "$id" "$task" -- \
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" register-task lavish "$id" "$task" -- \
       "${listener[@]}" || exit 1
   else
     # This adapter's own listener command, which runs the plain blocking form
     # with no --timeout-ms so completion is a server event, and absorbs only
     # the exact transient interruption.
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" register lavish "$id" \
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" register lavish "$id" \
       -- "${listener[@]}" || exit 1
   fi
   # Registration is not a running listener. Readiness is the process-event
   # owner's evidence for this generation; a miss retires a source that never
   # started so arm does not leave it registered.
   listening=0
-  FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" ensure-listening "$id" || listening=$?
+  JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" ensure-listening "$id" || listening=$?
   if [ "$listening" -eq 3 ]; then
     printf 'still-listening: %s\n' "$id"
     printf 'artifact: %s\n' "$real"
@@ -277,11 +277,11 @@ cmd_arm() {
     exit 0
   fi
   if [ "$listening" -ne 0 ]; then
-    owner=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" list 2>/dev/null \
+    owner=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" list 2>/dev/null \
       | awk -v id="$id" '$1 == id { print $3; exit }')
     case "$owner" in
       live|orphaned|task:*/listening|task:*/round-open) ;;
-      *) FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" retire "$id" >/dev/null 2>&1 || true ;;
+      *) JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" retire "$id" >/dev/null 2>&1 || true ;;
     esac
     exit 1
   fi
@@ -363,21 +363,21 @@ poll_response_filter() {  # <response-file>
   ' "$1"
 }
 
-# Minimum seconds between retry attempt starts. FM_LAVISH_POLL_RETRY_DELAY is a
+# Minimum seconds between retry attempt starts. JG_LAVISH_POLL_RETRY_DELAY is a
 # bounded test override; a malformed or out-of-range value is refused rather than quietly
 # rounded, because silently changing a retry cadence is how a bound stops
 # meaning anything.
 poll_retry_delay() {
-  local delay=${FM_LAVISH_POLL_RETRY_DELAY-}
+  local delay=${JG_LAVISH_POLL_RETRY_DELAY-}
   if [ -z "$delay" ]; then
     printf '%s\n' "$POLL_RETRY_DELAY_DEFAULT"
     return 0
   fi
   case "$delay" in
-    *[!0-9]*) die "FM_LAVISH_POLL_RETRY_DELAY must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $delay" ;;
+    *[!0-9]*) die "JG_LAVISH_POLL_RETRY_DELAY must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $delay" ;;
   esac
   [ "$delay" -ge "$POLL_RETRY_DELAY_MIN" ] && [ "$delay" -le "$POLL_RETRY_DELAY_MAX" ] \
-    || die "FM_LAVISH_POLL_RETRY_DELAY must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $delay"
+    || die "JG_LAVISH_POLL_RETRY_DELAY must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $delay"
   printf '%s\n' "$delay"
 }
 

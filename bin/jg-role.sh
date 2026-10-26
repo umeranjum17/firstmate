@@ -27,28 +27,28 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 # shellcheck source=bin/jg-role-lib.sh
 . "$SCRIPT_DIR/jg-role-lib.sh"
 
 case ${1:-} in
 report)
-  jg_role_resolve "$FM_HOME" "$CONFIG"
-  line="jg-role: $FM_ROLE"
-  [ -z "$FM_ROLE_SCOPE" ] || line="$line $FM_ROLE_SCOPE"
-  case $FM_ROLE_SOURCE in
+  jg_role_resolve "$JG_HOME" "$CONFIG"
+  line="jg-role: $JG_ROLE"
+  [ -z "$JG_ROLE_SCOPE" ] || line="$line $JG_ROLE_SCOPE"
+  case $JG_ROLE_SOURCE in
   local) line="$line (local)" ;;
   inherited) line="$line (inherited)" ;;
   absent)
-    if [ -z "$FM_ROLE_DIAG" ]; then
+    if [ -z "$JG_ROLE_DIAG" ]; then
       line="$line (default)"
     fi
     ;;
   esac
-  [ -z "$FM_ROLE_DIAG" ] || line="$line - $FM_ROLE_DIAG"
+  [ -z "$JG_ROLE_DIAG" ] || line="$line - $JG_ROLE_DIAG"
   printf '%s\n' "$line"
   ;;
 check)
@@ -61,8 +61,8 @@ check)
   if [ "${3:-}" = upstream-consent ]; then
     consent=${4:-}
   fi
-  if jg_role_gate_self_publish "$FM_HOME" "$CONFIG" "$proj" "$FM_ROOT" "$consent"; then
-    printf 'authorized: %s\n' "$FM_ROLE_PUB_AUTHORITY"
+  if jg_role_gate_self_publish "$JG_HOME" "$CONFIG" "$proj" "$JG_ROOT" "$consent"; then
+    printf 'authorized: %s\n' "$JG_ROLE_PUB_AUTHORITY"
     exit 0
   else
     rc=$?
@@ -71,7 +71,7 @@ check)
     printf 'not a self-repository task\n'
     exit 2
   fi
-  printf 'refused: %s\n' "$FM_ROLE_PUB_DENIAL"
+  printf 'refused: %s\n' "$JG_ROLE_PUB_DENIAL"
   exit 1
   ;;
 -h | --help | help)

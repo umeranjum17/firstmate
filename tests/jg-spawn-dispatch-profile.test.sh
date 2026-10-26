@@ -23,10 +23,10 @@ set -u
 if [ "${1:-}" = --help ]; then
   # Mirror real Pi help advertising: 0.82.0 has --approve but not --tui-mode;
   # 0.50.0 is a synthetic pre-approve probe; current defaults advertise both.
-  case "${FM_FAKE_PI_VERSION:-0.84.0}" in
+  case "${JG_FAKE_PI_VERSION:-0.84.0}" in
   0.50.0) printf '%s\n' 'Pi 0.50.0' 'Options: --help' ;;
   0.82.0) printf '%s\n' 'Pi 0.82.0' 'Options: --help --approve' ;;
-  *) printf '%s\n' "Pi ${FM_FAKE_PI_VERSION:-0.84.0}" 'Options: --help --tui-mode <mode> --approve' ;;
+  *) printf '%s\n' "Pi ${JG_FAKE_PI_VERSION:-0.84.0}" 'Options: --help --tui-mode <mode> --approve' ;;
   esac
 fi
 exit 0
@@ -45,8 +45,8 @@ SH
   cat > "$fakebin/cursor-agent" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --list-models ]; then
-  [ "${FM_FAKE_CURSOR_LIST_STATUS:-0}" -eq 0 ] || exit "${FM_FAKE_CURSOR_LIST_STATUS}"
-  printf '%b\n' "${FM_FAKE_CURSOR_MODELS:-Available models\ncursor-grok-4.5-high - Grok 4.5 High}"
+  [ "${JG_FAKE_CURSOR_LIST_STATUS:-0}" -eq 0 ] || exit "${JG_FAKE_CURSOR_LIST_STATUS}"
+  printf '%b\n' "${JG_FAKE_CURSOR_MODELS:-Available models\ncursor-grok-4.5-high - Grok 4.5 High}"
 fi
 exit 0
 SH
@@ -92,7 +92,7 @@ make_seeded_secondmate_home() {
 task_inbox_export() {  # <home> <id>
   local state
   state=$(CDPATH='' cd -- "$1/state" && pwd -P) || fail "cannot resolve state dir $1/state"
-  printf "export FM_TASK_INBOX='%s'; " "$state/$2.inbox"
+  printf "export JG_TASK_INBOX='%s'; " "$state/$2.inbox"
 }
 
 
@@ -114,14 +114,14 @@ run_spawn() {
   # CLAUDE_CONFIG_DIR is forwarded onto claude launches by jg-spawn, so pin it
   # explicitly (empty by default) instead of leaking the invoking shell's value,
   # which would make launch assertions depend on the developer's environment.
-  # A test opts in to the set case via FM_TEST_CLAUDE_CONFIG_DIR.
-  CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
-    FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_LOG="${FM_TEST_PANE_LOG:-}" \
-    FM_FAKE_PI_VERSION="${FM_TEST_PI_VERSION:-0.84.0}" \
-    FM_FAKE_CURSOR_MODELS="${FM_TEST_CURSOR_MODELS:-}" \
-    FM_FAKE_CURSOR_LIST_STATUS="${FM_TEST_CURSOR_LIST_STATUS:-0}" \
+  # A test opts in to the set case via JG_TEST_CLAUDE_CONFIG_DIR.
+  CLAUDE_CONFIG_DIR="${JG_TEST_CLAUDE_CONFIG_DIR:-}" \
+    JG_FAKE_LAUNCH_LOG="$launchlog" JG_FAKE_PANE_LOG="${JG_TEST_PANE_LOG:-}" \
+    JG_FAKE_PI_VERSION="${JG_TEST_PI_VERSION:-0.84.0}" \
+    JG_FAKE_CURSOR_MODELS="${JG_TEST_CURSOR_MODELS:-}" \
+    JG_FAKE_CURSOR_LIST_STATUS="${JG_TEST_CURSOR_LIST_STATUS:-0}" \
     GROK_HOME="$home/grok-home" \
-    FM_HOST_MEMORY_PROC="$calm/proc" FM_HOST_MEMORY_CGROUP_ROOT="$calm/cgroup" \
+    JG_HOST_MEMORY_PROC="$calm/proc" JG_HOST_MEMORY_CGROUP_ROOT="$calm/cgroup" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" "$@"
 }
 
@@ -191,7 +191,7 @@ test_claude_launch_brief_publishes_record_doorbell() {
     || fail "the launch record is not in this home's operational inbox: $record"
   grep -q 'Current worker role contract' "$record" \
     || fail "the launch record lost the worker brief: $(cat "$record")"
-  [ "$(printf '%s' "$doorbell" | FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" \
+  [ "$(printf '%s' "$doorbell" | JG_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/jg-operational-input.sh" open "$record")" \
     = "$(cat "$HOME_DIR/data/$id/launch-brief.md")" ] \
     || fail "open did not return the launch brief body"
   pass "a claude launch publishes the brief as an operational-inbox record and passes only the doorbell"
@@ -207,7 +207,7 @@ test_claude_secondmate_launch_brief_publishes_into_its_own_home() {
   sm="$CASE_DIR/secondmate-home"
   make_seeded_secondmate_home "$sm" "$id"
 
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
   status=$?
   expect_code 0 "$status" "secondmate claude spawn for the doorbell check should succeed"$'\n'"$out"
@@ -271,11 +271,11 @@ test_relative_home_overrides_launch_with_absolute_cross_process_paths() {
 
   out=$(
     cd "$CASE_DIR" || exit 1
-    CDPATH="$CASE_DIR/cdpath" FM_ROOT_OVERRIDE='' FM_HOME=home \
-      FM_STATE_OVERRIDE=home/state FM_DATA_OVERRIDE=home/data \
-      FM_PROJECTS_OVERRIDE=home/projects FM_CONFIG_OVERRIDE=home/config \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
-      CLAUDE_CONFIG_DIR='' FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+    CDPATH="$CASE_DIR/cdpath" JG_ROOT_OVERRIDE='' JG_HOME=home \
+      JG_STATE_OVERRIDE=home/state JG_DATA_OVERRIDE=home/data \
+      JG_PROJECTS_OVERRIDE=home/projects JG_CONFIG_OVERRIDE=home/config \
+      JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+      CLAUDE_CONFIG_DIR='' JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
       GROK_HOME=home/grok-home PATH="$FAKEBIN_DIR:$PATH" \
       "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
@@ -283,9 +283,9 @@ test_relative_home_overrides_launch_with_absolute_cross_process_paths() {
   expect_code 0 "$status" "spawn with relative home overrides should succeed"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "-e '$home_real/state/$id.pi-ext.ts'" \
-    "relative FM_STATE_OVERRIDE leaked into Pi's cross-process extension path"
+    "relative JG_STATE_OVERRIDE leaked into Pi's cross-process extension path"
   assert_contains "$launch" "< '$home_real/data/$id/launch-brief.md'" \
-    "relative FM_DATA_OVERRIDE leaked into the cross-process brief path"
+    "relative JG_DATA_OVERRIDE leaked into the cross-process brief path"
   pass "relative home overrides ignore CDPATH and become absolute before spawn launch construction"
 }
 
@@ -300,42 +300,42 @@ test_home_defaults_preserve_absolute_or_resolve_relative_paths() {
   : > "$LAUNCH_LOG"
   out=$(
     cd "$CASE_DIR" || exit 1
-    FM_ROOT_OVERRIDE='' FM_HOME=home \
-      FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
-      FM_PROJECTS_OVERRIDE=home/projects FM_CONFIG_OVERRIDE=home/config \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
-      CLAUDE_CONFIG_DIR='' FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+    JG_ROOT_OVERRIDE='' JG_HOME=home \
+      JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
+      JG_PROJECTS_OVERRIDE=home/projects JG_CONFIG_OVERRIDE=home/config \
+      JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+      CLAUDE_CONFIG_DIR='' JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
       GROK_HOME=home/grok-home PATH="$FAKEBIN_DIR:$PATH" \
       "$SPAWN" "$relative_id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
   status=$?
-  expect_code 0 "$status" "spawn with relative FM_HOME defaults should succeed"
+  expect_code 0 "$status" "spawn with relative JG_HOME defaults should succeed"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "-e '$home_real/state/$relative_id.pi-ext.ts'" \
-    "relative FM_HOME leaked into Pi's default cross-process extension path"
+    "relative JG_HOME leaked into Pi's default cross-process extension path"
   assert_contains "$launch" "< '$home_real/data/$relative_id/launch-brief.md'" \
-    "relative FM_HOME leaked into the default cross-process brief path"
+    "relative JG_HOME leaked into the default cross-process brief path"
 
   linked_home="$CASE_DIR/home-link"
   ln -s "$HOME_DIR" "$linked_home"
   : > "$LAUNCH_LOG"
   out=$(
-    FM_ROOT_OVERRIDE='' FM_HOME="$linked_home" \
-      FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
-      FM_PROJECTS_OVERRIDE="$linked_home/projects" FM_CONFIG_OVERRIDE="$linked_home/config" \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
-      CLAUDE_CONFIG_DIR='' FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+    JG_ROOT_OVERRIDE='' JG_HOME="$linked_home" \
+      JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
+      JG_PROJECTS_OVERRIDE="$linked_home/projects" JG_CONFIG_OVERRIDE="$linked_home/config" \
+      JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+      CLAUDE_CONFIG_DIR='' JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
       GROK_HOME="$linked_home/grok-home" PATH="$FAKEBIN_DIR:$PATH" \
       "$SPAWN" "$absolute_id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
   status=$?
-  expect_code 0 "$status" "spawn with absolute symlink-spelled FM_HOME defaults should succeed"
+  expect_code 0 "$status" "spawn with absolute symlink-spelled JG_HOME defaults should succeed"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "-e '$linked_home/state/$absolute_id.pi-ext.ts'" \
-    "absolute FM_HOME spelling changed in Pi's default cross-process extension path"
+    "absolute JG_HOME spelling changed in Pi's default cross-process extension path"
   assert_contains "$launch" "< '$linked_home/data/$absolute_id/launch-brief.md'" \
-    "absolute FM_HOME spelling changed in the default cross-process brief path"
-  pass "FM_HOME defaults resolve relative paths and preserve absolute spellings"
+    "absolute JG_HOME spelling changed in the default cross-process brief path"
+  pass "JG_HOME defaults resolve relative paths and preserve absolute spellings"
 }
 
 test_absolute_override_spelling_is_preserved_in_launch_paths() {
@@ -348,11 +348,11 @@ test_absolute_override_spelling_is_preserved_in_launch_paths() {
   : > "$LAUNCH_LOG"
 
   out=$(
-    FM_ROOT_OVERRIDE='' FM_HOME="$linked_home" \
-      FM_STATE_OVERRIDE="$linked_home/state" FM_DATA_OVERRIDE="$linked_home/data" \
-      FM_PROJECTS_OVERRIDE="$linked_home/projects" FM_CONFIG_OVERRIDE="$linked_home/config" \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
-      CLAUDE_CONFIG_DIR='' FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+    JG_ROOT_OVERRIDE='' JG_HOME="$linked_home" \
+      JG_STATE_OVERRIDE="$linked_home/state" JG_DATA_OVERRIDE="$linked_home/data" \
+      JG_PROJECTS_OVERRIDE="$linked_home/projects" JG_CONFIG_OVERRIDE="$linked_home/config" \
+      JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+      CLAUDE_CONFIG_DIR='' JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
       GROK_HOME="$linked_home/grok-home" PATH="$FAKEBIN_DIR:$PATH" \
       "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
@@ -360,9 +360,9 @@ test_absolute_override_spelling_is_preserved_in_launch_paths() {
   expect_code 0 "$status" "spawn with absolute symlink-spelled overrides should succeed"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "-e '$linked_home/state/$id.pi-ext.ts'" \
-    "absolute FM_STATE_OVERRIDE spelling changed in Pi's cross-process extension path"
+    "absolute JG_STATE_OVERRIDE spelling changed in Pi's cross-process extension path"
   assert_contains "$launch" "< '$linked_home/data/$id/launch-brief.md'" \
-    "absolute FM_DATA_OVERRIDE spelling changed in the cross-process brief path"
+    "absolute JG_DATA_OVERRIDE spelling changed in the cross-process brief path"
   pass "absolute override spellings are preserved in spawn launch paths"
 }
 
@@ -374,36 +374,36 @@ test_unresolvable_relative_overrides_fail_loudly() {
 
   out=$(
     cd "$CASE_DIR" || exit 1
-    FM_ROOT_OVERRIDE='' FM_HOME=missing-home \
-      FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
+    JG_ROOT_OVERRIDE='' JG_HOME=missing-home \
+      JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
       "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative home should fail"
-  assert_contains "$out" "FM_HOME directory cannot be resolved: missing-home" \
-    "spawn did not name the unresolvable FM_HOME"
+  assert_contains "$out" "JG_HOME directory cannot be resolved: missing-home" \
+    "spawn did not name the unresolvable JG_HOME"
 
   out=$(
     cd "$CASE_DIR" || exit 1
-    FM_ROOT_OVERRIDE='' FM_HOME=home \
-      FM_STATE_OVERRIDE=missing-state FM_DATA_OVERRIDE=home/data \
+    JG_ROOT_OVERRIDE='' JG_HOME=home \
+      JG_STATE_OVERRIDE=missing-state JG_DATA_OVERRIDE=home/data \
       "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative state override should fail"
-  assert_contains "$out" "FM_STATE_OVERRIDE directory cannot be resolved: missing-state" \
-    "spawn did not name the unresolvable FM_STATE_OVERRIDE"
+  assert_contains "$out" "JG_STATE_OVERRIDE directory cannot be resolved: missing-state" \
+    "spawn did not name the unresolvable JG_STATE_OVERRIDE"
 
   out=$(
     cd "$CASE_DIR" || exit 1
-    FM_ROOT_OVERRIDE='' FM_HOME=home \
-      FM_STATE_OVERRIDE=home/state FM_DATA_OVERRIDE=missing-data \
+    JG_ROOT_OVERRIDE='' JG_HOME=home \
+      JG_STATE_OVERRIDE=home/state JG_DATA_OVERRIDE=missing-data \
       "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative data override should fail"
-  assert_contains "$out" "FM_DATA_OVERRIDE directory cannot be resolved: missing-data" \
-    "spawn did not name the unresolvable FM_DATA_OVERRIDE"
+  assert_contains "$out" "JG_DATA_OVERRIDE directory cannot be resolved: missing-data" \
+    "spawn did not name the unresolvable JG_DATA_OVERRIDE"
   pass "unresolvable relative spawn overrides fail with named diagnostics"
 }
 
@@ -826,7 +826,7 @@ test_cursor_failed_catalog_probe_does_not_block_spawn() {
   rec=$(make_spawn_case profile-cursor-catalog-unreachable cursor "$id")
   read_case_record "$rec"
 
-  FM_TEST_CURSOR_LIST_STATUS=124 \
+  JG_TEST_CURSOR_LIST_STATUS=124 \
     out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
       --model cursor-catalog-unreachable)
   status=$?
@@ -900,7 +900,7 @@ test_opencode_go_model_takes_per_task_store_when_auth_has_key() {
   read_case_record "$rec"
 
   data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode-go":{"type":"api","key":"fixture-dummy"}}')
-  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  out=$(JG_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
   status=$?
   expect_code 0 "$status" "opencode spawn on a Go model with an auth.json key should succeed"
   launch=$(cat "$LAUNCH_LOG")
@@ -920,7 +920,7 @@ test_opencode_go_model_keeps_shared_store_without_key() {
   read_case_record "$rec"
 
   data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode":{"type":"oauth"}}')
-  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
+  out=$(JG_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode-go/deepseek-v4.1-flash)
   status=$?
   expect_code 0 "$status" "opencode spawn on a Go model without an auth.json key should succeed"
   launch=$(cat "$LAUNCH_LOG")
@@ -957,7 +957,7 @@ test_opencode_console_provider_keeps_shared_store() {
   # An opencode-go key in auth.json must not pull the console provider off the
   # shared store, whose account credentials live in the store itself.
   data_home=$(make_opencode_auth_data_home "$CASE_DIR/xdg-data" '{"opencode-go":{"type":"api","key":"fixture-dummy"}}')
-  out=$(FM_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode/grok-code-fast-1)
+  out=$(JG_TEST_XDG_DATA_HOME="$data_home" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model opencode/grok-code-fast-1)
   status=$?
   expect_code 0 "$status" "opencode spawn on a console-provider model should succeed"
   launch=$(cat "$LAUNCH_LOG")
@@ -1136,11 +1136,11 @@ test_pi_scout_launch_enters_recorded_worktree() {
   rec=$(make_spawn_case profile-pi-scout-cwd pi "$id")
   read_case_record "$rec"
 
-  FM_TEST_PANE_LOG="$CASE_DIR/pane.log"
+  JG_TEST_PANE_LOG="$CASE_DIR/pane.log"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
     "$id" "$PROJ_DIR" --scout --harness pi)
   status=$?
-  unset FM_TEST_PANE_LOG
+  unset JG_TEST_PANE_LOG
   expect_code 0 "$status" "Pi scout spawn should succeed"
   assert_grep "cd -- '$WT_DIR'" "$CASE_DIR/pane.log" \
     "Pi scout spawn must enter the recorded worktree before launching the agent"
@@ -1159,9 +1159,9 @@ test_pi_threads_model_and_max_effort() {
   expect_code 0 "$status" "pi spawn with max effort should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" pi openai-codex/gpt-5.6-sol max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
+  assert_contains "$launch" "JG_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
     "pi launch did not force the regular TUI while threading the requested model and max thinking level"
-  assert_not_contains "$launch" "FM_FIRSTMATE_PI_LAUNCH_BRIEF=" \
+  assert_not_contains "$launch" "JG_FIRSTMATE_PI_LAUNCH_BRIEF=" \
     "pi launch still exports the removed Calm input-reroute binding"
   assert_contains "$launch" "jg-operational-input.sh' encode launch-brief" \
     "pi launch lost the canonical typed launch-brief envelope"
@@ -1181,7 +1181,7 @@ test_pi_signed_threads_shared_pi_profile_and_preserves_identity() {
   assert_contains "$out" "spawned $id harness=pi-signed" "pi-signed spawn did not preserve its visible identity"
   assert_meta_profile "$HOME_DIR/state/$id.meta" pi-signed openai-codex/gpt-5.6-sol max
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
+  assert_contains "$launch" "JG_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --model 'openai-codex/gpt-5.6-sol' --thinking 'max' -e" \
     "pi-signed launch did not force the regular TUI with Pi's model, thinking, and extension semantics"
   assert_contains "$launch" "jg-operational-input.sh' encode launch-brief" \
     "pi-signed launch lost the canonical typed launch-brief envelope"
@@ -1200,7 +1200,7 @@ test_pi_tui_mode_probe_is_safe_for_old_and_new_pi() {
       rec=$(make_spawn_case "profile-__MODELFLAG__-${harness}-tui-${version//./}" "$harness" "$id")
       read_case_record "$rec"
 
-      out=$(FM_TEST_PI_VERSION="$version" \
+      out=$(JG_TEST_PI_VERSION="$version" \
         run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
         "$id" "$PROJ_DIR")
       status=$?
@@ -1208,7 +1208,7 @@ test_pi_tui_mode_probe_is_safe_for_old_and_new_pi() {
       launch=$(cat "$LAUNCH_LOG")
       assert_contains "$launch" "'$FAKEBIN_DIR/$harness'" \
         "$harness $version launch must use the executable selected for probing"
-      assert_not_contains "$launch" "FM_PI_HARNESS=$harness $harness" \
+      assert_not_contains "$launch" "JG_PI_HARNESS=$harness $harness" \
         "$harness $version launch must not re-resolve a bare executable in the worker"
       if [ "$version" = 0.82.0 ]; then
         assert_not_contains "$launch" "--tui-mode" \
@@ -1230,11 +1230,11 @@ test_pi_signed_missing_binary_refuses_before_endpoint_or_metadata() {
   rm -f "$FAKEBIN_DIR/pi-signed"
   : > "$LAUNCH_LOG"
 
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" PATH="$FAKEBIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin" \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$WT_DIR" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" PATH="$FAKEBIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin" \
     "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1)
   status=$?
   expect_code 1 "$status" "a missing pi-signed executable should refuse the spawn"
@@ -1268,9 +1268,9 @@ test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity() {
   assert_absent "$HOME_DIR/data/$id/launch-brief.md" "secondmate launch received a worker overlay"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "< '$sm/data/charter.md'" "secondmate launch lost its original charter"
-  assert_contains "$launch" "FM_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --approve -e '$sm/.pi/extensions/jg-primary-turnend-guard.ts' -e '$sm/.pi/extensions/jg-primary-pi-watch.ts'" \
+  assert_contains "$launch" "JG_PI_HARNESS=pi-signed '$FAKEBIN_DIR/pi-signed' --tui-mode regular --approve -e '$sm/.pi/extensions/jg-primary-turnend-guard.ts' -e '$sm/.pi/extensions/jg-primary-pi-watch.ts'" \
     "pi-signed secondmate did not force the regular TUI with Pi's primary extension launch shape and seeded-home --approve"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# evidence begin: persistent secondmate\n%s\n' "$out"
     printf 'launch command:\n%s\noriginal charter:\n' "$launch"
     cat "$sm/data/charter.md"
@@ -1314,7 +1314,7 @@ test_pi_worker_launch_omits_seeded_home_approve() {
   status=$?
   expect_code 0 "$status" "pi ship spawn should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "FM_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular" \
+  assert_contains "$launch" "JG_PI_HARNESS=pi '$FAKEBIN_DIR/pi' --tui-mode regular" \
     "pi worker launch lost its regular TUI probe"
   assert_not_contains "$launch" "--approve" \
     "ordinary Pi worker launches must not receive secondmate seeded-home --approve"
@@ -1332,7 +1332,7 @@ test_pi_approve_probe_omits_unsupported_flag() {
     make_seeded_secondmate_home "$sm" "$id"
     sm=$(cd "$sm" && pwd -P)
 
-    out=$(FM_TEST_PI_VERSION=0.50.0 \
+    out=$(JG_TEST_PI_VERSION=0.50.0 \
       run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
     status=$?
     expect_code 0 "$status" "$harness without --approve must still spawn"
@@ -1596,7 +1596,7 @@ function [ {
   builtin test "${@:1:$#-1}" || status=$?
   if builtin [ "$#" -eq 4 ] && builtin [ "$1" = '!' ] &&
     builtin [ "$2" = -r ] &&
-    builtin [ "$3" = "${FM_CONFIG_OVERRIDE:-}/crew-exclude-tools" ]; then
+    builtin [ "$3" = "${JG_CONFIG_OVERRIDE:-}/crew-exclude-tools" ]; then
     rm -f -- "$3"
   fi
   return "$status"
@@ -1682,7 +1682,7 @@ test_claude_forwards_firstmate_config_dir_when_set() {
   # A creatable path: this spawn now pre-registers workspace trust in that store
   # (bin/jg-claude-trust.sh), so an unwritable directory is a genuine blocker.
   # The forwarding assertion below is what this case proves and is unchanged.
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
@@ -1716,10 +1716,10 @@ test_lavish_absent_config_preserves_destination_ambient() {
   seen="$CASE_DIR/lavish-seen"
   cat > "$FAKEBIN_DIR/claude" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${LAVISH_AXI_HOST-unset}" > "$FM_LAVISH_SEEN"
+printf '%s\n' "${LAVISH_AXI_HOST-unset}" > "$JG_LAVISH_SEEN"
 SH
   chmod +x "$FAKEBIN_DIR/claude"
-  out=$(FM_FAKE_PANE_LOG="$pane_log" \
+  out=$(JG_FAKE_PANE_LOG="$pane_log" \
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "an absent Lavish host configuration should allow the worker spawn"
@@ -1728,7 +1728,7 @@ SH
     "an absent configuration changed the host in the worker launch"
   assert_not_contains "$(cat "$pane_log")" "LAVISH_AXI_HOST" \
     "an absent configuration changed the host in the destination pane"
-  FM_LAVISH_SEEN="$seen" LAVISH_AXI_HOST=destination.example PATH="$FAKEBIN_DIR:$PATH" \
+  JG_LAVISH_SEEN="$seen" LAVISH_AXI_HOST=destination.example PATH="$FAKEBIN_DIR:$PATH" \
     bash -c "$launch" || fail "the destination-pane launch command failed"
   assert_grep 'destination.example' "$seen" \
     "the worker launch did not retain the destination pane's Lavish host"
@@ -1758,7 +1758,7 @@ test_non_claude_harness_ignores_config_dir() {
   rec=$(make_spawn_case profile-codex-nocfgdir codex "$id")
   read_case_record "$rec"
 
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="/opt/test/claude-work" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="/opt/test/claude-work" \
     run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "codex spawn with CLAUDE_CONFIG_DIR set should succeed"
@@ -1817,7 +1817,7 @@ test_claude_secondmate_launch_omits_task_control_channel_authority() {
   sm="$CASE_DIR/secondmate-home"
   make_seeded_secondmate_home "$sm" "$id"
 
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
   status=$?
   expect_code 0 "$status" "secondmate claude spawn should succeed"$'\n'"$out"
@@ -1919,7 +1919,7 @@ test_claude_secondmate_launch_carries_the_attribution_policy() {
   sm="$CASE_DIR/secondmate-home"
   make_seeded_secondmate_home "$sm" "$id"
 
-  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
+  out=$(JG_TEST_CLAUDE_CONFIG_DIR="$CASE_DIR/claude-work" \
     run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
   status=$?
   expect_code 0 "$status" "secondmate claude spawn should succeed"$'\n'"$out"
@@ -1959,17 +1959,17 @@ test_launch_environment_allowlist() {
     read_case_record "$rec"
     case "$setting" in
       missing-config) rm "$HOME_DIR/config/crew-harness"; rmdir "$HOME_DIR/config" ;;
-      enabled) printf '# Synthetic credential name\nFM_TEST_ALLOWED\nFM_TEST_EMPTY\nFM_TEST_UNSET\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
+      enabled) printf '# Synthetic credential name\nJG_TEST_ALLOWED\nJG_TEST_EMPTY\nJG_TEST_UNSET\n' > "$HOME_DIR/config/launch-env-allowlist" ;;
       empty) : > "$HOME_DIR/config/launch-env-allowlist" ;;
     esac
     probe="$CASE_DIR/probe.sh"
     cat > "$probe" <<'SH'
 #!/bin/sh
-printf '%s\n' "${FM_TEST_AMBIENT_SENTINEL-unset}" "${FM_TEST_ALLOWED-unset}" \
-  "${FM_TEST_EMPTY-unset}" "${FM_TEST_UNSET-unset}" "$HOME" "$PATH" "$TERM" "$TMUX" "$GOTMPDIR"
+printf '%s\n' "${JG_TEST_AMBIENT_SENTINEL-unset}" "${JG_TEST_ALLOWED-unset}" \
+  "${JG_TEST_EMPTY-unset}" "${JG_TEST_UNSET-unset}" "$HOME" "$PATH" "$TERM" "$TMUX" "$GOTMPDIR"
 printf 'hooksPath=%s\n' "$(git config --get core.hooksPath || :)"
 SH
-    out=$(FM_TEST_AMBIENT_SENTINEL=synthetic-unrelated \
+    out=$(JG_TEST_AMBIENT_SENTINEL=synthetic-unrelated \
       run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
       "$id" "$PROJ_DIR" --harness "/bin/sh '$probe'")
     status=$?
@@ -1983,7 +1983,7 @@ SH
         || fail "could not read $pane_shell startup PATH"
       result=$(env -i HOME="$HOME_DIR/user-home" PATH=/usr/bin:/bin TERM=xterm \
       TMUX=synthetic-pane GOTMPDIR=/synthetic/gotmp \
-      FM_TEST_AMBIENT_SENTINEL=synthetic-unrelated FM_TEST_ALLOWED="$value" FM_TEST_EMPTY='' \
+      JG_TEST_AMBIENT_SENTINEL=synthetic-unrelated JG_TEST_ALLOWED="$value" JG_TEST_EMPTY='' \
       "$pane_shell" -c "$launch") || fail "allowlist=$setting emitted launch failed in $pane_shell"
       case "$setting" in
         absent|missing-config) expected=$(printf '%s\n' synthetic-unrelated "$value" '' unset) ;;
@@ -2004,7 +2004,7 @@ test_launch_environment_invalid_config_refuses() {
   id=env-invalid
   rec=$(make_spawn_case "$id" codex "$id")
   read_case_record "$rec"
-  for bad in 'FM_TEST_ALLOWED=value' 'NAME;false' '1INVALID' '*'; do
+  for bad in 'JG_TEST_ALLOWED=value' 'NAME;false' '1INVALID' '*'; do
     printf '%s\n' "$bad" > "$HOME_DIR/config/launch-env-allowlist"
     out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
     status=$?
@@ -2028,7 +2028,7 @@ test_launch_environment_inaccessible_config_refuses() {
       rec=$(make_spawn_case "$id" codex "$id")
       read_case_record "$rec"
       if [ "$presence" = present ]; then
-        printf 'FM_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
+        printf 'JG_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
       fi
       blocked="$HOME_DIR/config"
       if [ "$setting" = ancestor ]; then
@@ -2056,7 +2056,7 @@ test_launch_environment_inherited_by_secondmate() {
   id=env-secondmate
   rec=$(make_spawn_case "$id" codex "$id")
   read_case_record "$rec"
-  printf 'FM_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
+  printf 'JG_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
   sm="$CASE_DIR/secondmate-home"
   make_seeded_secondmate_home "$sm" "$id"
   out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --secondmate)
@@ -2066,11 +2066,11 @@ test_launch_environment_inherited_by_secondmate() {
     || fail "secondmate did not inherit the launch environment contract"
   cat > "$FAKEBIN_DIR/codex" <<'SH'
 #!/bin/sh
-printf '%s\n' "${FM_TEST_AMBIENT_SENTINEL-unset}" "$FM_TEST_ALLOWED" "$FM_HOME" "${FM_STATE_OVERRIDE-unset}"
+printf '%s\n' "${JG_TEST_AMBIENT_SENTINEL-unset}" "$JG_TEST_ALLOWED" "$JG_HOME" "${JG_STATE_OVERRIDE-unset}"
 SH
   chmod +x "$FAKEBIN_DIR/codex"
   result=$(env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
-    FM_TEST_AMBIENT_SENTINEL=synthetic-unrelated FM_TEST_ALLOWED=synthetic-provider \
+    JG_TEST_AMBIENT_SENTINEL=synthetic-unrelated JG_TEST_ALLOWED=synthetic-provider \
     /bin/sh -c "$(cat "$LAUNCH_LOG")") || fail "secondmate's emitted command failed"
   [ "$result" = "unset"$'\nsynthetic-provider\n'"$sm" ] \
     || fail "secondmate's environment lost filtering or explicit home assignments: $result"
@@ -2092,13 +2092,13 @@ run_launch_environment_inheritance() {
     (
       # shellcheck source=/dev/null
       . "$ROOT/bin/jg-config-inherit-lib.sh"
-      FM_INHERITABLE_CONFIG=launch-env-allowlist \
+      JG_INHERITABLE_CONFIG=launch-env-allowlist \
         propagate_inheritable_config "$home/config" "$dest/config"
     )
   else
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_CONFIG_OVERRIDE="$home/config" \
-      FM_DATA_OVERRIDE="$home/data" FM_INHERITABLE_CONFIG=launch-env-allowlist \
-      FM_SSH_BIN="$fakebin/inherit-ssh" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_CONFIG_OVERRIDE="$home/config" \
+      JG_DATA_OVERRIDE="$home/data" JG_INHERITABLE_CONFIG=launch-env-allowlist \
+      JG_SSH_BIN="$fakebin/inherit-ssh" \
       "$ROOT/bin/jg-remote-inherit-push.sh" inherited-env "$generation"
   fi
 }
@@ -2115,7 +2115,7 @@ test_launch_environment_inheritance_preserves_on_source_errors() {
     read_case_record "$rec"
     dest="$CASE_DIR/inherited-home"
     mkdir -p "$dest/config"
-    printf 'FM_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
+    printf 'JG_TEST_ALLOWED\n' > "$HOME_DIR/config/launch-env-allowlist"
     printf -- '- inherited-env - Test route (host: inherit-host; root: %s; home: %s; scope: test; projects: ; added 2026-09-05)\n' \
       "$ROOT" "$dest" > "$HOME_DIR/data/secondmates.md"
     cat > "$FAKEBIN_DIR/inherit-ssh" <<'SH'
@@ -2130,14 +2130,14 @@ remote_home=$(printf '%s' "$5" | base64 --decode)
 args=()
 while IFS= read -r -d '' arg; do args+=("$arg"); done < <(printf '%s' "$6" | base64 --decode)
 [ "${args[0]}" = jg-remote-inherit.sh ] || exit 92
-FM_HOME="$remote_home" FM_STATE_OVERRIDE="$remote_home/state" \
+JG_HOME="$remote_home" JG_STATE_OVERRIDE="$remote_home/state" \
   exec "$remote_root/bin/${args[0]}" "${args[@]:1}"
 SH
     chmod +x "$FAKEBIN_DIR/inherit-ssh"
     out=$(run_launch_environment_inheritance "$route" "$HOME_DIR" "$dest" "$FAKEBIN_DIR" 1 2>&1)
     status=$?
     expect_code 0 "$status" "$route allowlist inheritance should succeed: $out"
-    [ "$(cat "$dest/config/launch-env-allowlist")" = FM_TEST_ALLOWED ] \
+    [ "$(cat "$dest/config/launch-env-allowlist")" = JG_TEST_ALLOWED ] \
       || fail "$route inheritance did not publish the allowlist"
 
     chmod 600 "$HOME_DIR/config" || fail "could not remove source search permission"
@@ -2146,7 +2146,7 @@ SH
     chmod 700 "$HOME_DIR/config" || fail "could not restore source search permission"
     expect_code 1 "$status" "$route inheritance must refuse an inaccessible source: $out"
     assert_contains "$out" launch-env-allowlist "$route inspection error must identify the allowlist"
-    [ "$(cat "$dest/config/launch-env-allowlist")" = FM_TEST_ALLOWED ] \
+    [ "$(cat "$dest/config/launch-env-allowlist")" = JG_TEST_ALLOWED ] \
       || fail "$route inheritance removed or changed the allowlist after an inspection error"
 
     rm "$HOME_DIR/config/launch-env-allowlist"
@@ -2154,7 +2154,7 @@ SH
     out=$(run_launch_environment_inheritance "$route" "$HOME_DIR" "$dest" "$FAKEBIN_DIR" 3 2>&1)
     status=$?
     expect_code 1 "$status" "$route inheritance must refuse a dangling source link: $out"
-    [ "$(cat "$dest/config/launch-env-allowlist")" = FM_TEST_ALLOWED ] \
+    [ "$(cat "$dest/config/launch-env-allowlist")" = JG_TEST_ALLOWED ] \
       || fail "$route inheritance treated a dangling source link as absence"
 
     rm "$HOME_DIR/config/launch-env-allowlist"
@@ -2187,9 +2187,9 @@ test_worker_launch_delivers_role_scope() {
       fi
     else
       if [ "$kind" = scout ]; then
-        FM_HOME="$HOME_DIR" "$ROOT/bin/jg-brief.sh" "$id" arbitrary-project-name --scout >/dev/null || fail "scout scaffold failed"
+        JG_HOME="$HOME_DIR" "$ROOT/bin/jg-brief.sh" "$id" arbitrary-project-name --scout >/dev/null || fail "scout scaffold failed"
       else
-        FM_HOME="$HOME_DIR" "$ROOT/bin/jg-brief.sh" "$id" arbitrary-project-name --mode "$kind" >/dev/null || fail "$kind scaffold failed"
+        JG_HOME="$HOME_DIR" "$ROOT/bin/jg-brief.sh" "$id" arbitrary-project-name --mode "$kind" >/dev/null || fail "$kind scaffold failed"
       fi
       brief="$HOME_DIR/data/$id/brief.md"
       content=$(cat "$brief")
@@ -2200,7 +2200,7 @@ test_worker_launch_delivers_role_scope() {
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"
     cat > "$FAKEBIN_DIR/codex" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$@" > "$FM_ROLE_PROMPT"
+printf '%s\n' "$@" > "$JG_ROLE_PROMPT"
 SH
     chmod +x "$FAKEBIN_DIR/codex"
     if [ "$kind" = scout ]; then
@@ -2213,7 +2213,7 @@ SH
     envelope="$CASE_DIR/prompt-envelope"
     encoded="$CASE_DIR/encoded-prompt"
     prompt="$CASE_DIR/prompt"
-    FM_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
+    JG_ROLE_PROMPT="$envelope" PATH="$FAKEBIN_DIR:$PATH" bash -c "$launch" || fail "could not consume $kind launch command"
     sed -n '/FIRSTMATE_OP: v1 launch-brief:/,$p' "$envelope" > "$encoded"
     "$ROOT/bin/jg-operational-input.sh" body < "$encoded" > "$prompt" ||
       fail "could not decode $kind launch-brief envelope"
@@ -2241,7 +2241,7 @@ SH
       assert_grep 'Follow the project instructions' "$prompt" "$kind command dropped the authored role section"
     fi
     cmp -s "$CASE_DIR/brief-before" "$HOME_DIR/data/$id/brief.md" || fail "spawn rewrote the authored brief"
-    if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
       printf '# evidence begin: %s %s worker\n%s\n' "$brief_kind" "$kind" "$out"
       printf 'launch command executed with an argv-capture harness:\n%s\nreceived arguments and final prompt:\n' "$launch"
       cat "$prompt"
@@ -2386,7 +2386,7 @@ test_claude_worker_launch_covers_task_channel_dirs() {
       expect_code 0 "$status" "claude $kind spawn under $mode should succeed"$'\n'"$out"
       launch=$(cat "$LAUNCH_LOG")
 
-      eval_out=$(jg_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "FM_FAKE_CLAUDE_REQUIREMENTS=$reqs" 2>&1)
+      eval_out=$(jg_eval_launch "$launch" "$WT_DIR" "$FAKEBIN_DIR" "JG_FAKE_CLAUDE_REQUIREMENTS=$reqs" 2>&1)
       eval_rc=$?
       [ "$eval_rc" -eq 0 ] \
         || fail "claude $kind launch under $mode would hit the outside-read gate"$'\n'"$eval_out"

@@ -123,7 +123,7 @@ bin/jg-test-isolation-proof.sh --pool watcher-wake-lock --jobs 4   # re-run an a
 @AGENTS.md
 EOF
 [ "$(readlink .claude/skills)" = "../.agents/skills" ]
-tmp=$(mktemp -d) && printf 'done: smoke\n' > "$tmp/smoke.status" && FM_STATE_OVERRIDE="$tmp" FM_SIGNAL_GRACE=1 FM_POLL=1 FM_HEARTBEAT=999999 bin/jg-watch-arm.sh  # watcher re-arm smoke test (prints arm status, then an actionable signal)
+tmp=$(mktemp -d) && printf 'done: smoke\n' > "$tmp/smoke.status" && JG_STATE_OVERRIDE="$tmp" JG_SIGNAL_GRACE=1 JG_POLL=1 JG_HEARTBEAT=999999 bin/jg-watch-arm.sh  # watcher re-arm smoke test (prints arm status, then an actionable signal)
 ```
 
 `bin/jg-test-run.sh` is the single owner of behavior-suite selection, portable CI lane composition, bounded concurrency admission, per-script timing markers, family totals, the coverage guard, and the optional JSON timing artifact.
@@ -133,11 +133,11 @@ Portable shard balance evidence lives in `docs/jg-test-portable-shards.md`.
 Family selection is the ordinary local path; `--all` is deliberate full regression only.
 CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` are never cancelled, and the workflow owns that contract and its rationale.
-A fork can set the repository variable `FM_CI_SKIP_PUSH` to `1` to skip the push run of `CI`, and `FM_CI_SKIP_MACOS` to `1` to skip the stock macOS Bash job, without a tracked edit that drifts from upstream.
+A fork can set the repository variable `JG_CI_SKIP_PUSH` to `1` to skip the push run of `CI`, and `JG_CI_SKIP_MACOS` to `1` to skip the stock macOS Bash job, without a tracked edit that drifts from upstream.
 Each skip is a job-level condition, so a skipped job reports success rather than leaving the pull request pending, and with neither variable set every job runs on upstream and on every fork exactly as before.
 Use `bin/jg-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
-Those sleeps look like recoverable overhead - `jg-watch-triage.test.sh` alone issues about 1,900 of them, each paying a flat ~100ms scheduler wake-up penalty on macOS - but they are not overhead added to the clock; they are how a test waits for a subject that only moves on `jg-watch.sh`'s own one-second `FM_POLL` cadence.
+Those sleeps look like recoverable overhead - `jg-watch-triage.test.sh` alone issues about 1,900 of them, each paying a flat ~100ms scheduler wake-up penalty on macOS - but they are not overhead added to the clock; they are how a test waits for a subject that only moves on `jg-watch.sh`'s own one-second `JG_POLL` cadence.
 Sampling less often does not remove that wait, it only delays detection: raising the interval to 0.5s and charging each sample proportionally measured `jg-watch-triage.test.sh` at 435s and 440s against 390s and 393s for the unchanged script, back to back on 2026-09-03, because each of its ~40 poll-cycle waits and ~73 process-exit waits paid up to half a second more.
 Some of those loops are also catching a transient rather than waiting for a settled condition, so a coarser sample can step over the state they assert on.
 Discover tests by listing `tests/*.test.sh`: each is a self-contained bash script named `<subject>.test.sh`, and its header comment describes what it covers, so pass one to `bin/jg-test-run.sh` to focus on a subject with canonical timing output.

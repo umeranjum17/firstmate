@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Model-outage observer reached through the step-B loader and guarded tick, over
 # fixture lanes: present -> grouped wake, absent -> kun behavior (no function, no
-# wake, exit 0 under set -e). FM_TEST_FORK names a read-only Firstmate checkout;
+# wake, exit 0 under set -e). JG_TEST_FORK names a read-only Firstmate checkout;
 # the watcher itself is never run.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${FM_TEST_FORK:?set FM_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
 d=$(mktemp -d)
 cleanup() {
   rc=$?
@@ -14,7 +23,7 @@ cleanup() {
 trap cleanup EXIT
 export HOME=$d/user TMPDIR=$d/tmp
 mkdir -p "$HOME" "$TMPDIR" "$d/fork"
-cp -a "$FM_TEST_FORK/bin" "$d/fork/bin"
+cp -a "$JG_TEST_FORK/bin" "$d/fork/bin"
 rm -f "$d/fork/bin/jg-model-outage-lib.sh"   # step B deletes the fork-only copy
 # The observer reads the backend and busy verdict through sibling libraries run
 # in a bounded subshell; fake only those two, as the fork's own fixtures do.
@@ -36,9 +45,9 @@ run() {
   mkdir -p "$state" "$d/live"
   (
     set -e
-    export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$state FM_ADDONS_DIR=$ad
+    export JG_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$state JG_ADDONS_DIR=$ad
     # shellcheck source=/dev/null
-    [ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
+    [ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
     jg_busy_token_valid() { return 0; }
     jg_backend_visible_capture_supported() { return 0; }
     jg_busy_current_gen() { cat "$1/$2.busy-gen"; }
@@ -65,7 +74,7 @@ run "$d/no-addons" "$d/absent.wakes"
 # Push-transition hook: cursor and open-captain-call tasks suppress, others do not.
 # shellcheck disable=SC2031,SC2317,SC2329 # the sourced hook calls the stubs
 (
-  export FM_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$d/state-push
+  export JG_HOME=$d/fork SCRIPT_DIR=$d/fork/bin STATE=$d/state-push
   mkdir -p "$STATE"
   # shellcheck source=/dev/null
   . "$addons/alerts/bin/jg-model-outage-lib.sh"

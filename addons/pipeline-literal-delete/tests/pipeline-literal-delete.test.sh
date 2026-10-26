@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # shellcheck disable=SC2016 # the rule text and hook commands are the test subject: their literal $ and $(...) must not expand
 # Integration: install into a throwaway HOME/XDG copy and check the rule reaches the pipeline-agent
 # instruction surfaces (the installed pi extension's before_agent_start handler and the Claude
@@ -6,7 +15,7 @@
 # blocked $VAR delete prints the delete-guard literal-path hint.
 # Usage: pipeline-literal-delete.test.sh
 set -euo pipefail
-unset FM_TASK_ID FM_TASK_INBOX FM_HOME
+unset JG_TASK_ID JG_TASK_INBOX JG_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 REPO=$(cd "$ADDON/.." && pwd -P)
 T=$(mktemp -d)

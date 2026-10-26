@@ -19,9 +19,9 @@ jg_secondmate_parent_record_parse() {
   local file=$1 line schema='' route='' parent_home='' parent_host=''
   local schema_count=0 route_count=0 parent_home_count=0 parent_host_count=0
 
-  FM_SECONDMATE_PARENT_ROUTE=
-  FM_SECONDMATE_PARENT_HOME=
-  FM_SECONDMATE_PARENT_HOST=
+  JG_SECONDMATE_PARENT_ROUTE=
+  JG_SECONDMATE_PARENT_HOME=
+  JG_SECONDMATE_PARENT_HOST=
 
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   # bash's read drops NUL bytes, and different bash generations disagree on the
@@ -59,7 +59,7 @@ jg_secondmate_parent_record_parse() {
       [ "$parent_home_count" -eq 1 ] || return 1
       [ "$parent_host_count" -eq 0 ] || return 1
       case "$parent_home" in /*) ;; *) return 1 ;; esac
-      FM_SECONDMATE_PARENT_HOME=$parent_home
+      JG_SECONDMATE_PARENT_HOME=$parent_home
       ;;
     remote)
       [ "$parent_home_count" -eq 0 ] || return 1
@@ -67,6 +67,6 @@ jg_secondmate_parent_record_parse() {
     *) return 1 ;;
   esac
 
-  FM_SECONDMATE_PARENT_ROUTE=$route
-  FM_SECONDMATE_PARENT_HOST=$parent_host
+  JG_SECONDMATE_PARENT_ROUTE=$route
+  JG_SECONDMATE_PARENT_HOST=$parent_host
 }

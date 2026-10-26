@@ -47,7 +47,7 @@ Juggernaut invokes its CLI as a separate process.
 Select Herdr in any of these ways:
 
 - Local `config/backend` containing `herdr`.
-- `FM_BACKEND=herdr` for one launch.
+- `JG_BACKEND=herdr` for one launch.
 - An explicit request to Juggernaut.
 
 A remote second-mate agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
@@ -109,7 +109,7 @@ A secondmate launched by the primary receives a narrowly scoped home override du
 ### Watching tasks
 
 Attach to the selected named Herdr session and switch to the relevant home workspace to watch its task tabs.
-Routine supervision uses `bin/jg-peek.sh <id>` and `FM_HOME=<home> bin/jg-send.sh <id> '<text>'` without attaching.
+Routine supervision uses `bin/jg-peek.sh <id>` and `JG_HOME=<home> bin/jg-send.sh <id> '<text>'` without attaching.
 
 ### Focus
 

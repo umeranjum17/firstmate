@@ -17,31 +17,31 @@ test_add_refuses_an_entry_it_cannot_enforce() {
   home="$TMP_ROOT/refuse"
   mkdir -p "$home/data"
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" add --scope s --enforce bin/jg-pr-merge.sh 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" add --scope s --enforce bin/jg-pr-merge.sh 2>&1); rc=$?
   assert_equals 2 "$rc" "an entry with no owner words is accepted"
   case "$out" in
     *"needs the owner's own words"*) ;;
     *) fail "no-words refusal did not name the missing owner words: $out" ;;
   esac
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s 2>&1); rc=$?
   assert_equals 2 "$rc" "an entry with no enforcement point is accepted"
   case "$out" in
     *"needs an enforcement point"*) ;;
     *) fail "no-enforcement refusal did not name the enforcement point: $out" ;;
   esac
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s --enforce none 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s --enforce none 2>&1); rc=$?
   assert_equals 2 "$rc" "an enforcement point of 'none' is accepted"
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s --enforce bin/not-a-script.sh 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s --enforce bin/not-a-script.sh 2>&1); rc=$?
   assert_equals 2 "$rc" "an enforcement point naming a missing path is accepted"
   case "$out" in
     *"does not exist in this checkout"*) ;;
     *) fail "missing-path refusal did not name the path: $out" ;;
   esac
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" add --words "always keep the fleet moving" --scope s 2>&1); rc=$?
   assert_equals 2 "$rc" "an entry with no scope is accepted"
   assert_absent "$home/data/owner-rules.md" "a refused entry created a surface"
   pass "an entry with no words, no scope, or no real enforcement point is refused"
@@ -53,7 +53,7 @@ test_seeded_surface_and_added_entry() {
   mkdir -p "$home/data"
   surface="$home/data/owner-rules.md"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1 \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1 \
     || fail "init did not write the shared rules surface"
   assert_grep "should be in juggernaut not just in your memory" "$surface" \
     "the seeded surface dropped the owner's correction rule"
@@ -69,10 +69,10 @@ test_seeded_surface_and_added_entry() {
   assert_equals "$entries" "$enforcers" "a seeded entry has no enforcement line"
   assert_equals 0 "$words" "a seeded entry has an empty enforcement point"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1
   assert_not_equals 0 "$?" "init overwrote an existing surface"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$RULES" add --words "never ship an unproven screen" --scope "every user-visible change" \
     --enforce bin/jg-pr-merge.sh --date 2026-10-25 >/dev/null 2>&1 \
     || fail "a complete entry was refused"
@@ -83,7 +83,7 @@ test_seeded_surface_and_added_entry() {
   assert_grep 'words: "never ship an unproven screen"' "$surface" \
     "the recorded entry lost the owner's verbatim words"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$RULES" add --words "never ship an unproven screen" --scope x --enforce bin/jg-pr-merge.sh >/dev/null 2>&1
   assert_not_equals 0 "$?" "the same owner words were recorded twice"
   pass "the seeded surface and a recorded entry carry the words, the date, the scope and the enforcer"
@@ -93,23 +93,23 @@ test_audit_flags_a_correction_left_in_a_private_note() {
   local home out rc
   home="$TMP_ROOT/audit"
   mkdir -p "$home/data"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1
   printf -- '- from tonight: he said "never use step 5 preview for anything at all" and I noted it here\n' \
     > "$home/data/learnings.md"
 
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" audit 2>&1); rc=$?
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" audit 2>&1); rc=$?
   assert_equals 0 "$rc" "a findings report failed the default audit"
   assert_contains "$out" "$home/data/learnings.md" "the audit did not name the private note holding the quote"
   assert_contains "$out" "never use step 5 preview for anything at all" "the audit did not show the trapped words"
   assert_contains "$out" "jg-owner-rules.sh add" "the audit did not name the fix"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" audit --fail >/dev/null 2>&1
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" audit --fail >/dev/null 2>&1
   assert_not_equals 0 "$?" "--fail did not fail on a trapped rule"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$RULES" add --words "never use step 5 preview for anything at all" --scope dispatch \
     --enforce bin/jg-dispatch-resolve.sh >/dev/null 2>&1
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$RULES" audit 2>&1)
+  out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" audit 2>&1)
   assert_contains "$out" "clean:" "recording the rule did not clear the audit"
   pass "a rule quoted only in a private note is flagged until the surface records it"
 }
@@ -138,16 +138,16 @@ test_question_rule_blocks_until_a_card_is_cited() {
   mkdir -p "$board"
 
   payload=$(reply_payload "$home" "The blocker cleared and the fix is in. Should I merge it?")
-  printf '%s' "$payload" | FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 2 "$rc" "a reply ending in an unfiled question ended the turn unflagged"
 
-  printf '%s' "$payload" | FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 0 "$rc" "the same question was charged twice, which can wedge a harness"
 
   payload=$(reply_payload "$home" "Merged and cleaned up. Nothing outstanding.")
-  printf '%s' "$payload" | FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 0 "$rc" "a reply that asks nothing was flagged"
 
@@ -163,7 +163,7 @@ test_question_rule_blocks_until_a_card_is_cited() {
   [ -n "$key" ] || fail "jg-question-card.sh printed no board key"
 
   payload=$(reply_payload "$home" "The fix is green. Card $key on the board covers it - your call there.")
-  printf '%s' "$payload" | FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 0 "$rc" "a reply citing an open board card was still flagged"
 

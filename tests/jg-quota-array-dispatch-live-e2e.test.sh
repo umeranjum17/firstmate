@@ -11,7 +11,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_QUOTA_ARRAY_DISPATCH_LIVE_E2E pi python3
+jg_live_gate opt-in JG_QUOTA_ARRAY_DISPATCH_LIVE_E2E pi python3
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OWNER="$ROOT/.agents/skills/quota-array-dispatch/SKILL.md"

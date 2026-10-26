@@ -20,7 +20,7 @@ cleanup() {
     [ -f "$pointer" ] || continue
     name=${pointer##*/}
     name=${name%.xdg-root}
-    base=$(FM_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; jg_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/jg-herdr-lab.sh" "$name") || continue
+    base=$(JG_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; jg_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/jg-herdr-lab.sh" "$name") || continue
     rm -rf "$base"
   done
   jg_test_cleanup
@@ -30,8 +30,8 @@ trap cleanup EXIT
 cat > "$FAKEBIN/herdr" <<'SH'
 #!/usr/bin/env bash
 set -eu
-printf '%s\n' "$*" >> "$FM_FAKE_HERDR_LOG"
-state=$FM_FAKE_HERDR_STATE
+printf '%s\n' "$*" >> "$JG_FAKE_HERDR_LOG"
+state=$JG_FAKE_HERDR_STATE
 # Herdr reads --session only as an option, so it must end the arguments or
 # sit immediately before the first -- delimiter.
 last=
@@ -58,8 +58,8 @@ case "$1 ${2:-}" in
     fi
     ;;
   "server --session")
-    if [ "${FM_FAKE_HERDR_SERVER_DELAY:-0}" != 0 ]; then
-      "$FM_FAKE_HERDR_REAL_SLEEP" "$FM_FAKE_HERDR_SERVER_DELAY"
+    if [ "${JG_FAKE_HERDR_SERVER_DELAY:-0}" != 0 ]; then
+      "$JG_FAKE_HERDR_REAL_SLEEP" "$JG_FAKE_HERDR_SERVER_DELAY"
     fi
     printf '%s\n' running > "$state/$session"
     ;;
@@ -76,11 +76,11 @@ case "$1 ${2:-}" in
     ;;
   "session delete")
     [ "$3" = "$session" ] || exit 92
-    [ "${FM_FAKE_HERDR_DELETE_FAIL:-}" != 1 ] || exit 93
+    [ "${JG_FAKE_HERDR_DELETE_FAIL:-}" != 1 ] || exit 93
     printf '%s\n' deleted > "$state/$session"
     ;;
   "terminal title")
-    [ "${FM_FAKE_HERDR_TITLE_FAIL:-}" != 1 ] || exit 94
+    [ "${JG_FAKE_HERDR_TITLE_FAIL:-}" != 1 ] || exit 94
     reason=no_foreground_client
     [ ! -f "$state/$session.foreground" ] || reason=$(cat "$state/$session.foreground")
     jq -nc --arg reason "$reason" '{result:{reason:$reason,type:"client_window_title"}}'
@@ -97,14 +97,14 @@ chmod +x "$FAKEBIN/herdr"
 
 run_with_fake() {
   PATH="$FAKEBIN:$PATH" \
-    FM_FAKE_HERDR_STATE="$FAKE_STATE" \
-    FM_FAKE_HERDR_LOG="$FAKE_LOG" \
-    FM_FAKE_HERDR_REAL_SLEEP="$REAL_SLEEP" \
-    FM_FAKE_HERDR_SERVER_DELAY="${FM_FAKE_HERDR_SERVER_DELAY:-0}" \
-    FM_FAKE_HERDR_FAST_POLL="${FM_FAKE_HERDR_FAST_POLL:-}" \
-    FM_FAKE_HERDR_DELETE_FAIL="${FM_FAKE_HERDR_DELETE_FAIL:-}" \
-    FM_FAKE_HERDR_TITLE_FAIL="${FM_FAKE_HERDR_TITLE_FAIL:-}" \
-    FM_HERDR_LAB_STATE_DIR="$TRIPWIRES" \
+    JG_FAKE_HERDR_STATE="$FAKE_STATE" \
+    JG_FAKE_HERDR_LOG="$FAKE_LOG" \
+    JG_FAKE_HERDR_REAL_SLEEP="$REAL_SLEEP" \
+    JG_FAKE_HERDR_SERVER_DELAY="${JG_FAKE_HERDR_SERVER_DELAY:-0}" \
+    JG_FAKE_HERDR_FAST_POLL="${JG_FAKE_HERDR_FAST_POLL:-}" \
+    JG_FAKE_HERDR_DELETE_FAIL="${JG_FAKE_HERDR_DELETE_FAIL:-}" \
+    JG_FAKE_HERDR_TITLE_FAIL="${JG_FAKE_HERDR_TITLE_FAIL:-}" \
+    JG_HERDR_LAB_STATE_DIR="$TRIPWIRES" \
     "$@"
 }
 
@@ -254,7 +254,7 @@ test_failed_delete_retains_tripwire() {
   local name="jg-lab-delete-failure-$$" status=0
   : > "$FAKE_LOG"
   run_with_fake jg_herdr_lab_provision "$name" || fail "delete-failure fixture provision failed"
-  FM_FAKE_HERDR_DELETE_FAIL=1 run_with_fake jg_herdr_lab_teardown "$name" >/dev/null 2>&1 || status=$?
+  JG_FAKE_HERDR_DELETE_FAIL=1 run_with_fake jg_herdr_lab_teardown "$name" >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "failed delete must fail teardown"
   [ "$(cat "$FAKE_STATE/$name")" = stopped ] || fail "failed delete unexpectedly removed the lab session"
   assert_present "$TRIPWIRES/$name.fleet-state.json" "failed delete removed the ownership tripwire"
@@ -267,17 +267,17 @@ test_timed_out_provision_cancels_late_launch() {
   local name="jg-lab-late-launch-$$" status=0
   cat > "$FAKEBIN/sleep" <<'SH'
 #!/usr/bin/env bash
-if [ "${FM_FAKE_HERDR_FAST_POLL:-}" = 1 ]; then
-  while [ -n "${FM_FAKE_HERDR_WAIT_MARKER:-}" ] && [ ! -f "$FM_FAKE_HERDR_WAIT_MARKER" ]; do
-    "$FM_FAKE_HERDR_REAL_SLEEP" 0.01
+if [ "${JG_FAKE_HERDR_FAST_POLL:-}" = 1 ]; then
+  while [ -n "${JG_FAKE_HERDR_WAIT_MARKER:-}" ] && [ ! -f "$JG_FAKE_HERDR_WAIT_MARKER" ]; do
+    "$JG_FAKE_HERDR_REAL_SLEEP" 0.01
   done
   exit 0
 fi
-exec "$FM_FAKE_HERDR_REAL_SLEEP" "$@"
+exec "$JG_FAKE_HERDR_REAL_SLEEP" "$@"
 SH
   chmod +x "$FAKEBIN/sleep"
   : > "$FAKE_LOG"
-  FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_HERDR_SERVER_DELAY=30 \
+  JG_FAKE_HERDR_FAST_POLL=1 JG_FAKE_HERDR_SERVER_DELAY=30 \
     run_with_fake jg_herdr_lab_provision "$name" >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "timed-out provision must fail"
   assert_present "$TRIPWIRES/$name.fleet-state.json" \
@@ -340,12 +340,12 @@ test_viewer_start_cancels_an_unrecorded_launcher() {
   run_with_fake jg_herdr_lab_provision "$name" || fail "viewer-late fixture provision failed"
   cat > "$FAKEBIN/python3" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$$" > "$FM_FAKE_VIEWER_STARTED"
-exec "$FM_FAKE_HERDR_REAL_SLEEP" 20
+printf '%s\n' "$$" > "$JG_FAKE_VIEWER_STARTED"
+exec "$JG_FAKE_HERDR_REAL_SLEEP" 20
 SH
   chmod +x "$FAKEBIN/python3"
-  out=$(FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_HERDR_WAIT_MARKER="$started" \
-    FM_FAKE_VIEWER_STARTED="$started" run_with_fake jg_herdr_lab_viewer_start "$name" 2>&1) || status=$?
+  out=$(JG_FAKE_HERDR_FAST_POLL=1 JG_FAKE_HERDR_WAIT_MARKER="$started" \
+    JG_FAKE_VIEWER_STARTED="$started" run_with_fake jg_herdr_lab_viewer_start "$name" 2>&1) || status=$?
   rm -f "$FAKEBIN/python3"
   expect_code 1 "$status" "an unrecorded launcher must not outlive viewer start"
   assert_present "$started" "delayed viewer launcher did not start"
@@ -361,15 +361,15 @@ test_viewer_timeout_allows_launcher_escalation() {
   local terminating="$TMP_ROOT/viewer-grace-terminating" completed="$TMP_ROOT/viewer-grace-completed"
   cat > "$FAKEBIN/viewer-launcher" <<'SH'
 #!/usr/bin/env bash
-trap 'printf "" > "$FM_FAKE_VIEWER_TERMINATING"; "$FM_FAKE_HERDR_REAL_SLEEP" 1.2; printf "" > "$FM_FAKE_VIEWER_COMPLETED"; exit 0' TERM
-printf '' > "$FM_FAKE_VIEWER_STARTED"
+trap 'printf "" > "$JG_FAKE_VIEWER_TERMINATING"; "$JG_FAKE_HERDR_REAL_SLEEP" 1.2; printf "" > "$JG_FAKE_VIEWER_COMPLETED"; exit 0' TERM
+printf '' > "$JG_FAKE_VIEWER_STARTED"
 while :; do
-  "$FM_FAKE_HERDR_REAL_SLEEP" 0.1
+  "$JG_FAKE_HERDR_REAL_SLEEP" 0.1
 done
 SH
   chmod +x "$FAKEBIN/viewer-launcher"
-  FM_FAKE_HERDR_REAL_SLEEP="$REAL_SLEEP" FM_FAKE_VIEWER_STARTED="$started" \
-    FM_FAKE_VIEWER_TERMINATING="$terminating" FM_FAKE_VIEWER_COMPLETED="$completed" \
+  JG_FAKE_HERDR_REAL_SLEEP="$REAL_SLEEP" JG_FAKE_VIEWER_STARTED="$started" \
+    JG_FAKE_VIEWER_TERMINATING="$terminating" JG_FAKE_VIEWER_COMPLETED="$completed" \
     "$FAKEBIN/viewer-launcher" &
   launcher_pid=$!
   while [ ! -f "$started" ]; do
@@ -387,11 +387,11 @@ test_viewer_start_requires_its_owned_process() {
   printf '%s\n' cleared > "$FAKE_STATE/$name.foreground"
   cat > "$FAKEBIN/python3" <<'SH'
 #!/usr/bin/env bash
-: > "$FM_FAKE_VIEWER_MARKER"
+: > "$JG_FAKE_VIEWER_MARKER"
 exit 0
 SH
   chmod +x "$FAKEBIN/python3"
-  out=$(FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_VIEWER_MARKER="$marker" \
+  out=$(JG_FAKE_HERDR_FAST_POLL=1 JG_FAKE_VIEWER_MARKER="$marker" \
     run_with_fake jg_herdr_lab_viewer_start "$name" 2>&1) || status=$?
   rm -f "$FAKEBIN/python3"
   expect_code 1 "$status" "a foreign foreground client must not satisfy viewer start"
@@ -420,7 +420,7 @@ test_viewer_stop_only_signals_owned_processes() {
   start_viewer_fixture "$pair"
   write_viewer_record "$record" "$FIXTURE_LAUNCHER_PID" "$FIXTURE_VIEWER_PID"
   status=0
-  FM_FAKE_HERDR_FAST_POLL=1 run_with_fake jg_herdr_lab_viewer_stop "$name" \
+  JG_FAKE_HERDR_FAST_POLL=1 run_with_fake jg_herdr_lab_viewer_stop "$name" \
     >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "stop must fail while the session still reports a foreground client"
   wait "$FIXTURE_LAUNCHER_PID" 2>/dev/null || true
@@ -469,15 +469,15 @@ test_interrupted_viewer_start_cancels_launcher() {
   run_with_fake jg_herdr_lab_provision "$name" || fail "viewer-interrupt fixture provision failed"
   cat > "$FAKEBIN/python3" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$$" > "$FM_FAKE_VIEWER_STARTED"
-"$FM_FAKE_HERDR_REAL_SLEEP" 0.5
-: > "$FM_FAKE_VIEWER_ATTACHED"
-printf '%s\n' cleared > "$FM_FAKE_HERDR_STATE/$FM_FAKE_VIEWER_SESSION.foreground"
-exec "$FM_FAKE_HERDR_REAL_SLEEP" 20
+printf '%s\n' "$$" > "$JG_FAKE_VIEWER_STARTED"
+"$JG_FAKE_HERDR_REAL_SLEEP" 0.5
+: > "$JG_FAKE_VIEWER_ATTACHED"
+printf '%s\n' cleared > "$JG_FAKE_HERDR_STATE/$JG_FAKE_VIEWER_SESSION.foreground"
+exec "$JG_FAKE_HERDR_REAL_SLEEP" 20
 SH
   chmod +x "$FAKEBIN/python3"
-  FM_FAKE_VIEWER_STARTED="$started" FM_FAKE_VIEWER_ATTACHED="$attached" \
-    FM_FAKE_VIEWER_SESSION="$name" run_with_fake exec "$ROOT/bin/jg-herdr-lab.sh" \
+  JG_FAKE_VIEWER_STARTED="$started" JG_FAKE_VIEWER_ATTACHED="$attached" \
+    JG_FAKE_VIEWER_SESSION="$name" run_with_fake exec "$ROOT/bin/jg-herdr-lab.sh" \
     viewer start "$name" >/dev/null 2>&1 &
   command_pid=$!
   while [ ! -f "$started" ]; do
@@ -504,7 +504,7 @@ test_teardown_refuses_while_viewer_attached() {
   start_viewer_fixture "$pair"
   write_viewer_record "$record" "$FIXTURE_LAUNCHER_PID" "$FIXTURE_VIEWER_PID"
   : > "$FAKE_LOG"
-  FM_FAKE_HERDR_FAST_POLL=1 run_with_fake jg_herdr_lab_teardown "$name" \
+  JG_FAKE_HERDR_FAST_POLL=1 run_with_fake jg_herdr_lab_teardown "$name" \
     >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "teardown must refuse while an owned viewer is still attached"
   [ "$(cat "$FAKE_STATE/$name")" = running ] \
@@ -522,7 +522,7 @@ test_viewer_stop_retains_record_when_detach_is_unreadable() {
   run_with_fake jg_herdr_lab_provision "$name" || fail "unreadable-detach fixture provision failed"
   record=$(run_with_fake jg_herdr_lab_viewer_record_path "$name")
   printf 'launcher_pid=99999999\nlauncher_start=stale\nviewer_pid=99999999\nviewer_start=stale\n' > "$record"
-  FM_FAKE_HERDR_FAST_POLL=1 FM_FAKE_HERDR_TITLE_FAIL=1 \
+  JG_FAKE_HERDR_FAST_POLL=1 JG_FAKE_HERDR_TITLE_FAIL=1 \
     run_with_fake jg_herdr_lab_viewer_stop "$name" >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "an unreadable detach result on a running session must fail closed"
   assert_present "$record" "an unreadable detach result discarded the ownership record"

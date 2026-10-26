@@ -56,9 +56,9 @@ Use `gh-axi` for GitHub, `chrome-devtools-axi` for browser work, and compatible 
 ## 2. Layout and state
 
 `docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
-`FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
-Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
-`bin/jg-send.sh` fails closed unless `FM_HOME` is explicit, so a steer cannot silently resolve against another home.
+`JG_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
+Each secondmate has a persistent isolated `JG_HOME`, including its own state, backlog, projects, and session lock.
+`bin/jg-send.sh` fails closed unless `JG_HOME` is explicit, so a steer cannot silently resolve against another home.
 
 Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to firstmate except under hard rule 1's concrete captain-approved project operation exception.
 
@@ -215,7 +215,7 @@ After spawning, confirm the worker is processing the brief and handle any trust 
 A persistent secondmate is recorded in the secondmate registry and runtime state, never as a backlog work item.
 
 Steer a worker with ordinary text through fail-closed `jg-send`: the message becomes a durable record in the task's steering inbox (multi-line text is legal, local and remote alike) and the worker's terminal receives only a constant doorbell line, with the watcher re-ringing an unacknowledged local message and escalating a stuck one (`bin/jg-task-inbox-lib.sh`; `bin/jg-send.sh` owns the typed-plane carve-outs).
-A remote secondmate steer rides the same durable-inbox model through the remote transport; after an unconfirmed delivery, only the exact `FM_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe because it preserves the request body for remote enqueue deduplication (`bin/jg-send.sh` header).
+A remote secondmate steer rides the same durable-inbox model through the remote transport; after an unconfirmed delivery, only the exact `JG_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe because it preserves the request body for remote enqueue deduplication (`bin/jg-send.sh` header).
 When a steer answers an open keyed decision or blocker, pass `jg-send`'s `--resolve-key` so the answer itself closes that decision record at answer time, identically for local and remote workers (contract: `bin/jg-send.sh` header).
 `jg-send` is the data plane for text the worker should read; never use its key or text paths for interrupt, exit, or other lifecycle control, because routing-marked lifecycle text becomes chat the worker reasons about instead of executing.
 Drive a worker's lifecycle through `bin/jg-control.sh <task-id> interrupt|exit|relaunch`, which owns the per-runtime mechanics, verifies each action, and never tears down or discards anything ([`docs/agent-control.md`](docs/agent-control.md)).
@@ -304,7 +304,7 @@ Harness-aware turn-end guards are structural backstops, not permission to omit t
 
 ### Away-mode and quiet-mode stub
 
-Invoke the `/afk` skill when the captain says `/afk`, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`, or any `state/.subsuper-*` marker is involved.
+Invoke the `/afk` skill when the captain says `/afk`, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `JG_INJECT_MARK`, or any `state/.subsuper-*` marker is involved.
 Invoke the `/quiet` skill instead when the captain says `/quiet` or asks for quiet mode, or `state/.afk` already exists in quiet mode (`jg_afk_mode` in `bin/jg-wake-lib.sh`).
 Load `away-quiet-supervision` whenever either mode is invoked, either record exists, or a marked away-supervisor message arrives.
 

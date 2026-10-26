@@ -34,7 +34,7 @@ make_tools() { # <world>
   mkdir -p "$fake"
   cat > "$fake/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'state: %s · source: fake\n' "${FM_FAKE_CREW_STATE:-unknown}"
+printf 'state: %s · source: fake\n' "${JG_FAKE_CREW_STATE:-unknown}"
 SH
   cat > "$fake/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -47,7 +47,7 @@ SH
   for tool in gh gh-axi curl; do
     cat > "$fake/$tool" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$(basename "$0")" >> "${FM_FORGE_LOG:?}"
+printf '%s\n' "$(basename "$0")" >> "${JG_FORGE_LOG:?}"
 exit 97
 SH
   done
@@ -106,30 +106,30 @@ write_mate_meta() {
 
 run_reconcile() { # <home> [--startup]
   local home=$1 option=${2:-}
-  PATH="$WORLD/fakebin:$PATH" FM_ROOT_OVERRIDE="$WORLD/root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_INACTIVE_RECONCILE_SECS=60 FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" scan ${option:+"$option"}
+  PATH="$WORLD/fakebin:$PATH" JG_ROOT_OVERRIDE="$WORLD/root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_INACTIVE_RECONCILE_SECS=60 JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
+    JG_FORGE_LOG="$WORLD/forge.log" "$RECON" scan ${option:+"$option"}
 }
 
 # The teardown-side entry point: deliver one child's terminal ledger line for a
 # caller holding its meta lock.
 run_report() { # <home> <child>
   local home=$1 child=$2
-  PATH="$WORLD/fakebin:$PATH" FM_ROOT_OVERRIDE="$WORLD/root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child"
+  PATH="$WORLD/fakebin:$PATH" JG_ROOT_OVERRIDE="$WORLD/root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
+    JG_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child"
 }
 
 # The cleanup-side entry point: settle one child's pending receipts for a child
 # whose record is about to disappear.
 run_retire() { # <home> <child>
   local home=$1 child=$2
-  PATH="$WORLD/fakebin:$PATH" FM_ROOT_OVERRIDE="$WORLD/root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" retire "$child"
+  PATH="$WORLD/fakebin:$PATH" JG_ROOT_OVERRIDE="$WORLD/root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
+    JG_FORGE_LOG="$WORLD/forge.log" "$RECON" retire "$child"
 }
 
 wake_count() { # <home> <key prefix>
@@ -155,7 +155,7 @@ reported_outcome_key() { # <home> <id> <state>
 }
 
 prime_seen() { # <state> <status>
-  FM_STATE_OVERRIDE="$1" bash -c '
+  JG_STATE_OVERRIDE="$1" bash -c '
     . "$1"
     jg_wake_status_mark_current "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$1" "$2"
@@ -168,16 +168,16 @@ reap() { kill "$1" 2>/dev/null || true; wait "$1" 2>/dev/null || true; }
 test_main_direct_terminal_presentation_receipt() {
   local err seq generation
   make_world main-direct; write_child "$MAIN" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ "$(wake_count "$MAIN" 'inactive-outcome:')" = 1 ] || fail "main did not queue terminal presentation"
   [ "$(outcome_count "$MAIN" pending)" = 1 ] || fail "main did not retain presentation receipt"
 
   err="$WORLD/drain.err"
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" "$DRAIN" >/dev/null 2> "$err"
+  JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" "$DRAIN" >/dev/null 2> "$err"
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation .*/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   [ -n "$seq" ] && [ -n "$generation" ] || fail "main presentation did not require durable acknowledgement"
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation"
+  JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation"
   [ "$(outcome_count "$MAIN" presented)" = 1 ] || fail "acknowledged presentation did not receive its own receipt"
   pass "main direct terminal presentation has a durable receipt"
 }
@@ -191,7 +191,7 @@ test_branch_ack_retires_inactive_outcome_receipt() {
   local err seq generation
   make_world branch-ack
   write_child "$MAIN" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ "$(wake_count "$MAIN" 'inactive-outcome:')" = 1 ] || fail "scan did not queue the terminal presentation"
   [ "$(outcome_count "$MAIN" pending)" = 1 ] || fail "scan did not retain a presentation receipt"
 
@@ -200,20 +200,20 @@ test_branch_ack_retires_inactive_outcome_receipt() {
   # process as the recorded grant owner.
   seq=$(awk -F '\t' '$4 ~ /^inactive-outcome:/ { print $2 }' "$MAIN/state/.wake-queue" | tail -1)
   case "$seq" in ''|*[!0-9]*) fail "the queued inactive-outcome row had no sequence" ;; esac
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" "$GRANT" activate "$$" branch-ack \
+  JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" "$GRANT" activate "$$" branch-ack \
     || fail "branch owner activation failed"
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" "$GRANT" publish branch-ack "$seq" \
+  JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" "$GRANT" publish branch-ack "$seq" \
     || fail "branch grant publication failed"
 
   err="$WORLD/branch-drain.err"
-  FM_SUPERVISION_ACTOR=branch FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
-    FM_CONFIG_OVERRIDE="$MAIN/config" "$DRAIN" >/dev/null 2> "$err"
+  JG_SUPERVISION_ACTOR=branch JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" \
+    JG_CONFIG_OVERRIDE="$MAIN/config" "$DRAIN" >/dev/null 2> "$err"
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation .*/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   [ -n "$seq" ] && [ -n "$generation" ] \
     || { cat "$err"; fail "branch presentation did not require durable acknowledgement"; }
-  FM_SUPERVISION_ACTOR=branch FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
-    FM_CONFIG_OVERRIDE="$MAIN/config" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation" \
+  JG_SUPERVISION_ACTOR=branch JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" \
+    JG_CONFIG_OVERRIDE="$MAIN/config" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation" \
     || fail "branch acknowledgement failed"
 
   [ "$(wake_count "$MAIN" 'inactive-outcome:')" = 0 ] || fail "branch acknowledgement left its check row queued"
@@ -225,7 +225,7 @@ test_branch_ack_retires_inactive_outcome_receipt() {
   local cycle
   for cycle in 1 2 3; do
     age "$MAIN/state/.inactive-outcome-reconcile"
-    FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN"
+    JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN"
     [ "$(wake_count "$MAIN" 'inactive-outcome:')" = 0 ] \
       || fail "unchanged inactive outcome re-queued on cadence scan $cycle after its branch acknowledgement"
   done
@@ -241,7 +241,7 @@ test_unpushed_ci_ready_done_is_not_published() {
   git -C "$MATE/projects/child" commit -q --allow-empty -m 'only in the copy'
   grep -v '^pr=\|^pr_head=' "$MATE/state/child.meta" > "$MATE/state/child.meta.tmp"
   mv "$MATE/state/child.meta.tmp" "$MATE/state/child.meta"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ ! -s "$MAIN/state/mate.status" ] || fail "unpushed CI-ready done: was published upstream"
   [ "$(outcome_count "$MATE" reported)" = 0 ] || fail "unpushed CI-ready done: left a delivery receipt"
   pass "unpushed CI-ready ship done: is not published upstream"
@@ -257,11 +257,11 @@ test_delivered_ledger_done_skips_git_gate() {
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexec %q "$@"\n' \
     "$WORLD/git.log" "$real_git" > "$WORLD/fakebin/git"
   chmod +x "$WORLD/fakebin/git"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "pushed CI-ready done: was not delivered"
   [ -s "$WORLD/git.log" ] || fail "first delivery did not test the named head"
   : > "$WORLD/git.log"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ ! -s "$WORLD/git.log" ] || fail "a poll after delivery re-ran the git gate: $(cat "$WORLD/git.log")"
   [ "$(grep -c 'child-outcome-child-done' "$MAIN/state/mate.status")" = 1 ] \
     || fail "the delivered done: was published again"
@@ -278,18 +278,18 @@ test_local_secondmate_delivers_terminal_ledger_line() {
   local expected key
   make_world local; bind_secondmate local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   key=$(reported_outcome_key "$MATE" child 'done') || fail "ledger receipt did not retain its collision-resistant key"
   expected="done [key=$key]: child child done: PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$expected" \
     || fail "secondmate did not deliver the child's ledger line on a plain poll: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "ledger delivery receipt was not durable"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(grep -c 'child-outcome-child-done' "$MAIN/state/mate.status")" = 1 ] \
     || fail "a second poll delivered the same ledger line again"
   printf 'Report at /tmp/report.md\n' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   ! grep -q 'inactive-outcome-' "$MAIN/state/mate.status" \
     || fail "the inactive path reported a child the ledger delivery already owned"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "the inactive path minted a second receipt"
@@ -311,13 +311,13 @@ test_secondmate_multiline_terminal_outcome_is_delivered_once() {
       else
         cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s: validation finished\nSee the report for details.\n\n' "$FM_FAKE_CREW_STATE" >> "$FM_STATE_OVERRIDE/$1.status"
-printf 'state: %s · source: fake\n' "$FM_FAKE_CREW_STATE"
+printf '%s: validation finished\nSee the report for details.\n\n' "$JG_FAKE_CREW_STATE" >> "$JG_STATE_OVERRIDE/$1.status"
+printf 'state: %s · source: fake\n' "$JG_FAKE_CREW_STATE"
 SH
       fi
-      FM_FAKE_CREW_STATE="$terminal" run_reconcile "$MATE" --startup
+      JG_FAKE_CREW_STATE="$terminal" run_reconcile "$MATE" --startup
       age "$MATE/state/child.status"
-      FM_FAKE_CREW_STATE="$terminal" run_reconcile "$MATE" --startup
+      JG_FAKE_CREW_STATE="$terminal" run_reconcile "$MATE" --startup
       run_report "$MATE" child
       key=$(reported_outcome_key "$MATE" child "$terminal") \
         || fail "$terminal with trailing prose arriving $timing state read was not owned by the ledger"
@@ -341,13 +341,13 @@ test_secondmate_unterminated_prose_reports_run_outcome() {
   write_child "$MATE" child 'working: compiling'
   printf 'Still going' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" \
     | grep -Fq "failed [key=inactive-outcome-mate-child-failed]: inactive terminal child=child" \
     || fail "an unterminated prose line withheld a proven failure: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "the fallback report did not retain its receipt"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 1 ] \
     || fail "the proven failure was reported twice"
   pass "an unterminated continuation line does not withhold a proven child outcome"
@@ -360,15 +360,15 @@ test_secondmate_unterminated_prose_reports_run_outcome() {
 test_inactive_receipt_ignores_later_status_prose() {
   make_world prose-after-outcome; bind_secondmate local
   write_child "$MATE" child 'working: quiet since'
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-failed' "$MAIN/state/mate.status")" = 1 ] \
     || fail "inactive fallback did not publish exactly once"
   printf 'working: tidying up after the run\n' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   printf 'working: still tidying\n' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 1 ] \
     || fail "changed status prose minted a duplicate parent event: $(cat "$MAIN/state/mate.status")"
   [ "$(outcome_count "$MATE" reported)" = 1 ] \
@@ -384,9 +384,9 @@ test_busy_child_does_not_starve_later_ledger_outcomes() {
   write_child "$MATE" a-busy 'done: busy child finished'
   write_child "$MATE" b-ready 'done: later child finished'
   printf 'epoch=%s\ncursor=\n' "$(date +%s)" > "$MATE/state/.inactive-outcome-reconcile"
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
+  JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" bash -c '
     . "$1/bin/jg-wake-lib.sh"
-    lock=$(jg_meta_lock_path "$FM_STATE_OVERRIDE/a-busy.meta")
+    lock=$(jg_meta_lock_path "$JG_STATE_OVERRIDE/a-busy.meta")
     jg_lock_acquire_wait "$lock"
     : > "$2/busy-lock-held"
     while [ ! -e "$2/release-busy-lock" ]; do sleep 0.05; done
@@ -396,14 +396,14 @@ test_busy_child_does_not_starve_later_ledger_outcomes() {
   i=0
   while [ "$i" -lt 40 ] && [ ! -e "$WORLD/busy-lock-held" ]; do sleep 0.05; i=$((i + 1)); done
   if [ -e "$WORLD/busy-lock-held" ]; then
-    FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+    JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
     grep -Fq 'child-outcome-b-ready-done' "$MAIN/state/mate.status" 2>/dev/null && delivered=1
   fi
   : > "$WORLD/release-busy-lock"
   reap "$holder"
   [ "$delivered" -eq 1 ] \
     || fail "a busy early child starved a later terminal ledger outcome"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   grep -Fq 'child-outcome-a-busy-done' "$MAIN/state/mate.status" \
     || fail "the skipped busy child was not retried on the next poll"
   pass "busy child locks do not starve later ledger outcomes"
@@ -422,7 +422,7 @@ test_secondmate_ledger_delivery_carries_report_and_failure() {
   write_child "$MATE" replaced-pr $'working: old PR https://example.test/owner/repo/pull/11\ndone: PR https://example.test/owner/repo/pull/22'
   awk '$0 !~ /^pr=/' "$MATE/state/replaced-pr.meta" > "$MATE/state/replaced-pr.meta.tmp"
   mv "$MATE/state/replaced-pr.meta.tmp" "$MATE/state/replaced-pr.meta"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   scout_key=$(reported_outcome_key "$MATE" scout 'done') || fail "scout receipt key missing"
   boom_key=$(reported_outcome_key "$MATE" boom failed) || fail "failed receipt key missing"
   replaced_key=$(reported_outcome_key "$MATE" replaced-pr 'done') || fail "replacement PR receipt key missing"
@@ -433,7 +433,7 @@ test_secondmate_ledger_delivery_carries_report_and_failure() {
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "done [key=$replaced_key]: child replaced-pr done: PR https://example.test/owner/repo/pull/22 pr=https://example.test/owner/repo/pull/22 mode=no-mistakes yolo=off" \
     || fail "ledger fallback did not prefer the terminal ready line PR: $(cat "$MAIN/state/mate.status")"
   printf 'working: retrying\ndone: fixed on retry\n' >> "$MATE/state/boom.status"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   boom_key=$(reported_outcome_key "$MATE" boom 'done') || fail "recovered receipt key missing"
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fq "done [key=$boom_key]: child boom done: fixed on retry" \
     || fail "a new terminal line after recovery was not delivered"
@@ -460,7 +460,7 @@ test_pr_field_requires_recorded_pr_or_ready_signal_line() {
   awk '{ sub(/^kind=ship$/, "kind=scout"); print }' "$MATE/state/lookout.meta" \
     > "$MATE/state/lookout.meta.tmp"
   mv "$MATE/state/lookout.meta.tmp" "$MATE/state/lookout.meta"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   prose_key=$(reported_outcome_key "$MATE" prose 'done') || fail "prose receipt key missing"
   ready_key=$(reported_outcome_key "$MATE" ready 'done') || fail "ready receipt key missing"
   stamped_key=$(reported_outcome_key "$MATE" stamped 'done') || fail "stamped ready receipt key missing"
@@ -487,7 +487,7 @@ test_terminal_line_during_state_read_yields_to_ledger_delivery() {
   write_child "$MATE" child 'working: finishing now'
   cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'done: completed during state read\n' >> "$FM_STATE_OVERRIDE/$1.status"
+printf 'done: completed during state read\n' >> "$JG_STATE_OVERRIDE/$1.status"
 printf 'state: done · source: fake\n'
 SH
   chmod +x "$WORLD/fakebin/jg-crew-state.sh"
@@ -510,19 +510,19 @@ SH
 test_terminal_line_after_inactive_delivery_is_not_reported_twice() {
   make_world inactive-ledger-race; bind_secondmate local
   write_child "$MATE" child 'working: finishing now'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-done' "$MAIN/state/mate.status")" = 1 ] \
     || fail "inactive fallback did not publish exactly once"
 
   printf 'done: completion landed after reconciliation\n' >> "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE"
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 1 ] \
     || fail "one completion was published by both inactive and ledger paths: $(cat "$MAIN/state/mate.status")"
   [ "$(outcome_count "$MATE" reported)" = 2 ] \
     || fail "the raced ledger event was not durably reconciled with the fallback receipt"
 
   printf 'working: retrying after completion\ndone: completed again\n' >> "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE"
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 2 ] \
     || fail "the inactive claim suppressed a later same-state terminal event: $(cat "$MAIN/state/mate.status")"
   grep -Fq 'child child done: completed again' "$MAIN/state/mate.status" \
@@ -535,9 +535,9 @@ test_terminal_line_after_inactive_delivery_is_not_reported_twice() {
 test_progress_after_inactive_delivery_starts_a_new_event() {
   make_world inactive-recovery; bind_secondmate local
   write_child "$MATE" child 'working: first attempt finishing'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   printf 'working: retry started\ndone: retry completed\n' >> "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE"
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 2 ] \
     || fail "an intervening progress event did not separate two completions: $(cat "$MAIN/state/mate.status")"
   grep -Fq 'child child done: retry completed' "$MAIN/state/mate.status" \
@@ -552,9 +552,9 @@ test_long_terminal_lines_have_distinct_receipts() {
   make_world long-ledger; bind_secondmate local
   prefix=$(awk 'BEGIN { for (i = 0; i < 1300; i++) printf "a" }')
   write_child "$MATE" child "failed: ${prefix}one"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   printf 'failed: %stwo\n' "$prefix" >> "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(outcome_count "$MATE" reported)" = 2 ] \
     || fail "distinct complete ledger lines collided in the receipt store"
   [ "$(grep -c 'child-outcome-child-failed-' "$MAIN/state/mate.status")" = 2 ] \
@@ -569,15 +569,15 @@ test_secondmate_partial_ledger_line_waits_for_newline() {
   write_child "$MATE" child 'working: nearly there'
   printf 'done: half writ' >> "$MATE/state/child.status"
   age "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ ! -s "$MAIN/state/mate.status" ] \
     || fail "an unterminated ledger line was delivered: $(cat "$MAIN/state/mate.status")"
   printf 'ten\n' >> "$MATE/state/child.status"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   key=$(reported_outcome_key "$MATE" child 'done') || fail "completed ledger receipt key missing"
   sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fq "done [key=$key]: child child done: half written" \
     || fail "the completed line was not delivered once its newline landed"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(wc -l < "$MAIN/state/mate.status" | tr -d ' ')" = 1 ] \
     || fail "completing the partial line delivered the outcome twice"
   pass "a ledger line still being appended waits for its newline"
@@ -588,8 +588,8 @@ test_secondmate_partial_ledger_line_waits_for_newline() {
 test_secondmate_remote_route_ledger_delivery() {
   make_world remote-ledger; bind_secondmate remote
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(grep -c 'child-outcome-child-done' "$MATE/state/parent-replies.status")" = 1 ] \
     || fail "remote ledger delivery was not once-only: $(cat "$MATE/state/parent-replies.status" 2>/dev/null)"
   pass "the remote route carries a child's ledger line once"
@@ -604,7 +604,7 @@ test_pending_ledger_done_is_delivered_after_worktree_removal() {
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/2 checks green'
   cp "$MATE/.jg-secondmate-parent" "$WORLD/parent-binding"
   printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE"
   [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "failed parent write did not leave a pending delivery"
   rm -rf "$MATE/projects/child"
   cp "$WORLD/parent-binding" "$MATE/.jg-secondmate-parent"
@@ -647,9 +647,9 @@ test_report_avoids_scan_meta_lock_inversion() {
   local holder scan_pid report_pid i completed=0
   make_world report-lock-order; bind_secondmate local
   write_child "$MATE" child 'done: final word'
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
+  JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" bash -c '
     . "$1/bin/jg-wake-lib.sh"
-    lock=$(jg_meta_lock_path "$FM_STATE_OVERRIDE/child.meta")
+    lock=$(jg_meta_lock_path "$JG_STATE_OVERRIDE/child.meta")
     jg_lock_acquire_wait "$lock"
     : > "$2/meta-held"
     while [ ! -e "$2/release-meta" ]; do sleep 0.05; done
@@ -660,7 +660,7 @@ test_report_avoids_scan_meta_lock_inversion() {
   while [ "$i" -lt 40 ] && [ ! -e "$WORLD/meta-held" ]; do sleep 0.05; i=$((i + 1)); done
   [ -e "$WORLD/meta-held" ] || { reap "$holder"; fail "metadata lock holder did not start"; }
 
-  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" --startup &
+  JG_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" --startup &
   scan_pid=$!
   i=0
   while [ "$i" -lt 40 ] && [ ! -e "$MATE/state/.inactive-outcome-reconcile.lock" ]; do
@@ -688,7 +688,7 @@ test_local_secondmate_rejects_relative_parent_home() {
   printf 'schema=jg-secondmate-parent.v1\nroute=local\nparent_home=relative-parent\n' \
     > "$MATE/.jg-secondmate-parent"
   write_child "$MATE" child 'failed: terminal'
-  (cd "$WORLD" && FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
+  (cd "$WORLD" && JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
   [ ! -e "$WORLD/relative-parent/state/mate.status" ] \
     || fail "relative parent home received a false durable report"
   [ "$(outcome_count "$MATE" reported)" = 0 ] \
@@ -715,7 +715,7 @@ test_invalid_secondmate_marker_blocks_routing() {
       ln -s "$target" "$MATE/.jg-secondmate-home"
     fi
 
-    out=$(FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
+    out=$(JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup)
     printf '%s\n' "$out" | grep -Fq 'inactive terminal outcomes remain unreconciled: invalid .jg-secondmate-home marker' \
       || fail "$kind secondmate marker did not surface the blocked terminal obligation"
     [ "$(outcome_count "$MATE" pending)" = 0 ] \
@@ -733,8 +733,8 @@ test_invalid_secondmate_marker_blocks_routing() {
 # A remote child route writes the existing mirror input once even across restarts.
 test_remote_parent_reply_is_idempotent() {
   make_world remote; bind_secondmate remote; write_child "$MATE" child 'working: quiet since'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(grep -c 'inactive-outcome-mate-child-done' "$MATE/state/parent-replies.status")" = 1 ] \
     || fail "remote parent reply was not restart-idempotent"
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "remote parent report receipt missing"
@@ -746,10 +746,10 @@ test_remote_parent_reply_is_idempotent() {
 test_reused_task_id_reports_each_incarnation() {
   make_world reused-id; bind_secondmate remote
   write_child "$MATE" child 'working: quiet since' spawn-one
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   rm -f "$MATE/state/child.meta" "$MATE/state/child.status" "$MATE/state/child.turn-ended"
   write_child "$MATE" child 'working: quiet since' spawn-two
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" reported)" = 2 ] \
     || fail "reused task id collided with the retired incarnation receipt"
   [ "$(grep -c 'inactive-outcome-mate-child-failed' "$MATE/state/parent-replies.status")" = 2 ] \
@@ -770,11 +770,11 @@ test_legacy_metadata_rewrite_keeps_receipt_identity() {
   mv "$tmp" "$meta"
   age "$meta"
 
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   awk '{ print }' "$meta" > "$tmp"
   mv "$tmp" "$meta"
   age "$meta"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
 
   [ "$(outcome_count "$MATE" reported)" = 1 ] \
     || fail "legacy metadata rewrite changed the terminal receipt identity"
@@ -791,26 +791,26 @@ test_relaunch_cannot_replace_metadata_during_state_snapshot() {
   write_child "$MATE" child 'working: quiet since' spawn-old
   cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-: > "${FM_RACE_WORLD:?}/state-started"
-while [ ! -e "$FM_RACE_WORLD/state-release" ]; do sleep 0.05; done
+: > "${JG_RACE_WORLD:?}/state-started"
+while [ ! -e "$JG_RACE_WORLD/state-release" ]; do sleep 0.05; done
 printf 'state: failed · source: fake\n'
 SH
   chmod +x "$WORLD/fakebin/jg-crew-state.sh"
 
-  FM_RACE_WORLD="$WORLD" run_reconcile "$MATE" --startup &
+  JG_RACE_WORLD="$WORLD" run_reconcile "$MATE" --startup &
   recon_pid=$!
   i=0
   while [ "$i" -lt 40 ] && [ ! -e "$WORLD/state-started" ]; do sleep 0.05; i=$((i + 1)); done
   [ -e "$WORLD/state-started" ] || fail "reconciliation did not begin its state snapshot"
 
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
+  JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" bash -c '
     . "$1/bin/jg-wake-lib.sh"
-    meta="$FM_STATE_OVERRIDE/child.meta"
+    meta="$JG_STATE_OVERRIDE/child.meta"
     lock=$(jg_meta_lock_path "$meta")
     jg_lock_acquire_wait "$lock"
     awk '\''{ sub(/^spawn_gen=.*/, "spawn_gen=spawn-new"); print }'\'' "$meta" > "$meta.tmp"
     mv "$meta.tmp" "$meta"
-    printf "working: replacement active\n" > "$FM_STATE_OVERRIDE/child.status"
+    printf "working: replacement active\n" > "$JG_STATE_OVERRIDE/child.status"
     : > "$2/meta-updated"
     jg_lock_release "$lock"
   ' _ "$ROOT" "$WORLD" &
@@ -833,7 +833,7 @@ test_heartbeat_cap_does_not_delay_reconciliation() {
   make_world heartbeat; write_child "$MAIN" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   printf '12\n' > "$MAIN/state/.heartbeat-streak"
   : > "$MAIN/state/.last-heartbeat"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ "$(wake_count "$MAIN" 'inactive-outcome:')" = 1 ] || fail "heartbeat cap suppressed inactive terminal reconciliation"
   pass "terminal reconciliation ignores heartbeat backoff state"
 }
@@ -843,7 +843,7 @@ test_scan_marker_replaces_symlink_safely() {
   make_world marker; write_child "$MAIN" child 'done: green'
   printf 'preserve me\n' > "$MAIN/state/marker-target"
   ln -s marker-target "$MAIN/state/.inactive-outcome-reconcile"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ "$(cat "$MAIN/state/marker-target")" = 'preserve me' ] \
     || fail "scan marker symlink overwrote its target"
   [ ! -L "$MAIN/state/.inactive-outcome-reconcile" ] \
@@ -855,11 +855,11 @@ test_nonterminal_and_captain_held_states_do_not_report() {
   local state
   for state in working paused parked unknown; do
     make_world "nonterminal-$state"; write_child "$MAIN" child 'working: still active'
-    FM_FAKE_CREW_STATE="$state" run_reconcile "$MAIN" --startup
+    JG_FAKE_CREW_STATE="$state" run_reconcile "$MAIN" --startup
     [ "$(outcome_count "$MAIN" pending)" = 0 ] || fail "$state produced a terminal outcome"
   done
   make_world captain-held; write_child "$MAIN" child 'captain-held: awaiting captain'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ "$(outcome_count "$MAIN" pending)" = 0 ] || fail "captain-held item was reconciled"
   pass "nonterminal and captain-held workers remain outside inactive terminal reporting"
 }
@@ -874,10 +874,10 @@ test_watcher_hook_and_idle_secondmate_exemption() {
   # remove it to observe the reconcile wake in isolation here.
   rm -f "$MAIN/state/child.turn-ended"
   out="$WORLD/watch.out"
-  PATH="$WORLD/fakebin:$PATH" FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
-    FM_INACTIVE_RECONCILE_SECS=60 FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_FAKE_CREW_STATE='done' "$WATCH" > "$out" 2>&1 &
+  PATH="$WORLD/fakebin:$PATH" JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" \
+    JG_INACTIVE_RECONCILE_SECS=60 JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
+    JG_FORGE_LOG="$WORLD/forge.log" JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_FAKE_CREW_STATE='done' "$WATCH" > "$out" 2>&1 &
   pid=$!
   i=0
   while [ "$i" -lt 40 ]; do
@@ -890,8 +890,8 @@ test_watcher_hook_and_idle_secondmate_exemption() {
   grep -Fq 'check: inactive-outcome' "$out" || fail "watcher did not surface its reconciliation result"
 
   make_world idle-secondmate; bind_secondmate local; write_mate_meta; prime_seen "$MAIN/state" "$MAIN/state/mate.status"
-  PATH="$WORLD/fakebin:$PATH" FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$WORLD/idle.out" 2>&1 &
+  PATH="$WORLD/fakebin:$PATH" JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" JG_POLL=1 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$WORLD/idle.out" 2>&1 &
   pid=$!; sleep 2; kill -0 "$pid" 2>/dev/null || fail "idle secondmate watcher exited unexpectedly"; reap "$pid"
   grep -F 'stale:' "$WORLD/idle.out" >/dev/null && fail "idle secondmate was treated as a wedge"
   [ ! -s "$MAIN/state/.wake-queue" ] || fail "idle secondmate emitted a false wake"
@@ -910,11 +910,11 @@ test_watcher_poll_delivers_child_ledger_line_to_parent() {
   # cycle before the reconcile scan that delivers the ledger line, so consume
   # it here to observe the delivery path in isolation.
   rm -f "$MATE/state/child.turn-ended"
-  PATH="$WORLD/fakebin:$PATH" FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" FM_DATA_OVERRIDE="$MATE/data" \
-    FM_CONFIG_OVERRIDE="$MATE/config" FM_INACTIVE_RECONCILE_SECS=60 \
-    FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" FM_FORGE_LOG="$WORLD/forge.log" \
-    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_FAKE_CREW_STATE='unknown' "$WATCH" > "$WORLD/mate-watch.out" 2>&1 &
+  PATH="$WORLD/fakebin:$PATH" JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" JG_DATA_OVERRIDE="$MATE/data" \
+    JG_CONFIG_OVERRIDE="$MATE/config" JG_INACTIVE_RECONCILE_SECS=60 \
+    JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" JG_FORGE_LOG="$WORLD/forge.log" \
+    JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_FAKE_CREW_STATE='unknown' "$WATCH" > "$WORLD/mate-watch.out" 2>&1 &
   pid=$!
   i=0
   while [ "$i" -lt 100 ]; do
@@ -948,12 +948,12 @@ SH
   chmod +x "$WORLD/fakebin/jg-crew-state.sh"
 
   started=$(date +%s)
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+  JG_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
   elapsed=$(( $(date +%s) - started ))
   [ "$elapsed" -le 3 ] || fail "stalled state read exceeded aggregate scan budget (${elapsed}s)"
 
   write_child "$MAIN" b 'done: green'
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+  JG_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
   grep -Fq 'child=b state=done' "$MAIN/state/.wake-queue" \
     || fail "next bounded scan did not resume with the following child"
   pass "stalled state reads are bounded without starving later children"
@@ -962,9 +962,9 @@ SH
 test_full_scan_budget_includes_wake_lock_wait() {
   local holder started elapsed i
   make_world wake-lock; write_child "$MAIN" child 'done: green'
-  FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" bash -c '
+  JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" bash -c '
     . "$1/bin/jg-wake-lib.sh"
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
     : > "$2"
     sleep 30
   ' _ "$ROOT" "$WORLD/lock-ready" &
@@ -974,7 +974,7 @@ test_full_scan_budget_includes_wake_lock_wait() {
   [ -e "$WORLD/lock-ready" ] || fail "wake lock holder did not start"
 
   started=$(date +%s)
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_INACTIVE_RECONCILE_BUDGET_SECS=1 JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   elapsed=$(( $(date +%s) - started ))
   reap "$holder"
   # The unbounded wake-lock wait is ended by the process-group backstop, which
@@ -994,7 +994,7 @@ test_missing_parent_binding_names_itself() {
   printf 'mate\n' > "$MATE/.jg-secondmate-home"
   write_child "$MATE" child 'done: PR merged'
   write_child "$MATE" quiet 'working: quiet since'
-  out=$(FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup)
+  out=$(JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup)
   case "$out" in
     *"actionable: child outcome needs parent report: child=child"*".jg-secondmate-parent"*) ;;
     *) fail "a missing parent binding did not name itself for a ledger delivery: $out" ;;
@@ -1013,21 +1013,21 @@ test_notice_recovery_does_not_duplicate_wake() {
   make_world notice-recovery; bind_secondmate remote
   printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
   write_child "$MATE" child 'working: quiet since'
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wake_count "$MATE" 'inactive-reconcile:')" = 1 ] || fail "parent-report failure did not queue one notice"
 
   record=$(find "$MATE/state/terminal-outcomes" -type f -name '*.pending' | head -1)
   awk '{ sub(/^notice_emitted=1$/, "notice_emitted=0"); print }' "$record" > "$record.tmp"
   mv "$record.tmp" "$record"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wake_count "$MATE" 'inactive-reconcile:')" = 1 ] || fail "recovery duplicated an already queued notice"
 
   err="$WORLD/drain.err"
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" "$DRAIN" >/dev/null 2> "$err"
+  JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" "$DRAIN" >/dev/null 2> "$err"
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation .*/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
-  FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation"
-  FM_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
+  JG_HOME="$MATE" JG_STATE_OVERRIDE="$MATE/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$generation"
+  JG_FAKE_CREW_STATE='failed' run_reconcile "$MATE" --startup
   [ "$(wake_count "$MATE" 'inactive-reconcile:')" = 0 ] || fail "acknowledged notice was emitted again"
   pass "notice recovery remains idempotent across queue acknowledgement"
 }
@@ -1036,7 +1036,7 @@ test_notice_recovery_does_not_duplicate_wake() {
 # them while reconciling a local terminal outcome.
 test_reconciliation_never_calls_forge() {
   make_world forge; write_child "$MAIN" child 'done: green'
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
   [ ! -s "$WORLD/forge.log" ] || fail "reconciliation invoked a forge command: $(cat "$WORLD/forge.log")"
   pass "reconciliation makes zero forge or PR API calls"
 }
@@ -1045,13 +1045,13 @@ test_reconciliation_sets_no_forge_mode_for_state_read() {
   make_world no-forge-env; write_child "$MAIN" child 'working: quiet since'
   cat > "$WORLD/fakebin/jg-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${FM_CREW_STATE_NO_FORGE:-}" > "${FM_NO_FORGE_LOG:?}"
+printf '%s\n' "${JG_CREW_STATE_NO_FORGE:-}" > "${JG_NO_FORGE_LOG:?}"
 printf 'state: done · source: fake\n'
 SH
   chmod +x "$WORLD/fakebin/jg-crew-state.sh"
-  export FM_NO_FORGE_LOG="$WORLD/no-forge.log"
+  export JG_NO_FORGE_LOG="$WORLD/no-forge.log"
   run_reconcile "$MAIN" --startup
-  unset FM_NO_FORGE_LOG
+  unset JG_NO_FORGE_LOG
   assert_grep '1' "$WORLD/no-forge.log" "inactive reconciliation did not set crew-state no-forge mode"
   pass "reconciliation state reads set no-forge mode"
 }
@@ -1066,7 +1066,7 @@ test_cleaned_up_child_receipts_are_settled() {
   write_child "$MATE" other 'working: still running the pipeline'
   # An unusable parent route leaves both outcomes pending.
   printf 'schema=jg-secondmate-parent.v1\nroute=invalid\n' > "$MATE/.jg-secondmate-parent"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" pending)" = 2 ] || fail "broken binding did not leave the outcomes pending"
   notice_before=$(wake_count "$MATE" 'inactive-reconcile:')
   [ "$notice_before" -ge 2 ] || fail "the stuck receipts never queued their recovery notices"
@@ -1084,19 +1084,19 @@ test_cleaned_up_child_receipts_are_settled() {
   grep -v '^pr=\|^pr_head=' "$MATE/state/child.meta" > "$MATE/state/child.meta.tmp"
   mv "$MATE/state/child.meta.tmp" "$MATE/state/child.meta"
   age "$MATE/state/child.meta"
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" pending)" = 2 ] || fail "the second fingerprint did not retain its own receipt"
 
   # Delivery works again: it receipts the current fingerprint, not the earlier.
   bind_secondmate local
-  FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+  JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
   [ "$(outcome_count "$MATE" reported)" = 1 ] || fail "restored binding did not deliver the outcome"
   [ "$(outcome_count "$MATE" pending)" = 1 ] || fail "the earlier fingerprint was not left pending"
 
   # Cleanup removes the child's records; nothing can deliver it after that.
   rm -f "$MATE/state/child.meta" "$MATE/state/child.status" "$MATE/state/child.turn-ended"
   for cycle in 1 2 3; do
-    FM_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
+    JG_FAKE_CREW_STATE='done' run_reconcile "$MATE" --startup
     [ "$(outcome_count "$MATE" pending)" = 0 ] \
       || fail "a pending receipt outlived its cleaned-up child (scan $cycle)"
     [ "$(wake_count "$MATE" 'inactive-reconcile:')" = 0 ] \
@@ -1118,10 +1118,10 @@ test_watcher_drops_a_status_path_retired_before_it_is_reported() {
   printf 'working: building\n' >> "$MAIN/state/child.status"
 
   out="$WORLD/watch.out"
-  PATH="$WORLD/fakebin:$PATH" FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
-    FM_INACTIVE_RECONCILE_SECS=60 FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" FM_POLL=1 FM_SIGNAL_GRACE=3 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_FAKE_CREW_STATE='working' "$WATCH" > "$out" 2>&1 &
+  PATH="$WORLD/fakebin:$PATH" JG_HOME="$MAIN" JG_STATE_OVERRIDE="$MAIN/state" \
+    JG_INACTIVE_RECONCILE_SECS=60 JG_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/jg-crew-state.sh" \
+    JG_FORGE_LOG="$WORLD/forge.log" JG_POLL=1 JG_SIGNAL_GRACE=3 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_FAKE_CREW_STATE='working' "$WATCH" > "$out" 2>&1 &
   pid=$!
   # Retire the path inside the beacon's grace window, as cleanup of a finished
   # lane does, then let the beacon finish its cycle.

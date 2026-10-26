@@ -24,6 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fleet-dashboard'))
 from task_rows import toon_rows
 from lane import progress as lane_progress
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 def run(args, env=None, cwd=None, missing=False):
     r = sp.run(args, env=env, cwd=cwd, text=True, capture_output=True, timeout=60)
@@ -81,8 +85,8 @@ def sync():
     options = parser.parse_args()
     if bool(options.close) != bool(options.reason): parser.error('--close and --reason are required together')
     started = time.monotonic()
-    budget = float(os.environ.get('FM_TICKETS_SYNC_BUDGET_SECS', '20'))
-    home = Path(os.environ['FM_HOME']).resolve()
+    budget = float(os.environ.get('JG_TICKETS_SYNC_BUDGET_SECS', '20'))
+    home = Path(os.environ['JG_HOME']).resolve()
     board = Path((home / 'config/fleet-board').read_text().strip())
     if not board.is_absolute(): board = home / board
     if options.audit: print(run(['sign-off-axi', 'ticket', str(board), '--json'])); return
@@ -161,11 +165,11 @@ def sync():
             elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
                 publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
         for name, source in ordered:
-            env = {k: v for k, v in os.environ.items() if k not in ('FM_DATA_OVERRIDE', 'FM_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
-            env['FM_HOME'] = str(source)
+            env = {k: v for k, v in os.environ.items() if k not in ('JG_DATA_OVERRIDE', 'JG_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
+            env['JG_HOME'] = str(source)
             reader = ['bash', str(home / 'bin/jg-tasks-axi.sh')]
             tasks = rows(reader + ['list'], env) + rows(reader + ['list', '--state', 'done'], env)
-            address = run(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "$FM_HOME/data" || exit; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
+            address = run(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "$JG_HOME/data" || exit; printf "%s\\n%s\\n" "$JG_BACKLOG_AXI_ROOT" "$JG_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
             root, file = address
             if not file: raise RuntimeError(f'{name}: archive backfill requires markdown addressing')
             settings = {}

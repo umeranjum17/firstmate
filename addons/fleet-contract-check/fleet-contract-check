@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# fleet-contract-check: run each real cross-repo call with the installed versions, in a throwaway HOME and FM_HOME.
+# fleet-contract-check: run each real cross-repo call with the installed versions, in a throwaway HOME and JG_HOME.
 #
 #   fleet-contract-check [caller...]     callers: dispatch-resolve owner-guard checks-lint limit-prompt-move (default: all)
 #
-# Reads only: the fork's bin/ and config/ (FM_MAIN_HOME, default $FM_HOME or ~/firstmate) and this repo's add-ons.
+# Reads only: the fork's bin/ and config/ (JG_MAIN_HOME, default $JG_HOME or ~/firstmate) and this repo's add-ons.
 # Prints `ok <caller>` or `FAIL <caller>: <cause>` per caller; exits 1 when any caller fails, 2 on a usage error.
 set -u
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-MAIN=${FM_MAIN_HOME:-${FM_HOME:-$HOME/firstmate}}
-ADDONS=${FM_ADDONS_DIR:-$SRC}
+MAIN=${JG_MAIN_HOME:-${JG_HOME:-$HOME/firstmate}}
+ADDONS=${JG_ADDONS_DIR:-$SRC}
 d=$(mktemp -d) || exit 2
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/home" "$d/fm/config" "$d/fm/data" "$d/fm/state" "$d/ev" "$d/stub" || exit 2
 
-# One throwaway environment for every caller; the real HOME and FM_HOME are never touched.
-sandbox() { HOME=$d/home FM_HOME=$d/fm FM_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/.local/share TMPDIR=$d "$@"; }
+# One throwaway environment for every caller; the real HOME and JG_HOME are never touched.
+sandbox() { HOME=$d/home JG_HOME=$d/fm JG_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/.local/share TMPDIR=$d "$@"; }
 
 # jg-dispatch-resolve.sh validates the live rules before any network call; a stub curl keeps it offline.
 check_dispatch_resolve() {

@@ -104,7 +104,7 @@ run_check() {
   local home=$1 path=$2 out=$3
   shift 3
   local status=0
-  env FM_CHECK_TIMEOUT=30 "$@" FM_HOME="$home" PATH="$path" FM_TOOL_UPDATE_INTERVAL=0 "$CHECK" >"$out" 2>&1 || status=$?
+  env JG_CHECK_TIMEOUT=30 "$@" JG_HOME="$home" PATH="$path" JG_TOOL_UPDATE_INTERVAL=0 "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "check exit"
 }
 
@@ -337,7 +337,7 @@ test_unusable_announce_pattern_is_reported_not_read_as_silence() {
   # Arming is a deliberate operator action, so the same registry refuses it
   # rather than arming a check with a source that can never fire.
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm with an unusable announce_pattern exit"
   assert_absent "$home/state/tool-updates.check.sh" "arm registered a check whose announcement source cannot fire"
   pass "an announce_pattern that cannot be used is reported instead of read as silence"
@@ -394,7 +394,7 @@ SH
   # more than a full second of headroom for the millisecond-scale work before
   # the copy loop, while the version probe below (bounded, then sleeping 30)
   # still exhausts the budget before the announcement check.
-  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_BUDGET_SECS=2
+  run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_BUDGET_SECS=2
   report=$(cat "$out")
   assert_contains "$report" "no-mistakes check failed: the time budget ran out before the update announcement was checked" "an announcement source that was never asked was not reported"
   pass "an announcement source the budget could not reach is reported, not read as current"
@@ -419,7 +419,7 @@ SH
   chmod 0755 "$dir/no-mistakes-fixture"
   write_config "$home" '{"tools":[{"name":"no-mistakes","command":"no-mistakes-fixture","version_args":["--version"],"announce_args":["--help"],"announce_pattern":"A new version of no-mistakes is available: [^ ]+ -> [^ ]+"}]}'
   out="$home/out.txt"
-  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
+  run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
   assert_contains "$report" "no-mistakes check failed: $dir/no-mistakes-fixture did not answer when asked for its update announcement" "an announcement probe that never answered was read as a clean sweep"
   pass "an announcement probe that does not answer is reported, not read as current"
@@ -584,7 +584,7 @@ test_git_probes_stop_when_the_sweep_budget_is_gone() {
   make_slow_copy "$slow" "$TOOL" 30
   write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"command\":\"$TOOL\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
-  run_check "$home" "$(fixture_path "$slow")" "$out" FM_TOOL_UPDATE_BUDGET_SECS=1
+  run_check "$home" "$(fixture_path "$slow")" "$out" JG_TOOL_UPDATE_BUDGET_SECS=1
   report=$(cat "$out")
   assert_contains "$report" "check incomplete: the time budget ran out before firstmate" "a sweep with no budget left did not say which tool it did not finish"
   assert_not_contains "$report" "commits behind" "the git probes ran after the sweep budget was already gone"
@@ -625,7 +625,7 @@ SH
   # only probe that can hit it is the object query the fixture stalls. Asserting
   # that specific report keeps an unrelated timeout from passing this case for the
   # wrong reason.
-  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=3
+  run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_PROBE_SECS=3
   report=$(cat "$out")
   assert_not_contains "$report" "update available" "a probe that never answered was reported as an available update"
   assert_contains "$report" "firstmate check failed: $work did not answer whether it already has" "the stalled object query was not the reported failure"
@@ -658,7 +658,7 @@ SH
 
   write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
-  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
+  run_check "$home" "$(fixture_path "$dir")" "$out" JG_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
   assert_contains "$report" "firstmate check failed: $work did not answer whether it is a git repository" "a repository probe that never answered was not reported as such"
   assert_not_contains "$report" "is not a git repository" "a repository probe that never answered was reported as not a repository"
@@ -791,7 +791,7 @@ test_probes_are_skipped_between_intervals() {
   now=1700000000
 
   status=0
-  FM_HOME="$home" PATH="$(fixture_path "$dir")" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=900 FM_TOOL_UPDATE_NOW="$now" \
+  JG_HOME="$home" PATH="$(fixture_path "$dir")" JG_CHECK_TIMEOUT=30 JG_TOOL_UPDATE_INTERVAL=900 JG_TOOL_UPDATE_NOW="$now" \
     "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "first cadence run exit"
   assert_grep 'jg-tool-updates-v1' "$home/state/.tool-updates" "the first run did not record its sweep"
@@ -799,13 +799,13 @@ test_probes_are_skipped_between_intervals() {
   # A finding appears, but the interval has not elapsed, so no probe runs.
   make_copy "$dir" "$TOOL" 'no version here'
   status=0
-  FM_HOME="$home" PATH="$(fixture_path "$dir")" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=900 FM_TOOL_UPDATE_NOW="$((now + 300))" \
+  JG_HOME="$home" PATH="$(fixture_path "$dir")" JG_CHECK_TIMEOUT=30 JG_TOOL_UPDATE_INTERVAL=900 JG_TOOL_UPDATE_NOW="$((now + 300))" \
     "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "gated cadence run exit"
   [ ! -s "$out" ] || fail "a run inside the interval probed and spoke: $(cat "$out")"
 
   status=0
-  FM_HOME="$home" PATH="$(fixture_path "$dir")" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=900 FM_TOOL_UPDATE_NOW="$((now + 901))" \
+  JG_HOME="$home" PATH="$(fixture_path "$dir")" JG_CHECK_TIMEOUT=30 JG_TOOL_UPDATE_INTERVAL=900 JG_TOOL_UPDATE_NOW="$((now + 901))" \
     "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "due cadence run exit"
   assert_contains "$(cat "$out")" "did not report a version" "the run after the interval did not probe"
@@ -826,8 +826,8 @@ test_an_oversized_budget_is_cut_to_fit_and_reported() {
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
   out="$home/out.txt"
   status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_TOOL_UPDATE_BUDGET_SECS=60 FM_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
+  env JG_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" JG_TOOL_UPDATE_INTERVAL=0 \
+    JG_TOOL_UPDATE_BUDGET_SECS=60 JG_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "oversized budget exit"
   report=$(cat "$out")
   # The cut leaves room for the whole-second rounding and the kill grace as well
@@ -840,8 +840,8 @@ test_an_oversized_budget_is_cut_to_fit_and_reported() {
   # this run, whose bare skew line differs from the cut run's line above.
   rm -f "$home/state/.tool-updates"
   status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
+  env JG_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" JG_TOOL_UPDATE_INTERVAL=0 \
+    JG_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "default budget exit"
   report=$(cat "$out")
   assert_not_contains "$report" "sweep budget" "the default budget was cut at the default watcher bound"
@@ -851,8 +851,8 @@ test_an_oversized_budget_is_cut_to_fit_and_reported() {
   # record keeps the no-nag gate from hiding this run's repeat of the same line.
   rm -f "$home/state/.tool-updates"
   status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_TOOL_UPDATE_BUDGET_SECS=60 FM_CHECK_TIMEOUT=120 "$CHECK" >"$out" 2>&1 || status=$?
+  env JG_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" JG_TOOL_UPDATE_INTERVAL=0 \
+    JG_TOOL_UPDATE_BUDGET_SECS=60 JG_CHECK_TIMEOUT=120 "$CHECK" >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "fitting budget exit"
   report=$(cat "$out")
   assert_not_contains "$report" "sweep budget" "a budget that fits the watcher bound was cut anyway"
@@ -864,19 +864,19 @@ test_invalid_environment_and_action_refuse() {
   local home status
   home=$(make_home refuse)
   status=0
-  FM_HOME="$home" FM_TOOL_UPDATE_INTERVAL=5 "$CHECK" >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" JG_TOOL_UPDATE_INTERVAL=5 "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "too-small interval exit"
   status=0
-  FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=0 "$CHECK" >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" JG_TOOL_UPDATE_PROBE_SECS=0 "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "zero probe bound exit"
   status=0
-  FM_HOME="$home" FM_TOOL_UPDATE_BUDGET_SECS=999 "$CHECK" >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" JG_TOOL_UPDATE_BUDGET_SECS=999 "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "oversized budget exit"
   status=0
-  FM_HOME="$home" "$CHECK" sweep >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" sweep >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "unknown action exit"
   status=0
-  FM_HOME="$home" "$CHECK" --help >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" --help >/dev/null 2>&1 || status=$?
   expect_code 0 "$status" "help exit"
   pass "an out of range bound or unknown action refuses instead of guessing"
 }
@@ -889,13 +889,13 @@ test_arm_registers_the_check_and_disarm_removes_it() {
   dir="$TMP_ROOT/arm/bin"
   make_copy "$dir" "$TOOL" 'herdr 0.8.2'
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm without a registry exit"
   assert_absent "$home/state/tool-updates.check.sh" "arm wrote a check shim without a registry"
 
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null || status=$?
   expect_code 0 "$status" "arm exit"
   assert_present "$home/state/tool-updates.check.sh" "arm did not write the check shim"
   assert_present "$home/state/tool-updates.check-trust" "arm did not register the check's bytes"
@@ -904,10 +904,10 @@ test_arm_registers_the_check_and_disarm_removes_it() {
   assert_grep 'jg-custom-check-v1' "$home/state/tool-updates.check-trust" "the trust binding has the wrong schema"
 
   # Arming twice must stay valid rather than invalidating its own binding.
-  FM_HOME="$home" "$CHECK" arm >/dev/null || fail "arming twice failed"
+  JG_HOME="$home" "$CHECK" arm >/dev/null || fail "arming twice failed"
   assert_grep 'jg-custom-check-v1' "$home/state/tool-updates.check-trust" "re-arming lost the trust binding"
 
-  FM_HOME="$home" "$CHECK" disarm >/dev/null || fail "disarm failed"
+  JG_HOME="$home" "$CHECK" disarm >/dev/null || fail "disarm failed"
   assert_absent "$home/state/tool-updates.check.sh" "disarm left the check shim behind"
   assert_absent "$home/state/tool-updates.check-trust" "disarm left the trust binding behind"
   assert_absent "$home/state/.tool-updates" "disarm left the report record behind"
@@ -929,7 +929,7 @@ test_arm_refuses_a_symlink_at_the_shim_path() {
   ln -s "$target" "$home/state/tool-updates.check.sh"
 
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm over a symlink exit"
   [ "$(cat "$target")" = 'a file the shim must not touch' ] || fail "arm followed the symlink and overwrote its target"
   [ "$(stat -c %a "$target" 2>/dev/null || stat -f %Lp "$target")" = "$mode" ] || fail "arm changed the mode of the symlink's target"
@@ -954,7 +954,7 @@ test_a_failed_registration_leaves_no_unregistered_shim() {
   ln -s "$target" "$home/state/tool-updates.check-trust"
 
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm with an unusable trust path exit"
   assert_absent "$home/state/tool-updates.check.sh" "a failed registration left an unregistered check shim behind"
   [ "$(cat "$target")" = 'a file the trust binding must not touch' ] || fail "arm wrote through the trust symlink"
@@ -968,7 +968,7 @@ test_a_failed_registration_leaves_no_unregistered_shim() {
   cp "$stale_shim" "$home/state/tool-updates.check.sh"
   chmod 0700 "$home/state/tool-updates.check.sh"
   status=0
-  FM_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  JG_HOME="$home" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm over an existing shim with an unusable trust path exit"
   assert_absent "$home/state/tool-updates.check.sh" "a failed arm left a shim behind that no trust binding covers"
   pass "a failed registration never leaves a shim without a matching trust binding"
@@ -984,7 +984,7 @@ test_a_failed_rearm_leaves_no_shim_the_trust_binding_lost() {
   dir="$TMP_ROOT/arm-rearm-fail/bin"
   make_copy "$dir" "$TOOL" 'herdr 0.8.2'
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
-  FM_HOME="$home" "$CHECK" arm >/dev/null || fail "the first arm failed"
+  JG_HOME="$home" "$CHECK" arm >/dev/null || fail "the first arm failed"
   assert_present "$home/state/tool-updates.check-trust" "the first arm did not bind the shim"
 
   # A hash tool that answers with nothing makes the register write a binding it
@@ -998,7 +998,7 @@ test_a_failed_rearm_leaves_no_shim_the_trust_binding_lost() {
   chmod 0700 "$home/state/tool-updates.check.sh"
 
   status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$fake")" "$CHECK" arm >/dev/null 2>&1 || status=$?
+  env JG_HOME="$home" PATH="$(fixture_path "$fake")" "$CHECK" arm >/dev/null 2>&1 || status=$?
   expect_code 1 "$status" "arm whose registration cannot hash exit"
   assert_absent "$home/state/tool-updates.check.sh" "a failed re-arm left a shim behind after the trust binding was removed"
   assert_absent "$home/state/tool-updates.check-trust" "the failed registration left a trust binding behind"
@@ -1019,12 +1019,12 @@ test_arm_resolves_a_relative_home_into_the_shim() {
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
 
   status=0
-  (cd "$TMP_ROOT" && FM_HOME=arm-relative "$CHECK" arm >/dev/null 2>&1) || status=$?
+  (cd "$TMP_ROOT" && JG_HOME=arm-relative "$CHECK" arm >/dev/null 2>&1) || status=$?
   expect_code 0 "$status" "arm with a relative home exit"
 
   out="$home/out.txt"
   status=0
-  (cd / && env -u FM_HOME PATH="$(fixture_path "$stale:$fresh")" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=0 \
+  (cd / && env -u JG_HOME PATH="$(fixture_path "$stale:$fresh")" JG_CHECK_TIMEOUT=30 JG_TOOL_UPDATE_INTERVAL=0 \
     "$home/state/tool-updates.check.sh" >"$out" 2>&1) || status=$?
   expect_code 0 "$status" "shim run from another directory exit"
   assert_contains "$(cat "$out")" "herdr update not in effect" "the shim read a different home than the one it was armed for"
@@ -1041,13 +1041,13 @@ test_armed_check_wakes_the_watcher_with_the_skew_report() {
   make_copy "$stale" "$TOOL" 'herdr 0.8.0'
   make_copy "$fresh" "$TOOL" 'herdr 0.8.2'
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
-  FM_HOME="$home" "$CHECK" arm >/dev/null || fail "could not arm the watched tool check"
+  JG_HOME="$home" "$CHECK" arm >/dev/null || fail "could not arm the watched tool check"
 
   out="$home/out.txt"
   err="$home/err.txt"
   status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 \
+  env JG_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" JG_CHECK_TIMEOUT=30 JG_TOOL_UPDATE_INTERVAL=0 \
+    JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=1 \
     "$CHECKPOINT" --seconds 10 >"$out" 2>"$err" || status=$?
   expect_code 0 "$status" "watcher checkpoint exit"
   assert_contains "$(cat "$out")" "check:" "the armed check did not reach the watcher as a check wake"

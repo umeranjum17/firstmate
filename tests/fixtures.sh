@@ -11,37 +11,37 @@
 # stay in wake-helpers.sh; secondmate-lifecycle mocks stay in
 # secondmate-helpers.sh.
 #
-# FM_TEST_NO_MISTAKES_VERSION is the single default version for the shared fake
-# no-mistakes banner. Override a single case with FM_FAKE_NO_MISTAKES_VERSION
+# JG_TEST_NO_MISTAKES_VERSION is the single default version for the shared fake
+# no-mistakes banner. Override a single case with JG_FAKE_NO_MISTAKES_VERSION
 # rather than editing a stub body.
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-if [ -n "${FM_TEST_FIXTURES_SOURCED:-}" ]; then
+if [ -n "${JG_TEST_FIXTURES_SOURCED:-}" ]; then
   return 0
 fi
-FM_TEST_FIXTURES_SOURCED=1
+JG_TEST_FIXTURES_SOURCED=1
 
 # Production floor lives in bin/jg-bootstrap.sh (NO_MISTAKES_MIN). Keep this
 # equal to that floor so a bump is one constant here plus that production pin.
-export FM_TEST_NO_MISTAKES_VERSION=1.46.0
-export FM_TEST_NO_MISTAKES_FAKE_VERSION="no-mistakes version v${FM_TEST_NO_MISTAKES_VERSION} (fake)"
-export FM_TEST_NO_MISTAKES_FAKE_VERSION_TS="${FM_TEST_NO_MISTAKES_FAKE_VERSION} 2026-06-27T00:02:18Z"
-export FM_TEST_GH_AXI_VERSION=0.1.29
+export JG_TEST_NO_MISTAKES_VERSION=1.46.0
+export JG_TEST_NO_MISTAKES_FAKE_VERSION="no-mistakes version v${JG_TEST_NO_MISTAKES_VERSION} (fake)"
+export JG_TEST_NO_MISTAKES_FAKE_VERSION_TS="${JG_TEST_NO_MISTAKES_FAKE_VERSION} 2026-06-27T00:02:18Z"
+export JG_TEST_GH_AXI_VERSION=0.1.29
 
 # --- fake no-mistakes -------------------------------------------------------
 
 # jg_test_fake_no_mistakes <fakebin>
 # Drops a no-mistakes stub that answers --version with
-# FM_TEST_NO_MISTAKES_FAKE_VERSION (or FM_FAKE_NO_MISTAKES_VERSION when set)
+# JG_TEST_NO_MISTAKES_FAKE_VERSION (or JG_FAKE_NO_MISTAKES_VERSION when set)
 # and exits 0 for every other invocation.
 jg_test_fake_no_mistakes() {
   local fakebin=$1
   cat > "$fakebin/no-mistakes" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = --version ]; then
-  printf '%s\\n' "\${FM_FAKE_NO_MISTAKES_VERSION:-$FM_TEST_NO_MISTAKES_FAKE_VERSION}"
+  printf '%s\\n' "\${JG_FAKE_NO_MISTAKES_VERSION:-$JG_TEST_NO_MISTAKES_FAKE_VERSION}"
   exit 0
 fi
 exit 0
@@ -83,44 +83,44 @@ SH
 }
 
 # jg_test_fake_gh_axi <fakebin>
-# Answers --version with FM_FAKE_GH_AXI_VERSION or FM_TEST_GH_AXI_VERSION.
+# Answers --version with JG_FAKE_GH_AXI_VERSION or JG_TEST_GH_AXI_VERSION.
 jg_test_fake_gh_axi() {
   local fakebin=$1
-  jg_fake_version_tool "$fakebin" gh-axi FM_FAKE_GH_AXI_VERSION "$FM_TEST_GH_AXI_VERSION"
+  jg_fake_version_tool "$fakebin" gh-axi JG_FAKE_GH_AXI_VERSION "$JG_TEST_GH_AXI_VERSION"
 }
 
 # --- fake tmux / ssh / sleep ------------------------------------------------
 
 # jg_test_fake_tmux_spawn <fakebin>
-# Spawn-world tmux: pane_current_path from FM_FAKE_PANE_PATH, session named
-# firstmate, window ops succeed, send-keys succeed. When FM_FAKE_LAUNCH_LOG is
-# set, each send-keys -l payload is appended one per line. When FM_FAKE_PANE_LOG
+# Spawn-world tmux: pane_current_path from JG_FAKE_PANE_PATH, session named
+# firstmate, window ops succeed, send-keys succeed. When JG_FAKE_LAUNCH_LOG is
+# set, each send-keys -l payload is appended one per line. When JG_FAKE_PANE_LOG
 # is set, each send-keys TEXT-LINE payload (the pre-launch pane exports, which
 # carry no -l) is appended there instead, one per line in send order. Optional
-# FM_FAKE_DUPLICATE_WINDOW is printed from list-windows.
+# JG_FAKE_DUPLICATE_WINDOW is printed from list-windows.
 #
-# The pane path defaults to empty when FM_FAKE_PANE_PATH is unset. Window
+# The pane path defaults to empty when JG_FAKE_PANE_PATH is unset. Window
 # cleanup and option operations are no-ops. Launch logging is env-gated, so
-# suites that do not set FM_FAKE_LAUNCH_LOG keep a silent send-keys.
+# suites that do not set JG_FAKE_LAUNCH_LOG keep a silent send-keys.
 jg_test_fake_tmux_spawn() {
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows)
-    if [ -n "${FM_FAKE_DUPLICATE_WINDOW:-}" ]; then
-      printf '%s\n' "$FM_FAKE_DUPLICATE_WINDOW"
+    if [ -n "${JG_FAKE_DUPLICATE_WINDOW:-}" ]; then
+      printf '%s\n' "$JG_FAKE_DUPLICATE_WINDOW"
     fi
     exit 0
     ;;
   has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
   send-keys)
-    if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
+    if [ -n "${JG_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do
         if [ "$prev" = "-l" ]; then
@@ -144,7 +144,7 @@ case "${1:-}" in
               fi
               ;;
           esac
-          printf '%s\n' "$a" >> "$FM_FAKE_LAUNCH_LOG"
+          printf '%s\n' "$a" >> "$JG_FAKE_LAUNCH_LOG"
         fi
         prev=$a
       done
@@ -154,7 +154,7 @@ case "${1:-}" in
     # suite that asserts on what the pane shell received opts in with its own
     # log. Skip the flags, the target, and the trailing key so only the payload
     # is recorded, one per line, in send order.
-    if [ -n "${FM_FAKE_PANE_LOG:-}" ]; then
+    if [ -n "${JG_FAKE_PANE_LOG:-}" ]; then
       shift
       skip_next=
       literal=
@@ -164,7 +164,7 @@ case "${1:-}" in
           -t) skip_next=1; continue ;;
           -l) literal=1; continue ;;
           Enter|C-m) continue ;;
-          *) [ -n "$literal" ] || printf '%s\n' "$a" >> "$FM_FAKE_PANE_LOG" ;;
+          *) [ -n "$literal" ] || printf '%s\n' "$a" >> "$JG_FAKE_PANE_LOG" ;;
         esac
       done
     fi
@@ -177,11 +177,11 @@ SH
 }
 
 # jg_test_fake_tmux_send <fakebin>
-# Send-world tmux: logs send-keys -l payloads to FM_SEND_LOG, reports a numeric
+# Send-world tmux: logs send-keys -l payloads to JG_SEND_LOG, reports a numeric
 # cursor_y, and renders an empty bordered composer so the submit path reads
 # empty. Env knobs:
-#   FM_FAKE_TMUX_SEND_FAIL=1  send-keys exits 1
-#   FM_FAKE_TMUX_COMPOSER=pending  capture-pane shows leftover composer text
+#   JG_FAKE_TMUX_SEND_FAIL=1  send-keys exits 1
+#   JG_FAKE_TMUX_COMPOSER=pending  capture-pane shows leftover composer text
 jg_test_fake_tmux_send() {
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
@@ -189,7 +189,7 @@ jg_test_fake_tmux_send() {
 set -u
 case "${1:-}" in
   send-keys)
-    [ "${FM_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
     shift
     literal=0
     while [ $# -gt 0 ]; do
@@ -200,7 +200,7 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "${1:-}" >> "${FM_SEND_LOG:-/dev/null}"
+      printf '%s' "${1:-}" >> "${JG_SEND_LOG:-/dev/null}"
     fi
     exit 0
     ;;
@@ -212,7 +212,7 @@ case "${1:-}" in
     exit 0
     ;;
   capture-pane)
-    if [ "${FM_FAKE_TMUX_COMPOSER:-}" = pending ]; then
+    if [ "${JG_FAKE_TMUX_COMPOSER:-}" = pending ]; then
       printf '╭──────────────╮\n│ leftover txt │\n╰──────────────╯\n'
     else
       printf '╭────╮\n│    │\n╰────╯\n'
@@ -227,16 +227,16 @@ SH
 }
 
 # jg_test_fake_ssh <fakebin> [name]
-# Records argv to FM_SSH_LOG, consumes stdin, exits FM_FAKE_SSH_RC (default 0).
-# Default name is fake-ssh so tests can point FM_SSH_BIN at it without
+# Records argv to JG_SSH_LOG, consumes stdin, exits JG_FAKE_SSH_RC (default 0).
+# Default name is fake-ssh so tests can point JG_SSH_BIN at it without
 # shadowing a real ssh on PATH.
 jg_test_fake_ssh() {
   local fakebin=$1 name=${2:-fake-ssh}
   cat > "$fakebin/$name" <<'SH'
 #!/usr/bin/env bash
 cat > /dev/null
-printf '%s\n' "$*" >> "${FM_SSH_LOG:-/dev/null}"
-exit "${FM_FAKE_SSH_RC:-0}"
+printf '%s\n' "$*" >> "${JG_SSH_LOG:-/dev/null}"
+exit "${JG_FAKE_SSH_RC:-0}"
 SH
   chmod +x "$fakebin/$name"
 }
@@ -252,12 +252,12 @@ SH
 }
 
 # jg_test_fake_sleep_log <fakebin>
-# Records each requested duration to FM_SLEEP_LOG instead of sleeping.
+# Records each requested duration to JG_SLEEP_LOG instead of sleeping.
 jg_test_fake_sleep_log() {
   local fakebin=$1
   cat > "$fakebin/sleep" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${1:-}" >> "${FM_SLEEP_LOG:-/dev/null}"
+printf '%s\n' "${1:-}" >> "${JG_SLEEP_LOG:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/sleep"
@@ -310,7 +310,7 @@ make_spawn_fakebin() {
 }
 
 # jg_test_run_spawn <home> <pane-path> <fakebin> [jg-spawn args...]
-# Common spawn env. Extra variables in the caller (GROK_HOME, FM_FAKE_LAUNCH_LOG,
+# Common spawn env. Extra variables in the caller (GROK_HOME, JG_FAKE_LAUNCH_LOG,
 # CLAUDE_CONFIG_DIR, ...) are inherited. Does not add --mode/--yolo; ship tests
 # that need a delivery contract pass those flags themselves.
 jg_test_run_spawn() {
@@ -325,22 +325,22 @@ jg_test_run_spawn() {
   # hold, while an empty value falls through to it. Empty rather than a path
   # because bin/jg-spawn.sh prefixes the launch only when the value is non-empty,
   # so every launch-shape assertion in the suite keeps reading the same command.
-  # A test that needs the set case opts in through FM_TEST_CLAUDE_CONFIG_DIR.
+  # A test that needs the set case opts in through JG_TEST_CLAUDE_CONFIG_DIR.
   # XDG_DATA_HOME is pinned for the same reason: an OpenCode launch reads
   # <data dir>/opencode/auth.json to decide whether an opencode-go model gets
   # its own session store, so a value inherited from the developer's shell would
   # decide that assertion from their real credentials. The default sits under
   # the throwaway HOME, which is where an unset XDG_DATA_HOME resolves anyway,
   # so the default case is "no auth.json". A test that needs the set case opts
-  # in through FM_TEST_XDG_DATA_HOME.
+  # in through JG_TEST_XDG_DATA_HOME.
   local spawn_home=$home/user-home
   mkdir -p "$spawn_home"
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$spawn_home" \
-    CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
-    XDG_DATA_HOME="${FM_TEST_XDG_DATA_HOME:-$spawn_home/.local/share}" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$pane" TMUX="${TMUX:-fake,1,0}" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" HOME="$spawn_home" \
+    CLAUDE_CONFIG_DIR="${JG_TEST_CLAUDE_CONFIG_DIR:-}" \
+    XDG_DATA_HOME="${JG_TEST_XDG_DATA_HOME:-$spawn_home/.local/share}" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$pane" TMUX="${TMUX:-fake,1,0}" \
     PATH="$fakebin:$PATH" \
     "$ROOT/bin/jg-spawn.sh" "$@" 2>&1
 }

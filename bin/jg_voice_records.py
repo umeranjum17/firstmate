@@ -157,7 +157,7 @@ class RecordError(Exception):
 
 def default_home():
     """Return the operational home, matching bin/jg-inbox.sh's resolution."""
-    env = os.environ.get("FM_HOME")
+    env = os.environ.get("JG_HOME")
     if env:
         return env
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -166,13 +166,13 @@ def default_home():
 def state_dir(home):
     """Return the runtime state directory, resolved as bin/jg-inbox.sh resolves it.
 
-    jg-inbox.sh reads ${FM_STATE_OVERRIDE:-$FM_HOME/state}, and the handover
+    jg-inbox.sh reads ${JG_STATE_OVERRIDE:-$JG_HOME/state}, and the handover
     below queues through jg-inbox.sh with the ambient environment. A reader that
     ignored the override would count notes in one directory while the queue wrote
     them to another, so the agent would tell the captain their request was queued
     and then, asked what is waiting, report nothing.
     """
-    override = os.environ.get("FM_STATE_OVERRIDE")
+    override = os.environ.get("JG_STATE_OVERRIDE")
     if override:
         return override
     return os.path.join(home, "state")
@@ -181,14 +181,14 @@ def state_dir(home):
 def data_dir(home):
     """Return the durable records directory, the other half of the same pair.
 
-    Every script that sets FM_DATA_OVERRIDE for a child sets FM_STATE_OVERRIDE
+    Every script that sets JG_DATA_OVERRIDE for a child sets JG_STATE_OVERRIDE
     beside it, so resolving one and not the other would answer one question from
     two different homes: counts of workers and notes from the overridden state
     directory, counts of in-flight and queued work from the home's own backlog.
     A spliced answer is worse than a wrong one, because nothing about it looks
     wrong.
     """
-    override = os.environ.get("FM_DATA_OVERRIDE")
+    override = os.environ.get("JG_DATA_OVERRIDE")
     if override:
         return override
     return os.path.join(home, "data")
@@ -196,7 +196,7 @@ def data_dir(home):
 
 def config_dir(home):
     """Return the configuration directory, honouring the repo-wide override."""
-    override = os.environ.get("FM_CONFIG_OVERRIDE")
+    override = os.environ.get("JG_CONFIG_OVERRIDE")
     if override:
         return override
     return os.path.join(home, "config")
@@ -540,7 +540,7 @@ def queue_request(text, home=None, root=None):
     inbox = os.path.join(root, "jg-inbox.sh")
     if not os.access(inbox, os.X_OK):
         raise RecordError("cannot run {}".format(inbox))
-    env = dict(os.environ, FM_HOME=home)
+    env = dict(os.environ, JG_HOME=home)
     done = subprocess.run(
         [inbox, "note", body],
         # The relay's stdin is the captain's audio when this runs under

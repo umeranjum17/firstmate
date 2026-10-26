@@ -39,11 +39,11 @@ data/secondmates.md is only a fallback for missing home= fields in older or
 incomplete meta records.
 
 Environment overrides follow the rest of firstmate:
-  FM_HOME            active firstmate home
-  FM_ROOT_OVERRIDE  firstmate repo root
-  FM_STATE_OVERRIDE state dir
-  FM_DATA_OVERRIDE  data dir
-  FM_CONFIG_OVERRIDE config dir
+  JG_HOME            active firstmate home
+  JG_ROOT_OVERRIDE  firstmate repo root
+  JG_STATE_OVERRIDE state dir
+  JG_DATA_OVERRIDE  data dir
+  JG_CONFIG_OVERRIDE config dir
 EOF
 }
 
@@ -61,11 +61,11 @@ case "${1:-}" in
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 SECONDMATES_MD="$DATA/secondmates.md"
 
 "$SCRIPT_DIR/jg-guard.sh" || true
@@ -115,7 +115,7 @@ if [ ! -s "$records" ]; then
   exit 0
 fi
 
-echo "config-push: $FM_HOME -> live secondmate homes"
+echo "config-push: $JG_HOME -> live secondmate homes"
 
 seen_homes=""
 errors=0
@@ -149,21 +149,21 @@ while IFS='|' read -r id home _window meta; do
     remote_pending=0
     if [ -f "$remote_marker" ] && [ "$(jg_meta_get "$remote_marker" remote)" = 1 ]; then remote_pending=1; fi
     if ! jg_secondmate_nudge_write "$STATE" "$id" "$home" "" remote \
-      "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
+      "$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
       echo "  config-reread: retry marker failed"
       errors=1
       jg_lock_release "$remote_lock" || true
       continue
     fi
-    if remote_out=$(FM_CONFIG_INHERIT_LIVE=1 \
+    if remote_out=$(JG_CONFIG_INHERIT_LIVE=1 \
       "$SCRIPT_DIR/jg-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
       printf '%s\n' "$remote_out" | sed 's/^/  /'
       remote_nudge=0
       if printf '%s\n' "$remote_out" | grep -Eq '^(pushed|removed):'; then remote_nudge=1; fi
       [ "$remote_pending" -eq 0 ] || remote_nudge=1
       if [ "$remote_nudge" -eq 1 ]; then
-        if FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
-          "$SCRIPT_DIR/jg-send.sh" "jg-$id" "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
+        if JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" \
+          "$SCRIPT_DIR/jg-send.sh" "jg-$id" "$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
           rm -f -- "$remote_marker"
           echo "  config-reread: sent"
         else
@@ -214,9 +214,9 @@ while IFS='|' read -r id home _window meta; do
     errors=1
     continue
   }
-  if jg_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+  if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
     jg_config_reread_retry_pending "$id" "$home_real" || true
-    if jg_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+    if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
       echo "  config-reread: error - retry instruction queue is full"
       errors=1
       jg_lock_release "$home_lock" || true
@@ -231,19 +231,19 @@ while IFS='|' read -r id home _window meta; do
     continue
   }
   reports="$reports $report"
-  if FM_CONFIG_INHERIT_REPORT="$report" FM_CONFIG_INHERIT_LIVE=1 \
-    propagate_secondmate_inheritance "$FM_HOME" "$home_real" "$CONFIG" "$DATA"; then
+  if JG_CONFIG_INHERIT_REPORT="$report" JG_CONFIG_INHERIT_LIVE=1 \
+    propagate_secondmate_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
     :
   else
     errors=1
   fi
   print_item_report "$report"
   reread_pending=0
-  if jg_config_reread_has_pending "$home_real" || jg_config_reread_has_staged "$FM_HOME" "$id"; then
+  if jg_config_reread_has_pending "$home_real" || jg_config_reread_has_staged "$JG_HOME" "$id"; then
     reread_pending=1
   fi
-  if reread_out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" \
-    FM_STATE_OVERRIDE="$STATE" \
+  if reread_out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_STATE_OVERRIDE="$STATE" \
     jg_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
     if [ -n "$(jg_config_reread_changed_items "$report")" ] || [ "$reread_pending" -eq 1 ]; then
       printf '  config-reread: sent\n'

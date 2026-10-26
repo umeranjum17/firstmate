@@ -24,7 +24,7 @@
 #
 # This script forks the watcher as a tracked child, then VERIFIES the outcome
 # before it settles in. It confirms a watcher process is genuinely alive AND the
-# liveness beacon (state/.last-watcher-beat) is fresh within FM_GUARD_GRACE (the
+# liveness beacon (state/.last-watcher-beat) is fresh within JG_GUARD_GRACE (the
 # single source of truth, shared with jg-watch.sh and jg-guard.sh). Beacon
 # publication follows docs/turnend-guard.md "Guard grace and the poll cadence".
 # After confirmation this script prints
@@ -64,7 +64,7 @@
 # state/.watch-triage.log remains exclusively the watcher's absorbed-wake debug
 # log and is never written here.
 #
-# --restart: stop ONLY this FM_HOME's watcher (the pid recorded in THIS home's
+# --restart: stop ONLY this JG_HOME's watcher (the pid recorded in THIS home's
 # state/.watch.lock) and own a fresh cycle, or attach if a verified live peer
 # wins the singleton while the duplicate child stands down. It
 # resolves and signals exactly that pid, so it can never touch another home's
@@ -104,11 +104,11 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-gate-refuse-lib.sh
 . "$SCRIPT_DIR/jg-gate-refuse-lib.sh"
-if [ "${FM_GATE_REFUSE_BYPASS:-}" != 1 ]; then
+if [ "${JG_GATE_REFUSE_BYPASS:-}" != 1 ]; then
   case "$SCRIPT_DIR/:$(cd "$SCRIPT_DIR" && pwd -P)/" in
     */.no-mistakes/worktrees/*)
-      lab_root=$(cd -P -- "${FM_HOME:-/nonexistent}" 2>/dev/null && pwd -P || true)
-      state_dir=${FM_STATE_OVERRIDE:-${STATE:-${FM_HOME:-}/state}}
+      lab_root=$(cd -P -- "${JG_HOME:-/nonexistent}" 2>/dev/null && pwd -P || true)
+      state_dir=${JG_STATE_OVERRIDE:-${STATE:-${JG_HOME:-}/state}}
       if [ -d "$state_dir" ]; then
         resolved_state=$(cd -P -- "$state_dir" 2>/dev/null && pwd -P || true)
       elif [ ! -e "$state_dir" ] && [ ! -L "$state_dir" ]; then
@@ -130,16 +130,16 @@ WATCH="$SCRIPT_DIR/jg-watch.sh"
 WATCH_LOCK="$STATE/.watch.lock"
 BEAT="$STATE/.last-watcher-beat"
 # "Fresh" reuses the guard's threshold so there is one definition of liveness.
-GRACE=${FM_GUARD_GRACE:-300}
+GRACE=${JG_GUARD_GRACE:-300}
 # Poll interval while attached to an existing healthy watcher.
-ATTACH_POLL=${FM_ARM_ATTACH_POLL:-0.5}
+ATTACH_POLL=${JG_ARM_ATTACH_POLL:-0.5}
 # The beacon age at which the watcher's own re-arm evicts a live holder; an
 # attached arm follows a slow holder up to it (attach_and_wait).
 STALL_BOUND=$(jg_watcher_stall_bound)
 CYCLE_LOG="$STATE/.watch-cycle-exits.log"
 CYCLE_LOG_LOCK="$STATE/.watch-cycle-exits.lock"
-CYCLE_LOG_MAX_BYTES=${FM_WATCH_CYCLE_LOG_MAX_BYTES:-262144}
-CYCLE_LOG_KEEP_LINES=${FM_WATCH_CYCLE_LOG_KEEP_LINES:-1000}
+CYCLE_LOG_MAX_BYTES=${JG_WATCH_CYCLE_LOG_MAX_BYTES:-262144}
+CYCLE_LOG_KEEP_LINES=${JG_WATCH_CYCLE_LOG_KEEP_LINES:-1000}
 ARM_PID=${BASHPID:-$$}
 case "$CYCLE_LOG_MAX_BYTES" in ''|*[!0-9]*|0) CYCLE_LOG_MAX_BYTES=262144 ;; esac
 case "$CYCLE_LOG_KEEP_LINES" in ''|*[!0-9]*|0) CYCLE_LOG_KEEP_LINES=1000 ;; esac
@@ -248,7 +248,7 @@ cycle_log_append() {
 # extra synthetic lifecycle row. A taking-over arm names itself instead, so its
 # record of the cycle it took over names the cycle it started.
 cycle_mark_predecessor_successor() {
-  local successor=$1 predecessor=${2:-${FM_WATCH_PREDECESSOR_ARM_PID:-}} i tmp
+  local successor=$1 predecessor=${2:-${JG_WATCH_PREDECESSOR_ARM_PID:-}} i tmp
   case "$predecessor" in
     ''|*[!0-9]*) return 0 ;;
   esac
@@ -286,7 +286,7 @@ clear_stale_recorded_watcher_lock() {
   lock_home=$(cat "$WATCH_LOCK/jg-home" 2>/dev/null || true)
   lock_path=$(cat "$WATCH_LOCK/watcher-path" 2>/dev/null || true)
   lock_identity=$(cat "$WATCH_LOCK/pid-identity" 2>/dev/null || true)
-  [ "$lock_home" = "$FM_HOME" ] || return 0
+  [ "$lock_home" = "$JG_HOME" ] || return 0
   [ "$lock_path" = "$WATCH" ] || return 0
   [ -n "$lock_identity" ] || return 0
   jg_recovery_transition "$STATE/.watcher-down" clear-stale-lock "$WATCH_LOCK" downtime
@@ -302,9 +302,9 @@ HEALTHY_IDENTITY=
 healthy_watcher() {
   HEALTHY_PID=
   HEALTHY_IDENTITY=
-  jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME" || return 1
-  HEALTHY_PID=$FM_WATCHER_HEALTHY_PID
-  HEALTHY_IDENTITY=$FM_WATCHER_HEALTHY_IDENTITY
+  jg_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$JG_HOME" || return 1
+  HEALTHY_PID=$JG_WATCHER_HEALTHY_PID
+  HEALTHY_IDENTITY=$JG_WATCHER_HEALTHY_IDENTITY
 }
 
 report_attached() {
@@ -320,7 +320,7 @@ wait_for_healthy_successor() {
   local deadline
   # date(1) exposes whole seconds. Add one rounding second so a timeout of one
   # second cannot collapse to a few milliseconds when called near a boundary.
-  deadline=$(( $(date +%s) + $(jg_watcher_confirmation_budget "$STATE" "$WATCH" "$FM_HOME") + 1 ))
+  deadline=$(( $(date +%s) + $(jg_watcher_confirmation_budget "$STATE" "$WATCH" "$JG_HOME") + 1 ))
   while :; do
     healthy_watcher && return 0
     [ "$(date +%s)" -ge "$deadline" ] && return 1
@@ -375,8 +375,8 @@ attached_holder_live() {
   lock_pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
   [ "$lock_pid" = "$pid" ] || return 1
   jg_pid_alive "$pid" || return 1
-  jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME" || return 1
-  [ "$FM_WATCHER_MATCHED_IDENTITY" = "$cycle_watcher_identity" ]
+  jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$JG_HOME" || return 1
+  [ "$JG_WATCHER_MATCHED_IDENTITY" = "$cycle_watcher_identity" ]
 }
 
 # Stay alive across identity-matched healthy holders. If one cycle ends, attach
@@ -462,10 +462,10 @@ print_watch_output() {
 }
 
 handling_successor_generation() {
-  [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ] || return 0
+  [ -n "${JG_WATCH_PREDECESSOR_ARM_PID:-}" ] || return 0
   jg_recovery_marker_snapshot "$STATE/.watcher-down" || return 1
-  case "$FM_RECOVERY_MARKER_TOKEN" in
-    pending:downtime:*|pending:handling:*|announced:downtime:*|announced:handling:*) printf '%s' "${FM_RECOVERY_MARKER_TOKEN##*:}" ;;
+  case "$JG_RECOVERY_MARKER_TOKEN" in
+    pending:downtime:*|pending:handling:*|announced:downtime:*|announced:handling:*) printf '%s' "${JG_RECOVERY_MARKER_TOKEN##*:}" ;;
     acked:*|'') ;;
     *) return 1 ;;
   esac
@@ -499,7 +499,7 @@ esac
 
 if [ "$mode" = handling-delivered ]; then
   jg_pid_alive "$handling_watcher_pid" \
-    && jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$handling_watcher_pid" "$FM_HOME" \
+    && jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$handling_watcher_pid" "$JG_HOME" \
     && jg_recovery_marker_begin_handling "$STATE/.watcher-down" "$handling_generation"
   exit $?
 fi
@@ -513,7 +513,7 @@ stop_home_watcher() {
   local lock_pid i
   lock_pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
   jg_pid_alive "$lock_pid" || return 0
-  if jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$lock_pid" "$FM_HOME"; then
+  if jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$lock_pid" "$JG_HOME"; then
     kill -TERM "$lock_pid" 2>/dev/null || true
     i=0
     while [ "$i" -lt 50 ] && jg_pid_alive "$lock_pid"; do
@@ -584,7 +584,7 @@ take_over_cycle() {  # <watcher-pid> <identity>
   done
   if [ "$owner_signal" = TERM ]; then
     jg_recovery_marker_handover_restore "$STATE/.watcher-down" \
-      "$FM_RECOVERY_HANDOVER_TOKEN" "$FM_RECOVERY_HANDOVER_SEQ" || true
+      "$JG_RECOVERY_HANDOVER_TOKEN" "$JG_RECOVERY_HANDOVER_SEQ" || true
     cycle_log_append unknown unknown taken-over none
   else
     cycle_log_append unknown unknown taken-over-unconfirmed-stop none
@@ -643,7 +643,7 @@ handle_arm_signal() {
     # reach that cleanup-ready point (or exit naturally) before forwarding TERM,
     # but never past the startup confirmation deadline.
     while jg_pid_alive "$child"; do
-      if jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$child" "$FM_HOME" \
+      if jg_watcher_lock_matches_pid "$STATE" "$WATCH" "$child" "$JG_HOME" \
         || [ "$(date +%s)" -ge "$deadline" ]; then
         kill -TERM "$child" 2>/dev/null || true
         break
@@ -667,9 +667,9 @@ child_out=$(mktemp "$STATE/.watch-arm-output.XXXXXX") || {
 }
 # date(1) exposes whole seconds. Keep the configured confirmation budget from
 # collapsing when startup begins just before the next second boundary.
-deadline=$(( $(date +%s) + $(jg_watcher_confirmation_budget "$STATE" "$WATCH" "$FM_HOME") + 1 ))
-if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
-  FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH" >"$child_out" &
+deadline=$(( $(date +%s) + $(jg_watcher_confirmation_budget "$STATE" "$WATCH" "$JG_HOME") + 1 ))
+if [ -n "${JG_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+  JG_WATCH_HANDLING_SUCCESSOR=1 "$WATCH" >"$child_out" &
 else
   "$WATCH" >"$child_out" &
 fi

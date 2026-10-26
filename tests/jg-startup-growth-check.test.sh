@@ -31,7 +31,7 @@ make_world() {
 
 run_check() {
   local root=$1 home=$2 now=$3 out status=0
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW="$now" "$CHECK" check 2>&1) || status=$?
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW="$now" "$CHECK" check 2>&1) || status=$?
   printf '%s\t%s\n' "$status" "$out"
 }
 
@@ -282,7 +282,7 @@ esac
 exec $real_stat "\$@"
 FAKE
   chmod 0755 "$fakebin/stat"
-  out=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=87401 "$CHECK" check 2>&1) \
+  out=$(PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=87401 "$CHECK" check 2>&1) \
     || fail "unreadable due run failed: $out"
   assert_contains "$out" 'unreadable tracked AGENTS.md' "a failed size read was not reported as unreadable"
 
@@ -326,7 +326,7 @@ test_over_long_finding_set_is_capped_with_the_shared_marker() {
   done
   mkdir -p "$deep"
   ln -s "$home/data/captain.md" "$deep/learnings.md"
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_DATA_OVERRIDE="$deep" FM_STARTUP_GROWTH_NOW=1000 \
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_DATA_OVERRIDE="$deep" JG_STARTUP_GROWTH_NOW=1000 \
     "$CHECK" check 2>/dev/null) || fail "capped check failed"
   assert_contains "$out" 'unsafe memory data/learnings.md' "the leading finding was lost"
   [ "${#out}" -le 1000 ] || fail "the wake line was emitted uncapped at ${#out} characters"
@@ -356,7 +356,7 @@ STUB
   rec=$(make_world verdict-status)
   root=${rec%%|*}
   home=${rec#*|}
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=1000 \
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=1000 \
     "$fixbin/jg-startup-growth-check.sh" check 2>&1) || fail "unknown-status check failed: $out"
   assert_contains "$out" 'reason=unparseable report' "an unrecognized budget_status was accepted as within-budget"
 
@@ -377,7 +377,7 @@ STUB
   rec=$(make_world verdict-exception)
   root=${rec%%|*}
   home=${rec#*|}
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=1000 \
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=1000 \
     "$fixbin/jg-startup-growth-check.sh" check 2>&1) || fail "unknown-exception check failed: $out"
   assert_contains "$out" 'reason=unparseable report' "an unrecognized exception annotation silently suppressed the overrun"
 }
@@ -393,7 +393,7 @@ test_record_with_a_foreign_schema_marker_is_not_trusted() {
     printf 'last_eval\t1000\n'
     printf 'AGENTS.md\tpresent\t1\t1\t1\n'
   } > "$record"
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=1200 "$CHECK" check 2>&1) \
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=1200 "$CHECK" check 2>&1) \
     || fail "foreign-schema check failed: $out"
   [ -z "$out" ] || fail "a record from another schema was reinterpreted instead of re-baselined: $out"
   IFS= read -r first < "$record"
@@ -408,7 +408,7 @@ test_findings_are_delivered_even_when_the_record_cannot_be_published() {
   home=${rec#*|}
   printf '5\n' > "$home/config/startup-memory-budget"
   ln -s /no/such/place "$home/state/.startup-growth-check"
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=1000 "$CHECK" check 2>/dev/null) || status=$?
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=1000 "$CHECK" check 2>/dev/null) || status=$?
   [ "$status" != 0 ] || fail "an unpublishable report record should surface as a failure"
   assert_contains "$out" 'startup memory budget overrun' "the finding was dropped because the record could not be published"
   leftover=$(cd "$home/state" && ls -1 .startup-growth-check.?????? 2>/dev/null || true)
@@ -440,14 +440,14 @@ test_rearming_an_unchanged_binding_does_not_replace_the_shim() {
   root=${rec%%|*}
   home=${rec#*|}
   bin=$(make_isolated_bin rearm-noop 0)
-  FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$bin/jg-startup-growth-check.sh" arm >/dev/null \
+  JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$bin/jg-startup-growth-check.sh" arm >/dev/null \
     || fail "first arm failed"
   before=$(jg_pr_file_inode "$home/state/startup-growth.check.sh")
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$bin/jg-startup-growth-check.sh" arm 2>&1) \
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$bin/jg-startup-growth-check.sh" arm 2>&1) \
     || fail "re-arm of an unchanged binding failed: $out"
   after=$(jg_pr_file_inode "$home/state/startup-growth.check.sh")
   assert_equals "$before" "$after" "re-arming replaced a shim whose bytes were already correct"
-  out=$(env -u FM_HOME FM_ROOT_OVERRIDE="$root" FM_STARTUP_GROWTH_NOW=1000 \
+  out=$(env -u JG_HOME JG_ROOT_OVERRIDE="$root" JG_STARTUP_GROWTH_NOW=1000 \
     "$home/state/startup-growth.check.sh" 2>&1) || fail "the re-armed shim no longer runs: $out"
   assert_present "$home/state/.startup-growth-check" "the re-armed shim did not run the daily check"
 }
@@ -458,7 +458,7 @@ test_failed_first_arm_leaves_the_home_plainly_unarmed() {
   root=${rec%%|*}
   home=${rec#*|}
   bin=$(make_isolated_bin arm-fail 1)
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$bin/jg-startup-growth-check.sh" arm 2>&1) || status=$?
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$bin/jg-startup-growth-check.sh" arm 2>&1) || status=$?
   [ "$status" != 0 ] || fail "a failed registration reported a successful arm"
   assert_absent "$home/state/startup-growth.check.sh" "a failed first arm left an unregistered shim behind"
   assert_absent "$home/state/startup-growth.check-trust" "a failed first arm left a trust binding behind"
@@ -472,19 +472,19 @@ test_failed_rearm_keeps_the_previously_armed_shim_and_trust() {
   root=${rec%%|*}
   home=${rec#*|}
   good=$(make_isolated_bin rearm-fail 0)
-  FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$good/jg-startup-growth-check.sh" arm >/dev/null \
+  JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$good/jg-startup-growth-check.sh" arm >/dev/null \
     || fail "first arm failed"
   shim=$(cat "$home/state/startup-growth.check.sh")
   trust=$(cat "$home/state/startup-growth.check-trust")
 
   bad=$(make_isolated_bin rearm-fail-bad 1)
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$bad/jg-startup-growth-check.sh" arm 2>&1) || status=$?
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$bad/jg-startup-growth-check.sh" arm 2>&1) || status=$?
   [ "$status" != 0 ] || fail "a failed re-registration reported a successful arm"
   assert_present "$home/state/startup-growth.check.sh" "a failed re-arm disarmed a working home"
   assert_present "$home/state/startup-growth.check-trust" "a failed re-arm removed the trust binding of a working home"
   assert_equals "$shim" "$(cat "$home/state/startup-growth.check.sh")" "a failed re-arm changed the armed shim"
   assert_equals "$trust" "$(cat "$home/state/startup-growth.check-trust")" "a failed re-arm changed the trust binding"
-  out=$(env -u FM_HOME FM_ROOT_OVERRIDE="$root" FM_STARTUP_GROWTH_NOW=1000 \
+  out=$(env -u JG_HOME JG_ROOT_OVERRIDE="$root" JG_STARTUP_GROWTH_NOW=1000 \
     "$home/state/startup-growth.check.sh" 2>&1) || fail "the preserved shim no longer runs: $out"
   assert_present "$home/state/.startup-growth-check" "the preserved shim did not run the daily check"
 }
@@ -512,7 +512,7 @@ printf 'budget_status=within-budget\n'
 STUB
   chmod 0755 "$bin/jg-startup-memory-budget.sh"
 
-  FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_STARTUP_GROWTH_NOW=87401 \
+  JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_STARTUP_GROWTH_NOW=87401 \
     "$bin/jg-startup-growth-check.sh" check >/dev/null 2>&1 &
   pid=$!
   while [ ! -f "$ready" ]; do
@@ -583,22 +583,22 @@ test_arm_and_disarm_use_authenticated_custom_check() {
   rec=$(make_world arm)
   root=${rec%%|*}
   home=${rec#*|}
-  out=$(FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$CHECK" arm)
+  out=$(JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$CHECK" arm)
   assert_contains "$out" 'armed: state/startup-growth.check.sh' "arm did not announce the check shim"
   assert_present "$home/state/startup-growth.check.sh" "arm did not write the check shim"
   assert_present "$home/state/startup-growth.check-trust" "arm did not register trust for the check shim"
 
-  out=$(env -u FM_HOME FM_ROOT_OVERRIDE="$root" FM_STARTUP_GROWTH_NOW=1000 "$home/state/startup-growth.check.sh" 2>&1) \
+  out=$(env -u JG_HOME JG_ROOT_OVERRIDE="$root" JG_STARTUP_GROWTH_NOW=1000 "$home/state/startup-growth.check.sh" 2>&1) \
     || fail "registered check shim failed: $out"
   [ -z "$out" ] || fail "registered shim baseline run should stay silent: $out"
   assert_present "$home/state/.startup-growth-check" "registered shim did not run the daily check in the pinned home"
   assert_absent "$root/state/.startup-growth-check" "registered shim resolved the home from the environment instead of its pinned value"
   add_bytes "$root/AGENTS.md" 2500
-  out=$(env -u FM_HOME FM_ROOT_OVERRIDE="$root" FM_STARTUP_GROWTH_NOW=87401 "$home/state/startup-growth.check.sh" 2>&1) \
+  out=$(env -u JG_HOME JG_ROOT_OVERRIDE="$root" JG_STARTUP_GROWTH_NOW=87401 "$home/state/startup-growth.check.sh" 2>&1) \
     || fail "registered check shim failed on growth: $out"
   assert_contains "$out" 'startup-growth: tracked startup surface growth AGENTS.md +2500 bytes' "registered shim did not report growth to the watcher"
 
-  FM_ROOT_OVERRIDE="$root" FM_HOME="$home" "$CHECK" disarm >/dev/null
+  JG_ROOT_OVERRIDE="$root" JG_HOME="$home" "$CHECK" disarm >/dev/null
   assert_absent "$home/state/startup-growth.check.sh" "disarm left the check shim"
   assert_absent "$home/state/startup-growth.check-trust" "disarm left the trust binding"
 }

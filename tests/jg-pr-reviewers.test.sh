@@ -26,7 +26,7 @@ serve() {
       printf '%s\n' '[{"filename":"a.ts"},{"filename":"dir/b.ts"}]'
       ;;
     "api --method GET /repos/o/r/commits -f sha=base123 -f path=a.ts -F per_page=100 --jq "*)
-      if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
+      if [ "${JG_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[
           {"sha":"own1","author":{"login":"prauthor","type":"User"}},
           {"sha":"unmapped1","author":null}]'
@@ -42,7 +42,7 @@ serve() {
       fi
       ;;
     "api --method GET /repos/o/r/commits -f sha=base123 -f path=dir/b.ts -F per_page=100 --jq "*)
-      if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
+      if [ "${JG_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[{"sha":"own2","author":{"login":"prauthor","type":"User"}}]'
       else
         printf '%s\n' '[
@@ -86,7 +86,7 @@ test_candidates_use_api_logins_and_unique_commit_counts() {
 
 test_only_author_evidence_says_no_candidates() {
   local out
-  out=$(FM_TEST_ONLY_AUTHOR=1 run_reviewers) || fail "author-only fixture was refused"
+  out=$(JG_TEST_ONLY_AUTHOR=1 run_reviewers) || fail "author-only fixture was refused"
   [ "$out" = 'NO CANDIDATES: no mapped author other than the PR author' ] \
     || fail "author-only evidence was not explained plainly: $out"
   pass "author-only evidence produces no candidate and says why"

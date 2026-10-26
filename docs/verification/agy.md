@@ -26,7 +26,7 @@ $ agy --version
 A live TUI's `/proc/<pid>/environ` carries no `AGY_*` or `ANTIGRAVITY_*` variable.
 It does carry `AGENT=1` and `CLAUDECODE=1`, both inherited from the launching environment, so neither is an agy identity and neither is promoted to a marker.
 Herdr's `pane process-info` for the same pane reports the foreground process as `name=agy` with `argv=["agy", ...]`, and `ps -o comm=` reports `agy`.
-`bin/jg-harness.sh` therefore matches the anchored process name `agy` alone, and the spawn clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, and `FM_PI_HARNESS` at the launch boundary.
+`bin/jg-harness.sh` therefore matches the anchored process name `agy` alone, and the spawn clears `CLAUDECODE`, `PI_CODING_AGENT`, `GROK_AGENT`, and `JG_PI_HARNESS` at the launch boundary.
 `tests/jg-agy-harness.test.sh` pins the anchored match, the rejection of unrelated names containing the fragment, and that an inherited `CLAUDECODE` never outranks a real `agy` ancestor once the spawn clears it.
 
 ## Launch: positional prompt-interactive with auto-submit
@@ -84,7 +84,7 @@ gemini-3.8-flash-low	Gemini 3.8 Flash (Low)
 `agy --help` documents `--effort` as `low|medium|high` and `--model` as the model for the session.
 The bare `gemini-3.8-flash` id from this home's previous config is not listed; only the suffixed `-high`, `-medium`, and `-low` variants are.
 `bin/jg-spawn.sh`'s `agy_model_validate` refuses a requested id a reachable `agy models` listing omits, and launches unvalidated with a stderr notice when the listing is unreachable.
-The listing is a remote fetch (`Fetching available models...`), so the probe runs with stdin detached under the shared hard bound from `bin/jg-timeout-lib.sh` (15 seconds by default, `FM_AGY_MODELS_TIMEOUT`; a non-positive or non-numeric value clamps back to that default, because a non-positive bound is not a bound); a stalled fetch or a sign-in prompt is cut off and falls through to the unvalidated launch instead of blocking the spawn before any pane exists.
+The listing is a remote fetch (`Fetching available models...`), so the probe runs with stdin detached under the shared hard bound from `bin/jg-timeout-lib.sh` (15 seconds by default, `JG_AGY_MODELS_TIMEOUT`; a non-positive or non-numeric value clamps back to that default, because a non-positive bound is not a bound); a stalled fetch or a sign-in prompt is cut off and falls through to the unvalidated launch instead of blocking the spawn before any pane exists.
 Print mode (`agy -p "Reply with exactly: AGY_PRINT_PROBE_OK" --model gemini-3.8-flash-low`) returned the exact reply with exit 0 in about 8 seconds, proving the credential path without a pane.
 
 ## Busy state: the pinned status row, unknown on absence
@@ -140,7 +140,7 @@ agy stays out of the session-lock name vocabulary in `bin/jg-session-lock-lib.sh
 Byte-level capture of the idle pane shows a bare unstyled `>` between two full-width `─` rules, with an unstyled `? for shortcuts` cell and a dim (`SGR 2`) model cell in the status row below.
 The shared classifier reads that bare `>` as `unknown` under the dead-shell rule, never `empty`.
 Steering still confirms delivery: the Herdr submit core leads with the native `idle`-to-`working` transition, which agy performs, and the delivery footer regex covers the tmux path.
-agy renders the busy footer late for that confirm loop - about 1.5 s after Enter for a short steer and 4-5 s for a realistic longer brief, measured live on `agy 1.2.1` (2026-09-12) against the shared budget's 3 x 0.4 s - so `bin/jg-send.sh` gives agy typed targets a longer default submit-confirm budget (20 retries, about 8 s at the default cadence); an explicit `FM_SEND_RETRIES` still wins and every other harness keeps the shared 3-retry default.
+agy renders the busy footer late for that confirm loop - about 1.5 s after Enter for a short steer and 4-5 s for a realistic longer brief, measured live on `agy 1.2.1` (2026-09-12) against the shared budget's 3 x 0.4 s - so `bin/jg-send.sh` gives agy typed targets a longer default submit-confirm budget (20 retries, about 8 s at the default cadence); an explicit `JG_SEND_RETRIES` still wins and every other harness keeps the shared 3-retry default.
 `tests/jg-send-agy-confirm.test.sh` pins the raised default and `tests/jg-agy-harness.test.sh` pins the Herdr transition path.
 This is the cursor precedent, not a gap to patch in shared code.
 
@@ -166,5 +166,5 @@ Run the portable suite and the live guard after any agy upgrade, because the pro
 
 ```
 bin/jg-test-run.sh tests/jg-agy-harness.test.sh
-FM_AGY_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-agy-signals-live-e2e.test.sh
+JG_AGY_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-agy-signals-live-e2e.test.sh
 ```

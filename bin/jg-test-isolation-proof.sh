@@ -38,15 +38,15 @@
 # Isolation contract for each concurrent worker:
 #   - distinct mode-0700 temporary root under a proof-owned parent
 #   - TMPDIR/TMP point only at that root so mktemp/jg_test_tmproot stay private
-#   - ambient FM_HOME / FM_*_OVERRIDE cleared so no shared home is reused
+#   - ambient JG_HOME / JG_*_OVERRIDE cleared so no shared home is reused
 #   - no global git config mutation (snapshot before/after)
 #   - no production sharding and no retry-until-green
 #
 # Markers (stdout):
-#   FM_ISOLATION_BEGIN <iso8601> concurrency=<n> candidates=<n>
-#   FM_ISOLATION_CANDIDATE_BEGIN <iso8601> <script> worker=<i>
-#   FM_ISOLATION_CANDIDATE_END <iso8601> <script> exit=<code> duration_ms=<n> worker=<i>
-#   FM_ISOLATION_SUMMARY total=<n> failed=<n> concurrency=<n> duration_ms=<n>
+#   JG_ISOLATION_BEGIN <iso8601> concurrency=<n> candidates=<n>
+#   JG_ISOLATION_CANDIDATE_BEGIN <iso8601> <script> worker=<i>
+#   JG_ISOLATION_CANDIDATE_END <iso8601> <script> exit=<code> duration_ms=<n> worker=<i>
+#   JG_ISOLATION_SUMMARY total=<n> failed=<n> concurrency=<n> duration_ms=<n>
 #
 # Exit status is the aggregate of candidate exits: non-zero if any candidate
 # fails, gate-skips (first meaningful line matching ^skip:), if isolation checks
@@ -404,7 +404,7 @@ TOTAL=${#CANDIDATES[@]}
 FAILED=0
 AGG_RC=0
 
-printf 'FM_ISOLATION_BEGIN %s concurrency=%s candidates=%s\n' \
+printf 'JG_ISOLATION_BEGIN %s concurrency=%s candidates=%s\n' \
   "$RUN_STARTED_ISO" "$JOBS" "$TOTAL"
 
 # Worker state arrays parallel to CANDIDATES indices (1-based worker labels).
@@ -430,7 +430,7 @@ wait_one_slot() {
     rc=1
     log "pool $POOL candidate gate-skipped without proving concurrency: $script: $gate_skip"
   fi
-  printf 'FM_ISOLATION_CANDIDATE_END %s %s exit=%s duration_ms=%s worker=%s\n' \
+  printf 'JG_ISOLATION_CANDIDATE_END %s %s exit=%s duration_ms=%s worker=%s\n' \
     "$(now_iso)" "$script" "$rc" "$duration" "$idx"
   printf '%s\t%s\t%s\t%s\n' "$script" "$rc" "$duration" "$idx" >>"$RECORDS"
   if [ "$rc" -ne 0 ]; then
@@ -503,7 +503,7 @@ for script in "${CANDIDATES[@]}"; do
     *) die "failed to create mode-0700 TMPDIR at $work/tmp (mode=$mode)" ;;
   esac
 
-  printf 'FM_ISOLATION_CANDIDATE_BEGIN %s %s worker=%s\n' \
+  printf 'JG_ISOLATION_CANDIDATE_BEGIN %s %s worker=%s\n' \
     "$(now_iso)" "$script" "$idx"
 
   (
@@ -511,8 +511,8 @@ for script in "${CANDIDATES[@]}"; do
     export TMPDIR="$work/tmp"
     export TMP="$work/tmp"
     # Clear ambient fleet overrides so candidates cannot share a live home.
-    unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
-      FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+    unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
+      JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND 2>/dev/null || true
     cd "$ROOT" || exit 1
     begin_ms=$(now_ms)
     bash "$script" >"$work/out/output" 2>&1
@@ -567,7 +567,7 @@ if [ "$RUN_DURATION" -lt 0 ]; then
   RUN_DURATION=0
 fi
 
-printf 'FM_ISOLATION_SUMMARY total=%s failed=%s concurrency=%s duration_ms=%s\n' \
+printf 'JG_ISOLATION_SUMMARY total=%s failed=%s concurrency=%s duration_ms=%s\n' \
   "$TOTAL" "$FAILED" "$JOBS" "$RUN_DURATION"
 
 if [ -n "$JSON_PATH" ]; then

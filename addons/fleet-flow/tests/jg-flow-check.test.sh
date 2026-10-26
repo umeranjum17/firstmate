@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration test for fleet-flow/bin/jg-flow-check.sh over a fixture Main home and one muxr home.
 # Stub jg-tasks-axi.sh and jg-crew-state.sh in the fixture Main's bin/ stand in for the fork.
 # Proves: parked lanes (lane-cap park resumes, unnamed park is STALLED); a 5 h external-wait lane (paused or failed) stops counting toward the cap, a 3 h one,
@@ -15,13 +24,13 @@ mkdir -p "$main/bin" "$main/config" "$main/state" "$home/state" "$home/data" "$h
 cat > "$main/bin/jg-tasks-axi.sh" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = ready ] || exit 2
-n=$(cat "$FM_HOME/ready-count"); echo "ready[$n]{id,state}:"
+n=$(cat "$JG_HOME/ready-count"); echo "ready[$n]{id,state}:"
 for i in $(seq 1 "$n"); do echo "  item-$i,queued"; done
 EOF
 cat > "$main/bin/jg-crew-state.sh" <<'EOF'
 #!/usr/bin/env bash
-echo "$1" >> "$FM_HOME/probed"
-line=$(cat "$FM_HOME/crew/$1" 2>/dev/null) || line=''
+echo "$1" >> "$JG_HOME/probed"
+line=$(cat "$JG_HOME/crew/$1" 2>/dev/null) || line=''
 # A crew file holding a whole emitted line is the real shape (a kept copy): print it verbatim.
 case "$line" in
   state:*) printf '%s\n' "$line" ;;
@@ -45,7 +54,7 @@ fail=0
 expect() {  # <name> <want> <got>
   if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1: want [$2] got [$3]"; fail=1; fi
 }
-run() { FM_MAIN_HOME=$main python3 "$CHECK" "$home" "$@"; }
+run() { JG_MAIN_HOME=$main python3 "$CHECK" "$home" "$@"; }
 
 # Cap 4, hard cap 6: six open lanes, but the two long external waits free their slots.
 printf 'muxr 4\n' > "$main/config/lane-caps"
@@ -89,7 +98,7 @@ for t in bl-held bl-open; do
 done
 printf '%s\n' '- [ ] bl-held - held for the captain (kind: ship) (hold: jg-hold-v1:eA==) (hold-kind: captain)' \
   '- [ ] bl-open - not held (kind: ship)' > "$bhome/data/backlog.md"
-bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
+bout=$(JG_MAIN_HOME=$main python3 "$CHECK" "$bhome")
 expect 'backlog captain hold raises no red line' '' "$(grep -F 'bl-held' <<<"$bout" || true)"
 expect 'control lane without a hold still reads red' 1 "$(grep -cE 'bl-open lead .* red \(limit' <<<"$bout")"
 
@@ -100,7 +109,7 @@ for t in bl-done-held bl-done-open; do
 done
 printf '%s\n' '- [ ] bl-done-held - waiting (hold: jg-hold-v1:eA==) (hold-kind: captain)' \
   '- [ ] bl-done-open - not held' > "$bhome/data/backlog.md"
-bout=$(FM_MAIN_HOME=$main python3 "$CHECK" "$bhome")
+bout=$(JG_MAIN_HOME=$main python3 "$CHECK" "$bhome")
 expect 'backlog-held done lane raises no land line' '' "$(grep -F 'bl-done-held lead' <<<"$bout" || true)"
 expect 'unheld done lane still raises land line' 1 "$(grep -cF 'bl-done-open lead' <<<"$bout")"
 

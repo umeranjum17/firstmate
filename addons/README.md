@@ -42,7 +42,7 @@ Choose the job you need first; the reference lists the full catalog and dependen
 ## Choose your job
 
 Run these from the repository root.
-For home-specific installers, export `FM_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
+For home-specific installers, export `JG_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
 Each job names one starting add-on.
 
 **Protect the machine** — [Memory gate](host-memory/install.sh); also delete, kill, and read guards.
@@ -62,7 +62,7 @@ bash addons/fleet-stall/install.sh
 ```sh
 bash \
   addons/merge-on-green/install.sh \
-  "$FM_HOME"
+  "$JG_HOME"
 ```
 
 **Understand the fleet** — [Flow check](fleet-flow/install.sh); also dashboard, metrics, and ticket sync.

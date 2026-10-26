@@ -19,7 +19,7 @@
 #
 # Reading an idle screen submits no prompt, so no model tokens are spent and
 # the gate is default-on wherever codex and tmux are installed (jg_live_gate):
-# FM_COMPOSER_CODEX_IDLE_LIVE=1 forces it (an absent codex then fails instead
+# JG_COMPOSER_CODEX_IDLE_LIVE=1 forces it (an absent codex then fails instead
 # of skipping) and =0 disables it. A run that verified nothing fails rather
 # than passing vacuously. Whether the starfield was actually drawn during the
 # read is reported as a note, because codex need not animate it under every
@@ -35,7 +35,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate default-on FM_COMPOSER_CODEX_IDLE_LIVE codex tmux
+jg_live_gate default-on JG_COMPOSER_CODEX_IDLE_LIVE codex tmux
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -79,7 +79,7 @@ tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$WIN" -c "$ROOT" -- codex \
 # ANSI capture: a bounded styled tail plus the shared capability facts, with
 # the lazy identity pass answered `probe-absent` because no identity probe is
 # needed for a bare composer.
-CAPS_CURSORLESS=$(printf 'styled=1\ncursor=0\nidentity=1\nrows=%s' "$FM_COMPOSER_CAPTURE_LINES")
+CAPS_CURSORLESS=$(printf 'styled=1\ncursor=0\nidentity=1\nrows=%s' "$JG_COMPOSER_CAPTURE_LINES")
 classify_cursorless() {  # <styled-screen>
   local verdict
   verdict=$(jg_composer_classify_screen "$CAPS_CURSORLESS" "$1")
@@ -90,7 +90,7 @@ classify_cursorless() {  # <styled-screen>
   printf '%s' "$verdict"
 }
 
-budget=${FM_COMPOSER_CODEX_IDLE_LIVE_POLLS:-45}
+budget=${JG_COMPOSER_CODEX_IDLE_LIVE_POLLS:-45}
 i=0
 tmux_verdict=''
 cursorless_verdict=''
@@ -98,7 +98,7 @@ styled=''
 dismissed=0
 while [ "$i" -lt "$budget" ]; do
   tmux_verdict=$(jg_tmux_composer_state "$SESSION:$WIN")
-  styled=$(tmux capture-pane -e -p -t "$SESSION:$WIN" 2>/dev/null | tail -n "$FM_COMPOSER_CAPTURE_LINES")
+  styled=$(tmux capture-pane -e -p -t "$SESSION:$WIN" 2>/dev/null | tail -n "$JG_COMPOSER_CAPTURE_LINES")
   cursorless_verdict=$(classify_cursorless "$styled")
   if [ "$tmux_verdict" = empty ] && [ "$cursorless_verdict" = empty ]; then
     break

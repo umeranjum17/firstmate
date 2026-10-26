@@ -59,7 +59,7 @@
 #   jg-vendor-auth-probe.sh <probe>
 #
 # Environment:
-#   FM_VENDOR_AUTH_PROBE_TIMEOUT   hard per-command bound in seconds; must be a
+#   JG_VENDOR_AUTH_PROBE_TIMEOUT   hard per-command bound in seconds; must be a
 #                                  positive integer, otherwise the default 20 is
 #                                  used. Zero is rejected because `timeout 0` and
 #                                  `alarm 0` both mean "no deadline".
@@ -97,7 +97,7 @@ printed. Login, logout, and the interactive TUI are never invoked.
 Exit status: 0 whenever the line is printed, 2 on a usage error.
 
 Environment:
-  FM_VENDOR_AUTH_PROBE_TIMEOUT   hard per-command bound in seconds (default 20);
+  JG_VENDOR_AUTH_PROBE_TIMEOUT   hard per-command bound in seconds (default 20);
                                  a non-positive or non-numeric value is rejected
                                  in favor of the default
 EOF
@@ -126,7 +126,7 @@ done
 
 # A non-positive bound is not a bound: `timeout 0` and the Perl fallback's
 # `alarm 0` both disable the deadline, so a hung vendor CLI would run unbounded.
-TIMEOUT=${FM_VENDOR_AUTH_PROBE_TIMEOUT:-20}
+TIMEOUT=${JG_VENDOR_AUTH_PROBE_TIMEOUT:-20}
 case "$TIMEOUT" in
   ''|*[!0-9]*|0*) TIMEOUT=20 ;;
 esac

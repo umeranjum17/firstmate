@@ -35,8 +35,8 @@
 # dashboard works too. A configured non-markdown adapter is addressed by that
 # root alone, so an inherited TASKS_AXI_FILE is cleared for it.
 #
-# The data directory is FM_DATA_OVERRIDE, else $FM_HOME/data, else the code
-# root's data/ (FM_HOME unset keeps the single-home layout unchanged).
+# The data directory is JG_DATA_OVERRIDE, else $JG_HOME/data, else the code
+# root's data/ (JG_HOME unset keeps the single-home layout unchanged).
 #
 # Refusals (exit 2, nothing run):
 #   - tasks-axi missing from PATH;
@@ -60,16 +60,16 @@
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
-#     (FM_TASK_PRIORITY_CHECK overrides the path); when it is not installed this
+#     (JG_TASK_PRIORITY_CHECK overrides the path); when it is not installed this
 #     does nothing.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 # shellcheck source=bin/jg-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-tasks-axi-lib.sh"
 # shellcheck source=bin/jg-backlog-transition-lib.sh disable=SC1091
@@ -141,21 +141,21 @@ done
 
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/jg-bootstrap.sh for the install command"
 
-FM_BACKLOG_TRANSITION_ERROR=
+JG_BACKLOG_TRANSITION_ERROR=
 if ! jg_backlog_tasks_axi_addressing "$DATA"; then
-  fail "${FM_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
+  fail "${JG_BACKLOG_TRANSITION_ERROR:-data directory cannot be resolved: $DATA}"
 fi
 
-if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
-  if [ -L "$FM_BACKLOG_AXI_FILE" ]; then
-    fail "$FM_BACKLOG_AXI_FILE is a symlink; a tasks-axi write would replace it with a regular file and fork the backlog - make it this home's real file"
+if [ -n "$JG_BACKLOG_AXI_FILE" ]; then
+  if [ -L "$JG_BACKLOG_AXI_FILE" ]; then
+    fail "$JG_BACKLOG_AXI_FILE is a symlink; a tasks-axi write would replace it with a regular file and fork the backlog - make it this home's real file"
   fi
-  export TASKS_AXI_FILE="$FM_BACKLOG_AXI_FILE"
+  export TASKS_AXI_FILE="$JG_BACKLOG_AXI_FILE"
 else
   unset TASKS_AXI_FILE
 fi
 
-cd "$FM_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $FM_BACKLOG_AXI_ROOT"
+cd "$JG_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $JG_BACKLOG_AXI_ROOT"
 
 tasks_axi() { tasks-axi "$@"; }
 # shellcheck source=bin/jg-captain-ask-lib.sh disable=SC1091
@@ -212,7 +212,7 @@ captain_guard() {  # <tasks-axi args>
 # Optional task-priority add-on: a new task must carry a priority. No-op when not installed.
 case "${1:-}" in
   add|create)
-    PRIORITY_CHECK="${FM_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
+    PRIORITY_CHECK="${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
     if [ -x "$PRIORITY_CHECK" ]; then
       "$PRIORITY_CHECK" ${ARGS[@]+"${ARGS[@]}"} >/dev/null || exit $?
     fi

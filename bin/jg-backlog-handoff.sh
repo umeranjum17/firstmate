@@ -83,10 +83,10 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 REG="$DATA/secondmates.md"
 MAIN_BACKLOG="$DATA/backlog.md"
 # shellcheck source=bin/jg-tasks-axi-lib.sh disable=SC1091
@@ -213,8 +213,8 @@ validate_operational_dirs() {
 validate_secondmate_home() {
   local id=$1 home=$2 abs_home abs_active_home abs_root marker_id
   abs_home=$(resolved_existing_dir "$home") || return 1
-  abs_active_home=$(resolved_existing_dir "$FM_HOME")
-  abs_root=$(resolved_existing_dir "$FM_ROOT")
+  abs_active_home=$(resolved_existing_dir "$JG_HOME")
+  abs_root=$(resolved_existing_dir "$JG_ROOT")
   if [ "$abs_home" = "/" ]; then
     echo "error: secondmate home cannot be the filesystem root: $home" >&2
     return 1
@@ -344,7 +344,7 @@ warn_stale_public_commitments() { # <secondmate-id> <moved-key>...
     printf 'warning: %s still owes a public reply bound to main/%s; rebind it to secondmate:%s (bin/jg-tasks-axi.sh public-followup bind-work, then bin/jg-public-followup.sh register <obligation-id> --relation <relation-id> --work-home secondmate:%s --work-id %s --generation <n>) or the promised reply will be reconciled against work this home no longer owns.\n' \
       "$key" "$key" "$id" "$id" "$key" >&2
   done
-  if jg_pf_relay_active "$FM_HOME" && jg_pf_has_delivered_open_loops "$STATE"; then
+  if jg_pf_relay_active "$JG_HOME" && jg_pf_has_delivered_open_loops "$STATE"; then
     printf 'warning: this home has an open public loop with nothing owed; routing work to secondmate:%s does not close it. Hand it on with bin/jg-public-followup.sh rechain or close it with retire --reason.\n' \
       "$id" >&2
   fi
@@ -413,7 +413,7 @@ receiver_wake_mark() { # <secondmate-id> <prepared|pending> [batch-id]
     *) return 1 ;;
     esac
   fi
-  corr=$(jg_pending_reply_create "$FM_HOME" "$STATE" "$id" "$RECEIVER_WAKE_MESSAGE") || return 1
+  corr=$(jg_pending_reply_create "$JG_HOME" "$STATE" "$id" "$RECEIVER_WAKE_MESSAGE") || return 1
   wake_state="$wake_phase:$corr"
   if [ "$wake_phase" = prepared ]; then
     printf '%s' "$batch" | grep -Eq '^[a-f0-9]{16}$' || return 1
@@ -562,8 +562,8 @@ wake_secondmate_receiver() { # <secondmate-id> <correlation-id>
     printf 'error: secondmate %s has non-secondmate endpoint metadata; backlog is durable but the receiver was not woken\n' "$id" >&2
     return 1
   }
-  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_ROOT_OVERRIDE="$FM_ROOT" \
-    FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+  out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SCRIPT_DIR/jg-send.sh" "$id" "$RECEIVER_WAKE_MESSAGE" 2>&1) || rc=$?
   if [ "$rc" -ne 0 ]; then
     [ -z "$out" ] || printf '%s\n' "$out" >&2

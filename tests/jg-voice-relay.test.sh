@@ -252,8 +252,8 @@ spec.loader.exec_module(relay)
 import jg_voice_records as records
 
 home = sys.argv[2]
-for name in ("FM_VOICE_REGION", "FM_VOICE_MODEL", "FM_VOICE_PROFILE", "FM_VOICE_ID",
-             "FM_CONFIG_OVERRIDE"):
+for name in ("JG_VOICE_REGION", "JG_VOICE_MODEL", "JG_VOICE_PROFILE", "JG_VOICE_ID",
+             "JG_CONFIG_OVERRIDE"):
     os.environ.pop(name, None)
 
 def check(cond, label):
@@ -293,8 +293,8 @@ check(options.voice == relay.VOICE,
       "an absent voice should fall back to the shipped one: %r" % options.voice)
 
 # The environment overrides a file for a single run.
-os.environ["FM_VOICE_REGION"] = "eu-elsewhere-2"
-os.environ["FM_VOICE_ID"] = "amy"
+os.environ["JG_VOICE_REGION"] = "eu-elsewhere-2"
+os.environ["JG_VOICE_ID"] = "amy"
 options = relay.resolve_settings(relay.parse_args(["--serve", "--home", home]))
 check(options.region == "eu-elsewhere-2",
       "the environment should override the file: %r" % options.region)
@@ -305,10 +305,10 @@ options = relay.resolve_settings(
     relay.parse_args(["--serve", "--home", home, "--region", "eu-flag-3"]))
 check(options.region == "eu-flag-3", "a flag should win: %r" % options.region)
 
-os.environ.pop("FM_VOICE_REGION", None)
-os.environ.pop("FM_VOICE_ID", None)
+os.environ.pop("JG_VOICE_REGION", None)
+os.environ.pop("JG_VOICE_ID", None)
 
-# THE PROFILE IS READ BY PRESENCE, NOT BY TRUTHINESS. An empty FM_VOICE_PROFILE is
+# THE PROFILE IS READ BY PRESENCE, NOT BY TRUTHINESS. An empty JG_VOICE_PROFILE is
 # the captain saying "use the credentials I already have", so it must not fall
 # through to a configured profile and spend a second exporting from an account
 # they just opted out of. jg-inbox.sh reads its own equivalent that way and
@@ -319,24 +319,24 @@ options = relay.resolve_settings(relay.parse_args(["--serve", "--home", home]))
 check(options.profile == "a-configured-profile",
       "a configured profile should be used: %r" % options.profile)
 
-os.environ["FM_VOICE_PROFILE"] = ""
+os.environ["JG_VOICE_PROFILE"] = ""
 options = relay.resolve_settings(relay.parse_args(["--serve", "--home", home]))
 check(options.profile == "",
-      "an empty FM_VOICE_PROFILE must force ambient credentials: %r" % options.profile)
+      "an empty JG_VOICE_PROFILE must force ambient credentials: %r" % options.profile)
 
-os.environ["FM_VOICE_PROFILE"] = "another-profile"
+os.environ["JG_VOICE_PROFILE"] = "another-profile"
 options = relay.resolve_settings(relay.parse_args(["--serve", "--home", home]))
 check(options.profile == "another-profile",
-      "a set FM_VOICE_PROFILE should override the file: %r" % options.profile)
-os.environ.pop("FM_VOICE_PROFILE", None)
+      "a set JG_VOICE_PROFILE should override the file: %r" % options.profile)
+os.environ.pop("JG_VOICE_PROFILE", None)
 
 # An empty region, by contrast, is not a choice about anything, so it still falls
 # through to the file rather than refusing.
-os.environ["FM_VOICE_REGION"] = ""
+os.environ["JG_VOICE_REGION"] = ""
 options = relay.resolve_settings(relay.parse_args(["--serve", "--home", home]))
 check(options.region == "eu-somewhere-1",
       "an empty region variable should fall through to the file: %r" % options.region)
-os.environ.pop("FM_VOICE_REGION", None)
+os.environ.pop("JG_VOICE_REGION", None)
 
 # --help must work in a home that has configured nothing, or the captain cannot
 # read how to configure it.
@@ -356,7 +356,7 @@ pass "an unconfigured home can still read how to configure the relay"
 # list and drain make no model call, so they must keep working unconfigured. The
 # voice handover depends on note, so that is not a nicety.
 #
-# EVERY FM_INBOX_ VARIABLE IS NEUTRALIZED HERE, at the harness rather than in each
+# EVERY JG_INBOX_ VARIABLE IS NEUTRALIZED HERE, at the harness rather than in each
 # case, and the list is read out of the environment rather than written down, so a
 # knob added later cannot quietly survive into a refusal case. A shell that
 # exports a region and a model id would otherwise walk these cases straight past
@@ -366,9 +366,9 @@ inbox_env=()
 while IFS= read -r inbox_knob; do
   [ -n "$inbox_knob" ] || continue
   inbox_env+=(-u "$inbox_knob")
-done < <(env | sed -n 's/^\(FM_INBOX_[A-Za-z0-9_]*\)=.*/\1/p' | sort -u)
-inbox_env+=(FM_HOME="$CONFIG_HOME" FM_STATE_OVERRIDE="$CONFIG_HOME/state"
-            FM_CONFIG_OVERRIDE="$CONFIG_HOME/config")
+done < <(env | sed -n 's/^\(JG_INBOX_[A-Za-z0-9_]*\)=.*/\1/p' | sort -u)
+inbox_env+=(JG_HOME="$CONFIG_HOME" JG_STATE_OVERRIDE="$CONFIG_HOME/state"
+            JG_CONFIG_OVERRIDE="$CONFIG_HOME/config")
 
 # And a stub that records any attempt, so "no model call" is a checked fact rather
 # than a claim about control flow. The real aws would need credentials; this one
@@ -428,7 +428,7 @@ assert_contains "$inbox_help" 'PRIVACY:' \
   "the help must say which subcommands send anything to a model"
 assert_contains "$inbox_help" 'make no network call at all' \
   "the help must name the subcommands that stay on this host"
-assert_contains "$inbox_help" 'FM_HOME' \
+assert_contains "$inbox_help" 'JG_HOME' \
   "the help must keep its environment section"
 assert_contains "$inbox_help" 'inbox-ask-model' \
   "the help must name the files a home has to write"
@@ -1310,17 +1310,17 @@ def check(cond, label):
 # client carries no default for it and says so rather than trying a path that
 # belongs to somebody else. The refusal is checked before the variable below is
 # set, because after that every other case supplies it.
-os.environ.pop("FM_VOICE_RELAY", None)
+os.environ.pop("JG_VOICE_RELAY", None)
 try:
     client.parse_args(["--host", "desk"])
     sys.exit("client: started with no relay path at all")
 except SystemExit as exc:
     check(exc.code != 0, "a missing relay path must be a refusal, not a default")
 
-os.environ["FM_VOICE_RELAY"] = "/desktop/firstmate/bin/jg-voice-relay.py"
+os.environ["JG_VOICE_RELAY"] = "/desktop/firstmate/bin/jg-voice-relay.py"
 check(client.parse_args(["--host", "desk"]).relay
       == "/desktop/firstmate/bin/jg-voice-relay.py",
-      "FM_VOICE_RELAY should supply the relay path for a whole shell")
+      "JG_VOICE_RELAY should supply the relay path for a whole shell")
 check(client.parse_args(["--host", "desk", "--relay", "/other/relay.py"]).relay
       == "/other/relay.py", "an explicit --relay must win over the variable")
 
@@ -3565,7 +3565,7 @@ assert_contains "$control" '"state": "note"' \
 pass "an unrecognised declaration cannot hide behind trailing prose either"
 
 # The two halves of one answer must come from one home. Every script that sets
-# FM_DATA_OVERRIDE sets FM_STATE_OVERRIDE beside it, so a reader that resolved one
+# JG_DATA_OVERRIDE sets JG_STATE_OVERRIDE beside it, so a reader that resolved one
 # and not the other would count workers and notes from one home while counting
 # in-flight work from another, which reads exactly like an ordinary answer.
 alt_data="$TMP_ROOT/data-elsewhere"
@@ -3576,13 +3576,13 @@ cat > "$alt_data/backlog.md" <<'EOF'
 ## In flight
 - [ ] moved-one - Work recorded in the overridden data directory (repo: m) (kind: ship)
 EOF
-moved=$(FM_DATA_OVERRIDE="$alt_data" verb_status --scope full) \
+moved=$(JG_DATA_OVERRIDE="$alt_data" verb_status --scope full) \
   || fail "status with an overridden data directory failed"
 assert_contains "$moved" 'moved-one' \
   "the reader must take the backlog from the overridden data directory"
 assert_contains "$moved" '"in_flight": 1' "and count only what that backlog holds"
-inbox_moved=$(FM_HOME="$VERB_HOME" FM_STATE_OVERRIDE="$VERB_HOME/state" \
-  FM_DATA_OVERRIDE="$alt_data" "$ROOT/bin/jg-inbox.sh" status) \
+inbox_moved=$(JG_HOME="$VERB_HOME" JG_STATE_OVERRIDE="$VERB_HOME/state" \
+  JG_DATA_OVERRIDE="$alt_data" "$ROOT/bin/jg-inbox.sh" status) \
   || fail "jg-inbox status with an overridden data directory failed"
 assert_contains "$inbox_moved" 'moved-one' \
   "the human rendering of the same records must read the same backlog"
@@ -3693,7 +3693,7 @@ pass "the configured read scope is honoured"
 before=$(find "$HOME_FIXTURE/state" -maxdepth 2 -name '*.note' | wc -l | tr -d '[:space:]')
 [ "$before" = 0 ] || fail "fixture should start with an empty inbox"
 
-handed=$(FM_HOME="$HOME_FIXTURE" python3 "$ROOT/bin/jg_voice_records.py" queue \
+handed=$(JG_HOME="$HOME_FIXTURE" python3 "$ROOT/bin/jg_voice_records.py" queue \
   "Refactor the login module and open a pull request for it" \
   --home "$HOME_FIXTURE") || fail "handover failed"
 assert_contains "$handed" '"queued": true' "handover should report the request queued"
@@ -3721,13 +3721,13 @@ assert_contains "$paired" '"captain_notes_waiting": 1' \
 pass "handover queues the request for firstmate and wakes it exactly once"
 
 # The same pairing when the state directory is moved. bin/jg-inbox.sh resolves
-# ${FM_STATE_OVERRIDE:-$FM_HOME/state} and the handover queues through it with
+# ${JG_STATE_OVERRIDE:-$JG_HOME/state} and the handover queues through it with
 # the ambient environment, so a reader that ignored the override would count
 # notes in a directory nothing writes to.
 alt_state="$TMP_ROOT/state-elsewhere"
 alt_home="$TMP_ROOT/override-home"
 mkdir -p "$alt_state" "$alt_home/data" "$alt_home/state"
-FM_STATE_OVERRIDE="$alt_state" python3 "$ROOT/bin/jg_voice_records.py" queue \
+JG_STATE_OVERRIDE="$alt_state" python3 "$ROOT/bin/jg_voice_records.py" queue \
   "Chase the flaky retry test" --home "$alt_home" >/dev/null \
   || fail "handover with an overridden state directory failed"
 
@@ -3737,7 +3737,7 @@ moved=$(find "$alt_state/inbox" -maxdepth 1 -name '*.note' | wc -l | tr -d '[:sp
 [ ! -e "$alt_home/state/inbox" ] || \
   fail "the queue should not have written under the home when the state is moved"
 
-overridden=$(FM_STATE_OVERRIDE="$alt_state" python3 \
+overridden=$(JG_STATE_OVERRIDE="$alt_state" python3 \
   "$ROOT/bin/jg_voice_records.py" status --home "$alt_home") \
   || fail "status with an overridden state directory failed"
 assert_contains "$overridden" '"captain_notes_waiting": 1' \
@@ -3836,19 +3836,19 @@ here is derived from firstmate's records rather than from a fixture string, and
 it appends one JSON line per session describing what that session was opened
 with and what it was asked. tests/jg-voice-relay.test.sh reads that record.
 
-  FM_FAKE_SCRIPT   comma-separated turn kinds: status | handover | clean-end
-  FM_FAKE_THINK    seconds before the reply begins, standing in for the model
-  FM_FAKE_STATE    file holding the turn counter across the relay's reconnects
-  FM_FAKE_LOG      where to append the per-session record
-  FM_FAKE_REQUEST  the words the captain uses when asking for real work
-  FM_FAKE_EARLY    1 to answer from the first audio in, not from the talk end
+  JG_FAKE_SCRIPT   comma-separated turn kinds: status | handover | clean-end
+  JG_FAKE_THINK    seconds before the reply begins, standing in for the model
+  JG_FAKE_STATE    file holding the turn counter across the relay's reconnects
+  JG_FAKE_LOG      where to append the per-session record
+  JG_FAKE_REQUEST  the words the captain uses when asking for real work
+  JG_FAKE_EARLY    1 to answer from the first audio in, not from the talk end
 
 A clean-end turn is a session the model finishes with while the captain is still
 speaking: the output stream simply ends, with no error and no answer. That is an
 ordinary end of a Bedrock session rather than a fault, and the relay has to
 survive it, so it is a turn kind here rather than a failure injection.
 
-FM_FAKE_EARLY stands in for the model's own end-of-speech detector firing inside
+JG_FAKE_EARLY stands in for the model's own end-of-speech detector firing inside
 a clip that already ends in silence: the answer begins before this end of the
 stream has said the turn is over. Nova Sonic really does that, and the relay's
 own timing figures are negative when it happens, which is the one case where a
@@ -3867,14 +3867,14 @@ import types
 OUT_RATE = 24000
 CHUNK_MS = 100
 
-THINK = float(os.environ.get("FM_FAKE_THINK", "0.4"))
-REPLY_SECONDS = float(os.environ.get("FM_FAKE_REPLY_SECONDS", "0.4"))
-SCRIPT = [s.strip() for s in os.environ.get("FM_FAKE_SCRIPT", "status").split(",")
+THINK = float(os.environ.get("JG_FAKE_THINK", "0.4"))
+REPLY_SECONDS = float(os.environ.get("JG_FAKE_REPLY_SECONDS", "0.4"))
+SCRIPT = [s.strip() for s in os.environ.get("JG_FAKE_SCRIPT", "status").split(",")
           if s.strip()]
-STATE = os.environ.get("FM_FAKE_STATE", "")
-LOG = os.environ.get("FM_FAKE_LOG", "")
-REQUEST = os.environ.get("FM_FAKE_REQUEST", "open a pull request for the retry")
-EARLY = os.environ.get("FM_FAKE_EARLY", "") == "1"
+STATE = os.environ.get("JG_FAKE_STATE", "")
+LOG = os.environ.get("JG_FAKE_LOG", "")
+REQUEST = os.environ.get("JG_FAKE_REQUEST", "open a pull request for the retry")
+EARLY = os.environ.get("JG_FAKE_EARLY", "") == "1"
 
 HEARD = {"status": "how is the fleet doing right now", "handover": REQUEST}
 
@@ -4180,13 +4180,13 @@ PATH=$PATH
 HOME=$E2E/desktop-home
 PYTHONPATH=$E2E/fakesdk
 PYTHONDONTWRITEBYTECODE=1
-FM_HOME=$E2E/home
-FM_FAKE_STATE=$E2E/turn-counter
-FM_FAKE_LOG=$E2E/model-sessions.jsonl
-FM_FAKE_THINK=0.4
-FM_FAKE_REPLY_SECONDS=0.4
-FM_FAKE_SCRIPT=status,handover
-FM_FAKE_REQUEST=$E2E_REQUEST
+JG_HOME=$E2E/home
+JG_FAKE_STATE=$E2E/turn-counter
+JG_FAKE_LOG=$E2E/model-sessions.jsonl
+JG_FAKE_THINK=0.4
+JG_FAKE_REPLY_SECONDS=0.4
+JG_FAKE_SCRIPT=status,handover
+JG_FAKE_REQUEST=$E2E_REQUEST
 AWS_ACCESS_KEY_ID=$E2E_KEY
 AWS_SECRET_ACCESS_KEY=desktop-secret-not-a-real-key
 EOF
@@ -4429,13 +4429,13 @@ mkdir -p "$SURVIVE/bin"
 
 # The same desktop, with its own turn script and its own record of what the model
 # was asked, so neither run can read the other's sessions.
-grep -v '^FM_FAKE_' "$E2E/bin/desktop.env" > "$SURVIVE/bin/desktop.env"
+grep -v '^JG_FAKE_' "$E2E/bin/desktop.env" > "$SURVIVE/bin/desktop.env"
 cat >> "$SURVIVE/bin/desktop.env" <<EOF
-FM_FAKE_STATE=$SURVIVE/turn-counter
-FM_FAKE_LOG=$SURVIVE/model-sessions.jsonl
-FM_FAKE_THINK=0.4
-FM_FAKE_REPLY_SECONDS=0.4
-FM_FAKE_SCRIPT=clean-end,status
+JG_FAKE_STATE=$SURVIVE/turn-counter
+JG_FAKE_LOG=$SURVIVE/model-sessions.jsonl
+JG_FAKE_THINK=0.4
+JG_FAKE_REPLY_SECONDS=0.4
+JG_FAKE_SCRIPT=clean-end,status
 EOF
 cp "$E2E/bin/ssh" "$SURVIVE/bin/ssh"
 printf '0\n' > "$SURVIVE/turn-counter"
@@ -4581,7 +4581,7 @@ pass "a model session that ends mid-conversation costs one turn, not the relay"
 
 set +e
 env -i PATH="$PATH" HOME="$E2E/desktop-home" PYTHONPATH="$E2E/fakesdk" \
-  PYTHONDONTWRITEBYTECODE=1 FM_HOME="$E2E/home" \
+  PYTHONDONTWRITEBYTECODE=1 JG_HOME="$E2E/home" \
   AWS_ACCESS_KEY_ID="$E2E_KEY" \
   AWS_SECRET_ACCESS_KEY=desktop-secret-not-a-real-key \
   python3 - "$ROOT/bin" <<'PY'
@@ -4693,9 +4693,9 @@ relay_self_test() {
   local clip=$1
   shift
   env -i PATH="$PATH" HOME="$E2E/desktop-home" PYTHONPATH="$E2E/fakesdk" \
-    PYTHONDONTWRITEBYTECODE=1 FM_HOME="$E2E/home" \
-    FM_FAKE_STATE="$SELFTEST/turn-counter" FM_FAKE_LOG="$SELFTEST/sessions.jsonl" \
-    FM_FAKE_THINK=0.4 FM_FAKE_REPLY_SECONDS=0.4 FM_FAKE_SCRIPT=status \
+    PYTHONDONTWRITEBYTECODE=1 JG_HOME="$E2E/home" \
+    JG_FAKE_STATE="$SELFTEST/turn-counter" JG_FAKE_LOG="$SELFTEST/sessions.jsonl" \
+    JG_FAKE_THINK=0.4 JG_FAKE_REPLY_SECONDS=0.4 JG_FAKE_SCRIPT=status \
     AWS_ACCESS_KEY_ID="$E2E_KEY" \
     AWS_SECRET_ACCESS_KEY=desktop-secret-not-a-real-key \
     "$@" python3 "$ROOT/bin/jg-voice-relay.py" --self-test "$clip"
@@ -4746,7 +4746,7 @@ PY
 pass "the desktop's own check answers from the records and times it from the talk end"
 
 set +e
-early_out=$(relay_self_test "$SELFTEST/ends-in-silence.pcm" FM_FAKE_EARLY=1 \
+early_out=$(relay_self_test "$SELFTEST/ends-in-silence.pcm" JG_FAKE_EARLY=1 \
   2> "$SELFTEST/early.err")
 early_code=$?
 set -e

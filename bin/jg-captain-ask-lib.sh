@@ -46,7 +46,7 @@ captain_ask_done_keep() {  # <root>
 guard_captain_ask_archive() {  # <state> <keep-or-empty> <call-target-or-empty>
   local listing ids id count backlog root backend keep ahead=0 skip
   backlog=$(jg_backlog_data_absolute "$DATA") || fail "cannot resolve backlog data before pruning"
-  root=$(jg_backlog_root "$backlog") || fail "$FM_BACKLOG_TRANSITION_ERROR"
+  root=$(jg_backlog_root "$backlog") || fail "$JG_BACKLOG_TRANSITION_ERROR"
   backend=$(jg_tasks_axi_backend "$root") || fail "cannot read backlog backend before pruning"
   [ "$backend" = markdown ] || return 0
   listing=$(tasks_axi list --state "$1") || fail "cannot read $1 tasks before pruning"

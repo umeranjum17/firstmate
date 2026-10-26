@@ -25,8 +25,8 @@ DRAIN="$ROOT/bin/jg-wake-drain.sh"
 DAEMON="$ROOT/bin/jg-supervise-daemon.sh"
 
 # Source the daemon's pure functions (its main loop is guarded out under sourcing).
-if [ -z "${FM_TEST_DAEMON_SOURCED:-}" ]; then
-  export FM_TEST_DAEMON_SOURCED=1
+if [ -z "${JG_TEST_DAEMON_SOURCED:-}" ]; then
+  export JG_TEST_DAEMON_SOURCED=1
   # shellcheck source=/dev/null
   . "$DAEMON"
 fi
@@ -43,8 +43,8 @@ run_watcher_once() {
   local state=$1 fakebin=$2 out=$3
   mkdir -p "$state"
   date '+%s' > "$state/.afk"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=1 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   wait_for_exit "$!" 50
 }
 
@@ -53,7 +53,7 @@ ack_handled_wakes() {  # <state> <drain-stderr>
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$drain_err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$drain_err")
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
 
@@ -74,11 +74,11 @@ test_routine_then_terminal_after_restart() {
   grep -F "signal: $status_file" "$out" >/dev/null || fail "watcher did not report the routine signal"
 
   # Drain it and route through the daemon: a routine status self-handles.
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2> "$drain_err" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2> "$drain_err" \
     || fail "drain after routine signal failed"
   grep "$(printf '\tsignal\t')" "$drain_out" | grep -F "$status_file" >/dev/null \
     || fail "routine signal was not queued"
-  FM_STATE_OVERRIDE="$state" handle_wake "signal: $status_file" "$state"
+  JG_STATE_OVERRIDE="$state" handle_wake "signal: $status_file" "$state"
   ack_handled_wakes "$state" "$drain_err" || fail "routine wake acknowledgement failed"
   [ ! -s "$state/.subsuper-escalations" ] || fail "routine status was escalated by the daemon"
 
@@ -91,16 +91,16 @@ test_routine_then_terminal_after_restart() {
 
   # Drain and route the terminal: exactly ONE digest is buffered.
   : > "$drain_out"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2> "$drain_err" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2> "$drain_err" \
     || fail "drain after terminal signal failed"
-  FM_STATE_OVERRIDE="$state" handle_wake "signal: $status_file" "$state"
+  JG_STATE_OVERRIDE="$state" handle_wake "signal: $status_file" "$state"
   ack_handled_wakes "$state" "$drain_err" || fail "terminal wake acknowledgement failed"
   [ -s "$state/.subsuper-escalations" ] || fail "captain-relevant terminal status was not buffered"
   [ "$(wc -l < "$state/.subsuper-escalations" | tr -d ' ')" -eq 1 ] \
     || fail "expected exactly one buffered digest after the terminal signal"
 
   # The catch-all heartbeat scan must NOT re-escalate the same status (no dup).
-  FM_STATE_OVERRIDE="$state" housekeeping "$state"
+  JG_STATE_OVERRIDE="$state" housekeeping "$state"
   [ "$(wc -l < "$state/.subsuper-escalations" | tr -d ' ')" -eq 1 ] \
     || fail "catch-all scan duplicated the already-buffered digest"
 
@@ -110,8 +110,8 @@ test_routine_then_terminal_after_restart() {
   sent="$dir/sent.log"; : > "$sent"
   printf '❯\n' > "$dir/pane.txt"
   afk_enter "$state"
-  PATH="$fakebin:$PATH" FM_FAKE_TMUX_PANE_ALIVE=1 FM_FAKE_TMUX_SENT="$sent" \
-    FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" FM_ESCALATE_BATCH_SECS=0 escalate_flush "$state" \
+  PATH="$fakebin:$PATH" JG_FAKE_TMUX_PANE_ALIVE=1 JG_FAKE_TMUX_SENT="$sent" \
+    JG_FAKE_TMUX_CAPTURE="$dir/pane.txt" JG_ESCALATE_BATCH_SECS=0 escalate_flush "$state" \
     || fail "escalate_flush failed for the buffered digest"
   [ "$(grep -c '\[ENTER\]' "$sent")" -eq 1 ] || fail "buffered digest was not submitted exactly once"
   [ ! -s "$state/.subsuper-escalations" ] || fail "buffer not cleared after a successful flush"
@@ -130,7 +130,7 @@ test_stale_pane_transient_persistent_resume() {
 
   # Transient: first stale observation self-handles and records a marker.
   stale_marker_record "$win" "$state"
-  case "$(FM_STATE_OVERRIDE="$state" classify_stale "$win" "$state")" in
+  case "$(JG_STATE_OVERRIDE="$state" classify_stale "$win" "$state")" in
     self\|*) : ;;
     *) fail "transient stale did not self-handle" ;;
   esac
@@ -141,8 +141,8 @@ test_stale_pane_transient_persistent_resume() {
   printf 'idle prompt $\n' > "$dir/pane.txt"
   echo $(( $(date +%s) - 500 )) > "$state/.subsuper-stale-$key"
   : > "$state/.subsuper-escalations" 2>/dev/null || true
-  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" \
-    FM_STATE_OVERRIDE="$state" FM_STALE_ESCALATE_SECS=240 housekeeping "$state" \
+  PATH="$fakebin:$PATH" JG_FAKE_TMUX_WINDOW="$win" JG_FAKE_TMUX_CAPTURE="$dir/pane.txt" \
+    JG_STATE_OVERRIDE="$state" JG_STALE_ESCALATE_SECS=240 housekeeping "$state" \
     2>"$dir/housekeeping.err"
   [ ! -s "$dir/housekeeping.err" ] \
     || fail "missing task metadata leaked a raw read error: $(cat "$dir/housekeeping.err")"
@@ -160,8 +160,8 @@ test_stale_pane_transient_persistent_resume() {
   "$ROOT/bin/jg-busy-event.sh" apply "$state" stale-w2 busy --gen "$resumed_gen" \
     --source pi-ext --event agent-start
   : > "$state/.subsuper-escalations"
-  PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$dir/pane.txt" \
-    FM_STATE_OVERRIDE="$state" FM_STALE_ESCALATE_SECS=240 housekeeping "$state"
+  PATH="$fakebin:$PATH" JG_FAKE_TMUX_WINDOW="$win" JG_FAKE_TMUX_CAPTURE="$dir/pane.txt" \
+    JG_STATE_OVERRIDE="$state" JG_STALE_ESCALATE_SECS=240 housekeeping "$state"
   [ ! -e "$state/.subsuper-stale-$key" ] || fail "resumed stale marker was not cleared"
   [ ! -s "$state/.subsuper-escalations" ] || fail "resumed (busy) stale was escalated"
   pass "lifecycle: stale pane transient self-handles, persistent escalates once and clears, resumed clears quietly"

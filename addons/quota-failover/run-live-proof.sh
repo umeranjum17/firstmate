@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# run-live-proof.sh: a controlled real route failure recovers with no human. A disposable live lab (FM_CHECKOUT's
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
+# run-live-proof.sh: a controlled real route failure recovers with no human. A disposable live lab (JG_CHECKOUT's
 # jg-live-lab.sh, Haiku main) gets one real jg-spawn worker on pi, pinned to a local provider that answers HTTP 429, and
 # this checkout's watcher in a lab-only data path; PASS is the lab watcher moving it to Claude Haiku and the worker
 # finishing there. The lab pi agent dir defines only that provider and holds no credential. The evidence is one readable
@@ -10,7 +19,7 @@ set -euo pipefail
 real_pi=$(mise which pi 2>/dev/null) && PATH=$(dirname "$real_pi"):$PATH
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
-FMC=${FM_CHECKOUT:?set FM_CHECKOUT to a Firstmate checkout}
+FMC=${JG_CHECKOUT:?set JG_CHECKOUT to a Firstmate checkout}
 port=${LAB_429_PORT:-18429} wait=${LAB_WAIT_SECS:-1800} ID=lab429-worker
 mkdir -p "$evidence" && work=$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/jg-quota-failover-live.$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")
 ROOT=$work/lab raw=$work/raw srv='' downed=''
@@ -44,8 +53,8 @@ log "setup: disposable lab home up; $(grep '^ok probe:' "$raw/lab-up.txt") on cl
 rec() { sed -n "s/^$1=//p" "$ROOT/.jg-live-lab" | head -n 1; }
 LAB=$(rec home) TMUX_DIR=$(rec tmux_dir)
 lab_run() { (cd "$LAB" && env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" PATH="$PATH" SHELL="${SHELL:-/bin/bash}" \
-  TERM=xterm-256color LANG="${LANG:-en_US.UTF-8}" TMUX_TMPDIR="$TMUX_DIR" TREEHOUSE_ROOT="$ROOT/treehouse" FM_BACKEND=tmux \
-  DISABLE_AUTOUPDATER=1 FM_HOME="$LAB" ${CLAUDE_CONFIG_DIR:+CLAUDE_CONFIG_DIR="$CLAUDE_CONFIG_DIR"} "$@"); }
+  TERM=xterm-256color LANG="${LANG:-en_US.UTF-8}" TMUX_TMPDIR="$TMUX_DIR" TREEHOUSE_ROOT="$ROOT/treehouse" JG_BACKEND=tmux \
+  DISABLE_AUTOUPDATER=1 JG_HOME="$LAB" ${CLAUDE_CONFIG_DIR:+CLAUDE_CONFIG_DIR="$CLAUDE_CONFIG_DIR"} "$@"); }
 
 git init -q -b main "$work/seed" && mkdir -p "$work/seed/notes"
 printf 'NOTES = []\n\n\ndef add_note(text):\n    NOTES.append(text)\n    return len(NOTES) - 1\n' >"$work/seed/notes/__init__.py"
@@ -61,7 +70,7 @@ log "setup: this checkout's quota-failover watcher installed into the lab home (
 inst=$ROOT/xdg/jg-quota-failover # the only pool library line the installed watcher sources is the add-on's own copy
 # shellcheck disable=SC2016 # matches the literal source line
 [ "$(grep -c 'jg-account-pool-lib\.sh' "$inst/quota-failover/quota-failover")" = 1 ] &&
-  grep -q '^\. "\$_FM_POOL_DIR/jg-account-pool-lib\.sh"' "$inst/quota-failover/quota-failover" &&
+  grep -q '^\. "\$_JG_POOL_DIR/jg-account-pool-lib\.sh"' "$inst/quota-failover/quota-failover" &&
   cmp -s "$inst/account-pool/bin/jg-account-pool-lib.sh" "$repo/account-pool/bin/jg-account-pool-lib.sh" ||
   { log "FAIL: the installed watcher does not load the add-on's own account-pool library"; exit 1; }
 log "setup: the installed watcher sources only the add-on's own account-pool/bin/jg-account-pool-lib.sh (installed beside it, identical to this checkout's), not the Firstmate checkout's bin/ copy"

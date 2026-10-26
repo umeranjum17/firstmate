@@ -19,7 +19,7 @@
 # class. Before the asynchronous conversion the loaded arms ran an order of
 # magnitude worse than the floor, which is the regression this guard catches.
 #
-# Nothing global is touched: a scratch FM_HOME, a scratch project holding a
+# Nothing global is touched: a scratch JG_HOME, a scratch project holding a
 # copy of the tracked extension, a private tmux socket, a scratch session
 # directory, --approve (trust for this run only), and --offline. Pi reads the
 # operator's own agent directory because a Pi with no model renders a setup
@@ -31,7 +31,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate default-on FM_PI_BRANCH_RESPONSIVENESS_E2E pi tmux node
+jg_live_gate default-on JG_PI_BRANCH_RESPONSIVENESS_E2E pi tmux node
 
 PI_VERSION=$(pi --version 2>/dev/null || printf 'unknown')
 TMUX=$(command -v tmux)
@@ -59,7 +59,7 @@ OUTCOME_SCRIPT="$ROOT/bin/jg-branch-outcome.sh"
 
 # The store this guard drives is the real one; only the rows are synthetic.
 append_outcome() {
-  FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$HOME_DIR/state" JG_ROOT_OVERRIDE="$ROOT" \
     bash "$OUTCOME_SCRIPT" append --task lab-task --verdict routine --summary "$1" --silent false >/dev/null \
     || fail "could not seed the outcome store"
 }
@@ -69,7 +69,7 @@ append_outcome() {
 cat > "$LAB/launch.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/.lock"
+printf '%s\n' "$$" > "$JG_STATE_OVERRIDE/.lock"
 cd "$LAB_PROJECT" || exit 1
 exec "$@"
 SH
@@ -180,8 +180,8 @@ run_arm() {
     pi_args+=(-ne)
   fi
   "$TMUX" -L "$SOCKET" new-session -d -s "$SESSION" -x 200 -y 50 \
-    "FM_HOME='$HOME_DIR' FM_STATE_OVERRIDE='$HOME_DIR/state' FM_CONFIG_OVERRIDE='$HOME_DIR/config' \
-     FM_ROOT_OVERRIDE='$ROOT' LAB_PROJECT='$PROJECT' '$LAB/launch.sh' ${pi_args[*]@Q}"
+    "JG_HOME='$HOME_DIR' JG_STATE_OVERRIDE='$HOME_DIR/state' JG_CONFIG_OVERRIDE='$HOME_DIR/config' \
+     JG_ROOT_OVERRIDE='$ROOT' LAB_PROJECT='$PROJECT' '$LAB/launch.sh' ${pi_args[*]@Q}"
   # The lab project path in Pi's own status line is the readiness signal: it
   # appears only once the TUI has drawn, unlike any prompt character.
   wait_for_pane_text "$PROJECT" 240 \

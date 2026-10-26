@@ -19,12 +19,12 @@ install_writer() {
   mkdir -p "$TMP_ROOT/xdg/jg-tickets-sync/tickets-sync"
   cat > "$TMP_ROOT/xdg/jg-tickets-sync/tickets-sync/ticket.py" <<'SH'
 import json, os, sys
-with open(os.environ['FM_TICKET_TEST_CALLS'], 'a') as out:
-    out.write(json.dumps({'home': os.environ.get('FM_HOME'), 'argv': sys.argv[1:]}) + '\n')
+with open(os.environ['JG_TICKET_TEST_CALLS'], 'a') as out:
+    out.write(json.dumps({'home': os.environ.get('JG_HOME'), 'argv': sys.argv[1:]}) + '\n')
 SH
 }
 
-run() { FM_TICKET_TEST_CALLS="$CALLS" FM_HOME="$HOME_DIR" XDG_DATA_HOME="$TMP_ROOT/xdg" "$@"; }
+run() { JG_TICKET_TEST_CALLS="$CALLS" JG_HOME="$HOME_DIR" XDG_DATA_HOME="$TMP_ROOT/xdg" "$@"; }
 
 "$TICKET" --help | grep -q '^Usage: jg-ticket.sh <task-id>' || fail "jg-ticket --help does not print its usage"
 

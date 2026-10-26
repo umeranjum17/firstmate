@@ -48,7 +48,7 @@ import {
   afkPostureRecordPresent,
   branchOfferForWake,
   createBranchDispatchOffer,
-  FM_BRANCH_DISPATCH_EVENT,
+  JG_BRANCH_DISPATCH_EVENT,
 } from "./lib/jg-branch-dispatch.ts";
 import {
   type CalmPresentationState,
@@ -57,6 +57,10 @@ import {
 } from "./lib/jg-calm-visibility.ts";
 import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.ts";
 import { runCommandAsync } from "./lib/jg-async-exec.ts";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 type ArmResult = {
   ok: boolean;
@@ -144,10 +148,10 @@ function refreshWatchToolShell(
 const extensionFile = fileURLToPath(import.meta.url);
 const extensionDir = dirname(extensionFile);
 const root = resolve(extensionDir, "../..");
-const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
-const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
-const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
+const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
+const fmRoot = process.env.JG_ROOT_OVERRIDE || root;
+const state = process.env.JG_STATE_OVERRIDE || `${fmHome}/state`;
+const config = process.env.JG_CONFIG_OVERRIDE || `${fmHome}/config`;
 const armScript = `${fmRoot}/bin/jg-watch-arm.sh`;
 const marker = `${state}/.pi-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/pi-primary-watch`;
@@ -155,27 +159,27 @@ const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
 const extensionLog = `${state}/.watch-extension.log`;
 const extensionLogMaxLines = extensionLogKeepLines();
 const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
-const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
-const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
-const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+const retryBaseMs = positiveInteger("JG_WATCH_REARM_RETRY_BASE_MS", 250);
+const retryMaxMs = positiveInteger("JG_WATCH_REARM_RETRY_MAX_MS", 4000);
+const retryLimit = positiveInteger("JG_WATCH_REARM_RETRY_LIMIT", 5);
 // Bound for one accepted branch settlement: a branch that takes a wake but
 // never settles it (a wedged provider call) must not park the delivery
 // pipeline behind it forever, or every later wake waits while main stays
 // idle. Past this bound the wake is re-ringed to main, whose queue-lock
 // claim wins over a late branch drain (that settlement then rejects back
 // harmlessly as already-claimed-by-main).
-const branchSettlementTimeoutMs = positiveInteger("FM_BRANCH_SETTLEMENT_TIMEOUT_MS", 600000);
+const branchSettlementTimeoutMs = positiveInteger("JG_BRANCH_SETTLEMENT_TIMEOUT_MS", 600000);
 async function armReadinessBudgetMs(): Promise<number> {
-  const override = positiveInteger("FM_PI_ARM_READY_TIMEOUT_MS", 0);
+  const override = positiveInteger("JG_PI_ARM_READY_TIMEOUT_MS", 0);
   if (override) return override;
   const result = await runCommandAsync("bash", ["-lc",
-    'config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
+    'config_dir="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
     "jg-watcher-budget", `${root}/bin/jg-wake-lib.sh`, state, `${fmRoot}/bin/jg-watch.sh`, fmHome,
-  ], { env: { ...process.env, FM_HOME: fmHome, FM_CONFIG_OVERRIDE: config, FM_STATE_OVERRIDE: state } });
+  ], { env: { ...process.env, JG_HOME: fmHome, JG_CONFIG_OVERRIDE: config, JG_STATE_OVERRIDE: state } });
   const seconds = Number(result.stdout.trim());
   return result.status === 0 && Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 + 2000 : 0;
 }
-const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const armRetireTimeoutMs = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const repairOnlyHint = "call jg_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - Pi session is shutting down";
 
@@ -229,11 +233,11 @@ function positiveInteger(name: string, fallback: number): number {
 }
 
 // Opt-in bound for the extension diagnostic log: only a positive
-// FM_WATCH_EXTENSION_LOG_KEEP_LINES enables logging, so the default run
+// JG_WATCH_EXTENSION_LOG_KEEP_LINES enables logging, so the default run
 // writes nothing. Unset, empty, non-numeric, zero, and negative values
 // disable the log entirely instead of falling back to a silent default.
 function extensionLogKeepLines(): number {
-  const raw = process.env.FM_WATCH_EXTENSION_LOG_KEEP_LINES;
+  const raw = process.env.JG_WATCH_EXTENSION_LOG_KEEP_LINES;
   if (raw === undefined || raw.trim() === "") return 0;
   const value = Math.floor(Number(raw));
   if (!Number.isFinite(value) || value <= 0) return 0;
@@ -358,7 +362,7 @@ function nodeErrorCode(error: unknown): string {
 
 // Bounded diagnostic record for restore attempts, readiness timeouts, and
 // handling-confirmation targets and results. Opt-in through
-// FM_WATCH_EXTENSION_LOG_KEEP_LINES and off by default: a disabled log
+// JG_WATCH_EXTENSION_LOG_KEEP_LINES and off by default: a disabled log
 // returns before touching the filesystem, so it never creates its file.
 // Purely observational: a logging failure never changes supervision
 // behavior. docs/watcher-continuity.md owns what the arm layer already
@@ -691,7 +695,7 @@ export default function (pi: ExtensionAPI) {
         {
           cwd: fmRoot,
           encoding: "utf8",
-          env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot },
+          env: { ...process.env, JG_HOME: fmHome, JG_STATE_OVERRIDE: state, JG_ROOT_OVERRIDE: fmRoot },
         },
       );
       if (result.status === 0) return { ok: true, detail: "" };
@@ -731,7 +735,7 @@ export default function (pi: ExtensionAPI) {
     // the supervision host off Pi (bin/jg-branch-dispatch.mjs offer).
     const { scope, heartbeat, eligible, awayOnly } = branchOfferForWake(state, message, afkPostureRecordPresent(state));
     const offer = createBranchDispatchOffer(message, scope.projects, heartbeat, eligible, awayOnly);
-    pi.events?.emit?.(FM_BRANCH_DISPATCH_EVENT, offer);
+    pi.events?.emit?.(JG_BRANCH_DISPATCH_EVENT, offer);
     return offer.accepted ? offer.settlement : null;
   }
 
@@ -1116,13 +1120,13 @@ export default function (pi: ExtensionAPI) {
     const id = ++owner.seq;
     const env = {
       ...process.env,
-      FM_HOME: fmHome,
-      FM_ROOT_OVERRIDE: fmRoot,
-      FM_CONFIG_OVERRIDE: config,
-      FM_WATCH_ARM_SCRIPT: armScript,
-      FM_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
+      JG_HOME: fmHome,
+      JG_ROOT_OVERRIDE: fmRoot,
+      JG_CONFIG_OVERRIDE: config,
+      JG_WATCH_ARM_SCRIPT: armScript,
+      JG_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
     };
-    const armChild = spawn("bash", ["-lc", "config_dir=\"${FM_CONFIG_OVERRIDE:-$FM_HOME/config}\"; [ -f \"$config_dir/x-mode.env\" ] && . \"$config_dir/x-mode.env\"; exec \"$FM_WATCH_ARM_SCRIPT\" --restart"], {
+    const armChild = spawn("bash", ["-lc", "config_dir=\"${JG_CONFIG_OVERRIDE:-$JG_HOME/config}\"; [ -f \"$config_dir/x-mode.env\" ] && . \"$config_dir/x-mode.env\"; exec \"$JG_WATCH_ARM_SCRIPT\" --restart"], {
       cwd: fmRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],

@@ -32,7 +32,7 @@
 # Machine-wide claim root. Homes can share one underlying source store, so the
 # "one owner per canonical source" rule cannot live inside a single home.
 jg_procevent_claim_root() {
-  printf '%s\n' "${FM_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
+  printf '%s\n' "${JG_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
 }
 
 jg_procevent_registry_dir() { printf '%s\n' "$1/procevent"; }
@@ -162,74 +162,74 @@ jg_procevent_owner_lease_age() {  # <state-root>
 # is forty watcher cycles at the default poll interval, so an ordinary busy or
 # briefly wedged home never trips it, while a home that is simply gone stops
 # owning processes within the hour rather than within a day.
-FM_PROCEVENT_OWNER_LEASE_DEFAULT_SECONDS=600
-FM_PROCEVENT_OWNER_LEASE_MIN_SECONDS=1
-FM_PROCEVENT_OWNER_LEASE_MAX_SECONDS=86400
+JG_PROCEVENT_OWNER_LEASE_DEFAULT_SECONDS=600
+JG_PROCEVENT_OWNER_LEASE_MIN_SECONDS=1
+JG_PROCEVENT_OWNER_LEASE_MAX_SECONDS=86400
 
 jg_procevent_owner_lease_seconds() {
-  local value=${FM_PROCEVENT_OWNER_LEASE_SECONDS-}
+  local value=${JG_PROCEVENT_OWNER_LEASE_SECONDS-}
   if [ -z "$value" ]; then
-    printf '%s\n' "$FM_PROCEVENT_OWNER_LEASE_DEFAULT_SECONDS"
+    printf '%s\n' "$JG_PROCEVENT_OWNER_LEASE_DEFAULT_SECONDS"
     return 0
   fi
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$value" -ge "$FM_PROCEVENT_OWNER_LEASE_MIN_SECONDS" ] || return 1
-  [ "$value" -le "$FM_PROCEVENT_OWNER_LEASE_MAX_SECONDS" ] || return 1
+  [ "$value" -ge "$JG_PROCEVENT_OWNER_LEASE_MIN_SECONDS" ] || return 1
+  [ "$value" -le "$JG_PROCEVENT_OWNER_LEASE_MAX_SECONDS" ] || return 1
   printf '%s\n' "$value"
 }
 
 # Detection-interval semantics: docs/configuration.md, Process-to-event sources.
-FM_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS=15
-FM_PROCEVENT_OWNER_CHECK_MIN_SECONDS=1
-FM_PROCEVENT_OWNER_CHECK_MAX_SECONDS=3600
+JG_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS=15
+JG_PROCEVENT_OWNER_CHECK_MIN_SECONDS=1
+JG_PROCEVENT_OWNER_CHECK_MAX_SECONDS=3600
 
 jg_procevent_owner_check_seconds() {
-  local value=${FM_PROCEVENT_OWNER_CHECK_SECONDS-}
+  local value=${JG_PROCEVENT_OWNER_CHECK_SECONDS-}
   if [ -z "$value" ]; then
-    printf '%s\n' "$FM_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS"
+    printf '%s\n' "$JG_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS"
     return 0
   fi
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$value" -ge "$FM_PROCEVENT_OWNER_CHECK_MIN_SECONDS" ] || return 1
-  [ "$value" -le "$FM_PROCEVENT_OWNER_CHECK_MAX_SECONDS" ] || return 1
+  [ "$value" -ge "$JG_PROCEVENT_OWNER_CHECK_MIN_SECONDS" ] || return 1
+  [ "$value" -le "$JG_PROCEVENT_OWNER_CHECK_MAX_SECONDS" ] || return 1
   printf '%s\n' "$value"
 }
 
-FM_PROCEVENT_LAUNCH_FLOOR_DEFAULT_SECONDS=1
-FM_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS=1
-FM_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS=3600
+JG_PROCEVENT_LAUNCH_FLOOR_DEFAULT_SECONDS=1
+JG_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS=1
+JG_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS=3600
 
 jg_procevent_launch_floor_seconds() {
-  local value=${FM_PROCEVENT_LAUNCH_FLOOR_SECONDS-}
+  local value=${JG_PROCEVENT_LAUNCH_FLOOR_SECONDS-}
   if [ -z "$value" ]; then
-    printf '%s\n' "$FM_PROCEVENT_LAUNCH_FLOOR_DEFAULT_SECONDS"
+    printf '%s\n' "$JG_PROCEVENT_LAUNCH_FLOOR_DEFAULT_SECONDS"
     return 0
   fi
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$value" -ge "$FM_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS" ] || return 1
-  [ "$value" -le "$FM_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS" ] || return 1
+  [ "$value" -ge "$JG_PROCEVENT_LAUNCH_FLOOR_MIN_SECONDS" ] || return 1
+  [ "$value" -le "$JG_PROCEVENT_LAUNCH_FLOOR_MAX_SECONDS" ] || return 1
   printf '%s\n' "$value"
 }
 
 # How long reconcile waits for a runner it just detached to prove it took the
 # source's claim. Confirmation reads durable evidence, so a healthy launch
 # settles on the first poll and only a launch not yet proved spends the
-# window. The default stays well below FM_POLL because bin/jg-watch.sh runs
+# window. The default stays well below JG_POLL because bin/jg-watch.sh runs
 # reconcile once per supervision cycle, and every launch of a cycle shares ONE
 # window rather than taking a window each.
-FM_PROCEVENT_LAUNCH_CONFIRM_DEFAULT_SECONDS=3
-FM_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS=1
-FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS=600
+JG_PROCEVENT_LAUNCH_CONFIRM_DEFAULT_SECONDS=3
+JG_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS=1
+JG_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS=600
 
 jg_procevent_launch_confirm_seconds() {
-  local value=${FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS-}
+  local value=${JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS-}
   if [ -z "$value" ]; then
-    printf '%s\n' "$FM_PROCEVENT_LAUNCH_CONFIRM_DEFAULT_SECONDS"
+    printf '%s\n' "$JG_PROCEVENT_LAUNCH_CONFIRM_DEFAULT_SECONDS"
     return 0
   fi
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$value" -ge "$FM_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS" ] || return 1
-  [ "$value" -le "$FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS" ] || return 1
+  [ "$value" -ge "$JG_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS" ] || return 1
+  [ "$value" -le "$JG_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS" ] || return 1
   printf '%s\n' "$value"
 }
 
@@ -471,7 +471,7 @@ jg_procevent_extension_registration_publish_locked() {  # <state> <adapter> <sou
 
 # Load an extension-owned registration under the caller's source lock.
 # 0 = valid extension owner, 1 = ordinary built-in registration, 2 = malformed
-# extension owner. Sets FM_PROCEVENT_EXTENSION_* on success.
+# extension owner. Sets JG_PROCEVENT_EXTENSION_* on success.
 jg_procevent_extension_registration_load_locked() {  # <state> <source-id>
   local state=$1 id=$2 file adapter_line owner_line schema_line id_line version_line capability_line
   local package_line binding_line config_line token_line argc_line argv_line extra
@@ -500,29 +500,29 @@ jg_procevent_extension_registration_load_locked() {  # <state> <source-id>
   [ "$schema_line" = extension_schema=jg-procevent-extension-owner.v1 ] || return 2
   [ "$capability_line" = capability_version=1 ] || return 2
   [ "$argc_line" = argc=0 ] && [ "$argv_line" = argv: ] || return 2
-  FM_PROCEVENT_EXTENSION_ADAPTER=${adapter_line#adapter=}
-  FM_PROCEVENT_EXTENSION_ID=${id_line#extension_id=}
-  FM_PROCEVENT_EXTENSION_VERSION=${version_line#extension_version=}
+  JG_PROCEVENT_EXTENSION_ADAPTER=${adapter_line#adapter=}
+  JG_PROCEVENT_EXTENSION_ID=${id_line#extension_id=}
+  JG_PROCEVENT_EXTENSION_VERSION=${version_line#extension_version=}
   # shellcheck disable=SC2034 # Public loader output consumed by jg-procevent.sh.
-  FM_PROCEVENT_EXTENSION_CAPABILITY_VERSION=${capability_line#capability_version=}
-  FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST=${package_line#package_digest=}
-  FM_PROCEVENT_EXTENSION_BINDING_DIGEST=${binding_line#binding_digest=}
-  FM_PROCEVENT_EXTENSION_CONFIG_REF=${config_line#config_ref=}
-  FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN=${token_line#registration_token=}
-  [ "$adapter_line" = "adapter=$FM_PROCEVENT_EXTENSION_ADAPTER" ] || return 2
-  [ "$id_line" = "extension_id=$FM_PROCEVENT_EXTENSION_ID" ] || return 2
-  [ "$version_line" = "extension_version=$FM_PROCEVENT_EXTENSION_VERSION" ] || return 2
-  [ "$package_line" = "package_digest=$FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST" ] || return 2
-  [ "$binding_line" = "binding_digest=$FM_PROCEVENT_EXTENSION_BINDING_DIGEST" ] || return 2
-  [ "$config_line" = "config_ref=$FM_PROCEVENT_EXTENSION_CONFIG_REF" ] || return 2
-  [ "$token_line" = "registration_token=$FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" ] || return 2
-  jg_procevent_adapter_valid "$FM_PROCEVENT_EXTENSION_ADAPTER" || return 2
-  jg_procevent_extension_id_valid "$FM_PROCEVENT_EXTENSION_ID" || return 2
-  jg_procevent_extension_version_valid "$FM_PROCEVENT_EXTENSION_VERSION" || return 2
-  jg_procevent_digest_valid "$FM_PROCEVENT_EXTENSION_PACKAGE_DIGEST" || return 2
-  jg_procevent_digest_valid "$FM_PROCEVENT_EXTENSION_BINDING_DIGEST" || return 2
-  jg_procevent_extension_config_ref_valid "$FM_PROCEVENT_EXTENSION_CONFIG_REF" || return 2
-  jg_procevent_extension_registration_token_valid "$FM_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" || return 2
+  JG_PROCEVENT_EXTENSION_CAPABILITY_VERSION=${capability_line#capability_version=}
+  JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST=${package_line#package_digest=}
+  JG_PROCEVENT_EXTENSION_BINDING_DIGEST=${binding_line#binding_digest=}
+  JG_PROCEVENT_EXTENSION_CONFIG_REF=${config_line#config_ref=}
+  JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN=${token_line#registration_token=}
+  [ "$adapter_line" = "adapter=$JG_PROCEVENT_EXTENSION_ADAPTER" ] || return 2
+  [ "$id_line" = "extension_id=$JG_PROCEVENT_EXTENSION_ID" ] || return 2
+  [ "$version_line" = "extension_version=$JG_PROCEVENT_EXTENSION_VERSION" ] || return 2
+  [ "$package_line" = "package_digest=$JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST" ] || return 2
+  [ "$binding_line" = "binding_digest=$JG_PROCEVENT_EXTENSION_BINDING_DIGEST" ] || return 2
+  [ "$config_line" = "config_ref=$JG_PROCEVENT_EXTENSION_CONFIG_REF" ] || return 2
+  [ "$token_line" = "registration_token=$JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" ] || return 2
+  jg_procevent_adapter_valid "$JG_PROCEVENT_EXTENSION_ADAPTER" || return 2
+  jg_procevent_extension_id_valid "$JG_PROCEVENT_EXTENSION_ID" || return 2
+  jg_procevent_extension_version_valid "$JG_PROCEVENT_EXTENSION_VERSION" || return 2
+  jg_procevent_digest_valid "$JG_PROCEVENT_EXTENSION_PACKAGE_DIGEST" || return 2
+  jg_procevent_digest_valid "$JG_PROCEVENT_EXTENSION_BINDING_DIGEST" || return 2
+  jg_procevent_extension_config_ref_valid "$JG_PROCEVENT_EXTENSION_CONFIG_REF" || return 2
+  jg_procevent_extension_registration_token_valid "$JG_PROCEVENT_EXTENSION_REGISTRATION_TOKEN" || return 2
 }
 
 # Exact legacy registration comparison used by conditional built-in retirement.
@@ -596,18 +596,18 @@ jg_procevent_claim_load_locked() {  # <source-id>
   elif [ -n "$state_device$state_inode$state_owner$state_mode" ]; then
     return 1
   fi
-  FM_PROCEVENT_CLAIM_HOME=$home
-  FM_PROCEVENT_CLAIM_PID=$pid
-  FM_PROCEVENT_CLAIM_TOKEN=$token
-  FM_PROCEVENT_CLAIM_IDENTITY=$identity
-  FM_PROCEVENT_CLAIM_REG_DIR=$reg_dir
-  FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
-  FM_PROCEVENT_CLAIM_TERMINAL=$terminal
-  FM_PROCEVENT_CLAIM_STATE_ROOT=$state_root
-  FM_PROCEVENT_CLAIM_STATE_DEVICE=$state_device
-  FM_PROCEVENT_CLAIM_STATE_INODE=$state_inode
-  FM_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
-  FM_PROCEVENT_CLAIM_STATE_MODE=$state_mode
+  JG_PROCEVENT_CLAIM_HOME=$home
+  JG_PROCEVENT_CLAIM_PID=$pid
+  JG_PROCEVENT_CLAIM_TOKEN=$token
+  JG_PROCEVENT_CLAIM_IDENTITY=$identity
+  JG_PROCEVENT_CLAIM_REG_DIR=$reg_dir
+  JG_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
+  JG_PROCEVENT_CLAIM_TERMINAL=$terminal
+  JG_PROCEVENT_CLAIM_STATE_ROOT=$state_root
+  JG_PROCEVENT_CLAIM_STATE_DEVICE=$state_device
+  JG_PROCEVENT_CLAIM_STATE_INODE=$state_inode
+  JG_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
+  JG_PROCEVENT_CLAIM_STATE_MODE=$state_mode
 }
 
 jg_procevent_claim_state_root_field_valid() {  # <canonical-state-root>
@@ -628,30 +628,30 @@ jg_procevent_claim_state_root_identity() {  # <state-root>
 }
 
 jg_procevent_claim_owned_by_state() {  # <state-root> <legacy-home>
-  if [ -n "${FM_PROCEVENT_CLAIM_STATE_ROOT:-}" ]; then
-    [ "$FM_PROCEVENT_CLAIM_STATE_ROOT" = "$1" ]
+  if [ -n "${JG_PROCEVENT_CLAIM_STATE_ROOT:-}" ]; then
+    [ "$JG_PROCEVENT_CLAIM_STATE_ROOT" = "$1" ]
   else
-    [ "$FM_PROCEVENT_CLAIM_HOME" = "$2" ]
+    [ "$JG_PROCEVENT_CLAIM_HOME" = "$2" ]
   fi
 }
 
 jg_procevent_claim_recorded_state_root_valid() {
   local identity state_root state_device state_inode state_owner state_mode
-  state_root=${FM_PROCEVENT_CLAIM_STATE_ROOT:-}
+  state_root=${JG_PROCEVENT_CLAIM_STATE_ROOT:-}
   [ -n "$state_root" ] || return 0
   identity=$(jg_procevent_claim_state_root_identity "$state_root") || return 1
   IFS=$'\t' read -r state_root state_device state_inode state_owner state_mode <<< "$identity"
-  [ "$state_root" = "$FM_PROCEVENT_CLAIM_STATE_ROOT" ] \
-    && [ "$state_device" = "$FM_PROCEVENT_CLAIM_STATE_DEVICE" ] \
-    && [ "$state_inode" = "$FM_PROCEVENT_CLAIM_STATE_INODE" ] \
-    && [ "$state_owner" = "$FM_PROCEVENT_CLAIM_STATE_OWNER" ] \
-    && [ "$state_mode" = "$FM_PROCEVENT_CLAIM_STATE_MODE" ]
+  [ "$state_root" = "$JG_PROCEVENT_CLAIM_STATE_ROOT" ] \
+    && [ "$state_device" = "$JG_PROCEVENT_CLAIM_STATE_DEVICE" ] \
+    && [ "$state_inode" = "$JG_PROCEVENT_CLAIM_STATE_INODE" ] \
+    && [ "$state_owner" = "$JG_PROCEVENT_CLAIM_STATE_OWNER" ] \
+    && [ "$state_mode" = "$JG_PROCEVENT_CLAIM_STATE_MODE" ]
 }
 
 jg_procevent_claim_capture_reservation_remove_locked() {
-  [ -n "${FM_PROCEVENT_CLAIM_STATE_ROOT:-}" ] || return 0
+  [ -n "${JG_PROCEVENT_CLAIM_STATE_ROOT:-}" ] || return 0
   jg_procevent_claim_recorded_state_root_valid || return 1
-  jg_procevent_capture_reservation_remove_claim "$FM_PROCEVENT_CLAIM_STATE_ROOT" "$FM_PROCEVENT_CLAIM_TOKEN"
+  jg_procevent_capture_reservation_remove_claim "$JG_PROCEVENT_CLAIM_STATE_ROOT" "$JG_PROCEVENT_CLAIM_TOKEN"
 }
 
 # jg_procevent_claim_generation_gone_locked
@@ -662,16 +662,16 @@ jg_procevent_claim_capture_reservation_remove_locked() {
 # crashed leader with a still-live ambiguous group (state 3) all return false.
 jg_procevent_claim_generation_gone_locked() {
   local state=0
-  jg_procevent_pid_state "${FM_PROCEVENT_CLAIM_PID:-}" "${FM_PROCEVENT_CLAIM_IDENTITY:-}" || state=$?
+  jg_procevent_pid_state "${JG_PROCEVENT_CLAIM_PID:-}" "${JG_PROCEVENT_CLAIM_IDENTITY:-}" || state=$?
   [ "$state" -eq 1 ] \
-    && ! jg_procevent_group_alive "${FM_PROCEVENT_CLAIM_PID:-}"
+    && ! jg_procevent_group_alive "${JG_PROCEVENT_CLAIM_PID:-}"
 }
 
 # jg_procevent_claim_undisplaceable_locked <source-id>
 # The single owner of "this stale claim is one no unattended caller may
 # displace". True when a claim record is still present for the source and its
 # generation is NOT provably gone. Call it only where
-# jg_procevent_claim_state_locked has just returned 1, so the FM_PROCEVENT_CLAIM_*
+# jg_procevent_claim_state_locked has just returned 1, so the JG_PROCEVENT_CLAIM_*
 # globals below describe this source: that same return also covers a source with
 # no claim record at all, which leaves those globals holding whatever the
 # previous load put there, so the record check has to travel with the generation
@@ -741,12 +741,12 @@ jg_procevent_claim_state_locked() {
   claim=$(jg_procevent_claim_path "$1")
   [ -e "$claim" ] || return 1
   jg_procevent_claim_load_locked "$1" || return 2
-  if [ "$FM_PROCEVENT_CLAIM_TERMINAL" = terminal ] && [ -n "$FM_PROCEVENT_CLAIM_REG_IDENTITY" ]; then
-    registration="$FM_PROCEVENT_CLAIM_REG_DIR/$1.source"
+  if [ "$JG_PROCEVENT_CLAIM_TERMINAL" = terminal ] && [ -n "$JG_PROCEVENT_CLAIM_REG_IDENTITY" ]; then
+    registration="$JG_PROCEVENT_CLAIM_REG_DIR/$1.source"
     current_identity=$(jg_pr_file_identity "$registration" 2>/dev/null || true)
-    [ "$current_identity" = "$FM_PROCEVENT_CLAIM_REG_IDENTITY" ] && return 4
+    [ "$current_identity" = "$JG_PROCEVENT_CLAIM_REG_IDENTITY" ] && return 4
   fi
-  jg_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY"
+  jg_procevent_pid_state "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_IDENTITY"
 }
 
 # jg_procevent_claim_acquire_locked <source-id> <home> <pid> <registration> <state-root>
@@ -769,9 +769,9 @@ jg_procevent_claim_acquire_locked() {
       0|2|3|4) status=2 ;;
       1)
         if [ -f "$claim" ] && [ ! -L "$claim" ]; then
-          old_home=$FM_PROCEVENT_CLAIM_HOME
-          old_token=$FM_PROCEVENT_CLAIM_TOKEN
-          old_reg_dir=$FM_PROCEVENT_CLAIM_REG_DIR
+          old_home=$JG_PROCEVENT_CLAIM_HOME
+          old_token=$JG_PROCEVENT_CLAIM_TOKEN
+          old_reg_dir=$JG_PROCEVENT_CLAIM_REG_DIR
           if [ -z "$old_reg_dir" ]; then
             if [ "$old_home" = "$home" ]; then
               old_reg_dir=$reg_dir
@@ -836,13 +836,13 @@ jg_procevent_claim_acquire_locked() {
     [ "$status" -ne 0 ] || chmod 0600 "$tmp" || status=1
     [ "$status" -ne 0 ] || mv -f -- "$tmp" "$claim" || status=1
     if [ "$status" -eq 0 ]; then
-      FM_PROCEVENT_CLAIM_TOKEN=$token
-      FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
-      FM_PROCEVENT_CLAIM_STATE_ROOT=$state_root
-      FM_PROCEVENT_CLAIM_STATE_DEVICE=$state_device
-      FM_PROCEVENT_CLAIM_STATE_INODE=$state_inode
-      FM_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
-      FM_PROCEVENT_CLAIM_STATE_MODE=$state_mode
+      JG_PROCEVENT_CLAIM_TOKEN=$token
+      JG_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
+      JG_PROCEVENT_CLAIM_STATE_ROOT=$state_root
+      JG_PROCEVENT_CLAIM_STATE_DEVICE=$state_device
+      JG_PROCEVENT_CLAIM_STATE_INODE=$state_inode
+      JG_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
+      JG_PROCEVENT_CLAIM_STATE_MODE=$state_mode
     fi
   fi
   [ "$status" -eq 0 ] || { [ -z "${tmp:-}" ] || rm -f -- "$tmp"; }
@@ -853,19 +853,19 @@ jg_procevent_claim_mark_terminal_locked() {
   local id=$1 home=$2 pid=$3 token=$4 claim root tmp
   claim=$(jg_procevent_claim_path "$id")
   jg_procevent_claim_load_locked "$id" \
-    && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
-    && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
-    && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
-    && [ -n "$FM_PROCEVENT_CLAIM_REG_IDENTITY" ] || return 1
+    && [ "$JG_PROCEVENT_CLAIM_HOME" = "$home" ] \
+    && [ "$JG_PROCEVENT_CLAIM_PID" = "$pid" ] \
+    && [ "$JG_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
+    && [ -n "$JG_PROCEVENT_CLAIM_REG_IDENTITY" ] || return 1
   root=$(jg_procevent_claim_root)
   tmp=$(umask 077; mktemp "$root/.claim.XXXXXX") || return 1
-  if [ -n "$FM_PROCEVENT_CLAIM_STATE_ROOT" ]; then
+  if [ -n "$JG_PROCEVENT_CLAIM_STATE_ROOT" ]; then
     if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n%s\n%s\n%s\n%s\n%s\n' \
-      "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
-      "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" \
-      "$FM_PROCEVENT_CLAIM_REG_IDENTITY" "$FM_PROCEVENT_CLAIM_STATE_ROOT" \
-      "$FM_PROCEVENT_CLAIM_STATE_DEVICE" "$FM_PROCEVENT_CLAIM_STATE_INODE" \
-      "$FM_PROCEVENT_CLAIM_STATE_OWNER" "$FM_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
+      "$JG_PROCEVENT_CLAIM_HOME" "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_TOKEN" \
+      "$JG_PROCEVENT_CLAIM_IDENTITY" "$JG_PROCEVENT_CLAIM_REG_DIR" \
+      "$JG_PROCEVENT_CLAIM_REG_IDENTITY" "$JG_PROCEVENT_CLAIM_STATE_ROOT" \
+      "$JG_PROCEVENT_CLAIM_STATE_DEVICE" "$JG_PROCEVENT_CLAIM_STATE_INODE" \
+      "$JG_PROCEVENT_CLAIM_STATE_OWNER" "$JG_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
       && chmod 0600 "$tmp" \
       && mv -f -- "$tmp" "$claim"; then
       return 0
@@ -875,9 +875,9 @@ jg_procevent_claim_mark_terminal_locked() {
     fi
   fi
   if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n' \
-    "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
-    "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" \
-    "$FM_PROCEVENT_CLAIM_REG_IDENTITY" > "$tmp" \
+    "$JG_PROCEVENT_CLAIM_HOME" "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_TOKEN" \
+    "$JG_PROCEVENT_CLAIM_IDENTITY" "$JG_PROCEVENT_CLAIM_REG_DIR" \
+    "$JG_PROCEVENT_CLAIM_REG_IDENTITY" > "$tmp" \
     && chmod 0600 "$tmp" \
     && mv -f -- "$tmp" "$claim"; then
     return 0
@@ -896,33 +896,33 @@ jg_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
   case "$reg_identity" in *:*) ;; *) return 1 ;; esac
   claim=$(jg_procevent_claim_path "$id")
   jg_procevent_claim_load_locked "$id" \
-    && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
-    && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
-    && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
-    && [ "$FM_PROCEVENT_CLAIM_TERMINAL" = active ] || return 1
+    && [ "$JG_PROCEVENT_CLAIM_HOME" = "$home" ] \
+    && [ "$JG_PROCEVENT_CLAIM_PID" = "$pid" ] \
+    && [ "$JG_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
+    && [ "$JG_PROCEVENT_CLAIM_TERMINAL" = active ] || return 1
   root=$(jg_procevent_claim_root)
   tmp=$(umask 077; mktemp "$root/.claim.XXXXXX") || return 1
-  if [ -n "$FM_PROCEVENT_CLAIM_STATE_ROOT" ]; then
+  if [ -n "$JG_PROCEVENT_CLAIM_STATE_ROOT" ]; then
     if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n%s\n%s\n%s\n%s\n%s\n' \
-      "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
-      "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" \
-      "$FM_PROCEVENT_CLAIM_STATE_ROOT" "$FM_PROCEVENT_CLAIM_STATE_DEVICE" \
-      "$FM_PROCEVENT_CLAIM_STATE_INODE" "$FM_PROCEVENT_CLAIM_STATE_OWNER" \
-      "$FM_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
+      "$JG_PROCEVENT_CLAIM_HOME" "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_TOKEN" \
+      "$JG_PROCEVENT_CLAIM_IDENTITY" "$JG_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" \
+      "$JG_PROCEVENT_CLAIM_STATE_ROOT" "$JG_PROCEVENT_CLAIM_STATE_DEVICE" \
+      "$JG_PROCEVENT_CLAIM_STATE_INODE" "$JG_PROCEVENT_CLAIM_STATE_OWNER" \
+      "$JG_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
       && chmod 0600 "$tmp" \
       && mv -f -- "$tmp" "$claim"; then
-      FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
+      JG_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
       return 0
     fi
     rm -f -- "$tmp"
     return 1
   fi
   if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n' \
-    "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
-    "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" > "$tmp" \
+    "$JG_PROCEVENT_CLAIM_HOME" "$JG_PROCEVENT_CLAIM_PID" "$JG_PROCEVENT_CLAIM_TOKEN" \
+    "$JG_PROCEVENT_CLAIM_IDENTITY" "$JG_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" > "$tmp" \
     && chmod 0600 "$tmp" \
     && mv -f -- "$tmp" "$claim"; then
-    FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
+    JG_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
     return 0
   fi
   rm -f -- "$tmp"
@@ -956,9 +956,9 @@ jg_procevent_claim_release_mode_locked() {
   claim=$(jg_procevent_claim_path "$id")
   [ -e "$claim" ] || return 0
   if jg_procevent_claim_load_locked "$id" \
-    && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
-    && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
-    && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ]; then
+    && [ "$JG_PROCEVENT_CLAIM_HOME" = "$home" ] \
+    && [ "$JG_PROCEVENT_CLAIM_PID" = "$pid" ] \
+    && [ "$JG_PROCEVENT_CLAIM_TOKEN" = "$token" ]; then
     case "$mode" in
       reclaim)
         jg_procevent_claim_capture_reservation_reclaim_locked || return 1
@@ -1111,13 +1111,13 @@ jg_procevent_capture() {
     jg_procevent_digest_valid "$binding_digest" || return 1
   fi
   if [ "$#" -eq 9 ]; then
-    if [ "${FM_PROCEVENT_CAPTURE_PINNED_INBOX:-}" != 1 ]; then
+    if [ "${JG_PROCEVENT_CAPTURE_PINNED_INBOX:-}" != 1 ]; then
       inbox=$(jg_procevent_capture_inbox_prepare "$state") || return 1
       (
         CDPATH='' cd -- "$inbox" 2>/dev/null || exit 1
         [ "$(pwd -P)" = "$inbox" ] || exit 1
-        FM_PROCEVENT_CAPTURE_PINNED_INBOX=1 \
-          FM_PROCEVENT_CAPTURE_ABSOLUTE_INBOX="$inbox" \
+        JG_PROCEVENT_CAPTURE_PINNED_INBOX=1 \
+          JG_PROCEVENT_CAPTURE_ABSOLUTE_INBOX="$inbox" \
           jg_procevent_capture "$@"
       )
       return $?
@@ -1196,7 +1196,7 @@ jg_procevent_capture() {
     return 1
   fi
   if [ "$#" -eq 9 ]; then
-    printf '%s\n' "$FM_PROCEVENT_CAPTURE_ABSOLUTE_INBOX/$id.$seq.result"
+    printf '%s\n' "$JG_PROCEVENT_CAPTURE_ABSOLUTE_INBOX/$id.$seq.result"
   else
     printf '%s\n' "$dest"
   fi
@@ -1248,7 +1248,7 @@ jg_procevent_event_line() {
 
 # jg_procevent_handled_marker <state> <source-id> <sequence>
 jg_procevent_handled_marker() {
-  if [ "${FM_PROCEVENT_CAPTURE_PINNED_INBOX:-}" = 1 ]; then
+  if [ "${JG_PROCEVENT_CAPTURE_PINNED_INBOX:-}" = 1 ]; then
     printf './%s.%s.handled\n' "$2" "$3"
     return
   fi
@@ -1276,7 +1276,7 @@ jg_procevent_mark_handled() {
   local state=$1 id=$2 seq=$3 inbox result adapter_file marker tmp
   jg_procevent_source_id_valid "$id" || return 2
   case "$seq" in ''|*[!0-9]*) return 2 ;; esac
-  if [ "${FM_PROCEVENT_CAPTURE_PINNED_INBOX:-}" = 1 ]; then
+  if [ "${JG_PROCEVENT_CAPTURE_PINNED_INBOX:-}" = 1 ]; then
     inbox=.
   else
     inbox=$(jg_procevent_inbox_dir "$state")
@@ -1348,18 +1348,18 @@ jg_procevent_result_extension_load() {  # <result-path>
   } < "$file" || return 2
   [ "$schema_line" = schema=jg-procevent-extension-owner.v1 ] || return 2
   [ "$capability_line" = capability_version=1 ] || return 2
-  FM_PROCEVENT_RESULT_EXTENSION_ID=${id_line#extension_id=}
-  FM_PROCEVENT_RESULT_EXTENSION_VERSION=${version_line#extension_version=}
+  JG_PROCEVENT_RESULT_EXTENSION_ID=${id_line#extension_id=}
+  JG_PROCEVENT_RESULT_EXTENSION_VERSION=${version_line#extension_version=}
   # shellcheck disable=SC2034 # Public loader output consumed by jg-procevent.sh.
-  FM_PROCEVENT_RESULT_EXTENSION_CAPABILITY_VERSION=${capability_line#capability_version=}
-  FM_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST=${package_line#package_digest=}
-  FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST=${binding_line#binding_digest=}
-  [ "$id_line" = "extension_id=$FM_PROCEVENT_RESULT_EXTENSION_ID" ] || return 2
-  [ "$version_line" = "extension_version=$FM_PROCEVENT_RESULT_EXTENSION_VERSION" ] || return 2
-  [ "$package_line" = "package_digest=$FM_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST" ] || return 2
-  [ "$binding_line" = "binding_digest=$FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" ] || return 2
-  jg_procevent_extension_id_valid "$FM_PROCEVENT_RESULT_EXTENSION_ID" || return 2
-  jg_procevent_extension_version_valid "$FM_PROCEVENT_RESULT_EXTENSION_VERSION" || return 2
-  jg_procevent_digest_valid "$FM_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST" || return 2
-  jg_procevent_digest_valid "$FM_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" || return 2
+  JG_PROCEVENT_RESULT_EXTENSION_CAPABILITY_VERSION=${capability_line#capability_version=}
+  JG_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST=${package_line#package_digest=}
+  JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST=${binding_line#binding_digest=}
+  [ "$id_line" = "extension_id=$JG_PROCEVENT_RESULT_EXTENSION_ID" ] || return 2
+  [ "$version_line" = "extension_version=$JG_PROCEVENT_RESULT_EXTENSION_VERSION" ] || return 2
+  [ "$package_line" = "package_digest=$JG_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST" ] || return 2
+  [ "$binding_line" = "binding_digest=$JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" ] || return 2
+  jg_procevent_extension_id_valid "$JG_PROCEVENT_RESULT_EXTENSION_ID" || return 2
+  jg_procevent_extension_version_valid "$JG_PROCEVENT_RESULT_EXTENSION_VERSION" || return 2
+  jg_procevent_digest_valid "$JG_PROCEVENT_RESULT_EXTENSION_PACKAGE_DIGEST" || return 2
+  jg_procevent_digest_valid "$JG_PROCEVENT_RESULT_EXTENSION_BINDING_DIGEST" || return 2
 }

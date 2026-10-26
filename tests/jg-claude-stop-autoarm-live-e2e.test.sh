@@ -8,7 +8,7 @@
 # tokenless auto-arm and rewake cycles then complete with zero model-issued arm
 # commands; and the cooperative guard consumes no forced continuation while the
 # hook's launch is healthy.
-# The project and FM_HOME are isolated; Claude keeps using its existing managed
+# The project and JG_HOME are isolated; Claude keeps using its existing managed
 # authentication. No live fleet home, worktree, or session is touched.
 # shellcheck disable=SC2016 # the model, not this test shell, reads the prompt text
 set -u
@@ -16,7 +16,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_CLAUDE_LIVE_E2E claude
+jg_live_gate opt-in JG_CLAUDE_LIVE_E2E claude
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -65,7 +65,7 @@ JSON
 cat > "$PROJECT/bin/tool-logger.sh" <<'SH'
 #!/usr/bin/env bash
 P=$(cat 2>/dev/null || true)
-printf '%s\n' "$P" | jq -r '.tool_input.command // "unknown"' >> "$FM_HOME/state/tool-calls.log" 2>/dev/null
+printf '%s\n' "$P" | jq -r '.tool_input.command // "unknown"' >> "$JG_HOME/state/tool-calls.log" 2>/dev/null
 exit 0
 SH
 chmod +x "$PROJECT/bin/tool-logger.sh"
@@ -81,15 +81,15 @@ printf '9999999\n' > "$HOME_DIR/state/.lock"
 # a misbehaving session can never loop forever.
 cat > "$PROJECT/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-N=$(cat "$FM_HOME/state/arm-count" 2>/dev/null || echo 0); N=$((N+1)); echo "$N" > "$FM_HOME/state/arm-count"
-echo "arm-run=$N pid=$$" >> "$FM_HOME/state/arm-ran"
+N=$(cat "$JG_HOME/state/arm-count" 2>/dev/null || echo 0); N=$((N+1)); echo "$N" > "$JG_HOME/state/arm-count"
+echo "arm-run=$N pid=$$" >> "$JG_HOME/state/arm-ran"
 if [ "$N" -ge 3 ]; then
-  rm -f "$FM_HOME/state/task.meta"
+  rm -f "$JG_HOME/state/task.meta"
   printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
   exit 0
 fi
-printf 'pending:downtime:fixture-generation-%s\n' "$N" > "$FM_HOME/state/.watcher-down"
-touch "$FM_HOME/state/.last-watcher-beat"
+printf 'pending:downtime:fixture-generation-%s\n' "$N" > "$JG_HOME/state/.watcher-down"
+touch "$JG_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-rapid-%s\n' "$N"
 exit 0
@@ -99,10 +99,10 @@ SH
 # Stop-owned cycles.
 cat > "$PROJECT/bin/jg-wake-drain.sh" <<'SH'
 #!/usr/bin/env bash
-N=$(cat "$FM_HOME/state/drain-count" 2>/dev/null || echo 0); N=$((N+1)); echo "$N" > "$FM_HOME/state/drain-count"
-echo "drain-run=$N" >> "$FM_HOME/state/drain-ran"
+N=$(cat "$JG_HOME/state/drain-count" 2>/dev/null || echo 0); N=$((N+1)); echo "$N" > "$JG_HOME/state/drain-count"
+echo "drain-run=$N" >> "$JG_HOME/state/drain-ran"
 if [ "$N" -ge 3 ]; then
-  rm -f "$FM_HOME/state/task.meta"
+  rm -f "$JG_HOME/state/task.meta"
 fi
 printf 'stale: fixture-rapid drained\n'
 SH
@@ -112,7 +112,7 @@ PROMPT='After reading the complete session-start digest, reply with exactly CYCL
 
 (
   cd "$PROJECT" || exit 1
-  FM_HOME="$HOME_DIR" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
+  JG_HOME="$HOME_DIR" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
     claude -p "$PROMPT" --dangerously-skip-permissions --settings '{"feedbackDrafts":"off"}' \
     --effort low --output-format stream-json --verbose
 ) > "$TRANSCRIPT" 2>&1 || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
@@ -174,7 +174,7 @@ LIVE_OWNER_PID=$!
 printf '%s\n' "$LIVE_OWNER_PID" > "$LIVE_OWNER_HOME/state/.lock"
 LIVE_OWNER_RC=0
 printf '%s\n' '{"session_id":"live-owner-control"}' \
-  | FM_HOME="$LIVE_OWNER_HOME" FM_ROOT_OVERRIDE="$PROJECT" "$FAKE_CLAUDE" -c '"$FM_ROOT_OVERRIDE/bin/jg-claude-stop-autoarm.sh"' \
+  | JG_HOME="$LIVE_OWNER_HOME" JG_ROOT_OVERRIDE="$PROJECT" "$FAKE_CLAUDE" -c '"$JG_ROOT_OVERRIDE/bin/jg-claude-stop-autoarm.sh"' \
       >"$LAB/live-owner.out" 2>"$LAB/live-owner.err" || LIVE_OWNER_RC=$?
 [ "$LIVE_OWNER_RC" -eq 0 ] || fail "competing Stop hook returned $LIVE_OWNER_RC while another live session owned the home"
 [ "$(cat "$LIVE_OWNER_HOME/state/.lock")" = "$LIVE_OWNER_PID" ] || fail "competing Stop hook replaced the live session owner"

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # account-pool: drive the jg-spawn and jg-control hook lines (the exact form a Kun jg-spawn.sh and
 # jg-control.sh carry) against a stub byokit-accounts and a throwaway config. Add-on present = the
 # pool pick lands in the launch line and record, and relaunch --account rests and moves; add-on
@@ -48,7 +57,7 @@ cat > "$w/fake-spawn.sh" <<'FAKE'
 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude} WORKER_ACCOUNT=${TEST_PIN:-} SPAWN_ACCOUNT= RELAUNCH=0
 SCRIPT_DIR=$TEST_BIN LAUNCH=$HARNESS
 shell_quote() { printf '%q' "$1"; }
-_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
 eval "$(jg_account_hook argv "$@")"
 case " $* " in *" --relaunch "*) RELAUNCH=1 ;; esac
 jg_account_hook spawn-validate || exit 1
@@ -66,7 +75,7 @@ cat > "$w/fake-control.sh" <<'FAKE'
 SCRIPT_DIR=$TEST_BIN VERB=$1 CONFIG=$TEST_CONFIG HARNESS=${TEST_HARNESS:-claude}
 shift
 jg_worker_account_resolve() { [ -z "${TEST_PIN:-}" ] || printf 'ordinary\t\t\n'; }
-_jg_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
+_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/jg-account-pool-lib.sh; { [ -r "$_jg_ap" ] && . "$_jg_ap"; } || jg_account_hook() { :; }
 eval "$(jg_account_hook argv "$@")"
 [ "$#" -eq 0 ] || { echo "error: unexpected argument '$1'" >&2; exit 1; }
 jg_account_hook control-validate "$VERB" || exit 1
@@ -74,14 +83,14 @@ jg_account_hook relaunch-pre "$HARNESS" "$CONFIG" "${TEST_TO:-}" "$TEST_RECORDED
 jg_account_hook relaunch-commit "$HARNESS" "$CONFIG" "$TEST_RECORDED" || exit 1
 spawn_args=(t1 --relaunch --harness "$HARNESS")
 jg_account_hook spawn-args
-FM_CONTROL_RELAUNCH_TX=tx bash "$TEST_SPAWN" "${spawn_args[@]}"
+JG_CONTROL_RELAUNCH_TX=tx bash "$TEST_SPAWN" "${spawn_args[@]}"
 FAKE
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
 run() { # run <addons-dir> <script> [args...]: sets out and rc, from a fresh pool
   local a=$1 s=$2; shift 2
   rm -f "$w"/rested-*; : > "$w/pool.log"
-  out=$(env -i PATH="$PATH" HOME="$w" TMPDIR="$w" FM_ADDONS_DIR="$a" TEST_BIN="$w/bin" TEST_CONFIG="${CFG:-$w/config}" \
+  out=$(env -i PATH="$PATH" HOME="$w" TMPDIR="$w" JG_ADDONS_DIR="$a" TEST_BIN="$w/bin" TEST_CONFIG="${CFG:-$w/config}" \
     TEST_RAW="${TEST_RAW:-}" TEST_PIN="${TEST_PIN:-}" TEST_RECORDED="${TEST_RECORDED-acct1}" TEST_HARNESS="${TEST_HARNESS:-}" \
     TEST_PICK="${TEST_PICK:-}" TEST_PICK_RESTED="${TEST_PICK_RESTED:-}" TEST_FROM="${TEST_FROM:-}" TEST_TO="${TEST_TO:-}" \
     TEST_PANE="${TEST_PANE:-}" TEST_SPAWN="$w/fake-spawn.sh" bash "$w/$s" "$@" 2>&1); rc=$?

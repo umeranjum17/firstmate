@@ -25,10 +25,10 @@
 
 
 # jg_model_allowlist_file: the list path, read at call time so a caller's own
-# CONFIG or FM_HOME applies.
+# CONFIG or JG_HOME applies.
 jg_model_allowlist_file() {
-  local config=${FM_CONFIG_OVERRIDE:-${CONFIG:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$HOME/firstmate}}/config}}
-  printf '%s\n' "${FM_MODEL_ALLOWLIST:-$config/model-allow-list.json}"
+  local config=${JG_CONFIG_OVERRIDE:-${CONFIG:-${JG_HOME:-${JG_ROOT_OVERRIDE:-$HOME/firstmate}}/config}}
+  printf '%s\n' "${JG_MODEL_ALLOWLIST:-$config/model-allow-list.json}"
 }
 
 # jg_model_allowlist_provider <harness> <model>: the key a model is listed under.
@@ -84,10 +84,10 @@ jg_model_allowlist_require() {
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-$FM_ROOT}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-$JG_ROOT}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 LIST=$(jg_model_allowlist_file)
 SEEN="$STATE/.model-allowlist.seen"
 CHECK_ID='model-allowlist'

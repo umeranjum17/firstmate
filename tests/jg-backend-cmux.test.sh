@@ -18,8 +18,8 @@ command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (required by the cmu
 TMP_ROOT=$(jg_test_tmproot jg-backend-cmux-tests)
 
 # make_cmux_fakebin: a `cmux` stub that logs every invocation (one line,
-# unit-separated args, to $FM_CMUX_LOG) and returns the canned response for
-# that call read from $FM_CMUX_RESPONSES/<n>.out, consumed IN ORDER (call 1
+# unit-separated args, to $JG_CMUX_LOG) and returns the canned response for
+# that call read from $JG_CMUX_RESPONSES/<n>.out, consumed IN ORDER (call 1
 # reads 1.out, call 2 reads 2.out, ...), mirroring
 # tests/jg-backend-zellij.test.sh's make_zellij_fakebin. A missing response
 # file means "succeed with empty stdout" (new-workspace/send/send-key/
@@ -34,8 +34,8 @@ make_cmux_fakebin() {  # <dir> -> echoes fakebin dir
   cat > "$fb/cmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-LOG="${FM_CMUX_LOG:?}"
-RESP="${FM_CMUX_RESPONSES:?}"
+LOG="${JG_CMUX_LOG:?}"
+RESP="${JG_CMUX_RESPONSES:?}"
 COUNT_FILE="$RESP/.count"
 {
   printf 'CMUX_SOCKET_PASSWORD=%s' "${CMUX_SOCKET_PASSWORD:-}"
@@ -44,12 +44,12 @@ COUNT_FILE="$RESP/.count"
 } >> "$LOG"
 
 if [ "${1:-}" = version ]; then
-  printf 'cmux %s (97) [abcdef1]\n' "${FM_CMUX_FAKE_VERSION:-0.64.17}"
+  printf 'cmux %s (97) [abcdef1]\n' "${JG_CMUX_FAKE_VERSION:-0.64.17}"
   exit 0
 fi
 if [ "${1:-}" = ping ]; then
-  printf '%s\n' "${FM_CMUX_FAKE_PING:-PONG}"
-  exit "${FM_CMUX_FAKE_PING_EXIT:-0}"
+  printf '%s\n' "${JG_CMUX_FAKE_PING:-PONG}"
+  exit "${JG_CMUX_FAKE_PING_EXIT:-0}"
 fi
 
 next=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
@@ -158,7 +158,7 @@ test_version_check_accepts_current_version() {
   local dir fb status
   dir="$TMP_ROOT/version-ok"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_VERSION=0.64.17 \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_VERSION=0.64.17 \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_version_check' "$ROOT"
   status=$?
   expect_code 0 "$status" "version_check should accept 0.64.17 (the verified minimum)"
@@ -169,7 +169,7 @@ test_version_check_accepts_newer_version() {
   local dir fb status
   dir="$TMP_ROOT/version-newer"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_VERSION=0.70.0 \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_VERSION=0.70.0 \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_version_check' "$ROOT"
   status=$?
   expect_code 0 "$status" "version_check should accept a newer minor (0.70.0)"
@@ -180,7 +180,7 @@ test_version_check_refuses_old_version() {
   local dir fb out status
   dir="$TMP_ROOT/version-old"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_VERSION=0.50.0 \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_VERSION=0.50.0 \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_version_check' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "version_check should refuse 0.50.0 (below the 0.64 minimum)"
@@ -191,11 +191,11 @@ test_version_check_refuses_old_version() {
 test_version_check_refuses_missing_cmux() {
   local dir out status
   dir="$TMP_ROOT/version-missing"; mkdir -p "$dir/empty-fakebin"
-  # FM_BACKEND_CMUX_BUNDLE_BIN must also be overridden to a nonexistent path:
+  # JG_BACKEND_CMUX_BUNDLE_BIN must also be overridden to a nonexistent path:
   # this test may run on a machine (like the one that verified this adapter)
   # where cmux really is installed at the real bundle path, which the plain
   # PATH-emptying above would not hide.
-  out=$( PATH="$dir/empty-fakebin:/usr/bin:/bin" FM_BACKEND_CMUX_BUNDLE_BIN="$dir/no-such-cmux" \
+  out=$( PATH="$dir/empty-fakebin:/usr/bin:/bin" JG_BACKEND_CMUX_BUNDLE_BIN="$dir/no-such-cmux" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_version_check' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "version_check should refuse when cmux is not installed"
@@ -209,7 +209,7 @@ test_password_reads_from_config_file() {
   local dir out
   dir="$TMP_ROOT/password-file"; mkdir -p "$dir/config"
   printf 'sekret-pw\n' > "$dir/config/cmux-socket-password"
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
   [ "$out" = "sekret-pw" ] || fail "password should be read from config/cmux-socket-password, got '$out'"
   pass "jg_backend_cmux_password: reads the first non-empty line of config/cmux-socket-password"
 }
@@ -218,7 +218,7 @@ test_password_preserves_config_file_whitespace() {
   local dir out
   dir="$TMP_ROOT/password-file-whitespace"; mkdir -p "$dir/config"
   printf '\nsek ret\t pw  \n' > "$dir/config/cmux-socket-password"
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
   [ "$out" = $'sek ret\t pw  ' ] || fail "password should preserve spaces and tabs from config/cmux-socket-password, got '$out'"
   pass "jg_backend_cmux_password: preserves spaces and tabs in config/cmux-socket-password"
 }
@@ -229,15 +229,15 @@ test_password_respects_config_override() {
   mkdir -p "$home_cfg" "$override_cfg"
   printf 'home-pw\n' > "$home_cfg/cmux-socket-password"
   printf 'override-pw\n' > "$override_cfg/cmux-socket-password"
-  out=$( FM_HOME="$dir/home" FM_CONFIG_OVERRIDE="$override_cfg" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
-  [ "$out" = "override-pw" ] || fail "password should be read from FM_CONFIG_OVERRIDE, got '$out'"
-  pass "jg_backend_cmux_password: respects FM_CONFIG_OVERRIDE"
+  out=$( JG_HOME="$dir/home" JG_CONFIG_OVERRIDE="$override_cfg" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
+  [ "$out" = "override-pw" ] || fail "password should be read from JG_CONFIG_OVERRIDE, got '$out'"
+  pass "jg_backend_cmux_password: respects JG_CONFIG_OVERRIDE"
 }
 
 test_password_empty_when_config_absent() {
   local dir out
   dir="$TMP_ROOT/password-absent"; mkdir -p "$dir/config"
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_password' "$ROOT" )
   [ -z "$out" ] || fail "password should be empty when config/cmux-socket-password is absent, got '$out'"
   pass "jg_backend_cmux_password: empty when config/cmux-socket-password is absent"
 }
@@ -247,7 +247,7 @@ test_cli_exports_password_only_when_configured() {
   dir="$TMP_ROOT/password-export"; mkdir -p "$dir/config" "$dir/responses"
   printf 'sekret-pw\n' > "$dir/config/cmux-socket-password"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_HOME="$dir" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_HOME="$dir" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_cli ping' "$ROOT" >/dev/null
   assert_contains "$(cat "$dir/log")" "CMUX_SOCKET_PASSWORD=sekret-pw" \
     "jg_backend_cmux_cli did not export the configured password"
@@ -259,8 +259,8 @@ test_cli_exports_password_only_when_configured() {
 test_parse_target() {
   ( . "$ROOT/bin/backends/cmux.sh"
     jg_backend_cmux_parse_target "11111111-1111-1111-1111-111111111111:22222222-2222-2222-2222-222222222222" || exit 1
-    [ "$FM_BACKEND_CMUX_WORKSPACE" = "11111111-1111-1111-1111-111111111111" ] || { echo "workspace mismatch: $FM_BACKEND_CMUX_WORKSPACE" >&2; exit 1; }
-    [ "$FM_BACKEND_CMUX_SURFACE" = "22222222-2222-2222-2222-222222222222" ] || { echo "surface mismatch: $FM_BACKEND_CMUX_SURFACE" >&2; exit 1; }
+    [ "$JG_BACKEND_CMUX_WORKSPACE" = "11111111-1111-1111-1111-111111111111" ] || { echo "workspace mismatch: $JG_BACKEND_CMUX_WORKSPACE" >&2; exit 1; }
+    [ "$JG_BACKEND_CMUX_SURFACE" = "22222222-2222-2222-2222-222222222222" ] || { echo "surface mismatch: $JG_BACKEND_CMUX_SURFACE" >&2; exit 1; }
   ) || fail "jg_backend_cmux_parse_target did not split workspace:surface correctly"
   pass "jg_backend_cmux_parse_target: splits '<workspace_uuid>:<surface_uuid>' on the first colon"
 }
@@ -280,7 +280,7 @@ test_scoped_title_uses_primary_home_label() {
   local dir out expected
   dir="$TMP_ROOT/scoped-title-primary"; mkdir -p "$dir"
   expected=$(cmux_expected_scoped_title jg-task1 "$dir")
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
   [ "$out" = "$expected" ] || fail "primary scoped title should be $expected, got '$out'"
   pass "jg_backend_cmux_scoped_title: scopes a primary task title with firstmate plus root hash"
 }
@@ -290,7 +290,7 @@ test_scoped_title_uses_secondmate_home_label() {
   dir="$TMP_ROOT/scoped-title-secondmate"; mkdir -p "$dir"
   printf 'sm-one\n' > "$dir/.jg-secondmate-home"
   expected=$(cmux_expected_scoped_title jg-task1 "$dir")
-  out=$( FM_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
+  out=$( JG_HOME="$dir" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
   [ "$out" = "$expected" ] || fail "secondmate scoped title should be $expected, got '$out'"
   pass "jg_backend_cmux_scoped_title: scopes a secondmate task title with the home marker plus root hash"
 }
@@ -301,12 +301,12 @@ test_scoped_title_changes_with_root_path() {
   mkdir -p "$home" "$root_one" "$root_two"
   expected_one=$(cmux_expected_scoped_title jg-task1 "$home" "$root_one")
   expected_two=$(cmux_expected_scoped_title jg-task1 "$home" "$root_two")
-  out_one=$( FM_HOME="$home" FM_ROOT_OVERRIDE="$root_one" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
-  out_two=$( FM_HOME="$home" FM_ROOT_OVERRIDE="$root_two" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
+  out_one=$( JG_HOME="$home" JG_ROOT_OVERRIDE="$root_one" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
+  out_two=$( JG_HOME="$home" JG_ROOT_OVERRIDE="$root_two" bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_scoped_title jg-task1' "$ROOT" )
   [ "$out_one" = "$expected_one" ] || fail "scoped title should include root-one hash as $expected_one, got '$out_one'"
   [ "$out_two" = "$expected_two" ] || fail "scoped title should include root-two hash as $expected_two, got '$out_two'"
-  [ "$out_one" != "$out_two" ] || fail "scoped titles should differ for distinct FM_ROOT paths"
-  pass "jg_backend_cmux_scoped_title: includes the resolved FM_ROOT hash in the home label"
+  [ "$out_one" != "$out_two" ] || fail "scoped titles should differ for distinct JG_ROOT paths"
+  pass "jg_backend_cmux_scoped_title: includes the resolved JG_ROOT hash in the home label"
 }
 
 # --- dispatch wiring (jg-backend.sh) ------------------------------------------
@@ -331,7 +331,7 @@ test_dispatch_composer_state_routes_cmux() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/jg-backend.sh"; jg_backend_composer_state cmux "$1"' "$ROOT" "$target" )
   [ "$out" = pending ] || fail "jg_backend_composer_state should route cmux to its classifier, got '$out'"
   pass "jg_backend_composer_state: routes cmux to the cmux composer classifier"
@@ -343,7 +343,7 @@ test_ping_state_ok() {
   local dir fb out
   dir="$TMP_ROOT/ping-ok"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING=PONG \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING=PONG \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ping_state' "$ROOT" )
   [ "$out" = ok ] || fail "ping_state should report ok on PONG, got '$out'"
   pass "jg_backend_cmux_ping_state: reports 'ok' on PONG"
@@ -353,8 +353,8 @@ test_ping_state_denied() {
   local dir fb out
   dir="$TMP_ROOT/ping-denied"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: ERROR: Access denied - only processes started inside cmux can connect" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: ERROR: Access denied - only processes started inside cmux can connect" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ping_state' "$ROOT" )
   [ "$out" = denied ] || fail "ping_state should report denied on the cmuxOnly rejection text, got '$out'"
   pass "jg_backend_cmux_ping_state: reports 'denied' when socketControlMode=cmuxOnly rejects the connection"
@@ -364,8 +364,8 @@ test_ping_state_unauth() {
   local dir fb out
   dir="$TMP_ROOT/ping-unauth"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: ERROR: Authentication required - send auth <password> first" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: ERROR: Authentication required - send auth <password> first" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ping_state' "$ROOT" )
   [ "$out" = unauth ] || fail "ping_state should report unauth when no password was presented, got '$out'"
   pass "jg_backend_cmux_ping_state: reports 'unauth' when password mode rejects a missing/wrong password"
@@ -375,8 +375,8 @@ test_ping_state_invalid_password() {
   local dir fb out
   dir="$TMP_ROOT/ping-invalid-pw"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: ERROR: Invalid password" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: ERROR: Invalid password" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ping_state' "$ROOT" )
   [ "$out" = unauth ] || fail "ping_state should report unauth on the wrong-password rejection text, got '$out'"
   pass "jg_backend_cmux_ping_state: reports 'unauth' when password mode rejects a wrong password (Invalid password)"
@@ -386,8 +386,8 @@ test_ping_state_down() {
   local dir fb out
   dir="$TMP_ROOT/ping-down"; mkdir -p "$dir/responses"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: Socket not found at /home/x/.local/state/cmux/cmux.sock" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: Socket not found at /home/x/.local/state/cmux/cmux.sock" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ping_state' "$ROOT" )
   [ "$out" = down ] || fail "ping_state should report down when the socket does not exist yet, got '$out'"
   pass "jg_backend_cmux_ping_state: reports 'down' when the app is not running yet"
@@ -403,7 +403,7 @@ echo "open should not be called when cmux is already reachable" >&2
 exit 1
 SH
   chmod +x "$fb/open"
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING=PONG \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING=PONG \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ensure_running' "$ROOT"
   status=$?
   expect_code 0 "$status" "ensure_running should succeed immediately when already reachable"
@@ -416,13 +416,13 @@ test_ensure_running_fails_fast_on_denied_without_launching() {
   fb=$(make_cmux_fakebin "$dir")
   cat > "$fb/open" <<'SH'
 #!/usr/bin/env bash
-echo "LAUNCHED" >> "${FM_CMUX_LAUNCH_MARKER:?}"
+echo "LAUNCHED" >> "${JG_CMUX_LAUNCH_MARKER:?}"
 exit 0
 SH
   chmod +x "$fb/open"
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: ERROR: Access denied - only processes started inside cmux can connect" \
-    FM_CMUX_LAUNCH_MARKER="$dir/launched" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: ERROR: Access denied - only processes started inside cmux can connect" \
+    JG_CMUX_LAUNCH_MARKER="$dir/launched" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ensure_running' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "ensure_running should refuse when the socket is denied (relaunching cannot fix a config problem)"
@@ -440,13 +440,13 @@ test_ensure_running_fails_fast_on_unauth_without_launching() {
   fb=$(make_cmux_fakebin "$dir")
   cat > "$fb/open" <<'SH'
 #!/usr/bin/env bash
-echo "LAUNCHED" >> "${FM_CMUX_LAUNCH_MARKER:?}"
+echo "LAUNCHED" >> "${JG_CMUX_LAUNCH_MARKER:?}"
 exit 0
 SH
   chmod +x "$fb/open"
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" FM_CMUX_FAKE_PING_EXIT=1 \
-    FM_CMUX_FAKE_PING="Error: ERROR: Authentication required - send auth <password> first" \
-    FM_CMUX_LAUNCH_MARKER="$dir/launched" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" JG_CMUX_FAKE_PING_EXIT=1 \
+    JG_CMUX_FAKE_PING="Error: ERROR: Authentication required - send auth <password> first" \
+    JG_CMUX_LAUNCH_MARKER="$dir/launched" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_ensure_running' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "ensure_running should refuse when the socket is unauthenticated (relaunching cannot fix a password problem)"
@@ -465,7 +465,7 @@ test_create_task_refuses_duplicate_label() {
   title=$(cmux_expected_scoped_title jg-dup1)
   cmux_workspace_list_response "$dir" 1 "aaaaaaaa-0000-0000-0000-000000000000" "$title"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_create_task jg-dup1 /tmp/proj' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "create_task should refuse an existing workspace title (cmux itself does not enforce uniqueness)"
@@ -485,7 +485,7 @@ test_create_task_creates_and_parses_ids() {
   # 4: list-panes --json --id-format uuids -> default surface id
   cmux_panes_response "$dir" 4 "cccccccc-2222-2222-2222-222222222222"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_create_task jg-newtask /tmp/proj' "$ROOT" )
   [ "$out" = "bbbbbbbb-1111-1111-1111-111111111111 cccccccc-2222-2222-2222-222222222222" ] \
     || fail "create_task should echo '<workspace_id> <surface_id>', got '$out'"
@@ -504,7 +504,7 @@ test_target_ready_fails_when_target_absent() {
   # 1: list-panes --json --id-format uuids -> no panes at all (surface absent)
   cmux_panes_empty_response "$dir" 1
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_target_ready "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "target_ready should fail when list-panes reports the surface not found"
@@ -519,7 +519,7 @@ test_target_ready_checks_expected_label() {
   # 2: list-panes --json --id-format uuids -> matching surface
   cmux_panes_response "$dir" 2 "bbbbbbbb-1111-1111-1111-111111111111"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_target_ready "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" jg-label' "$ROOT"
   expect_code 0 $? "target_ready should succeed when the workspace title matches the expected label"
   cmux_assert_call_order "$dir/log" $'\x1f''workspace'$'\x1f''list' $'\x1f''list-panes' \
@@ -532,7 +532,7 @@ test_target_ready_rejects_label_mismatch() {
   dir="$TMP_ROOT/ready-label-mismatch"; mkdir -p "$dir/responses"
   cmux_workspace_list_response "$dir" 1 "aaaaaaaa-0000-0000-0000-000000000000" "not-the-task"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_target_ready "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" jg-label' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "target_ready should reject a workspace whose title does not match the expected label"
@@ -549,7 +549,7 @@ test_capture_trims_locally() {
   # 2: read-screen --scrollback --lines 200 --json (actual fetch)
   cmux_read_screen_response "$dir" 2 $'line one\nline two\nline three\nline four'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_capture "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" 2' "$ROOT" )
   [ "$out" = $'line three\nline four' ] || fail "capture should trim to the last N lines locally, got '$out'"
   cmux_assert_call_order "$dir/log" $'\x1f''list-panes'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000' \
@@ -565,7 +565,7 @@ test_capture_fails_when_read_screen_fails_empty() {
   # 2: read-screen exits nonzero with no stdout
   printf '1' > "$dir/responses/2.exit"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_capture "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" 5' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "capture should fail when read-screen exits nonzero with no stdout"
@@ -580,7 +580,7 @@ test_capture_fails_when_target_not_ready() {
   # 1: list-panes --json --id-format uuids -> no matching surface
   cmux_panes_empty_response "$dir" 1
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_capture "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" 5' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "capture should fail when the target is not ready"
@@ -597,7 +597,7 @@ test_send_key_normalizes_and_targets() {
   # 1: list-panes --json --id-format uuids (target_ready)
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_key "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" Escape' "$ROOT"
   expect_code 0 $? "send_key should succeed"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-key'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000'$'\x1f''--surface'$'\x1f''bbbbbbbb-1111-1111-1111-111111111111'$'\x1f''escape' \
@@ -613,7 +613,7 @@ test_send_key_recovers_stale_target_by_label() {
   cmux_workspace_list_response "$dir" 2 "cccccccc-2222-2222-2222-222222222222" "$title"
   cmux_panes_response "$dir" 3 "dddddddd-3333-3333-3333-333333333333"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_key "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" Enter jg-label' "$ROOT"
   expect_code 0 $? "send_key should recover a stale cmux target when the expected label is live"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-key'$'\x1f''--workspace'$'\x1f''cccccccc-2222-2222-2222-222222222222'$'\x1f''--surface'$'\x1f''dddddddd-3333-3333-3333-333333333333'$'\x1f''enter' \
@@ -629,7 +629,7 @@ test_send_literal_uses_separator_for_option_shaped_text() {
   # 1: list-panes --json --id-format uuids (target_ready)
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_literal "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "--help"' "$ROOT"
   expect_code 0 $? "send_literal should succeed"
   assert_contains "$(cat "$dir/log")" $'\x1f''send'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000'$'\x1f''--surface'$'\x1f''bbbbbbbb-1111-1111-1111-111111111111'$'\x1f''--'$'\x1f''--help' \
@@ -646,7 +646,7 @@ test_send_text_line_clears_partial_input_when_enter_fails() {
   cmux_panes_response "$dir" 5 "bbbbbbbb-1111-1111-1111-111111111111"
   fb=$(make_cmux_fakebin "$dir")
 
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_line "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "export TRACEPARENT=carrier"' "$ROOT"
   status=$?
   [ "$status" -ne 0 ] || fail "send_text_line should report a failed Enter"
@@ -668,7 +668,7 @@ test_send_text_line_reports_unsafe_input_when_cleanup_fails() {
   printf '1\n' > "$dir/responses/6.exit"
   fb=$(make_cmux_fakebin "$dir")
 
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_line "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "export TRACEPARENT=carrier"' "$ROOT"
   status=$?
   expect_code 2 "$status" "send_text_line should distinguish uncleared input"
@@ -698,12 +698,12 @@ test_current_path_probes_with_marker() {
   cmux_panes_response "$dir" 2 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_panes_response "$dir" 4 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_panes_response "$dir" 6 "bbbbbbbb-1111-1111-1111-111111111111"
-  cmux_read_screen_response "$dir" 7 $'/tmp/proj\n❯ printf marker\n__FM_CMUX_CWD_BEGIN__\n/home/fixture/.treehouse/fake-worktree\n__FM_CMUX_CWD_END__\n/home/fixture/.treehouse/fake-worktree ❯'
+  cmux_read_screen_response "$dir" 7 $'/tmp/proj\n❯ printf marker\n__JG_CMUX_CWD_BEGIN__\n/home/fixture/.treehouse/fake-worktree\n__JG_CMUX_CWD_END__\n/home/fixture/.treehouse/fake-worktree ❯'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_current_path "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = "/home/fixture/.treehouse/fake-worktree" ] || fail "current_path should read only the marked cwd line, got '$out'"
-  assert_contains "$(cat "$dir/log")" "__FM_CMUX_CWD_BEGIN__" "current_path did not send the cwd begin marker"
+  assert_contains "$(cat "$dir/log")" "__JG_CMUX_CWD_BEGIN__" "current_path did not send the cwd begin marker"
   assert_contains "$(cat "$dir/log")" "pwd;" "current_path did not send the pwd probe"
   assert_contains "$(cat "$dir/log")" $'\x1f''send-key'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000'$'\x1f''--surface'$'\x1f''bbbbbbbb-1111-1111-1111-111111111111'$'\x1f''enter' \
     "current_path did not submit the cwd probe with Enter"
@@ -720,7 +720,7 @@ test_composer_state_bare_prompt_is_empty() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'  ╭────────────────────────╮\n  │ ❯                      │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = empty ] || fail "a bare prompt glyph should read as empty, got '$out'"
   pass "jg_backend_cmux_composer_state: a bare '❯' composer row reads empty"
@@ -732,7 +732,7 @@ test_composer_state_borderless_claude_prompt_is_empty() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'────────────────────────\n❯\n────────────────────────\nHaiku 4.5'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = empty ] || fail "a borderless Claude '❯' row bounded by horizontal rules should read empty, got '$out'"
   pass "jg_backend_cmux_composer_state: a borderless Claude '❯' composer row reads empty"
@@ -744,7 +744,7 @@ test_composer_state_borderless_claude_prompt_outranks_stale_bordered_row() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'│ ❯ stale input │\n────────────────────────\n❯\n────────────────────────\nHaiku 4.5'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = empty ] || fail "a current borderless Claude row should outrank stale bordered scrollback, got '$out'"
   pass "jg_backend_cmux_composer_state: a borderless Claude row outranks stale bordered scrollback"
@@ -756,7 +756,7 @@ test_composer_state_borderless_claude_nbsp_prompt_is_empty() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'────────────────────────\n❯\302\240\n────────────────────────\nHaiku 4.5'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( LC_ALL=C PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( LC_ALL=C PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = empty ] || fail "a borderless Claude '❯'+NBSP row bounded by horizontal rules should read empty under LC_ALL=C, got '$out'"
   pass "jg_backend_cmux_composer_state: a borderless Claude '❯'+NBSP composer row reads empty under LC_ALL=C"
@@ -776,7 +776,7 @@ test_composer_state_borderless_claude_text_is_unknown_plain() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'────────────────────────\n❯ retain this message\n────────────────────────\nHaiku 4.5'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = unknown ] || fail "plain-capture text after a bare glyph must degrade to unknown, got '$out'"
   pass "jg_backend_cmux_composer_state: plain-capture text after a bare glyph degrades to unknown (never false pending)"
@@ -788,7 +788,7 @@ test_composer_state_ghost_placeholder_is_empty() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'  ╭────────────────────────╮\n  │ ❯ Type a message...    │\n  ╰──────── Composer ──────╯'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = empty ] || fail "the known ghost placeholder 'Type a message...' should read as empty, got '$out'"
   pass "jg_backend_cmux_composer_state: the ghost placeholder text reads empty, not pending"
@@ -800,7 +800,7 @@ test_composer_state_real_text_is_pending() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = pending ] || fail "real unsubmitted text should read as pending, got '$out'"
   pass "jg_backend_cmux_composer_state: real composer text reads pending"
@@ -818,7 +818,7 @@ test_composer_state_popup_placeholder_fill_is_pending() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 $'  ╭──────────────────────────────────────╮\n  │ ❯ /compact compaction instructions   │\n  ╰──────────────── Composer ────────────╯\n\n  Enter:send'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = pending ] || fail "a popup-close-with-placeholder-fill must still read as pending (not yet submitted), got '$out'"
   pass "jg_backend_cmux_composer_state: a slash-command popup's argument-hint placeholder still reads pending (the incident fix)"
@@ -829,7 +829,7 @@ test_composer_state_unknown_on_capture_failure() {
   dir="$TMP_ROOT/composer-capture-fail"; mkdir -p "$dir/responses"
   printf '1\n' > "$dir/responses/1.exit"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   status=$?
   [ "$status" -eq 0 ] || fail "composer_state should not itself fail the caller"
@@ -843,7 +843,7 @@ test_composer_state_unknown_when_no_composer_row_found() {
   cmux_panes_response "$dir" 1 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 2 'plain-shell-prompt$ '
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_composer_state "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT" )
   [ "$out" = unknown ] || fail "a capture with no recognizable composer row should read as unknown, got '$out'"
   pass "jg_backend_cmux_composer_state: reports unknown when no border-delimited composer row is found"
@@ -865,7 +865,7 @@ test_send_text_submit_detects_landed_send() {
   cmux_panes_response "$dir" 5 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 6 $'  ╭────────────────────────╮\n  │ ❯                      │\n  ╰──────── Composer ──────╯'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "hello captain" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should report empty (submitted) once the composer row reads empty, got '$out'"
   assert_contains "$(cat "$dir/log")" $'\x1f''send'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000'$'\x1f''--surface'$'\x1f''bbbbbbbb-1111-1111-1111-111111111111'$'\x1f''--'$'\x1f''hello captain' \
@@ -886,7 +886,7 @@ test_send_text_submit_detects_swallowed_enter() {
   cmux_read_screen_response "$dir" 6 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
   cmux_read_screen_response "$dir" 10 $'  ╭────────────────────────╮\n  │ ❯ hello captain        │\n  ╰──────── Composer ──────╯\n\n  Enter:send'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "hello captain" 2 0.01 0.01' "$ROOT" )
   [ "$out" = pending ] || fail "send_text_submit should report pending once retries are exhausted with no visible change, got '$out'"
   pass "jg_backend_cmux_send_text_submit: reports 'pending' when the composer never clears after retried Enters (swallowed)"
@@ -918,7 +918,7 @@ test_send_text_submit_popup_autocomplete_requires_second_enter() {
   cmux_panes_response "$dir" 9 "bbbbbbbb-1111-1111-1111-111111111111"
   cmux_read_screen_response "$dir" 10 $'  ╭────────────────────────╮\n  │ ❯                      │\n  ╰──────── Composer ──────╯'
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "/compact" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should eventually report empty once the SECOND Enter actually clears the composer, got '$out'"
   enter_count=$(grep -c $'\x1f''send-key'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000'$'\x1f''--surface'$'\x1f''bbbbbbbb-1111-1111-1111-111111111111'$'\x1f''enter' "$dir/log")
@@ -933,7 +933,7 @@ test_send_text_submit_send_failed_when_target_absent() {
   dir="$TMP_ROOT/submit-no-target"; mkdir -p "$dir/responses"
   printf '1\n' > "$dir/responses/1.exit"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_send_text_submit "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "x" 2 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "send_text_submit should report send-failed when the target is absent, got '$out'"
   pass "jg_backend_cmux_send_text_submit: reports 'send-failed' when the target workspace/surface is absent"
@@ -951,7 +951,7 @@ test_window_of_workspace_finds_window_and_count() {
   # 3: workspace list --window e2222222 -> contains the target
   cmux_workspace_list_response "$dir" 3 "aaaaaaaa-0000-0000-0000-000000000000" "the-task"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_window_of_workspace "aaaaaaaa-0000-0000-0000-000000000000"' "$ROOT" )
   [ "$out" = "e2222222-0000-0000-0000-000000000000 1" ] \
     || fail "window_of_workspace should echo the owning window and its matched-list count, got '$out'"
@@ -966,7 +966,7 @@ test_window_of_workspace_empty_when_not_found() {
   cmux_windows_response "$dir" 1 "e1111111-0000-0000-0000-000000000000" 1
   cmux_workspace_list_response "$dir" 2 "ffffffff-0000-0000-0000-000000000000" "other"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_window_of_workspace "aaaaaaaa-0000-0000-0000-000000000000"' "$ROOT" )
   [ -z "$out" ] || fail "window_of_workspace should echo nothing when the workspace is not found, got '$out'"
   pass "jg_backend_cmux_window_of_workspace: echoes nothing when no window holds the workspace"
@@ -984,7 +984,7 @@ test_kill_closes_workspace_directly_when_not_last() {
   # 2: workspace list --window eeeeeeee -> contains the target
   cmux_workspace_list_response "$dir" 2 "aaaaaaaa-0000-0000-0000-000000000000" "the-task" "ffffffff-0000-0000-0000-000000000000" "other"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_kill "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT"
   assert_contains "$(cat "$dir/log")" $'\x1f''close-workspace'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000' \
     "kill did not close the task workspace"
@@ -1005,7 +1005,7 @@ test_kill_adds_sibling_when_last_in_window() {
   # 2: workspace list --window eeeeeeee -> contains the target
   cmux_workspace_list_response "$dir" 2 "aaaaaaaa-0000-0000-0000-000000000000" "the-task"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_kill "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT"
   assert_contains "$(cat "$dir/log")" $'\x1f''new-workspace'$'\x1f''--window'$'\x1f''eeeeeeee-0000-0000-0000-000000000000'$'\x1f''--focus'$'\x1f''false' \
     "kill did not add a throwaway sibling in the target's own window before closing the last workspace"
@@ -1028,7 +1028,7 @@ test_kill_is_best_effort_when_close_workspace_fails() {
   cmux_workspace_list_response "$dir" 2 "aaaaaaaa-0000-0000-0000-000000000000" "the-task" "ffffffff-0000-0000-0000-000000000000" "other"
   printf '1\n' > "$dir/responses/3.exit"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_kill "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111"' "$ROOT"
   expect_code 0 $? "kill must stay best-effort (never fail) even when close-workspace fails"
   assert_contains "$(cat "$dir/log")" $'\x1f''close-workspace'$'\x1f''--workspace'$'\x1f''aaaaaaaa-0000-0000-0000-000000000000' \
@@ -1051,7 +1051,7 @@ test_kill_recovers_stale_target_by_label() {
   cmux_windows_response "$dir" 4 "eeeeeeee-0000-0000-0000-000000000000" 2
   cmux_workspace_list_response "$dir" 5 "cccccccc-2222-2222-2222-222222222222" "$title" "ffffffff-0000-0000-0000-000000000000" "other"
   fb=$(make_cmux_fakebin "$dir")
-  PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_kill "aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111" "" jg-label' "$ROOT"
   expect_code 0 $? "kill should recover a stale cmux target when the expected label is live"
   assert_contains "$(cat "$dir/log")" $'\x1f''close-workspace'$'\x1f''--workspace'$'\x1f''cccccccc-2222-2222-2222-222222222222' \
@@ -1079,7 +1079,7 @@ test_list_live_filters_by_title_prefix() {
   # 2: list-panes for this home's task1 workspace
   cmux_panes_response "$dir" 2 "bbbbbbbb-1111-1111-1111-111111111111"
   fb=$(make_cmux_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_CMUX_LOG="$dir/log" FM_CMUX_RESPONSES="$dir/responses" \
+  out=$( PATH="$fb:$PATH" JG_CMUX_LOG="$dir/log" JG_CMUX_RESPONSES="$dir/responses" \
     bash -c '. "$0/bin/backends/cmux.sh"; jg_backend_cmux_list_live' "$ROOT" )
   [ "$out" = $'aaaaaaaa-0000-0000-0000-000000000000:bbbbbbbb-1111-1111-1111-111111111111\tjg-task1' ] \
     || fail "list_live should list only the in-home task workspace with its plain label and surface id, got '$out'"
@@ -1092,7 +1092,7 @@ test_secondmate_spawn_refuses_cmux_backend() {
   local dir state data config projects out status
   dir="$TMP_ROOT/secondmate-refuse"; state="$dir/state"; data="$dir/data"; config="$dir/config"; projects="$dir/projects"
   mkdir -p "$state" "$data" "$config" "$projects"
-  out=$( FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" FM_PROJECTS_OVERRIDE="$projects" \
+  out=$( JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" JG_PROJECTS_OVERRIDE="$projects" \
     "$ROOT/bin/jg-spawn.sh" sm-cmux-test --secondmate --backend cmux 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "jg-spawn.sh should refuse a --secondmate spawn with --backend cmux"

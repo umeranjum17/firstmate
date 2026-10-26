@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Sourced by the Firstmate watcher once, just before its main loop. The lead-wake
 # policy: a secondmate home sitting below its lane floor (or with no worker
 # provably working) while jg-tasks-axi.sh ready has dispatchable work raises one
-# `check: ready work waiting ...` wake, re-raised every FM_READY_WORK_RESURFACE_SECS;
+# `check: ready work waiting ...` wake, re-raised every JG_READY_WORK_RESURFACE_SECS;
 # an emptied ready set withdraws the queued row; a stalled lead's drain ring names
 # the frozen row and its acknowledgement. The caller supplies the watcher's own
 # STATE, SCRIPT_DIR, HEARTBEAT, age_of, triage_log, wake, jg_wake_append,
@@ -10,7 +19,7 @@
 # backend helpers; only the drain-ring body repeats Kun's, around the fork's text.
 # Public names match the fork's, so the current fork keeps working with this loaded.
 
-READY_WORK_RESURFACE_SECS=${FM_READY_WORK_RESURFACE_SECS:-1800}
+READY_WORK_RESURFACE_SECS=${JG_READY_WORK_RESURFACE_SECS:-1800}
 case "$READY_WORK_RESURFACE_SECS" in ''|*[!0-9]*|0) READY_WORK_RESURFACE_SECS=1800 ;; esac
 
 # Remove every queued row for exactly <kind>/<key> under the append lock; idempotent,
@@ -22,14 +31,14 @@ jg_wake_withdraw() {  # <kind> <key>
     *) printf 'jg_wake_withdraw: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
   esac
   clean_key=$(printf '%s' "$key" | jg_wake_clean_field)
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   rm -f -- "$STATE"/.wake-queue.withdraw.* 2>/dev/null || true
-  if [ -f "$FM_WAKE_QUEUE" ] && awk -F '\t' -v kind="$kind" -v key="$clean_key" \
-    'NF >= 5 && $3 == kind && $4 == key { found = 1 } END { exit(found ? 0 : 1) }' "$FM_WAKE_QUEUE"; then
+  if [ -f "$JG_WAKE_QUEUE" ] && awk -F '\t' -v kind="$kind" -v key="$clean_key" \
+    'NF >= 5 && $3 == kind && $4 == key { found = 1 } END { exit(found ? 0 : 1) }' "$JG_WAKE_QUEUE"; then
     if tmp=$(mktemp "$STATE/.wake-queue.withdraw.XXXXXX") && chmod 0600 "$tmp"; then
       if awk -F '\t' -v kind="$kind" -v key="$clean_key" \
-        '!(NF >= 5 && $3 == kind && $4 == key) { print }' "$FM_WAKE_QUEUE" > "$tmp" \
-        && _jg_atomic_replace "$tmp" "$FM_WAKE_QUEUE"; then
+        '!(NF >= 5 && $3 == kind && $4 == key) { print }' "$JG_WAKE_QUEUE" > "$tmp" \
+        && _jg_atomic_replace "$tmp" "$JG_WAKE_QUEUE"; then
         tmp=
       else
         status=1
@@ -39,13 +48,13 @@ jg_wake_withdraw() {  # <kind> <key>
     fi
     [ -z "$tmp" ] || rm -f -- "$tmp"
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
 # config/lane-target: one positive integer; returns 0 and prints it only for that.
 lane_target_value() {
-  local path=$FM_HOME/config/lane-target raw
+  local path=$JG_HOME/config/lane-target raw
   [ -f "$path" ] && [ ! -L "$path" ] && raw=$(awk 'NF { print }' "$path" 2>/dev/null) || return 1
   case "$raw" in ''|*"$'\n'"*) return 1 ;; esac
   case "$raw" in *[!0-9]*) return 1 ;; esac
@@ -59,7 +68,7 @@ open_lane_count() {
   local check counted meta kind count=0
   check=${XDG_DATA_HOME:-$HOME/.local/share}/jg-fleet-flow/jg-flow-check.sh
   if [ -f "$check" ] && [ -x "$check" ] \
-    && counted=$(jg_run_timed "${FM_FLOW_CHECK_TIMEOUT_SECS:-10}" "$check" "$FM_HOME" --summary 2>/dev/null); then
+    && counted=$(jg_run_timed "${JG_FLOW_CHECK_TIMEOUT_SECS:-10}" "$check" "$JG_HOME" --summary 2>/dev/null); then
     counted=$(printf '%s\n' "$counted" | awk -F '\t' 'NF == 9 && NR == 1 { print $8 }')
     case "$counted" in
       ''|*[!0-9]*) ;;
@@ -78,7 +87,7 @@ open_lane_count() {
 
 warn_invalid_lane_target_once() {
   local marker=$STATE/.ready-work-lane-target-invalid current
-  current=$(cat "$FM_HOME/config/lane-target" 2>/dev/null) || current=unreadable
+  current=$(cat "$JG_HOME/config/lane-target" 2>/dev/null) || current=unreadable
   [ "$(cat "$marker" 2>/dev/null)" = "$current" ] && return 0
   printf '%s' "$current" > "$marker" 2>/dev/null || true
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
@@ -92,8 +101,8 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$FM_HOME/.jg-secondmate-home" ] && [ ! -L "$FM_HOME/.jg-secondmate-home" ] || return 1
-  ready_out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
+  [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] || return 1
+  ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
   ready_rc=$?
   READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
     | awk '/^ready\[[0-9]+\]/ { on = 1; next } on && /^  / { sub(/^  /, ""); split($0, f, ","); print f[1]; next } { on = 0 }' \
@@ -104,7 +113,7 @@ ready_work_waits_idle() {
     return 1
   fi
   target=$(lane_target_value) || target=
-  if [ -z "$target" ] && [ -f "$FM_HOME/config/lane-target" ]; then
+  if [ -z "$target" ] && [ -f "$JG_HOME/config/lane-target" ]; then
     warn_invalid_lane_target_once
   fi
   if [ -n "$target" ] && open=$(open_lane_count) && [ "$open" -lt "$target" ]; then
@@ -150,7 +159,7 @@ secondmate_ring_to_drain() {  # <task> <window> [<seq>]
   case "$delivery_id" in ''|*[!0-9a-f]*) return 1 ;; esac
   [ "${#delivery_id}" -eq 16 ] || return 1
   rec=$(jg_task_inbox_write "$STATE" "$task" \
-    "${FM_FROMFIRST_MARK}delivery=${delivery_id} Wake row $seq is still queued in this home. Run bin/jg-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision." \
+    "${JG_FROMFIRST_MARK}delivery=${delivery_id} Wake row $seq is still queued in this home. Run bin/jg-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision." \
     fire-and-forget) || return 1
   jg_task_inbox_ring "$backend" "$w" "$rec" "$(window_label "$w")"
 }

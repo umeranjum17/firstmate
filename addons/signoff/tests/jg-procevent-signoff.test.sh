@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The sign-off adapter, driven through the process-event runner in a throwaway
 # HOME with the process-event claim root redirected. Section A uses a stub
 # sign-off-axi and a stub keyed-answer intake: a transient intake failure is
@@ -13,10 +22,10 @@
 # command skips with one log line.
 set -u
 
-# The Firstmate checkout owns tests/lib.sh; FM_CODE_ROOT names that checkout.
-CODE_ROOT=${FM_CODE_ROOT:-}
+# The Firstmate checkout owns tests/lib.sh; JG_CODE_ROOT names that checkout.
+CODE_ROOT=${JG_CODE_ROOT:-}
 [ -n "$CODE_ROOT" ] && [ -f "$CODE_ROOT/tests/lib.sh" ] \
-  || { echo "skip: set FM_CODE_ROOT to a Firstmate checkout"; exit 0; }
+  || { echo "skip: set JG_CODE_ROOT to a Firstmate checkout"; exit 0; }
 ADDONS=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 ADAPTER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/jg-procevent-signoff.sh"
 # shellcheck source=/dev/null
@@ -34,8 +43,8 @@ mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
 FAKEBIN="$TMP_ROOT/fake-bin"
-FM_HOME_DIR="$TMP_ROOT/fmhome"
-mkdir -p "$FAKEBIN" "$FM_HOME_DIR/state"
+JG_HOME_DIR="$TMP_ROOT/fmhome"
+mkdir -p "$FAKEBIN" "$JG_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \
   INTAKE_LOG="$TMP_ROOT/intake.log" INTAKE_RC="$TMP_ROOT/intake.rc" FEEDBACK_LOG="$TMP_ROOT/feedback.log"
 printf '{}\n' > "$SIGNOFF_BOARD"
@@ -110,14 +119,14 @@ SH
 chmod +x "$ROOTCOPY/bin/jg-captain-hold.sh"
 
 adapter() {
-  PATH="$FAKEBIN:$PATH" FM_CODE_ROOT="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  PATH="$FAKEBIN:$PATH" JG_CODE_ROOT="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+    JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ADAPTER" "$@"
 }
 
 runner() {
-  PATH="$FAKEBIN:$PATH" FM_CODE_ROOT="$ROOTCOPY" FM_HOME="$FM_HOME_DIR" \
-    FM_STATE_OVERRIDE="$FM_HOME_DIR/state" FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
+  PATH="$FAKEBIN:$PATH" JG_CODE_ROOT="$ROOTCOPY" JG_HOME="$JG_HOME_DIR" \
+    JG_STATE_OVERRIDE="$JG_HOME_DIR/state" JG_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims" \
     "$ROOTCOPY/bin/jg-procevent.sh" "$@"
 }
 
@@ -128,12 +137,12 @@ answer_card() {  # <key> <answer> <at>
     "$SIGNOFF_BOARD" > "$SIGNOFF_BOARD.tmp" && mv "$SIGNOFF_BOARD.tmp" "$SIGNOFF_BOARD"
 }
 
-delivered() { cat "$FM_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
+delivered() { cat "$JG_HOME_DIR/state/signoff-delivered" 2>/dev/null || true; }
 
 # picked_up <task-id>: the handler concludes the latest captured result carrying that task's answer.
 picked_up() {
   local result
-  result=$(grep -lF "\"key\":\"$1\"" "$FM_HOME_DIR/state/procevent-inbox"/signoff.*.result | sort -t. -k2 -n | tail -n 1)
+  result=$(grep -lF "\"key\":\"$1\"" "$JG_HOME_DIR/state/procevent-inbox"/signoff.*.result | sort -t. -k2 -n | tail -n 1)
   result=${result%.result}
   runner handled signoff "${result##*.}" >/dev/null || fail "the handler could not conclude the result for $1"
 }
@@ -146,12 +155,12 @@ if adapter raise internal-call '[captain-ask] Main42: Run a proof?' 'Needs a key
 fi
 [ "$(jq 'length' "$SIGNOFF_BOARD")" = 0 ] || fail 'the refused call left a card'
 author() {
-  FM_HOME="$1" python3 "$ADDONS/ask-default/bin/jg-captain-ask.py" add "$2" "${3:-Can you sign in to the release account?}" \
+  JG_HOME="$1" python3 "$ADDONS/ask-default/bin/jg-captain-ask.py" add "$2" "${3:-Can you sign in to the release account?}" \
     --owner-must login --about 'The release account needs your sign in.' --why 'Publishing waits for your account access.' \
     --already 'The release checks passed.' --option 'Yes=Publishing continues after you sign in.' \
     --option 'No=The release stays unpublished.' --recommend Yes --reason 'The release checks passed.' --default No
 }
-for ask_id in T1 T2 T3 T4; do author "$FM_HOME_DIR" "$ask_id"; done
+for ask_id in T1 T2 T3 T4; do author "$JG_HOME_DIR" "$ask_id"; done
 adapter raise T1 'Ship T1' 'needs a call' release >/dev/null 2>&1 || fail "first hold raised no card"
 first=$(jq -r 'keys[0]' "$SIGNOFF_BOARD")
 answer_card "$first" 'use the cheap plan' '2026-10-12T10:05:00Z'
@@ -170,9 +179,9 @@ jq -e 'to_entries | all(.value.ask_ref == "T1" and (.value.title == "Can you sig
   || fail "a raised card lacks the hold task id as its ask reference: $(cat "$SIGNOFF_BOARD")"
 pass "a task held again after an answered card gets a live card of its own, each raised with the hold id as --ask-ref"
 
-rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
+rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$JG_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
-rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$FM_HOME_DIR/state/signoff-delivered"
+rm -f "$HOLD_FILE" "$SIGNOFF_BOARD" "$JG_HOME_DIR/state/signoff-delivered"
 printf '{}\n' > "$SIGNOFF_BOARD"
 hold_as '2026-10-12T12:00:00Z#0'
 adapter raise T2 'Ship T2' 'needs a call' "done" >/dev/null 2>&1 || fail "hold T2 raised no card"
@@ -272,9 +281,9 @@ make_beads_home() {  # <name>; prints the fixture home
 real_env() {  # <home> <command args...>; the real adapter, hold, runner and intake
   local home=$1
   shift
-  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_CODE_ROOT="$ROOT" \
-    FM_STATE_OVERRIDE="$home/state" FM_HOME="$home" FM_DATA_OVERRIDE="$home/data" \
-    FM_ADDONS_DIR="$ADDONS" FM_CONFIG_OVERRIDE="$home/config" FM_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
+  PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" JG_CODE_ROOT="$ROOT" \
+    JG_STATE_OVERRIDE="$home/state" JG_HOME="$home" JG_DATA_OVERRIDE="$home/data" \
+    JG_ADDONS_DIR="$ADDONS" JG_CONFIG_OVERRIDE="$home/config" JG_PROCEVENT_CLAIM_ROOT="$home/claims" "$@"
 }
 
 jg_fake_exit0 "$FAKEBIN" tmux treehouse no-mistakes gh gh-axi

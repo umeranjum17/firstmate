@@ -18,8 +18,8 @@ mkdir -p "$STATE_DIR"
 
 # Source the watcher with an isolated state/home. The guard returns before the
 # lock/loop, so only the functions load.
-export FM_STATE_OVERRIDE="$STATE_DIR"
-export FM_ROOT_OVERRIDE="$ROOT"
+export JG_STATE_OVERRIDE="$STATE_DIR"
+export JG_ROOT_OVERRIDE="$ROOT"
 # Production modules are independently linted canonical roots. Keep this test's
 # ShellCheck context local while preserving its unchanged runtime source path.
 # shellcheck source=/dev/null
@@ -117,7 +117,7 @@ CAP_CALLS=0
 jg_backend_events_capable() { CAP_CALLS=$((CAP_CALLS + 1)); return 0; }
 # shellcheck disable=SC2329 # Runtime overrides called by the isolated watcher.
 jg_backend_wait_transition() {
-  [ "${FM_BACKEND_EVENTS_CAPABILITY_CONFIRMED:-0}" = 1 ] || fail "cached capability verdict was not passed to the wait"
+  [ "${JG_BACKEND_EVENTS_CAPABILITY_CONFIRMED:-0}" = 1 ] || fail "cached capability verdict was not passed to the wait"
   return 1
 }
 event_wait_or_sleep

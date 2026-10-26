@@ -32,7 +32,7 @@ SPAWN="$ROOT/bin/jg-spawn.sh"
 PROMOTE="$ROOT/bin/jg-promote.sh"
 TMP_ROOT=$(jg_test_tmproot jg-self-repo-role)
 mkdir -p "$TMP_ROOT/no-addons"
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 # The code root under test is this checkout, so self-repo detection reaches it
 # through the shared git common dir. Its publication target is derived, never
@@ -88,19 +88,19 @@ clone_with_origin() {
 check_as() {
   local root=$1 home=$2
   shift 2
-  FM_ROOT_OVERRIDE="$root" FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" \
+  JG_ROOT_OVERRIDE="$root" JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROLE" check "$@" 2>&1
 }
 
-# run_role <home> <args...> - jg-role.sh pinned to a fixture home. FM_ROOT stays
+# run_role <home> <args...> - jg-role.sh pinned to a fixture home. JG_ROOT stays
 # this checkout: the check command exists to compare a task's project against
 # the running code root.
 run_role() {
   local home=$1
   shift
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" \
     "$ROLE" "$@" 2>&1
 }
 
@@ -348,7 +348,7 @@ test_secondmate_inheritance_receipt_lifecycle() {
   receipt="$dst_config/.jg-inherit-firstmate-role.generation"
 
   printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$src/firstmate-role"
-  FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
     || fail "local propagation of firstmate-role failed"
   assert_present "$dst_config/firstmate-role" "propagation did not copy the role file"
   assert_present "$receipt" "propagation did not commit the role receipt"
@@ -387,7 +387,7 @@ test_secondmate_inheritance_receipt_lifecycle() {
   # destination file and records the absence in the receipt.
   printf 'maintainer %s\n' "${PUB_TARGET:-github.com/kunchenguid/firstmate}" > "$dst_config/firstmate-role"
   rm "$src/firstmate-role"
-  FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
     || fail "revocation propagation of firstmate-role failed"
   assert_absent "$dst_config/firstmate-role" "revocation did not remove the inherited role file"
   assert_present "$receipt" "revocation dropped the receipt that proves absence"
@@ -420,7 +420,7 @@ test_secondmate_inherits_only_resolved_primary_role() {
   for bad in symlink two-directives; do
     rm -f "$src/firstmate-role"
     printf '# operator note\nmaintainer %s\n' "$scope" > "$src/firstmate-role"
-    FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+    JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
       || fail "propagation of a valid primary grant failed"
     out=$(run_role "$sm_home" report)
     assert_equals "jg-role: maintainer $scope (inherited)" "$out" "a valid primary grant must be inherited"
@@ -435,9 +435,9 @@ test_secondmate_inherits_only_resolved_primary_role() {
       printf 'maintainer %s\nuser\n' "$scope" > "$src/firstmate-role"
       ;;
     esac
-    out=$(FM_HOME="$TMP_ROOT/resolved-src-home" FM_CONFIG_OVERRIDE="$src" "$ROLE" report 2>&1)
+    out=$(JG_HOME="$TMP_ROOT/resolved-src-home" JG_CONFIG_OVERRIDE="$src" "$ROLE" report 2>&1)
     assert_contains "$out" "jg-role: user" "the $bad primary role file must resolve to user on the primary"
-    FM_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
+    JG_INHERITABLE_CONFIG=firstmate-role propagate_inheritable_config "$src" "$dst_config" \
       || fail "propagation of a rejected $bad primary role failed"
     assert_absent "$dst_config/firstmate-role" "a rejected $bad primary role must not be copied downstream"
     [ "$(sed -n '4p' "$receipt")" = absent ] || fail "a rejected $bad primary role must record an absent receipt"
@@ -470,22 +470,22 @@ test_brief_consent_flag_bounds() {
   home=$(make_role_home brief-user)
   brief="$home/data/brief-consent-ok/brief.md"
 
-  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+  out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-consent-bad some-proj --mode direct-PR --upstream-consent 'not a scope' 2>&1); rc=$?
   expect_code 1 "$rc" "an invalid consent scope must be refused"
   assert_contains "$out" "must be <host>/<owner>/<repo>" "an invalid consent scope must name the schema"
 
-  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+  out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-consent-scout some-proj --scout --upstream-consent github.com/a/b 2>&1); rc=$?
   expect_code 1 "$rc" "a scout must refuse a consent it can never spend"
   assert_contains "$out" "applies only to ship briefs" "a scout consent refusal must name the boundary"
 
-  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+  out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-consent-local some-proj --mode local-only --upstream-consent github.com/a/b 2>&1); rc=$?
   expect_code 1 "$rc" "local-only must refuse a consent it publishes nothing with"
   assert_contains "$out" "local-only" "a local-only consent refusal must name the mode"
 
-  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+  out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-consent-ok some-proj --mode direct-PR --upstream-consent GitHub.COM/KunChenGuid/FirstMate 2>&1); rc=$?
   expect_code 0 "$rc" "a valid consent must scaffold (got: $out)"
   assert_grep "upstream-consent=github.com/kunchenguid/firstmate" "$brief" \
@@ -496,14 +496,14 @@ test_brief_consent_flag_bounds() {
 test_brief_self_repo_pre_gate() {
   local home out rc
   home=$(make_role_home brief-selfrepo)
-  out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+  out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
     "$BRIEF" brief-selfrefuse some-proj --mode direct-PR --project "$ROOT" 2>&1); rc=$?
   expect_code 1 "$rc" "a user home must be refused a publishing brief for firstmate itself"
   assert_contains "$out" "user/operator" "the refusal must name the role"
   assert_contains "$out" "no publication authority" "the refusal must name the missing grant"
 
   if [ -n "$PUB_TARGET" ]; then
-    out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
       "$BRIEF" brief-selfconsent some-proj --mode direct-PR --project "$ROOT" \
       --upstream-consent "$PUB_TARGET" 2>&1); rc=$?
     expect_code 0 "$rc" "recorded consent must let the same scaffold through (got: $out)"
@@ -513,7 +513,7 @@ test_brief_self_repo_pre_gate() {
 
   home=$(make_role_home brief-maint "maintainer ${PUB_TARGET:-github.com/x/y}")
   if [ -n "$PUB_TARGET" ]; then
-    out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    out=$(JG_HOME="$home" JG_CONFIG_OVERRIDE="$home/config" JG_DATA_OVERRIDE="$home/data" \
       "$BRIEF" brief-selfmaint some-proj --mode direct-PR --project "$ROOT" 2>&1); rc=$?
     expect_code 0 "$rc" "a matching maintainer home must scaffold a self-repo publishing brief (got: $out)"
   fi
@@ -542,13 +542,13 @@ write_ship_brief() {  # <home> <id> [<contract-extras>]
 run_spawn() {  # <home> <spawn-args...>
   local home=$1
   shift
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/projects-unused" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux PATH="$SPAWN_FAKEBIN:$BASE_PATH" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/projects-unused" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_BACKEND=tmux PATH="$SPAWN_FAKEBIN:$BASE_PATH" \
     "$SPAWN" "$@" 2>&1
 }
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 test_spawn_gate_on_self_repo() {
   local home out rc
@@ -637,8 +637,8 @@ test_promote_gate_on_self_repo() {
   printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nInvestigate a firstmate bug.\n\n## Firstmate spec\nReport findings.\n' \
     > "$home/data/promote-r1/brief.md"
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" \
     "$PROMOTE" promote-r1 --mode direct-PR --yolo off 2>&1); rc=$?
   expect_code 1 "$rc" "a user home must not promote a self-repo scout into a publishing ship"
   assert_contains "$out" "promotion refused for promote-r1" "the refusal must name the task"
@@ -647,8 +647,8 @@ test_promote_gate_on_self_repo() {
   assert_absent "$home/data/promote-r1/ship-instructions.md" "a refused promotion must publish no instructions"
 
   if [ -n "$PUB_TARGET" ]; then
-    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-      FM_CONFIG_OVERRIDE="$home/config" \
+    out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+      JG_CONFIG_OVERRIDE="$home/config" \
       "$PROMOTE" promote-r1 --mode direct-PR --yolo off --upstream-consent "$PUB_TARGET" 2>&1); rc=$?
     expect_code 0 "$rc" "recorded consent must let the same promotion through (got: $out)"
     assert_grep 'upstream_consent=' "$meta" "the promoted task record must carry the consent"

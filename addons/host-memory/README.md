@@ -27,7 +27,7 @@ Kun's diagnostic guard must remain intact when the admission rule moves: the add
   lock exits 0. Sourced, it provides the `jg_memory_sampler_*` functions
   above; the watcher calls `jg_memory_sampler_ensure` to start (or reuse)
   the loop and `jg_memory_sampler_stop` to end it.
-- Cadence: one sample every `FM_HOST_MEMORY_SECS` (default 10), each tick
+- Cadence: one sample every `JG_HOST_MEMORY_SECS` (default 10), each tick
   calling the fork guard as
   `jg-jev-mem-guard.sh --config <CONFIG>/host-memory --record
   <STATE>/host-memory.tsv --owned-top-task <STATE> --state-dir ...`.
@@ -57,10 +57,10 @@ Kun's diagnostic guard must remain intact when the admission rule moves: the add
 
 ## Relocation and integration proof
 
-Originally copied from `umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf`, the sampler now passes `FM_HOST_MEMORY_FORK_BIN` to its child instead of assuming fork libraries are add-on siblings.
+Originally copied from `umeranjum17/firstmate@0689b4b9d9ab3594f846cfe07c400edfa58244bf`, the sampler now passes `JG_HOST_MEMORY_FORK_BIN` to its child instead of assuming fork libraries are add-on siblings.
 The fork's wake/backend libraries, control CLI, watcher identity and current guard remain the dependency owner.
 Existing `jg_memory_sampler_*` names, PID validation, cadence, durable wakes and interrupt behavior are unchanged.
-No installer changes are needed for the source entrypoint: the fork hook resolves `${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}`.
+No installer changes are needed for the source entrypoint: the fork hook resolves `${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}`.
 An absent checkout skips both sourcing and lifecycle dispatch, leaving no sampler and no errors.
 Removing the checkout affects the next watcher; restart an existing watcher to unload already-sourced functions.
 
@@ -73,7 +73,7 @@ Run the CI ShellCheck and syntax steps plus the other `host-memory/tests` script
 
 ## Memory gate
 
-`jg-mem-gate.sh <command...>` waits until the host has room, then starts a command in a user scope in `jg-heavy.slice`; with no command it only waits. Room is `MemAvailable` at least `FM_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and avg60) under 40. An emulator job also waits while `FM_EMU_MAX` (2) emulators run, and a Gradle job while `FM_GRADLE_MAX` (1) builds run; those two checks and the start share one host lock.
+`jg-mem-gate.sh <command...>` waits until the host has room, then starts a command in a user scope in `jg-heavy.slice`; with no command it only waits. Room is `MemAvailable` at least `JG_MEM_MIN_GB` (12) and memory pressure (lower of `some` avg10 and avg60) under 40. An emulator job also waits while `JG_EMU_MAX` (2) emulators run, and a Gradle job while `JG_GRADLE_MAX` (1) builds run; those two checks and the start share one host lock.
 
 The installer deploys `bin/jg-heavy-adopt.sh` and enables a 20-second user timer. It retains the existing memory/process-name rule and also moves a process using more than 2 CPU-seconds during the prior interval, plus its descendants, into the heavy scope. Herdr, no-mistakes and agent CLI processes are excluded; descendant expansion stops at each excluded process, while a CPU-heavy child can still move on its own. The threshold is below the 14-30 CPU-seconds measured per worker in the bounded 64-worker reproduction, which drove Herdr run-delay to 54-121 ms/s and CPU PSI `some avg10` to 66%; the integration test uses fixture proc/cgroup trees. Main must replace `firstmate/config/jg-heavy-adopt.sh` with a shim to the installed copy or update the unit's `ExecStart` to `${XDG_DATA_HOME:-$HOME/.local/share}/jg-host-memory/jg-heavy-adopt.sh`.
 
@@ -102,6 +102,6 @@ exec "${XDG_DATA_HOME:-$HOME/.local/share}/jg-host-memory/jg-mem-gate.sh" "$@"
 
 Test: `host-memory/tests/jg-mem-gate.test.sh [gate]` runs the gate with
 stub `emulator`, `gradlew`, `pgrep` and `systemd-run`, fixture memory
-files (`FM_MEM_GATE_PROC`) and private lock dirs, and checks that a waiting
+files (`JG_MEM_GATE_PROC`) and private lock dirs, and checks that a waiting
 emulator job does not hold the lock, that wrapped emulator and Gradle jobs
 are held at their caps, and that a wrapped emulator starts with a free slot.

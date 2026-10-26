@@ -16,10 +16,10 @@ command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found (requi
 TMP_ROOT=$(jg_test_tmproot jg-backlog-handoff)
 HANDOFF_FAKEBIN=$(make_fake_tmux "$TMP_ROOT/default-fake")
 export PATH="$HANDOFF_FAKEBIN:$PATH"
-export FM_FAKE_TMUX_WINDOW='firstmate:jg-design'
-export FM_FAKE_TMUX_LOG="$TMP_ROOT/default-tmux.log"
-export FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/default-fake/pane.txt"
-export FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 FM_SEND_RETRIES=1
+export JG_FAKE_TMUX_WINDOW='firstmate:jg-design'
+export JG_FAKE_TMUX_LOG="$TMP_ROOT/default-tmux.log"
+export JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/default-fake/pane.txt"
+export JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1
 
 setup_homes() {
   local home=$1 subhome=$2 id=${3:-design}
@@ -79,11 +79,11 @@ EOF
   printf '## Queued\n\n## Done\n' > "$sub/data/backlog.md"
   fakebin=$(make_fake_tmux "$TMP_ROOT/live-wake-fake")
   out="$TMP_ROOT/live-wake.out"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
-    FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 FM_SEND_RETRIES=1 \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
+    JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1 \
     "$ROOT/bin/jg-backlog-handoff.sh" design wake-item > "$out" 2>&1 \
     || fail "handoff to a live receiver failed: $(cat "$out")"
   grep -F 'wake-item' "$sub/data/backlog.md" >/dev/null \
@@ -96,11 +96,11 @@ EOF
   wake_count=$(inbox_record_count "$home/state" design)
   [ "$(doorbell_count "$TMP_ROOT/live-wake-tmux.log")" -eq 1 ] \
     || fail "handoff did not ring exactly one constant receiver doorbell"
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
-    FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 FM_SEND_RETRIES=1 \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$PATH" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/live-wake-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/live-wake-fake/pane.txt" \
+    JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 JG_SEND_RETRIES=1 \
     "$ROOT/bin/jg-backlog-handoff.sh" design wake-item > "$TMP_ROOT/live-wake-rerun.out" 2>&1 \
     || fail "idempotent successful handoff rerun failed: $(cat "$TMP_ROOT/live-wake-rerun.out")"
   [ "$(inbox_record_count "$home/state" design)" -eq "$wake_count" ] \
@@ -123,7 +123,7 @@ test_failed_wake_retries_when_the_item_is_already_present() {
 EOF
   printf '## Queued\n\n## Done\n' > "$sub/data/backlog.md"
 
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design retry-item 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design retry-item 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "handoff without a receiver endpoint reported success"
   assert_contains "$out" "receiver was not woken" "missing receiver failure was not observable"
   assert_grep 'retry-item' "$sub/data/backlog.md" "failed wake lost the durably handed-off item"
@@ -140,7 +140,7 @@ home=$sub
 worktree=$sub
 EOF
   : > "$TMP_ROOT/default-tmux.log"
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design retry-item > "$TMP_ROOT/retry-wake.out" 2>&1 \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design retry-item > "$TMP_ROOT/retry-wake.out" 2>&1 \
     || fail "an already-present handoff did not retry its receiver wake: $(cat "$TMP_ROOT/retry-wake.out")"
   assert_contains "$(inbox_body_stream "$home/state" design)" \
     'New routed work is in your backlog.' \
@@ -166,14 +166,14 @@ EOF
   cat > "$rejectbin/tmux" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" != send-keys ] || exit 1
-exec "$FM_BASE_TMUX" "$@"
+exec "$JG_BASE_TMUX" "$@"
 SH
   chmod +x "$rejectbin/tmux"
 
-  out=$(PATH="$rejectbin:$basebin:$PATH" FM_BASE_TMUX="$basebin/tmux" \
-    FM_HOME="$home" FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/known-fail-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/known-fail-fake/pane.txt" \
+  out=$(PATH="$rejectbin:$basebin:$PATH" JG_BASE_TMUX="$basebin/tmux" \
+    JG_HOME="$home" JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/known-fail-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/known-fail-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design known-fail 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "failed advisory doorbell negated durable handoff: $out"
   assert_contains "$out" 'doorbell did not reach' \
@@ -188,7 +188,7 @@ SH
   [ -n "$(grep '^delivered_epoch=' "$corr" | cut -d= -f2-)" ] \
     || fail "durable enqueue was not recorded as delivered"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design known-fail \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design known-fail \
     > "$TMP_ROOT/known-fail-retry.out" 2>&1 \
     || fail "idempotent handoff after failed doorbell failed: $(cat "$TMP_ROOT/known-fail-retry.out")"
   [ "$(inbox_record_count "$home/state" design)" -eq "$rec_count" ] \
@@ -212,20 +212,20 @@ EOF
   cat > "$blockbin/tmux" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = send-keys ]; then
-  touch "$FM_RECONCILE_RACE_ENTERED"
-  while [ ! -f "$FM_RECONCILE_RACE_RELEASE" ]; do sleep 0.02; done
+  touch "$JG_RECONCILE_RACE_ENTERED"
+  while [ ! -f "$JG_RECONCILE_RACE_RELEASE" ]; do sleep 0.02; done
   exit 1
 fi
-exec "$FM_BASE_TMUX" "$@"
+exec "$JG_BASE_TMUX" "$@"
 SH
   chmod +x "$blockbin/tmux"
 
-  PATH="$blockbin:$basebin:$PATH" FM_BASE_TMUX="$basebin/tmux" FM_HOME="$home" \
-    FM_RECONCILE_RACE_ENTERED="$TMP_ROOT/reconcile-race.entered" \
-    FM_RECONCILE_RACE_RELEASE="$TMP_ROOT/reconcile-race.release" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/reconcile-race-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/reconcile-race-fake/pane.txt" \
+  PATH="$blockbin:$basebin:$PATH" JG_BASE_TMUX="$basebin/tmux" JG_HOME="$home" \
+    JG_RECONCILE_RACE_ENTERED="$TMP_ROOT/reconcile-race.entered" \
+    JG_RECONCILE_RACE_RELEASE="$TMP_ROOT/reconcile-race.release" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/reconcile-race-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/reconcile-race-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design reconcile-race \
     > "$TMP_ROOT/reconcile-race.out" 2>&1 &
   handoff=$!
@@ -237,7 +237,7 @@ SH
     sleep 0.02
   done
   corr=$(cut -d: -f2- "$home/state/.backlog-handoff-design.wake-pending")
-  FM_PENDING_REPLY_NOW=9999999999 bash -c '
+  JG_PENDING_REPLY_NOW=9999999999 bash -c '
     . "$1"
     jg_pending_reply_reconcile_delivery "$2" "$3"
   ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$home/state" "$corr" \
@@ -252,7 +252,7 @@ SH
   [ "$(inbox_record_count "$home/state" design)" -eq 1 ] \
     || fail "advisory ring race did not retain exactly one inbox record"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design reconcile-race \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design reconcile-race \
     > "$TMP_ROOT/reconcile-race-retry.out" 2>&1 \
     || fail "idempotent handoff after the ring race failed: $(cat "$TMP_ROOT/reconcile-race-retry.out")"
   [ "$(inbox_record_count "$home/state" design)" -eq 1 ] \
@@ -276,7 +276,7 @@ EOF
   jg_fake_crash_injector "$fakebin"
   cat > "$fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
-"$FM_REAL_TASKS_AXI" "$@"
+"$JG_REAL_TASKS_AXI" "$@"
 rc=$?
 case " $* " in
   *" --file "*" --to "*)
@@ -293,7 +293,7 @@ SH
   chmod +x "$fakebin/tasks-axi"
 
   set +e
-  FM_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" FM_HOME="$home" \
+  JG_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" JG_HOME="$home" \
     "$ROOT/bin/jg-backlog-handoff.sh" design crash-item > "$TMP_ROOT/move-crash.out" 2>&1
   rc=$?
   set +e
@@ -309,7 +309,7 @@ SH
 ## Done
 EOF
   rc=0
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design unrelated-move \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design unrelated-move \
     > "$TMP_ROOT/move-crash-unrelated.out" 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail "unrelated moving handoff discarded a post-move prepared wake"
   assert_contains "$(cat "$TMP_ROOT/move-crash-unrelated.out")" \
@@ -323,7 +323,7 @@ EOF
     "unrelated moving handoff moved work despite the unresolved older wake"
 
   : > "$TMP_ROOT/default-tmux.log"
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design crash-item \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design crash-item \
     > "$TMP_ROOT/move-crash-retry.out" 2>&1 \
     || fail "post-move crash recovery failed: $(cat "$TMP_ROOT/move-crash-retry.out")"
   assert_contains "$(inbox_body_stream "$home/state" design)" \
@@ -364,13 +364,13 @@ case " $* " in
     fi
     ;;
 esac
-exec "$FM_REAL_TASKS_AXI" "$@"
+exec "$JG_REAL_TASKS_AXI" "$@"
 SH
   chmod +x "$fakebin/tasks-axi"
   : > "$TMP_ROOT/default-tmux.log"
 
   set +e
-  FM_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" FM_HOME="$home" \
+  JG_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" JG_HOME="$home" \
     "$ROOT/bin/jg-backlog-handoff.sh" design pre-move-crash > "$TMP_ROOT/pre-move-crash.out" 2>&1
   rc=$?
   set -e
@@ -387,7 +387,7 @@ SH
 ## Done
 EOF
   rc=0
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design unrelated-ready \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design unrelated-ready \
     > "$TMP_ROOT/pre-move-unrelated.out" 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail "unrelated handoff accepted another batch's prepared wake"
   assert_contains "$(cat "$TMP_ROOT/pre-move-unrelated.out")" \
@@ -400,7 +400,7 @@ EOF
   assert_present "$home/state/.backlog-handoff-design.wake-pending" \
     "unrelated handoff discarded another batch's prepared wake"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design pre-move-crash \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design pre-move-crash \
     > "$TMP_ROOT/pre-move-crash-retry.out" 2>&1 \
     || fail "pre-move crash recovery failed: $(cat "$TMP_ROOT/pre-move-crash-retry.out")"
   assert_grep 'pre-move-crash' "$sub/data/backlog.md" "pre-move crash recovery did not move the item"
@@ -428,24 +428,24 @@ EOF
   cat > "$fakebin/rm" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
-  if [ "$arg" = "$FM_CONFIRM_WAKE_MARKER" ] \
-    && mkdir "$FM_CONFIRM_CRASH_ONCE" 2>/dev/null; then
+  if [ "$arg" = "$JG_CONFIRM_WAKE_MARKER" ] \
+    && mkdir "$JG_CONFIRM_CRASH_ONCE" 2>/dev/null; then
     # Crash instead of clearing the marker, and confirm the handoff is gone
     # before returning so it cannot proceed past this step.
     jg-crash-inject "$PPID" || exit 1
     exit 0
   fi
 done
-exec "$FM_REAL_RM" "$@"
+exec "$JG_REAL_RM" "$@"
 SH
   chmod +x "$fakebin/rm"
   : > "$TMP_ROOT/default-tmux.log"
 
   set +e
-  PATH="$fakebin:$PATH" FM_REAL_RM="$real_rm" \
-    FM_CONFIRM_CRASH_ONCE="$TMP_ROOT/confirm-crash.once" \
-    FM_CONFIRM_WAKE_MARKER="$home/state/.backlog-handoff-design.wake-pending" \
-    FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design confirm-crash \
+  PATH="$fakebin:$PATH" JG_REAL_RM="$real_rm" \
+    JG_CONFIRM_CRASH_ONCE="$TMP_ROOT/confirm-crash.once" \
+    JG_CONFIRM_WAKE_MARKER="$home/state/.backlog-handoff-design.wake-pending" \
+    JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design confirm-crash \
     > "$TMP_ROOT/confirm-crash.out" 2>&1
   rc=$?
   set +e
@@ -468,7 +468,7 @@ SH
 
 ## Done
 EOF
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design after-crash \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design after-crash \
     > "$TMP_ROOT/after-confirm-crash.out" 2>&1 \
     || fail "new handoff after a confirmation crash failed: $(cat "$TMP_ROOT/after-confirm-crash.out")"
   [ "$(inbox_record_count "$home/state" design)" -eq "$((wake_count + 1))" ] \
@@ -478,7 +478,7 @@ EOF
   assert_grep 'after-crash' "$sub/data/backlog.md" \
     "new item after a confirmation crash was not durably handed off"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design confirm-crash \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design confirm-crash \
     > "$TMP_ROOT/confirm-crash-retry.out" 2>&1 \
     || fail "post-confirmation crash recovery failed: $(cat "$TMP_ROOT/confirm-crash-retry.out")"
   [ "$(inbox_record_count "$home/state" design)" -eq "$((wake_count + 1))" ] \
@@ -514,13 +514,13 @@ for arg in "$@"; do
     exit 1
   fi
 done
-exec "$FM_REAL_MV" "$@"
+exec "$JG_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
   : > "$TMP_ROOT/default-tmux.log"
 
   set +e
-  PATH="$fakebin:$PATH" FM_REAL_MV="$real_mv" FM_HOME="$home" \
+  PATH="$fakebin:$PATH" JG_REAL_MV="$real_mv" JG_HOME="$home" \
     "$ROOT/bin/jg-backlog-handoff.sh" design attempt-crash \
     > "$TMP_ROOT/attempt-crash.out" 2>&1
   rc=$?
@@ -532,7 +532,7 @@ SH
     || fail "delivery bookkeeping crash unexpectedly reached the later doorbell step"
 
   rc=0
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design attempt-crash 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design attempt-crash 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "immediate retry resent or accepted an unresolved delivery attempt"
   assert_contains "$out" 'delivery for design is unresolved; refusing to resend correlation' \
     "immediate retry did not report the unresolved delivery boundary"
@@ -560,23 +560,23 @@ EOF
 #!/usr/bin/env bash
 case "$*" in
   *"Firstmate instruction waiting:"*)
-    if mkdir "$FM_BLOCK_WAKE_ONCE" 2>/dev/null; then
-      touch "$FM_BLOCK_WAKE_ENTERED"
-      while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+    if mkdir "$JG_BLOCK_WAKE_ONCE" 2>/dev/null; then
+      touch "$JG_BLOCK_WAKE_ENTERED"
+      while [ ! -f "$JG_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
     fi
     ;;
 esac
-exec "$FM_BASE_TMUX" "$@"
+exec "$JG_BASE_TMUX" "$@"
 SH
   chmod +x "$blockbin/tmux"
 
-  PATH="$blockbin:$basebin:$PATH" FM_HOME="$home" FM_BASE_TMUX="$basebin/tmux" \
-    FM_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
-    FM_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
-    FM_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
+  PATH="$blockbin:$basebin:$PATH" JG_HOME="$home" JG_BASE_TMUX="$basebin/tmux" \
+    JG_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
+    JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
+    JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design concurrent-a > "$TMP_ROOT/concurrent-a.out" 2>&1 &
   first=$!
   i=0
@@ -592,13 +592,13 @@ SH
 
 ## Done
 EOF
-  PATH="$blockbin:$basebin:$PATH" FM_HOME="$home" FM_BASE_TMUX="$basebin/tmux" \
-    FM_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
-    FM_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
-    FM_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
+  PATH="$blockbin:$basebin:$PATH" JG_HOME="$home" JG_BASE_TMUX="$basebin/tmux" \
+    JG_BLOCK_WAKE_ONCE="$TMP_ROOT/concurrent.once" \
+    JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/concurrent.entered" \
+    JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/concurrent.release" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/concurrent-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/concurrent-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design concurrent-b > "$TMP_ROOT/concurrent-b.out" 2>&1 &
   second=$!
   sleep 0.2
@@ -634,19 +634,19 @@ EOF
 #!/usr/bin/env bash
 case "$*" in
   *"Firstmate instruction waiting:"*)
-    touch "$FM_BLOCK_WAKE_ENTERED"
-    while [ ! -f "$FM_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
+    touch "$JG_BLOCK_WAKE_ENTERED"
+    while [ ! -f "$JG_BLOCK_WAKE_RELEASE" ]; do sleep 0.02; done
     ;;
 esac
-exec "$FM_BASE_TMUX" "$@"
+exec "$JG_BASE_TMUX" "$@"
 SH
   chmod +x "$blockbin/tmux"
-  PATH="$blockbin:$basebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_BASE_TMUX="$basebin/tmux" FM_BLOCK_WAKE_ENTERED="$TMP_ROOT/teardown-race.entered" \
-    FM_BLOCK_WAKE_RELEASE="$TMP_ROOT/teardown-race.release" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
+  PATH="$blockbin:$basebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_BASE_TMUX="$basebin/tmux" JG_BLOCK_WAKE_ENTERED="$TMP_ROOT/teardown-race.entered" \
+    JG_BLOCK_WAKE_RELEASE="$TMP_ROOT/teardown-race.release" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
     "$ROOT/bin/jg-backlog-handoff.sh" design teardown-race > "$TMP_ROOT/teardown-race-handoff.out" 2>&1 &
   handoff=$!
   i=0
@@ -656,10 +656,10 @@ SH
     [ "$i" -le 250 ] || fail "teardown-race handoff never reached its receiver wake"
     sleep 0.02
   done
-  PATH="$basebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
+  PATH="$basebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-race-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-race-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-race-teardown.out" 2>&1 &
   teardown=$!
   sleep 0.3
@@ -683,7 +683,7 @@ test_local_teardown_preserves_wake_when_home_removal_fails() {
   printf 'project=%s\n' "$ROOT" >> "$home/state/design.meta"
   mkdir -p "$sub/data" "$rm_bin"
   printf '## Queued\n- [ ] still-routed - preserve its wake (repo: alpha)\n\n## Done\n' > "$sub/data/backlog.md"
-  corr=$(FM_HOME="$home" bash -c '
+  corr=$(JG_HOME="$home" bash -c '
     . "$1"
     jg_pending_reply_create "$2" "$2/state" design "New routed work is in your backlog."
   ' _ "$ROOT/bin/jg-pending-reply-lib.sh" "$home") \
@@ -698,19 +698,19 @@ test_local_teardown_preserves_wake_when_home_removal_fails() {
   cat > "$rm_bin/rm" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
-  [ "$arg" != "$FM_FAIL_HOME" ] || exit 1
+  [ "$arg" != "$JG_FAIL_HOME" ] || exit 1
 done
-exec "$FM_REAL_RM" "$@"
+exec "$JG_REAL_RM" "$@"
 SH
   chmod +x "$rm_bin/rm"
   fakebin=$(make_fake_tmux "$TMP_ROOT/teardown-home-fail-fake")
 
   set +e
-  PATH="$rm_bin:$fakebin:$PATH" FM_REAL_RM="$real_rm" FM_FAIL_HOME="$fail_home" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
+  PATH="$rm_bin:$fakebin:$PATH" JG_REAL_RM="$real_rm" JG_FAIL_HOME="$fail_home" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-home-fail.out" 2>&1
   rc=$?
   set -e
@@ -724,10 +724,10 @@ SH
   assert_present "$home/state/design.meta" "failed teardown removed route metadata"
   assert_grep '- design ' "$home/data/secondmates.md" "failed teardown removed the registry route"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_FAKE_TMUX_WINDOW='firstmate:jg-design' \
-    FM_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_FAKE_TMUX_WINDOW='firstmate:jg-design' \
+    JG_FAKE_TMUX_LOG="$TMP_ROOT/teardown-home-fail-tmux.log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-home-fail-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" design --force > "$TMP_ROOT/teardown-home-retry.out" 2>&1 \
     || fail "teardown retry did not retire the preserved wake: $(cat "$TMP_ROOT/teardown-home-retry.out")"
   assert_absent "$sub" "teardown retry left the receiver home"
@@ -794,7 +794,7 @@ seed_public_commitment() {
   (cd "$home" && tasks-axi public-followup bind-work "$obligation" \
     --relation-file "$home/relation.json") >/dev/null \
     || fail "could not bind work to the public commitment"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" "$ROOT/bin/jg-public-followup.sh" register \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" "$ROOT/bin/jg-public-followup.sh" register \
     "$obligation" --relation rel-code --work-home "$work_home" --work-id "$work_id" \
     --generation 1 >/dev/null \
     || fail "could not register the public commitment"
@@ -819,7 +819,7 @@ EOF
   seed_public_commitment "$home" pf-handoff main promised-item
 
   local out rc=0
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design promised-item plain-item 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design promised-item plain-item 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "handoff must still succeed while reporting the stale binding: $out"
   assert_contains "$out" "handed off 2 item(s)" "the move itself must still be reported"
   assert_grep 'promised-item' "$sub/data/backlog.md" "the promised item did not reach the secondmate backlog"
@@ -851,7 +851,7 @@ test_handoff_is_silent_about_public_commitments_without_the_relay() {
 EOF
 
   local out rc=0
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design quiet-item 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design quiet-item 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "handoff failed in a relay-free home: $out"
   case "$out" in
     *"public reply"*) fail "a relay-free home must not mention public commitments: $out" ;;
@@ -883,7 +883,7 @@ EOF
   local expected_block
   expected_block=$(extract_item_block "$home/data/backlog.md" body-item)
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design body-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design body-item >/dev/null \
     || fail "handoff of body-followed-by-item failed"
 
   local dest_block
@@ -933,7 +933,7 @@ EOF
   local expected_block
   expected_block=$(extract_item_block "$home/data/backlog.md" section-tail)
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design section-tail >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design section-tail >/dev/null \
     || fail "handoff of body-followed-by-section failed"
 
   local dest_block
@@ -983,7 +983,7 @@ test_body_moves_when_last_lines_of_file() {
   local expected_block
   expected_block=$(extract_item_block "$home/data/backlog.md" eof-item)
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design eof-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design eof-item >/dev/null \
     || fail "handoff of EOF body item failed"
 
   local dest_block
@@ -1028,7 +1028,7 @@ test_eof_body_before_seeded_destination_section_keeps_boundary() {
     printf '%s\n' '## Done'
   } > "$expected_destination"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design seeded-eof-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design seeded-eof-item >/dev/null \
     || fail "handoff of EOF body into seeded backlog failed"
 
   cmp -s "$expected_destination" "$sub/data/backlog.md" \
@@ -1056,7 +1056,7 @@ test_untouched_eof_line_preserves_terminator() {
     printf '%s' '  keep body without a final newline'
   } > "$expected_source"
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design move-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design move-item >/dev/null \
     || fail "handoff before untouched EOF preservation check failed"
 
   cmp -s "$expected_source" "$home/data/backlog.md" \
@@ -1082,7 +1082,7 @@ test_body_handoff_is_idempotent() {
 ## Done
 EOF
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design idem-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design idem-item >/dev/null \
     || fail "first handoff of body-carrying item failed"
 
   local main_after dest_after
@@ -1090,7 +1090,7 @@ EOF
   dest_after=$(cat "$sub/data/backlog.md")
 
   local out
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design idem-item 2>&1) \
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design idem-item 2>&1) \
     || fail "idempotent re-run of body-carrying item failed"
   assert_contains "$out" "already present" "re-run did not report skip of already-present key"
 
@@ -1140,7 +1140,7 @@ EOF
   cp "$home/data/backlog.md" "$source_before"
   cp "$sub/data/backlog.md" "$destination_before"
 
-  if out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design malformed-body 2>&1); then
+  if out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design malformed-body 2>&1); then
     fail "handoff accepted a noncanonical indented continuation"
   fi
 
@@ -1176,7 +1176,7 @@ EOF
   local expected_block
   expected_block=$(extract_item_block "$home/data/backlog.md" ha-codex-fast-default-4e)
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design ha-codex-fast-default-4e >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design ha-codex-fast-default-4e >/dev/null \
     || fail "handoff of ## Intent body item failed"
 
   local dest_block
@@ -1231,7 +1231,7 @@ EOF
   local expected_block
   expected_block=$(extract_item_block "$home/data/backlog.md" multi-para)
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design multi-para >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design multi-para >/dev/null \
     || fail "handoff of multi-paragraph body failed"
 
   local dest_block
@@ -1263,7 +1263,7 @@ EOF
   main_after=$(cat "$home/data/backlog.md")
   dest_after=$(cat "$sub/data/backlog.md")
   local out
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design multi-para 2>&1) \
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design multi-para 2>&1) \
     || fail "idempotent re-run of multi-paragraph body failed"
   assert_contains "$out" "already present" "re-run did not report skip of already-present key"
   [ "$main_after" = "$(cat "$home/data/backlog.md")" ] \
@@ -1290,7 +1290,7 @@ test_registry_home_with_pre_home_parentheses() {
   # Prose parentheses before (home: ...) and punctuation inside scope match the live registry shape.
   printf -- '- %s - issue triage (id is legacy) (home: %s; scope: issue triage (child); semicolon is meaningful; projects: alpha; added 2026-07-09)\n' \
     "$id" "$sub_abs" > "$home/data/secondmates.md"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
     || fail "home-seed validation rejected punctuation-bearing registry fields"
 
   cat > "$home/data/backlog.md" <<'EOF'
@@ -1301,7 +1301,7 @@ test_registry_home_with_pre_home_parentheses() {
 ## Done
 EOF
 
-  FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" "$id" paren-item >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" "$id" paren-item >/dev/null \
     || fail "handoff failed for registry entry with parentheses before (home: ...)"
 
   assert_grep 'paren-item' "$sub/data/backlog.md" \
@@ -1332,7 +1332,7 @@ test_registry_home_missing_field_fails_cleanly() {
 EOF
 
   local out rc=0
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" "$id" orphan-item 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" "$id" orphan-item 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "handoff succeeded for registry entry with no (home: ...) field"
   assert_contains "$out" "has no home" \
     "missing (home: ...) field did not report the clean 'has no home' error"
@@ -1360,7 +1360,7 @@ EOF
   mkdir -p "$decoy"
   printf 'backend = "beads"\n\n[beads]\ndb = "%s/missing/beads.db"\n' "$decoy" > "$decoy/.tasks.toml"
 
-  out=$(cd "$decoy" && FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design decoy-item 2>&1) \
+  out=$(cd "$decoy" && JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design decoy-item 2>&1) \
     || fail "handoff from a cwd with a beads .tasks.toml failed: $out"
   assert_grep 'decoy-item' "$sub/data/backlog.md" "item did not reach the secondmate backlog"
   assert_no_grep 'decoy-item' "$home/data/backlog.md" "item stayed in the main backlog"

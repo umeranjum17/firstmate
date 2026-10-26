@@ -163,12 +163,12 @@ while [ ! -e "$B_SAMPLER_READY" ] && [ "$B_READY_ATTEMPT" -lt 100 ]; do
 done
 [ -e "$B_SAMPLER_READY" ] || fail 'the Part B focus sampler did not start'
 : > "$B_OPERATION_ACTIVE"
-B_OUT=$(PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" FM_FLASH_CALL_LOG="$CALL_LOG" bash -c '
+B_OUT=$(PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" JG_FLASH_CALL_LOG="$CALL_LOG" bash -c '
   . "$1/bin/backends/herdr.sh"
   jg_backend_herdr_cli() {
     local session=$1
     shift
-    printf "%s\n" "$*" >> "$FM_FLASH_CALL_LOG"
+    printf "%s\n" "$*" >> "$JG_FLASH_CALL_LOG"
     HERDR_SESSION="$session" herdr "$@" --session "$session"
   }
   jg_backend_herdr_projection_close_pane_focus_preserving "$2" "$3"
@@ -296,13 +296,13 @@ done
 # A short proof budget keeps the exhausted-proof path fast; the count below is
 # what proves the proof was exhausted rather than skipped.
 C_PROOF_POLLS=3
-C_OUT=$(PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" FM_FLASH_CALL_LOG="$C_CALL_LOG" \
-  FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS="$C_PROOF_POLLS" bash -c '
+C_OUT=$(PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" JG_FLASH_CALL_LOG="$C_CALL_LOG" \
+  JG_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS="$C_PROOF_POLLS" bash -c '
   . "$1/bin/backends/herdr.sh"
   jg_backend_herdr_cli() {
     local session=$1
     shift
-    printf "%s\n" "$*" >> "$FM_FLASH_CALL_LOG"
+    printf "%s\n" "$*" >> "$JG_FLASH_CALL_LOG"
     HERDR_SESSION="$session" herdr "$@" --session "$session"
   }
   jg_backend_herdr_projection_close_pane_focus_preserving "$2" "$3"

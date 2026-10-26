@@ -25,11 +25,11 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `lookout-adapter` — prints or serves this fleet as the JSON document Lookout reads (`lookout-firstmate`): hosts, homes, lanes, workers, quota, merges, history and devices from the fleet dashboard builder's output; read-only, no secrets.
 - `tickets-sync` - reads registered backlogs into sign-off Tickets; see [setup and limits](../tickets-sync/README.md).
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.
-- `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `FM_HOME=<home> fleet-stall/install.sh`.
+- `fleet-stall` — alerts you when a team lead idles with ready work, or workers sit stuck waiting on their team lead. Wire in: `JG_HOME=<home> fleet-stall/install.sh`.
 - `fleet-stats` — per-model and per-skill fleet statistics plus the task outcome recorder. Dormant copy: the fork still runs its own.
 - `fleet-pulse` — appends redacted captain chat from Claude transcripts to a private, gitignored TSV. Wire in: `fleet-pulse/install.sh <home>`.
 - `git-identity` — task commits always carry the configured git identity; pushes of foreign-author commits are refused. Wire in: `git-identity/install.sh <home>`, plus a fork hook.
-- `key-in-env-check` — wakes Main when any running fleet process carries a provider API key (OPENROUTER, ANTHROPIC, OPENAI, MINIMAX...) in its environment; names only, never a value. It names the pid, home, task and the topmost parent still exporting the key, and writes `state/key-in-env.incidents` for the dashboard. Wire in: `FM_HOME=<home> key-in-env-check/install.sh`; see `key-in-env-check/README.md`.
+- `key-in-env-check` — wakes Main when any running fleet process carries a provider API key (OPENROUTER, ANTHROPIC, OPENAI, MINIMAX...) in its environment; names only, never a value. It names the pid, home, task and the topmost parent still exporting the key, and writes `state/key-in-env.incidents` for the dashboard. Wire in: `JG_HOME=<home> key-in-env-check/install.sh`; see `key-in-env-check/README.md`.
 - `kill-guard` — protects critical services and interactive shells, refuses pattern kills, and permits audited fleet-process kills by verified primary Main; other callers keep descendant/worktree ownership (see [rules and limits](../kill-guard/README.md)). Record device launches with `node guard.mjs own start <serial> -- <command>`; records bind device PID to start time and serial, while unrecorded legacy device processes stay refused (stop a stuck one via its owned host adb parent or have the lead stop it). A block is final, except a kill whose PID the shell sets (`$pid`, `$!`, `%1`), which asks for the literal PID. Wire in: `kill-guard/install.sh`; remove: `kill-guard/uninstall.sh`.
 - `read-guard` — blocks agent tool access to provider logins, BYOKit person credentials and no-mistakes config; metadata-only `ls`, `stat`, `test` and `[` checks are allowed. Process/library reads are unaffected. Wire in: `read-guard/install.sh`; remove: `read-guard/uninstall.sh`.
 - `glm-queue` — one local line in front of the GLM API, so parallel calls queue instead of hitting rate limits. Wire in: `glm-queue/install.sh`, then point pi at the queue.
@@ -58,7 +58,7 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `supervisor-guard` — stops a supervisor session from doing a worker's job, via a pre-tool check. Dormant copy: the fork still runs its own.
 - `tailscale-resilience` — heals a Tailscale connection that died while its daemon still runs; alerts on a dead display. Wire in: a systemd timer you add, see Install.
 - `wait-timers` — owner-alert and escalation timers for tasks that declared a wait. Dormant copy: the fork still runs its own.
-- `zai-quota-check` — alarms when the GLM plan burns ahead of its window, naming the route moves that protect the pipeline. Wire in: `FM_HOME=<home> zai-quota-check/install.sh`.
+- `zai-quota-check` — alarms when the GLM plan burns ahead of its window, naming the route moves that protect the pipeline. Wire in: `JG_HOME=<home> zai-quota-check/install.sh`.
 
 Every change still on the fork that is not upstream yet, with its exit path and status, is tracked in [FORK-EXIT.md](../FORK-EXIT.md). Add-ons marked "dormant copy" or "fork hook" do not wire into an unmodified install of the host tool yet; FORK-EXIT.md lists the fork changes each one waits for.
 
@@ -68,15 +68,15 @@ There is no install-all script yet. The shortest real install for the add-ons th
 
 ```sh
 git clone https://github.com/umeranjum17/juggernaut && cd juggernaut/addons
-export FM_HOME=~/firstmate    # your home folder for the fleet manager
+export JG_HOME=~/firstmate    # your home folder for the fleet manager
 for d in pipeline-literal-delete pipeline-quota-failover host-memory fleet-flow glm-queue route-change claude-model-guard; do "$d/install.sh"; done
-for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$FM_HOME"; done
+for d in delete-guard claude-quota merge-on-green git-identity nm-drain owner-guard pane-titles; do "$d/install.sh" "$JG_HOME"; done
 read-guard/install.sh
 codex-guard/install.sh
-FM_HOME="$FM_HOME" fleet-stall/install.sh
-FM_HOME="$FM_HOME" owner-guard/install-scan.sh
-FM_HOME="$FM_HOME" zai-quota-check/install.sh
-quota-failover/install.sh --all "$FM_HOME"   # also each active local secondmate home in data/secondmates.md
+JG_HOME="$JG_HOME" fleet-stall/install.sh
+JG_HOME="$JG_HOME" owner-guard/install-scan.sh
+JG_HOME="$JG_HOME" zai-quota-check/install.sh
+quota-failover/install.sh --all "$JG_HOME"   # also each active local secondmate home in data/secondmates.md
 ```
 
 `route-change` must come after `pipeline-quota-failover` from the same clone (the loop's order). To route GLM calls through the queue, set `.providers.zai.baseUrl` to `http://127.0.0.1:8787/api/coding/paas/v4` in `~/.pi/agent/models.json`; new pi sessions pick it up. `git-identity` prints a note until the fork's launch-env hook is merged — until then lanes stay unguarded.
@@ -87,10 +87,10 @@ Two add-ons wire in by hand:
 
 ```sh
 # merge-card, one shim per home (needs done-done on PATH; see its Details section):
-printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$FM_HOME/config/merge-gate"
-printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$FM_HOME/config/post-merge"
-chmod +x "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"
-owner-guard/install.sh "$FM_HOME"   # re-chain: the owner-details merge scan runs first, then the shim
+printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$JG_HOME/config/merge-gate"
+printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$JG_HOME/config/post-merge"
+chmod +x "$JG_HOME/config/merge-gate" "$JG_HOME/config/post-merge"
+owner-guard/install.sh "$JG_HOME"   # re-chain: the owner-details merge scan runs first, then the shim
 ```
 
 `tailscale-resilience` installs as a systemd user timer; copy the unit from its Details section. The dormant and fork-hook add-ons install nothing.
@@ -112,7 +112,7 @@ bash pipeline-quota-failover/tests/pi-quota-failover-route.test.sh
 bash pipeline-literal-delete/tests/pipeline-literal-delete.test.sh
 bash quota-failover/tests/quota-failover-e2e.sh
 bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
-FM_TEST_FORK=<fork checkout> bash quota-failover/tests/install.test.sh
+JG_TEST_FORK=<fork checkout> bash quota-failover/tests/install.test.sh
 bash glm-queue/tests/glm-queue.test.sh
 bash route-change/tests/route-change-e2e.sh
 bash merge-on-green/tests/merge-on-green.test.sh
@@ -143,21 +143,21 @@ The dormant and fork-hook add-ons are not wired into an unmodified install of th
 ```sh
 claude-model-guard/install.sh --restore                  # removes exactly its keys and hook entries
 pipeline-quota-failover/install.sh --restore             # removes the wrapper and its config key
-"$FM_HOME/bin/jg-check-unregister.sh" quota-failover-watch
-"$FM_HOME/bin/jg-check-unregister.sh" claude-quota       # then rm "$FM_HOME/state/claude-quota.check.sh" ~/.local/share/jg-claude-quota -r
-"$FM_HOME/bin/jg-check-unregister.sh" merge-on-green     # then rm "$FM_HOME/state/merge-on-green.check.sh" ~/.local/share/jg-merge-on-green -r
-"$FM_HOME/bin/jg-check-unregister.sh" 0-nm-drain         # then rm "$FM_HOME/state/0-nm-drain.check.sh" ~/.local/share/jg-nm-drain -r
-"$FM_HOME/bin/jg-check-unregister.sh" fleet-stall        # then rm "$FM_HOME/state/fleet-stall.check.sh" ~/.local/share/jg-fleet-stall -r
-"$FM_HOME/bin/jg-check-unregister.sh" zai-quota          # then rm "$FM_HOME/state/zai-quota.check.sh"
-rm "$FM_HOME/config/merge-gate" "$FM_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
-owner-guard/install.sh --uninstall "$FM_HOME"            # owner-guard: also restores the home's previous config/merge-gate
-pane-titles/uninstall.sh "$FM_HOME"                      # pane-titles: restores the home's previous launch-env-hook
-rm "$FM_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
+"$JG_HOME/bin/jg-check-unregister.sh" quota-failover-watch
+"$JG_HOME/bin/jg-check-unregister.sh" claude-quota       # then rm "$JG_HOME/state/claude-quota.check.sh" ~/.local/share/jg-claude-quota -r
+"$JG_HOME/bin/jg-check-unregister.sh" merge-on-green     # then rm "$JG_HOME/state/merge-on-green.check.sh" ~/.local/share/jg-merge-on-green -r
+"$JG_HOME/bin/jg-check-unregister.sh" 0-nm-drain         # then rm "$JG_HOME/state/0-nm-drain.check.sh" ~/.local/share/jg-nm-drain -r
+"$JG_HOME/bin/jg-check-unregister.sh" fleet-stall        # then rm "$JG_HOME/state/fleet-stall.check.sh" ~/.local/share/jg-fleet-stall -r
+"$JG_HOME/bin/jg-check-unregister.sh" zai-quota          # then rm "$JG_HOME/state/zai-quota.check.sh"
+rm "$JG_HOME/config/merge-gate" "$JG_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
+owner-guard/install.sh --uninstall "$JG_HOME"            # owner-guard: also restores the home's previous config/merge-gate
+pane-titles/uninstall.sh "$JG_HOME"                      # pane-titles: restores the home's previous launch-env-hook
+rm "$JG_HOME/config/parked-homes"                        # parked-homes: a missing file parks nothing
 systemctl --user disable --now jg-glm-queue && rm -r ~/.local/share/jg-glm-queue ~/.config/systemd/user/jg-glm-queue.service   # glm-queue
 rm -r ~/.local/share/jg-route-change ~/.local/bin/route-change                  # route-change
 rm -r ~/.local/share/jg-host-memory ~/.local/share/jg-fleet-flow                # host-memory, fleet-flow
-rm -r ~/.local/share/jg-git-identity                     # git-identity: also restore the backed-up "$FM_HOME/config/launch-env-hook"
-"$FM_HOME/bin/jg-check-unregister.sh" delete-guard      # delete-guard: then rm -r ~/.local/share/jg-delete-guard and drop its hook entries (its .bak files show what it added)
+rm -r ~/.local/share/jg-git-identity                     # git-identity: also restore the backed-up "$JG_HOME/config/launch-env-hook"
+"$JG_HOME/bin/jg-check-unregister.sh" delete-guard      # delete-guard: then rm -r ~/.local/share/jg-delete-guard and drop its hook entries (its .bak files show what it added)
 rm ~/.pi/agent/extensions/jg-literal-delete.ts           # pipeline-literal-delete: also drop its Claude SessionStart hook entry
 systemctl disable --now tailscale-resilience.timer       # tailscale-resilience: then remove its unit files
 ```
@@ -197,7 +197,7 @@ The rule (`pipeline-literal-delete/rule.txt`): recursive deletes (`rm -r`, `rm -
 
 Surfaces: pi gets `~/.pi/agent/extensions/jg-literal-delete.ts`, which appends the rule to the system prompt of every pi session on `before_agent_start` (gate agents run with project context files disabled, but user extensions still load - the delete guard's own pi adapter proves it fires there).
 Claude gets a `SessionStart` hook in `~/.claude/settings.json` whose `additionalContext` carries the rule into every session, gate agents included.
-One install covers every firstmate home, because both surfaces live under the Unix user's home, not under any FM_HOME.
+One install covers every firstmate home, because both surfaces live under the Unix user's home, not under any JG_HOME.
 
 Install or update with `pipeline-literal-delete/install.sh [--dry-run]`; it is idempotent and needs no jg-home argument (no watcher is registered).
 It backs up each file it changes as `<file>.bak-pipeline-literal-delete-<epoch>`, copies the rule to `${XDG_DATA_HOME:-~/.local/share}/jg-pipeline-literal-delete/`, writes the pi extension, and merges the Claude hook without dropping other settings.
@@ -210,11 +210,11 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
 
 `merge-card/merge-card` is one bash script with three subcommands:
 
-- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$FM_HOME/data/<task-id>/checks.md` otherwise.
-  The Checks evidence lives in `$FM_HOME/data/<task-id>`, so each relative or bare name resolves there before done-done checks that the file exists, while absolute paths stay unchanged: `done-done check --citation-base $FM_HOME/data/<task-id>` resolves the names itself on done-done 0.3.1+, and on an older one merge-card resolves them in the Checks block and hands it to `done-done check --from -` (with the pull request's branch as `--claim-id`). A name still missing there is reported missing at its resolved path.
+- `merge-card gate <task-id> <worktree|-> <head|-> <pr-url|->` runs `done-done check --from <source> --judge --json` in the task's worktree, where `<source>` is the pull request when there is one and `$JG_HOME/data/<task-id>/checks.md` otherwise.
+  The Checks evidence lives in `$JG_HOME/data/<task-id>`, so each relative or bare name resolves there before done-done checks that the file exists, while absolute paths stay unchanged: `done-done check --citation-base $JG_HOME/data/<task-id>` resolves the names itself on done-done 0.3.1+, and on an older one merge-card resolves them in the Checks block and hands it to `done-done check --from -` (with the pull request's branch as `--claim-id`). A name still missing there is reported missing at its resolved path.
   The work copy only supplies the repo identity.
-  It prints the verdict and saves it for the card in `$FM_HOME/data/<task-id>/merge-card.json`.
-  done-done's verdict is report only, but a PR merge is refused (exit 1) when `$FM_HOME/data/checks-gate.log` has no `pass` row for the head (rows come from merge-on-green's `checks-lint.sh`).
+  It prints the verdict and saves it for the card in `$JG_HOME/data/<task-id>/merge-card.json`.
+  done-done's verdict is report only, but a PR merge is refused (exit 1) when `$JG_HOME/data/checks-gate.log` has no `pass` row for the head (rows come from merge-on-green's `checks-lint.sh`).
   Hand-captured evidence legitimately comes back inconclusive and the merge still lands.
   A judge that is not configured degrades to a plain "not checked" verdict; a done-done that could not check at all names the real reason (an older done-done rejecting `--citation-base`, say) instead of a bare exit code.
   `merge-card gate`, `merge-card check` and `merge-card post` all take `--judge <route>`, which reaches `done-done check --judge <route>` for that call alone: a lane whose configured judge route is rate limited names another one instead of waiting on done-done's fallback. Without the flag nothing changes.
@@ -232,7 +232,7 @@ Every merge runs done-done and, only with passed proof, posts one evidence card 
   The card key is the merge's own (`merge-<owner>-<repo>-pull-<n>`, or `merge-<head>` for a local merge), so a repeat post or a second home adds nothing.
   sign-off-axi writes the board under its lock and only appends.
   After each card it files, `merge-card/one-card-per-pr --apply <board.json>` archives every other live evidence card for the same PR, from any filer: the newest card carrying a passed-test receipt stays (the newest card when none has one), and nothing is deleted (`sign-off-axi restore <key>` brings one back). Run it without `--apply` for a dry run that prints one `archive` line per card.
-  Feedback trail: for a PR, each card the task's `$FM_HOME/data/<task-id>/brief.md` or the PR body names on a line `sign-off cards: <key>[, <key>...]` is marked acted on with `sign-off-axi feedback <key> <board.json> --acted --link <pr-url>` (`--reply "<text>"` instead when a `sign-off reply: <text>` line gives the outcome), once per card and PR, whether or not an evidence card posts. NOT_FOUND (nothing sent on the card yet) counts as done, a sign-off-axi older than 0.6.1 skips with one line, and any other failure is printed and retried on the next post.
+  Feedback trail: for a PR, each card the task's `$JG_HOME/data/<task-id>/brief.md` or the PR body names on a line `sign-off cards: <key>[, <key>...]` is marked acted on with `sign-off-axi feedback <key> <board.json> --acted --link <pr-url>` (`--reply "<text>"` instead when a `sign-off reply: <text>` line gives the outcome), once per card and PR, whether or not an evidence card posts. NOT_FOUND (nothing sent on the card yet) counts as done, a sign-off-axi older than 0.6.1 skips with one line, and any other failure is printed and retried on the next post.
 
 In a home with a worker account pool (`config/account-pool`), the judge is a claude caller, so the check runs it on the account the pool picks: that account's profile folder goes into `CLAUDE_CONFIG_DIR` and the login variables the pool sheds are unset for the call, so the judge never answers on the default login. The line says which account ran. A failed pool read uses the last good pick with its age; without a usable pick the judge is not started: a proof check never refuses a merge over the pool.
 
@@ -241,12 +241,12 @@ In a home with a worker account pool (`config/account-pool`), the judge is a cla
 Install into one home, so the post-merge hook calls `post` once for each recorded merge:
 
 ```sh
-printf '#!/bin/sh\nexec <addons>/merge-card/merge-card gate "$@"\n' > $FM_HOME/config/merge-gate
-printf '#!/bin/sh\nexec <addons>/merge-card/merge-card post --board <board.json> "$@"\n' > $FM_HOME/config/post-merge
-chmod +x $FM_HOME/config/merge-gate $FM_HOME/config/post-merge
+printf '#!/bin/sh\nexec <addons>/merge-card/merge-card gate "$@"\n' > $JG_HOME/config/merge-gate
+printf '#!/bin/sh\nexec <addons>/merge-card/merge-card post --board <board.json> "$@"\n' > $JG_HOME/config/post-merge
+chmod +x $JG_HOME/config/merge-gate $JG_HOME/config/post-merge
 ```
 
-With `owner-guard` installed, rerun `owner-guard/install.sh "$FM_HOME"` after rewriting the gate shim, so the owner-details merge scan is chained back in front of it (see [owner-guard](../owner-guard/README.md)).
+With `owner-guard` installed, rerun `owner-guard/install.sh "$JG_HOME"` after rewriting the gate shim, so the owner-details merge scan is chained back in front of it (see [owner-guard](../owner-guard/README.md)).
 
 Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end against a task folder holding a retained PNG, with a stub `done-done` placed earlier on `PATH` (one accepting `--citation-base`, one rejecting it, and one that lies about supporting it), and asserts the recorded verdict, the invocation the stub saw, and that the card's media resolves in each case.
 
@@ -273,7 +273,7 @@ The filter reads the dispatch file on disk, so hand edits survive while a route 
 A stopped task on a pool account (`account=` in its meta that the pool command in a usable `config/account-pool` names as its own) hit that account's limit, not its route's, so its route stays in dispatch (a route-scoped verdict, its pinned probe, still takes it out as above). An account the pool does not name, such as the `ambient` id a Claude pool gives a Codex or Pi launch, has nothing to move or rest, so that task takes the route move:
 
 - When the task's tool may change accounts automatically (the list below), it runs `bin/jg-control.sh <task> relaunch --account next` (which rests the account) with a note naming the old account and why. No human, no switch to write. Only when that fails, for example with no next account ready, does the route move above run.
-- `$FM_HOME/config/account-pool-autorelaunch-off` (content ignored) puts the human back in the loop for that home.
+- `$JG_HOME/config/account-pool-autorelaunch-off` (content ignored) puts the human back in the loop for that home.
 - With the opt-out written, or with a tool that may not move accounts automatically, the account only rests, through the pool's own rest, and one line naming the task, the account and the manual `bin/jg-control.sh <task> relaunch --account ...` command goes to the log and to `state/quota-failover.wake`, which the watcher check prints as a wake. The rest and the wake happen once per stop.
 - Which account's limit stopped it is read on that account's own profile folder, the folder the pool command names for the account in the task's meta, with the login variables a pool launch sheds also shed: the ambient login answers for a different account than the one the worker is on. A Claude pool task stopped by that reading moves to the next account; the verdict never takes its route out of dispatch, because a full account is not a dead route.
 
@@ -291,10 +291,10 @@ Test: `quota-failover/tests/quota-failover-e2e.sh` drives the real script end to
 Install into one home as a watcher check, so it runs on the watcher's own cadence; `check.sh` prints any pending wake line and starts the pass detached (an install with the older `setsid -f .../quota-failover` line keeps working but never wakes, so re-run this):
 
 ```sh
-printf '<addons>/quota-failover/check.sh %s\n' "$FM_HOME" > $FM_HOME/state/quota-failover-watch.check.sh && chmod 700 $FM_HOME/state/quota-failover-watch.check.sh && $FM_HOME/bin/jg-check-register.sh quota-failover-watch
+printf '<addons>/quota-failover/check.sh %s\n' "$JG_HOME" > $JG_HOME/state/quota-failover-watch.check.sh && chmod 700 $JG_HOME/state/quota-failover-watch.check.sh && $JG_HOME/bin/jg-check-register.sh quota-failover-watch
 ```
 
-Remove it with `$FM_HOME/bin/jg-check-unregister.sh quota-failover-watch`.
+Remove it with `$JG_HOME/bin/jg-check-unregister.sh quota-failover-watch`.
 
 ### pipeline-quota-failover
 
@@ -338,18 +338,18 @@ An unanswered ask gets a safe, pre-declared default instead of blocking the home
 
 `ask-default/ask-default` is one bash script with four subcommands:
 
-- `ask-default open <ask-id> --wait-until <YYYY-MM-DDTHH:MM:SSZ> | --wait <seconds> --default-cmd <command> --safety <class> --reason <one line>` records one ask in `$FM_HOME/data/ask-default/asks/<ask-id>`: its wait clock, the pre-declared default action, that action's safety class, and the reason.
+- `ask-default open <ask-id> --wait-until <YYYY-MM-DDTHH:MM:SSZ> | --wait <seconds> --default-cmd <command> --safety <class> --reason <one line>` records one ask in `$JG_HOME/data/ask-default/asks/<ask-id>`: its wait clock, the pre-declared default action, that action's safety class, and the reason.
   A class of `safe` means the default action is reversible and touches no destructive, irreversible, money, credential, or merge action, and it must name the command that performs it; any other class (`destructive`, `irreversible`, `money`, `credential`, `merge`) or `none` declares that no safe default exists and the ask must stay held.
   Re-opening refreshes the wait clock; a defaulted ask is settled and never re-opens under the same id.
 - `ask-default decide <ask-id> [--probe-cmd <command>] [--timeout <seconds>]` probes the operator once under a hard timeout and decides what the home does about the ask.
   The probe command exits 0 for reachable; anything else, including the timeout, resolves to unreachable inside the bound, so a hanging endpoint never wedges the caller.
   Its command comes from `--probe-cmd` or `$ASK_DEFAULT_PROBE` and its timeout from `--timeout`, `$ASK_DEFAULT_TIMEOUT`, or 5 seconds; with no probe configured it refuses rather than assume the operator is unreachable.
   Exit codes: `0` defaulted (or already-defaulted), so the caller may continue unrelated work, `10` held (the clock expired but no safe default exists), `11` waiting (the clock has not expired), `12` reachable (the ask stays open for the real answer), `1` error on stderr.
-  A defaulted ask runs its default action exactly once, under a per-ask lock, and appends `{ask, applied_at, default_cmd, reason, rc}` to the append-only `$FM_HOME/data/ask-default/applied.log`.
+  A defaulted ask runs its default action exactly once, under a per-ask lock, and appends `{ask, applied_at, default_cmd, reason, rc}` to the append-only `$JG_HOME/data/ask-default/applied.log`.
 - `ask-default probe <command> [--timeout <seconds>]` runs one bounded reachability probe on its own: exit 0 reachable, 1 unreachable.
 - `ask-default show <ask-id>` prints the ask record.
 
-`ask-default` needs `bash`, `jq`, `flock`, and GNU coreutils (`timeout`, `date -d`) on `PATH`, plus `FM_HOME` set.
+`ask-default` needs `bash`, `jq`, `flock`, and GNU coreutils (`timeout`, `date -d`) on `PATH`, plus `JG_HOME` set.
 
 The add-on decides; it does not wire itself in. A home discovers open asks and calls `decide` per ask from its own supervision loop, which is a thin hook in the firstmate fork, not in this repo.
 
@@ -400,7 +400,7 @@ Test: `claude-model-guard/tests/claude-model-guard-e2e.sh` installs into a throw
 
 A yolo task's PR merges itself once the required checks are green, instead of waiting for the lead to notice and merge (about 21 minutes per change).
 
-`merge-on-green/merge-on-green.sh check <jg-home>` is the watcher check. For each `state/<task>.meta` with `yolo=on` and a recorded `pr=` and `pr_head=` whose resolved state (`bin/jg-crew-state.sh`) says checks green / PR ready, it skips silently when the meta says `merge=manual` or the evidence gate (`checks-lint.sh`, pinned to done-done-axi 0.6.17 with Firstmate's size rules, falling back to the legacy lint when unavailable, must print PASS) returns a not-proven PASS; otherwise it requires the run receipt to be a PASS for exactly the meta's `pr_head` and `spawn_gen`, and only then merges through `bin/jg-pr-merge.sh` — never `--auto`, never `gh merge` directly, and no refusal is ever bypassed, so jg-pr-merge's live green check, head pin and refusal rules stay in charge. One merge attempt per task per head, remembered in `<home>/data/jg-merge-on-green/<task>.head`; refusals are remembered per task+head+reason+receipt state in `<task>.refused` and repeat silently until the head, the receipt or the reason changes; a timeout kill wakes truthfully once per task+head+reason like a refusal, records no attempt and is retried next sweep, while a `jg-crew-state` timeout stays silent. A merge prints one wake line with the verified merged URL, so the lead runs the post-merge steps (install from main, teardown), and appends the normal `done [at=<epoch>]: merged <PR URL>` line to `state/<task>.status`, so the lead relays it. Every command is bounded with `timeout` (a third of `FM_CHECK_TIMEOUT`, floor 5 s): a gate starts only before 80% of the bound and a merge only when it fits inside the whole bound, so the watcher's kill can never cut a merge.
+`merge-on-green/merge-on-green.sh check <jg-home>` is the watcher check. For each `state/<task>.meta` with `yolo=on` and a recorded `pr=` and `pr_head=` whose resolved state (`bin/jg-crew-state.sh`) says checks green / PR ready, it skips silently when the meta says `merge=manual` or the evidence gate (`checks-lint.sh`, pinned to done-done-axi 0.6.17 with Firstmate's size rules, falling back to the legacy lint when unavailable, must print PASS) returns a not-proven PASS; otherwise it requires the run receipt to be a PASS for exactly the meta's `pr_head` and `spawn_gen`, and only then merges through `bin/jg-pr-merge.sh` — never `--auto`, never `gh merge` directly, and no refusal is ever bypassed, so jg-pr-merge's live green check, head pin and refusal rules stay in charge. One merge attempt per task per head, remembered in `<home>/data/jg-merge-on-green/<task>.head`; refusals are remembered per task+head+reason+receipt state in `<task>.refused` and repeat silently until the head, the receipt or the reason changes; a timeout kill wakes truthfully once per task+head+reason like a refusal, records no attempt and is retried next sweep, while a `jg-crew-state` timeout stays silent. A merge prints one wake line with the verified merged URL, so the lead runs the post-merge steps (install from main, teardown), and appends the normal `done [at=<epoch>]: merged <PR URL>` line to `state/<task>.status`, so the lead relays it. Every command is bounded with `timeout` (a third of `JG_CHECK_TIMEOUT`, floor 5 s): a gate starts only before 80% of the bound and a merge only when it fits inside the whole bound, so the watcher's kill can never cut a merge.
 
 Install with `merge-on-green/install.sh [--dry-run] <jg-home>`; it copies the watcher, pinned done-done lint adapter and config to `${XDG_DATA_HOME:-~/.local/share}/jg-merge-on-green/`, writes the `state/merge-on-green.check.sh` shim, and registers the check with `bin/jg-check-register.sh`; it is idempotent and `--dry-run` writes nothing.
 Tests: `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end against a fixture home with stub `jg-crew-state.sh`, `jg-pr-merge.sh` and lint, and `merge-on-green/tests/checks-lint-parity.test.sh` compares pinned done-done verdicts against the legacy verdict fixtures, covering the `merge=manual` and "not proven" skips, the merged status line, the skip and refusal cases, the per-head and per-refusal memory, the timeout contract, and `install.sh` in both `--dry-run` and real mode.
@@ -409,7 +409,7 @@ Tests: `merge-on-green/tests/merge-on-green.test.sh` drives the check end to end
 
 `zai-quota-check/zai-quota-check` is a shippable version of a proven state check: it alerts you when the GLM plan it watches burns ahead of time - the 5 h window under 30% with more than 45 min to its reset, or the week's used share more than 15 points ahead of the week's elapsed share, or the week under 20% - with the message naming the route moves that keep the pipeline's share. It reads `quota-axi --json` at most once per 10 min (the check cadence bounds it further) and repeats only when its repeat signature changes: on a 10% step of the 5 h window only while the 5 h condition holds, otherwise on a 10% step of the week alone. The fix over the state copy it shipped from: its `fp//10|wp//10` signature carried the 5 h step on every week-ahead wake and so woke about 10 times per 5 h window while the week-ahead condition stayed true all week. `$0 <quota-json-file>` is the test mode: it reads the file instead of `quota-axi`, and `ZAI_QUOTA_MARK` then names the repeat-state file (default a fresh temp file), so a fixture sequence can exercise the repeat logic with no live quota read.
 
-Install with `zai-quota-check/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `$FM_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/jg-check-register.sh`; idempotent. Out of the box the live repeat state lives at `~/firstmate/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
+Install with `zai-quota-check/install.sh [--dry-run]` and `JG_HOME` set: it copies the check to `$JG_HOME/state/zai-quota.check.sh` (mode 700) and registers the zai-quota check with the home's `bin/jg-check-register.sh`; idempotent. Out of the box the live repeat state lives at `~/firstmate/state/.zai-quota.last`, the same file the state copy used, so the install replaces it in place with no re-wake.
 
 Test: `zai-quota-check/tests/zai-quota-check-e2e.sh` drives the real check in the file-argument mode over fixture sequences: with the week-ahead condition true all week and the 5 h window above 30%, fp 90->80->...->40 wakes once (the old signature woke on every run); with the 5 h condition each 10% step wakes once (29, 19, 9); a week 50->40->30 step wakes once per step.
 
@@ -431,9 +431,9 @@ It then drives `install.sh` against a throwaway home, as `--dry-run` and as a re
 
 ### fleet-stall
 
-`fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `FM_STALL_ROOT` (the main home) and `FM_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
+`fleet-stall/fleet-stall-check` is a shippable version of a proven state check: it alerts at most every 45 min when a home lead is idle while it has 0 busy lanes and ready work, or while live workers have sat more than 45 min in a `paused:` that waits on the lead; the missed-wake guard, fleet-pause marker, zero-busy guard, live-lane filter and `slot` exclusion are unchanged. Fix over the state copy: the paused-reason word list is matched against the reason text only, with absolute paths, URLs, `key=value` tokens (`evidence=...`) and `[at=...]`/`[key=...]` stamps removed first. Before it, a treehouse evidence path matched `firstmate`, so workers waiting on their own CI or emulator runs counted as waiting on the lead. `JG_STALL_ROOT` (the main home) and `JG_STALL_BASE` (the leads' homes) default to the live paths and exist for the fixture test.
 
-Install with `fleet-stall/install.sh [--dry-run]` and `FM_HOME` set: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-stall/fleet-stall-check`, writes `$FM_HOME/state/fleet-stall.check.sh` as a shim that execs it (mode 700; a different old file is kept as `.bak-fleet-stall-<epoch>`) and registers the fleet-stall check with the home's `bin/jg-check-register.sh`; idempotent.
+Install with `fleet-stall/install.sh [--dry-run]` and `JG_HOME` set: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-stall/fleet-stall-check`, writes `$JG_HOME/state/fleet-stall.check.sh` as a shim that execs it (mode 700; a different old file is kept as `.bak-fleet-stall-<epoch>`) and registers the fleet-stall check with the home's `bin/jg-check-register.sh`; idempotent.
 
 Test: `fleet-stall/tests/fleet-stall-e2e.sh` runs the real check against a fixture fleet (the main home's lead records, two fixture homes, a stub herdr showing both leads idle): the false-stall lines no longer count, while `waiting on firstmate for the decision` and `awaiting main instruction` still do. `FLEET_STALL_BIN` runs another copy against the same fixture.
 
@@ -461,4 +461,4 @@ The no-mistakes pipeline commits and pushes from its own repositories with the g
 Install or update with `git-identity/install.sh [--dry-run] [--email <email>] [--name <name>] <jg-home>`: it copies the script to `${XDG_DATA_HOME:-~/.local/share}/jg-git-identity/`, writes `identity.gitconfig` there (a configured identity is kept unless a flag replaces it; default `you <you@example.com>`) and one read-only wrapper per client hook in `hooks/`, backs up a different `<jg-home>/config/launch-env-hook` as `<file>.bak-git-identity-<epoch>` and writes it as an exec shim (mode 700); idempotent, and `--dry-run` writes nothing. It says so when the home's `jg-spawn.sh` does not run `config/launch-env-hook` yet.
 
 Test: `git-identity/tests/git-identity.test.sh` builds a pooled-style lane (a shared clone whose `.git/config` holds `t <t@e.c>` and its own logging pre-push, a linked worktree, a bare origin carrying a forge-made squash commit), shows the leak without the add-on, then launches the lane the way `jg-spawn` runs the hook: task commits carry the configured identity, a push of a hand-made `t@e.c` commit is refused with the commit and the fix and reaches nothing, a clean push on the forge-made base passes and runs the repository's own pre-push with git's stdin, a push whose inspection fails (a `git log` error) is refused instead of let through, a fixture repository outside the clone keeps its identity and pushes freely, and `--email` changes what is pinned and allowed; it also drives `install.sh` as `--dry-run`, a real install with a backup and an idempotent rerun.
-With `FM_ROOT=<firstmate checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.
+With `JG_ROOT=<firstmate checkout>` the lane also gets that checkout's AI-trailer hooks dir layered on top, as a real spawn does.

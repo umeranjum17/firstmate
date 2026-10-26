@@ -18,7 +18,7 @@ set -u
 # versioned muse-bin ancestor these detection cases launch. Drop the ambient
 # markers so the asserted verdict does not depend on which harness launched
 # the suite.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
 
 SPAWN="$ROOT/bin/jg-spawn.sh"
 TEARDOWN="$ROOT/bin/jg-teardown.sh"
@@ -73,11 +73,11 @@ make_spawn_fakebin() {
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   show-environment)
-    [ "${FM_FAKE_WORKER_META_KEY:-}" = present ] || exit 1
+    [ "${JG_FAKE_WORKER_META_KEY:-}" = present ] || exit 1
     printf 'META_API_KEY=worker-key\n'
     exit 0
     ;;
@@ -95,10 +95,10 @@ case "${1:-}" in
             [ ! -f "$staged" ] || arg=$(cat "$staged")
             ;;
         esac
-        printf '%s\n' "$arg" >> "$FM_FAKE_LAUNCH_LOG"
-        if [ "${FM_FAKE_EXECUTE_MUSE_LAUNCH:-}" = 1 ]; then
+        printf '%s\n' "$arg" >> "$JG_FAKE_LAUNCH_LOG"
+        if [ "${JG_FAKE_EXECUTE_MUSE_LAUNCH:-}" = 1 ]; then
           case "$arg" in
-            *"$FM_FAKE_MUSE_EXECUTABLE"*) (cd "$FM_FAKE_PANE_PATH" && bash -c "$arg") ;;
+            *"$JG_FAKE_MUSE_EXECUTABLE"*) (cd "$JG_FAKE_PANE_PATH" && bash -c "$arg") ;;
           esac
         fi
         break
@@ -115,8 +115,8 @@ SH
   cat > "$fakebin/muse" <<'SH'
 #!/usr/bin/env bash
 set -u
-[ -n "${FM_FAKE_HARNESS_RESULT:-}" ] || exit 0
-exec "$FM_FAKE_MUSE_VERSIONED" -c 'result=$($FM_FAKE_HARNESS_PROBE); printf "%s" "$result" > "$FM_FAKE_HARNESS_RESULT"'
+[ -n "${JG_FAKE_HARNESS_RESULT:-}" ] || exit 0
+exec "$JG_FAKE_MUSE_VERSIONED" -c 'result=$($JG_FAKE_HARNESS_PROBE); printf "%s" "$result" > "$JG_FAKE_HARNESS_RESULT"'
 SH
   chmod +x "$fakebin/muse"
   jg_fake_exit0 "$fakebin" treehouse gh-axi gh
@@ -149,20 +149,20 @@ EOF
 run_muse_spawn() {  # <home> <proj> <wt> <fakebin> <id> [extra args...]
   local home=$1 proj=$2 wt=$3 fakebin=$4 id=$5
   shift 5
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$home/launch.log" \
-    FM_FAKE_MUSE_EXECUTABLE="$fakebin/muse" \
-    FM_FAKE_MUSE_VERSIONED="$fakebin/muse-bin-test-version" \
-    FM_FAKE_HARNESS_PROBE="$HARNESS" \
-    FM_FAKE_EXECUTE_MUSE_LAUNCH="${FM_FAKE_EXECUTE_MUSE_LAUNCH:-}" \
-    FM_FAKE_HARNESS_RESULT="${FM_FAKE_HARNESS_RESULT:-}" \
-    FM_FAKE_WORKER_META_KEY="${FM_TEST_MUSE_WORKER_KEY-present}" \
-    META_API_KEY="${FM_TEST_MUSE_KEY-test-key}" \
-    XDG_CONFIG_HOME="${FM_TEST_MUSE_CONFIG_HOME-$home/xdgconfig}" \
-    XDG_DATA_HOME="${FM_TEST_MUSE_DATA_HOME-$home/xdgdata}" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$home/launch.log" \
+    JG_FAKE_MUSE_EXECUTABLE="$fakebin/muse" \
+    JG_FAKE_MUSE_VERSIONED="$fakebin/muse-bin-test-version" \
+    JG_FAKE_HARNESS_PROBE="$HARNESS" \
+    JG_FAKE_EXECUTE_MUSE_LAUNCH="${JG_FAKE_EXECUTE_MUSE_LAUNCH:-}" \
+    JG_FAKE_HARNESS_RESULT="${JG_FAKE_HARNESS_RESULT:-}" \
+    JG_FAKE_WORKER_META_KEY="${JG_TEST_MUSE_WORKER_KEY-present}" \
+    META_API_KEY="${JG_TEST_MUSE_KEY-test-key}" \
+    XDG_CONFIG_HOME="${JG_TEST_MUSE_CONFIG_HOME-$home/xdgconfig}" \
+    XDG_DATA_HOME="${JG_TEST_MUSE_DATA_HOME-$home/xdgdata}" \
     PATH="$fakebin:$PATH" \
     "$SPAWN" "$id" "$proj" muse "$@" 2>&1
 }
@@ -189,7 +189,7 @@ test_detects_versioned_process_ancestor() {
   mkdir -p "$dir"
   for bin in muse-bin-0.1.0-R708.1 muse-bin-9.9.9-RZZZ.9 muse; do
     cp "$(command -v bash)" "$dir/$bin"
-    out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
       -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI \
       "$dir/$bin" -c "r=\$(\"$HARNESS\"); printf '%s' \"\$r\"")
     [ "$out" = muse ] || fail "jg-harness.sh under process '$bin' reported '$out', expected muse"
@@ -205,7 +205,7 @@ test_detection_is_anchored() {
   mkdir -p "$dir"
   for bin in musescore amuse notmuse-bin muse-binary muse-bind; do
     cp "$(command -v bash)" "$dir/$bin"
-    out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
       -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI \
       "$dir/$bin" -c "r=\$(\"$HARNESS\"); printf '%s' \"\$r\"")
     [ "$out" != muse ] || fail "jg-harness.sh misdetected unrelated process '$bin' as muse"
@@ -220,9 +220,9 @@ test_spawn_clears_inherited_foreign_harness_markers() {
 $rec
 EOF
   result="$case_dir/harness-result"
-  out=$(CLAUDECODE=1 PI_CODING_AGENT=true GROK_AGENT=1 FM_PI_HARNESS=pi-signed \
+  out=$(CLAUDECODE=1 PI_CODING_AGENT=true GROK_AGENT=1 JG_PI_HARNESS=pi-signed \
     CURSOR_AGENT=1 CURSOR_INVOKED_AS=cursor-agent \
-    FM_FAKE_EXECUTE_MUSE_LAUNCH=1 FM_FAKE_HARNESS_RESULT="$result" \
+    JG_FAKE_EXECUTE_MUSE_LAUNCH=1 JG_FAKE_HARNESS_RESULT="$result" \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "muse spawn from a marked backend should succeed: $out"
@@ -317,7 +317,7 @@ test_spawn_refuses_without_credential() {
 $rec
 EOF
   mkdir -p "$home/xdgconfig/muse"
-  out=$(FM_TEST_MUSE_KEY='' FM_TEST_MUSE_WORKER_KEY='' run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" \
+  out=$(JG_TEST_MUSE_KEY='' JG_TEST_MUSE_WORKER_KEY='' run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" \
     --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "muse spawn succeeded with no credential available"
@@ -332,7 +332,7 @@ test_spawn_refuses_caller_only_environment_credential() {
   IFS='|' read -r case_dir home proj wt fakebin id <<EOF
 $rec
 EOF
-  out=$(FM_TEST_MUSE_KEY='caller-only-secret' FM_TEST_MUSE_WORKER_KEY='' \
+  out=$(JG_TEST_MUSE_KEY='caller-only-secret' JG_TEST_MUSE_WORKER_KEY='' \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "muse spawn accepted a caller-only META_API_KEY"
@@ -352,7 +352,7 @@ $rec
 EOF
   mkdir -p "$home/xdgconfig/muse"
   printf '{"schema_version":1}\n' > "$home/xdgconfig/muse/auth.json"
-  FM_TEST_MUSE_KEY='' FM_TEST_MUSE_WORKER_KEY='' \
+  JG_TEST_MUSE_KEY='' JG_TEST_MUSE_WORKER_KEY='' \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" \
     --mode no-mistakes --yolo off >/dev/null
   status=$?
@@ -370,8 +370,8 @@ EOF
   mkdir -p "$caller/cfg/muse" "$caller/data"
   resolved_caller=$(cd "$caller" && pwd -P)
   printf '{"schema_version":1}\n' > "$caller/cfg/muse/auth.json"
-  out=$(cd "$caller" && FM_TEST_MUSE_KEY='' FM_TEST_MUSE_WORKER_KEY='' \
-    FM_TEST_MUSE_CONFIG_HOME=cfg FM_TEST_MUSE_DATA_HOME=data \
+  out=$(cd "$caller" && JG_TEST_MUSE_KEY='' JG_TEST_MUSE_WORKER_KEY='' \
+    JG_TEST_MUSE_CONFIG_HOME=cfg JG_TEST_MUSE_DATA_HOME=data \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "muse spawn with relative XDG roots should succeed: $out"
@@ -397,10 +397,10 @@ test_spawn_refuses_secondmate() {
   id="muse-secondmate-x1"
   mkdir -p "$home/data/$id" "$home/projects" "$home/state" "$home/config" "$case_dir/muse"
   printf 'charter\n' > "$home/data/$id/brief.md"
-  out=$(cd "$case_dir" && FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" META_API_KEY=test-key \
+  out=$(cd "$case_dir" && JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" META_API_KEY=test-key \
     PATH="$fakebin:$PATH" \
     "$SPAWN" "$id" muse --secondmate 2>&1)
   status=$?
@@ -417,7 +417,7 @@ $rec
 EOF
   prior=$(write_session_log "$case_dir/xdgdata/muse/sessions" 2026 08 05 prior "$wt" </dev/null)
   prior=$(printf '%s\n' "$prior" | sed 's://*:/:g')
-  FM_TEST_MUSE_DATA_HOME="$case_dir/xdgdata" \
+  JG_TEST_MUSE_DATA_HOME="$case_dir/xdgdata" \
     run_muse_spawn "$home" "$proj" "$wt" "$fakebin" "$id" --mode no-mistakes --yolo off >/dev/null \
     || fail "muse spawn failed"
 
@@ -433,7 +433,7 @@ EOF
   assert_absent "$home/state/$id.busy-gen" "muse spawn armed a busy record it can never clear"
   printf 'binding_id=retired\nsession_log=%s\n' "$prior" > "$home/state/$id.muse-session-current"
 
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     PATH="$fakebin:$PATH" "$TEARDOWN" "$id" --force >/dev/null 2>&1 \
     || fail "muse teardown failed"
   assert_absent "$binding" "muse session binding survived teardown"
@@ -463,8 +463,8 @@ case "${1:-}" in
   list-panes|list-windows) printf 'jg-send:0\n'; exit 0 ;;
   send-keys)
     shift
-    printf '%s\n' "$*" >> "$FM_FAKE_KEY_LOG"
-    [ "${FM_FAKE_KEY_FAIL:-}" = "$*" ] && exit 1
+    printf '%s\n' "$*" >> "$JG_FAKE_KEY_LOG"
+    [ "${JG_FAKE_KEY_FAIL:-}" = "$*" ] && exit 1
     exit 0
     ;;
 esac
@@ -478,8 +478,8 @@ SH
 }
 
 run_send_key() {  # <home> <fakebin> <id> <key> <keylog>
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" \
-    FM_FAKE_KEY_LOG="$5" PATH="$2:$PATH" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$1" JG_STATE_OVERRIDE="$1/state" \
+    JG_FAKE_KEY_LOG="$5" PATH="$2:$PATH" \
     "$ROOT/bin/jg-send.sh" "$3" --key "$4" 2>&1
 }
 
@@ -529,7 +529,7 @@ $rec
 EOF
   keylog="$case_dir/keys.log"
   : > "$keylog"
-  out=$(FM_FAKE_KEY_FAIL='-t jg-send:0 C-u' run_send_key "$home" "$fakebin" "$id" Escape "$keylog")
+  out=$(JG_FAKE_KEY_FAIL='-t jg-send:0 C-u' run_send_key "$home" "$fakebin" "$id" Escape "$keylog")
   status=$?
   [ "$status" -ne 0 ] || fail "a failed muse composer clear was reported as success"
   assert_contains "$out" "could not be cleared" "the failed clear did not explain the pane state"

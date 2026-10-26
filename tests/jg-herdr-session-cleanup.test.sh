@@ -8,22 +8,22 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 TMP_ROOT=$(jg_test_tmproot jg-herdr-session-cleanup)
-FM_TEST_CLEANUP_DIRS+=("$TMP_ROOT")
+JG_TEST_CLEANUP_DIRS+=("$TMP_ROOT")
 trap jg_test_cleanup EXIT
 
-export FM_HOME="$TMP_ROOT/home"
-export FM_STATE_OVERRIDE="$FM_HOME/state"
-export FM_CONFIG_OVERRIDE="$FM_HOME/config"
-mkdir -p "$FM_STATE_OVERRIDE" "$FM_CONFIG_OVERRIDE"
-touch "$FM_CONFIG_OVERRIDE/herdr-presentation-spaces"
-printf '%s\n' herdr > "$FM_CONFIG_OVERRIDE/backend"
+export JG_HOME="$TMP_ROOT/home"
+export JG_STATE_OVERRIDE="$JG_HOME/state"
+export JG_CONFIG_OVERRIDE="$JG_HOME/config"
+mkdir -p "$JG_STATE_OVERRIDE" "$JG_CONFIG_OVERRIDE"
+touch "$JG_CONFIG_OVERRIDE/herdr-presentation-spaces"
+printf '%s\n' herdr > "$JG_CONFIG_OVERRIDE/backend"
 FAKEBIN=$(jg_fakebin "$TMP_ROOT")
 jg_fake_exit0 "$FAKEBIN" herdr
 export PATH="$FAKEBIN:$PATH"
-export FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY=1
+export JG_HERDR_SESSION_CLEANUP_SOURCE_ONLY=1
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-herdr-session-cleanup.sh"
-unset FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY
+unset JG_HERDR_SESSION_CLEANUP_SOURCE_ONLY
 
 # The idle-shell proof now lives in the backend as
 # jg_backend_herdr_pane_idle_shell_pid; prove it still reads Linux argv
@@ -42,13 +42,13 @@ LINUX_PROCESS_INFO='{"result":{"type":"pane_process_info","process_info":{"pane_
 argv_pid=$(
   # shellcheck disable=SC2329 # invoked indirectly by the idle-shell proof.
   jg_backend_herdr_cli() { printf '%s\n' "$LINUX_PROCESS_INFO"; }
-  FM_HERDR_PS_BIN="$FAKE_PS" jg_backend_herdr_pane_idle_shell_pid test w2:p1
+  JG_HERDR_PS_BIN="$FAKE_PS" jg_backend_herdr_pane_idle_shell_pid test w2:p1
 ) || fail "Linux Herdr process argv array was not accepted"
 [ "$argv_pid" = 67 ] || fail "idle-shell proof printed the wrong shell pid: $argv_pid"
 if (
   # shellcheck disable=SC2329 # invoked indirectly by the idle-shell proof.
   jg_backend_herdr_cli() { printf '%s\n' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w2:p1","shell_pid":67,"foreground_process_group_id":67,"foreground_processes":[{"argv":[67],"name":"sh","pid":67}]}}}'; }
-  FM_HERDR_PS_BIN="$FAKE_PS" FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+  JG_HERDR_PS_BIN="$FAKE_PS" JG_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
     jg_backend_herdr_pane_idle_shell_pid test w2:p1
 ) >/dev/null 2>&1; then
   fail "non-string Herdr process argv was accepted"
@@ -199,7 +199,7 @@ write_v1() { # <id> [token]
     printf 'version=1\n'
     printf 'task_id=%s\n' "$id"
     printf 'projection_id=%s\n' "$token"
-  } > "$FM_STATE_OVERRIDE/$id.herdr-presentation"
+  } > "$JG_STATE_OVERRIDE/$id.herdr-presentation"
 }
 
 write_v2() { # <home> <workspace> <tab> <pane>
@@ -211,7 +211,7 @@ write_v2() { # <home> <workspace> <tab> <pane>
     printf 'home=%s\n' "$home"
     printf 'session=test\nworkspace_id=%s\ntab_id=%s\npane_id=%s\n' "$workspace" "$tab" "$pane"
     printf 'parent_workspace_id=w1\nparent_label=firstmate\nworkspace_label=%s\ntask_label=jg-%s\n' "$TITLE" "$ID"
-  } > "$FM_STATE_OVERRIDE/$ID.herdr-presentation"
+  } > "$JG_STATE_OVERRIDE/$ID.herdr-presentation"
 }
 
 write_cross_home_v2() {
@@ -220,7 +220,7 @@ write_cross_home_v2() {
 }
 
 reset_fixture() {
-  rm -rf "$FIXTURE_DIR" "$TMP_ROOT"/*.lock "${FM_STATE_OVERRIDE:?}/"*
+  rm -rf "$FIXTURE_DIR" "$TMP_ROOT"/*.lock "${JG_STATE_OVERRIDE:?}/"*
   mkdir -p "$FIXTURE_DIR"
   : > "$LOCK_LOG"; : > "$CLOSE_LOG"
   printf '%s\n' "$TITLE" > "$FIXTURE_DIR/title"
@@ -233,10 +233,10 @@ reset_fixture() {
 
 assert_preserved() { # <case>
   local name=$1 had_journal=0
-  [ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] && had_journal=1
+  [ -f "$JG_STATE_OVERRIDE/$ID.herdr-presentation" ] && had_journal=1
   jg_herdr_session_cleanup >/dev/null 2>&1
   if [ "$had_journal" -eq 1 ]; then
-    [ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "$name retired the journal"
+    [ -f "$JG_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "$name retired the journal"
   fi
   [ ! -s "$CLOSE_LOG" ] || fail "$name closed the pane"
   pass "$name preserves the candidate"
@@ -244,9 +244,9 @@ assert_preserved() { # <case>
 
 reset_fixture
 jg_herdr_session_cleanup >/dev/null 2>&1
-[ ! -e "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "positive cleanup kept the journal"
+[ ! -e "$JG_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "positive cleanup kept the journal"
 [ "$(wc -l < "$CLOSE_LOG" | tr -d ' ')" = 1 ] || fail "positive cleanup did not close exactly once"
-[ "$(sed -n '1p' "$LOCK_LOG")" = "$FM_STATE_OVERRIDE/.spawn-$ID.lock" ] || fail "task lock was not acquired first"
+[ "$(sed -n '1p' "$LOCK_LOG")" = "$JG_STATE_OVERRIDE/.spawn-$ID.lock" ] || fail "task lock was not acquired first"
 [ "$(sed -n '2p' "$LOCK_LOG")" = "$TMP_ROOT/presentation.lock" ] || fail "presentation lock was not acquired second"
 pass "exact stale projection closes one exact pane under task then presentation locks"
 jg_herdr_session_cleanup >/dev/null 2>&1
@@ -255,21 +255,21 @@ pass "successful cleanup is idempotent on repeat"
 
 reset_fixture; printf '%s\n' '└ malformed p:AbCdEfGhIjKlMnOpQrStUv' > "$FIXTURE_DIR/title"; assert_preserved "malformed title"
 reset_fixture; printf '%s\n' '└ missing-token' > "$FIXTURE_DIR/title"; assert_preserved "missing token"
-reset_fixture; printf 'version=1\ntask_id=%s\nprojection_id=short\n' "$ID" > "$FM_STATE_OVERRIDE/$ID.herdr-presentation"; assert_preserved "malformed journal"
+reset_fixture; printf 'version=1\ntask_id=%s\nprojection_id=short\n' "$ID" > "$JG_STATE_OVERRIDE/$ID.herdr-presentation"; assert_preserved "malformed journal"
 reset_fixture; : > "$FIXTURE_DIR/duplicate-token"; assert_preserved "duplicate token"
 reset_fixture; printf '%s\n' "└ task · p:$TOKEN p:$TOKEN" > "$FIXTURE_DIR/title"; assert_preserved "duplicate title token"
-reset_fixture; rm -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation"; assert_preserved "zero journal match"
+reset_fixture; rm -f "$JG_STATE_OVERRIDE/$ID.herdr-presentation"; assert_preserved "zero journal match"
 reset_fixture; write_v1 jg-task; assert_preserved "multiple journal matches"
-reset_fixture; rm -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation"; write_cross_home_v2; assert_preserved "cross-home journal"
-reset_fixture; write_v2 "$FM_HOME" w9 "$TAB" "$PANE"; assert_preserved "v2 workspace binding mismatch"
-reset_fixture; write_v2 "$FM_HOME" "$WS" w9:t1 "$PANE"; assert_preserved "v2 tab binding mismatch"
-reset_fixture; write_v2 "$FM_HOME" "$WS" "$TAB" w9:p1; assert_preserved "v2 pane binding mismatch"
-reset_fixture; write_v2 "$FM_HOME" "$WS" "$TAB" "$PANE"
+reset_fixture; rm -f "$JG_STATE_OVERRIDE/$ID.herdr-presentation"; write_cross_home_v2; assert_preserved "cross-home journal"
+reset_fixture; write_v2 "$JG_HOME" w9 "$TAB" "$PANE"; assert_preserved "v2 workspace binding mismatch"
+reset_fixture; write_v2 "$JG_HOME" "$WS" w9:t1 "$PANE"; assert_preserved "v2 tab binding mismatch"
+reset_fixture; write_v2 "$JG_HOME" "$WS" "$TAB" w9:p1; assert_preserved "v2 pane binding mismatch"
+reset_fixture; write_v2 "$JG_HOME" "$WS" "$TAB" "$PANE"
 jg_herdr_session_cleanup >/dev/null 2>&1
-[ ! -e "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "matching v2 cleanup kept the journal"
+[ ! -e "$JG_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "matching v2 cleanup kept the journal"
 [ "$(wc -l < "$CLOSE_LOG" | tr -d ' ')" = 1 ] || fail "matching v2 cleanup did not close exactly once"
 pass "v2 cleanup requires and accepts the exact journal endpoint binding"
-reset_fixture; : > "$FM_STATE_OVERRIDE/$ID.meta"; assert_preserved "current task metadata"
+reset_fixture; : > "$JG_STATE_OVERRIDE/$ID.meta"; assert_preserved "current task metadata"
 reset_fixture; printf 'live\n' > "$FIXTURE_DIR/agent"; assert_preserved "registered agent"
 reset_fixture; printf 'unknown\n' > "$FIXTURE_DIR/agent"; assert_preserved "unknown agent"
 reset_fixture; printf '2\n' > "$FIXTURE_DIR/tabs"; printf '2\n' > "$FIXTURE_DIR/panes"; assert_preserved "multiple tabs"
@@ -288,14 +288,14 @@ cp -R "$ROOT/bin" "$INTEGRATION_ROOT/bin"
 TRACE="$INTEGRATION_ROOT/cleanup.trace"
 cat > "$INTEGRATION_ROOT/bin/jg-herdr-session-cleanup.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${FM_HOME:?}" >> "${FM_HERDR_CLEANUP_TRACE:?}"
+printf '%s\n' "${JG_HOME:?}" >> "${JG_HERDR_CLEANUP_TRACE:?}"
 SH
 chmod +x "$INTEGRATION_ROOT/bin/jg-herdr-session-cleanup.sh"
 printf '%s\n' manual > "$INTEGRATION_ROOT/home/config/backlog-backend"
-FM_HOME="$INTEGRATION_ROOT/home" FM_HERDR_CLEANUP_TRACE="$TRACE" FM_BOOTSTRAP_DETECT_ONLY=1 \
+JG_HOME="$INTEGRATION_ROOT/home" JG_HERDR_CLEANUP_TRACE="$TRACE" JG_BOOTSTRAP_DETECT_ONLY=1 \
   "$INTEGRATION_ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
 [ ! -e "$TRACE" ] || fail "detect-only bootstrap ran stale projection cleanup"
-FM_HOME="$INTEGRATION_ROOT/home" FM_HERDR_CLEANUP_TRACE="$TRACE" \
+JG_HOME="$INTEGRATION_ROOT/home" JG_HERDR_CLEANUP_TRACE="$TRACE" \
   "$INTEGRATION_ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
 [ ! -e "$TRACE" ] || fail "standalone bootstrap ran lock-owned stale projection cleanup"
 pass "standalone bootstrap cannot run lock-owned stale projection cleanup"
@@ -305,8 +305,8 @@ cat > "$INTEGRATION_ROOT/bin/jg-lock.sh" <<'SH'
 printf '%s\n' 'lock acquired'
 SH
 chmod +x "$INTEGRATION_ROOT/bin/jg-lock.sh"
-FM_HOME="$INTEGRATION_ROOT/home" FM_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
-  FM_HERDR_CLEANUP_TRACE="$TRACE" \
+JG_HOME="$INTEGRATION_ROOT/home" JG_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
+  JG_HERDR_CLEANUP_TRACE="$TRACE" \
   "$INTEGRATION_ROOT/bin/jg-session-start.sh" >/dev/null 2>&1 \
   || fail "lock-owning session start failed"
 [ "$(cat "$TRACE")" = "$INTEGRATION_ROOT/home" ] \
@@ -319,8 +319,8 @@ printf '%s\n' 'error: another live firstmate session holds the lock' >&2
 exit 1
 SH
 chmod +x "$INTEGRATION_ROOT/bin/jg-lock.sh"
-FM_HOME="$INTEGRATION_ROOT/home" FM_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
-  FM_HERDR_CLEANUP_TRACE="$TRACE" \
+JG_HOME="$INTEGRATION_ROOT/home" JG_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
+  JG_HERDR_CLEANUP_TRACE="$TRACE" \
   "$INTEGRATION_ROOT/bin/jg-session-start.sh" >/dev/null 2>&1 \
   || fail "read-only session start failed"
 [ ! -s "$TRACE" ] || fail "read-only session start ran stale projection cleanup"

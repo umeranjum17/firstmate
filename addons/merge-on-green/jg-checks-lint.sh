@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Merge gate for worker claims (flow playbook R4, captain 5 Oct: artifacts, not claims).
-# Usage: FM_HOME=<home> jg-checks-lint.sh <PR URL | local report file> <evidence folder>
+# Usage: JG_HOME=<home> jg-checks-lint.sh <PR URL | local report file> <evidence folder>
 #        then, after reading PASS, merge in a later separate call (bin/jg-pr-merge.sh).
 # Needs under "## Checks": outcome:, repro:, proof:, evidence:. proof names a command or path; repro is
 # not n/a on a fix PR; evidence files exist, are non-empty, are newer than the lane's first launch
@@ -14,16 +14,16 @@
 # A PR over gh's 100-file view cap and over its 300-file diff cap is still measured: every page of the
 # pull-files API counts the added lines, and the diff comes from the compare API (else a local checkout).
 # An API or diff failure keeps the full count, so it can never turn a big PR into a PASS.
-# One gh call per run (plus one per 100 files past the 100-file view cap, the compare/upstream diffs and one or two per moved file). Each run appends a row to $FM_HOME/data/checks-gate.log. A FAIL for a task of this home
+# One gh call per run (plus one per 100 files past the 100-file view cap, the compare/upstream diffs and one or two per moved file). Each run appends a row to $JG_HOME/data/checks-gate.log. A FAIL for a task of this home
 # also publishes a FAIL completion receipt (receipts/bin/jg-run-receipt.sh in firstmate-addons), so bin/jg-pr-merge.sh and jg-merge-local.sh
 # refuse the merge (bin/jg-dod-lib.sh jg_dod_receipt_accept) until the worker re-lints to PASS and republishes PASS.
 import os, re, sys, json, time, hashlib, subprocess, tempfile
 from collections import Counter
 
-if len(sys.argv) < 3 or not os.environ.get('FM_HOME'):
-    sys.exit('usage: FM_HOME=<home> jg-checks-lint.sh <PR URL | report file> <evidence folder>')
+if len(sys.argv) < 3 or not os.environ.get('JG_HOME'):
+    sys.exit('usage: JG_HOME=<home> jg-checks-lint.sh <PR URL | report file> <evidence folder>')
 src, ev = sys.argv[1], sys.argv[2]
-home = os.environ['FM_HOME']; LOG = f'{home}/data/checks-gate.log'; HASHES = f'{home}/data/checks-gate.hashes'
+home = os.environ['JG_HOME']; LOG = f'{home}/data/checks-gate.log'; HASHES = f'{home}/data/checks-gate.hashes'
 GEN = re.compile(r'(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|go\.sum|[^/]*\.lock)$'+ r'|(^|/)packages/accounts/src/pi/|(^|/)packages/accounts/src/routes\.json$|(^|/)vendor/|(^|/)dist/|(^|/)(LICENSE|LICENSES|NOTICE|COPYING)[^/]*$')  # third-party, legal text and committed build output (dist/) are not reviewable code
 
 task, ROOT = '', os.path.dirname(os.path.dirname(os.path.realpath(__file__)))  # task is set below
@@ -128,7 +128,7 @@ def pr_diff(nwo, base, head, dirs):
     return ''
 
 def lane_task(home, src, ev, fallback=''):
-    """Lane id from state/<task>.meta (pr=) or $FM_HOME/data/<task>, not the PR branch name."""
+    """Lane id from state/<task>.meta (pr=) or $JG_HOME/data/<task>, not the PR branch name."""
     if isinstance(src, str) and src.startswith('http') and os.path.isdir(f'{home}/state'):
         for name in sorted(os.listdir(f'{home}/state')):
             if not name.endswith('.meta'):
@@ -159,8 +159,8 @@ def done(ok, why, head='-'):
         with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as t:
             t.write(f'checks-lint FAIL {src} head {head}: {why}\n')
         try:
-            r = subprocess.run([f"{os.environ.get('FM_ADDONS_DIR') or ROOT}/receipts/bin/jg-run-receipt.sh", task, 'FAIL', t.name, wt if os.path.isdir(wt) else home],
-                               env={**os.environ, 'FM_HOME': home}, capture_output=True, text=True, timeout=60)
+            r = subprocess.run([f"{os.environ.get('JG_ADDONS_DIR') or ROOT}/receipts/bin/jg-run-receipt.sh", task, 'FAIL', t.name, wt if os.path.isdir(wt) else home],
+                               env={**os.environ, 'JG_HOME': home}, capture_output=True, text=True, timeout=60)
             print('checks-lint: receipt FAIL published: merge refused until a new PASS receipt' if r.returncode == 0
                   else 'checks-lint: receipt not revoked: ' + (r.stderr.strip() or '?')[-160:])
         except subprocess.TimeoutExpired:

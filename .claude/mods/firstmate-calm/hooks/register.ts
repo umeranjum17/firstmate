@@ -160,9 +160,9 @@ async function readTheme($: EngineInterface): Promise<unknown> {
 async function load($: EngineInterface): Promise<void> {
   preferencePath = calmPreferencePath(
     {
-      FM_HOME: await $.env.get("FM_HOME"),
-      FM_ROOT_OVERRIDE: await $.env.get("FM_ROOT_OVERRIDE"),
-      FM_CONFIG_OVERRIDE: await $.env.get("FM_CONFIG_OVERRIDE"),
+      JG_HOME: await $.env.get("JG_HOME"),
+      JG_ROOT_OVERRIDE: await $.env.get("JG_ROOT_OVERRIDE"),
+      JG_CONFIG_OVERRIDE: await $.env.get("JG_CONFIG_OVERRIDE"),
     },
     $.plugin.root,
   );
@@ -267,9 +267,9 @@ async function readIfChanged(
 async function startNotes($: EngineInterface): Promise<void> {
   const state = firstmateStateDirectory(
     {
-      FM_HOME: await $.env.get("FM_HOME"),
-      FM_ROOT_OVERRIDE: await $.env.get("FM_ROOT_OVERRIDE"),
-      FM_STATE_OVERRIDE: await $.env.get("FM_STATE_OVERRIDE"),
+      JG_HOME: await $.env.get("JG_HOME"),
+      JG_ROOT_OVERRIDE: await $.env.get("JG_ROOT_OVERRIDE"),
+      JG_STATE_OVERRIDE: await $.env.get("JG_STATE_OVERRIDE"),
     },
     $.plugin.root,
   );

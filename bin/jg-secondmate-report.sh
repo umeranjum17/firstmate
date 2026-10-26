@@ -13,7 +13,7 @@
 # It resolves the parent channel through jg_parent_channel_destination
 # (bin/jg-parent-channel-lib.sh): a local mate writes the parent home's
 # state/<id>.status, and a remote mate writes this home's
-# state/parent-replies.status. Call it from the secondmate home with FM_HOME
+# state/parent-replies.status. Call it from the secondmate home with JG_HOME
 # set to that home.
 #
 # Usage:
@@ -24,12 +24,12 @@
 #   jg-secondmate-report.sh done abcdef0123456789 "audit clean"
 #   jg-secondmate-report.sh --doc done abcdef0123456789 data/x/report.md "see report"
 #
-# An optional firstmate-addons status-wait-check add-on (${FM_ADDONS_DIR:-<home>/projects/firstmate-addons}/status-wait-check/status-wait-check)
+# An optional firstmate-addons status-wait-check add-on (${JG_ADDONS_DIR:-<home>/projects/firstmate-addons}/status-wait-check/status-wait-check)
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
 set -eu
 
-CALLER_FM_HOME=${FM_HOME:-}
+CALLER_JG_HOME=${JG_HOME:-}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
@@ -40,7 +40,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   || { echo "error: the question rule needs $SCRIPT_DIR/jg-question-lib.sh beside this script" >&2; exit 1; }
 
 jg_secondmate_report_status_blocked_wait() {  # <verb> <text>
-  local hook="${FM_ADDONS_DIR:-${CALLER_FM_HOME}/projects/firstmate-addons}/status-wait-check/status-wait-check"
+  local hook="${JG_ADDONS_DIR:-${CALLER_JG_HOME}/projects/firstmate-addons}/status-wait-check/status-wait-check"
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?
@@ -84,14 +84,14 @@ case "$CORR" in
     ;;
 esac
 
-HOME_DIR=$CALLER_FM_HOME
+HOME_DIR=$CALLER_JG_HOME
 case "$HOME_DIR" in
   '')
-    echo "error: FM_HOME is required so the helper can resolve the parent channel" >&2
+    echo "error: JG_HOME is required so the helper can resolve the parent channel" >&2
     exit 1
     ;;
 esac
-STATE_DIR="${FM_STATE_OVERRIDE:-$HOME_DIR/state}"
+STATE_DIR="${JG_STATE_OVERRIDE:-$HOME_DIR/state}"
 
 DESTINATION=
 DEST_RC=0

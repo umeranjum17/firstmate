@@ -74,14 +74,14 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 CURSOR_DIR="$STATE/remote-replies"
 REMOTE_LOG='state/parent-replies.status'
-WAIT_SECONDS=${FM_REMOTE_REPLY_WAIT_SECONDS:-55}
-MAX_DOC_BYTES=${FM_REMOTE_REPLY_MAX_DOC_BYTES:-262144}
+WAIT_SECONDS=${JG_REMOTE_REPLY_WAIT_SECONDS:-55}
+MAX_DOC_BYTES=${JG_REMOTE_REPLY_MAX_DOC_BYTES:-262144}
 # jg-on.sh returns ssh's status unchanged, so 255 alone means unavailable
 # transport or unknown remote completion. Any other nonzero status is the remote
 # reader's own refusal of that path at that moment. The reader has no permanence

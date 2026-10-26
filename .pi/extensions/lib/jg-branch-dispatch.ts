@@ -2,13 +2,17 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runCommandAsync } from "./jg-async-exec.ts";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 // Shared wake-dispatch handshake between the Pi watcher extension (the
 // dispatcher) and the supervision-branch extension (the handler), carried over
 // pi.events so neither extension imports the other.
 //
 // Contract: the watcher builds one offer per actionable wake and emits it on
-// FM_BRANCH_DISPATCH_EVENT. A live, enabled branch extension calls accept()
+// JG_BRANCH_DISPATCH_EVENT. A live, enabled branch extension calls accept()
 // SYNCHRONOUSLY inside its handler (the event bus invokes handlers
 // synchronously up to their first await), so after emit returns the watcher
 // reads `accepted`: true means the branch owns handling the wake, and its
@@ -30,7 +34,7 @@ import { runCommandAsync } from "./jg-async-exec.ts";
 // back to main exactly as attended, because only main can repair supervision
 // itself; parking main is a cost measure, continuity is the safety property.
 
-export const FM_BRANCH_DISPATCH_EVENT = "jg-branch-supervision:dispatch";
+export const JG_BRANCH_DISPATCH_EVENT = "jg-branch-supervision:dispatch";
 
 // The away-posture record's state-relative filename, exactly as
 // bin/jg-afk-contract.sh writes it. Presence is the only fact read here; the
@@ -417,9 +421,9 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
   const checkSeqs: string[] = [];
   const heartbeatSeqs: string[] = [];
   const staleDecisionOwnership = new Map<string, boolean>();
-  const resolveVerb = process.env.FM_CLASSIFY_RESOLVE_VERB || "resolved";
-  const heldVerb = process.env.FM_CLASSIFY_CAPTAIN_HELD_VERB || "captain-held";
-  const reservedPrefixes = (process.env.FM_CLASSIFY_RESERVED_KEY_PREFIXES || "pending-reply-")
+  const resolveVerb = process.env.JG_CLASSIFY_RESOLVE_VERB || "resolved";
+  const heldVerb = process.env.JG_CLASSIFY_CAPTAIN_HELD_VERB || "captain-held";
+  const reservedPrefixes = (process.env.JG_CLASSIFY_RESERVED_KEY_PREFIXES || "pending-reply-")
     .split(/\s+/)
     .filter(Boolean);
   const decisionConfig = `${resolveVerb}\0${heldVerb}\0${reservedPrefixes.join("\0")}`;
@@ -630,7 +634,7 @@ export function branchOfferForWake(state: string, message: string, afk: boolean,
 }
 
 // The exact state-relative filename bin/jg-wake-drain.sh reads for a
-// FM_SUPERVISION_ACTOR=branch drain or ack (its header is the single owner of
+// JG_SUPERVISION_ACTOR=branch drain or ack (its header is the single owner of
 // the consume-side contract). Written atomically, immediately before every
 // branch prompt, by writeEligibleRowsSnapshot below.
 export const BRANCH_ELIGIBLE_ROWS_FILE = ".branch-eligible-rows";
@@ -654,9 +658,9 @@ async function runGrantScript(
   const result = await runCommandAsync("bash", [grantScript, ...args], {
     env: {
       ...process.env,
-      FM_STATE_OVERRIDE: state,
-      FM_WAKE_QUEUE: `${state}/.wake-queue`,
-      FM_WAKE_QUEUE_LOCK: `${state}/.wake-queue.lock`,
+      JG_STATE_OVERRIDE: state,
+      JG_WAKE_QUEUE: `${state}/.wake-queue`,
+      JG_WAKE_QUEUE_LOCK: `${state}/.wake-queue.lock`,
     },
   });
   return result.status;

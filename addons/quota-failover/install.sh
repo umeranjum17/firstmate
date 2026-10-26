@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install the quota-failover watcher for this user and register an exec shim to it as a home's quota-failover-watch
 # check (a different check is backed up first). --all: the home and each local, unparked home its data/secondmates.md
 # lists (a remote one is named and skipped); --list prints those homes and writes nothing. Idempotent.
@@ -28,7 +37,7 @@ homes() {
     [[ $line =~ $re ]] || continue
     name=${BASH_REMATCH[1]} dir=${BASH_REMATCH[3]}
     if [ -n "${BASH_REMATCH[2]}" ]; then echo "skipped: $name: a remote home, install it on its host" >&2
-    elif FM_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
+    elif JG_HOME=$FMH jg_parked_home "$name"; then echo "skipped: $name: parked" >&2
     else printf '%s\t%s\n' "$name" "$dir"
     fi
   done <"$FMH/data/secondmates.md"
@@ -60,8 +69,8 @@ while IFS=$'\t' read -r name home; do
   [ -z "$bak" ] || { cp -p "$check" "$bak"; echo "backed up: $bak"; }
   printf '%s\n' "$shim" >"$check"
   chmod 700 "$check"
-  # An FM_STATE_OVERRIDE in the caller env, even empty, would register away from the home's state.
-  if env -u FM_STATE_OVERRIDE FM_HOME="$home" "$home/bin/jg-check-register.sh" "$ID" >/dev/null; then
+  # An JG_STATE_OVERRIDE in the caller env, even empty, would register away from the home's state.
+  if env -u JG_STATE_OVERRIDE JG_HOME="$home" "$home/bin/jg-check-register.sh" "$ID" >/dev/null; then
     echo "installed: $name: $check -> $DEST/quota-failover/check.sh"
   else
     echo "failed: $name: $home/bin/jg-check-register.sh $ID refused the check" >&2; fails=$((fails + 1))

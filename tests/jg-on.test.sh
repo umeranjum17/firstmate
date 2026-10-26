@@ -19,7 +19,7 @@ cleanup() {
     # cleanup before removing the fixture tree.
     # shellcheck source=bin/jg-remote-job-lib.sh
     . "$ROOT/bin/jg-remote-job-lib.sh"
-    FM_REMOTE_JOB_STATE="$TMP_ROOT/remote-jobs"
+    JG_REMOTE_JOB_STATE="$TMP_ROOT/remote-jobs"
     jg_remote_job_stop_worker_tree "$pid" 2>/dev/null || true
   fi
   rm -rf -- "$TMP_ROOT"
@@ -51,7 +51,7 @@ exit "$rc"
 SH
 cat > "$REMOTE_ROOT/bin/jg-probe-two.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'home=%s\nroot=%s\nworker=%s\n' "$FM_HOME" "$FM_ROOT_OVERRIDE" "${FM_REMOTE_JOB_ACTIVE:-}"
+printf 'home=%s\nroot=%s\nworker=%s\n' "$JG_HOME" "$JG_ROOT_OVERRIDE" "${JG_REMOTE_JOB_ACTIVE:-}"
 if [ -n "${TOP_SECRET:-}" ]; then printf 'secret=leaked\n'; else printf 'secret=absent\n'; fi
 SH
 cat > "$REMOTE_ROOT/bin/jg-probe-path.sh" <<'SH'
@@ -60,7 +60,7 @@ printf '%s\n' "$PATH"
 SH
 cat > "$REMOTE_ROOT/bin/tasks-axi" <<SH
 #!/usr/bin/env bash
-printf '%s\n' "\${FM_REMOTE_JOB_ACTIVE:-absent}" >> "$TOOL_PROBE_LOG"
+printf '%s\n' "\${JG_REMOTE_JOB_ACTIVE:-absent}" >> "$TOOL_PROBE_LOG"
 case "\${1:-}:\${2:-}" in
   --version:*) printf '0.2.6\n' ;;
   update:--help) printf '%s\n' --archive-body ;;
@@ -85,9 +85,9 @@ git -C "$REMOTE_ROOT" commit -qm 'tracked remote fixture'
 
 cat > "$FAKEBIN/fake-ssh" <<'SH'
 #!/usr/bin/env bash
-count=$(cat "$FM_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
-printf '%s\n' "$((count + 1))" > "$FM_FAKE_SSH_COUNT"
-printf '%s\n' "$*" >> "$FM_FAKE_SSH_LOG"
+count=$(cat "$JG_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((count + 1))" > "$JG_FAKE_SSH_COUNT"
+printf '%s\n' "$*" >> "$JG_FAKE_SSH_LOG"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) shift 2 ;;
@@ -100,13 +100,13 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-case "${FM_FAKE_SSH_MODE:-normal}" in
+case "${JG_FAKE_SSH_MODE:-normal}" in
   unreachable) exit 255 ;;
   ambiguous)
-    "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+    "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
     exit 255
     ;;
-  *) exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
+  *) exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
 esac
 SH
 chmod +x "$FAKEBIN/fake-ssh"
@@ -119,14 +119,14 @@ EOF
 write_registry
 
 jg_on() {
-  FM_HOME="$LOCAL_HOME" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_SSH_COUNT="$SSH_COUNT" \
-  FM_FAKE_SSH_LOG="$SSH_LOG" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_HOME="$LOCAL_HOME" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_SSH_COUNT="$SSH_COUNT" \
+  JG_FAKE_SSH_LOG="$SSH_LOG" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
   "$ROOT/bin/jg-on.sh" "$@"
 }
 
@@ -172,7 +172,7 @@ pass "jg-on defaults the remote command's stdin to /dev/null"
 # A vanished remote peer must become a bounded ssh failure instead of an
 # indefinite hang on a half-open TCP connection, so the existing no-result ->
 # reconcile re-arm recovery can self-heal without manual intervention. Assert
-# this on the real ssh argv the FM_SSH_BIN process seam captured, never on
+# this on the real ssh argv the JG_SSH_BIN process seam captured, never on
 # jg-on.sh source text.
 LAST_SSH_ARGV=$(tail -n 1 "$SSH_LOG")
 DEFAULT_INTERVAL=$(printf '%s\n' "$LAST_SSH_ARGV" | grep -oE 'ServerAliveInterval=[0-9]+' | cut -d= -f2)
@@ -187,28 +187,28 @@ DEFAULT_WINDOW=$((DEFAULT_INTERVAL * DEFAULT_COUNT))
 pass "jg-on arms a bounded SSH dead-peer detection window by default (${DEFAULT_INTERVAL}s x $DEFAULT_COUNT = ${DEFAULT_WINDOW}s)"
 
 : > "$SSH_LOG"
-FM_SSH_ALIVE_INTERVAL=7 FM_SSH_ALIVE_COUNT_MAX=2 jg_on ios jg-probe-two.sh >/dev/null
+JG_SSH_ALIVE_INTERVAL=7 JG_SSH_ALIVE_COUNT_MAX=2 jg_on ios jg-probe-two.sh >/dev/null
 OVERRIDE_ARGV=$(tail -n 1 "$SSH_LOG")
-assert_contains "$OVERRIDE_ARGV" 'ServerAliveInterval=7' "FM_SSH_ALIVE_INTERVAL override was not honored on the ssh transport"
-assert_contains "$OVERRIDE_ARGV" 'ServerAliveCountMax=2' "FM_SSH_ALIVE_COUNT_MAX override was not honored on the ssh transport"
+assert_contains "$OVERRIDE_ARGV" 'ServerAliveInterval=7' "JG_SSH_ALIVE_INTERVAL override was not honored on the ssh transport"
+assert_contains "$OVERRIDE_ARGV" 'ServerAliveCountMax=2' "JG_SSH_ALIVE_COUNT_MAX override was not honored on the ssh transport"
 pass "jg-on's dead-peer detection window is env-overridable"
 
 SSH_CALLS_BEFORE_INVALID=$(cat "$SSH_COUNT")
 set +e
-INVALID_INTERVAL_OUT=$(FM_SSH_ALIVE_INTERVAL=0 jg_on ios jg-probe-two.sh 2>&1)
+INVALID_INTERVAL_OUT=$(JG_SSH_ALIVE_INTERVAL=0 jg_on ios jg-probe-two.sh 2>&1)
 INVALID_INTERVAL_RC=$?
-INVALID_COUNT_OUT=$(FM_SSH_ALIVE_COUNT_MAX=not-a-number jg_on ios jg-probe-two.sh 2>&1)
+INVALID_COUNT_OUT=$(JG_SSH_ALIVE_COUNT_MAX=not-a-number jg_on ios jg-probe-two.sh 2>&1)
 INVALID_COUNT_RC=$?
 set -e
-[ "$INVALID_INTERVAL_RC" -eq 1 ] || fail "a zero FM_SSH_ALIVE_INTERVAL was accepted (got exit $INVALID_INTERVAL_RC)"
-[ "$INVALID_COUNT_RC" -eq 1 ] || fail "a non-integer FM_SSH_ALIVE_COUNT_MAX was accepted (got exit $INVALID_COUNT_RC)"
-assert_contains "$INVALID_INTERVAL_OUT" 'FM_SSH_ALIVE_INTERVAL must be a positive integer' "invalid interval did not explain its constraint"
-assert_contains "$INVALID_COUNT_OUT" 'FM_SSH_ALIVE_COUNT_MAX must be a positive integer' "invalid count did not explain its constraint"
+[ "$INVALID_INTERVAL_RC" -eq 1 ] || fail "a zero JG_SSH_ALIVE_INTERVAL was accepted (got exit $INVALID_INTERVAL_RC)"
+[ "$INVALID_COUNT_RC" -eq 1 ] || fail "a non-integer JG_SSH_ALIVE_COUNT_MAX was accepted (got exit $INVALID_COUNT_RC)"
+assert_contains "$INVALID_INTERVAL_OUT" 'JG_SSH_ALIVE_INTERVAL must be a positive integer' "invalid interval did not explain its constraint"
+assert_contains "$INVALID_COUNT_OUT" 'JG_SSH_ALIVE_COUNT_MAX must be a positive integer' "invalid count did not explain its constraint"
 [ "$(cat "$SSH_COUNT")" -eq "$SSH_CALLS_BEFORE_INVALID" ] || fail "invalid keepalive configuration launched ssh"
 pass "jg-on rejects invalid dead-peer settings before launching ssh"
 
 out=$(TOP_SECRET='must-not-cross' jg_on remote-mac jg-probe-two.sh)
-assert_contains "$out" "home=$REMOTE_HOME" "remote FM_HOME was not explicit"
+assert_contains "$out" "home=$REMOTE_HOME" "remote JG_HOME was not explicit"
 assert_contains "$out" "root=$REMOTE_ROOT" "remote root was not explicit"
 assert_contains "$out" 'secret=absent' "the primary ambient environment crossed the transport"
 assert_contains "$out" 'worker=1' "the fixed entrypoint executed outside the remote job worker"
@@ -433,18 +433,18 @@ chmod +x "$REMOTE_ROOT/bin/jg-untracked.sh"
 GIT_SHADOW_LOG="$TMP_ROOT/git-shadow.log"
 cat > "$REMOTE_ROOT/bin/git" <<'SH'
 #!/usr/bin/env bash
-printf 'consulted\n' >> "$FM_GIT_SHADOW_LOG"
+printf 'consulted\n' >> "$JG_GIT_SHADOW_LOG"
 exit 0
 SH
 chmod +x "$REMOTE_ROOT/bin/git"
-FM_GIT_SHADOW_LOG="$GIT_SHADOW_LOG" "$REMOTE_ROOT/bin/git" -C "$REMOTE_ROOT" ls-files --error-unmatch bin/jg-untracked.sh \
+JG_GIT_SHADOW_LOG="$GIT_SHADOW_LOG" "$REMOTE_ROOT/bin/git" -C "$REMOTE_ROOT" ls-files --error-unmatch bin/jg-untracked.sh \
   || fail "the checkout-local git shim did not demonstrate that it would authorize the untracked command"
 untracked_root_b64=$(printf '%s' "$REMOTE_ROOT" | base64 | tr -d '\n')
 untracked_home_b64=$(printf '%s' "$REMOTE_HOME" | base64 | tr -d '\n')
 untracked_argv_b64=$(printf '%s\0' jg-untracked.sh | base64 | tr -d '\n')
 set +e
-out=$(FM_GIT_SHADOW_LOG="$GIT_SHADOW_LOG" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" "$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+out=$(JG_GIT_SHADOW_LOG="$GIT_SHADOW_LOG" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" "$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
   1 "$untracked_root_b64" "$untracked_home_b64" "$untracked_argv_b64" 2>&1)
 rc=$?
 set -e
@@ -488,7 +488,7 @@ cp "$ROOT/bin/jg-remote-doctor.sh" "$REMOTE_ROOT/bin/jg-remote-doctor.sh"
 chmod +x "$REMOTE_ROOT/bin/jg-remote-doctor.sh"
 pass "doctor bootstrap remains authenticated when git is unavailable"
 
-if FM_HOME="$LOCAL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_SSH_BIN="$FAKEBIN/fake-ssh" \
+if JG_HOME="$LOCAL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_SSH_BIN="$FAKEBIN/fake-ssh" \
   "$ROOT/bin/jg-on.sh" '-oProxyCommand=bad' jg-probe-two.sh >/dev/null 2>&1; then
   fail "an option-shaped SSH route was accepted"
 fi
@@ -528,7 +528,7 @@ pass "ambiguous aliases refuse while exact secondmate ids remain routable"
 
 : > "$SSH_COUNT"
 set +e
-FM_FAKE_SSH_MODE=unreachable jg_on ios jg-mutate.sh "$REMOTE_HOME/mutations" >/dev/null 2>&1
+JG_FAKE_SSH_MODE=unreachable jg_on ios jg-mutate.sh "$REMOTE_HOME/mutations" >/dev/null 2>&1
 rc=$?
 set -e
 [ "$rc" -eq 255 ] || fail "unreachable transport did not preserve ssh status 255 (got $rc)"
@@ -537,7 +537,7 @@ assert_absent "$REMOTE_HOME/mutations" "unreachable transport ran the mutation"
 
 : > "$SSH_COUNT"
 set +e
-FM_FAKE_SSH_MODE=ambiguous jg_on ios jg-mutate.sh "$REMOTE_HOME/mutations" >/dev/null 2>&1
+JG_FAKE_SSH_MODE=ambiguous jg_on ios jg-mutate.sh "$REMOTE_HOME/mutations" >/dev/null 2>&1
 rc=$?
 set -e
 [ "$rc" -eq 255 ] || fail "ambiguous completion did not surface status 255 (got $rc)"

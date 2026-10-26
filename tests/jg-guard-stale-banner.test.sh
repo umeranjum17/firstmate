@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regression tests for jg-guard's watcher-down banner deduplication.
 #
-# The first stale command in one FM_HOME must print the full actionable watcher
+# The first stale command in one JG_HOME must print the full actionable watcher
 # banner.
 # Repeated commands in that same stale episode should print only a concise
 # reminder, while unrelated alarms such as queued wakes stay independent.
@@ -33,7 +33,7 @@ case_root() {
 record_live_watcher() {
   local dir=$1 pid=$2 home identity
   home=$(case_home "$dir")
-  identity=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$pid") || return 1
+  identity=$(JG_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$pid") || return 1
   mkdir -p "$home/state/.watch.lock"
   printf '%s\n' "$pid" > "$home/state/.watch.lock/pid"
   printf '%s\n' "$home" > "$home/state/.watch.lock/jg-home"
@@ -46,20 +46,20 @@ record_live_watcher() {
 # ambient harness ancestry pick it.
 run_guard_case() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=persistent \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=persistent \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
 run_guard_case_read_only() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=persistent \
-    FM_GUARD_READ_ONLY=1 \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=persistent \
+    JG_GUARD_READ_ONLY=1 \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
@@ -67,10 +67,10 @@ run_guard_case_read_only() {
 # beacon with no live watcher process is the healthy mid-turn state.
 run_guard_case_autoarm() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=autoarm \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=autoarm \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
@@ -96,22 +96,22 @@ record_session_lock_pid() {
 # legitimately unheld during a hand-off.
 run_guard_case_extension() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=extension \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=extension \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
 # The same extension-model call from the supervision branch actor
-# (FM_SUPERVISION_ACTOR=branch, as the Pi branch extension injects it).
+# (JG_SUPERVISION_ACTOR=branch, as the Pi branch extension injects it).
 run_guard_case_extension_as_branch() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=extension \
-    FM_SUPERVISION_ACTOR=branch \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=extension \
+    JG_SUPERVISION_ACTOR=branch \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
@@ -140,7 +140,7 @@ record_pi_extension_session() {
     if [ "$drift" = "${pair##*:}" ]; then
       version="sha256:0000000000000000000000000000000000000000000000000000000000000000"
     else
-      version=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pi_extension_version "$2"' \
+      version=$(JG_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pi_extension_version "$2"' \
         _ "$ROOT/bin/jg-wake-lib.sh" "$root/.pi/extensions/$source") || return 1
     fi
     if [ "${pair##*:}" = watch ]; then
@@ -164,11 +164,11 @@ EOF
 # supervision host's engine turn runs every guarded command.
 run_guard_case_as_branch() {
   local dir=$1
-  FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$(case_home "$dir")" \
-    FM_GUARD_GRACE=999 \
-    FM_SUPERVISION_MODEL=persistent \
-    FM_SUPERVISION_ACTOR=branch \
+  JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$(case_home "$dir")" \
+    JG_GUARD_GRACE=999 \
+    JG_SUPERVISION_MODEL=persistent \
+    JG_SUPERVISION_ACTOR=branch \
     "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
@@ -325,7 +325,7 @@ test_home_isolation() {
     || fail "home B first stale call was suppressed by home A: $out_b1"
   assert_contains "$out_a2" "full banner already printed this episode" \
     "home A repeated stale call did not remember its own episode"
-  pass "jg-guard stale banner: deduplication is isolated per FM_HOME"
+  pass "jg-guard stale banner: deduplication is isolated per JG_HOME"
 }
 
 test_queued_wake_warning_stays_independent() {
@@ -799,10 +799,10 @@ test_extension_stale_beacon_alarms_despite_live_session() {
   sleep 60 &
   pid=$!
   record_pi_extension_session "$dir" "$pid" || fail "could not record the Pi extension session"
-  out=$(FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-    FM_HOME="$home" \
-    FM_GUARD_GRACE=1 \
-    FM_SUPERVISION_MODEL=extension \
+  out=$(JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+    JG_HOME="$home" \
+    JG_GUARD_GRACE=1 \
+    JG_SUPERVISION_MODEL=extension \
     "$ROOT/bin/jg-guard.sh" 2>&1)
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
@@ -907,7 +907,7 @@ test_extension_live_watcher_is_healthy_without_ownership_evidence() {
 }
 
 # The cases above pin the model. This one takes the end-user path instead: no
-# FM_SUPERVISION_MODEL at all, so bin/jg-harness.sh must route a Pi primary to the
+# JG_SUPERVISION_MODEL at all, so bin/jg-harness.sh must route a Pi primary to the
 # extension model on its own. Without that routing the tolerance would never reach
 # a real Pi home. Pinning Pi takes both halves of the evidence: the foreign markers
 # are cleared because the host running this suite may carry one, and the ancestry
@@ -920,19 +920,19 @@ test_pi_harness_routes_itself_to_the_extension_model() {
   jg_fake_blind_ancestry "$blind"
   for harness in pi pi-signed; do
     pi_env=(PI_CODING_AGENT=true)
-    [ "$harness" = pi ] || pi_env+=(FM_PI_HARNESS=pi-signed)
+    [ "$harness" = pi ] || pi_env+=(JG_PI_HARNESS=pi-signed)
     dir=$(make_guard_case "harness-routing-$harness")
     home=$(case_home "$dir")
     sleep 60 &
     pid=$!
     record_pi_extension_session "$dir" "$pid" || fail "could not record the Pi extension session"
     touch "$home/state/.last-watcher-beat"
-    out=$(env -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GROK_AGENT -u FM_SUPERVISION_MODEL \
+    out=$(env -u CLAUDECODE -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GROK_AGENT -u JG_SUPERVISION_MODEL \
       "${pi_env[@]}" \
       PATH="$blind:$PATH" \
-      FM_ROOT_OVERRIDE="$(case_root "$dir")" \
-      FM_HOME="$home" \
-      FM_GUARD_GRACE=999 \
+      JG_ROOT_OVERRIDE="$(case_root "$dir")" \
+      JG_HOME="$home" \
+      JG_GUARD_GRACE=999 \
       "$ROOT/bin/jg-guard.sh" 2>&1)
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true

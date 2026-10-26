@@ -3,7 +3,7 @@ Mode: Pi extension background wake.
 When this session owns supervision, in either posture:
 1. Drain first with `bin/jg-wake-drain.sh`.
    After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
-2. Confirm the Pi primary auto-loaded both project extensions (plain `pi` or `pi-signed`, after approving project trust once per clone); if not, restart the selected executable with `-e __FM_PI_TURNEND_EXT__ -e __FM_PI_EXT__` as a trust-free fallback.
+2. Confirm the Pi primary auto-loaded both project extensions (plain `pi` or `pi-signed`, after approving project trust once per clone); if not, restart the selected executable with `-e __JG_PI_TURNEND_EXT__ -e __JG_PI_EXT__` as a trust-free fallback.
 3. Initial process cycle only: make the one required `jg_watch_arm_pi` call; if startup already owned the fleet lock, this is an ownership-based no-op.
    Use `/jg-watch-arm-pi` only as a human-entered fallback.
    Never run `bin/jg-watch-arm.sh` through Pi's bash tool because that foreground arm can wedge the agent and bypasses extension-owned cleanup.
@@ -17,7 +17,7 @@ When this session owns supervision, in either posture:
 10. Missing, failed, or unhealthy cycle only: if a later notification explicitly reports one of those repair conditions, drain queued wakes, inspect the failure text, call `jg_watch_arm_pi`, and restart the selected Pi-family executable with both extensions loaded if needed.
    A redundant call while the extension owns an arm child or scheduled retry is an ownership-based `watcher: unchanged` no-op, not an independent health claim.
 11. Never use shell `&` for watcher supervision.
-   The arm mechanism above is extension-owned, not a model tool call, but a manual recovery probe that backgrounds, pipes, or bundles the arm is denied automatically by the PreToolUse seatbelt (`bin/jg-arm-pretool-check.sh`, wired into the turn-end guard extension at `__FM_PI_TURNEND_EXT__`).
+   The arm mechanism above is extension-owned, not a model tool call, but a manual recovery probe that backgrounds, pipes, or bundles the arm is denied automatically by the PreToolUse seatbelt (`bin/jg-arm-pretool-check.sh`, wired into the turn-end guard extension at `__JG_PI_TURNEND_EXT__`).
 
 The supervision branch is default-on (docs/pi-supervision-branch.md): whenever this session owns the fleet lock, the watcher extension hands eligible task-local rows from ordinary actionable wakes, plus selected fleet-wide heartbeat reviews, to the in-process supervision branch while main-only rows remain queued for this conversation.
 While the away-posture record `state/.afk-contract` exists the branch takes every row instead, this conversation receives no processing request, and main's standing authority relocates to the branch through the guarded scripts; a wake the branch cannot take and every watcher-failure alarm still reach this conversation, and the first run boundary after the record is archived presents what accumulated (docs/pi-supervision-branch.md "Postures").
@@ -36,6 +36,6 @@ Treat the merged fleet event as already handled for fleet operations: MAIN must 
 Separately, MAIN applies judgment about whether and how to surface, summarize, reference, or incorporate a merged sailboat outcome in the captain conversation; event ownership does not decide the conversational treatment.
 Read the durable outcome store with the jg_branch_outcomes tool when the captain asks what happened.
 
-The turn-end guard extension lives at `__FM_PI_TURNEND_EXT__`.
-The watcher extension lives at `__FM_PI_EXT__`.
+The turn-end guard extension lives at `__JG_PI_TURNEND_EXT__`.
+The watcher extension lives at `__JG_PI_EXT__`.
 Both are tracked, project-local `.pi/extensions/*.ts` files that Pi auto-discovers once the project is trusted; `bin/jg-session-start.sh` reports when the running Pi session has not loaded both required extensions.

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: drive the real check over sample pool readings in its file-argument mode and once live, then drive install.sh
 # against a throwaway firstmate home and HOME. Usage: claude-quota/tests/claude-quota.test.sh
 set -euo pipefail
@@ -70,14 +79,14 @@ M=$d/main; mkdir -p "$M/state"
 reading umeranjum17:85:200:10:30 cognify:85:240:15:60 seecs:85:260:10:90
 cp "$d/q.json" "$M/state/claude-accounts.json"
 echo "$(($(date +%s) - 7200)) 3 255 45" > "$M/state/.claude-quota.hist"
-check "d: live mode wakes on the pool's reading" "$(FM_MAIN_HOME=$M "$SRC/claude-quota.check.sh" | grep -c "$ACTION")" 1
+check "d: live mode wakes on the pool's reading" "$(JG_MAIN_HOME=$M "$SRC/claude-quota.check.sh" | grep -c "$ACTION")" 1
 reading umeranjum17:85:200:2:30 cognify:85:240:2:60 seecs:85:260:2:90
 cp "$d/q.json" "$M/state/claude-accounts.json"
-check "d: a second read inside 10 min is held, even a step lower" "$(FM_MAIN_HOME=$M "$SRC/claude-quota.check.sh")" ""
+check "d: a second read inside 10 min is held, even a step lower" "$(JG_MAIN_HOME=$M "$SRC/claude-quota.check.sh")" ""
 
 # (e) install --dry-run: prints the steps, writes nothing.
 # shellcheck disable=SC2016 # expands in the stub, not here
-printf '#!/bin/sh\necho "$FM_HOME|${FM_STATE_OVERRIDE-unset}|$*" >> "%s/register.calls"\n' "$d" > "$FM/bin/jg-check-register.sh"
+printf '#!/bin/sh\necho "$JG_HOME|${JG_STATE_OVERRIDE-unset}|$*" >> "%s/register.calls"\n' "$d" > "$FM/bin/jg-check-register.sh"
 chmod +x "$FM/bin/jg-check-register.sh"
 printf '#!/usr/bin/env bash\necho old check\n' > "$FM/state/claude-quota.check.sh"
 chmod 700 "$FM/state/claude-quota.check.sh"
@@ -87,8 +96,8 @@ has "e: dry run names the backup" "$out" "would back up: $FM/state/claude-quota.
 has "e: dry run names the register" "$out" "would run: $FM/bin/jg-check-register.sh claude-quota"
 check "e: dry run wrote nothing" "$(find "$d" | sort)" "$before"
 
-# (f) install: backs up the old check, writes the exec shim (mode 700), re-registers with FM_STATE_OVERRIDE dropped.
-export FM_STATE_OVERRIDE=
+# (f) install: backs up the old check, writes the exec shim (mode 700), re-registers with JG_STATE_OVERRIDE dropped.
+export JG_STATE_OVERRIDE=
 "$SRC/install.sh" "$FM" > /dev/null
 check "f: old check backed up" "$(cat "$FM"/state/claude-quota.check.sh.bak-claude-quota-*)" "$(printf '#!/usr/bin/env bash\necho old check')"
 check "f: shim mode" "$(stat -c %a "$FM/state/claude-quota.check.sh")" 700

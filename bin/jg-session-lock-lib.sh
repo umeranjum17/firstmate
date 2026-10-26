@@ -20,22 +20,22 @@
 # cursor-agent and the far-too-generic legacy alias `agent`, and it runs as a
 # bundled node script. bin/jg-cursor-lib.sh is the fleet's single owner of that
 # decision, so this file delegates to it rather than widening the name match.
-_FM_SESSION_LOCK_LIB_DIR=${BASH_SOURCE[0]%/*}
-[ "$_FM_SESSION_LOCK_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_SESSION_LOCK_LIB_DIR=.
+_JG_SESSION_LOCK_LIB_DIR=${BASH_SOURCE[0]%/*}
+[ "$_JG_SESSION_LOCK_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_SESSION_LOCK_LIB_DIR=.
 # shellcheck source=bin/jg-cursor-lib.sh
-. "${_FM_SESSION_LOCK_LIB_DIR:-/}/jg-cursor-lib.sh"
-unset _FM_SESSION_LOCK_LIB_DIR
+. "${_JG_SESSION_LOCK_LIB_DIR:-/}/jg-cursor-lib.sh"
+unset _JG_SESSION_LOCK_LIB_DIR
 
 # Known harness command names; extend when a new adapter is verified. omp is
 # anchored exactly like pi: its process name is the bare word `omp` (verified,
 # omp 18.1.11), and a substring match would claim ompd or comp.
-FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+JG_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
 
 # The same harnesses as exact executable names. Keep in sync with
-# FM_HARNESS_RE. Used only for the stricter path evidence below, where the
+# JG_HARNESS_RE. Used only for the stricter path evidence below, where the
 # loose regex would also match ordinary firstmate paths such as
 # bin/jg-claude-stop-autoarm.sh.
-FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
+JG_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
 
 # Print the exact harness name carried by executable path $1 - its own basename
 # or any directory component - or return 1.
@@ -49,7 +49,7 @@ FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
 jg_harness_path_name() {  # <path>
   local path=$1 name
   [ -n "$path" ] || return 1
-  for name in "${FM_HARNESS_NAMES[@]}"; do
+  for name in "${JG_HARNESS_NAMES[@]}"; do
     case "/$path/" in
       */"$name"/*) printf '%s' "$name"; return 0 ;;
     esac
@@ -58,10 +58,10 @@ jg_harness_path_name() {  # <path>
 }
 
 # True when the process described by command name $1 and full argument string $2
-# is a verified harness. Sets FM_HARNESS_IS_CLAUDE for the ancestry walk.
+# is a verified harness. Sets JG_HARNESS_IS_CLAUDE for the ancestry walk.
 #
 # Evidence, in order:
-#   1. the basename of the reported command name, against FM_HARNESS_RE.
+#   1. the basename of the reported command name, against JG_HARNESS_RE.
 #   2. an exact harness component in that command path or in argv[0]. Both are
 #      needed because the two platforms report different things: macOS reports
 #      argv[0] in `ps -o comm=`, while procps on Linux reports the kernel exec
@@ -69,25 +69,25 @@ jg_harness_path_name() {  # <path>
 #      is identified by its install path on macOS and by argv[0] on Linux.
 #   3. a bare interpreter (node, python) running a harness script path.
 #   4. Cursor's own structural identity, owned by bin/jg-cursor-lib.sh.
-FM_HARNESS_IS_CLAUDE=0
+JG_HARNESS_IS_CLAUDE=0
 jg_harness_process_matches() {  # <comm> <args>
   local comm=$1 args=$2 base argv0 name
-  FM_HARNESS_IS_CLAUDE=0
+  JG_HARNESS_IS_CLAUDE=0
   base=$(basename -- "$comm")
-  if printf '%s' "$base" | grep -qE "$FM_HARNESS_RE"; then
-    case "$base" in *claude*) FM_HARNESS_IS_CLAUDE=1 ;; esac
+  if printf '%s' "$base" | grep -qE "$JG_HARNESS_RE"; then
+    case "$base" in *claude*) JG_HARNESS_IS_CLAUDE=1 ;; esac
     return 0
   fi
   argv0=${args%% *}
   if name=$(jg_harness_path_name "$comm") || name=$(jg_harness_path_name "$argv0"); then
-    case "$name" in claude) FM_HARNESS_IS_CLAUDE=1 ;; esac
+    case "$name" in claude) JG_HARNESS_IS_CLAUDE=1 ;; esac
     return 0
   fi
   # Bare interpreter (e.g. node): match the harness name in its script path.
   case "$comm" in
     *node*|*python*)
-      if printf '%s' "$args" | grep -qE "$FM_HARNESS_RE"; then
-        case "$args" in *claude*) FM_HARNESS_IS_CLAUDE=1 ;; esac
+      if printf '%s' "$args" | grep -qE "$JG_HARNESS_RE"; then
+        case "$args" in *claude*) JG_HARNESS_IS_CLAUDE=1 ;; esac
         return 0
       fi
       ;;
@@ -126,7 +126,7 @@ jg_harness_ancestry_pids() {
     if jg_harness_process_matches "$comm" "$args"; then
       printf '%s\n' "$pid"
       printed=1
-      [ "$FM_HARNESS_IS_CLAUDE" -eq 1 ] || break
+      [ "$JG_HARNESS_IS_CLAUDE" -eq 1 ] || break
       extending=1
     elif [ "$extending" -eq 1 ]; then
       break
@@ -213,7 +213,7 @@ jg_session_lock_trusted_session_id() {  # [<ancestry-pids>]
     comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
     args=$(ps -o args= -p "$pid" 2>/dev/null)
     jg_harness_process_matches "$comm" "$args" || return 1
-    [ "$FM_HARNESS_IS_CLAUDE" -eq 1 ] || return 1
+    [ "$JG_HARNESS_IS_CLAUDE" -eq 1 ] || return 1
     printf '%s\n' "$id"
     return 0
   done <<EOF
@@ -293,14 +293,14 @@ EOF
 
 # True when state dir $1 records a live verified harness outside this process's
 # contiguous harness ancestry that was not recorded by this same trusted Claude
-# session. Sets FM_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller.
+# session. Sets JG_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller.
 # Malformed, missing, dead, and ancestry-uncertain locks are not foreign-owner
 # evidence.
 # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.
-FM_SESSION_LOCK_FOREIGN_OWNER_PID=
+JG_SESSION_LOCK_FOREIGN_OWNER_PID=
 jg_session_lock_foreign_owner_live() {
   local state=$1 lock_pid pids pid
-  FM_SESSION_LOCK_FOREIGN_OWNER_PID=
+  JG_SESSION_LOCK_FOREIGN_OWNER_PID=
   [ -f "$state/.lock" ] && [ ! -L "$state/.lock" ] || return 1
   lock_pid=$(cat "$state/.lock" 2>/dev/null || true)
   case "$lock_pid" in
@@ -315,7 +315,7 @@ $pids
 EOF
   jg_session_lock_same_session "$state" "$pids" && return 1
   # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.
-  FM_SESSION_LOCK_FOREIGN_OWNER_PID=$lock_pid
+  JG_SESSION_LOCK_FOREIGN_OWNER_PID=$lock_pid
   return 0
 }
 
@@ -324,9 +324,9 @@ EOF
 # wakes; that question belongs to the inbox readiness projection.
 #
 # Sets:
-#   FM_LOCK_INSPECT_STATE         free|held|stale|unreadable|unknown
-#   FM_LOCK_INSPECT_PID           recorded pid, or empty
-#   FM_LOCK_INSPECT_LIVE_HARNESS  true|false|unknown
+#   JG_LOCK_INSPECT_STATE         free|held|stale|unreadable|unknown
+#   JG_LOCK_INSPECT_PID           recorded pid, or empty
+#   JG_LOCK_INSPECT_LIVE_HARNESS  true|false|unknown
 #
 # held: the recorded pid is a live verified harness.
 # stale: the recorded pid is gone.
@@ -334,56 +334,56 @@ EOF
 # live process that is not a verified harness. Existence of a lock file, a
 # session record, or a pane is never treated as liveness.
 # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
-FM_LOCK_INSPECT_STATE=unknown
-FM_LOCK_INSPECT_PID=
-FM_LOCK_INSPECT_LIVE_HARNESS=unknown
+JG_LOCK_INSPECT_STATE=unknown
+JG_LOCK_INSPECT_PID=
+JG_LOCK_INSPECT_LIVE_HARNESS=unknown
 jg_session_lock_inspect() {  # <state>
   local state=$1 lock pid
   # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_STATE=unknown
+  JG_LOCK_INSPECT_STATE=unknown
   # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_PID=
+  JG_LOCK_INSPECT_PID=
   # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_LIVE_HARNESS=unknown
+  JG_LOCK_INSPECT_LIVE_HARNESS=unknown
   lock="$state/.lock"
   if [ ! -e "$lock" ]; then
-    FM_LOCK_INSPECT_STATE=free
-    FM_LOCK_INSPECT_LIVE_HARNESS=false
+    JG_LOCK_INSPECT_STATE=free
+    JG_LOCK_INSPECT_LIVE_HARNESS=false
     return 0
   fi
   if [ ! -f "$lock" ] || [ -L "$lock" ]; then
-    FM_LOCK_INSPECT_STATE=unreadable
+    JG_LOCK_INSPECT_STATE=unreadable
     return 0
   fi
   pid=$(cat "$lock" 2>/dev/null) || {
-    FM_LOCK_INSPECT_STATE=unreadable
+    JG_LOCK_INSPECT_STATE=unreadable
     return 0
   }
   pid=${pid%%$'\n'*}
   # shellcheck disable=SC2034 # Output global, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_PID=$pid
+  JG_LOCK_INSPECT_PID=$pid
   case "$pid" in
     ''|*[!0-9]*)
-      FM_LOCK_INSPECT_STATE=unknown
+      JG_LOCK_INSPECT_STATE=unknown
       return 0
       ;;
   esac
   if kill -0 "$pid" 2>/dev/null; then
     if jg_harness_pid_alive "$pid"; then
-      FM_LOCK_INSPECT_STATE=held
-      FM_LOCK_INSPECT_LIVE_HARNESS=true
+      JG_LOCK_INSPECT_STATE=held
+      JG_LOCK_INSPECT_LIVE_HARNESS=true
     else
-      FM_LOCK_INSPECT_STATE=unknown
-      FM_LOCK_INSPECT_LIVE_HARNESS=false
+      JG_LOCK_INSPECT_STATE=unknown
+      JG_LOCK_INSPECT_LIVE_HARNESS=false
     fi
     return 0
   fi
   if ps -o comm= -p "$pid" >/dev/null 2>&1; then
-    FM_LOCK_INSPECT_STATE=unknown
+    JG_LOCK_INSPECT_STATE=unknown
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_STATE=stale
+  JG_LOCK_INSPECT_STATE=stale
   # shellcheck disable=SC2034 # Output global, read by lock status and inbox ready.
-  FM_LOCK_INSPECT_LIVE_HARNESS=false
+  JG_LOCK_INSPECT_LIVE_HARNESS=false
 }

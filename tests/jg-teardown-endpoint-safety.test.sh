@@ -19,16 +19,16 @@ make_case() {  # <name>
   : > "$TMP_ROOT/$dir/runtime.log"
   cat > "$TMP_ROOT/$dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-printf 'tmux' >> "${FM_RUNTIME_LOG:?}"
-printf ' <%s>' "$@" >> "${FM_RUNTIME_LOG:?}"
-printf '\n' >> "${FM_RUNTIME_LOG:?}"
+printf 'tmux' >> "${JG_RUNTIME_LOG:?}"
+printf ' <%s>' "$@" >> "${JG_RUNTIME_LOG:?}"
+printf '\n' >> "${JG_RUNTIME_LOG:?}"
 exit 0
 SH
   cat > "$TMP_ROOT/$dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
-printf 'treehouse' >> "${FM_RUNTIME_LOG:?}"
-printf ' <%s>' "$@" >> "${FM_RUNTIME_LOG:?}"
-printf '\n' >> "${FM_RUNTIME_LOG:?}"
+printf 'treehouse' >> "${JG_RUNTIME_LOG:?}"
+printf ' <%s>' "$@" >> "${JG_RUNTIME_LOG:?}"
+printf '\n' >> "${JG_RUNTIME_LOG:?}"
 exit 0
 SH
   chmod +x "$TMP_ROOT/$dir/fakebin/tmux" "$TMP_ROOT/$dir/fakebin/treehouse"
@@ -50,8 +50,8 @@ mark_case_as_treehouse_pool() {  # <case>
 
 run_case() {  # <case> <id>
   local dir=$1 id=$2
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
-  FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" \
+  JG_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     "$TEARDOWN" "$id" --force
 }
 
@@ -250,13 +250,13 @@ test_supported_backend_endpoint_records_validate() {
   jg_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:jg-$id" "worktree=$dir/worktree" "project=$dir/project"
   jg_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid tmux endpoint refused"
-  [ "$FM_BACKEND_VALIDATED_BACKEND:$FM_BACKEND_VALIDATED_TARGET" = "tmux:firstmate:jg-$id" ] || fail "tmux endpoint validation returned wrong identity"
+  [ "$JG_BACKEND_VALIDATED_BACKEND:$JG_BACKEND_VALIDATED_TARGET" = "tmux:firstmate:jg-$id" ] || fail "tmux endpoint validation returned wrong identity"
 
   id=tmux-spaced-session
   jg_write_meta "$dir/home/state/$id.meta" \
     "window=team work:jg-$id" "worktree=$dir/worktree" "project=$dir/project"
   jg_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid tmux endpoint with a spaced session name refused"
-  [ "$FM_BACKEND_VALIDATED_TARGET" = "team work:jg-$id" ] || fail "tmux validation changed the spaced session identity"
+  [ "$JG_BACKEND_VALIDATED_TARGET" = "team work:jg-$id" ] || fail "tmux validation changed the spaced session identity"
 
   id=herdr-task
   jg_write_meta "$dir/home/state/$id.meta" \
@@ -275,7 +275,7 @@ test_supported_backend_endpoint_records_validate() {
     "window=jg-$id" "endpoint_task_id=$id" "terminal=term-7" \
     "worktree=$dir/worktree" "project=$dir/project" "backend=orca" "orca_worktree_id=worktree-9::/orca/worktree-9"
   jg_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid Orca endpoint refused"
-  [ "$FM_BACKEND_VALIDATED_TARGET" = term-7 ] || fail "Orca validation did not select its terminal"
+  [ "$JG_BACKEND_VALIDATED_TARGET" = term-7 ] || fail "Orca validation did not select its terminal"
 
   id=cmux-task
   jg_write_meta "$dir/home/state/$id.meta" \
@@ -316,7 +316,7 @@ test_orca_composite_worktree_id_validates() {
     "orca_worktree_id=411226f7-dc91-4d37-975d-32d412bf97a2::$dir/worktree"
   jg_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" \
     || fail "an Orca record carrying its real composite worktree id was refused"
-  [ "$FM_BACKEND_VALIDATED_TARGET" = term-11 ] \
+  [ "$JG_BACKEND_VALIDATED_TARGET" = term-11 ] \
     || fail "Orca validation did not select its terminal"
   pass "cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses"
 }
@@ -325,7 +325,7 @@ test_tmux_empty_target_refuses_without_invocation() {
   local dir rc
   dir=$(make_case direct-empty)
   set +e
-  FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
+  JG_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     bash -c '. "$1/bin/jg-backend.sh"; jg_backend_source tmux; jg_backend_tmux_kill ""' _ "$ROOT" \
     > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
@@ -378,11 +378,11 @@ test_isolated_tmux_invalid_and_valid_cleanup() {
 #!/usr/bin/env bash
 set -eu
 [ -z "\${TMUX:-}" ] && [ -z "\${TMUX_PANE:-}" ] || exit 91
-[ "\${FM_TEST_TMUX_SOCKET:-}" = '$socket_id' ] || exit 92
+[ "\${JG_TEST_TMUX_SOCKET:-}" = '$socket_id' ] || exit 92
 [ "\$(cat '$dir/socket.identity')" = '$socket_id' ] || exit 93
-printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
-printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
-printf '\n' >> "\${FM_RUNTIME_LOG:?}"
+printf 'tmux' >> "\${JG_RUNTIME_LOG:?}"
+printf ' <%s>' "\$@" >> "\${JG_RUNTIME_LOG:?}"
+printf '\n' >> "\${JG_RUNTIME_LOG:?}"
 cd '$dir'
 exec '$REAL_TMUX' -S '$socket' "\$@"
 SH
@@ -391,8 +391,8 @@ SH
   jg_write_meta "$dir/home/state/invalid.meta" \
     "window=" "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   set +e
-  env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_TMUX_SOCKET="$socket_id" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" invalid --force \
     > "$dir/invalid.out" 2> "$dir/invalid.err"
   rc=$?
@@ -404,7 +404,7 @@ SH
 
   set +e
   # shellcheck disable=SC2016 # $1 expands inside the isolated child shell.
-  env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_TMUX_SOCKET="$socket_id" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" bash -c \
     '. "$1/bin/jg-backend.sh"; jg_backend_source tmux; jg_backend_tmux_kill ""' _ "$ROOT" \
     > "$dir/empty.out" 2> "$dir/empty.err"
@@ -417,7 +417,7 @@ SH
 
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-window -d -t "=$session:" -n "$prefix_survivor" )
   # shellcheck disable=SC2016 # $1 and $2 expand inside the isolated child shell.
-  env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_TMUX_SOCKET="$socket_id" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" bash -c \
     '. "$1/bin/jg-backend.sh"; jg_backend_source tmux; jg_backend_tmux_kill "$2"' _ "$ROOT" "$session:$prefix_target"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "$prefix_survivor" \
@@ -427,8 +427,8 @@ SH
     "window=$session:$target" "endpoint_task_id=$target_id" \
     "worktree=$dir/nonexistent-worktree" "project=$dir/nonexistent-project" \
     "kind=scout" "mode=no-mistakes"
-  env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_TMUX_SOCKET="$socket_id" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$target_id" --force \
     > "$dir/valid.out" 2> "$dir/valid.err" \
     || fail "isolated valid endpoint teardown failed: $(cat "$dir/valid.err")"
@@ -454,11 +454,11 @@ test_bare_relative_origin_shares_project_lock_with_clone() {
   second_project="$dir/second-project"
   git clone -q "$dir/project/remotes/origin.git" "$second_project"
 
-  primary_lock=$(FM_HOME="$dir/home" bash -c \
+  primary_lock=$(JG_HOME="$dir/home" bash -c \
     '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$dir/project") \
     || fail "could not resolve the primary project's bare-origin lock"
-  clone_lock=$(FM_HOME="$dir/home" bash -c \
+  clone_lock=$(JG_HOME="$dir/home" bash -c \
     '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$second_project") \
     || fail "could not resolve the clone project's absolute-origin lock"
@@ -622,9 +622,9 @@ if [ "\${1:-}" = display-message ]; then
   printf '%s\n' '$dir/other-directory'
   exit 0
 fi
-printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
-printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
-printf '\n' >> "\${FM_RUNTIME_LOG:?}"
+printf 'tmux' >> "\${JG_RUNTIME_LOG:?}"
+printf ' <%s>' "\$@" >> "\${JG_RUNTIME_LOG:?}"
+printf '\n' >> "\${JG_RUNTIME_LOG:?}"
 exit 0
 SH
   chmod +x "$dir/fakebin/tmux"
@@ -671,7 +671,7 @@ make_home() {  # <path>
 }
 
 resolve_project_lock() {  # <home> <project>
-  FM_HOME="$1" bash -c '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
+  JG_HOME="$1" bash -c '. "$1"; jg_treehouse_project_lock_path "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$2"
 }
 
@@ -757,9 +757,9 @@ test_remote_seeded_home_returns_its_uncontested_slot() {
   assert_absent "$dir/home/state/$id.meta" "remote-seeded teardown left the task record"
   grep -Fq "treehouse <return>" "$dir/runtime.log" \
     || fail "remote-seeded teardown did not return its own pool slot: $(cat "$dir/runtime.log")"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# remote-seeded Treehouse teardown command\n'
-    printf '$ FM_HOME=%s bin/jg-teardown.sh %s --force\n' "$dir/home" "$id"
+    printf '$ JG_HOME=%s bin/jg-teardown.sh %s --force\n' "$dir/home" "$id"
     printf 'stdout:\n'; cat "$dir/stdout"
     printf 'stderr:\n'; cat "$dir/stderr"
     printf 'exit=%s\nruntime calls:\n' "$rc"; cat "$dir/runtime.log"
@@ -804,9 +804,9 @@ test_remote_seeded_home_still_refuses_a_slot_its_child_holds() {
   assert_present "$dir/worktree/sentinel" "remote-layout collision reset the shared slot"
   assert_contains "$(cat "$dir/stderr")" "$other" \
     "remote-layout refusal should name the task holding the slot"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# remote-seeded cross-home collision command\n'
-    printf '$ FM_HOME=%s bin/jg-teardown.sh %s --force\n' "$dir/home" "$id"
+    printf '$ JG_HOME=%s bin/jg-teardown.sh %s --force\n' "$dir/home" "$id"
     printf 'stderr:\n'; cat "$dir/stderr"
     printf 'exit=%s\nruntime calls=%s\n' "$rc" \
       "$([ -s "$dir/runtime.log" ] && cat "$dir/runtime.log" || printf none)"
@@ -840,7 +840,7 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   # it, standing in for a slot allocation running in that home right now.
   lock=$(resolve_project_lock "$child_home" "$child_project") \
     || fail "the local child could not resolve the shared project lock"
-  FM_HOME="$child_home" bash -c \
+  JG_HOME="$child_home" bash -c \
     '. "$1"; jg_lock_try_acquire "$2" || exit 1; : > "$3"; exec sleep 30' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$lock" "$dir/lock-held" &
   holder=$!
@@ -872,12 +872,12 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
 
 # The tmux shim used by the endpoint-close tests below: every subcommand
 # reaches the real isolated server, so presence is always read from real tmux.
-# When FM_TEST_BLOCK_KILL is set, `kill-window` alone fails without forwarding,
+# When JG_TEST_BLOCK_KILL is set, `kill-window` alone fails without forwarding,
 # which is a close that genuinely could not do its job - the recorded window is
 # demonstrably still there afterwards. Real tmux cannot be made to accept a
 # kill-window and leave the window alive, so blocking the call is the only way
 # to reach that state against a real endpoint.
-# When FM_TEST_UNREADABLE_LIST is set, `list-windows` fails with a response
+# When JG_TEST_UNREADABLE_LIST is set, `list-windows` fails with a response
 # that is NOT one of tmux's definitive missing-session/server answers, which is
 # the transient-server and tmux-absent-from-PATH shape: the read never happened,
 # so it proves nothing about whether the window survived.
@@ -889,14 +889,14 @@ write_close_failing_tmux_shim() {  # <dir> <socket-name> <real-tmux>
   cat > "$dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
-printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
-printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
-printf '\n' >> "\${FM_RUNTIME_LOG:?}"
-if [ -n "\${FM_TEST_BLOCK_KILL:-}" ] && [ "\${1:-}" = kill-window ]; then
+printf 'tmux' >> "\${JG_RUNTIME_LOG:?}"
+printf ' <%s>' "\$@" >> "\${JG_RUNTIME_LOG:?}"
+printf '\n' >> "\${JG_RUNTIME_LOG:?}"
+if [ -n "\${JG_TEST_BLOCK_KILL:-}" ] && [ "\${1:-}" = kill-window ]; then
   echo "can't find window" >&2
   exit 1
 fi
-if [ -n "\${FM_TEST_UNREADABLE_LIST:-}" ] && [ "\${1:-}" = list-windows ]; then
+if [ -n "\${JG_TEST_UNREADABLE_LIST:-}" ] && [ "\${1:-}" = list-windows ]; then
   echo "lost server" >&2
   exit 1
 fi
@@ -930,8 +930,8 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
   write_endpoint_close_meta "$dir" "$id" "$session:jg-$id"
 
   set +e
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/failed.out" 2> "$dir/failed.err"
   rc=$?
@@ -962,7 +962,7 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
   # Same task, same records, with the close working again: the retained record
   # is what lets the rerun finish, so the refusal is recoverable, not terminal.
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/rerun.out" 2> "$dir/rerun.err" \
     || fail "the rerun after a recovered close still failed: $(cat "$dir/rerun.err")"
@@ -990,8 +990,8 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
   # explicit authority. Unforced it still refuses, which is what makes --force
   # an override rather than the absence of a gate.
   set +e
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/unforced.out" 2> "$dir/unforced.err"
   rc=$?
@@ -1001,8 +1001,8 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
   grep -qF -- "--force" "$dir/unforced.err" \
     || fail "the refusal did not name the override that lets an operator through"
 
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" --force \
     > "$dir/forced.out" 2> "$dir/forced.err" \
     || fail "--force did not get past a close that failed: $(cat "$dir/forced.err")"
@@ -1038,8 +1038,8 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   write_endpoint_close_meta "$dir" "$id" "$session:jg-$id"
 
   set +e
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 FM_TEST_UNREADABLE_LIST=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 JG_TEST_UNREADABLE_LIST=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/unreadable.out" 2> "$dir/unreadable.err"
   rc=$?
@@ -1062,8 +1062,8 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-session -d -s survivor -n control )
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   write_endpoint_close_meta "$dir" "$id" "gone session:jg-$id"
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/missing-session.out" 2> "$dir/missing-session.err" \
     || fail "a definitively absent session refused its own cleanup: $(cat "$dir/missing-session.err")"
@@ -1080,8 +1080,8 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   dir=$(make_case missing-server-close-read)
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   write_endpoint_close_meta "$dir" "$id" "$session:jg-$id"
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/missing-server.out" 2> "$dir/missing-server.err" \
     || fail "a definitively absent server refused its own cleanup: $(cat "$dir/missing-server.err")"
@@ -1119,8 +1119,8 @@ test_forced_secondmate_child_close_failure_still_refuses() {
   # the refusal rather than override it, and discard a child home whose
   # endpoint is still live.
   set +e
-  env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+  env -u TMUX -u TMUX_PANE JG_TEST_BLOCK_KILL=1 \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force \
     > "$dir/child.out" 2> "$dir/child.err"
   rc=$?
@@ -1160,7 +1160,7 @@ test_orca_close_failure_refuses_even_under_force() {
 
   set +e
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" --force \
     > "$dir/orca-forced.out" 2> "$dir/orca-forced.err"
   rc=$?
@@ -1182,7 +1182,7 @@ test_orca_close_failure_refuses_even_under_force() {
   # same operator authority does get through.
   set +e
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" \
     > "$dir/orca-unforced.out" 2> "$dir/orca-unforced.err"
   rc=$?
@@ -1209,7 +1209,7 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
   write_endpoint_close_meta "$dir" "$id" "$session:jg-$id"
 
   env -u TMUX -u TMUX_PANE \
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_RUNTIME_LOG="$dir/runtime.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
     > "$dir/gone.out" 2> "$dir/gone.err" \
     || fail "an already-exited endpoint refused cleanup: $(cat "$dir/gone.err")"
@@ -1226,7 +1226,7 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
   # adapter is driven directly so no other teardown refusal can stand in for it.
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" kill-server 2>/dev/null ) || true
   # shellcheck disable=SC2016 # $1 and $2 expand inside the isolated child shell.
-  env -u TMUX -u TMUX_PANE FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
+  env -u TMUX -u TMUX_PANE JG_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     bash -c '. "$1/bin/jg-backend.sh"; jg_backend_kill tmux "$2"' _ "$ROOT" "$session:jg-$id" \
     > "$dir/deadserver.out" 2> "$dir/deadserver.err" \
     || fail "closing an endpoint whose whole server is gone reported a failure: $(cat "$dir/deadserver.err")"

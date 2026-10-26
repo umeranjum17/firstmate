@@ -51,7 +51,7 @@ spawn_and_run() {  # <id>; prints the probe output, returns the launch status
   local out status
   : > "$LAUNCH_LOG"
   : > "$PANE_LOG"
-  out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_PANE_LOG="$PANE_LOG" \
+  out=$(JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" JG_FAKE_PANE_LOG="$PANE_LOG" \
     jg_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$1" "$PROJ_DIR" --mode no-mistakes --yolo off)
   status=$?
   SPAWN_OUT=$out

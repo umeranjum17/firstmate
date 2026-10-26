@@ -39,43 +39,43 @@
 # Sourced by those scripts and by tests. No side effects on source beyond its
 # sourced libraries.
 
-_FM_MERGE_AUTHORITY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_MERGE_AUTHORITY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-pr-lib.sh
-. "$_FM_MERGE_AUTHORITY_LIB_DIR/jg-pr-lib.sh"
+. "$_JG_MERGE_AUTHORITY_LIB_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-afk-contract.sh
-. "$_FM_MERGE_AUTHORITY_LIB_DIR/jg-afk-contract.sh"
+. "$_JG_MERGE_AUTHORITY_LIB_DIR/jg-afk-contract.sh"
 
 # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
-FM_MERGE_AUTHORITY=
+JG_MERGE_AUTHORITY=
 # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
-FM_MERGE_AUTHORITY_REASON=
+JG_MERGE_AUTHORITY_REASON=
 # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
-FM_MERGE_AUTHORITY_RECORD_IDENTITY=
+JG_MERGE_AUTHORITY_RECORD_IDENTITY=
 
 jg_merge_authority_resolve() {  # <home> <state> <meta> <task-id>
   local home=${1-} state=${2-} meta=${3-} id=${4-}
-  FM_MERGE_AUTHORITY=
-  FM_MERGE_AUTHORITY_REASON='invalid'
+  JG_MERGE_AUTHORITY=
+  JG_MERGE_AUTHORITY_REASON='invalid'
   [ -n "$home" ] && [ -n "$state" ] && [ -n "$meta" ] && [ -n "$id" ] || return 1
 
   if ! jg_afk_contract_present "$state"; then
-    FM_MERGE_AUTHORITY='attended'
-    FM_MERGE_AUTHORITY_REASON='attended'
+    JG_MERGE_AUTHORITY='attended'
+    JG_MERGE_AUTHORITY_REASON='attended'
     return 0
   fi
-  if ! FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    "$_FM_MERGE_AUTHORITY_LIB_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1; then
-    FM_MERGE_AUTHORITY_REASON='record-unreadable'
+  if ! JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    "$_JG_MERGE_AUTHORITY_LIB_DIR/jg-afk-contract.sh" validate >/dev/null 2>&1; then
+    JG_MERGE_AUTHORITY_REASON='record-unreadable'
     return 1
   fi
   if ! jg_afk_contract_away_present "$state"; then
-    FM_MERGE_AUTHORITY='attended'
-    FM_MERGE_AUTHORITY_REASON='attended'
+    JG_MERGE_AUTHORITY='attended'
+    JG_MERGE_AUTHORITY_REASON='attended'
     return 0
   fi
-  FM_MERGE_AUTHORITY='away'
+  JG_MERGE_AUTHORITY='away'
   # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
-  FM_MERGE_AUTHORITY_REASON='away'
+  JG_MERGE_AUTHORITY_REASON='away'
   return 0
 }
 
@@ -101,7 +101,7 @@ jg_merge_authority_record_matches() {  # <record> <device> <provider> <host> <pa
     && [ "$host" = "$expected_host" ] \
     && [ "$path" = "$expected_path" ] \
     && [ "$number" = "$expected_number" ] || return 1
-  FM_MERGE_AUTHORITY=$authority
+  JG_MERGE_AUTHORITY=$authority
 }
 
 jg_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <path> <number> <authority>
@@ -112,10 +112,10 @@ jg_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <pa
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
   state_device=$(jg_pr_file_device "$state") || return 1
   jg_pr_metadata_identity_parse "$meta" || return 1
-  [ "$FM_PR_META_PROVIDER" = "$provider" ] \
-    && [ "$FM_PR_META_HOST" = "$host" ] \
-    && [ "$FM_PR_META_PATH" = "$path" ] \
-    && [ "$FM_PR_META_NUMBER" = "$number" ] || return 1
+  [ "$JG_PR_META_PROVIDER" = "$provider" ] \
+    && [ "$JG_PR_META_HOST" = "$host" ] \
+    && [ "$JG_PR_META_PATH" = "$path" ] \
+    && [ "$JG_PR_META_NUMBER" = "$number" ] || return 1
   record="$state/$id.merge-authority"
   lock="$record.lock"
   jg_lock_acquire_wait "$lock" || return 1
@@ -147,8 +147,8 @@ jg_merge_authority_persist() {  # <state> <task-id> <meta> <provider> <host> <pa
 jg_merge_authority_read() {  # <state> <task-id> <provider> <host> <path> <number>
   local state=$1 id=$2 provider=$3 host=$4 path=$5 number=$6
   local record state_device lock status=0
-  FM_MERGE_AUTHORITY='external'
-  FM_MERGE_AUTHORITY_RECORD_IDENTITY=
+  JG_MERGE_AUTHORITY='external'
+  JG_MERGE_AUTHORITY_RECORD_IDENTITY=
   jg_pr_task_id_valid "$id" || return 1
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
   state_device=$(jg_pr_file_device "$state") || return 1
@@ -158,9 +158,9 @@ jg_merge_authority_read() {  # <state> <task-id> <provider> <host> <path> <numbe
   if jg_merge_authority_record_matches "$record" "$state_device" \
       "$provider" "$host" "$path" "$number"; then
     # shellcheck disable=SC2034 # Public results consumed by sourcing callers.
-    FM_MERGE_AUTHORITY_RECORD_IDENTITY=$(jg_pr_file_identity "$record") || status=1
+    JG_MERGE_AUTHORITY_RECORD_IDENTITY=$(jg_pr_file_identity "$record") || status=1
   else
-    FM_MERGE_AUTHORITY='external'
+    JG_MERGE_AUTHORITY='external'
     status=1
   fi
   jg_lock_release "$lock" || status=1
@@ -181,7 +181,7 @@ jg_merge_authority_remove_if_matches() {  # <state> <task-id> <provider> <host> 
         "$provider" "$host" "$path" "$number"; then
       current_file_identity=$(jg_pr_file_identity "$record") || status=1
       if [ "$status" -eq 0 ] \
-        && [ "$FM_MERGE_AUTHORITY" = "$authority" ] \
+        && [ "$JG_MERGE_AUTHORITY" = "$authority" ] \
         && [ "$current_file_identity" = "$expected_file_identity" ]; then
         rm -f -- "$record" || status=1
       fi

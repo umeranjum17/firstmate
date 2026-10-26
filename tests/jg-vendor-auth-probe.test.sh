@@ -24,7 +24,7 @@ set -u
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-vendor-auth-probe-tests)
 SCRIPT="$ROOT/bin/jg-vendor-auth-probe.sh"
 
@@ -41,24 +41,24 @@ make_fakebin() {
   fakebin=$(jg_fakebin "$dir")
   cat > "$fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_FAKE_QUOTA_LOG"
+printf '%s\n' "$*" >> "$JG_FAKE_QUOTA_LOG"
 exit 0
 SH
   chmod +x "$fakebin/quota-axi"
 
   cat > "$fakebin/grok" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_FAKE_GROK_LOG"
+printf '%s\n' "$*" >> "$JG_FAKE_GROK_LOG"
 # Record whatever is readable on stdin. With stdin correctly closed by the
 # caller this reads EOF immediately and records nothing.
 if IFS= read -r -t 2 leaked; then
-  printf '%s\n' "$leaked" >> "$FM_FAKE_GROK_STDIN"
+  printf '%s\n' "$leaked" >> "$JG_FAKE_GROK_STDIN"
 fi
 if [ "${1:-}" = --version ]; then
-  printf 'grok %s (fakebuild) [stable]\n' "${FM_FAKE_GROK_VERSION:-0.2.117}"
+  printf 'grok %s (fakebuild) [stable]\n' "${JG_FAKE_GROK_VERSION:-0.2.117}"
   exit 0
 fi
-case "${FM_FAKE_GROK_MODE:-authenticated}" in
+case "${JG_FAKE_GROK_MODE:-authenticated}" in
   authenticated)
     printf '%s\n' 'You are logged in with grok.com.'
     printf '\n%s\n' 'Default model: grok-4.5'
@@ -118,9 +118,9 @@ run_probe() {
     fi
   done
   out=$(env "PATH=$fakebin:$BASE_PATH" \
-    "FM_FAKE_GROK_LOG=$RUN_GROK_LOG" \
-    "FM_FAKE_GROK_STDIN=$RUN_GROK_STDIN" \
-    "FM_FAKE_QUOTA_LOG=$RUN_QUOTA_LOG" \
+    "JG_FAKE_GROK_LOG=$RUN_GROK_LOG" \
+    "JG_FAKE_GROK_STDIN=$RUN_GROK_STDIN" \
+    "JG_FAKE_QUOTA_LOG=$RUN_QUOTA_LOG" \
     "${env_pairs[@]+"${env_pairs[@]}"}" \
     "$SCRIPT" "${script_args[@]+"${script_args[@]}"}" \
     <<<"$STDIN_SENTINEL" 2>/dev/null) || rc=$?
@@ -201,7 +201,7 @@ test_probe_accepts_no_candidate_identity() {
 test_probe_never_reads_quota() {
   local mode
   for mode in authenticated unauthenticated; do
-    run_probe "no-quota-$mode" grok -- "FM_FAKE_GROK_MODE=$mode"
+    run_probe "no-quota-$mode" grok -- "JG_FAKE_GROK_MODE=$mode"
     assert_quota_never_read "no-quota-$mode"
   done
   pass "the probe never reads quota, leaving one intake snapshot to the dispatch owner"
@@ -213,7 +213,7 @@ test_probe_never_reads_quota() {
 test_probe_result_is_never_an_exit_status_verdict() {
   local mode
   for mode in authenticated unauthenticated garbage empty; do
-    run_probe "rc-$mode" grok -- "FM_FAKE_GROK_MODE=$mode"
+    run_probe "rc-$mode" grok -- "JG_FAKE_GROK_MODE=$mode"
     expect_code 0 "$RUN_RC" "probe result '$mode' must not be encoded in the exit status"
     [ -n "$RUN_LINE" ] || fail "probe result '$mode' must still print its fact line"
   done
@@ -237,7 +237,7 @@ test_unregistered_probe_is_a_usage_error() {
 # --- probe classification ---------------------------------------------------
 
 test_authenticated_session_is_reported() {
-  run_probe authenticated grok -- "FM_FAKE_GROK_MODE=authenticated"
+  run_probe authenticated grok -- "JG_FAKE_GROK_MODE=authenticated"
   expect_code 0 "$RUN_RC" "a completed probe prints its fact"
   assert_field "$RUN_LINE" probe grok "the probe name must be echoed"
   assert_field "$RUN_LINE" status authenticated "an authenticated first line must be recognized"
@@ -246,7 +246,7 @@ test_authenticated_session_is_reported() {
 }
 
 test_unauthenticated_session_is_reported() {
-  run_probe unauthenticated grok -- "FM_FAKE_GROK_MODE=unauthenticated"
+  run_probe unauthenticated grok -- "JG_FAKE_GROK_MODE=unauthenticated"
   assert_field "$RUN_LINE" status unauthenticated "an unauthenticated first line must be recognized"
   assert_grok_argv_safe "unauthenticated case"
   pass "an unauthenticated vendor session is reported as ground truth"
@@ -257,7 +257,7 @@ test_unauthenticated_session_is_reported() {
 test_unrecognized_output_is_indeterminate() {
   local mode
   for mode in garbage leading-blank empty; do
-    run_probe "indeterminate-$mode" grok -- "FM_FAKE_GROK_MODE=$mode"
+    run_probe "indeterminate-$mode" grok -- "JG_FAKE_GROK_MODE=$mode"
     assert_field "$RUN_LINE" status indeterminate "'$mode' output must never read as authenticated"
   done
   pass "unrecognized, blank-led, and silent probe output is indeterminate, never authenticated"
@@ -270,7 +270,7 @@ test_missing_vendor_cli_is_reported_not_assumed() {
   fakebin=$(make_fakebin "$case_dir")
   rm -f "$fakebin/grok"
   line=$(env "PATH=$fakebin:$BASE_PATH" \
-    "FM_FAKE_QUOTA_LOG=$case_dir/quota.log" \
+    "JG_FAKE_QUOTA_LOG=$case_dir/quota.log" \
     "$SCRIPT" grok </dev/null 2>/dev/null) || rc=$?
   expect_code 0 "$rc" "an absent vendor CLI is a fact, not a usage error"
   assert_field "$line" status unavailable "an absent probe command must be reported"
@@ -284,7 +284,7 @@ test_missing_vendor_cli_is_reported_not_assumed() {
 test_hanging_probe_is_bounded_and_reported() {
   local started finished
   started=$(date +%s)
-  run_probe grok-hang grok -- "FM_FAKE_GROK_MODE=hang" "FM_VENDOR_AUTH_PROBE_TIMEOUT=2"
+  run_probe grok-hang grok -- "JG_FAKE_GROK_MODE=hang" "JG_VENDOR_AUTH_PROBE_TIMEOUT=2"
   finished=$(date +%s)
   assert_field "$RUN_LINE" status timeout "a hit bound must be reported as a timeout"
   [ $((finished - started)) -lt 25 ] \
@@ -300,7 +300,7 @@ test_zero_bound_falls_back_to_a_real_bound() {
   local started finished value
   for value in 0 00; do
     started=$(date +%s)
-    run_probe "bound-zero-$value" grok -- "FM_FAKE_GROK_MODE=hang" "FM_VENDOR_AUTH_PROBE_TIMEOUT=$value"
+    run_probe "bound-zero-$value" grok -- "JG_FAKE_GROK_MODE=hang" "JG_VENDOR_AUTH_PROBE_TIMEOUT=$value"
     finished=$(date +%s)
     assert_field "$RUN_LINE" status timeout "a zero bound must fall back to the default bound, not to no bound"
     [ $((finished - started)) -lt 28 ] \
@@ -314,14 +314,14 @@ test_zero_bound_falls_back_to_a_real_bound() {
 test_malformed_bound_is_replaced_not_forwarded() {
   local value
   for value in -1 abc 1.5 ' '; do
-    run_probe "bound-${value// /space}" grok -- "FM_FAKE_GROK_MODE=authenticated" "FM_VENDOR_AUTH_PROBE_TIMEOUT=$value"
+    run_probe "bound-${value// /space}" grok -- "JG_FAKE_GROK_MODE=authenticated" "JG_VENDOR_AUTH_PROBE_TIMEOUT=$value"
     assert_field "$RUN_LINE" status authenticated "bound '$value' must be replaced, not forwarded to the bounding command"
   done
   pass "a malformed bound is replaced by the default rather than forwarded"
 }
 
 test_probe_never_inherits_caller_stdin() {
-  run_probe grok-stdin grok -- "FM_FAKE_GROK_MODE=authenticated"
+  run_probe grok-stdin grok -- "JG_FAKE_GROK_MODE=authenticated"
   [ -n "$RUN_LINE" ] || fail "expected a fact line"
   [ ! -s "$RUN_GROK_STDIN" ] \
     || fail "the probe inherited caller stdin: $(cat "$RUN_GROK_STDIN")"
@@ -331,7 +331,7 @@ test_probe_never_inherits_caller_stdin() {
 test_probe_argv_is_fixed_and_non_destructive() {
   local mode
   for mode in authenticated unauthenticated garbage; do
-    run_probe "argv-$mode" grok -- "FM_FAKE_GROK_MODE=$mode"
+    run_probe "argv-$mode" grok -- "JG_FAKE_GROK_MODE=$mode"
     assert_grok_argv_safe "argv-$mode"
     [ "$(grep -c . "$RUN_GROK_LOG")" -eq 2 ] \
       || fail "argv-$mode: expected exactly one --version and one models call, got: $(tr '\n' '|' < "$RUN_GROK_LOG")"
@@ -340,7 +340,7 @@ test_probe_argv_is_fixed_and_non_destructive() {
 }
 
 test_fact_line_carries_no_vendor_output_or_credential_material() {
-  run_probe sanitized grok -- "FM_FAKE_GROK_MODE=authenticated"
+  run_probe sanitized grok -- "JG_FAKE_GROK_MODE=authenticated"
   assert_not_contains "$RUN_LINE" "You are logged in" "the fact line must not echo raw vendor output"
   assert_not_contains "$RUN_LINE" "grok.com" "the fact line must not echo raw vendor output"
   assert_not_contains "$RUN_LINE" "auth.json" "the fact line must not name a credential path"
@@ -356,14 +356,14 @@ test_fact_line_carries_no_vendor_output_or_credential_material() {
 # The discriminator strings are un-owned vendor UI text. A version change does
 # not silently invalidate the fact, but it is disclosed so it can be re-verified.
 test_probe_version_change_is_disclosed() {
-  run_probe version-drift grok -- "FM_FAKE_GROK_MODE=authenticated" "FM_FAKE_GROK_VERSION=0.9.0"
+  run_probe version-drift grok -- "JG_FAKE_GROK_MODE=authenticated" "JG_FAKE_GROK_VERSION=0.9.0"
   assert_field "$RUN_LINE" version 0.9.0 "the probed CLI version must be recorded"
   assert_field "$RUN_LINE" versionVerified no "an unverified version must be disclosed"
   pass "a vendor CLI version change is recorded and disclosed for re-verification"
 }
 
 test_probe_version_match_is_recorded() {
-  run_probe version-pinned grok -- "FM_FAKE_GROK_MODE=authenticated"
+  run_probe version-pinned grok -- "JG_FAKE_GROK_MODE=authenticated"
   assert_field "$RUN_LINE" versionVerified yes "the pinned verified version must be recognized"
   pass "the pinned verified vendor version is recognized"
 }

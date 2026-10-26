@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Firstmate home, so the
 # dashboard's Claude accounts card and state/claude-accounts.json stay fresh. Copies the reader to
 # ${XDG_DATA_HOME:-~/.local/share}/jg-claude-accounts/, writes jg-claude-accounts-quota.service and .timer under
@@ -20,7 +29,7 @@ Description=Firstmate Claude accounts quota reading for $HOME_DIR
 
 [Service]
 Type=oneshot
-Environment=FM_HOME=$HOME_DIR
+Environment=JG_HOME=$HOME_DIR
 Environment=PATH=$PATH
 ExecStart=$DEST
 UNIT

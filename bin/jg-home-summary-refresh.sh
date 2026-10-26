@@ -6,7 +6,7 @@
 # Usage: jg-home-summary-refresh.sh [--best-effort]
 #
 # The published state/home-summary.json is the exact
-# `jg-fleet-snapshot.sh --secondmate-home-summary` document for this FM_HOME.
+# `jg-fleet-snapshot.sh --secondmate-home-summary` document for this JG_HOME.
 # Its schema remains `jg-secondmate-home-summary.v1`, declares the current hold
 # classifier contract, and includes both the existing generated timestamp and
 # generated_epoch for freshness arithmetic.
@@ -17,7 +17,7 @@
 # either the prior complete document or the new complete document, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
 # summary cannot overwrite one computed after a later status change. The shared
-# timeout owner bounds the complete refresh with FM_HOME_SUMMARY_TIMEOUT
+# timeout owner bounds the complete refresh with JG_HOME_SUMMARY_TIMEOUT
 # (default 60 seconds). No reader can observe temporary output through the
 # ledger path.
 #
@@ -30,18 +30,18 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
 LEDGER="$STATE/home-summary.json"
 ERROR_LOG="$STATE/.home-summary-refresh.log"
 REFRESH_LOCK="$STATE/.home-summary-refresh.lock"
-ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
-HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-60}
-HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
+ERROR_LOG_MAX_BYTES=${JG_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
+HOME_SUMMARY_TIMEOUT=${JG_HOME_SUMMARY_TIMEOUT:-60}
+HOME_SUMMARY_IF_IDLE=${JG_HOME_SUMMARY_IF_IDLE:-0}
 BEST_EFFORT=0
 HOME_SUMMARY_MODE=parent
 HOME_SUMMARY_ERROR=
@@ -63,7 +63,7 @@ case "${1:-}" in
   --best-effort) BEST_EFFORT=1 ;;
   --_worker)
     HOME_SUMMARY_MODE=worker
-    BEST_EFFORT=${FM_HOME_SUMMARY_WORKER_BEST_EFFORT:-0}
+    BEST_EFFORT=${JG_HOME_SUMMARY_WORKER_BEST_EFFORT:-0}
     ;;
   --_log-failure) HOME_SUMMARY_MODE=log-failure ;;
   -h|--help) usage; exit 0 ;;
@@ -127,12 +127,12 @@ home_summary_refresh_once() {
   }
 
   if env \
-    FM_ROOT_OVERRIDE="$FM_ROOT" \
-    FM_HOME="$FM_HOME" \
-    FM_STATE_OVERRIDE="$STATE" \
-    FM_DATA_OVERRIDE="$DATA" \
-    FM_CONFIG_OVERRIDE="$CONFIG" \
-    FM_PROJECTS_OVERRIDE="$PROJECTS" \
+    JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_HOME="$JG_HOME" \
+    JG_STATE_OVERRIDE="$STATE" \
+    JG_DATA_OVERRIDE="$DATA" \
+    JG_CONFIG_OVERRIDE="$CONFIG" \
+    JG_PROJECTS_OVERRIDE="$PROJECTS" \
     "$SCRIPT_DIR/jg-fleet-snapshot.sh" --secondmate-home-summary \
       > "$HOME_SUMMARY_TMP" 2> "$HOME_SUMMARY_ERR_TMP"; then
     producer_rc=0
@@ -151,7 +151,7 @@ home_summary_refresh_once() {
   fi
   rm -f -- "$HOME_SUMMARY_ERR_TMP"
   HOME_SUMMARY_ERR_TMP=
-  if ! jq -e --arg home "$FM_HOME" '
+  if ! jq -e --arg home "$JG_HOME" '
     .schema == "jg-secondmate-home-summary.v1"
     and .hold_classifier_schema == "jg-captain-hold-buckets.v1"
     and .home == $home
@@ -211,8 +211,8 @@ home_summary_log_failure() {
 }
 
 if [ "$HOME_SUMMARY_MODE" = log-failure ]; then
-  HOME_SUMMARY_ERROR=${FM_HOME_SUMMARY_PARENT_ERROR:-"refresh worker failed"}
-  HOME_SUMMARY_FAILURE_STAMP=${FM_HOME_SUMMARY_PARENT_STAMP:-}
+  HOME_SUMMARY_ERROR=${JG_HOME_SUMMARY_PARENT_ERROR:-"refresh worker failed"}
+  HOME_SUMMARY_FAILURE_STAMP=${JG_HOME_SUMMARY_PARENT_STAMP:-}
   home_summary_log_failure
   exit 0
 fi
@@ -220,8 +220,8 @@ fi
 if [ "$HOME_SUMMARY_MODE" = parent ]; then
   attempt_stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || attempt_stamp=
   if jg_run_timed "$HOME_SUMMARY_TIMEOUT" env \
-    FM_HOME_SUMMARY_WORKER_BEST_EFFORT="$BEST_EFFORT" \
-    FM_HOME_SUMMARY_IF_IDLE="$HOME_SUMMARY_IF_IDLE" \
+    JG_HOME_SUMMARY_WORKER_BEST_EFFORT="$BEST_EFFORT" \
+    JG_HOME_SUMMARY_IF_IDLE="$HOME_SUMMARY_IF_IDLE" \
     "$SCRIPT_DIR/jg-home-summary-refresh.sh" --_worker; then
     exit 0
   else
@@ -234,8 +234,8 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
       parent_error="refresh worker failed with exit $refresh_rc"
     fi
     jg_run_timed 2 env \
-      FM_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
-      FM_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
+      JG_HOME_SUMMARY_PARENT_ERROR="$parent_error" \
+      JG_HOME_SUMMARY_PARENT_STAMP="$attempt_stamp" \
       "$SCRIPT_DIR/jg-home-summary-refresh.sh" --_log-failure >/dev/null || true
     exit 0
   fi

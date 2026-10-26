@@ -68,9 +68,9 @@
 # capability on its own argv rather than trusting a caller's list.
 #
 # Environment knobs:
-#   FM_SECONDMATE_PERSIST_WAIT  seconds to wait for one mate's persist answer (900)
-#   FM_SECONDMATE_IDLE_WAIT     seconds after that answer to wait for its composer to read empty (600)
-#   FM_SECONDMATE_PERSIST_POLL  seconds between checks of the answer and the composer (5)
+#   JG_SECONDMATE_PERSIST_WAIT  seconds to wait for one mate's persist answer (900)
+#   JG_SECONDMATE_IDLE_WAIT     seconds after that answer to wait for its composer to read empty (600)
+#   JG_SECONDMATE_PERSIST_POLL  seconds between checks of the answer and the composer (5)
 #
 # Exit status: 0 every named mate restarted; 3 at least one was nudged or left
 # unreached and every mate was still accounted for; 1 the input itself is
@@ -78,7 +78,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
   sed -n '2,72{s/^# \{0,1\}//;p;}' "$0"
@@ -89,13 +89,13 @@ case "${1:-}" in
   '') usage >&2; exit 2 ;;
 esac
 
-if [ -z "${FM_HOME:-}" ]; then
-  echo "error: FM_HOME is not set; jg-secondmate-restart refuses to resolve second mates without an explicit firstmate home" >&2
+if [ -z "${JG_HOME:-}" ]; then
+  echo "error: JG_HOME is not set; jg-secondmate-restart refuses to resolve second mates without an explicit firstmate home" >&2
   exit 1
 fi
-[ -d "$FM_HOME" ] || { echo "error: FM_HOME '$FM_HOME' is not a directory" >&2; exit 1; }
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-[ -d "$STATE" ] || { echo "error: state dir '$STATE' is missing; jg-secondmate-restart cannot resolve second mates for FM_HOME '$FM_HOME'" >&2; exit 1; }
+[ -d "$JG_HOME" ] || { echo "error: JG_HOME '$JG_HOME' is not a directory" >&2; exit 1; }
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+[ -d "$STATE" ] || { echo "error: state dir '$STATE' is missing; jg-secondmate-restart cannot resolve second mates for JG_HOME '$JG_HOME'" >&2; exit 1; }
 
 # shellcheck source=bin/jg-secondmate-restart-lib.sh
 . "$SCRIPT_DIR/jg-secondmate-restart-lib.sh"
@@ -104,12 +104,12 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 
-PERSIST_WAIT=${FM_SECONDMATE_PERSIST_WAIT:-900}
-IDLE_WAIT=${FM_SECONDMATE_IDLE_WAIT:-600}
-PERSIST_POLL=${FM_SECONDMATE_PERSIST_POLL:-5}
-case "$PERSIST_WAIT" in ''|*[!0-9]*) echo "error: FM_SECONDMATE_PERSIST_WAIT must be a non-negative integer: $PERSIST_WAIT" >&2; exit 2 ;; esac
-case "$IDLE_WAIT" in ''|*[!0-9]*) echo "error: FM_SECONDMATE_IDLE_WAIT must be a non-negative integer: $IDLE_WAIT" >&2; exit 2 ;; esac
-case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: FM_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
+PERSIST_WAIT=${JG_SECONDMATE_PERSIST_WAIT:-900}
+IDLE_WAIT=${JG_SECONDMATE_IDLE_WAIT:-600}
+PERSIST_POLL=${JG_SECONDMATE_PERSIST_POLL:-5}
+case "$PERSIST_WAIT" in ''|*[!0-9]*) echo "error: JG_SECONDMATE_PERSIST_WAIT must be a non-negative integer: $PERSIST_WAIT" >&2; exit 2 ;; esac
+case "$IDLE_WAIT" in ''|*[!0-9]*) echo "error: JG_SECONDMATE_IDLE_WAIT must be a non-negative integer: $IDLE_WAIT" >&2; exit 2 ;; esac
+case "$PERSIST_POLL" in ''|*[!0-9]*|0) echo "error: JG_SECONDMATE_PERSIST_POLL must be a positive integer: $PERSIST_POLL" >&2; exit 2 ;; esac
 
 IDS=()
 for arg in "$@"; do
@@ -170,8 +170,8 @@ first_reported_line() {  # <text>
 # plainly which it was. A nudge is a partial reload and is never reported as more.
 fall_back_to_nudge() {  # <id> <reason>
   local id=$1 reason=$2 out
-  if out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/jg-send.sh" "$id" "$FM_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
+  if out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/jg-send.sh" "$id" "$JG_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
     nudged_count=$((nudged_count + 1))
     printf 'nudged: %s: %s\n' "$id" "$reason"
   else
@@ -190,12 +190,12 @@ restart_mate() {  # <array-index>
   local i=$1 id restart_out restart_rc restart_reason ran_on
   id=${IDS[$i]}
   if [ "${PLACEMENT[i]}" = remote ]; then
-    restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    restart_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-remote-secondmate-relaunch.sh" \
       "$id" "${HARNESS[i]}" "${MODEL[i]:-default}" "${EFFORT[i]:-default}" < /dev/null 2>&1)
     restart_rc=$?
   else
-    restart_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    restart_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-control.sh" "$id" relaunch 2>&1)
     restart_rc=$?
   fi
@@ -221,8 +221,8 @@ restart_mate() {  # <array-index>
 composer_reads_empty() {  # <array-index>
   local id=${IDS[$1]}
   jg_backend_validate_task_endpoint "$STATE/$id.meta" "$id" 2>/dev/null || return 1
-  [ "$(jg_backend_composer_state "$FM_BACKEND_VALIDATED_BACKEND" \
-    "$FM_BACKEND_VALIDATED_TARGET" "jg-$id" 2>/dev/null)" = empty ]
+  [ "$(jg_backend_composer_state "$JG_BACKEND_VALIDATED_BACKEND" \
+    "$JG_BACKEND_VALIDATED_TARGET" "jg-$id" 2>/dev/null)" = empty ]
 }
 
 # The persist answer landed: a remote mate restarts now, a local one first
@@ -307,13 +307,13 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
   MODEL[i]=""
   EFFORT[i]=""
   if ! jg_secondmate_restart_capable "$STATE/$id.meta"; then
-    REASON[i]=$FM_SECONDMATE_RESTART_REASON
+    REASON[i]=$JG_SECONDMATE_RESTART_REASON
     i=$((i + 1))
     continue
   fi
-  PLACEMENT[i]=$FM_SECONDMATE_RESTART_PLACEMENT
-  HOST[i]=$FM_SECONDMATE_RESTART_HOST
-  HARNESS[i]=$FM_SECONDMATE_RESTART_HARNESS
+  PLACEMENT[i]=$JG_SECONDMATE_RESTART_PLACEMENT
+  HOST[i]=$JG_SECONDMATE_RESTART_HOST
+  HARNESS[i]=$JG_SECONDMATE_RESTART_HARNESS
   if [ "${PLACEMENT[i]}" = remote ]; then
     # A local relaunch re-resolves this home's durable secondmate pin on its own,
     # which is the one owner of that resolution. A remote one cannot: it runs in
@@ -339,15 +339,15 @@ while [ "$i" -lt "${#IDS[@]}" ]; do
     fi
   fi
 
-  if ! corr=$(jg_pending_reply_create "$FM_HOME" "$STATE" "$id" \
-    "$FM_SECONDMATE_PERSIST_REQUEST"); then
+  if ! corr=$(jg_pending_reply_create "$JG_HOME" "$STATE" "$id" \
+    "$JG_SECONDMATE_PERSIST_REQUEST"); then
     REASON[i]="its answer about the open work cannot be tracked, so a clean reload could not be proven"
     i=$((i + 1))
     continue
   fi
-  if ! send_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_PENDING_REPLY_EXISTING_CORR="$corr" \
-    "$SCRIPT_DIR/jg-send.sh" "$id" "$FM_SECONDMATE_PERSIST_REQUEST" 2>&1); then
+  if ! send_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+    JG_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SCRIPT_DIR/jg-send.sh" "$id" "$JG_SECONDMATE_PERSIST_REQUEST" 2>&1); then
     jg_pending_reply_discard_undelivered "$STATE" "$corr" >/dev/null 2>&1 || true
     REASON[i]="the request to write down its open work could not be delivered: $(first_reported_line "$send_out")"
     i=$((i + 1))

@@ -49,7 +49,7 @@
 # deferral remains re-holding with --until.
 #
 # Ordinary Charted Next gates are ordered by durable filed date, newest first,
-# before the FM_BEARINGS_GATES bound is applied. Gates without a comparable filed
+# before the JG_BEARINGS_GATES bound is applied. Gates without a comparable filed
 # date keep their input order after dated gates. The synthetic (return-catchup)
 # posture row is reserved ahead of that ordering and bound so it always surfaces.
 #
@@ -102,36 +102,36 @@ FLEET="$SCRIPT_DIR/jg-fleet-snapshot.sh"
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 # shellcheck source=bin/jg-landed-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/jg-landed-lib.sh"  # FM_LANDED_JQ_DEFS: the shared landed selector
+. "$SCRIPT_DIR/jg-landed-lib.sh"  # JG_LANDED_JQ_DEFS: the shared landed selector
 
 # Bounds (overridable for tests / large fleets).
-FM_BEARINGS_LANDED=${FM_BEARINGS_LANDED:-6}
-FM_BEARINGS_LANDED_PER_HOME=${FM_BEARINGS_LANDED_PER_HOME:-$FM_BEARINGS_LANDED}
-FM_BEARINGS_IN_FLIGHT=${FM_BEARINGS_IN_FLIGHT:-20}
-FM_BEARINGS_DECISIONS=${FM_BEARINGS_DECISIONS:-20}
-FM_BEARINGS_SECONDMATES=${FM_BEARINGS_SECONDMATES:-20}
-FM_BEARINGS_GATES=${FM_BEARINGS_GATES:-20}
-FM_BEARINGS_REPORTS=${FM_BEARINGS_REPORTS:-20}
-FM_BEARINGS_RECORDED_PRS=${FM_BEARINGS_RECORDED_PRS:-20}
-FM_BEARINGS_UNHEALTHY=${FM_BEARINGS_UNHEALTHY:-20}
-FM_BEARINGS_PR_REPOS=${FM_BEARINGS_PR_REPOS:-10}
-FM_BEARINGS_PR_LIMIT=${FM_BEARINGS_PR_LIMIT:-20}
-FM_BEARINGS_PR_TIMEOUT=${FM_BEARINGS_PR_TIMEOUT:-20}
-case "$FM_BEARINGS_PR_TIMEOUT" in ''|*[!0-9]*|0) FM_BEARINGS_PR_TIMEOUT=20 ;; esac
+JG_BEARINGS_LANDED=${JG_BEARINGS_LANDED:-6}
+JG_BEARINGS_LANDED_PER_HOME=${JG_BEARINGS_LANDED_PER_HOME:-$JG_BEARINGS_LANDED}
+JG_BEARINGS_IN_FLIGHT=${JG_BEARINGS_IN_FLIGHT:-20}
+JG_BEARINGS_DECISIONS=${JG_BEARINGS_DECISIONS:-20}
+JG_BEARINGS_SECONDMATES=${JG_BEARINGS_SECONDMATES:-20}
+JG_BEARINGS_GATES=${JG_BEARINGS_GATES:-20}
+JG_BEARINGS_REPORTS=${JG_BEARINGS_REPORTS:-20}
+JG_BEARINGS_RECORDED_PRS=${JG_BEARINGS_RECORDED_PRS:-20}
+JG_BEARINGS_UNHEALTHY=${JG_BEARINGS_UNHEALTHY:-20}
+JG_BEARINGS_PR_REPOS=${JG_BEARINGS_PR_REPOS:-10}
+JG_BEARINGS_PR_LIMIT=${JG_BEARINGS_PR_LIMIT:-20}
+JG_BEARINGS_PR_TIMEOUT=${JG_BEARINGS_PR_TIMEOUT:-20}
+case "$JG_BEARINGS_PR_TIMEOUT" in ''|*[!0-9]*|0) JG_BEARINGS_PR_TIMEOUT=20 ;; esac
 validate_bound() {  # <name> <value>
   case "$2" in ''|*[!0-9]*|0) echo "jg-bearings-snapshot: $1 must be a positive integer" >&2; exit 2 ;; esac
 }
-validate_bound FM_BEARINGS_LANDED "$FM_BEARINGS_LANDED"
-validate_bound FM_BEARINGS_LANDED_PER_HOME "$FM_BEARINGS_LANDED_PER_HOME"
-validate_bound FM_BEARINGS_IN_FLIGHT "$FM_BEARINGS_IN_FLIGHT"
-validate_bound FM_BEARINGS_DECISIONS "$FM_BEARINGS_DECISIONS"
-validate_bound FM_BEARINGS_SECONDMATES "$FM_BEARINGS_SECONDMATES"
-validate_bound FM_BEARINGS_GATES "$FM_BEARINGS_GATES"
-validate_bound FM_BEARINGS_REPORTS "$FM_BEARINGS_REPORTS"
-validate_bound FM_BEARINGS_RECORDED_PRS "$FM_BEARINGS_RECORDED_PRS"
-validate_bound FM_BEARINGS_UNHEALTHY "$FM_BEARINGS_UNHEALTHY"
-validate_bound FM_BEARINGS_PR_REPOS "$FM_BEARINGS_PR_REPOS"
-validate_bound FM_BEARINGS_PR_LIMIT "$FM_BEARINGS_PR_LIMIT"
+validate_bound JG_BEARINGS_LANDED "$JG_BEARINGS_LANDED"
+validate_bound JG_BEARINGS_LANDED_PER_HOME "$JG_BEARINGS_LANDED_PER_HOME"
+validate_bound JG_BEARINGS_IN_FLIGHT "$JG_BEARINGS_IN_FLIGHT"
+validate_bound JG_BEARINGS_DECISIONS "$JG_BEARINGS_DECISIONS"
+validate_bound JG_BEARINGS_SECONDMATES "$JG_BEARINGS_SECONDMATES"
+validate_bound JG_BEARINGS_GATES "$JG_BEARINGS_GATES"
+validate_bound JG_BEARINGS_REPORTS "$JG_BEARINGS_REPORTS"
+validate_bound JG_BEARINGS_RECORDED_PRS "$JG_BEARINGS_RECORDED_PRS"
+validate_bound JG_BEARINGS_UNHEALTHY "$JG_BEARINGS_UNHEALTHY"
+validate_bound JG_BEARINGS_PR_REPOS "$JG_BEARINGS_PR_REPOS"
+validate_bound JG_BEARINGS_PR_LIMIT "$JG_BEARINGS_PR_LIMIT"
 
 usage() {
   cat <<'EOF'
@@ -156,7 +156,7 @@ Default fields: schema, home, generated, prs, in_flight{id,kind,state,repo,name,
 Default gates are selected newest filed first before their bound; undated gates
   retain input order after dated gates.
 landed merges this home's Done with registered secondmate homes' Done, bounded by
-  a per-home cap (FM_BEARINGS_LANDED_PER_HOME) and an overall cap (FM_BEARINGS_LANDED),
+  a per-home cap (JG_BEARINGS_LANDED_PER_HOME) and an overall cap (JG_BEARINGS_LANDED),
   with omitted[] disclosure. Default selection is balanced across deterministic home
   order while preserving each home's internal newest-first order; sparse homes do
   not waste capacity. --all-landed reveals the full global newest-first set.
@@ -169,7 +169,7 @@ Opt-in surfaces: --fields bodies|paths|actions|endpoints, --all-in-flight,
   --all-decisions (all open decisions and captain holds in the bounded snapshot),
   --all-secondmates, --all-landed, --all-reports, --all-queued, --all-recorded-prs,
   --all-unhealthy, --all-pr-repos, --include-prs (adds candidate_prs).
-Raise FM_BEARINGS_PR_LIMIT to expand per-repository open-PR results.
+Raise JG_BEARINGS_PR_LIMIT to expand per-repository open-PR results.
 EOF
 }
 
@@ -232,15 +232,15 @@ if [ "$GUARD_RC" -eq 4 ]; then
     '{pending:true,blockers:$blockers,reason:$reason}')
 fi
 
-NOW=${FM_BEARINGS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+NOW=${JG_BEARINGS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 if [ "$ALL_LANDED" = 1 ] || [ "$ALL_SECONDMATES" = 1 ]; then
   if [ "$ALL_LANDED" = 1 ]; then
-    SNAP=$(FM_SNAPSHOT_NOW="$NOW" FM_SNAPSHOT_SECONDMATES=0 FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 "$FLEET" --json) || exit $?
+    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SECONDMATES=0 JG_SNAPSHOT_SECONDMATE_LANDED_PER_HOME=0 "$FLEET" --json) || exit $?
   else
-    SNAP=$(FM_SNAPSHOT_NOW="$NOW" FM_SNAPSHOT_SECONDMATES=0 "$FLEET" --json) || exit $?
+    SNAP=$(JG_SNAPSHOT_NOW="$NOW" JG_SNAPSHOT_SECONDMATES=0 "$FLEET" --json) || exit $?
   fi
 else
-  SNAP=$(FM_SNAPSHOT_NOW="$NOW" "$FLEET" --json) || exit $?
+  SNAP=$(JG_SNAPSHOT_NOW="$NOW" "$FLEET" --json) || exit $?
 fi
 HOME_LABEL=$(printf '%s' "$SNAP" | jq -er '.jg_home | strings | split("/") | (.[-2:] | join("/"))') \
   || { echo "jg-bearings-snapshot: invalid canonical snapshot" >&2; exit 1; }
@@ -261,7 +261,7 @@ repo_slug() {  # <url>
 # Bounded gh call; prints stdout, non-zero on timeout/failure. gh only.
 # bin/jg-timeout-lib.sh owns the bound itself.
 gh_bounded() {  # <args...>
-  jg_run_timed "$FM_BEARINGS_PR_TIMEOUT" \
+  jg_run_timed "$JG_BEARINGS_PR_TIMEOUT" \
     env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 gh "$@"
 }
 
@@ -290,7 +290,7 @@ EOF
 
     for repo in $repos; do PR_REPOS_TOTAL=$((PR_REPOS_TOTAL + 1)); done
     nrepos=0; npr=0; nwarn=0; ncapped=0; rows='[]'
-    pr_fetch_limit=$((FM_BEARINGS_PR_LIMIT + 1))
+    pr_fetch_limit=$((JG_BEARINGS_PR_LIMIT + 1))
     # The task side of the mapping rides a temp file, not an argv element: a
     # fleet snapshot exceeds the ~128KB per-argument exec cap on large fleets,
     # and an E2BIG there would drop the repo's PR rows into the warning count.
@@ -298,13 +298,13 @@ EOF
       || { echo "jg-bearings-snapshot: cannot create a temporary tasks file" >&2; exit 1; }
     printf '%s' "$SNAP" | jq '.tasks // []' > "$tasks_file"
     for repo in $repos; do
-      if [ "$ALL_PR_REPOS" != 1 ] && [ "$nrepos" -ge "$FM_BEARINGS_PR_REPOS" ]; then break; fi
+      if [ "$ALL_PR_REPOS" != 1 ] && [ "$nrepos" -ge "$JG_BEARINGS_PR_REPOS" ]; then break; fi
       nrepos=$((nrepos + 1))
       out=$(gh_bounded pr list --repo "$repo" --state open --limit "$pr_fetch_limit" \
         --json number,title,url,headRefName,reviewDecision,mergeable,statusCheckRollup 2>/dev/null) \
         || { nwarn=$((nwarn + 1)); continue; }
       [ -n "$out" ] || out='[]'
-      repo_result=$(printf '%s' "$out" | jq --arg repo "$repo" --argjson limit "$FM_BEARINGS_PR_LIMIT" --slurpfile tasks "$tasks_file" '
+      repo_result=$(printf '%s' "$out" | jq --arg repo "$repo" --argjson limit "$JG_BEARINGS_PR_LIMIT" --slurpfile tasks "$tasks_file" '
         ($tasks[0] // []) as $all_tasks
         | def task_for_branch($ref):
             ( [ $all_tasks[] | select((.branch // ("fm/" + .id)) == $ref) | .id ] | .[0] )
@@ -326,7 +326,7 @@ EOF
       returned=$(printf '%s' "$repo_result" | jq '.returned')
       repo_rows=$(printf '%s' "$repo_result" | jq '.rows')
       cnt=$(printf '%s' "$repo_rows" | jq 'length')
-      [ "$returned" -gt "$FM_BEARINGS_PR_LIMIT" ] && ncapped=$((ncapped + 1))
+      [ "$returned" -gt "$JG_BEARINGS_PR_LIMIT" ] && ncapped=$((ncapped + 1))
       npr=$((npr + cnt))
       rows=$(jq -n --argjson a "$rows" --argjson b "$repo_rows" '$a + $b')
     done
@@ -359,15 +359,15 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --arg today "$BEARINGS_TODAY" \
   --arg prs "$PR_STATUS" \
   --arg fields "$FIELDS" \
-  --argjson landed_n "$FM_BEARINGS_LANDED" \
-  --argjson landed_per_home_n "$FM_BEARINGS_LANDED_PER_HOME" \
-  --argjson in_flight_n "$FM_BEARINGS_IN_FLIGHT" \
-  --argjson decisions_n "$FM_BEARINGS_DECISIONS" \
-  --argjson secondmates_n "$FM_BEARINGS_SECONDMATES" \
-  --argjson gates_n "$FM_BEARINGS_GATES" \
-  --argjson reports_n "$FM_BEARINGS_REPORTS" \
-  --argjson recorded_prs_n "$FM_BEARINGS_RECORDED_PRS" \
-  --argjson unhealthy_n "$FM_BEARINGS_UNHEALTHY" \
+  --argjson landed_n "$JG_BEARINGS_LANDED" \
+  --argjson landed_per_home_n "$JG_BEARINGS_LANDED_PER_HOME" \
+  --argjson in_flight_n "$JG_BEARINGS_IN_FLIGHT" \
+  --argjson decisions_n "$JG_BEARINGS_DECISIONS" \
+  --argjson secondmates_n "$JG_BEARINGS_SECONDMATES" \
+  --argjson gates_n "$JG_BEARINGS_GATES" \
+  --argjson reports_n "$JG_BEARINGS_REPORTS" \
+  --argjson recorded_prs_n "$JG_BEARINGS_RECORDED_PRS" \
+  --argjson unhealthy_n "$JG_BEARINGS_UNHEALTHY" \
   --argjson include_prs "$INCLUDE_PRS" \
   --argjson all_in_flight "$ALL_IN_FLIGHT" \
   --argjson all_decisions "$ALL_DECISIONS" \
@@ -382,7 +382,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson pr_rows_capped "$PR_ROWS_CAPPED" \
   --argjson pr_rows_min_total "$PR_ROWS_MIN_TOTAL" \
   --argjson return_catchup "$RETURN_CATCHUP" \
-  --argjson candidate_prs "$CANDIDATE_PRS" "$FM_LANDED_JQ_DEFS"'
+  --argjson candidate_prs "$CANDIDATE_PRS" "$JG_LANDED_JQ_DEFS"'
   def trunc($n): if . == null then null else
     (tostring | gsub("\\s+"; " ") | if (length > $n) then (.[:$n] + "…") else . end) end;
   def fit($n):
@@ -676,16 +676,16 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $all_in_flight == 0 and ($in_flight_all | length) > $in_flight_n then {surface:("in_flight showing \($in_flight_n) of \($in_flight_all | length)"), reveal:"--all-in-flight"} else empty end),
         (($snap.secondmate_current.records // [])[] as $m
          | ([($m.omitted // [])[] | select(.surface == "active_children") | .count] | add // 0) as $n
-         | if $n > 0 then {surface:("secondmate " + $m.id + " active children omitted by snapshot bound: \($n)"), reveal:"raise FM_SNAPSHOT_SECONDMATE_CHILDREN"} else empty end),
+         | if $n > 0 then {surface:("secondmate " + $m.id + " active children omitted by snapshot bound: \($n)"), reveal:"raise JG_SNAPSHOT_SECONDMATE_CHILDREN"} else empty end),
         (if $all_secondmates == 0 and ($secondmates_all | length) > $secondmates_n then {surface:("secondmates showing \($secondmates_n) of \($secondmates_all | length)"), reveal:"--all-secondmates"} else empty end),
-        (if (($snap.secondmate_current.truncated // 0) > 0) then {surface:("registered secondmates omitted by snapshot bound: \($snap.secondmate_current.truncated)"), reveal:"raise FM_SNAPSHOT_SECONDMATES"} else empty end),
-        (if $snap.secondmate_current.registry.input_truncated == true then {surface:"secondmate registry input truncated by bounded read", reveal:"raise FM_SNAPSHOT_REGISTRY_LINES or FM_SNAPSHOT_REGISTRY_BYTES"} else empty end),
-        (if $snap.secondmate_current.registry.records_truncated == true then {surface:"secondmate registry records omitted by bounded read", reveal:"raise FM_SNAPSHOT_REGISTRY_RECORDS"} else empty end),
+        (if (($snap.secondmate_current.truncated // 0) > 0) then {surface:("registered secondmates omitted by snapshot bound: \($snap.secondmate_current.truncated)"), reveal:"raise JG_SNAPSHOT_SECONDMATES"} else empty end),
+        (if $snap.secondmate_current.registry.input_truncated == true then {surface:"secondmate registry input truncated by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_LINES or JG_SNAPSHOT_REGISTRY_BYTES"} else empty end),
+        (if $snap.secondmate_current.registry.records_truncated == true then {surface:"secondmate registry records omitted by bounded read", reveal:"raise JG_SNAPSHOT_REGISTRY_RECORDS"} else empty end),
         (if $snap.secondmate_current.registry.available == false then {surface:("secondmate registry unavailable: " + ($snap.secondmate_current.registry.reason // "read failed")), reveal:"inspect data/secondmates.md"} else empty end),
         (($snap.secondmate_current.records // [])[]
          | select(.provenance.summary_source == "remote-ledger-cache")
          | {surface:("secondmate " + .id + " served from cached home ledger"),reveal:"inspect the home ledger publication and remote route"}),
-        (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.input_truncated == true or .parent_event.activity_scan.retained_truncated == true)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence truncated for \($n) record(s)"), reveal:"raise FM_SNAPSHOT_PARENT_ACTIVITY_LINES, FM_SNAPSHOT_PARENT_ACTIVITY_BYTES, or FM_SNAPSHOT_PARENT_ACTIVITIES"} else empty end),
+        (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.input_truncated == true or .parent_event.activity_scan.retained_truncated == true)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence truncated for \($n) record(s)"), reveal:"raise JG_SNAPSHOT_PARENT_ACTIVITY_LINES, JG_SNAPSHOT_PARENT_ACTIVITY_BYTES, or JG_SNAPSHOT_PARENT_ACTIVITIES"} else empty end),
         (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.available == false)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence unavailable for \($n) record(s)"), reveal:"inspect the parent status logs"} else empty end),
         (if $all_decisions == 0 and ($decisions_all | length) > $decisions_n then {surface:("decisions_open showing \($decisions_n) of \($decisions_all | length)"), reveal:"--all-decisions"} else empty end),
         (if $all_decisions == 0 and $decisions_marked_deferred > 0 then {surface:("captain holds bucketed blocked, dated, or aged: \($decisions_marked_deferred)"), reveal:"--all-decisions"} else empty end),
@@ -694,7 +694,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $all_recorded_prs == 0 and ($recorded_prs_all | length) > $recorded_prs_n then {surface:("recorded_prs showing \($recorded_prs_n) of \($recorded_prs_all | length)"), reveal:"--all-recorded-prs"} else empty end),
         (if $all_unhealthy == 0 and ($unhealthy_all | length) > $unhealthy_n then {surface:("unhealthy_endpoints showing \($unhealthy_n) of \($unhealthy_all | length)"), reveal:"--all-unhealthy"} else empty end),
         (if $include_prs == 1 and $pr_repos_total > $pr_repos_shown then {surface:("PR repositories showing \($pr_repos_shown) of \($pr_repos_total)"), reveal:"--all-pr-repos"} else empty end),
-        (if $include_prs == 1 and $pr_rows_capped > 0 then {surface:("candidate_prs showing \($candidate_prs | length) of at least \($pr_rows_min_total); capped in \($pr_rows_capped) repo(s)"), reveal:"raise FM_BEARINGS_PR_LIMIT"} else empty end),
+        (if $include_prs == 1 and $pr_rows_capped > 0 then {surface:("candidate_prs showing \($candidate_prs | length) of at least \($pr_rows_min_total); capped in \($pr_rows_capped) repo(s)"), reveal:"raise JG_BEARINGS_PR_LIMIT"} else empty end),
         (if $include_prs == 1 then empty else {surface:"live PR discovery + checks", reveal:"--include-prs"} end) ]) }
 ') || { echo "jg-bearings-snapshot: projection failed" >&2; exit 1; }
 

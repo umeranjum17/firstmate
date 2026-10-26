@@ -361,7 +361,7 @@ The first matching row in this order decides the bucket:
 | --- | --- | --- |
 | 1 | `blocked` | Any blocker is unresolved. |
 | 2 | `dated` | `hold_until` is in the future. |
-| 3 | `aged` | An undated hold's hold-set timestamp is at least `FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS` old (default 14, floored elapsed days). |
+| 3 | `aged` | An undated hold's hold-set timestamp is at least `JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS` old (default 14, floored elapsed days). |
 | 4 | `live` | None of the above. |
 
 No captain hold can fall through them and none can match two, which is what keeps a hold from vanishing from every view.
@@ -393,7 +393,7 @@ Three accepted limits remain deliberate:
 
 - A remote or secondmate hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
 - A rare concurrent answer-close and re-hold race can leave the newly re-held task without its age basis.
-- Cross-home summaries remain bounded by `FM_SNAPSHOT_SECONDMATE_DECISIONS` and `FM_SNAPSHOT_SECONDMATE_QUEUED`.
+- Cross-home summaries remain bounded by `JG_SNAPSHOT_SECONDMATE_DECISIONS` and `JG_SNAPSHOT_SECONDMATE_QUEUED`.
   A remote deferred hold beyond those bounds is not exported, so it can be neither gated nor revealed.
 
 Re-holding through the wrapper with `--until` remains the durable fix rather than relying on the projection safety net.
@@ -644,4 +644,4 @@ To refresh this record, run:
 - `tests/jg-send-resolve-key.test.sh`, `tests/jg-bearings-board.test.sh`, and `tests/jg-procevent.test.sh`.
 - `bin/jg-lint.sh`.
 
-After a lavish-axi upgrade, run `FM_BEARINGS_LAVISH_LIVE=1 tests/jg-bearings-board-lavish-live-e2e.test.sh`.
+After a lavish-axi upgrade, run `JG_BEARINGS_LAVISH_LIVE=1 tests/jg-bearings-board-lavish-live-e2e.test.sh`.

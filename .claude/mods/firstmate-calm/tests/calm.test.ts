@@ -133,15 +133,15 @@ describe("/calm", () => {
     expect(journal.invalidations).toHaveLength(redrawsBefore);
   });
 
-  test("writes under FM_CONFIG_OVERRIDE when that override names the config directory", async ($, on) => {
-    const { files } = world(on, { env: { FM_CONFIG_OVERRIDE: "/elsewhere/cfg" } });
+  test("writes under JG_CONFIG_OVERRIDE when that override names the config directory", async ($, on) => {
+    const { files } = world(on, { env: { JG_CONFIG_OVERRIDE: "/elsewhere/cfg" } });
     await $.command.run(calmCommand());
     expect(files.get("/elsewhere/cfg/calm")).toBe("on\n");
     expect(files.has(PREFERENCE)).toBe(false);
   });
 
-  test("falls back to FM_ROOT_OVERRIDE, then the tracked code root above the plugin, when FM_HOME is unset", async ($, on) => {
-    const { files } = world(on, { home: undefined, env: { FM_ROOT_OVERRIDE: "/root/override" } });
+  test("falls back to JG_ROOT_OVERRIDE, then the tracked code root above the plugin, when JG_HOME is unset", async ($, on) => {
+    const { files } = world(on, { home: undefined, env: { JG_ROOT_OVERRIDE: "/root/override" } });
     await $.command.run(calmCommand());
     expect(files.get("/root/override/config/calm")).toBe("on\n");
   });

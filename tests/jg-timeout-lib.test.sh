@@ -215,7 +215,7 @@ test_a_named_owner_that_is_gone_ends_the_command() {
   started=$SECONDS
   (
     . "$ROOT/bin/jg-timeout-lib.sh"
-    PATH=$PERL_ONLY FM_EXEC_TIMED_OWNER_PID=$gone \
+    PATH=$PERL_ONLY JG_EXEC_TIMED_OWNER_PID=$gone \
       jg_exec_timed 60 1 bash -c 'echo $$ > "$1"; exec sleep 300' _ "$dir/pid"
   ) || rc=$?
   elapsed=$((SECONDS - started))

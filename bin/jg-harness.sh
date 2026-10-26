@@ -62,8 +62,8 @@
 # process under another harness (a Pi engine under a Claude primary detects as
 # pi) would otherwise resolve "own" - and with it an absent or "default"
 # config/crew-harness or config/secondmate-harness - to its own harness and
-# dispatch crew there. While FM_SUPERVISION_ACTOR=branch, a non-empty
-# FM_SUPERVISION_PRIMARY_HARNESS names the primary's harness and replaces
+# dispatch crew there. While JG_SUPERVISION_ACTOR=branch, a non-empty
+# JG_SUPERVISION_PRIMARY_HARNESS names the primary's harness and replaces
 # detection for the own, crew, and secondmate resolutions; a value that names
 # no known harness refuses (exit 2, nothing on stdout) instead of resolving.
 # Outside the branch actor the pin is ignored, and the evidence-only ancestry
@@ -71,9 +71,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 # shellcheck source=bin/jg-cursor-lib.sh
 . "$SCRIPT_DIR/jg-cursor-lib.sh"
@@ -118,22 +118,22 @@ harness_marker() {
   # omp (Oh My Pi) publishes NO harness-identity marker of its own: verified on
   # omp 18.1.11 that PI_CODING_AGENT is absent from the binary and that the
   # default profile sets neither PI_CODING_AGENT_DIR nor OMP_PROFILE in the
-  # process environment. FM_OMP_HARNESS=omp is therefore a Firstmate-OWNED
+  # process environment. JG_OMP_HARNESS=omp is therefore a Firstmate-OWNED
   # launch marker, established by bin/jg-spawn.sh at the omp launch boundary
   # (which also clears every foreign marker) and by the README's primary launch
   # command. It is a PRECEDENCE override, never evidence on its own: it wins
   # over an inherited CLAUDECODE only when an omp process is genuinely in the
-  # ancestry, so `FM_OMP_HARNESS=omp omp` started from a Claude pane identifies
+  # ancestry, so `JG_OMP_HARNESS=omp omp` started from a Claude pane identifies
   # as omp, while the same variable leaking from an omp secondmate into that
   # home's claude worker (whose ancestry holds no omp) changes nothing. The
   # anchored ancestry arm below covers a plain hand-started `omp` by itself.
-  if [ "${FM_OMP_HARNESS:-}" = omp ] && ancestry_names_omp; then
+  if [ "${JG_OMP_HARNESS:-}" = omp ] && ancestry_names_omp; then
     echo omp
     return
   fi
   [ "${CLAUDECODE:-}" = "1" ] && { echo claude; return; }
   if [ "${PI_CODING_AGENT:-}" = "true" ]; then
-    if [ "${FM_PI_HARNESS:-}" = pi-signed ]; then echo pi-signed; else echo pi; fi
+    if [ "${JG_PI_HARNESS:-}" = pi-signed ]; then echo pi-signed; else echo pi; fi
     return
   fi
   # grok set GROK_AGENT=1 for its child/tool processes (verified, grok 0.2.73).
@@ -160,7 +160,7 @@ harness_marker() {
 
 # True when an exact `omp` process sits within eight parents of this one. The
 # same anchored match as the ancestry walk below, kept separate so the marker
-# precedence above can demand real process evidence before trusting FM_OMP_HARNESS.
+# precedence above can demand real process evidence before trusting JG_OMP_HARNESS.
 ancestry_names_omp() {
   local pid=$$ comm
   for _ in 1 2 3 4 5 6 7 8; do
@@ -397,14 +397,14 @@ harness_family() {
 # Print the supervision-branch primary pin when it applies (header), or
 # nothing. Returns 2, with the reason on stderr, for a pin naming no harness.
 supervision_primary_pin() {
-  local pin=${FM_SUPERVISION_PRIMARY_HARNESS:-}
-  [ "${FM_SUPERVISION_ACTOR:-}" = branch ] && [ -n "$pin" ] || return 0
+  local pin=${JG_SUPERVISION_PRIMARY_HARNESS:-}
+  [ "${JG_SUPERVISION_ACTOR:-}" = branch ] && [ -n "$pin" ] || return 0
   case "$pin" in
     claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
       printf '%s\n' "$pin"
       ;;
     *)
-      echo "error: FM_SUPERVISION_PRIMARY_HARNESS='$pin' names no known harness; refusing to resolve the supervision branch's harness" >&2
+      echo "error: JG_SUPERVISION_PRIMARY_HARNESS='$pin' names no known harness; refusing to resolve the supervision branch's harness" >&2
       return 2
       ;;
   esac

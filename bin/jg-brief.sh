@@ -32,8 +32,8 @@
 #   firstmate repo itself (its home is a firstmate worktree, its crews take pooled
 #   worktrees of the same repo). It is mutually exclusive with a project list, and
 #   omitting both still fails loudly so an accidental omission is never silent.
-#   Set FM_SECONDMATE_CHARTER='<charter>' to fill the charter text.
-#   Set FM_SECONDMATE_SCOPE='<scope>' to write a routing scope distinct from the charter text.
+#   Set JG_SECONDMATE_CHARTER='<charter>' to fill the charter text.
+#   Set JG_SECONDMATE_SCOPE='<scope>' to write a routing scope distinct from the charter text.
 #   --herdr-lab is mandatory when the task will issue Herdr lifecycle commands.
 #   It adds the hard isolation contract backed by bin/jg-herdr-lab.sh.
 #   The flag must be explicit because {TASK} and {FIRSTMATE_SPEC} are filled
@@ -113,7 +113,7 @@
 # There is no --yolo flag here. The worker never owns merge decisions, so yolo is
 # a spawn-time and firstmate-side input only (AGENTS.md section 7).
 # Every scaffold's status protocol distinguishes the configured
-# declared-external-wait verb (FM_CLASSIFY_PAUSED_VERB, default "paused") from
+# declared-external-wait verb (JG_CLASSIFY_PAUSED_VERB, default "paused") from
 # "blocked:": pause for a known wait expected to clear on its own, including
 # the worker's own background work, pipeline or long command; blocked when
 # firstmate must act. The first-sight alert remains; repeats use the long cadence.
@@ -169,7 +169,7 @@ esac
 . "$SCRIPT_DIR/jg-dod-lib.sh"
 # shellcheck source=bin/jg-role-lib.sh
 . "$SCRIPT_DIR/jg-role-lib.sh"
-PAUSED_VERB=${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}
+PAUSED_VERB=${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}
 IFS= read -r -d '' CREWMATE_PAUSE_INSTRUCTIONS <<EOF || true
    Use \`$PAUSED_VERB: {why}\` - never \`blocked:\` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
    Before ending your turn with your own background shell or monitor still running, or before waiting on your own pipeline run or a long foreground command, append \`$PAUSED_VERB [at=<epoch>]: {job and completion condition}\` to the status file.
@@ -193,19 +193,19 @@ resolve_directory_input() {
   printf '%s\n' "$resolved"
 }
 
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME=$(resolve_directory_input FM_HOME "${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}") || exit 1
-if [ -n "${FM_DATA_OVERRIDE:-}" ]; then
-  DATA=$(resolve_directory_input FM_DATA_OVERRIDE "$FM_DATA_OVERRIDE") || exit 1
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME=$(resolve_directory_input JG_HOME "${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}") || exit 1
+if [ -n "${JG_DATA_OVERRIDE:-}" ]; then
+  DATA=$(resolve_directory_input JG_DATA_OVERRIDE "$JG_DATA_OVERRIDE") || exit 1
 else
-  DATA="$FM_HOME/data"
+  DATA="$JG_HOME/data"
 fi
-if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
-  STATE=$(resolve_directory_input FM_STATE_OVERRIDE "$FM_STATE_OVERRIDE") || exit 1
+if [ -n "${JG_STATE_OVERRIDE:-}" ]; then
+  STATE=$(resolve_directory_input JG_STATE_OVERRIDE "$JG_STATE_OVERRIDE") || exit 1
 else
-  STATE="$FM_HOME/state"
+  STATE="$JG_HOME/state"
 fi
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 case "$CONFIG" in /*) ;; *) CONFIG="$PWD/$CONFIG" ;; esac
 KIND=ship
 HERDR_LAB=0
@@ -366,12 +366,12 @@ if [ "$KIND" = ship ] && [ "$MODE" != local-only ] && [ "$PROJECT_DIR_SET" -eq 1
     exit 1
   }
   gate_rc=0
-  jg_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROJECT_DIR" "$FM_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
+  jg_role_gate_self_publish "$JG_HOME" "$CONFIG" "$PROJECT_DIR" "$JG_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
   case $gate_rc in
     0 | 2) ;;
     *)
-      echo "error: $FM_ROLE_PUB_DENIAL" >&2
-      echo "error: to let this home publish to ${FM_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
+      echo "error: $JG_ROLE_PUB_DENIAL" >&2
+      echo "error: to let this home publish to ${JG_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
       exit 1
       ;;
   esac
@@ -410,7 +410,7 @@ if [ "$KIND" != secondmate ] && { [ -e "$BRIEF_INCLUDE_FILE" ] || [ -L "$BRIEF_I
   [ -n "$(printf '%s' "$BRIEF_INCLUDE_BODY" | tr -d '[:space:]')" ] || BRIEF_INCLUDE_BODY=
 fi
 
-_bi="${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"
+_bi="${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"
 # shellcheck disable=SC1090 # The optional add-on source is installed outside this repository.
 [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }
 
@@ -443,13 +443,13 @@ STATUS_FILE=$(shell_quote "$STATE/$ID.status")
 # the opt-in fleet ledger (docs/fleet-ledger.md) records it at once, costing one
 # file test when the flag is absent. A host without that flag, such as a remote
 # second mate's, runs only the append; the watcher capture is the backstop.
-STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" >> $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$FM_ROOT/bin/jg-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
+STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" >> $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$JG_ROOT/bin/jg-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
 INBOX_DIR=$(shell_quote "$STATE/$ID.inbox")
 
 # The receive-and-ack half of the steering-inbox contract, included in every
 # scaffold kind. The record format, doorbell line, and re-ring ladder are
 # owned by bin/jg-task-inbox-lib.sh. The doorbell names the inbox as
-# "$FM_TASK_INBOX", which bin/jg-spawn.sh exports into every launch; the full
+# "$JG_TASK_INBOX", which bin/jg-spawn.sh exports into every launch; the full
 # path here remains the fallback for a worker launched without that export.
 # The doorbell itself is self-describing, so this section is reinforcement
 # for the natural-checkpoint habit, not the only carrier of the instruction.
@@ -502,8 +502,8 @@ if [ "$NO_PROJECTS" -eq 1 ]; then
 else
   [ -n "$SECONDMATE_PROJECTS" ] || { echo "error: --secondmate requires at least one project, or --no-projects for a project-less home" >&2; exit 1; }
 fi
-SECONDMATE_CHARTER=${FM_SECONDMATE_CHARTER:-"{TASK}"}
-SECONDMATE_SCOPE=${FM_SECONDMATE_SCOPE:-${FM_SECONDMATE_CHARTER:-"{TASK}"}}
+SECONDMATE_CHARTER=${JG_SECONDMATE_CHARTER:-"{TASK}"}
+SECONDMATE_SCOPE=${JG_SECONDMATE_SCOPE:-${JG_SECONDMATE_CHARTER:-"{TASK}"}}
 if [ "$NO_PROJECTS" -eq 1 ]; then
   PROJECT_CLONES_BODY="None. This is a project-less domain: its subject is the firstmate repo this home lives in, so it needs no separate clones under \`projects/\`; its crews take pooled worktrees of that firstmate repo."
   PROJECT_CLONES_NOTE="This domain has no separate project clones: its subject is the firstmate repo this home lives in, and its crews take pooled worktrees of that repo."
@@ -541,7 +541,7 @@ What only you can append is judgement: the answer to a marked request below, a r
 # Requests from the main firstmate
 You are a firstmate in your own home, so an incoming message reaches you in your own chat.
 You must distinguish who it is from, because the answer goes to a different place.
-A request relayed to you by the main firstmate is tagged with a leading \`$FM_FROMFIRST_LABEL\` marker followed by an invisible system separator; this marker is untypable, so a human never produces it.
+A request relayed to you by the main firstmate is tagged with a leading \`$JG_FROMFIRST_LABEL\` marker followed by an invisible system separator; this marker is untypable, so a human never produces it.
 When a message carries that marker, do the work, then respond via the STATUS/ESCALATION path below, never only in this chat: the main firstmate does not read your chat, so a chat-only reply is lost.
 Marked requests also carry a privacy-safe \`corr=<id>\` token after the marker; include that exact token in your parent status reply (or in the status pointer to a detailed doc) so the parent can correlate the answer.
 Optional helper: \`bin/jg-secondmate-report.sh <verb> <corr_id> <note>\` appends that correlated line to the parent channel itself - do not pass a status path, and do not write a hand path under this home.
@@ -591,7 +591,7 @@ fi
 REPO=${POS[1]}
 
 if [ "$HERDR_LAB" -eq 1 ]; then
-HERDR_LAB_HELPER=$(shell_quote "$FM_ROOT/bin/jg-herdr-lab.sh")
+HERDR_LAB_HELPER=$(shell_quote "$JG_ROOT/bin/jg-herdr-lab.sh")
 # shellcheck disable=SC2016  # single quotes are deliberate: these lines are literal brief text whose backtick-wrapped $(...) and "$HERDR_LAB_SESSION" snippets must reach the reading agent verbatim, not expand at scaffold time; only the '"$VAR"' break-outs interpolate.
 HERDR_SECTION=$(printf '%s\n' \
 '# Herdr isolation - HARD SAFETY CONTRACT' \
@@ -600,8 +600,8 @@ HERDR_SECTION=$(printf '%s\n' \
 'A named non-`default` session plus an explicit `--session <name>` Herdr option on every call is the only viable local isolation.' \
 '' \
 'For tmux-based lab primaries, `bin/jg-lab-home.sh` owns the short private socket directory; do not place `TMUX_TMPDIR` under the lab home or worktree.' \
-'Use `LAB_HOME_HELPER='"$(shell_quote "$FM_ROOT/bin/jg-lab-home.sh")"'`, then `LAB_TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$FM_HOME")` and launch tmux with `TMUX_TMPDIR="$LAB_TMUX_DIR"`.' \
-'Your single EXIT cleanup trap must kill only the server addressed through that `TMUX_TMPDIR`, call `"$LAB_HOME_HELPER" teardown "$FM_HOME"`, and call the Herdr teardown below; do not install a second trap that replaces either cleanup.' \
+'Use `LAB_HOME_HELPER='"$(shell_quote "$JG_ROOT/bin/jg-lab-home.sh")"'`, then `LAB_TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$JG_HOME")` and launch tmux with `TMUX_TMPDIR="$LAB_TMUX_DIR"`.' \
+'Your single EXIT cleanup trap must kill only the server addressed through that `TMUX_TMPDIR`, call `"$LAB_HOME_HELPER" teardown "$JG_HOME"`, and call the Herdr teardown below; do not install a second trap that replaces either cleanup.' \
 '' \
 '1. Set `HERDR_LAB_HELPER='"$HERDR_LAB_HELPER"'` and generate the session name with `HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name '"$ID"')`.' \
 '   Install the combined EXIT cleanup before provisioning, then provision only with `"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"`.' \
@@ -721,7 +721,7 @@ $WAIT_BLOCK$INBOX_SECTION
 Write your findings to \`$DATA/$ID/report.md\`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 $LAVISH_LINE
-Before reporting done, read and follow \`$FM_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
+Before reporting done, read and follow \`$JG_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
 When the report is complete, append \`done [at=<epoch>]: {one-line conclusion}\` to the status file and stop.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; firstmate may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
 EOF
@@ -771,7 +771,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 $RULE1
 2. Keep project edits inside this worktree; keep proof and scratch output outside it, under \`$DATA/$ID/\` or a temporary directory.
    Outside the worktree, write only that task material and the status and steering-inbox records authorized below.
-   Register disposable temporary directories outside the Firstmate home, repository, state and data directories with \`FM_HOME='$FM_HOME' FM_STATE_OVERRIDE='$STATE' FM_DATA_OVERRIDE='$DATA' '$FM_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
+   Register disposable temporary directories outside the Firstmate home, repository, state and data directories with \`JG_HOME='$JG_HOME' JG_STATE_OVERRIDE='$STATE' JG_DATA_OVERRIDE='$DATA' '$JG_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
    Leave the worktree clean before reporting done.
    Never use git stash: all worktrees of a repo share one stash; commit work in progress on your own branch instead.
 3. $FORGE_RULE_LINE
@@ -801,7 +801,7 @@ $WAIT_BLOCK$INBOX_SECTION
 
 # Project memory
 A project's \`AGENTS.md\` or \`CLAUDE.md\` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never to add knowledge because it is missing.
-A correction edits only the wrong text: do not run \`$FM_ROOT/bin/jg-ensure-agents-md.sh\`, create either file, or add sections, headings, or pointers alongside it.
+A correction edits only the wrong text: do not run \`$JG_ROOT/bin/jg-ensure-agents-md.sh\`, create either file, or add sections, headings, or pointers alongside it.
 
 $DOD
 EOF

@@ -25,14 +25,14 @@ make_home() {
 run_inbox() {
   local home=$1
   shift
-  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$INBOX_BIN" "$@"
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$INBOX_BIN" "$@"
 }
 
 run_lock() {
   local home=$1
   shift
-  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$LOCK_BIN" "$@"
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$LOCK_BIN" "$@"
 }
 
 json_get() {
@@ -80,7 +80,7 @@ cp "$ROOT/bin/jg-question-lib.sh" "$isolated/bin/jg-question-lib.sh"
 chmod +x "$isolated/bin/jg-inbox.sh"
 home=$(make_home human-wake-fail)
 set +e
-fail_out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+fail_out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
   "$isolated/bin/jg-inbox.sh" note "saved but not announced" 2>&1)
 fail_code=$?
 set -e
@@ -150,7 +150,7 @@ pass "a crash between recording the request id and publishing the note reuses th
 
 home=$(make_home announce-fail)
 set +e
-saved_out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+saved_out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
   "$isolated/bin/jg-inbox.sh" note --request-id repair-1 --json "please announce" 2>/dev/null)
 saved_code=$?
 set -e
@@ -166,7 +166,7 @@ assert_equals "1" "$(count_notes "$home")" "isolated submit wrote one note"
 assert_equals "0" "$(count_wakes "$home")" "isolated submit wrote no wake"
 
 set +e
-replay_fail=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+replay_fail=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
   "$isolated/bin/jg-inbox.sh" note --request-id repair-1 --json "please announce" 2>/dev/null)
 replay_fail_code=$?
 set -e
@@ -197,7 +197,7 @@ assert_equals "1" "$(count_wakes "$home")" \
   "already-announced must not append another wake"
 home=$(make_home announce-repair)
 set +e
-unannounced=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+unannounced=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
   "$isolated/bin/jg-inbox.sh" note --request-id repair-2 --json "announce me" 2>/dev/null)
 set -e
 unannounced_id=$(printf '%s' "$unannounced" | json_get id)
@@ -212,7 +212,7 @@ pass "saved-but-unannounced notes are repairable without creating a second note"
 # path nor a request-id replay appends one.
 home=$(make_home announce-acked)
 set +e
-acked=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+acked=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
   "$isolated/bin/jg-inbox.sh" note --request-id acked-1 --json "drained before repair" 2>/dev/null)
 set -e
 acked_id=$(printf '%s' "$acked" | json_get id)
@@ -439,7 +439,7 @@ assert_equals "unreadable" "$(printf '%s' "$ready" | python3 -c 'import json,sys
 # check, owns whether the wake will be drained.
 home=$(make_home ready-midturn)
 touch "$home/state/.last-watcher-beat"
-midturn=$(FM_SUPERVISION_MODEL=autoarm run_inbox "$home" ready) \
+midturn=$(JG_SUPERVISION_MODEL=autoarm run_inbox "$home" ready) \
   || fail "ready should succeed for a mid-turn autoarm primary"
 assert_equals "healthy" "$(printf '%s' "$midturn" | json_get wake_consumer state)" \
   "a mid-turn autoarm primary with a fresh beacon has a healthy wake consumer"
@@ -456,7 +456,7 @@ assert_equals "None" "$(printf '%s' "$nobeat" | json_get wake_consumer beacon_ag
   "a beacon that does not exist has no age"
 
 # The intended caller (HTTP backend, ssh host jg-inbox.sh ready) does not set
-# FM_SUPERVISION_MODEL. A live non-harness lock pid must not invent a model
+# JG_SUPERVISION_MODEL. A live non-harness lock pid must not invent a model
 # from the caller's own process tree.
 home=$(make_home ready-no-override)
 printf '%s\n' "$$" > "$home/state/.lock"

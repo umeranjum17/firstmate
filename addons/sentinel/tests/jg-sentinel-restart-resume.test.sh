@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # tests/jg-sentinel-restart-resume.test.sh - real-Herdr journey for the restart
 # resume in bin/jg-sentinel.sh reconcile, token-free.
 #
@@ -11,22 +20,22 @@
 # none for the lane that already acted after the restart. Repeat passes and a
 # second restart must not nudge again while the lane's state is unchanged.
 # Every Herdr call goes through bin/jg-herdr-lab.sh; the default session is
-# never touched. Set FM_SENTINEL_RESUME_EVIDENCE=<dir> to keep the outputs.
+# never touched. Set JG_SENTINEL_RESUME_EVIDENCE=<dir> to keep the outputs.
 set -u
 
-# The Firstmate checkout named by FM_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
+# The Firstmate checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
 # upstream bin/ scripts; the sentinel under test is this add-on's copy.
-[ -n "${FM_UPSTREAM_ROOT:-}" ] || { echo "skip: set FM_UPSTREAM_ROOT to a Firstmate checkout"; exit 0; }
+[ -n "${JG_UPSTREAM_ROOT:-}" ] || { echo "skip: set JG_UPSTREAM_ROOT to a Firstmate checkout"; exit 0; }
 SENTINEL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/jg-sentinel.sh"
 # shellcheck source=/dev/null
-. "$FM_UPSTREAM_ROOT/tests/lib.sh"
+. "$JG_UPSTREAM_ROOT/tests/lib.sh"
 
 command -v herdr >/dev/null 2>&1 || { echo "skip: herdr not found"; exit 0; }
 
-jg_live_gate default-on FM_SENTINEL_RESUME_E2E herdr jq git
+jg_live_gate default-on JG_SENTINEL_RESUME_E2E herdr jq git
 
 HELPER=$ROOT/bin/jg-herdr-lab.sh
-EVID=${FM_SENTINEL_RESUME_EVIDENCE:-}
+EVID=${JG_SENTINEL_RESUME_EVIDENCE:-}
 REAL_PATH=$PATH
 LAB=$(mktemp -d "$(cd "${TMPDIR:-/tmp}" && pwd -P)/jg-resume.XXXXXX")
 S=$("$HELPER" name jg-restart-resume)
@@ -59,10 +68,10 @@ SH
 chmod +x "$LAB/bin/herdr"
 lab() { PATH="$REAL_PATH" "$HELPER" run "$S" "$@"; }
 
-FM_HOME=$("$ROOT/bin/jg-lab-home.sh" create "$HOME_DIR") || fail "could not create the lab home"
-# The lab home is state-only; the sentinel runs the host tool's scripts from FM_HOME/bin.
-ln -s "$ROOT/bin" "$FM_HOME/bin"
-STATE=$FM_HOME/state
+JG_HOME=$("$ROOT/bin/jg-lab-home.sh" create "$HOME_DIR") || fail "could not create the lab home"
+# The lab home is state-only; the sentinel runs the host tool's scripts from JG_HOME/bin.
+ln -s "$ROOT/bin" "$JG_HOME/bin"
+STATE=$JG_HOME/state
 READY=1
 PATH="$REAL_PATH" "$HELPER" provision "$S" >/dev/null || fail "could not provision the lab session"
 
@@ -112,7 +121,7 @@ restart() {
   done
 }
 reconcile() {
-  PATH="$LAB/bin:$REAL_PATH" FM_HOME="$FM_HOME" FM_SENTINEL_HERDR_SESSION="$S" \
+  PATH="$LAB/bin:$REAL_PATH" JG_HOME="$JG_HOME" JG_SENTINEL_HERDR_SESSION="$S" \
     "$SENTINEL" reconcile
 }
 nudges() { find "$STATE/$1.inbox" -maxdepth 1 -name '*.msg' 2>/dev/null | wc -l | tr -d ' '; }

@@ -4,7 +4,7 @@
 # Watcher liveness and worktree-tangle guard, called by supervision scripts, by
 # jg-wake-drain.sh after it empties queued wakes, and by jg-session-start.sh in
 # read-only advisory mode whenever session-lock ownership was not verified.
-# First, always warn if the firstmate primary checkout (FM_ROOT) is on a named
+# First, always warn if the firstmate primary checkout (JG_ROOT) is on a named
 # non-default branch, because that means firstmate-on-itself work landed in the
 # primary instead of an isolated worktree.
 # Then, if the home needs supervision (bin/jg-supervision-lib.sh owns that
@@ -24,7 +24,7 @@
 # persistent-watcher harness a live identity-matched watcher with a fresh beacon
 # is required. The banner names the true failing condition (a missing live
 # watcher process vs a genuinely stale beacon). The full banner is emitted once
-# per distinct down-episode in this FM_HOME (keyed to the failing condition, not
+# per distinct down-episode in this JG_HOME (keyed to the failing condition, not
 # the beacon mtime, which a healthy between-turns watcher advances every poll);
 # later guarded commands in the same episode print a one-line reminder instead.
 # Episode state lives only under state/.guard-watcher-stale-banner (volatile,
@@ -38,7 +38,7 @@
 # going silent about a visibly non-empty queue, main gets a distinct advisory
 # naming the branch as the holder and saying not to drain those rows.
 # The ordinary warning also stays silent for the supervision branch
-# actor (FM_SUPERVISION_ACTOR=branch), because that actor runs guarded commands
+# actor (JG_SUPERVISION_ACTOR=branch), because that actor runs guarded commands
 # while handling exactly the queued rows its grant covers and can drain nothing
 # else. The watcher-down banner and its reminder stay silent for that actor too,
 # and its calls leave the episode state alone: the branch never owns watcher
@@ -50,17 +50,17 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 WATCH="$SCRIPT_DIR/jg-watch.sh"
-GRACE=${FM_GUARD_GRACE:-300}
+GRACE=${JG_GUARD_GRACE:-300}
 queue_pending=false
 queue_branch_held=false
-READ_ONLY=${FM_GUARD_READ_ONLY:-0}
+READ_ONLY=${JG_GUARD_READ_ONLY:-0}
 case "$READ_ONLY" in 1|true|TRUE|yes|YES) READ_ONLY=1 ;; *) READ_ONLY=0 ;; esac
-CONTINUE_LINE=${FM_GUARD_CONTINUE_LINE:-This is a supervision warning only; the guarded operation WILL still run.}
+CONTINUE_LINE=${JG_GUARD_CONTINUE_LINE:-This is a supervision warning only; the guarded operation WILL still run.}
 
 # Volatile, home-scoped episode marker: one line = the current stale-episode key.
 # Cleared when the home leaves the unhealthy state so a later episode re-arms.
@@ -148,26 +148,26 @@ jg_guard_clear_stale_banner() {
 }
 
 # Worktree-tangle alarm, checked FIRST and independent of in-flight tasks: the
-# firstmate PRIMARY checkout (FM_ROOT) must stay on its default branch. If a
+# firstmate PRIMARY checkout (JG_ROOT) must stay on its default branch. If a
 # crewmate's branch/commits landed here instead of in its own isolated worktree,
 # the primary is stranded on a feature branch - surface it loudly on the very next
 # fleet action, the same way the watcher-down banner does. Scoped to the primary
 # only: detached HEAD (linked worktrees, secondmate homes) never trips this.
-tangle_branch=$(jg_primary_tangle_branch "$FM_ROOT" || true)
+tangle_branch=$(jg_primary_tangle_branch "$JG_ROOT" || true)
 if [ -n "$tangle_branch" ]; then
-  tangle_default=$(jg_default_branch "$FM_ROOT" 2>/dev/null || echo main)
+  tangle_default=$(jg_default_branch "$JG_ROOT" 2>/dev/null || echo main)
   trule='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
   {
     printf '●%s\n' "$trule"
     printf '●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH\n'
-    printf "●  %s is on '%s', not its default branch '%s'.\n" "$FM_ROOT" "$tangle_branch" "$tangle_default"
+    printf "●  %s is on '%s', not its default branch '%s'.\n" "$JG_ROOT" "$tangle_branch" "$tangle_default"
     printf '●  A crewmate likely branched/committed in the primary instead of its own worktree.\n'
     printf "●  The work is SAFE on the '%s' ref.\n" "$tangle_branch"
     if [ "$READ_ONLY" -eq 1 ]; then
       printf '●  This read-only session must leave restore work to a session with verified fleet-lock ownership.\n'
     else
       printf "●  Restore the primary to '%s':\n" "$tangle_default"
-      printf '●      git -C %s checkout %s\n' "$FM_ROOT" "$tangle_default"
+      printf '●      git -C %s checkout %s\n' "$JG_ROOT" "$tangle_default"
       printf "●  then re-validate '%s' in a proper isolated worktree.\n" "$tangle_branch"
     fi
     printf '●%s\n' "$trule"
@@ -178,14 +178,14 @@ fi
 # grace-based predicate (bin/jg-supervision-lib.sh), which owns what needs
 # supervision.
 jg_supervision_status "$STATE" "$GRACE"
-in_flight=$FM_SUP_IN_FLIGHT
-sources=$FM_SUP_SOURCES
-checks=$FM_SUP_CHECKS
-needed=$FM_SUP_NEEDED
-beacon_desc=$FM_SUP_BEACON_DESC
-jg_watcher_supervision_verdict "$STATE" "$WATCH" "$GRACE" "$FM_HOME" "$FM_ROOT"
-watcher_healthy=$FM_WATCHER_VERDICT_OK
-watcher_down_reason=$FM_WATCHER_VERDICT_REASON
+in_flight=$JG_SUP_IN_FLIGHT
+sources=$JG_SUP_SOURCES
+checks=$JG_SUP_CHECKS
+needed=$JG_SUP_NEEDED
+beacon_desc=$JG_SUP_BEACON_DESC
+jg_watcher_supervision_verdict "$STATE" "$WATCH" "$GRACE" "$JG_HOME" "$JG_ROOT"
+watcher_healthy=$JG_WATCHER_VERDICT_OK
+watcher_down_reason=$JG_WATCHER_VERDICT_REASON
 if [ "$needed" = false ]; then
   # Leave the unhealthy state (nothing riding on the watcher): clear so a later
   # work or X-mode need + stale combination is a fresh episode even if the
@@ -199,7 +199,7 @@ fi
 # jg-wake-lib.sh owns that per-actor classification. A non-empty queue with
 # nothing for main is the branch-held case: keep the raw pending signal visible
 # there as its own advisory rather than dropping it.
-if [ -s "$FM_WAKE_QUEUE" ]; then
+if [ -s "$JG_WAKE_QUEUE" ]; then
   if [ "$(jg_wake_actor_pending_count "$GUARD_ACTOR")" -gt 0 ]; then
     queue_pending=true
   elif [ "$GUARD_ACTOR" != branch ] && [ "$(jg_wake_actor_pending_count branch)" -gt 0 ]; then

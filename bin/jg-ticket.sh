@@ -17,7 +17,7 @@
 #
 # The writer is addons/tickets-sync/ticket.py, installed at
 # ${XDG_DATA_HOME:-$HOME/.local/share}/jg-tickets-sync/tickets-sync/ticket.py
-# (FM_TICKETS_TICKET overrides the path).
+# (JG_TICKETS_TICKET overrides the path).
 # When the add-on is not installed, or this home has no fleet board, this does
 # nothing and exits 0: the board is optional and the poll owns creating tickets.
 # A failure names its cause on stderr and exits 1, so callers guard the call and
@@ -25,9 +25,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 usage() {
   sed -n '/^# Usage:/,/^#   --release/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -47,7 +47,7 @@ esac
   *) usage >&2; exit 2 ;;
 esac
 
-WRITER="${FM_TICKETS_TICKET:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-tickets-sync/tickets-sync/ticket.py}"
+WRITER="${JG_TICKETS_TICKET:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-tickets-sync/tickets-sync/ticket.py}"
 [ -f "$WRITER" ] || exit 0
 [ -e "$CONFIG/fleet-board" ] || exit 0
 
@@ -55,4 +55,4 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo 'jg-ticket: python3 is required to write a ticket' >&2
   exit 1
 fi
-FM_HOME=$FM_HOME exec python3 "$WRITER" "$TASK" "$@"
+JG_HOME=$JG_HOME exec python3 "$WRITER" "$TASK" "$@"

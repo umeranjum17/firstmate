@@ -13,7 +13,7 @@ set -u
 # from inside Cursor, Claude, Pi, or Grok inherits those markers, which outrank
 # the fake ancestry the detection cases set up. Drop the ambient markers so the
 # asserted verdict does not depend on which harness launched the suite.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
   ATLASSIAN_AGENT_TYPE ROVODEV_CLI
 
 SPAWN="$ROOT/bin/jg-spawn.sh"
@@ -32,8 +32,8 @@ make_rovo_fakebin() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "$FM_FAKE_TMUX_CALL_LOG"
-state=$(cat "$FM_FAKE_ROVO_STATE" 2>/dev/null || true)
+printf '%s\n' "$*" >> "$JG_FAKE_TMUX_CALL_LOG"
+state=$(cat "$JG_FAKE_ROVO_STATE" 2>/dev/null || true)
 fake_screen() {
   case "$state" in
     ready)
@@ -43,7 +43,7 @@ fake_screen() {
       printf 'Context: | 0.0%% 0/922K\n╭────────────────────────────────╮\n│ > Read the brief and follow it │\n│                                │\n╰────────────────────────────────╯\n'
       ;;
     delivered)
-      printf 'Read the brief at %s and follow it exactly.\nContext: | 3.3%% 30.1K/922K\n╭────────────────────────────────╮\n│ >                              │\n╰────────────────────────────────╯\n' "$FM_FAKE_BRIEF_REAL"
+      printf 'Read the brief at %s and follow it exactly.\nContext: | 3.3%% 30.1K/922K\n╭────────────────────────────────╮\n│ >                              │\n╰────────────────────────────────╯\n' "$JG_FAKE_BRIEF_REAL"
       ;;
     *)
       printf 'shell starting\n$ \n'
@@ -58,7 +58,7 @@ fake_cursor_y() {
   esac
 }
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "$FM_FAKE_PANE_PATH"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "$JG_FAKE_PANE_PATH"; exit 0 ;;
   *"#{cursor_y}"*) fake_cursor_y; exit 0 ;;
 esac
 case "${1:-}" in
@@ -78,12 +78,12 @@ case "${1:-}" in
       esac
       case "$literal" in
         *'run --yolo'*)
-          printf '%s\n' "$literal" >> "$FM_FAKE_LAUNCH_LOG"
-          printf 'launched\n' > "$FM_FAKE_ROVO_STATE"
+          printf '%s\n' "$literal" >> "$JG_FAKE_LAUNCH_LOG"
+          printf 'launched\n' > "$JG_FAKE_ROVO_STATE"
           ;;
         *)
-          printf '%s\n' "$literal" >> "$FM_FAKE_POINTER_LOG"
-          printf 'pointer-typed\n' > "$FM_FAKE_ROVO_STATE"
+          printf '%s\n' "$literal" >> "$JG_FAKE_POINTER_LOG"
+          printf 'pointer-typed\n' > "$JG_FAKE_ROVO_STATE"
           ;;
       esac
       exit 0
@@ -92,15 +92,15 @@ case "${1:-}" in
       *' Enter '*)
         case "$state" in
           launched)
-            if [ "${FM_FAKE_ROVO_READY:-yes}" = yes ]; then
-              printf 'ready\n' > "$FM_FAKE_ROVO_STATE"
+            if [ "${JG_FAKE_ROVO_READY:-yes}" = yes ]; then
+              printf 'ready\n' > "$JG_FAKE_ROVO_STATE"
             fi
             ;;
           pointer-typed)
-            if [ "${FM_FAKE_ROVO_DELIVERY:-yes}" = yes ]; then
-              printf 'delivered\n' > "$FM_FAKE_ROVO_STATE"
+            if [ "${JG_FAKE_ROVO_DELIVERY:-yes}" = yes ]; then
+              printf 'delivered\n' > "$JG_FAKE_ROVO_STATE"
             else
-              printf 'ready\n' > "$FM_FAKE_ROVO_STATE"
+              printf 'ready\n' > "$JG_FAKE_ROVO_STATE"
             fi
             ;;
         esac
@@ -165,23 +165,23 @@ $1
 EOF
 }
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 run_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6
   shift 6
-  HOME="$home" FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    FM_FAKE_POINTER_LOG="$case_dir/pointer.log" \
-    FM_FAKE_ROVO_STATE="$case_dir/rovo.state" \
-    FM_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
-    FM_FAKE_BRIEF_REAL="$(cd "$home/data/$id" && pwd -P)/launch-brief.md" \
-    FM_FAKE_ROVO_READY="${FM_FAKE_ROVO_READY:-yes}" \
-    FM_FAKE_ROVO_DELIVERY="${FM_FAKE_ROVO_DELIVERY:-yes}" \
-    FM_ROVO_READY_POLLS=3 FM_ROVO_DELIVERY_POLLS=3 FM_ROVO_POLL_INTERVAL=0 \
+  HOME="$home" JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+    JG_FAKE_POINTER_LOG="$case_dir/pointer.log" \
+    JG_FAKE_ROVO_STATE="$case_dir/rovo.state" \
+    JG_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
+    JG_FAKE_BRIEF_REAL="$(cd "$home/data/$id" && pwd -P)/launch-brief.md" \
+    JG_FAKE_ROVO_READY="${JG_FAKE_ROVO_READY:-yes}" \
+    JG_FAKE_ROVO_DELIVERY="${JG_FAKE_ROVO_DELIVERY:-yes}" \
+    JG_ROVO_READY_POLLS=3 JG_ROVO_DELIVERY_POLLS=3 JG_ROVO_POLL_INTERVAL=0 \
     PATH="$fakebin:$BASE_PATH" \
     "$SPAWN" "$id" "$proj" --harness rovo --mode no-mistakes --yolo off "$@" 2>&1
 }
@@ -205,7 +205,7 @@ test_rovo_launch_then_send_is_verified() {
   assert_not_contains "$launch" "encode launch-brief" "rovo launch carried a positional brief instead of launching bare"
   assert_not_contains "$launch" "brief for rovo" "rovo launch embedded the brief body as a positional argument"
   assert_contains "$launch" "--model 'auto'" "rovo launch omitted the requested model"
-  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS" \
+  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS" \
     "rovo launch did not clear foreign primary markers"
   assert_contains "$launch" "env -u CURSOR_AGENT -u CURSOR_INVOKED_AS" \
     "rovo launch did not clear cursor's markers via the shared outer wrap"
@@ -286,7 +286,7 @@ test_rovo_readiness_gate_precedes_pointer() {
   rec=$(make_spawn_case not-ready "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_ROVO_READY=no run_spawn \
+  out=$(JG_FAKE_ROVO_READY=no run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "rovo spawn without a ready signal should fail"
   assert_contains "$out" "rovo did not show a verified ready signal" \
@@ -300,7 +300,7 @@ test_rovo_readiness_gate_precedes_pointer() {
     || fail "a failed rovo readiness gate must tear down the exact endpoint it created instead of leaking an orphaned --yolo process"
   status_line_at_epoch "$line" >/dev/null \
     || fail "new rovo spawn failure has unknown emission time: $line"
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf 'Rovo readiness failure CLI output:\n%s\nPersisted status:\n%s\n' "$out" "$line"
   fi
   pass "jg-spawn: rovo never sends the brief pointer before an observable ready signal, and tears down the created endpoint on failure"
@@ -312,7 +312,7 @@ test_rovo_unconfirmed_delivery_fails_loudly() {
   rec=$(make_spawn_case drop "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_ROVO_DELIVERY=no run_spawn \
+  out=$(JG_FAKE_ROVO_DELIVERY=no run_spawn \
     "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "an unconfirmed rovo delivery should fail"
   # The pointer was typed (readiness passed) but its delivery never confirmed.
@@ -349,10 +349,10 @@ test_rovo_secondmate_is_refused() {
   rec=$(make_spawn_case secondmate-refuse "$id")
   read_spawn_record "$rec"
   rc=0
-  out=$(HOME="$HOME_DIR" FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
+  out=$(HOME="$HOME_DIR" JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
     "$SPAWN" "$id" --secondmate rovo 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a rovo secondmate spawn should be refused"
   assert_contains "$out" "rovo is a verified crewmate/scout adapter only" \
@@ -387,19 +387,19 @@ esac
 SH
   chmod +x "$fakebin/ps"
 
-  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u ATLASSIAN_AGENT_TYPE -u ROVODEV_CLI \
-    PATH="$fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    PATH="$fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = rovo ] || fail "rovo ancestry detection returned '$out'"
 
   out=$(env -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     ATLASSIAN_AGENT_TYPE=rovo CLAUDECODE=1 \
-    PATH="$fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    PATH="$fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = rovo ] || fail "rovo's ATLASSIAN_AGENT_TYPE marker did not outrank an inherited CLAUDECODE, got '$out'"
 
   out=$(env -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     ROVODEV_CLI=1 CLAUDECODE=1 \
-    PATH="$fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    PATH="$fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = rovo ] || fail "rovo's ROVODEV_CLI marker did not outrank an inherited CLAUDECODE, got '$out'"
 
   # CLAUDECODE alone, with no rovo marker, is a marker-layer question, not an
@@ -410,7 +410,7 @@ SH
   blind_fakebin=$(jg_fakebin "$dir/blind-ancestry")
   jg_fake_blind_ancestry "$blind_fakebin"
   out=$(env -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    CLAUDECODE=1 PATH="$blind_fakebin:$BASE_PATH" FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
+    CLAUDECODE=1 PATH="$blind_fakebin:$BASE_PATH" JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh")
   [ "$out" = claude ] || fail "verified env-marker precedence changed, got '$out'"
   pass "jg-harness: rovo's markers outrank an inherited CLAUDECODE, and markerless ancestry still resolves rovo"
 }

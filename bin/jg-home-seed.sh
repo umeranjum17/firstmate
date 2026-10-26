@@ -24,8 +24,8 @@
 #       generated briefs, new homes, new project clones, and registry edits are
 #       rolled back. Treehouse-acquired homes are returned only when the rollback
 #       target is safe; a failed return warns because the lease may still be held.
-#       Set FM_SECONDMATE_CHARTER='<charter>' to seed from inline charter text
-#       when no filled charter brief exists. Set FM_SECONDMATE_SCOPE='<scope>'
+#       Set JG_SECONDMATE_CHARTER='<charter>' to seed from inline charter text
+#       when no filled charter brief exists. Set JG_SECONDMATE_SCOPE='<scope>'
 #       to override the registry routing scope. Otherwise the registry summary
 #       and scope are derived from the filled charter brief.
 #   jg-home-seed.sh validate
@@ -35,11 +35,11 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 REG="$DATA/secondmates.md"
 SUB_HOME_MARKER=".jg-secondmate-home"
 SUB_HOME_PARENT_MARKER=".jg-secondmate-parent"
@@ -222,8 +222,8 @@ resolved_path() {
 refuse_active_home_path() {
   local home=$1 abs_home abs_active_home abs_root
   abs_home=$(resolved_path "$home")
-  abs_active_home=$(resolved_path "$FM_HOME")
-  abs_root=$(resolved_path "$FM_ROOT")
+  abs_active_home=$(resolved_path "$JG_HOME")
+  abs_root=$(resolved_path "$JG_ROOT")
   if [ "$abs_home" = "/" ]; then
     echo "error: secondmate home cannot be the filesystem root: $home" >&2
     return 1
@@ -263,8 +263,8 @@ validate_operational_dir() {
   fi
   abs_home=$(resolved_path "$home")
   abs_dir=$(resolved_path "$dir")
-  abs_active_home=$(resolved_path "$FM_HOME")
-  abs_root=$(resolved_path "$FM_ROOT")
+  abs_active_home=$(resolved_path "$JG_HOME")
+  abs_root=$(resolved_path "$JG_ROOT")
   if ! path_is_ancestor_of "$abs_home" "$abs_dir"; then
     echo "error: secondmate $name directory must resolve inside the secondmate home: $dir" >&2
     return 1
@@ -316,10 +316,10 @@ validate_existing_parent_binding() {
   record="$home/$SUB_HOME_PARENT_MARKER"
   [ -f "$record" ] && [ ! -L "$record" ] || return 0
   jg_secondmate_parent_record_parse "$record" || return 0
-  [ "$FM_SECONDMATE_PARENT_ROUTE" = local ] || return 0
+  [ "$JG_SECONDMATE_PARENT_ROUTE" = local ] || return 0
 
-  recorded_parent=$(resolved_path "$FM_SECONDMATE_PARENT_HOME")
-  requested_parent=$(resolved_path "$FM_HOME")
+  recorded_parent=$(resolved_path "$JG_SECONDMATE_PARENT_HOME")
+  requested_parent=$(resolved_path "$JG_HOME")
   [ "$recorded_parent" = "$requested_parent" ] && return 0
   printf 'error: secondmate home is bound to parent %s, not requested parent %s\n' \
     "$recorded_parent" "$requested_parent" >&2
@@ -333,8 +333,8 @@ validate_project_destination() {
   abs_home=$(resolved_path "$home")
   abs_projects=$(resolved_path "$projects_dir")
   abs_dst=$(resolved_path "$dst")
-  abs_active_home=$(resolved_path "$FM_HOME")
-  abs_root=$(resolved_path "$FM_ROOT")
+  abs_active_home=$(resolved_path "$JG_HOME")
+  abs_root=$(resolved_path "$JG_ROOT")
   if ! path_is_ancestor_of "$abs_home" "$abs_projects"; then
     echo "error: secondmate projects directory must resolve inside the secondmate home: $projects_dir" >&2
     return 1
@@ -391,22 +391,22 @@ seeded_origin_url() {
 
 acquire_treehouse_home() (
   local id=$1 home project_lock
-  project_lock=$(jg_treehouse_project_lock_path "$FM_ROOT") || return 1
+  project_lock=$(jg_treehouse_project_lock_path "$JG_ROOT") || return 1
   jg_lock_try_acquire "$project_lock" || {
-    echo "error: another Treehouse slot allocation or return is in progress for $FM_ROOT; refusing to race it" >&2
+    echo "error: another Treehouse slot allocation or return is in progress for $JG_ROOT; refusing to race it" >&2
     return 1
   }
   trap 'jg_lock_release "$project_lock"' EXIT
   jg_local_firstmate_state_dirs "$STATE" || {
-    echo "error: cannot enumerate recorded Treehouse copies: $FM_LOCAL_FIRSTMATE_ERROR" >&2
+    echo "error: cannot enumerate recorded Treehouse copies: $JG_LOCAL_FIRSTMATE_ERROR" >&2
     return 1
   }
-  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$FM_ROOT" "${FM_LOCAL_FIRSTMATE_STATES[@]}" || return 1
+  python3 "$SCRIPT_DIR/jg-treehouse-protect.py" "$JG_ROOT" "${JG_LOCAL_FIRSTMATE_STATES[@]}" || return 1
   # Durably lease a firstmate worktree from the pool. The lease persists with no
   # live process and is skipped by later get/prune, so the home survives restarts
   # until teardown or rollback returns it. treehouse prints only the worktree path
   # to stdout (banners go to stderr), so command substitution captures the path.
-  home=$(cd "$FM_ROOT" && treehouse get --lease --lease-holder "$id") || {
+  home=$(cd "$JG_ROOT" && treehouse get --lease --lease-holder "$id") || {
     echo "error: treehouse get --lease failed to lease a firstmate home" >&2
     return 1
   }
@@ -428,7 +428,7 @@ ensure_home() {
     [ -d "$home" ] || { echo "error: $home exists and is not a directory" >&2; return 1; }
   else
     mkdir -p "$(dirname "$home")"
-    git clone --quiet "$FM_ROOT" "$home"
+    git clone --quiet "$JG_ROOT" "$home"
   fi
   verify_firstmate_home "$home"
 }
@@ -475,7 +475,7 @@ EOF
 # seed instead of arriving as an empty mode that passes every posture guard.
 registered_posture_line() {  # <project>
   local project=$1 line
-  line=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$FM_ROOT/bin/jg-project-mode.sh" "$project") || {
+  line=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$JG_ROOT/bin/jg-project-mode.sh" "$project") || {
     echo "error: project $project does not resolve to a delivery posture (see the refusal above); correct $DATA/projects.md" >&2
     return 1
   }
@@ -574,8 +574,8 @@ seed_rollback_target() {
   [ -n "$target" ] || return 1
   [ "$target" != "/" ] || { echo "REFUSED: unsafe $label rollback target $target" >&2; return 1; }
   abs_target=$(resolved_path "$target")
-  abs_home=$(resolved_path "$FM_HOME")
-  abs_root=$(resolved_path "$FM_ROOT")
+  abs_home=$(resolved_path "$JG_HOME")
+  abs_root=$(resolved_path "$JG_ROOT")
   if [ "$abs_target" = "$abs_home" ]; then
     echo "REFUSED: unsafe $label rollback target $target is the active firstmate home" >&2
     return 1
@@ -610,7 +610,7 @@ seed_return_treehouse_home() {
     echo "warning: failed to return treehouse-acquired home $abs_home during seed rollback; treehouse command not found" >&2
     return 0
   fi
-  ( cd "$FM_ROOT" && treehouse return --force "$abs_home" >/dev/null ) || {
+  ( cd "$JG_ROOT" && treehouse return --force "$abs_home" >/dev/null ) || {
     echo "warning: failed to return treehouse-acquired home $abs_home during seed rollback; lease may still be held" >&2
     return 0
   }
@@ -714,7 +714,7 @@ registry_line_for_project() {
 
 project_mode_in_home() {
   local home=$1 project=$2 mode mode_line
-  mode_line=$(FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' FM_HOME="$home" "$FM_ROOT/bin/jg-project-mode.sh" "$project") || {
+  mode_line=$(JG_ROOT_OVERRIDE='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' JG_HOME="$home" "$JG_ROOT/bin/jg-project-mode.sh" "$project") || {
     echo "error: project $project does not resolve to a delivery posture in $home (see the refusal above); correct $home/data/projects.md" >&2
     return 1
   }
@@ -953,15 +953,15 @@ seed_home() {
   SEED_HOME_BACKED_UP=1
 
   if [ ! -f "$SEED_PARENT_BRIEF" ]; then
-    [ -n "${FM_SECONDMATE_CHARTER:-}" ] || {
-      echo "error: no filled secondmate charter brief at $SEED_PARENT_BRIEF; set FM_SECONDMATE_CHARTER or scaffold one and replace {TASK}" >&2
+    [ -n "${JG_SECONDMATE_CHARTER:-}" ] || {
+      echo "error: no filled secondmate charter brief at $SEED_PARENT_BRIEF; set JG_SECONDMATE_CHARTER or scaffold one and replace {TASK}" >&2
       return 1
     }
     [ -d "$DATA/$id" ] || SEED_PARENT_BRIEF_DIR_CREATED=1
     if [ "$no_projects" -eq 1 ]; then
-      "$FM_ROOT/bin/jg-brief.sh" "$id" --secondmate --no-projects
+      "$JG_ROOT/bin/jg-brief.sh" "$id" --secondmate --no-projects
     else
-      "$FM_ROOT/bin/jg-brief.sh" "$id" --secondmate "$@"
+      "$JG_ROOT/bin/jg-brief.sh" "$id" --secondmate "$@"
     fi
     SEED_PARENT_BRIEF_CREATED=1
   fi
@@ -1000,13 +1000,13 @@ seed_home() {
   projects_csv=$(join_projects "$@")
   # Durable record of this home's route to its parent, written once here next
   # to the identity marker: the cleanup check in jg-teardown.sh reads it so a
-  # restart that drops the launch-time FM_PUBLIC_FOLLOWUP_PRIMARY_HOME prefix
+  # restart that drops the launch-time JG_PUBLIC_FOLLOWUP_PRIMARY_HOME prefix
   # can still resolve the real parent instead of silently treating its relay
   # as inactive.
   {
     printf 'schema=jg-secondmate-parent.v1\n'
     printf 'route=local\n'
-    printf 'parent_home=%s\n' "$(resolved_path "$FM_HOME")"
+    printf 'parent_home=%s\n' "$(resolved_path "$JG_HOME")"
   } > "$home/$SUB_HOME_PARENT_MARKER.tmp.$$"
   mv -f -- "$home/$SUB_HOME_PARENT_MARKER.tmp.$$" "$home/$SUB_HOME_PARENT_MARKER"
   printf '%s\n' "$id" > "$home/$SUB_HOME_MARKER.tmp.$$"

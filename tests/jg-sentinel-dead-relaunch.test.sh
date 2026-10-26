@@ -8,7 +8,7 @@
 # that acted after the restart, a lane stopped through jg-control exit, and an
 # ordinary paused lane that did not act. A herdr stand-in reports the server
 # stopped, so every lane reads missing without a live Herdr. Reconcile runs in
-# FM_SENTINEL_DRY_RUN=1, which must print the decisions and leave the home
+# JG_SENTINEL_DRY_RUN=1, which must print the decisions and leave the home
 # byte-identical: the held, acted and stopped lanes are skipped, and the paused
 # lane is still chosen for relaunch. A lane spawned after its exit is relaunched.
 set -u
@@ -85,8 +85,8 @@ case " $* " in
 esac
 SH
 chmod +x "$FAKEBIN_STOP/herdr"
-PATH="$FAKEBIN_STOP:$PATH" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
-  FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+PATH="$FAKEBIN_STOP:$PATH" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
+  JG_DATA_OVERRIDE="$HOME_DIR/data" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
   "$ROOT/bin/jg-control.sh" stopped exit >/dev/null || fail "jg-control exit could not stop the stopped lane"
 [ -f "$STATE/stopped.exit" ] || fail "jg-control exit recorded no exit epoch"
 # The acted lane posted a busy event after the restart, as a relaunched or
@@ -95,8 +95,8 @@ printf 'v1 gen=s%s.1.1 seq=2 state=idle source=claude-hook event=stop ts=%s\n' \
   "$((RESTART - 3600))" "$NOW" > "$STATE/acted.busy-state"
 
 PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$(command -v tasks-axi)" \
-  FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-  FM_CONFIG_OVERRIDE="$HOME_DIR/config" "$ROOT/bin/jg-captain-hold.sh" \
+  JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+  JG_CONFIG_OVERRIDE="$HOME_DIR/config" "$ROOT/bin/jg-captain-hold.sh" \
   hold held --title "Captain call for held lane" --reason "captain must decide the held lane" \
   --repo sample >/dev/null || fail "could not hold the lane's captain call"
 
@@ -106,9 +106,9 @@ snapshot() {
 
 reconcile_dry() {
   PATH="$FAKEBIN:$PATH" REAL_TASKS_AXI="$(command -v tasks-axi)" \
-    FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_SENTINEL_HERDR_SESSION="$SESSION" \
-    FM_SENTINEL_EPISODE="$SESSION:$RESTART" FM_SENTINEL_DRY_RUN=1 \
+    JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_CONFIG_OVERRIDE="$HOME_DIR/config" JG_SENTINEL_HERDR_SESSION="$SESSION" \
+    JG_SENTINEL_EPISODE="$SESSION:$RESTART" JG_SENTINEL_DRY_RUN=1 \
     "$ROOT/bin/jg-sentinel.sh" reconcile
 }
 
@@ -140,7 +140,7 @@ printf '%s\n' "$OUT" | grep -q '^stopped: dry run, no action: agent missing; rel
   || fail "a lane spawned after its exit was not eligible for relaunch: $OUT"
 pass "a lane spawned after its exit is relaunched again"
 
-if FM_HOME="$HOME_DIR" FM_SENTINEL_DRY_RUN=1 FM_SENTINEL_HERDR_SESSION="$SESSION" \
+if JG_HOME="$HOME_DIR" JG_SENTINEL_DRY_RUN=1 JG_SENTINEL_HERDR_SESSION="$SESSION" \
   "$ROOT/bin/jg-sentinel.sh" tick >/dev/null 2>&1; then
   fail "dry run was accepted for tick"
 fi
@@ -162,9 +162,9 @@ SH
 chmod +x "$FAKEBIN_UP/herdr"
 
 oneshot() {  # <home> <path-prefix> <dry-run 0|1>
-  PATH="$2:$PATH" FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" FM_DATA_OVERRIDE="$1/data" \
-    FM_CONFIG_OVERRIDE="$1/config" FM_SENTINEL_HERDR_SESSION="$SESSION" \
-    FM_SENTINEL_EPISODE="$EPISODE" FM_SENTINEL_DRY_RUN="$3" \
+  PATH="$2:$PATH" JG_HOME="$1" JG_STATE_OVERRIDE="$1/state" JG_DATA_OVERRIDE="$1/data" \
+    JG_CONFIG_OVERRIDE="$1/config" JG_SENTINEL_HERDR_SESSION="$SESSION" \
+    JG_SENTINEL_EPISODE="$EPISODE" JG_SENTINEL_DRY_RUN="$3" \
     "$ROOT/bin/jg-sentinel.sh" reconcile
 }
 

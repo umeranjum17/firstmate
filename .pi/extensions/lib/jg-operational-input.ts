@@ -1,9 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 const operationalInputScript =
-  process.env.FM_OPERATIONAL_INPUT_SCRIPT ||
+  process.env.JG_OPERATIONAL_INPUT_SCRIPT ||
   resolve(dirname(fileURLToPath(import.meta.url)), "../../../bin/jg-operational-input.sh");
 
 export const FIRSTMATE_CURRENT_OPERATIONAL_KINDS = [

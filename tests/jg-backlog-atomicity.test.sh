@@ -96,7 +96,7 @@ EOF
 
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;; esac
+case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
 SH
@@ -295,7 +295,7 @@ SH
 
 # The commit's `start` reports success but never moves the row - the beads
 # failure pattern - and interrupts the spawn; every later `start` (the error
-# path's own read-back repair) never answers. With FM_TASKS_AXI_TIMEOUT
+# path's own read-back repair) never answers. With JG_TASKS_AXI_TIMEOUT
 # bounding each call, the verification must time out and exit with the honest
 # attempted wording instead of holding the per-task meta lock open forever.
 hang_start_after_first() {  # <case-dir>
@@ -342,7 +342,7 @@ run_bounded_jg_tasks_axi() {  # <fallback-bin> <bound> [args...]
   # PATH, as every real caller does.
   out=$(
     . "$ROOT/bin/jg-backlog-transition-lib.sh"
-    PATH="$fb" FM_TASKS_AXI_TIMEOUT="$bound" jg_tasks_axi "$@" 2>&1
+    PATH="$fb" JG_TASKS_AXI_TIMEOUT="$bound" jg_tasks_axi "$@" 2>&1
   ) || rc=$?
   printf '%s' "$out"
   return "$rc"
@@ -446,7 +446,7 @@ break_launch_delivery() {  # <case-dir>
   local case_dir=$1
   cat > "$case_dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;; esac
+case "$*" in *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   send-keys) exit 1 ;;
@@ -496,7 +496,7 @@ interrupt_kimi_readiness() {  # <case-dir>
   cat > "$case_dir/fakebin/tmux" <<SH
 #!/usr/bin/env bash
 case "\$*" in
-  *"#{pane_current_path}"*) printf '%s\\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
   *"#{cursor_y}"*) printf '1\\n'; exit 0 ;;
 esac
 case "\${1:-}" in
@@ -601,8 +601,8 @@ run_spawn() {  # <case-dir> <args...>
   # store (bin/jg-claude-trust.sh), so it runs against a throwaway HOME;
   # without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$case_dir/user-home"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" HOME="$case_dir/user-home" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" HOME="$case_dir/user-home" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
     CLAUDE_CONFIG_DIR='' \
     PATH="$case_dir/fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
@@ -619,15 +619,15 @@ run_ship_spawn() {  # <case-dir> <id>
 run_teardown() {  # <case-dir> <id> [args...]
   local case_dir=$1
   shift
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
     PATH="$case_dir/fakebin:$PATH" \
     "$TEARDOWN" "$@" 2>&1
 }
 
 run_bootstrap() {  # <case-dir>
   local case_dir=$1
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
-    FM_BOOTSTRAP_NETWORK=skip \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
+    JG_BOOTSTRAP_NETWORK=skip \
     PATH="$case_dir/fakebin:$PATH" \
     "$BOOTSTRAP" 2>&1
 }
@@ -722,8 +722,8 @@ test_backlog_callers_refuse_unreadable_backend_config() (
     [ "$rc" -eq 2 ] || fail "$operation ignored the backend error (exit $rc)"
     [ ! -s "$case_dir/stdout" ] || fail "$operation returned data despite the backend error"
     case "$operation" in
-      jg_backlog_row_probe) diagnostic=$FM_BACKLOG_ROW_ERROR ;;
-      jg_backlog_transition_applies|jg_backlog_mutate) diagnostic=$FM_BACKLOG_TRANSITION_ERROR ;;
+      jg_backlog_row_probe) diagnostic=$JG_BACKLOG_ROW_ERROR ;;
+      jg_backlog_transition_applies|jg_backlog_mutate) diagnostic=$JG_BACKLOG_TRANSITION_ERROR ;;
       *) diagnostic=$(cat "$case_dir/stderr") ;;
     esac
     assert_contains "$diagnostic" "tasks-axi backend configuration cannot be read at $case_dir/.tasks.toml" \
@@ -755,8 +755,8 @@ test_captain_hold_preserves_relocated_backlog_on_backend_error() {
       readable) printf '%s\n' 'backend = "markdown"' > "$home/.tasks.toml" ;;
     esac
     rc=0
-    out=$(env -u TASKS_AXI_BACKEND HOME="$case_dir/user-home" FM_HOME="$home" \
-      FM_DATA_OVERRIDE="$data" "$ROOT/bin/jg-captain-hold.sh" hold "$id" \
+    out=$(env -u TASKS_AXI_BACKEND HOME="$case_dir/user-home" JG_HOME="$home" \
+      JG_DATA_OVERRIDE="$data" "$ROOT/bin/jg-captain-hold.sh" hold "$id" \
       --title "Hold regression" --reason "Captain must choose" 2>&1) || rc=$?
     if [ "$config_state" = dangling ]; then
       [ "$rc" -ne 0 ] || fail "captain hold accepted an unresolved backend and changed the wrong backlog"
@@ -915,7 +915,7 @@ test_dispatch_refuses_a_pending_authoritative_close() {
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
-  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
@@ -950,7 +950,7 @@ test_dispatch_refuses_a_held_row_before_creating_resources() {
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
-  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
@@ -985,7 +985,7 @@ test_dispatch_refuses_a_blocked_row_before_creating_resources() {
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
-  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
@@ -1020,7 +1020,7 @@ test_dispatch_refuses_a_held_in_flight_row_before_relaunch() {
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
   *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
-  *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "\${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
 exit 0
@@ -1072,7 +1072,7 @@ test_recovery_uses_the_parent_of_a_trailing_slash_data_record() {
   printf 'id=%s\ndata=%s/\nspawn_gen=spawn-relocated-recovery\narg=--note\narg=local%%20main\n' "$id" "$relocated" > "$marker"
   require_show_cwd "$case_dir" "$(cd "$case_dir" && pwd -P)"
 
-  out=$(FM_DATA_OVERRIDE="$relocated/" run_bootstrap "$case_dir")
+  out=$(JG_DATA_OVERRIDE="$relocated/" run_bootstrap "$case_dir")
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
     || fail "relocated-data recovery used the wrong addressing root: $out"
   assert_absent "$marker" "relocated-data recovery retained its close marker"
@@ -1095,8 +1095,8 @@ test_completion_targets_a_nested_relative_data_directory() {
   write_task_meta "$case_dir" "$id" ship local-only "spawn_gen=spawn-relative-data"
 
   out=$(cd "$case_dir" && \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
-    FM_DATA_OVERRIDE="$relative_data" PATH="$case_dir/fakebin:$PATH" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
+    JG_DATA_OVERRIDE="$relative_data" PATH="$case_dir/fakebin:$PATH" \
     "$TEARDOWN" "$id" 2>&1) \
     || fail "relative-data teardown failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
@@ -1121,13 +1121,13 @@ test_immediate_child_absolute_data_dispatches_and_completes() {
   backlog="$data/backlog.md"
   tasks-axi add "$id" "item for $id" --kind ship --file "$backlog" >/dev/null
 
-  out=$(FM_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") \
+  out=$(JG_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") \
     || fail "immediate-child-data spawn failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = in_flight ] \
     || fail "immediate-child absolute dispatch mutated a different backlog"
   rm -f "$(home_of "$case_dir")/state/$id.meta"
   write_task_meta "$case_dir" "$id" ship local-only "spawn_gen=spawn-immediate-child"
-  out=$(FM_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") \
+  out=$(JG_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") \
     || fail "immediate-child-data teardown failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
     || fail "immediate-child absolute completion mutated a different backlog"
@@ -1146,13 +1146,13 @@ test_bare_relative_data_dispatches_and_completes() {
   backlog="$data/backlog.md"
   tasks-axi add "$id" "item for $id" --kind ship --file "$backlog" >/dev/null
 
-  out=$(cd "$case_dir" && FM_DATA_OVERRIDE=records run_ship_spawn "$case_dir" "$id") \
+  out=$(cd "$case_dir" && JG_DATA_OVERRIDE=records run_ship_spawn "$case_dir" "$id") \
     || fail "bare-relative-data spawn failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = in_flight ] \
     || fail "bare relative dispatch mutated a different backlog"
   rm -f "$(home_of "$case_dir")/state/$id.meta"
   write_task_meta "$case_dir" "$id" ship local-only "spawn_gen=spawn-bare-relative"
-  out=$(cd "$case_dir" && FM_DATA_OVERRIDE=records run_teardown "$case_dir" "$id") \
+  out=$(cd "$case_dir" && JG_DATA_OVERRIDE=records run_teardown "$case_dir" "$id") \
     || fail "bare-relative-data teardown failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
     || fail "bare relative completion mutated a different backlog"
@@ -1478,15 +1478,15 @@ test_deferred_signal_verification_outlives_an_unresponsive_tasks_axi() {
   hang_start_after_first "$case_dir"
 
   # The read-back's own `start` never answers, so the spawn must bound it
-  # (FM_TASKS_AXI_TIMEOUT=3), print the attempted wording naming the timeout,
+  # (JG_TASKS_AXI_TIMEOUT=3), print the attempted wording naming the timeout,
   # and exit - the outer 30s bound (jg_run_timed, portable to a host with no
   # timeout binary) only turns a regression back into the lock-held-forever
   # hang it exists to catch.
   mkdir -p "$case_dir/user-home"
-  out=$(jg_run_timed 30 env FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
-    HOME="$case_dir/user-home" FM_SPAWN_NO_GUARD=1 \
-    FM_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" CLAUDE_CONFIG_DIR='' \
-    FM_TASKS_AXI_TIMEOUT=3 PATH="$case_dir/fakebin:$PATH" \
+  out=$(jg_run_timed 30 env JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
+    HOME="$case_dir/user-home" JG_SPAWN_NO_GUARD=1 \
+    JG_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" CLAUDE_CONFIG_DIR='' \
+    JG_TASKS_AXI_TIMEOUT=3 PATH="$case_dir/fakebin:$PATH" \
     "$SPAWN" "$id" "$case_dir/project" \
     --mode no-mistakes --yolo off 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an interrupted spawn reported success"
@@ -1512,7 +1512,7 @@ test_dispatch_interruption_during_kimi_readiness_fails_before_commit() {
   add_item "$case_dir" "$id"
   interrupt_kimi_readiness "$case_dir"
 
-  out=$(HOME="$home" FM_KIMI_READY_POLLS=2 FM_KIMI_POLL_INTERVAL=0 \
+  out=$(HOME="$home" JG_KIMI_READY_POLLS=2 JG_KIMI_POLL_INTERVAL=0 \
     run_spawn "$case_dir" "$id" "$case_dir/project" --harness kimi \
       --mode no-mistakes --yolo off) || rc=$?
   [ "$rc" -ne 0 ] || fail "Kimi readiness interruption was reported as success"
@@ -1586,7 +1586,7 @@ test_completion_closes_a_scout_with_its_report() {
   # captain-call completion gate; satisfy both the way a real scout does.
   mkdir -p "$(home_of "$case_dir")/data/$id"
   printf 'findings\n' > "$(home_of "$case_dir")/data/$id/report.md"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
     PATH="$case_dir/fakebin:$PATH" \
     "$ROOT/bin/jg-captain-hold.sh" complete "$id" --none >/dev/null \
     || fail "could not record the scout's completed captain-call inventory"
@@ -1656,12 +1656,12 @@ test_completion_records_a_relative_report_for_relocated_data() {
   write_task_meta "$case_dir" "$id" scout '' "spawn_gen=spawn-relocated-scout"
   mkdir -p "$relocated/$id"
   printf 'findings\n' > "$relocated/$id/report.md"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
-    FM_DATA_OVERRIDE="$relocated////" PATH="$case_dir/fakebin:$PATH" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
+    JG_DATA_OVERRIDE="$relocated////" PATH="$case_dir/fakebin:$PATH" \
     "$ROOT/bin/jg-captain-hold.sh" complete "$id" --none >/dev/null \
     || fail "could not record the relocated scout's captain-call inventory"
 
-  out=$(FM_DATA_OVERRIDE="$relocated////" run_teardown "$case_dir" "$id") \
+  out=$(JG_DATA_OVERRIDE="$relocated////" run_teardown "$case_dir" "$id") \
     || fail "relocated scout teardown failed: $out"
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
     || fail "relocated scout backlog row was not closed"
@@ -1684,21 +1684,21 @@ test_space_containing_scout_report_marker_replays() {
   write_task_meta "$case_dir" "$id" scout '' "spawn_gen=spawn-space-report"
   mkdir -p "$data/$id"
   printf 'findings\n' > "$data/$id/report.md"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" \
-    FM_DATA_OVERRIDE="$data" PATH="$case_dir/fakebin:$PATH" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$(home_of "$case_dir")" \
+    JG_DATA_OVERRIDE="$data" PATH="$case_dir/fakebin:$PATH" \
     "$ROOT/bin/jg-captain-hold.sh" complete "$id" --none >/dev/null \
     || fail "could not record the space-path scout's captain-call inventory"
   break_verb "$case_dir" "done"
   marker="$(home_of "$case_dir")/state/$id.backlog-close"
 
-  out=$(FM_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "space-path scout teardown unexpectedly completed"
   assert_present "$marker" "space-path scout teardown recorded no pending close"
   assert_absent "$(home_of "$case_dir")/state/$id.meta" \
     "space-path scout teardown retained meta after recording its close"
   rm -f "$case_dir/fakebin/tasks-axi"
 
-  out=$(FM_DATA_OVERRIDE="$data" run_bootstrap "$case_dir")
+  out=$(JG_DATA_OVERRIDE="$data" run_bootstrap "$case_dir")
   [ "$(tasks-axi show "$id" --file "$backlog" 2>/dev/null | sed -n 's/^  state: *//p' | head -1)" = "done" ] \
     || fail "space-containing report marker did not replay: $out"
   assert_grep "data/$id/report.md" "$backlog" \
@@ -1720,7 +1720,7 @@ test_trailing_newline_data_path_fails_closed() {
   backlog_alias="$case_dir/data-alias/backlog.md"
   tasks-axi add "$id" "item for $id" --kind ship --file "$backlog_alias" >/dev/null
 
-  out=$(FM_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "trailing-newline data path bypassed dispatch transition"
   assert_absent "$home/state/$id.meta" \
     "trailing-newline dispatch published a task record"
@@ -1730,7 +1730,7 @@ test_trailing_newline_data_path_fails_closed() {
   tasks-axi start "$id" --file "$backlog_alias" >/dev/null
   write_task_meta "$case_dir" "$id" ship local-only "spawn_gen=spawn-newline-data"
   rc=0
-  out=$(FM_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "trailing-newline data path bypassed completion transition"
   assert_present "$home/state/$id.meta" \
     "trailing-newline teardown removed the task record"
@@ -1750,7 +1750,7 @@ test_control_character_data_path_is_refused_before_cleanup() {
   backlog="$data/backlog.md"
   tasks-axi add "$id" "item for $id" --kind ship --file "$backlog" >/dev/null
 
-  out=$(FM_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "control-character data path passed dispatch preflight"
   assert_absent "$(home_of "$case_dir")/state/$id.meta" \
     "control-character dispatch published a task record"
@@ -1761,7 +1761,7 @@ test_control_character_data_path_is_refused_before_cleanup() {
   write_task_meta "$case_dir" "$id" ship local-only "spawn_gen=spawn-control-data"
   marker="$(home_of "$case_dir")/state/$id.backlog-close"
   rc=0
-  out=$(FM_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "control-character data path passed close preflight"
   assert_present "$(home_of "$case_dir")/state/$id.meta" \
     "control-character close preflight removed the task record"
@@ -2543,7 +2543,7 @@ test_lifecycle_refuses_ancestor_symlinks_outside_home_roots() {
   mkdir -p "$foreign/data"
   cp "$(backlog_of "$backlog_case")" "$foreign/data/backlog.md"
   ln -s "$foreign" "$home/foreign-link"
-  out=$(FM_DATA_OVERRIDE="$home/foreign-link/data" run_ship_spawn "$backlog_case" "$id") || rc=$?
+  out=$(JG_DATA_OVERRIDE="$home/foreign-link/data" run_ship_spawn "$backlog_case" "$id") || rc=$?
   [ "$rc" -ne 0 ] || fail "dispatch accepted a backlog through an ancestor symlink"
   assert_absent "$home/state/$id.meta" "dispatch published through a foreign backlog root"
 
@@ -2555,7 +2555,7 @@ test_lifecycle_refuses_ancestor_symlinks_outside_home_roots() {
   jg_write_meta "$foreign/state/$id.meta" "kind=ship" "spawn_gen=foreign-worker"
   ln -s "$foreign" "$home/foreign-link"
   rc=0
-  out=$(FM_STATE_OVERRIDE="$home/foreign-link/state" run_bootstrap "$worker_case") || rc=$?
+  out=$(JG_STATE_OVERRIDE="$home/foreign-link/state" run_bootstrap "$worker_case") || rc=$?
   [ "$rc" -ne 0 ] || fail "bootstrap accepted a worker record through an ancestor symlink"
   [ "$(row_state "$worker_case" "$id")" = queued ] \
     || fail "bootstrap paired a foreign worker with the local backlog"
@@ -2571,7 +2571,7 @@ test_lifecycle_refuses_ancestor_symlinks_outside_home_roots() {
     "$id" "$home/data" > "$marker"
   ln -s "$foreign" "$home/foreign-link"
   rc=0
-  out=$(FM_STATE_OVERRIDE="$home/foreign-link/state" run_bootstrap "$close_case") || rc=$?
+  out=$(JG_STATE_OVERRIDE="$home/foreign-link/state" run_bootstrap "$close_case") || rc=$?
   [ "$rc" -ne 0 ] || fail "bootstrap accepted a close record through an ancestor symlink"
   assert_present "$marker" "bootstrap discarded a foreign authoritative close"
   [ "$(row_state "$close_case" "$id")" = in_flight ] \
@@ -2589,7 +2589,7 @@ test_same_home_state_override_remains_supported() {
   write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=same-home-override"
   mv "$home/state" "$state"
 
-  out=$(FM_STATE_OVERRIDE="$state" run_bootstrap "$case_dir") \
+  out=$(JG_STATE_OVERRIDE="$state" run_bootstrap "$case_dir") \
     || fail "same-home state override was refused: $out"
   [ "$(row_state "$case_dir" "$id")" = in_flight ] \
     || fail "same-home state override did not reconcile its worker"
@@ -2822,8 +2822,8 @@ test_spawn_refuses_a_special_file_tasks_config() {
   rm -f "$home/.tasks.toml"
   mkfifo "$home/.tasks.toml"
 
-  out=$(jg_run_timed 60 env FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
+  out=$(jg_run_timed 60 env JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
     CLAUDE_CONFIG_DIR='' \
     PATH="$case_dir/fakebin:$PATH" \
     "$SPAWN" "$id" "$case_dir/project" --mode no-mistakes --yolo off 2>&1) || rc=$?
@@ -2986,11 +2986,11 @@ test_manual_backend_home_dispatches_and_completes_without_touching_the_backlog()
   make_tasks_axi_incompatible "$case_dir"
   # Deliberately no backlog item: on a manual home the operator owns the file,
   # so neither half of the lifecycle may hard-fail over its contents.
-  out=$(FM_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") \
+  out=$(JG_DATA_OVERRIDE="$data" run_ship_spawn "$case_dir" "$id") \
     || fail "manual-backend spawn failed: $out"
   assert_contains "$out" "spawned $id" "manual-backend spawn did not report success"
 
-  out=$(FM_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") \
+  out=$(JG_DATA_OVERRIDE="$data" run_teardown "$case_dir" "$id") \
     || fail "manual-backend teardown failed: $out"
   assert_contains "$out" "Update $data_resolved/backlog.md" \
     "manual-backend teardown did not name its configured backlog path"

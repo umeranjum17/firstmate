@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-sentinel.sh - recovery that runs OUTSIDE the agent runtime.
 #
 # Every Firstmate watcher, Stop-hook arm, and away daemon runs inside the Herdr
@@ -11,14 +20,14 @@
 # script is the piece that must live in its own process (a systemd user service
 # from `unit`), never inside Herdr.
 #
-# Usage (FM_HOME is required; the backend session defaults to Herdr's default):
-#   FM_HOME=<home> jg-sentinel.sh tick       one pass; what a scheduler runs
-#   FM_HOME=<home> jg-sentinel.sh loop       tick every FM_SENTINEL_INTERVAL seconds
-#   FM_HOME=<home> jg-sentinel.sh reconcile  nudge or relaunch this home's direct reports, once per episode
-#   FM_HOME=<home> jg-sentinel.sh unit       print a systemd user service running `loop`
+# Usage (JG_HOME is required; the backend session defaults to Herdr's default):
+#   JG_HOME=<home> jg-sentinel.sh tick       one pass; what a scheduler runs
+#   JG_HOME=<home> jg-sentinel.sh loop       tick every JG_SENTINEL_INTERVAL seconds
+#   JG_HOME=<home> jg-sentinel.sh reconcile  nudge or relaunch this home's direct reports, once per episode
+#   JG_HOME=<home> jg-sentinel.sh unit       print a systemd user service running `loop`
 #
 # tick, under the home's state/.sentinel.lock:
-#   1. Reads the Herdr server identity for FM_SENTINEL_HERDR_SESSION (default the
+#   1. Reads the Herdr server identity for JG_SENTINEL_HERDR_SESSION (default the
 #      backend's own HERDR_SESSION, else `default`) as the inode and bind time of its API socket, which the server
 #      recreates on every start. A stopped server is left alone: its supervisor
 #      restarts it, and this script never starts one.
@@ -31,7 +40,7 @@
 #   3. Wakes the primary session when a restart wake is pending, or when
 #      supervision is needed and the watcher beacon is older than the grace
 #      (bin/jg-supervision-lib.sh owns that predicate). A beacon-only wake is
-#      repeated at most once per FM_SENTINEL_REWAKE_SECS for one beacon age.
+#      repeated at most once per JG_SENTINEL_REWAKE_SECS for one beacon age.
 #      The primary is the Herdr pane whose agent session is state/.lock-session.
 #      The wake is typed only when that pane reads not busy and its composer
 #      reads exactly empty, as the away daemon's injection does, so it never
@@ -80,13 +89,13 @@
 # reconcile that returns success it records the episode under the same settle
 # rule tick uses, so a later session start in that episode skips it.
 #
-# Knobs: FM_SENTINEL_HERDR_SESSION (HERDR_SESSION, else default), FM_SENTINEL_INTERVAL (60),
-# FM_SENTINEL_REWAKE_SECS (1800), FM_GUARD_GRACE (300).
-# FM_SENTINEL_DRY_RUN=1 with reconcile decides as usual and prints each line to
+# Knobs: JG_SENTINEL_HERDR_SESSION (HERDR_SESSION, else default), JG_SENTINEL_INTERVAL (60),
+# JG_SENTINEL_REWAKE_SECS (1800), JG_GUARD_GRACE (300).
+# JG_SENTINEL_DRY_RUN=1 with reconcile decides as usual and prints each line to
 # stdout, but runs no jg-control action, takes no lock, and writes nothing to the
 # home; it is refused for tick and loop.
 # Exit: 0 after a pass (including deferred work), 1 when the pass hit an error
-# it logged, 2 for usage or a missing FM_HOME.
+# it logged, 2 for usage or a missing JG_HOME.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -100,21 +109,21 @@ case "${1:-}" in
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
-[ -n "${FM_HOME:-}" ] || { echo "jg-sentinel: FM_HOME must be set explicitly" >&2; exit 2; }
-FM_HOME=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || { echo "jg-sentinel: FM_HOME is not a directory" >&2; exit 2; }
-export FM_HOME
+[ -n "${JG_HOME:-}" ] || { echo "jg-sentinel: JG_HOME must be set explicitly" >&2; exit 2; }
+JG_HOME=$(cd "$JG_HOME" 2>/dev/null && pwd -P) || { echo "jg-sentinel: JG_HOME is not a directory" >&2; exit 2; }
+export JG_HOME
 # Upstream Firstmate scripts and libraries run from the home's checkout; this
 # add-on copy carries only the sentinel itself.
-BIN="$FM_HOME/bin"
-STATE="$FM_HOME/state"
-SESSION=${FM_SENTINEL_HERDR_SESSION:-${HERDR_SESSION:-default}}
-INTERVAL=${FM_SENTINEL_INTERVAL:-60}
-REWAKE=${FM_SENTINEL_REWAKE_SECS:-1800}
-GRACE=${FM_GUARD_GRACE:-300}
+BIN="$JG_HOME/bin"
+STATE="$JG_HOME/state"
+SESSION=${JG_SENTINEL_HERDR_SESSION:-${HERDR_SESSION:-default}}
+INTERVAL=${JG_SENTINEL_INTERVAL:-60}
+REWAKE=${JG_SENTINEL_REWAKE_SECS:-1800}
+GRACE=${JG_GUARD_GRACE:-300}
 LOG="$STATE/.sentinel.log"
-DRY_RUN=${FM_SENTINEL_DRY_RUN:-0}
-case "$DRY_RUN" in 0|1) ;; *) echo "jg-sentinel: FM_SENTINEL_DRY_RUN must be 0 or 1" >&2; exit 2 ;; esac
-[ "$DRY_RUN" = 0 ] || [ "$CMD" = reconcile ] || { echo "jg-sentinel: FM_SENTINEL_DRY_RUN applies only to reconcile" >&2; exit 2; }
+DRY_RUN=${JG_SENTINEL_DRY_RUN:-0}
+case "$DRY_RUN" in 0|1) ;; *) echo "jg-sentinel: JG_SENTINEL_DRY_RUN must be 0 or 1" >&2; exit 2 ;; esac
+[ "$DRY_RUN" = 0 ] || [ "$CMD" = reconcile ] || { echo "jg-sentinel: JG_SENTINEL_DRY_RUN applies only to reconcile" >&2; exit 2; }
 
 if [ "$CMD" = unit ]; then
   unit_quote() {
@@ -126,10 +135,10 @@ if [ "$CMD" = unit ]; then
   }
   cat <<EOF
 [Unit]
-Description=Firstmate sentinel for ${FM_HOME//%/%%} (recovers supervision after an agent-runtime restart)
+Description=Firstmate sentinel for ${JG_HOME//%/%%} (recovers supervision after an agent-runtime restart)
 
 [Service]
-Environment=$(unit_quote "FM_HOME=$FM_HOME")
+Environment=$(unit_quote "JG_HOME=$JG_HOME")
 Environment=$(unit_quote "PATH=$PATH")
 ExecStart=$(unit_quote "$SCRIPT_DIR/jg-sentinel.sh") loop
 Restart=always
@@ -307,7 +316,7 @@ reconcile() {  # <episode>
         "The host session restarted, so your last turn was lost and your supervision stopped. Run bin/jg-session-start.sh, which resumes your own home's lanes, then reconcile what remains and end the turn so your supervision re-arms."
       continue
     fi
-    current=$(FM_CREW_STATE_NO_FORGE=1 "$BIN/jg-crew-state.sh" "$id" 2>/dev/null | awk '{print $2}')
+    current=$(JG_CREW_STATE_NO_FORGE=1 "$BIN/jg-crew-state.sh" "$id" 2>/dev/null | awk '{print $2}')
     note="The host session restarted and stopped this task's agent; this relaunch put it back in its recorded worktree. Your last recorded status: $(status_current_line "$STATE/$id.status" "$kind" | cut -c1-300). Continue the brief you are already on from the local copy as it stands; this is not new work."
     harness=$(jg_meta_get "$meta" harness)
     model=$(jg_meta_get "$meta" model)
@@ -433,16 +442,16 @@ relaunch_lead_model_mismatches() {
     remote=$(printf '%s\n' "$line" | grep -q '(host:' && echo yes || echo no)
     home=$(printf '%s\n' "$line" | sed -n 's/.*(home: \([^;)]*\).*/\1/p')
     [ "$remote" = no ] && [ -n "$home" ] || continue
-    if [ -f "$FM_HOME/config/parked-homes" ] && grep -Eq "^[[:space:]]*$lead([[:space:]]|$|#)" "$FM_HOME/config/parked-homes"; then
+    if [ -f "$JG_HOME/config/parked-homes" ] && grep -Eq "^[[:space:]]*$lead([[:space:]]|$|#)" "$JG_HOME/config/parked-homes"; then
       say "$lead: parked lead home skipped"
       continue
     fi
     [ -d "$home/state" ] && [ -x "$home/bin/jg-control.sh" ] || { say "$lead: unavailable lead home skipped"; continue; }
-    if ! FM_HOME="$home" FM_SENTINEL_MODEL_EVENT="$FM_SENTINEL_MODEL_EVENT" "$SCRIPT_DIR/jg-sentinel.sh" model-reconcile; then
+    if ! JG_HOME="$home" JG_SENTINEL_MODEL_EVENT="$JG_SENTINEL_MODEL_EVENT" "$SCRIPT_DIR/jg-sentinel.sh" model-reconcile; then
       say "$lead: lead model reconciliation failed"
       rc=1
     fi
-  done < <(grep -E '^[[:space:]]*-[[:space:]]' "$FM_HOME/data/secondmates.md" 2>/dev/null || true)
+  done < <(grep -E '^[[:space:]]*-[[:space:]]' "$JG_HOME/data/secondmates.md" 2>/dev/null || true)
   return "$rc"
 }
 
@@ -471,7 +480,7 @@ relaunch_model_mismatches() {
     has_model=0
     case " $cmd " in *" --model $model "*|*" --model=$model "*) has_model=1 ;; esac
     [ "$has_model" -eq 0 ] || continue
-    event=${FM_SENTINEL_MODEL_EVENT:-unknown}
+    event=${JG_SENTINEL_MODEL_EVENT:-unknown}
     marker="$STATE/$id.model-relaunch"
     [ "$(cat "$marker" 2>/dev/null)" = "$event" ] && continue
     printf '%s\n' "$event" >"$marker"
@@ -502,9 +511,9 @@ tick() {
       else
         rc=1
       fi
-      FM_SENTINEL_MODEL_EVENT=$id relaunch_model_mismatches || rc=1
+      JG_SENTINEL_MODEL_EVENT=$id relaunch_model_mismatches || rc=1
       # The lead pane is handled above; each lead owns its worker pass.
-      FM_SENTINEL_MODEL_EVENT=$id relaunch_lead_model_mismatches || rc=1
+      JG_SENTINEL_MODEL_EVENT=$id relaunch_lead_model_mismatches || rc=1
     else
       printf '%s\n' "$id" >"$STATE/.sentinel-herdr-identity"
     fi
@@ -518,7 +527,7 @@ tick() {
   read -r last woken_beat <"$STATE/.sentinel-wake-last" 2>/dev/null || true
   age=$(( $(date +%s) - ${last:-0} ))
   [ "${woken_beat:-}" != "${beat:-none}" ] || [ "$age" -ge "$REWAKE" ] || return "$rc"
-  body="Supervision is needed but the watcher beacon is $FM_SUP_BEACON_DESC old and no turn is running, so nothing is watching the fleet. Run bin/jg-session-start.sh if this session was resumed, reconcile, then end the turn so supervision re-arms."
+  body="Supervision is needed but the watcher beacon is $JG_SUP_BEACON_DESC old and no turn is running, so nothing is watching the fleet. Run bin/jg-session-start.sh if this session was resumed, reconcile, then end the turn so supervision re-arms."
   wake_primary "$body" && printf '%s %s\n' "$(date +%s)" "${beat:-none}" >"$STATE/.sentinel-wake-last"
   return "$rc"
 }
@@ -537,7 +546,7 @@ locked() {
 
 case "$CMD" in
   tick) locked tick ;;
-  reconcile) locked reconcile_episode "${FM_SENTINEL_EPISODE:-$(herdr_identity)}" ;;
+  reconcile) locked reconcile_episode "${JG_SENTINEL_EPISODE:-$(herdr_identity)}" ;;
   model-reconcile) locked relaunch_model_mismatches ;;
   lead-model-reconcile) locked relaunch_lead_model_mismatches ;;
   loop)

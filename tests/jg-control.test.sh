@@ -60,7 +60,7 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 
 # --- fake session provider --------------------------------------------------
 #
-# A tmux stub whose whole model is four files under $FM_FAKE_DIR:
+# A tmux stub whose whole model is four files under $JG_FAKE_DIR:
 #   command  the pane's foreground process name, which IS the agent-state
 #            classifier's input (bin/backends/tmux.sh).
 #   cwd      the pane's current path.
@@ -75,12 +75,12 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 #            `idle`, `primed`, or `picker`. Escape moves running->armed (the
 #            `esc again` hint), armed->cancelled, primed (an idle agent whose
 #            last Escape was a moment ago) ->picker, and picker->idle unless
-#            FM_FAKE_DEVIN_PICKER_STUCK is set. Real sleeps apply while it
+#            JG_FAKE_DEVIN_PICKER_STUCK is set. Real sleeps apply while it
 #            exists, so key-times carry the true gap between presses.
 # Two transitions make it a lifecycle model rather than a recorder: a literal
 # that is the harness's exit command flips `command` to a shell (the agent
 # stopped), and a literal carrying a launch brief flips it to the value in
-# `becomes` (a new agent came up). FM_FAKE_NEVER_DIES suppresses the first, so
+# `becomes` (a new agent came up). JG_FAKE_NEVER_DIES suppresses the first, so
 # a stubborn agent can be tested too.
 make_tmux_stub() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
@@ -88,7 +88,7 @@ make_tmux_stub() {  # <dir> -> echoes fakebin dir
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=$JG_FAKE_DIR
 # The rows devin 3000.11.1 renders for each modelled screen (live capture).
 devin_screen() {  # <running|armed|cancelled|idle|picker>
   # The idle placeholder is dark truecolor text, as Devin draws it.
@@ -127,7 +127,7 @@ case "${1:-}" in
     payload=${1:-}
     if [ "$literal" = 1 ]; then
       printf '%s\n' "$payload" >> "$D/literal"
-      if [ -z "${FM_FAKE_NEVER_DIES:-}" ] \
+      if [ -z "${JG_FAKE_NEVER_DIES:-}" ] \
          && { [ "$payload" = /exit ] || [ "$payload" = /quit ]; }; then
         if [ -f "$D/open-exit-modal" ]; then
           : > "$D/exit-modal-armed"
@@ -154,18 +154,18 @@ case "${1:-}" in
           running) printf armed > "$D/devin" ;;
           armed) printf cancelled > "$D/devin" ;;
           primed) printf picker > "$D/devin" ;;
-          picker) [ -n "${FM_FAKE_DEVIN_PICKER_STUCK:-}" ] || printf idle > "$D/devin" ;;
+          picker) [ -n "${JG_FAKE_DEVIN_PICKER_STUCK:-}" ] || printf idle > "$D/devin" ;;
         esac
       fi
-      if [ -n "${FM_FAKE_INTERRUPT_STOPS_AGENT:-}" ] \
+      if [ -n "${JG_FAKE_INTERRUPT_STOPS_AGENT:-}" ] \
          && { [ "$payload" = Escape ] || [ "$payload" = C-c ]; }; then
         printf 'zsh' > "$D/command"
       fi
-      if [ "$payload" = Escape ] && [ -n "${FM_FAKE_MUSE_LOG:-}" ]; then
-        if [ -n "${FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" ]; then
+      if [ "$payload" = Escape ] && [ -n "${JG_FAKE_MUSE_LOG:-}" ]; then
+        if [ -n "${JG_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" ]; then
           : > "$D/muse-ack-pending"
         else
-          printf '%s\n' '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"terminal","terminal":"cancelled","reason":null}}}' >> "$FM_FAKE_MUSE_LOG"
+          printf '%s\n' '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"terminal","terminal":"cancelled","reason":null}}}' >> "$JG_FAKE_MUSE_LOG"
         fi
       fi
     fi
@@ -210,12 +210,12 @@ SH
   chmod +x "$fb/tmux"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_FAKE_DIR/devin" ]; then exec /bin/sleep "$@"; fi
-if [ -n "${FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" ] \
-   && [ -e "$FM_FAKE_DIR/muse-ack-pending" ]; then
-  rm -f "$FM_FAKE_DIR/muse-ack-pending"
-  printf 'zsh' > "$FM_FAKE_DIR/command"
-  printf '%s\n' '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"terminal","terminal":"cancelled","reason":null}}}' >> "$FM_FAKE_MUSE_LOG"
+if [ -f "$JG_FAKE_DIR/devin" ]; then exec /bin/sleep "$@"; fi
+if [ -n "${JG_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" ] \
+   && [ -e "$JG_FAKE_DIR/muse-ack-pending" ]; then
+  rm -f "$JG_FAKE_DIR/muse-ack-pending"
+  printf 'zsh' > "$JG_FAKE_DIR/command"
+  printf '%s\n' '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"terminal","terminal":"cancelled","reason":null}}}' >> "$JG_FAKE_MUSE_LOG"
 fi
 exit 0
 SH
@@ -266,13 +266,13 @@ add_task() {
 # the stubbed provider on PATH. Echoes combined output; returns its exit code.
 run_control() {
   local dir=$1; shift
-  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
-    FM_CONTROL_POLL=0.01 FM_CONTROL_SETTLE_WAIT=0.05 \
-    FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
-    FM_FAKE_MUSE_LOG="${FM_FAKE_MUSE_LOG:-}" \
-    FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK="${FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" \
-    FM_FAKE_INTERRUPT_STOPS_AGENT="${FM_FAKE_INTERRUPT_STOPS_AGENT:-}" \
-    FM_FAKE_DEVIN_PICKER_STUCK="${FM_FAKE_DEVIN_PICKER_STUCK:-}" \
+  env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
+    JG_CONTROL_POLL=0.01 JG_CONTROL_SETTLE_WAIT=0.05 \
+    JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
+    JG_FAKE_MUSE_LOG="${JG_FAKE_MUSE_LOG:-}" \
+    JG_FAKE_MUSE_DISAPPEAR_BEFORE_ACK="${JG_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" \
+    JG_FAKE_INTERRUPT_STOPS_AGENT="${JG_FAKE_INTERRUPT_STOPS_AGENT:-}" \
+    JG_FAKE_DEVIN_PICKER_STUCK="${JG_FAKE_DEVIN_PICKER_STUCK:-}" \
     "$CONTROL" "$@" 2>&1
 }
 
@@ -416,13 +416,13 @@ test_devin_stuck_picker_refuses_and_exit_types_nothing() {
   dir=$(new_case devin-stuck)
   add_task "$dir" t1 devin
   devin_as "$dir" primed
-  out=$(FM_FAKE_DEVIN_PICKER_STUCK=1 run_control "$dir" t1 interrupt); rc=$?
+  out=$(JG_FAKE_DEVIN_PICKER_STUCK=1 run_control "$dir" t1 interrupt); rc=$?
   expect_code 1 "$rc" "a revert picker that will not close must fail the interrupt"$'\n'"$out"
   assert_contains "$out" 'never Enter' 'the refusal should warn against Enter'
   dir=$(new_case devin-exit-picker)
   add_task "$dir" t1 devin
   devin_as "$dir" picker
-  out=$(FM_FAKE_DEVIN_PICKER_STUCK=1 run_control "$dir" t1 exit); rc=$?
+  out=$(JG_FAKE_DEVIN_PICKER_STUCK=1 run_control "$dir" t1 exit); rc=$?
   expect_code 1 "$rc" "exit must refuse while the revert picker is open"$'\n'"$out"
   [ -z "$(literals "$dir")" ] || fail "exit typed into the revert picker: $(literals "$dir")"
   ! grep -qx Enter "$dir/fake/keys" || fail "exit pressed Enter in the revert picker"
@@ -911,8 +911,8 @@ test_exit_refuses_the_confirming_enter() {
   add_task "$dir" t1 claude
   alive_as "$dir" claude
   exit_picker_screen > "$dir/fake/after-enter"
-  out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+  out=$(env JG_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" \
+    JG_FAKE_DIR="$dir/fake" JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "the confirming Enter should refuse"$'\n'"$out"
   assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
@@ -934,8 +934,8 @@ test_exit_names_a_picker_that_renders_after_the_submit() {
   alive_as "$dir" claude
   exit_picker_screen > "$dir/fake/after-enter"
   printf '1' > "$dir/fake/after-enter-late"
-  out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+  out=$(env JG_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" \
+    JG_FAKE_DIR="$dir/fake" JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "a picker that renders after the submit should refuse"$'\n'"$out"
   [ "$(cat "$dir/fake/after-enter-late")" = 0 ] \
@@ -1015,7 +1015,7 @@ test_muse_interrupt_confirms_adapter_acknowledgement() {
     '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"started","prompt":"work"}}}' > "$log"
   printf 'sessions_root=%s\nworkspace_root=%s\nbinding_id=test\n' \
     "$root" "$dir/wt-t1" > "$dir/home/state/t1.muse-session"
-  out=$(FM_FAKE_MUSE_LOG="$log" run_control "$dir" t1 interrupt); rc=$?
+  out=$(JG_FAKE_MUSE_LOG="$log" run_control "$dir" t1 interrupt); rc=$?
   expect_code 0 "$rc" "muse interrupt should observe its adapter acknowledgement"$'\n'"$out"
   assert_contains "$out" "verified=agent-alive cancel=confirmed" \
     "the result should report muse's cancelled terminal acknowledgement"
@@ -1035,7 +1035,7 @@ test_interrupt_revalidates_agent_after_acknowledgement_wait() {
     '{"schema_version":1,"payload_type":"runtime.session","payload":{"kind":"run","run_id":"run-1","event":{"kind":"started","prompt":"work"}}}' > "$log"
   printf 'sessions_root=%s\nworkspace_root=%s\nbinding_id=test\n' \
     "$root" "$dir/wt-t1" > "$dir/home/state/t1.muse-session"
-  out=$(FM_FAKE_MUSE_LOG="$log" FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK=1 \
+  out=$(JG_FAKE_MUSE_LOG="$log" JG_FAKE_MUSE_DISAPPEAR_BEFORE_ACK=1 \
     run_control "$dir" t1 interrupt); rc=$?
   expect_code 1 "$rc" "interrupt should fail when the agent stops during acknowledgement polling"
   assert_contains "$out" "agent is 'dead' after its interrupt key" \
@@ -1052,7 +1052,7 @@ test_exit_accepts_agent_stopped_by_busy_interrupt() {
   alive_as "$dir" claude
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$dir/home/state" t1)
   printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/t1.meta"
-  out=$(FM_FAKE_INTERRUPT_STOPS_AGENT=1 run_control "$dir" t1 exit); rc=$?
+  out=$(JG_FAKE_INTERRUPT_STOPS_AGENT=1 run_control "$dir" t1 exit); rc=$?
   expect_code 0 "$rc" "exit should accept a busy agent stopped by interrupt"$'\n'"$out"
   assert_contains "$out" "stopped t1 harness=claude" \
     "the authoritative gone-state should complete exit successfully"
@@ -1072,8 +1072,8 @@ test_agent_that_does_not_stop_fails_closed() {
   alive_as "$dir" claude
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$dir/home/state" t1)
   printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/t1.meta"
-  out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+  out=$(env JG_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" \
+    JG_FAKE_DIR="$dir/fake" JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "an agent that ignores its exit command should fail closed"
   assert_contains "$out" "did not stop" "the failure should say the agent did not stop"
@@ -1133,7 +1133,7 @@ test_secondmate_control_command_carries_no_marker() {
   [ "$typed" = "/exit" ] \
     || fail "a secondmate control command must be the bare exit command, got: $typed"
   case "$typed" in
-    *"$FM_FROMFIRST_MARK"*) fail "a control command must never carry the from-firstmate marker" ;;
+    *"$JG_FROMFIRST_MARK"*) fail "a control command must never carry the from-firstmate marker" ;;
   esac
   case "$typed" in
     *corr=*) fail "a control command must never carry a pending-reply correlation id" ;;
@@ -1149,15 +1149,15 @@ test_jg_send_still_marks_the_same_secondmate_task() {
   add_task "$dir" domain claude secondmate
   log="$dir/fake/sendlog"
   : > "$log"
-  out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
-    FM_SEND_SETTLE=0 FM_ROOT_OVERRIDE="$dir/home" \
+  out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
+    JG_SEND_SETTLE=0 JG_ROOT_OVERRIDE="$dir/home" \
     "$SEND" domain "audit the build" 2>&1); rc=$?
   expect_code 0 "$rc" "jg-send to a secondmate should still succeed"$'\n'"$out"
   # The marked steer rides jg-send's durable inbox plane; only the doorbell is
   # typed, so the marker is asserted on the recorded body.
   case "$(bash -c '. "$1"; jg_task_inbox_body "$2"' _ "$ROOT/bin/jg-task-inbox-lib.sh" \
     "$dir/home/state/domain.inbox/001.msg")" in
-    "$FM_FROMFIRST_MARK"*) : ;;
+    "$JG_FROMFIRST_MARK"*) : ;;
     *) fail "jg-send must still mark a kind=secondmate target: $(literals "$dir")" ;;
   esac
   pass "jg-control's arrival leaves jg-send's from-firstmate marking untouched"

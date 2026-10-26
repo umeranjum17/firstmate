@@ -9,7 +9,7 @@
 # remote probes, which bootstrap runs concurrently), pending remote
 # handoff delivery, and the fleet-sync fetch of every project clone. None of
 # those calls is individually bounded, so one unreachable host could consume the
-# whole FM_SESSION_START_TIMEOUT budget and truncate the digest outright, turning
+# whole JG_SESSION_START_TIMEOUT budget and truncate the digest outright, turning
 # a slow network into a startup that never printed the work queue at all.
 # This script runs exactly that work OFF the blocking path: the digest is
 # composed from bounded local reads while these checks run concurrently in a
@@ -20,7 +20,7 @@
 #
 # WHAT IS PRESERVED. Nothing is dropped. bin/jg-bootstrap.sh remains the single
 # owner of every network sweep and still runs all of them, unchanged, via its
-# FM_BOOTSTRAP_NETWORK=only phase. bin/jg-inactive-reconcile.sh remains the
+# JG_BOOTSTRAP_NETWORK=only phase. bin/jg-inactive-reconcile.sh remains the
 # owner of the startup scan and its separate watcher cadence. Deferral changes
 # WHEN they run, not WHETHER, and three properties make the later run safe:
 #   - The work is idempotent detection. A run whose report is lost (killed
@@ -107,10 +107,10 @@
 #   .startup-network.lock     serializes publication, harvest acknowledgement,
 #                             and the wake decision; every wait on it is bounded.
 #
-# The whole stage is bounded by FM_STARTUP_NETWORK_TIMEOUT (default 120s), one
+# The whole stage is bounded by JG_STARTUP_NETWORK_TIMEOUT (default 120s), one
 # aggregate deadline covering both the inactive-outcome scan and network sweeps
 # plus every lock the worker waits on before them.
-# Publication and delivery are bounded the same way by FM_SESSION_START_TIMEOUT.
+# Publication and delivery are bounded the same way by JG_SESSION_START_TIMEOUT.
 # A lock that a live process still holds at either deadline ends the worker with
 # a failed record naming that holder and the rerun command, never a wait that
 # outlives the budget with its output discarded.
@@ -119,9 +119,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 STATUS_FILE="$STATE/.startup-network.status"
 REPORT_FILE="$STATE/.startup-network.report"
@@ -134,7 +134,7 @@ PUBLISH_LOCK="$STATE/.startup-network.lock"
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 # jg-timing-lib.sh owns the per-step elapsed record this stage publishes beside
 # its report. Recording is opt-in per run: it stays inert until cmd_run points
-# FM_TIMING_LOG at a file, so nothing else that sources these scripts pays for it.
+# JG_TIMING_LOG at a file, so nothing else that sources these scripts pays for it.
 # shellcheck source=bin/jg-timing-lib.sh
 . "$SCRIPT_DIR/jg-timing-lib.sh"
 # jg-wake-lib.sh owns both the portable lock helpers used below and the durable
@@ -172,13 +172,13 @@ age_of() {  # <epoch> - seconds since, or empty when unreadable
 }
 
 stage_budget() {
-  local budget=${FM_STARTUP_NETWORK_TIMEOUT:-120}
+  local budget=${JG_STARTUP_NETWORK_TIMEOUT:-120}
   case "$budget" in ''|*[!0-9]*|0) budget=120 ;; esac
   printf '%s' "$budget"
 }
 
 delivery_budget() {
-  local budget=${FM_SESSION_START_TIMEOUT:-120}
+  local budget=${JG_SESSION_START_TIMEOUT:-120}
   case "$budget" in ''|*[!0-9]*|0) budget=120 ;; esac
   printf '%s' "$budget"
 }
@@ -193,14 +193,14 @@ seconds_until() {  # <deadline-epoch>
 
 # Every lock this script takes goes through here: bounded by the caller's
 # remaining budget, 124 when a live holder still owns it at the deadline
-# (FM_LOCK_HELD_PID names it). An unbounded wait here is what let a wedged
+# (JG_LOCK_HELD_PID names it). An unbounded wait here is what let a wedged
 # harvest keep the detached worker alive for hours past its own timeout.
 take_lock() {  # <lockdir> <seconds>
   jg_lock_acquire_wait_bounded "$1" "$2"
 }
 
 held_by() {  # human-readable holder of the lock the last take_lock refused
-  printf 'pid %s' "${FM_LOCK_HELD_PID:-unknown}"
+  printf 'pid %s' "${JG_LOCK_HELD_PID:-unknown}"
 }
 
 # Is a `running` record a stage that is genuinely still in flight? Two
@@ -360,7 +360,7 @@ report_requires_wake() {  # <state>
 
 queue_result_wake() {  # <state>
   jg_wake_append check startup-network \
-    "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/jg-startup-network.sh report" \
+    "check: startup-network: deferred startup network checks finished ($1); read them with $JG_ROOT/bin/jg-startup-network.sh report" \
     || true
 }
 
@@ -470,7 +470,7 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
 publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <output-file> <timing-file>
   local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-}
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/jg-startup-network.sh run --locked %s once that lock is released\n' \
-    "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
+    "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$JG_ROOT" "$locked" >> "$out"
   if [ "$(status_get generation)" != "$generation" ] \
     && [ "$(status_get state)" = running ] && worker_alive; then
     return 1
@@ -493,7 +493,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
   # killed mid-sweep cannot leave a half-written artifact where the previous
   # run's complete one used to be; publish() promotes it atomically at the end.
   # Sweeps run in child processes (bin/jg-bootstrap.sh, and bin/jg-fleet-sync.sh
-  # below it), so FM_TIMING_LOG is exported and appended to by all of them.
+  # below it), so JG_TIMING_LOG is exported and appended to by all of them.
   timings=$(mktemp "${TMPDIR:-/tmp}/jg-startup-network-timings.XXXXXX" 2>/dev/null) || timings=
   [ -z "$timings" ] || jg_timing_start "$timings"
   if [ -n "$generation" ]; then
@@ -554,7 +554,7 @@ EOF
       # holder past the budget means no sweep can safely start, so this is a
       # failed stage to rerun, published through the ordinary bounded path.
       printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s did not run; rerun %s/bin/jg-startup-network.sh run --locked 1 once that lease is released\n' \
-        "$STATE/.lock.acquire" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" >> "$out"
+        "$STATE/.lock.acquire" "$(held_by)" "$(phase_label "$phases")" "$JG_ROOT" >> "$out"
       publish "$generation" failed "$phases" "$sweep_locked" "$started" 124 "$out" "$timings"
       run_cleanup "$out" "$timings"
       return 1
@@ -575,15 +575,15 @@ EOF
   budget=$(seconds_until "$stage_deadline")
   if [ "$sweep_locked" -eq 1 ]; then
     # shellcheck disable=SC2016  # Child-shell variables expand inside the bound.
-    jg_run_timed "$budget" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-      FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_NETWORK_LOCK_PID="$lock_pid" \
+    jg_run_timed "$budget" env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      JG_BOOTSTRAP_NETWORK=only JG_BOOTSTRAP_NETWORK_LOCK_PID="$lock_pid" \
       bash -c '
         script_dir=$1
         "$script_dir/jg-inactive-reconcile.sh" scan --startup >/dev/null 2>&1 || true
         exec "$script_dir/jg-bootstrap.sh"
       ' _ "$SCRIPT_DIR" >"$out" 2>&1 || rc=$?
   else
-    jg_run_timed "$budget" env FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=1 \
+    jg_run_timed "$budget" env JG_BOOTSTRAP_NETWORK=only JG_BOOTSTRAP_DETECT_ONLY=1 \
       "$SCRIPT_DIR/jg-bootstrap.sh" >"$out" 2>&1 || rc=$?
   fi
   [ "$lease_held" -eq 0 ] || jg_lock_release "$STATE/.lock.acquire"
@@ -598,12 +598,12 @@ EOF
     0) publish "$generation" 'done' "$phases" "$sweep_locked" "$started" "$rc" "$out" "$timings" ;;
     124)
       printf 'NETWORK_CHECKS: hit the %ss bound before finishing, so %s may be incomplete; rerun %s/bin/jg-startup-network.sh run --locked %s\n' \
-        "$(stage_budget)" "$(phase_label "$phases")" "$FM_ROOT" "$sweep_locked" >> "$out"
+        "$(stage_budget)" "$(phase_label "$phases")" "$JG_ROOT" "$sweep_locked" >> "$out"
       publish "$generation" timeout "$phases" "$sweep_locked" "$started" "$rc" "$out" "$timings"
       ;;
     *)
       printf 'NETWORK_CHECKS: the deferred check worker exited %s, so %s may be incomplete; rerun %s/bin/jg-startup-network.sh run --locked %s\n' \
-        "$rc" "$(phase_label "$phases")" "$FM_ROOT" "$sweep_locked" >> "$out"
+        "$rc" "$(phase_label "$phases")" "$JG_ROOT" "$sweep_locked" >> "$out"
       publish "$generation" failed "$phases" "$sweep_locked" "$started" "$rc" "$out" "$timings"
       ;;
   esac
@@ -633,7 +633,7 @@ print_finished() {  # <state>
   [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state"
   if [ "$report_published" = 0 ]; then
     printf 'NETWORK_CHECKS: could not publish the deferred check report, so %s results are unavailable; rerun %s/bin/jg-startup-network.sh run --locked %s\n' \
-      "$(phase_label "$phases")" "$FM_ROOT" "$(status_get locked)"
+      "$(phase_label "$phases")" "$JG_ROOT" "$(status_get locked)"
   elif [ -s "$REPORT_FILE" ]; then
     cat "$REPORT_FILE"
     printf 'These ran AFTER the sections above were composed, so re-read any record a line here names.\n'
@@ -661,7 +661,7 @@ print_pending() {
   [ -z "$age" ] || printf 'Started %ss ago, bounded at %ss.\n' "$age" "$(stage_budget)"
   # shellcheck disable=SC2016  # The backticked wake name is literal digest text.
   printf 'Only a FAILED or otherwise actionable result arrives as a `check: startup-network` wake; a clean success stays silent.\n'
-  printf 'The durable result is readable on demand with %s/bin/jg-startup-network.sh report; until it finishes, treat none of it as confirmed.\n' "$FM_ROOT"
+  printf 'The durable result is readable on demand with %s/bin/jg-startup-network.sh report; until it finishes, treat none of it as confirmed.\n' "$JG_ROOT"
 }
 
 print_state() {
@@ -672,7 +672,7 @@ print_state() {
         print_pending
       else
         printf 'NETWORK_CHECKS: the deferred check worker stopped before publishing, so %s did not complete; rerun %s/bin/jg-startup-network.sh run --locked %s\n' \
-          "$(phase_label "$(status_get phases)")" "$FM_ROOT" "$(status_get locked)"
+          "$(phase_label "$(status_get phases)")" "$JG_ROOT" "$(status_get locked)"
       fi
       ;;
     *) printf 'not started - no deferred network checks have run for this home yet.\n' ;;
@@ -683,7 +683,7 @@ cmd_harvest() {  # <pid>
   local pid=$1 generation state claim_record claim_generation claim_pid
   if ! take_lock "$PUBLISH_LOCK" "$(delivery_budget)"; then
     printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/jg-startup-network.sh report once that lock is released\n' \
-      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT"
+      "$(held_by)" "$(phase_label "$(status_get phases)")" "$JG_ROOT"
     return 1
   fi
   generation=$(status_get generation)

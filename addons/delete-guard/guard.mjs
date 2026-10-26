@@ -6,6 +6,10 @@ import { spawnSync } from "node:child_process";
 import { homedir, userInfo } from "node:os";
 import { dirname, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 const SELF = fileURLToPath(import.meta.url);
 const HOMES = [...new Set([userInfo().homedir, homedir()].map((h) => h.replace(/\/+$/, "")))];
@@ -163,7 +167,7 @@ function escalate(row) {
 	if (recent.length < 2) return;
 	const reason = `check: delete guard REPEAT: ${row.task ? "task " + row.task : "an agent in " + row.cwd} tried ${recent.length} blocked recursive deletes in ${REPEAT_SECS / 60} min (home ${row.home || "?"}, ${row.runtime}); latest: ${row.command.slice(0, 200)} - stop that task and check it`;
 	const wake = spawnSync("bash", ["-c", '. "$1/bin/jg-wake-lib.sh" && jg_wake_append check delete-guard "$2"', "_", home, reason],
-		{ env: { PATH: process.env.PATH, FM_HOME: home }, stdio: ["ignore", "ignore", "pipe"] });
+		{ env: { PATH: process.env.PATH, JG_HOME: home }, stdio: ["ignore", "ignore", "pipe"] });
 	if (wake.status !== 0) throw new Error(`repeat wake failed: ${wake.stderr}`);
 }
 
@@ -172,13 +176,13 @@ export function guard(command, { cwd = process.cwd(), runtime = "unknown" } = {}
 	const target = blockedDelete(String(command ?? ""));
 	if (target === null) return null;
 	const env = process.env;
-	// The true home: the firstmate home holding cwd (the lane the command ran in, even when an inbox or FM_HOME from
-	// elsewhere is inherited), else the task's inbox, else FM_HOME.
+	// The true home: the firstmate home holding cwd (the lane the command ran in, even when an inbox or JG_HOME from
+	// elsewhere is inherited), else the task's inbox, else JG_HOME.
 	let home = "";
 	for (let d = resolve(cwd); !home && d !== "/"; d = dirname(d)) if (existsSync(`${d}/bin/jg-wake-lib.sh`) && existsSync(`${d}/state`)) home = d;
-	if (!home && env.FM_TASK_INBOX) home = dirname(dirname(env.FM_TASK_INBOX));
-	home = home || env.FM_HOME || "";
-	const row = { at: new Date().toISOString(), home, task: env.FM_TASK_ID || "", cwd, runtime, target, command: loggedCommand(command, target) };
+	if (!home && env.JG_TASK_INBOX) home = dirname(dirname(env.JG_TASK_INBOX));
+	home = home || env.JG_HOME || "";
+	const row = { at: new Date().toISOString(), home, task: env.JG_TASK_ID || "", cwd, runtime, target, command: loggedCommand(command, target) };
 	let note = "";
 	try { escalate(row); } catch (e) { note = ` (the block could not be logged: ${e.message})`; }
 	return (

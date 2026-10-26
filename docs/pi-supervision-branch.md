@@ -702,9 +702,9 @@ Other tests remain where they were:
 
 ### Live guards
 
-`FM_PI_BRANCH_LIVE_E2E=1 tests/jg-pi-branch-live-e2e.test.sh` exercises the real installed Pi SDK's immediate active-transcript appendEntry rendering, persistence, custom-entry model exclusion, branch-session surfaces, and watcher-owned fallback after rejected branch settlement.
+`JG_PI_BRANCH_LIVE_E2E=1 tests/jg-pi-branch-live-e2e.test.sh` exercises the real installed Pi SDK's immediate active-transcript appendEntry rendering, persistence, custom-entry model exclusion, branch-session surfaces, and watcher-owned fallback after rejected branch settlement.
 
-`FM_PI_BRANCH_RESPONSIVENESS_E2E=1 tests/jg-pi-branch-responsiveness-live-e2e.test.sh` answers the question only a real TUI can.
+`JG_PI_BRANCH_RESPONSIVENESS_E2E=1 tests/jg-pi-branch-responsiveness-live-e2e.test.sh` answers the question only a real TUI can.
 It types into an isolated Pi pane while outcomes are delivered and fails if keystroke echo leaves the class of the same machine's extension-free floor.
 
 Record dated current results in [docs/verification/runtime-backends.md](verification/runtime-backends.md).

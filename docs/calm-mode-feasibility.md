@@ -42,7 +42,7 @@ $ pi --version
 
 ### Original transcript cleanup
 
-The pre-cleanup reproduction used a real isolated Pi TUI at 180 columns by 44 rows with the tracked Calm and watcher extensions, an isolated `FM_HOME`, and a live home-owned watcher cycle.
+The pre-cleanup reproduction used a real isolated Pi TUI at 180 columns by 44 rows with the tracked Calm and watcher extensions, an isolated `JG_HOME`, and a live home-owned watcher cycle.
 The model called `jg_watch_arm_pi`, the real tool returned `watcher: started Pi extension arm child 1`, and a `done:` status write caused the watcher extension to inject `Juggernaut WATCHER WAKE: signal: ...` followed by the stable drain instruction.
 With Calm off, the captured transcript contained the genuine user prompt, the full watcher tool shell, the synthetic user-role wake, four collapsed `Thinking...` labels, built-in tool rows from wake handling, and the final assistant response.
 With the pre-cleanup implementation's Calm mode on, the existing seven built-in tool rows disappeared, but the watcher tool shell, synthetic wake, and all four `Thinking...` labels remained.
@@ -56,7 +56,7 @@ The later duplicate-turn evidence below supersedes custom-message rerouting as a
 
 ### Hidden-block height regression
 
-The 2026-07-23 end-user-aligned reproduction used the installed Pi 0.81.1 TUI at 100 columns by 44 rows, an isolated project and `FM_HOME`, the real `/skill:ahoy` command path, and a deterministic provider that produced five thinking-bearing read calls, five tool results, final hidden thinking, and a visible final response.
+The 2026-07-23 end-user-aligned reproduction used the installed Pi 0.81.1 TUI at 100 columns by 44 rows, an isolated project and `JG_HOME`, the real `/skill:ahoy` command path, and a deterministic provider that produced five thinking-bearing read calls, five tool results, final hidden thinking, and a visible final response.
 With Calm on and Pi's thinking display collapsed, the completed turn left 14 empty rows between the visible collapsed `[skill] ahoy` content row and the first final assistant row.
 With Calm off, the same sequence rendered all six `Thinking...` labels and all five read rows instead of an empty field.
 A controlled baseline containing only the skill row and final response had two standard visible-row separators.
@@ -320,12 +320,12 @@ The relevant commands are:
 ```sh
 tests/jg-calm-pi-extension.test.sh
 tests/jg-pi-branch-extension.test.sh
-FM_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
+JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
 tests/jg-pi-primary-types.test.sh
 tests/jg-calm-pi-queue-retention-live-e2e.test.sh
 tests/jg-calm-claude-mod.test.sh
 tests/jg-calm-claude-mod-plugin.test.sh
-FM_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
+JG_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
 ```
 
 ## 2026-07-23 verification record
@@ -352,12 +352,12 @@ $ bin/jg-lint.sh
 jg-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
 
 $ bin/jg-test-run.sh --changed --base origin/main
-FM_TEST_SUMMARY total=38 failed=0 skipped_gate=7 duration_ms=166881
-FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=192 failed=0
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=31 duration_ms=165384 failed=0
+JG_TEST_SUMMARY total=38 failed=0 skipped_gate=7 duration_ms=166881
+JG_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=192 failed=0
+JG_TEST_SUMMARY_FAMILY family=pure-contract-unit count=31 duration_ms=165384 failed=0
 
 $ tests/jg-pi-primary-live-e2e.test.sh
-skip: set FM_PI_LIVE_E2E=1 to run the isolated interactive Pi regression
+skip: set JG_PI_LIVE_E2E=1 to run the isolated interactive Pi regression
 ```
 
 ## 2026-07-26 Pi 0.82.0 compatibility verification
@@ -415,9 +415,9 @@ $ bin/jg-doc-audience-check.sh
 jg-doc-audience-check: ok surfaces=57 local_links=160
 
 $ bin/jg-test-run.sh --changed --base origin/main
-FM_TEST_SUMMARY total=32 failed=0 skipped_gate=7 duration_ms=196009
-FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=202 failed=0
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=25 duration_ms=194670 failed=0
+JG_TEST_SUMMARY total=32 failed=0 skipped_gate=7 duration_ms=196009
+JG_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=202 failed=0
+JG_TEST_SUMMARY_FAMILY family=pure-contract-unit count=25 duration_ms=194670 failed=0
 ```
 
 One rendered frame at 120 columns, with Pi's stock working row hidden and the boat directly above the editor:
@@ -456,9 +456,9 @@ $ bin/jg-doc-audience-check.sh
 jg-doc-audience-check: ok surfaces=57 local_links=163
 
 $ bin/jg-test-run.sh --changed --base origin/main
-FM_TEST_SUMMARY total=32 failed=0 skipped_gate=7 duration_ms=386738
-FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=257 failed=0
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=25 duration_ms=383010 failed=0
+JG_TEST_SUMMARY total=32 failed=0 skipped_gate=7 duration_ms=386738
+JG_TEST_SUMMARY_FAMILY family=live-harness-optin count=7 duration_ms=257 failed=0
+JG_TEST_SUMMARY_FAMILY family=pure-contract-unit count=25 duration_ms=383010 failed=0
 ```
 
 Real Pi TUI observations from the isolated deterministic trial at 100 columns.
@@ -545,9 +545,9 @@ $ bin/jg-doc-audience-check.sh
 jg-doc-audience-check: ok surfaces=68 local_links=253
 
 $ bin/jg-test-run.sh --changed --base origin/main
-FM_TEST_SUMMARY total=46 failed=0 skipped_gate=16 duration_ms=279390
-FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=16 duration_ms=431 failed=0
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=30 duration_ms=277700 failed=0
+JG_TEST_SUMMARY total=46 failed=0 skipped_gate=16 duration_ms=279390
+JG_TEST_SUMMARY_FAMILY family=live-harness-optin count=16 duration_ms=431 failed=0
+JG_TEST_SUMMARY_FAMILY family=pure-contract-unit count=30 duration_ms=277700 failed=0
 ```
 
 ## 2026-08-28 Pi 0.84.4 outcome-renderer compatibility verification
@@ -567,7 +567,7 @@ Observed against installed `@earendil-works/pi-coding-agent` 0.84.4:
 ```text
 ok - jg_branch_outcomes hides through ToolExecutionComponent while Calm-off and HTML export stay stock
 ok - the installed Pi still bounds the picker's list and ranks its search
-FM_TEST_END 2026-08-29T01:01:30Z tests/jg-pi-branch-extension.test.sh exit=0 duration_ms=22418 gate_skip=false
+JG_TEST_END 2026-08-29T01:01:30Z tests/jg-pi-branch-extension.test.sh exit=0 duration_ms=22418 gate_skip=false
 ```
 
 The real renderer comparison exercised twelve outcome lines and reported collapsed and expanded parity with Pi stock, zero visible rows under Calm, restored stock parity after toggling Calm off, and delegated stock HTML export fallback.
@@ -578,7 +578,7 @@ This host tracks Pi latest, so the version this contract's evidence is pinned to
 The renderer and lifecycle evidence below was taken against installed `@earendil-works/pi-coding-agent` 0.85.1 with `@earendil-works/pi-server` 0.85.0 also installed globally.
 
 Calm's rendered rows are unchanged across 0.84.4, 0.85.0, and 0.85.1.
-`FM_PI_PACKAGE_DIR` points `tests/jg-calm-pi-extension.test.sh` at an isolated install, so each comparison ran against its own temporary dependency tree and never mutated the globally installed packages.
+`JG_PI_PACKAGE_DIR` points `tests/jg-calm-pi-extension.test.sh` at an isolated install, so each comparison ran against its own temporary dependency tree and never mutated the globally installed packages.
 
 ```text
 $ pi --version
@@ -590,11 +590,11 @@ $ npm ls -g --depth 0 @earendil-works/pi-coding-agent @earendil-works/pi-server
 ```
 
 ```text
-$ FM_PI_PACKAGE_DIR=<pi 0.84.4> tests/jg-calm-pi-extension.test.sh
+$ JG_PI_PACKAGE_DIR=<pi 0.84.4> tests/jg-calm-pi-extension.test.sh
 ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
-$ FM_PI_PACKAGE_DIR=<pi 0.85.0> tests/jg-calm-pi-extension.test.sh
+$ JG_PI_PACKAGE_DIR=<pi 0.85.0> tests/jg-calm-pi-extension.test.sh
 ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
-$ FM_PI_PACKAGE_DIR=<pi 0.85.1> tests/jg-calm-pi-extension.test.sh
+$ JG_PI_PACKAGE_DIR=<pi 0.85.1> tests/jg-calm-pi-extension.test.sh
 ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
 ```
 
@@ -624,10 +624,10 @@ macOS derives its profile directory from `~/Library` regardless of `HOME`, so Da
 It still retries a bounded number of Chrome start-ups and, when every attempt fails, reports the Chrome binary, its version, the installed Pi version, each attempt's exit status, whether that attempt was timed out, and Chrome's own stderr, so the next occurrence is diagnosable from the CI log alone.
 `test_export_dom_render_guard` in the same script pins that behavior with real processes and no browser.
 
-The complete Calm suite against installed Pi 0.85.1, with `FM_CHROME_BIN` naming the Chrome the render step used:
+The complete Calm suite against installed Pi 0.85.1, with `JG_CHROME_BIN` naming the Chrome the render step used:
 
 ```text
-$ FM_CHROME_BIN=<chrome> tests/jg-calm-pi-extension.test.sh
+$ JG_CHROME_BIN=<chrome> tests/jg-calm-pi-extension.test.sh
 ok - Pi calm resolves its persistent home independently of Pi's launch directory
 ok - Pi calm compatibility evidence never rejects a Pi version for being newer than 0.82.0, and still fails closed on a missing or malformed version
 ok - a missing collapsed-thinking presentation API degrades only that Calm adapter with a clear skip reason, while the rest of Calm still registers
@@ -698,7 +698,7 @@ tmux 3.6a
 
 ### Spike-verified behavior
 
-Every capture came from real Claude Code 2.1.272 TUIs under tmux at 160 by 44 cells, driven by Haiku, with an isolated `FM_HOME` and the inherited session markers stripped.
+Every capture came from real Claude Code 2.1.272 TUIs under tmux at 160 by 44 cells, driven by Haiku, with an isolated `JG_HOME` and the inherited session markers stripped.
 
 - The stock `✽ Verb… (Ns · tokens)` row is absent while the boat draws in its place; over 23 working frames at 0.4s spacing the hull advanced one column every 0.8s to 0.9s (the 880ms cadence), the water row changed on every frame (the quarter-cell swell), the water width was exactly 158 (the 160-cell viewport minus the transcript's 2-cell margin), and the sail stayed one column right of the hull.
 - When the turn settled the boat was gone with no residual row, on both the fullscreen (`CLAUDE_CODE_NO_FLICKER=1`) and main-screen (`CLAUDE_CODE_NO_FLICKER=0`) layouts.
@@ -752,7 +752,7 @@ $ CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin validate --strict .claude/mo
   ❯ ./register.ts hooks: session.start, command.run{command=calm}, config.set{key=theme}, turn.step, ui.render{component=Spinner}, ui.render{component=ToolUse}, ui.render{component=ToolResult}, ui.render{component=ToolGroup}, ui.render{component=UserMessage}, ui.render{component=AssistantMessage}
   ❯ ./register.ts calls: $.clock.every (via load), $.command.register, $.config.list (via readTheme), $.env.get (via isActivated, load), $.fs.read (via readPreference), $.fs.write, $.session.messages (via load), $.ui.blit (via repaintShip), $.ui.invalidate, $.ui.resolve, $.ui.toast
   ❯ ./register.ts env writes: nothing
-  ❯ ./register.ts env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, FM_CONFIG_OVERRIDE, FM_HOME, FM_ROOT_OVERRIDE
+  ❯ ./register.ts env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, JG_CONFIG_OVERRIDE, JG_HOME, JG_ROOT_OVERRIDE
 ✔ Validation passed
 
 $ CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .claude/mods/firstmate-calm
@@ -768,16 +768,16 @@ ok - the Calm policy resolves the shared preference exactly as Pi does, reads on
 ok - the mod's operational-input classifier agrees with bin/jg-operational-input.sh on all 77 corpus cases: every current kind the owner encodes, every legacy shape, and every near miss
 
 $ bin/jg-test-run.sh tests/jg-calm-pi-extension.test.sh
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=68438
+JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=68438
 ```
 
 The Pi suite above ran against the extracted sprite core with every one of its thirteen cases green, including the working-ship geometry and the interactive TUI case, which is the evidence that the extraction left Pi's drawing unchanged.
 Later the same day the installed Claude Code auto-updated to 2.1.273, and `tests/jg-calm-claude-mod-plugin.test.sh` passed there as well: strict validation accepts the mod from both paths, including the theme hook and configuration read shown above, and the plugin-kit suites pass with the theme cases added.
 
-The opt-in live guard, run on this host against the installed Claude Code 2.1.272 with tmux 3.6a and Haiku, through the shipped `.claude/skills` auto-load path, an isolated project and `FM_HOME`, and the preference already `on` before the flag-off session:
+The opt-in live guard, run on this host against the installed Claude Code 2.1.272 with tmux 3.6a and Haiku, through the shipped `.claude/skills` auto-load path, an isolated project and `JG_HOME`, and the preference already `on` before the flag-off session:
 
 ```text
-$ FM_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
+$ JG_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
 ok - Claude Code 2.1.272 (Claude Code) with the flag unset: no hooks module, no /calm, stock working row, stock tool rows, preference on ignored
 ok - Claude Code 2.1.272 (Claude Code) with the flag on: the mod auto-loads from .claude/skills, /calm exists, the sailboat replaces and moves in the working row, tool and operational rows draw at zero height, /calm restores and re-hides them while persisting the shared preference
 ok - Claude Code 2.1.272 (Claude Code) resumes the transcript with Calm's hidden rows still hidden and the preference intact
@@ -837,7 +837,7 @@ The failure was reproduced end to end on the installed Claude Code 2.1.282 in a 
 $ claude --version
 2.1.282 (Claude Code)
 
-$ FM_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
+$ JG_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
 ok - Claude Code 2.1.282 (Claude Code) with the flag unset: no hooks module, no /calm, stock working row, stock tool rows, preference on ignored
 ok - Claude Code 2.1.282 (Claude Code) with the flag on: the mod auto-loads from .claude/skills, /calm exists, the sailboat replaces and moves in the working row, tool rows and the record-backed operational doorbell draw at zero height, /calm restores and re-hides them while persisting the shared preference
 ok - Claude Code 2.1.282 (Claude Code) resumes the transcript with Calm's hidden rows still hidden and the preference intact
@@ -861,7 +861,7 @@ $ bash tests/jg-calm-claude-mod-plugin.test.sh
 ok - Claude Code 2.1.283 (Claude Code) validates the Calm mod strictly at its folder and its auto-load path, hooking exactly the working row, tool, user, and assistant drawings and /calm, and logging supervision notes
 ok - Claude Code 2.1.283 (Claude Code) runs the Calm mod's plugin test suites clean: persisted toggle, hidden rows, working notes, the clock-driven working ship, and supervision notes
 
-$ FM_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
+$ JG_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
 ok - Claude Code 2.1.283 (Claude Code) with the flag unset: no hooks module, no /calm, stock working row, stock tool rows, preference on ignored
 ok - Claude Code 2.1.283 (Claude Code) with the flag on: the mod auto-loads from .claude/skills, /calm exists, the sailboat replaces and moves in the working row, tool rows and the record-backed operational doorbell draw at zero height, /calm restores and re-hides them while persisting the shared preference
 ok - Claude Code 2.1.283 (Claude Code) resumes the transcript with Calm's hidden rows still hidden and the preference intact
@@ -885,7 +885,7 @@ $ bash tests/jg-calm-claude-mod-plugin.test.sh
 ok - Claude Code 2.1.284 (Claude Code) validates the Calm mod strictly at its folder and its auto-load path, hooking exactly the working row, tool, user, and assistant drawings and /calm, and logging supervision notes
 ok - Claude Code 2.1.284 (Claude Code) runs the Calm mod's plugin test suites clean: persisted toggle, hidden rows, working notes, the clock-driven working ship, and supervision notes
 
-$ FM_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
+$ JG_CLAUDE_CALM_LIVE_E2E=1 bash tests/jg-calm-claude-mod-live-e2e.test.sh
 ok - Claude Code 2.1.284 (Claude Code) with the flag unset: no hooks module, no /calm, stock working row, stock tool rows, preference on ignored
 ok - Claude Code 2.1.284 (Claude Code) with the flag on: the mod auto-loads from .claude/skills, /calm exists, the sailboat replaces and moves in the working row, tool rows and the record-backed operational doorbell draw at zero height, /calm restores and re-hides them while persisting the shared preference
 ok - Claude Code 2.1.284 (Claude Code) resumes the transcript with Calm's hidden rows still hidden and the preference intact

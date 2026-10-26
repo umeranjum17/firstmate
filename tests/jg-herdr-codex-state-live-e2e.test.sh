@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Real Codex / Herdr recovery guard: an unknown registration cannot hide a
 # running harness or a shell-only exit. The normal guard spends no tokens.
-# FM_HERDR_CODEX_TURN_LIVE=1 additionally submits a 90-second tool wait and
+# JG_HERDR_CODEX_TURN_LIVE=1 additionally submits a 90-second tool wait and
 # checks native busy through jg_busy_classify; this token-spending path is opt-in.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-if [ "${FM_HERDR_CODEX_TURN_LIVE:-0}" = 1 ]; then
-  jg_live_gate opt-in FM_HERDR_CODEX_TURN_LIVE herdr codex jq
+if [ "${JG_HERDR_CODEX_TURN_LIVE:-0}" = 1 ]; then
+  jg_live_gate opt-in JG_HERDR_CODEX_TURN_LIVE herdr codex jq
 else
-  jg_live_gate default-on FM_HERDR_CODEX_STATE_LIVE herdr codex jq
+  jg_live_gate default-on JG_HERDR_CODEX_STATE_LIVE herdr codex jq
 fi
 # shellcheck source=tests/herdr-test-safety.sh
 . "$ROOT/tests/herdr-test-safety.sh"
@@ -48,7 +48,7 @@ lab pane run "$PANE" bash >/dev/null
 sleep 1
 lab pane run "$PANE" 'codex --disable hooks' >/dev/null
 wait_endpoint alive
-if [ "${FM_HERDR_CODEX_TURN_LIVE:-0}" = 1 ]; then
+if [ "${JG_HERDR_CODEX_TURN_LIVE:-0}" = 1 ]; then
   lab pane send-text "$PANE" 'You are a bounded lab worker. Do not read repository instructions or run fleet commands. Use your shell tool to run exactly sleep 90, wait until it finishes, then reply LAB_COMPLETE. Do not modify files.' >/dev/null
   sleep 1
   lab pane send-keys "$PANE" Enter >/dev/null

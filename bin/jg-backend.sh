@@ -11,18 +11,18 @@
 # into bin/backends/tmux.sh, with those SAME command sequences, so the default
 # (tmux) path stays byte-identical. P2 adds bin/backends/herdr.sh, a verified
 # spawn-capable backend with its own required CI lane, behind `--backend
-# herdr`/`FM_BACKEND=herdr`/`config/backend`, and behind runtime auto-detection
+# herdr`/`JG_BACKEND=herdr`/`config/backend`, and behind runtime auto-detection
 # when firstmate itself is running inside herdr with no explicit backend setting;
 # see herdr-addendum.md and data/jg-backend-design-d7/herdr-verification-p2.md for
 # its empirical basis.
 # P3 adds bin/backends/zellij.sh, also EXPERIMENTAL and spawn-capable, behind
-# `--backend zellij`/`FM_BACKEND=zellij`/`config/backend` - NOT behind runtime
+# `--backend zellij`/`JG_BACKEND=zellij`/`config/backend` - NOT behind runtime
 # auto-detection (report.md's Open Question #2: start with a dedicated
 # background session for predictability, unlike tmux's/herdr's ambient-session
 # reuse); see report.md's "Zellij Backend" section and docs/zellij-backend.md
 # for its empirical basis. P4 makes Orca spawn-capable: Orca owns both the
 # task worktree and the terminal endpoint. P5 adds bin/backends/cmux.sh, also
-# EXPERIMENTAL and spawn-capable, behind `--backend cmux`/`FM_BACKEND=cmux`/
+# EXPERIMENTAL and spawn-capable, behind `--backend cmux`/`JG_BACKEND=cmux`/
 # `config/backend`, and behind runtime auto-detection when firstmate itself is
 # running inside a cmux-spawned terminal (primary CMUX_WORKSPACE_ID marker, or
 # the documented macOS fallback signals when cmux's claude wrapper strips that
@@ -49,13 +49,13 @@
 # does not change the loop's behavior. The pull primitives also stay available
 # on their own for on-demand reads (jg-peek.sh, jg-crew-state.sh).
 
-FM_BACKEND_SCRIPT=${BASH_SOURCE[0]:-$0}
-FM_BACKEND_LIB_DIR="$(cd "$(dirname "$FM_BACKEND_SCRIPT")" && pwd)"
-unset FM_BACKEND_SCRIPT
-FM_BACKEND_DEFAULT_ROOT="$(cd "$FM_BACKEND_LIB_DIR/.." && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_DEFAULT_ROOT}}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-FM_BACKEND_CONFIG_DIR="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_BACKEND_SCRIPT=${BASH_SOURCE[0]:-$0}
+JG_BACKEND_LIB_DIR="$(cd "$(dirname "$JG_BACKEND_SCRIPT")" && pwd)"
+unset JG_BACKEND_SCRIPT
+JG_BACKEND_DEFAULT_ROOT="$(cd "$JG_BACKEND_LIB_DIR/.." && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-${JG_ROOT:-$JG_BACKEND_DEFAULT_ROOT}}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+JG_BACKEND_CONFIG_DIR="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 # Verified backend adapters. Extend only after a backend gets its own
 # bin/backends/<name>.sh and empirical verification, mirroring AGENTS.md
@@ -69,8 +69,8 @@ FM_BACKEND_CONFIG_DIR="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 # cmux is EXPERIMENTAL and spawn-capable, session-provider-only like
 # herdr/zellij - verified against the real 0.64.17 binary (docs/cmux-backend.md).
 # codex-app remains deliberately absent; see docs/codex-app-backend.md.
-FM_BACKEND_KNOWN="tmux herdr zellij orca cmux"
-FM_BACKEND_SPAWN="tmux herdr zellij orca cmux"
+JG_BACKEND_KNOWN="tmux herdr zellij orca cmux"
+JG_BACKEND_SPAWN="tmux herdr zellij orca cmux"
 
 # jg_backend_list_contains: whitespace-delimited membership without relying on
 # shell word splitting. jg-backend.sh is normally sourced by bash scripts, but
@@ -87,7 +87,7 @@ jg_backend_list_contains() {  # <list> <name>
 }
 
 jg_backend_is_known() {  # <name>
-  jg_backend_list_contains "$FM_BACKEND_KNOWN" "$1"
+  jg_backend_list_contains "$JG_BACKEND_KNOWN" "$1"
 }
 
 # jg_backend_detect: detect the runtime firstmate itself is CURRENTLY executing
@@ -135,34 +135,34 @@ jg_backend_is_known() {  # <name>
 #      scrubbed entirely (no bundle id to inherit); NOT usable from inside
 #      tmux, where the tmux server reparents to launchd and the chain never
 #      reaches cmux - which is fine, because $TMUX already won there.
-# Callers needing the winning signal read FM_BACKEND_DETECT_SIGNAL (set to
+# Callers needing the winning signal read JG_BACKEND_DETECT_SIGNAL (set to
 # TMUX, HERDR_ENV, CMUX_WORKSPACE_ID, bundle-id, or ancestry) and
-# FM_BACKEND_DETECTED after a direct (non-command-substitution) call.
-FM_BACKEND_CMUX_BUNDLE_ID="com.cmuxterm.app"
+# JG_BACKEND_DETECTED after a direct (non-command-substitution) call.
+JG_BACKEND_CMUX_BUNDLE_ID="com.cmuxterm.app"
 
 jg_backend_detect() {
-  FM_BACKEND_DETECTED=""
-  FM_BACKEND_DETECT_SIGNAL=""
+  JG_BACKEND_DETECTED=""
+  JG_BACKEND_DETECT_SIGNAL=""
   if [ -n "${TMUX:-}" ]; then
-    FM_BACKEND_DETECTED=tmux
-    FM_BACKEND_DETECT_SIGNAL=TMUX
+    JG_BACKEND_DETECTED=tmux
+    JG_BACKEND_DETECT_SIGNAL=TMUX
     printf 'tmux'
     return 0
   fi
   if [ "${HERDR_ENV:-}" = "1" ]; then
-    FM_BACKEND_DETECTED=herdr
-    FM_BACKEND_DETECT_SIGNAL=HERDR_ENV
+    JG_BACKEND_DETECTED=herdr
+    JG_BACKEND_DETECT_SIGNAL=HERDR_ENV
     printf 'herdr'
     return 0
   fi
   if [ -n "${CMUX_WORKSPACE_ID:-}" ]; then
-    FM_BACKEND_DETECTED=cmux
-    FM_BACKEND_DETECT_SIGNAL=CMUX_WORKSPACE_ID
+    JG_BACKEND_DETECTED=cmux
+    JG_BACKEND_DETECT_SIGNAL=CMUX_WORKSPACE_ID
     printf 'cmux'
     return 0
   fi
   if jg_backend_detect_cmux_fallback; then
-    FM_BACKEND_DETECTED=cmux
+    JG_BACKEND_DETECTED=cmux
     printf 'cmux'
     return 0
   fi
@@ -170,17 +170,17 @@ jg_backend_detect() {
 }
 
 # jg_backend_detect_cmux_fallback: the two macOS-only cmux fallback signals
-# (see jg_backend_detect's header comment). Sets FM_BACKEND_DETECT_SIGNAL to
+# (see jg_backend_detect's header comment). Sets JG_BACKEND_DETECT_SIGNAL to
 # bundle-id or ancestry on success. Cheap-first: the bundle-id check is a pure
 # env read; the ancestry walk (subprocess-per-hop) runs only when it misses.
 jg_backend_detect_cmux_fallback() {
   [ "$(uname 2>/dev/null)" = Darwin ] || return 1
-  if [ "${__CFBundleIdentifier:-}" = "$FM_BACKEND_CMUX_BUNDLE_ID" ]; then
-    FM_BACKEND_DETECT_SIGNAL=bundle-id
+  if [ "${__CFBundleIdentifier:-}" = "$JG_BACKEND_CMUX_BUNDLE_ID" ]; then
+    JG_BACKEND_DETECT_SIGNAL=bundle-id
     return 0
   fi
   if jg_backend_detect_cmux_app_is_ancestor; then
-    FM_BACKEND_DETECT_SIGNAL=ancestry
+    JG_BACKEND_DETECT_SIGNAL=ancestry
     return 0
   fi
   return 1
@@ -192,7 +192,7 @@ jg_backend_detect_cmux_fallback() {
 jg_backend_detect_cmux_app_pid() {
   command -v lsappinfo >/dev/null 2>&1 || return 1
   local out pid
-  out=$(lsappinfo info -only pid -app "$FM_BACKEND_CMUX_BUNDLE_ID" 2>/dev/null) || return 1
+  out=$(lsappinfo info -only pid -app "$JG_BACKEND_CMUX_BUNDLE_ID" 2>/dev/null) || return 1
   pid=${out##*=}
   pid=$(printf '%s' "$pid" | tr -d '[:space:]"')
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
@@ -231,7 +231,7 @@ jg_backend_detect_cmux_app_is_ancestor() {
 }
 
 # jg_backend_name: resolve the ACTIVE backend for a NEW spawn, absent an
-# explicit per-task override. Precedence: FM_BACKEND env, then config/backend
+# explicit per-task override. Precedence: JG_BACKEND env, then config/backend
 # (a single word on its first non-empty line, mirroring config/crew-harness),
 # then runtime auto-detection (jg_backend_detect), then default tmux. A
 # per-task `--backend` flag is parsed by the caller (jg-spawn.sh) and takes
@@ -244,26 +244,26 @@ jg_backend_detect_cmux_app_is_ancestor() {
 # distinct from the primary-marker case.
 jg_backend_name() {
   local line v detected marker
-  if [ -n "${FM_BACKEND:-}" ]; then
-    printf '%s' "$FM_BACKEND"
+  if [ -n "${JG_BACKEND:-}" ]; then
+    printf '%s' "$JG_BACKEND"
     return 0
   fi
-  if [ -f "$FM_BACKEND_CONFIG_DIR/backend" ]; then
+  if [ -f "$JG_BACKEND_CONFIG_DIR/backend" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
       v=$(printf '%s' "$line" | tr -d '[:space:]')
       if [ -n "$v" ]; then
         printf '%s' "$v"
         return 0
       fi
-    done < "$FM_BACKEND_CONFIG_DIR/backend"
+    done < "$JG_BACKEND_CONFIG_DIR/backend"
   fi
   # Called directly (not in a command substitution) so the detect signal
   # globals survive into the notice below.
   if jg_backend_detect >/dev/null; then
-    detected=$FM_BACKEND_DETECTED
+    detected=$JG_BACKEND_DETECTED
     if [ "$detected" = cmux ]; then
-      case "$FM_BACKEND_DETECT_SIGNAL" in
-        bundle-id) marker="FALLBACK signal __CFBundleIdentifier=$FM_BACKEND_CMUX_BUNDLE_ID; CMUX_WORKSPACE_ID absent, stripped by cmux's bundled claude wrapper" ;;
+      case "$JG_BACKEND_DETECT_SIGNAL" in
+        bundle-id) marker="FALLBACK signal __CFBundleIdentifier=$JG_BACKEND_CMUX_BUNDLE_ID; CMUX_WORKSPACE_ID absent, stripped by cmux's bundled claude wrapper" ;;
         ancestry) marker="FALLBACK signal process-ancestry reaching the running cmux app; CMUX_WORKSPACE_ID absent, stripped by cmux's bundled claude wrapper" ;;
         *) marker="CMUX_WORKSPACE_ID" ;;
       esac
@@ -279,7 +279,7 @@ jg_backend_name() {
 jg_backend_validate() {  # <name>
   local name=$1
   if ! jg_backend_is_known "$name"; then
-    echo "error: unknown backend '$name' (known: $FM_BACKEND_KNOWN)" >&2
+    echo "error: unknown backend '$name' (known: $JG_BACKEND_KNOWN)" >&2
     return 1
   fi
   return 0
@@ -288,8 +288,8 @@ jg_backend_validate() {  # <name>
 jg_backend_validate_spawn() {  # <name>
   local name=$1
   jg_backend_validate "$name" || return 1
-  jg_backend_list_contains "$FM_BACKEND_SPAWN" "$name" && return 0
-  echo "error: backend '$name' does not support task spawning yet (spawn-supported: $FM_BACKEND_SPAWN)" >&2
+  jg_backend_list_contains "$JG_BACKEND_SPAWN" "$name" && return 0
+  echo "error: backend '$name' does not support task spawning yet (spawn-supported: $JG_BACKEND_SPAWN)" >&2
   return 1
 }
 
@@ -370,8 +370,8 @@ jg_backend_target_of_meta() {  # <meta-file>
 # and worktree. New non-tmux records carry endpoint_task_id because their
 # opaque runtime ids do not encode the task label. Legacy tmux records remain
 # valid only when their window name itself is exactly jg-<task-id>.
-# On success, sets FM_BACKEND_VALIDATED_BACKEND and
-# FM_BACKEND_VALIDATED_TARGET. On failure, prints one refusal and returns 1.
+# On success, sets JG_BACKEND_VALIDATED_BACKEND and
+# JG_BACKEND_VALIDATED_TARGET. On failure, prints one refusal and returns 1.
 jg_backend_meta_exact_value() {  # <meta-file> <key>
   local meta=$1 key=$2 count value
   count=$(grep -c "^$key=" "$meta" 2>/dev/null || true)
@@ -409,8 +409,8 @@ jg_backend_orca_worktree_id_valid() {  # <value>
 jg_backend_validate_task_endpoint() {  # <meta-file> <task-id>
   local meta=$1 id=$2 backend_count backend window worktree project binding_count binding
   local session pane recorded_session workspace tab terminal worktree_id surface
-  FM_BACKEND_VALIDATED_BACKEND=
-  FM_BACKEND_VALIDATED_TARGET=
+  JG_BACKEND_VALIDATED_BACKEND=
+  JG_BACKEND_VALIDATED_TARGET=
   [ -f "$meta" ] && [ ! -L "$meta" ] || {
     echo "REFUSED: task $id has no regular endpoint metadata at $meta; preserving task state." >&2
     return 1
@@ -548,9 +548,9 @@ jg_backend_validate_task_endpoint() {  # <meta-file> <task-id>
       ;;
   esac
   # shellcheck disable=SC2034 # Output globals are consumed by sourcing callers.
-  FM_BACKEND_VALIDATED_BACKEND=$backend
+  JG_BACKEND_VALIDATED_BACKEND=$backend
   # shellcheck disable=SC2034 # Output globals are consumed by sourcing callers.
-  FM_BACKEND_VALIDATED_TARGET=$window
+  JG_BACKEND_VALIDATED_TARGET=$window
   return 0
 }
 
@@ -626,7 +626,7 @@ jg_backend_source_readable() {  # <path>
 jg_backend_source() {  # <name>
   local name=$1 adapter rel sibling
   jg_backend_validate "$name" || return 1
-  adapter="$FM_BACKEND_LIB_DIR/backends/$name.sh"
+  adapter="$JG_BACKEND_LIB_DIR/backends/$name.sh"
   # The sibling list rides in the positional parameters: zsh does not
   # word-split an unquoted expansion, so a space-separated string is one path.
   case "$name" in
@@ -651,43 +651,43 @@ jg_backend_source() {  # <name>
   esac
   jg_backend_source_readable "$adapter" || return 1
   for rel in "$@"; do
-    sibling="$FM_BACKEND_LIB_DIR/$rel"
+    sibling="$JG_BACKEND_LIB_DIR/$rel"
     jg_backend_source_readable "$sibling" || return 1
   done
   case "$name" in
     tmux)
-      if [ -z "${_FM_BACKEND_TMUX_SOURCED:-}" ]; then
+      if [ -z "${_JG_BACKEND_TMUX_SOURCED:-}" ]; then
         # shellcheck source=/dev/null
         . "$adapter" || return 1
-        _FM_BACKEND_TMUX_SOURCED=1
+        _JG_BACKEND_TMUX_SOURCED=1
       fi
       ;;
     herdr)
-      if [ -z "${_FM_BACKEND_HERDR_SOURCED:-}" ]; then
+      if [ -z "${_JG_BACKEND_HERDR_SOURCED:-}" ]; then
         # shellcheck source=/dev/null
         . "$adapter" || return 1
-        _FM_BACKEND_HERDR_SOURCED=1
+        _JG_BACKEND_HERDR_SOURCED=1
       fi
       ;;
     zellij)
-      if [ -z "${_FM_BACKEND_ZELLIJ_SOURCED:-}" ]; then
+      if [ -z "${_JG_BACKEND_ZELLIJ_SOURCED:-}" ]; then
         # shellcheck source=/dev/null
         . "$adapter" || return 1
-        _FM_BACKEND_ZELLIJ_SOURCED=1
+        _JG_BACKEND_ZELLIJ_SOURCED=1
       fi
       ;;
     orca)
-      if [ -z "${_FM_BACKEND_ORCA_SOURCED:-}" ]; then
+      if [ -z "${_JG_BACKEND_ORCA_SOURCED:-}" ]; then
         # shellcheck source=/dev/null
         . "$adapter" || return 1
-        _FM_BACKEND_ORCA_SOURCED=1
+        _JG_BACKEND_ORCA_SOURCED=1
       fi
       ;;
     cmux)
-      if [ -z "${_FM_BACKEND_CMUX_SOURCED:-}" ]; then
+      if [ -z "${_JG_BACKEND_CMUX_SOURCED:-}" ]; then
         # shellcheck source=/dev/null
         . "$adapter" || return 1
-        _FM_BACKEND_CMUX_SOURCED=1
+        _JG_BACKEND_CMUX_SOURCED=1
       fi
       ;;
   esac
@@ -765,24 +765,24 @@ jg_backend_capture() {  # <backend> <target> <lines> [expected-label]
   esac
 }
 
-# FM_BACKEND_VISIBLE_CAPTURE: backends with a verified viewport-only read, each
+# JG_BACKEND_VISIBLE_CAPTURE: backends with a verified viewport-only read, each
 # implementing jg_backend_<name>_visible_capture. This one list answers both the
 # capability question and the dispatch, so they cannot disagree. cmux is absent
 # pending live verification: its `read-screen` without `--scrollback` plausibly
 # reads only the viewport, but that has not been observed on a real cmux, and
 # the adapter's own capture opts into history with `--scrollback`. orca's
 # `terminal read --limit` is a history read with no viewport mode.
-FM_BACKEND_VISIBLE_CAPTURE="tmux herdr zellij"
+JG_BACKEND_VISIBLE_CAPTURE="tmux herdr zellij"
 
 # jg_backend_visible_capture_supported: whether <backend> can read the visible
 # viewport WITHOUT scrollback. Callers that must not mistake a scrolled-away
 # frame for the live screen ask this first and fail closed on a no.
 jg_backend_visible_capture_supported() {  # <backend>
-  jg_backend_list_contains "$FM_BACKEND_VISIBLE_CAPTURE" "$1"
+  jg_backend_list_contains "$JG_BACKEND_VISIBLE_CAPTURE" "$1"
 }
 
 # jg_backend_visible_capture: the visible viewport, never scrollback. A backend
-# outside FM_BACKEND_VISIBLE_CAPTURE declines here rather than answering with a
+# outside JG_BACKEND_VISIBLE_CAPTURE declines here rather than answering with a
 # history-backed capture the caller would read as the live screen.
 jg_backend_visible_capture() {  # <backend> <target> [expected-label]
   local backend=$1

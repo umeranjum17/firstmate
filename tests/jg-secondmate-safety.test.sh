@@ -11,7 +11,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/secondmate-helpers.sh"
 
 TMP_ROOT=$(jg_test_tmproot jg-secondmate-safety)
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 file_mode() {
   if [ "$(uname)" = Darwin ]; then
@@ -33,12 +33,12 @@ case "${1:-}" in
       exit 0
     fi
     [ "$#" -eq 1 ] || exit 2
-    printf '%s\n' "$FM_HOME" >> "$FM_FAKE_PROCEVENT_SWEEP_LOG"
-    rm -f -- "$FM_HOME"/state/procevent/*.source "$FM_HOME"/state/procevent/*.runner
+    printf '%s\n' "$JG_HOME" >> "$JG_FAKE_PROCEVENT_SWEEP_LOG"
+    rm -f -- "$JG_HOME"/state/procevent/*.source "$JG_HOME"/state/procevent/*.runner
     ;;
   reconcile)
-    printf '%s\n' "$FM_HOME" >> "$FM_FAKE_PROCEVENT_REARM_LOG"
-    [ -z "${FM_FAKE_PROCEVENT_REARM_FAIL:-}" ] || exit 1
+    printf '%s\n' "$JG_HOME" >> "$JG_FAKE_PROCEVENT_REARM_LOG"
+    [ -z "${JG_FAKE_PROCEVENT_REARM_FAIL:-}" ] || exit 1
     ;;
   *) exit 2 ;;
 esac
@@ -54,24 +54,24 @@ test_jg_home_parameterization() {
   mkdir -p "$home_one/data" "$home_one/state" "$home_two/data" "$home_two/state"
   printf '%s\n' '- app [local-only +yolo] - test app (added 2026-06-22)' > "$home_one/data/projects.md"
 
-  out=$(FM_HOME="$home_one" "$ROOT/bin/jg-project-mode.sh" app)
-  [ "$out" = "local-only on" ] || fail "jg-project-mode did not read projects.md from FM_HOME"
-  out=$(FM_HOME="$home_two" "$ROOT/bin/jg-project-mode.sh" app 2>/dev/null)
+  out=$(JG_HOME="$home_one" "$ROOT/bin/jg-project-mode.sh" app)
+  [ "$out" = "local-only on" ] || fail "jg-project-mode did not read projects.md from JG_HOME"
+  out=$(JG_HOME="$home_two" "$ROOT/bin/jg-project-mode.sh" app 2>/dev/null)
   [ "$out" = "no-mistakes off" ] || fail "jg-project-mode did not isolate missing registry by home"
 
-  FM_HOME="$home_one" "$ROOT/bin/jg-brief.sh" task-a app --mode no-mistakes >/dev/null || fail "brief scaffold failed under FM_HOME"
+  JG_HOME="$home_one" "$ROOT/bin/jg-brief.sh" task-a app --mode no-mistakes >/dev/null || fail "brief scaffold failed under JG_HOME"
   brief="$home_one/data/task-a/brief.md"
-  [ -f "$brief" ] || fail "brief was not written under FM_HOME/data"
-  grep -F ">> '$home_one/state/task-a.status'" "$brief" >/dev/null || fail "brief did not shell-quote FM_HOME state path"
+  [ -f "$brief" ] || fail "brief was not written under JG_HOME/data"
+  grep -F ">> '$home_one/state/task-a.status'" "$brief" >/dev/null || fail "brief did not shell-quote JG_HOME state path"
 
-  FM_HOME="$home_one" "$ROOT/bin/jg-brief.sh" task-b app --scout >/dev/null || fail "scout brief scaffold failed under FM_HOME"
+  JG_HOME="$home_one" "$ROOT/bin/jg-brief.sh" task-b app --scout >/dev/null || fail "scout brief scaffold failed under JG_HOME"
   brief="$home_one/data/task-b/brief.md"
-  grep -F ">> '$home_one/state/task-b.status'" "$brief" >/dev/null || fail "scout brief did not shell-quote FM_HOME state path"
+  grep -F ">> '$home_one/state/task-b.status'" "$brief" >/dev/null || fail "scout brief did not shell-quote JG_HOME state path"
 
-  FM_HOME="$home_one" FM_SECONDMATE_CHARTER='ops domain' "$ROOT/bin/jg-brief.sh" task-c --secondmate app >/dev/null \
-    || fail "secondmate brief scaffold failed under FM_HOME"
+  JG_HOME="$home_one" JG_SECONDMATE_CHARTER='ops domain' "$ROOT/bin/jg-brief.sh" task-c --secondmate app >/dev/null \
+    || fail "secondmate brief scaffold failed under JG_HOME"
   brief="$home_one/data/task-c/brief.md"
-  grep -F ">> '$home_one/state/task-c.status'" "$brief" >/dev/null || fail "secondmate brief did not shell-quote FM_HOME state path"
+  grep -F ">> '$home_one/state/task-c.status'" "$brief" >/dev/null || fail "secondmate brief did not shell-quote JG_HOME state path"
 
   # A pushed ship worktree, and a gh that supplies no forge head, so the PR
   # check stays offline and its named-head gate reads the worktree's HEAD.
@@ -81,12 +81,12 @@ test_jg_home_parameterization() {
   printf '#!/usr/bin/env bash\nexit 1\n' > "$home_one/fakebin/gh"
   chmod +x "$home_one/fakebin/gh"
   printf 'project=x\nworktree=%s\n' "$home_one/wt" > "$home_one/state/task-a.meta"
-  PATH="$home_one/fakebin:$PATH" FM_HOME="$home_one" FM_GUARD_GRACE=999999 \
+  PATH="$home_one/fakebin:$PATH" JG_HOME="$home_one" JG_GUARD_GRACE=999999 \
     "$ROOT/bin/jg-pr-check.sh" task-a https://github.com/example/repo/pull/1 >/dev/null 2>/dev/null \
-    || fail "jg-pr-check failed under FM_HOME"
-  [ -f "$home_one/state/task-a.check.sh" ] || fail "pr check was not written under FM_HOME/state"
+    || fail "jg-pr-check failed under JG_HOME"
+  [ -f "$home_one/state/task-a.check.sh" ] || fail "pr check was not written under JG_HOME/state"
   [ ! -e "$home_two/state/task-a.check.sh" ] || fail "pr check leaked into another home"
-  pass "FM_HOME parameterizes data and state paths"
+  pass "JG_HOME parameterizes data and state paths"
 }
 
 test_lock_status_is_per_home() {
@@ -95,9 +95,9 @@ test_lock_status_is_per_home() {
   home_two="$TMP_ROOT/lock-two"
   mkdir -p "$home_one/state" "$home_two/state"
   printf '999999\n' > "$home_one/state/.lock"
-  out=$(FM_HOME="$home_one" "$ROOT/bin/jg-lock.sh" status)
+  out=$(JG_HOME="$home_one" "$ROOT/bin/jg-lock.sh" status)
   printf '%s\n' "$out" | grep -F 'lock: stale' >/dev/null || fail "home one lock status did not read its own lock"
-  out=$(FM_HOME="$home_two" "$ROOT/bin/jg-lock.sh" status)
+  out=$(JG_HOME="$home_two" "$ROOT/bin/jg-lock.sh" status)
   [ "$out" = "lock: free" ] || fail "home two lock status was affected by home one"
   pass "jg-lock status is scoped per home"
 }
@@ -121,8 +121,8 @@ test_seed_allows_overlapping_clones_and_drops_owner() {
 - beta [direct-PR] - beta project (added 2026-06-22)
 EOF
 
-  FM_HOME="$home" FM_SECONDMATE_CHARTER='feature design for alpha beta' \
-    FM_SECONDMATE_SCOPE='feature design for alpha beta' \
+  JG_HOME="$home" JG_SECONDMATE_CHARTER='feature design for alpha beta' \
+    JG_SECONDMATE_SCOPE='feature design for alpha beta' \
     "$ROOT/bin/jg-home-seed.sh" design "$design" alpha beta >/dev/null \
     || fail "initial seed failed"
   assert_grep '- design - feature design for alpha beta' "$home/data/secondmates.md" "design registry line missing"
@@ -130,14 +130,14 @@ EOF
   assert_no_grep 'owns:' "$home/data/secondmates.md" "registry used the legacy owns field"
 
   # beta is shared with a second secondmate of a different scope (overlap allowed).
-  FM_HOME="$home" FM_SECONDMATE_CHARTER='issue triage for beta' \
-    FM_SECONDMATE_SCOPE='issue triage for beta' \
+  JG_HOME="$home" JG_SECONDMATE_CHARTER='issue triage for beta' \
+    JG_SECONDMATE_SCOPE='issue triage for beta' \
     "$ROOT/bin/jg-home-seed.sh" other "$other" beta >/dev/null 2>&1 \
     || fail "seed refused overlapping project clones across different scopes"
   assert_grep '- other - issue triage for beta' "$home/data/secondmates.md" "overlapping registry line missing"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation rejected overlapping clones"
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation rejected overlapping clones"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" owner alpha >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" owner alpha >/dev/null 2>&1; then
     fail "owner subcommand still succeeded after routing moved to scopes"
   fi
   pass "seed allows overlapping project clone lists and drops the owns/owner routing"
@@ -149,7 +149,7 @@ test_home_seed_validate_rejects_unparseable_registry_entry() {
   err="$TMP_ROOT/unparseable-registry.err"
   mkdir -p "$home/data"
   printf '%s\n' '- broken - prose (home: /tmp/child; scope: missing projects and date)' > "$home/data/secondmates.md"
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     fail "home-seed validation accepted an operationally unparseable registry record"
   fi
   grep -F 'malformed secondmate registry entry' "$err" >/dev/null \
@@ -165,12 +165,12 @@ test_home_seed_refuses_broken_registry_symlink() {
   target="$home/data/missing-secondmates.md"
   mkdir -p "$home/data" "$home/state" "$home/projects"
   ln -s "$target" "$home/data/secondmates.md"
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     fail "home-seed validation accepted a broken registry symlink"
   fi
   grep -F 'secondmate registry is unavailable or unsafe' "$err" >/dev/null \
     || fail "home-seed validation did not explain the broken registry symlink"
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='design domain' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='design domain' \
     "$ROOT/bin/jg-home-seed.sh" design "$sub" alpha >/dev/null 2>"$err"; then
     fail "home seeding accepted a broken registry symlink"
   fi
@@ -190,7 +190,7 @@ test_home_seed_refuses_unreadable_registry() {
   mkdir -p "$home/data" "$home/state" "$home/projects"
   printf '%s\n' '- design - design domain (home: /tmp/design; scope: design; projects: alpha; added 2026-07-30)' > "$registry"
   chmod 000 "$registry"
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     chmod 600 "$registry"
     fail "home-seed validation accepted an unreadable registry"
   fi
@@ -198,7 +198,7 @@ test_home_seed_refuses_unreadable_registry() {
     chmod 600 "$registry"
     fail "home-seed validation did not explain the unreadable registry"
   }
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='design domain' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='design domain' \
     "$ROOT/bin/jg-home-seed.sh" design "$sub" alpha >/dev/null 2>"$err"; then
     chmod 600 "$registry"
     fail "home seeding accepted an unreadable registry"
@@ -221,7 +221,7 @@ test_home_seed_validate_rejects_duplicate_homes() {
 - triage - triage domain (home: $subhome_abs; scope: issue triage; projects: beta; added 2026-06-22)
 EOF
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     fail "registry validation accepted two secondmates with the same home"
   fi
   grep -F 'duplicate secondmate home assignment' "$err" >/dev/null \
@@ -243,7 +243,7 @@ test_home_seed_validate_rejects_duplicate_ids() {
 - design - design domain (home: $second_abs; scope: design work; projects: beta; added 2026-06-22)
 EOF
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     fail "registry validation accepted two homes for the same secondmate id"
   fi
   grep -F 'duplicate secondmate id assignment' "$err" >/dev/null \
@@ -265,7 +265,7 @@ test_home_seed_validate_rejects_nested_homes() {
 - triage - triage domain (home: $descendant_abs; scope: issue triage; projects: beta; added 2026-06-22)
 EOF
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null 2>"$err"; then
     fail "registry validation accepted nested secondmate homes"
   fi
   grep -F 'overlapping secondmate home assignment' "$err" >/dev/null \
@@ -286,9 +286,9 @@ test_home_seed_uses_treehouse_acquired_home() {
   log="$TMP_ROOT/dash-fake/tmux.log"
   lease="$TMP_ROOT/dash-fake/lease"
 
-  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TREEHOUSE_HOME="$acquired" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TREEHOUSE_LEASE_FILE="$lease" \
-    FM_SECONDMATE_CHARTER='dash acquired scope' FM_SECONDMATE_SCOPE='dash acquired scope' \
+  out=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TREEHOUSE_HOME="$acquired" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TREEHOUSE_LEASE_FILE="$lease" \
+    JG_SECONDMATE_CHARTER='dash acquired scope' JG_SECONDMATE_SCOPE='dash acquired scope' \
     "$ROOT/bin/jg-home-seed.sh" dash - alpha) \
     || fail "seed failed for a treehouse-acquired home"
   acquired_abs=$(cd "$acquired" && pwd -P)
@@ -318,8 +318,8 @@ test_home_seed_returns_treehouse_acquired_home_on_assignment_failure() {
   fakebin=$(make_fake_tmux "$TMP_ROOT/dash-fail-fake")
   log="$TMP_ROOT/dash-fail-fake/tmux.log"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TREEHOUSE_HOME="$acquired" FM_FAKE_TMUX_LOG="$log" \
-    FM_SECONDMATE_CHARTER='dash acquired scope' FM_SECONDMATE_SCOPE='dash acquired scope' \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TREEHOUSE_HOME="$acquired" JG_FAKE_TMUX_LOG="$log" \
+    JG_SECONDMATE_CHARTER='dash acquired scope' JG_SECONDMATE_SCOPE='dash acquired scope' \
     "$ROOT/bin/jg-home-seed.sh" dash - alpha >/dev/null 2>"$err"; then
     fail "seed reused an acquired home marked for another secondmate"
   fi
@@ -348,9 +348,9 @@ test_home_seed_warns_when_acquired_home_return_fails() {
   log="$TMP_ROOT/dash-return-fail-fake/tmux.log"
   lease="$TMP_ROOT/dash-return-fail-fake/lease"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TREEHOUSE_HOME="$acquired" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TREEHOUSE_LEASE_FILE="$lease" FM_FAKE_TREEHOUSE_RETURN_FAIL=1 \
-    FM_SECONDMATE_CHARTER='dash acquired scope' FM_SECONDMATE_SCOPE='dash acquired scope' \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TREEHOUSE_HOME="$acquired" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TREEHOUSE_LEASE_FILE="$lease" JG_FAKE_TREEHOUSE_RETURN_FAIL=1 \
+    JG_SECONDMATE_CHARTER='dash acquired scope' JG_SECONDMATE_SCOPE='dash acquired scope' \
     "$ROOT/bin/jg-home-seed.sh" dash - alpha >/dev/null 2>"$err"; then
     fail "seed reused an acquired home after return failure setup"
   fi
@@ -375,7 +375,7 @@ test_home_seed_does_not_return_unsafe_acquired_home() {
   fakebin=$(make_fake_tmux "$TMP_ROOT/dash-active-fake")
   log="$TMP_ROOT/dash-active-fake/tmux.log"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TREEHOUSE_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TREEHOUSE_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-home-seed.sh" dash - alpha >/dev/null 2>"$err"; then
     fail "seed accepted an acquired home matching the active firstmate home"
   fi
@@ -386,7 +386,7 @@ test_home_seed_does_not_return_unsafe_acquired_home() {
   [ -d "$home/projects/alpha" ] || fail "unsafe acquired-home rollback removed the active home"
 
   : > "$log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TREEHOUSE_HOME="$descendant" FM_FAKE_TMUX_LOG="$log" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TREEHOUSE_HOME="$descendant" JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-home-seed.sh" dash - alpha >/dev/null 2>"$err"; then
     fail "seed accepted an acquired home inside the active firstmate home"
   fi
@@ -414,7 +414,7 @@ test_home_seed_rolls_back_failed_clone() {
 - beta [direct-PR] - beta project (added 2026-06-22)
 EOF
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='rollback scope' FM_SECONDMATE_SCOPE='rollback scope' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='rollback scope' JG_SECONDMATE_SCOPE='rollback scope' \
     "$ROOT/bin/jg-home-seed.sh" rollback "$subhome" alpha beta >/dev/null 2>"$err"; then
     fail "seed succeeded even though the second project clone failed"
   fi
@@ -441,7 +441,7 @@ test_home_seed_refuses_missing_filled_charter() {
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/missing-charter-alpha.git"
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted a direct seed without a filled charter"
   fi
   grep -F 'no filled secondmate charter brief' "$err" >/dev/null \
@@ -460,10 +460,10 @@ test_home_seed_refuses_placeholder_charter() {
   jg_git_init_commit "$home/projects/alpha"
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/placeholder-charter-alpha.git"
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
-  FM_HOME="$home" "$ROOT/bin/jg-brief.sh" design --secondmate alpha >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" design --secondmate alpha >/dev/null \
     || fail "placeholder charter scaffold failed"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted an unfilled placeholder charter"
   fi
   grep -F 'still contains {TASK}' "$err" >/dev/null \
@@ -483,7 +483,7 @@ test_home_seed_refuses_empty_charter_fields() {
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/empty-charter-alpha.git"
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='   ' "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='   ' "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted a whitespace-only charter"
   fi
   grep -F 'empty Charter section' "$err" >/dev/null \
@@ -491,9 +491,9 @@ test_home_seed_refuses_empty_charter_fields() {
   [ ! -e "$subhome" ] || fail "empty charter seed left a generated subhome"
 
   rm -rf "$home/data/design" "$subhome" "$err"
-  FM_SECONDMATE_SCOPE='   ' scaffold_secondmate_charter "$home" design 'filled charter' alpha \
+  JG_SECONDMATE_SCOPE='   ' scaffold_secondmate_charter "$home" design 'filled charter' alpha \
     || fail "empty scope fixture scaffold failed"
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted an empty routing scope"
   fi
   grep -F 'empty Routing scope section' "$err" >/dev/null \
@@ -513,8 +513,8 @@ test_home_seed_no_projects_end_to_end() {
   fakebin=$(make_fake_tmux "$TMP_ROOT/no-projects-fake")
   log="$TMP_ROOT/no-projects-fake/tmux.log"
 
-  out=$(FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  out=$(JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects) \
     || fail "project-less seed failed"
   sub_abs=$(cd "$sub" && pwd -P)
@@ -527,13 +527,13 @@ test_home_seed_no_projects_end_to_end() {
   [ "$(cat "$sub/.jg-secondmate-home")" = fdev ] || fail "project-less seed did not mark the subhome"
   assert_present "$sub/data/charter.md" "project-less seed did not copy the charter"
   [ -z "$(ls -A "$sub/projects" 2>/dev/null)" ] || fail "project-less seed cloned a project"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation failed after project-less seed"
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null || fail "registry validation failed after project-less seed"
 
   # Spawn tolerates the empty projects field: the home resolves from the registry
   # and the projects meta is recorded empty rather than breaking the launch.
   : > "$log"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/no-projects-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/no-projects-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" fdev "$sub" codex --secondmate >/dev/null 2>&1 \
     || fail "project-less secondmate spawn failed"
   meta="$home/state/fdev.meta"
@@ -558,12 +558,12 @@ test_secondmate_spawn_resolves_punctuated_registry_projects() {
   sub_abs=$(cd "$sub" && pwd -P)
   printf -- '- punctuated - launch notes (parenthetical) (home: %s; scope: launch (child); semicolon is valid; projects: alpha, beta; added 2026-07-30)' \
     "$sub_abs" > "$home/data/secondmates.md"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" validate >/dev/null \
     || fail "home-seed validation rejected punctuated registry fields before spawn"
   fakebin=$(make_fake_tmux "$TMP_ROOT/punctuated-spawn-fake")
   log="$TMP_ROOT/punctuated-spawn-fake/tmux.log"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/punctuated-spawn-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/punctuated-spawn-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" punctuated codex --secondmate >/dev/null 2>&1 \
     || fail "secondmate spawn failed for punctuated registry fields"
   meta="$home/state/punctuated.meta"
@@ -614,15 +614,15 @@ EOF
       jg_write_secondmate_meta "$home/state/domain.meta" "$sub"
       meta_before="$TMP_ROOT/spawn-binding-$case_name.meta.before"
       cp "$home/state/domain.meta" "$meta_before"
-      if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-        FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-binding-$case_name-fake/pane.txt" \
+      if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+        JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-binding-$case_name-fake/pane.txt" \
         "$ROOT/bin/jg-spawn.sh" domain codex --secondmate >/dev/null 2>"$err"; then
         fail "secondmate spawn accepted $case_name registry binding"
       fi
       cmp -s "$meta_before" "$home/state/domain.meta" || fail "secondmate spawn changed metadata after $case_name refusal"
     else
-      if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-        FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-binding-$case_name-fake/pane.txt" \
+      if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+        JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-binding-$case_name-fake/pane.txt" \
         "$ROOT/bin/jg-spawn.sh" domain "$sub" codex --secondmate >/dev/null 2>"$err"; then
         fail "secondmate spawn accepted $case_name registry binding"
       fi
@@ -649,7 +649,7 @@ test_home_seed_refuses_projectful_reused_charter_for_projectless_home() {
   scaffold_secondmate_charter "$home" reusable 'firstmate self-development' --no-projects \
     || fail "project-less charter scaffold failed"
   printf '\n# Custom note\nThe projects above are local clones for work you supervise.\n' >> "$home/data/reusable/brief.md"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" reusable "$reusable_sub" --no-projects >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" reusable "$reusable_sub" --no-projects >/dev/null \
     || fail "project-less seed rejected a reused project-less charter"
   assert_grep 'None. This is a project-less domain' "$reusable_sub/data/charter.md" \
     "reused project-less charter was not copied"
@@ -660,7 +660,7 @@ test_home_seed_refuses_projectful_reused_charter_for_projectless_home() {
     "$stale_brief" > "$stale_brief_before"
   mv "$stale_brief_before" "$stale_brief"
   cp "$stale_brief" "$stale_brief_before"
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" stale "$stale_sub" --no-projects >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" stale "$stale_sub" --no-projects >/dev/null 2>"$err"; then
     fail "project-less seed accepted a reused charter with project clones"
   fi
   grep -F 'existing charter brief' "$err" >/dev/null \
@@ -691,8 +691,8 @@ test_home_seed_refuses_projectless_conversion_of_populated_home() {
 EOF
   registry_before=$(cat "$sub/data/projects.md")
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     fail "project-less seed converted a populated secondmate home"
   fi
@@ -727,8 +727,8 @@ test_home_seed_spaced_name_registry_handling() {
   cat > "$sub/data/projects.md" <<EOF
 - spaced app [direct-PR] - retained project entry (added 2026-06-22)
 EOF
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     fail "project-less seed accepted a home with a spaced project entry in projects.md"
   fi
@@ -741,8 +741,8 @@ EOF
   cat > "$home/data/projects.md" <<EOF
 - spaced app [direct-PR] - spaced project with posture (added 2026-06-22)
 EOF
-  FM_HOME="$home" FM_SECONDMATE_CHARTER='feature design for spaced app' \
-    FM_SECONDMATE_SCOPE='feature design for spaced app' \
+  JG_HOME="$home" JG_SECONDMATE_CHARTER='feature design for spaced app' \
+    JG_SECONDMATE_SCOPE='feature design for spaced app' \
     "$ROOT/bin/jg-home-seed.sh" design "$design" "spaced app" >/dev/null \
     || fail "seed with spaced project name failed"
   assert_grep '- spaced app [direct-PR] - spaced project with posture' "$design/data/projects.md" \
@@ -758,8 +758,8 @@ EOF
 EOF
   local i
   for i in 1 2; do
-    FM_HOME="$home" FM_SECONDMATE_CHARTER='feature design for dash app' \
-      FM_SECONDMATE_SCOPE='feature design for dash app' \
+    JG_HOME="$home" JG_SECONDMATE_CHARTER='feature design for dash app' \
+      JG_SECONDMATE_SCOPE='feature design for dash app' \
       "$ROOT/bin/jg-home-seed.sh" design "$design" "dash - app" >/dev/null \
       || fail "seed $i with a dashed project name failed"
   done
@@ -779,8 +779,8 @@ test_home_seed_refuses_projectless_home_with_uninspectable_projects() {
   jg_git_init_commit "$sub/projects/hidden-clone"
   chmod 311 "$sub/projects"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     chmod 700 "$sub/projects"
     fail "project-less seed accepted a home whose projects directory could not be inspected"
@@ -812,8 +812,8 @@ test_home_seed_refuses_projectless_home_with_symlinked_projects() {
   ln -s "$target" "$sub/projects"
   chmod 311 "$target"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     chmod 700 "$target"
     fail "project-less seed accepted a home whose projects directory is a symlink"
@@ -846,8 +846,8 @@ test_home_seed_refuses_projectless_home_with_non_directory_projects() {
   printf '%s\n' 'retained project path' > "$sub/projects"
   projects_before=$(cat "$sub/projects")
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     fail "project-less seed accepted a home whose projects path is not a directory"
   fi
@@ -877,8 +877,8 @@ test_home_seed_refuses_projectless_home_with_uninspectable_registry() {
   registry_before=$(cat "$sub/data/projects.md")
   chmod 000 "$sub/data/projects.md"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='firstmate self-development' \
-    FM_SECONDMATE_SCOPE='firstmate repo work' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='firstmate self-development' \
+    JG_SECONDMATE_SCOPE='firstmate repo work' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects >/dev/null 2>"$err"; then
     chmod 600 "$sub/data/projects.md"
     fail "project-less seed accepted a home whose project registry could not be inspected"
@@ -910,7 +910,7 @@ test_home_seed_refuses_missing_projects_without_signal() {
   err="$TMP_ROOT/missing-projects.err"
   mkdir -p "$home/projects" "$home/data" "$home/state"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='some scope' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='some scope' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" >/dev/null 2>"$err"; then
     fail "seed accepted a project-less home without the deliberate --no-projects signal"
   fi
@@ -920,7 +920,7 @@ test_home_seed_refuses_missing_projects_without_signal() {
   fi
 
   # The deliberate signal is mutually exclusive with a project list.
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='some scope' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='some scope' \
     "$ROOT/bin/jg-home-seed.sh" fdev "$sub" --no-projects alpha >/dev/null 2>"$err"; then
     fail "seed accepted --no-projects combined with a project list"
   fi
@@ -938,7 +938,7 @@ test_home_seed_refuses_local_only_project() {
   jg_git_init_commit "$home/projects/alpha"
   printf '%s\n' '- alpha [local-only] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed allowed a local-only project into a secondmate home"
   fi
   grep -F 'project alpha is local-only; secondmate routes support only no-mistakes and direct-PR projects' "$err" >/dev/null \
@@ -961,7 +961,7 @@ test_home_seed_refuses_an_unresolvable_registry_posture() {
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/unresolvable-alpha.git"
   printf '%s\n' '- alpha [local-only forge=githb] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='design for alpha' FM_SECONDMATE_SCOPE='design for alpha' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='design for alpha' JG_SECONDMATE_SCOPE='design for alpha' \
     "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed proceeded on a registry entry the parser refuses"
   fi
@@ -983,7 +983,7 @@ test_home_seed_refuses_registry_delimiter_home() {
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/delimiter-alpha.git"
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='delimiter charter' "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='delimiter charter' "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted a home path with registry delimiters"
   fi
   grep -F 'secondmate home path contains registry delimiters' "$err" >/dev/null \
@@ -1012,48 +1012,48 @@ test_home_seed_refuses_active_home_and_root() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for active-home seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$home" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home to reuse active FM_HOME"
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$home" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home to reuse active JG_HOME"
   fi
   grep -F 'secondmate home cannot be the active firstmate home' "$err" >/dev/null \
-    || fail "seed did not explain active FM_HOME rejection"
+    || fail "seed did not explain active JG_HOME rejection"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$active_descendant" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home inside active FM_HOME"
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$active_descendant" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home inside active JG_HOME"
   fi
   grep -F 'secondmate home cannot be inside the active firstmate home' "$err" >/dev/null \
-    || fail "seed did not explain active FM_HOME descendant rejection"
-  [ ! -e "$home/nested" ] || fail "seed created a directory inside active FM_HOME before descendant rejection"
+    || fail "seed did not explain active JG_HOME descendant rejection"
+  [ ! -e "$home/nested" ] || fail "seed created a directory inside active JG_HOME before descendant rejection"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$active_ancestor" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home to contain active FM_HOME"
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$active_ancestor" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home to contain active JG_HOME"
   fi
   grep -F 'secondmate home cannot be an ancestor of the active firstmate home' "$err" >/dev/null \
-    || fail "seed did not explain active FM_HOME ancestor rejection"
-  [ ! -f "$active_ancestor/.jg-secondmate-home" ] || fail "seed marked an ancestor of active FM_HOME"
+    || fail "seed did not explain active JG_HOME ancestor rejection"
+  [ ! -f "$active_ancestor/.jg-secondmate-home" ] || fail "seed marked an ancestor of active JG_HOME"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$ROOT" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home to reuse FM_ROOT"
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$ROOT" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home to reuse JG_ROOT"
   fi
   grep -F 'secondmate home cannot be the firstmate repo' "$err" >/dev/null \
-    || fail "seed did not explain FM_ROOT rejection"
+    || fail "seed did not explain JG_ROOT rejection"
 
   git clone --quiet "$ROOT" "$root_clone"
-  if FM_HOME="$home" FM_ROOT_OVERRIDE="$root_clone" "$ROOT/bin/jg-home-seed.sh" design "$root_descendant" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home inside FM_ROOT"
+  if JG_HOME="$home" JG_ROOT_OVERRIDE="$root_clone" "$ROOT/bin/jg-home-seed.sh" design "$root_descendant" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home inside JG_ROOT"
   fi
   grep -F 'secondmate home cannot be inside the firstmate repo' "$err" >/dev/null \
-    || fail "seed did not explain FM_ROOT descendant rejection"
-  [ ! -e "$root_clone/tmp" ] || fail "seed created a directory inside FM_ROOT before descendant rejection"
+    || fail "seed did not explain JG_ROOT descendant rejection"
+  [ ! -e "$root_clone/tmp" ] || fail "seed created a directory inside JG_ROOT before descendant rejection"
 
   git clone --quiet "$ROOT" "$root_ancestor"
   git clone --quiet "$ROOT" "$root_inside"
-  if FM_HOME="$home" FM_ROOT_OVERRIDE="$root_inside" "$ROOT/bin/jg-home-seed.sh" design "$root_ancestor" alpha >/dev/null 2>"$err"; then
-    fail "seed allowed secondmate home to contain FM_ROOT"
+  if JG_HOME="$home" JG_ROOT_OVERRIDE="$root_inside" "$ROOT/bin/jg-home-seed.sh" design "$root_ancestor" alpha >/dev/null 2>"$err"; then
+    fail "seed allowed secondmate home to contain JG_ROOT"
   fi
   grep -F 'secondmate home cannot be an ancestor of the firstmate repo' "$err" >/dev/null \
-    || fail "seed did not explain FM_ROOT ancestor rejection"
-  [ ! -f "$root_ancestor/.jg-secondmate-home" ] || fail "seed marked an ancestor of FM_ROOT"
+    || fail "seed did not explain JG_ROOT ancestor rejection"
+  [ ! -f "$root_ancestor/.jg-secondmate-home" ] || fail "seed marked an ancestor of JG_ROOT"
   pass "home seeding refuses active home and repo root"
 }
 
@@ -1070,7 +1070,7 @@ test_home_seed_refuses_home_marked_for_another_id() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for marked-home seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed reused a home marked for another secondmate"
   fi
   grep -F 'already marked for other' "$err" >/dev/null || fail "seed did not explain marked-home rejection"
@@ -1092,7 +1092,7 @@ test_home_seed_refuses_home_registered_to_another_id() {
   printf '%s\n' '- other - other domain (home: '"$subhome_abs"'; scope: other domain; projects: beta; added 2026-06-22)' > "$home/data/secondmates.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for registered-home seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed reused a home registered to another secondmate"
   fi
   grep -F 'already registered to other' "$err" >/dev/null || fail "seed did not explain registered-home rejection"
@@ -1111,12 +1111,12 @@ test_home_seed_refuses_reassigning_existing_id_to_different_home() {
   jg_git_add_origin "$home/projects/alpha" "$TMP_ROOT/remotes/reassign-alpha.git"
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
 
-  FM_HOME="$home" FM_SECONDMATE_CHARTER='design domain' FM_SECONDMATE_SCOPE='design domain' \
+  JG_HOME="$home" JG_SECONDMATE_CHARTER='design domain' JG_SECONDMATE_SCOPE='design domain' \
     "$ROOT/bin/jg-home-seed.sh" design "$first" alpha >/dev/null \
     || fail "initial seed failed for reassigning-id test"
   first_abs=$(cd "$first" && pwd -P)
 
-  if FM_HOME="$home" FM_SECONDMATE_CHARTER='design domain' FM_SECONDMATE_SCOPE='design domain' \
+  if JG_HOME="$home" JG_SECONDMATE_CHARTER='design domain' JG_SECONDMATE_SCOPE='design domain' \
     "$ROOT/bin/jg-home-seed.sh" design "$second" alpha >/dev/null 2>"$err"; then
     fail "seed reassigned an existing secondmate id to a different home"
   fi
@@ -1151,14 +1151,14 @@ test_home_seed_refuses_home_overlapping_registered_home() {
 - child - child domain (home: $registered_child; scope: child domain; projects: gamma; added 2026-06-22)
 EOF
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$nested" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$nested" alpha >/dev/null 2>"$err"; then
     fail "seed accepted a home inside a registered secondmate home"
   fi
   grep -F 'overlaps registered secondmate home' "$err" >/dev/null \
     || fail "seed did not explain registered ancestor overlap"
   [ ! -e "$nested" ] || fail "seed created a nested home inside a registered home"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$parent" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$parent" alpha >/dev/null 2>"$err"; then
     fail "seed accepted a home containing a registered secondmate home"
   fi
   grep -F 'overlaps registered secondmate home' "$err" >/dev/null \
@@ -1177,7 +1177,7 @@ test_home_seed_refuses_remote_backed_project_without_origin() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for no-origin seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed allowed remote-backed project without origin"
   fi
   grep -F 'project alpha is direct-PR but has no origin remote' "$err" >/dev/null || fail "seed did not explain missing origin for remote-backed project"
@@ -1199,7 +1199,7 @@ test_home_seed_refuses_existing_remote_backed_project_with_wrong_origin() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for wrong-origin seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed accepted existing remote-backed project with wrong origin"
   fi
   expected=$(git -C "$home/projects/alpha" remote get-url origin)
@@ -1221,14 +1221,14 @@ test_home_seed_resolves_relative_source_origins() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for relative origin seed test"
 
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha)
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha)
   subhome_abs=$(cd "$subhome" && pwd -P)
   expected=$(cd "$home/remotes/relative-alpha.git" && pwd -P)
   printf '%s\n' "$out" | grep -F "home=$subhome_abs" >/dev/null || fail "seed did not report relative-origin subhome"
   [ -d "$subhome/projects/alpha/.git" ] || fail "relative source origin was not cloned"
   actual=$(git -C "$subhome/projects/alpha" remote get-url origin)
   [ "$actual" = "$expected" ] || fail "relative source origin was not cloned through the resolved path"
-  FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null \
     || fail "relative source origin did not compare equal on reseed"
   pass "home seeding resolves relative source origins against the source project"
 }
@@ -1253,8 +1253,8 @@ test_home_seed_skips_initialized_existing_no_mistakes_projects() {
   fakebin=$(make_recording_no_mistakes "$TMP_ROOT/existing-initialized-fake")
   : > "$log"
 
-  if PATH="$fakebin:$PATH" FM_FAKE_NO_MISTAKES_LOG="$log" FM_FAKE_NO_MISTAKES_FAIL_PROJECT=beta \
-    FM_HOME="$home" FM_SECONDMATE_CHARTER='existing init rollback scope' FM_SECONDMATE_SCOPE='existing init rollback scope' \
+  if PATH="$fakebin:$PATH" JG_FAKE_NO_MISTAKES_LOG="$log" JG_FAKE_NO_MISTAKES_FAIL_PROJECT=beta \
+    JG_HOME="$home" JG_SECONDMATE_CHARTER='existing init rollback scope' JG_SECONDMATE_SCOPE='existing init rollback scope' \
     "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha beta >/dev/null 2>"$err"; then
     fail "seed succeeded even though later no-mistakes initialization failed"
   fi
@@ -1285,8 +1285,8 @@ test_home_seed_refuses_uninitialized_existing_no_mistakes_project() {
   fakebin=$(make_recording_no_mistakes "$TMP_ROOT/existing-uninitialized-fake")
   : > "$log"
 
-  if PATH="$fakebin:$PATH" FM_FAKE_NO_MISTAKES_LOG="$log" \
-    FM_HOME="$home" FM_SECONDMATE_CHARTER='existing uninitialized scope' \
+  if PATH="$fakebin:$PATH" JG_FAKE_NO_MISTAKES_LOG="$log" \
+    JG_HOME="$home" JG_SECONDMATE_CHARTER='existing uninitialized scope' \
     "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed initialized a preexisting no-mistakes clone"
   fi
@@ -1312,7 +1312,7 @@ test_home_seed_refuses_project_destinations_outside_subhome() {
   printf '%s\n' '- alpha [direct-PR] - alpha project (added 2026-06-22)' > "$home/data/projects.md"
   scaffold_secondmate_charter "$home" design 'design domain' alpha || fail "charter scaffold failed for symlink destination seed test"
 
-  if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+  if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
     fail "seed followed a subhome projects symlink outside the subhome"
   fi
   grep -F 'secondmate projects directory must resolve inside the secondmate home' "$err" >/dev/null \
@@ -1340,7 +1340,7 @@ test_home_seed_refuses_operational_dirs_outside_subhome() {
     mkdir -p "$sink"
     rm -rf "${subhome:?}/${opdir:?}"
     ln -s "$sink" "$subhome/$opdir"
-    if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+    if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
       fail "seed accepted a subhome with $opdir symlinked outside the subhome"
     fi
     grep -F "secondmate $opdir directory must resolve inside the secondmate home" "$err" >/dev/null \
@@ -1372,7 +1372,7 @@ test_home_seed_refuses_unsafe_leaf_files() {
     fi
     printf '%s\n' "$expected" > "$sink"
     ln -s "$sink" "$subhome/$leaf"
-    if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+    if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
       fail "seed accepted symlinked leaf file $leaf"
     fi
     grep -F 'secondmate leaf file must not be a symlink:' "$err" >/dev/null \
@@ -1386,7 +1386,7 @@ test_home_seed_refuses_unsafe_leaf_files() {
     rm -rf "$subhome"
     git clone --quiet "$ROOT" "$subhome"
     mkdir -p "$subhome/$leaf"
-    if FM_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
+    if JG_HOME="$home" "$ROOT/bin/jg-home-seed.sh" design "$subhome" alpha >/dev/null 2>"$err"; then
       fail "seed accepted directory leaf $leaf"
     fi
     grep -F 'secondmate leaf file must be a regular file:' "$err" >/dev/null \
@@ -1408,8 +1408,8 @@ test_home_seed_preserves_existing_parent_binding() {
   mkdir -p "$parent_a/data" "$parent_a/state" "$parent_a/projects" \
     "$parent_b/data" "$parent_b/state" "$parent_b/projects" "$before/data"
 
-  FM_HOME="$parent_a" FM_SECONDMATE_CHARTER='Durable parent reseed charter.' \
-    FM_SECONDMATE_SCOPE='durable parent reseed scope' \
+  JG_HOME="$parent_a" JG_SECONDMATE_CHARTER='Durable parent reseed charter.' \
+    JG_SECONDMATE_SCOPE='durable parent reseed scope' \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects >/dev/null \
     || fail "initial durable-parent seed failed"
   parent_a_abs=$(cd "$parent_a" && pwd -P)
@@ -1420,8 +1420,8 @@ test_home_seed_preserves_existing_parent_binding() {
     cp "$child/$leaf" "$before/$leaf"
   done
 
-  if FM_HOME="$parent_b" FM_SECONDMATE_CHARTER='Replacement parent charter.' \
-    FM_SECONDMATE_SCOPE='replacement parent scope' \
+  if JG_HOME="$parent_b" JG_SECONDMATE_CHARTER='Replacement parent charter.' \
+    JG_SECONDMATE_SCOPE='replacement parent scope' \
     "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects > /dev/null 2>"$err"; then
     fail "reseed replaced a valid durable parent binding"
   fi
@@ -1436,7 +1436,7 @@ test_home_seed_preserves_existing_parent_binding() {
   [ ! -e "$parent_b/data/secondmates.md" ] \
     || fail "mismatched-parent reseed registered the child to the replacement parent"
 
-  out=$(FM_HOME="$parent_a" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects) \
+  out=$(JG_HOME="$parent_a" "$ROOT/bin/jg-home-seed.sh" mate "$child" --no-projects) \
     || fail "matching-parent reseed failed"
   printf '%s\n' "$out" | grep -F "home=$child_abs" >/dev/null \
     || fail "matching-parent reseed did not report success"
@@ -1474,7 +1474,7 @@ SH
   log="$TMP_ROOT/spawn-validate-fake/tmux.log"
   err="$TMP_ROOT/spawn-validate.err"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$subhome" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted an unseeded home"
   fi
@@ -1485,7 +1485,7 @@ SH
   grep -F 'new-window' "$log" >/dev/null && fail "spawn created a window before validation"
 
   printf 'other\n' > "$wronghome/.jg-secondmate-home"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$wronghome" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a home marked for another secondmate"
   fi
@@ -1493,27 +1493,27 @@ SH
 
   printf 'domain\n' > "$marker_only/.jg-secondmate-home"
   printf 'charter\n' > "$marker_only/data/charter.md"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$marker_only" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a marked home missing AGENTS.md"
   fi
   grep -F 'not a firstmate home (missing AGENTS.md)' "$err" >/dev/null || fail "spawn did not explain missing AGENTS.md"
 
   printf '# Firstmate\n' > "$marker_only/AGENTS.md"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$marker_only" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a marked home missing bin"
   fi
   grep -F 'not a firstmate home (missing bin/)' "$err" >/dev/null || fail "spawn did not explain missing bin"
 
   printf 'domain\n' > "$home/.jg-secondmate-home"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$home" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted the active home"
   fi
   grep -F 'secondmate home cannot be the active firstmate home' "$err" >/dev/null || fail "spawn did not reject active home"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$ROOT" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted the firstmate repo root"
   fi
@@ -1521,7 +1521,7 @@ SH
 
   printf 'domain\n' > "$active_descendant/.jg-secondmate-home"
   printf 'charter\n' > "$active_descendant/data/charter.md"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$active_descendant" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a home inside the active firstmate home"
   fi
@@ -1529,7 +1529,7 @@ SH
 
   printf 'domain\n' > "$active_ancestor/.jg-secondmate-home"
   printf 'charter\n' > "$active_ancestor/data/charter.md"
-  if PATH="$fakebin:$PATH" FM_HOME="$ancestor_active_home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$ancestor_active_home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$active_ancestor" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a home containing the active firstmate home"
   fi
@@ -1537,7 +1537,7 @@ SH
 
   printf 'domain\n' > "$root_descendant/.jg-secondmate-home"
   printf 'charter\n' > "$root_descendant/data/charter.md"
-  if PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fakeroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fakeroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$root_descendant" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a home inside the firstmate repo"
   fi
@@ -1545,7 +1545,7 @@ SH
 
   printf 'domain\n' > "$root_ancestor/.jg-secondmate-home"
   printf 'charter\n' > "$root_ancestor/data/charter.md"
-  if PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$root_inside" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$root_inside" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-validate-fake/pane.txt" \
     "$ROOT/bin/jg-spawn.sh" domain "$root_ancestor" codex --secondmate >/dev/null 2>"$err"; then
     fail "secondmate spawn accepted a home containing the firstmate repo"
   fi
@@ -1575,7 +1575,7 @@ test_secondmate_spawn_refuses_operational_dirs_outside_subhome() {
       printf 'charter\n' > "$sink/charter.md"
     fi
     : > "$log"
-    if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-opdir-fake/pane.txt" \
+    if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/spawn-opdir-fake/pane.txt" \
       "$ROOT/bin/jg-spawn.sh" domain "$subhome" codex --secondmate >/dev/null 2>"$err"; then
       fail "secondmate spawn accepted a subhome with $opdir symlinked outside the subhome"
     fi
@@ -1599,7 +1599,7 @@ test_jg_send_refuses_bare_window_without_home_meta() {
   log="$TMP_ROOT/send-fake/tmux.log"
   err="$TMP_ROOT/send-fake/send.err"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_WINDOW="other-session:jg-missing" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/send-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_WINDOW="other-session:jg-missing" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/send-fake/pane.txt" \
     "$ROOT/bin/jg-send.sh" jg-missing 'wrong home' >/dev/null 2>"$err"; then
     fail "jg-send sent to a bare firstmate window without home metadata"
   fi
@@ -1636,8 +1636,8 @@ EOF
   log="$TMP_ROOT/teardown-fake/tmux.log"
   lease="$TMP_ROOT/teardown-fake/lease"
   printf 'domain\n' > "$lease"
-  PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-fake/pane.txt" \
-    FM_FAKE_TREEHOUSE_LEASE_FILE="$lease" \
+  PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-fake/pane.txt" \
+    JG_FAKE_TREEHOUSE_LEASE_FILE="$lease" \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>/dev/null \
     || fail "teardown failed for empty secondmate home"
   grep -F "treehouse return --force $subhome_abs" "$log" >/dev/null || fail "teardown did not release the secondmate home lease via treehouse return"
@@ -1665,8 +1665,8 @@ test_branch_actor_cannot_retire_secondmate() {
   printf '%s\n' '- domain - design domain (home: '"$subhome"'; scope: design domain; projects: alpha; added 2026-06-22)' > "$home/data/secondmates.md"
   fakebin=$(make_fake_tmux "$TMP_ROOT/branch-retire-fake")
   log="$TMP_ROOT/branch-retire-fake/tmux.log"
-  out=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/branch-retire-fake/pane.txt" FM_SUPERVISION_ACTOR=branch \
+  out=$(PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/branch-retire-fake/pane.txt" JG_SUPERVISION_ACTOR=branch \
     "$ROOT/bin/jg-teardown.sh" domain 2>&1) || rc=$?
   expect_code 6 "$rc" "the supervision branch must not retire a secondmate: $out"
   assert_contains "$out" "secondmate retirement (jg-teardown) refused" "the refusal must name secondmate retirement"
@@ -1711,8 +1711,8 @@ EOF
     fakebin=$(make_fake_tmux "$TMP_ROOT/teardown-binding-$case_name-fake")
     log="$TMP_ROOT/teardown-binding-$case_name-fake/tmux.log"
     err="$TMP_ROOT/teardown-binding-$case_name.err"
-    if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-      FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-binding-$case_name-fake/pane.txt" \
+    if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+      JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-binding-$case_name-fake/pane.txt" \
       "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
       fail "secondmate teardown accepted $case_name registry binding"
     fi
@@ -1741,9 +1741,9 @@ test_secondmate_teardown_sweeps_process_events_before_removal() {
   fakebin=$(make_fake_tmux "$TMP_ROOT/procevent-teardown-fake")
   log="$TMP_ROOT/procevent-teardown-fake/tmux.log"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-teardown-fake/pane.txt" \
-    FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-teardown-fake/pane.txt" \
+    JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>/dev/null \
     || fail "normal secondmate teardown failed after process-event sweep"
   grep -Fx "$subhome_abs" "$sweep_log" >/dev/null || fail "normal secondmate teardown did not invoke the child home's sweep"
@@ -1768,8 +1768,8 @@ test_secondmate_teardown_refuses_process_events_without_sweep_script() {
   fakebin=$(make_fake_tmux "$TMP_ROOT/procevent-refusal-fake")
   log="$TMP_ROOT/procevent-refusal-fake/tmux.log"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_PROCEVENT_CLAIM_ROOT="$claim_root" \
-      FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-refusal-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_PROCEVENT_CLAIM_ROOT="$claim_root" \
+      JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-refusal-fake/pane.txt" \
       "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "force teardown removed process-event state without a sweep-capable child script"
   fi
@@ -1806,9 +1806,9 @@ exit 1
 SH
   chmod +x "$fakebin/tasks-axi"
 
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-      FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-later-refusal-fake/pane.txt" \
-      FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+      JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-later-refusal-fake/pane.txt" \
+      JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
       "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>"$err"; then
     fail "teardown bypassed a later public-followup refusal"
   fi
@@ -1846,9 +1846,9 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/procevent-force-fake")
   log="$TMP_ROOT/procevent-force-fake/tmux.log"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-force-fake/pane.txt" \
-    FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-force-fake/pane.txt" \
+    JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>/dev/null \
     || fail "force teardown failed after recursively sweeping process events"
   grep -Fx "$subhome_abs" "$sweep_log" >/dev/null || fail "force teardown did not sweep the parent secondmate home"
@@ -1891,10 +1891,10 @@ EOF
   log="$TMP_ROOT/procevent-nested-fail-fake/tmux.log"
 
   set +e
-  PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-nested-fail-fake/pane.txt" \
-    FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" FM_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
-    FM_FAKE_TREEHOUSE_RETURN_FAIL=1 FM_FAKE_PROCEVENT_REARM_FAIL=1 \
+  PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/procevent-nested-fail-fake/pane.txt" \
+    JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" JG_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
+    JG_FAKE_TREEHOUSE_RETURN_FAIL=1 JG_FAKE_PROCEVENT_REARM_FAIL=1 \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"
   rc=$?
   set -e
@@ -1942,9 +1942,9 @@ EOF
   log="$TMP_ROOT/teardown-return-fail-fake/tmux.log"
 
   set +e
-  PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-return-fail-fake/pane.txt" \
-    FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" FM_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
-    FM_FAKE_TREEHOUSE_RETURN_FAIL=1 \
+  PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-return-fail-fake/pane.txt" \
+    JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" JG_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
+    JG_FAKE_TREEHOUSE_RETURN_FAIL=1 \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>"$err"
   rc=$?
   set -e
@@ -1959,9 +1959,9 @@ EOF
   grep -F -- '- domain ' "$home/data/secondmates.md" >/dev/null || fail "teardown removed registry route after leased home return failed"
 
   set +e
-  PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-return-fail-fake/pane.txt" \
-    FM_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" FM_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
-    FM_FAKE_TREEHOUSE_RETURN_FAIL=1 FM_FAKE_PROCEVENT_REARM_FAIL=1 \
+  PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/teardown-return-fail-fake/pane.txt" \
+    JG_FAKE_PROCEVENT_SWEEP_LOG="$sweep_log" JG_FAKE_PROCEVENT_REARM_LOG="$rearm_log" \
+    JG_FAKE_TREEHOUSE_RETURN_FAIL=1 JG_FAKE_PROCEVENT_REARM_FAIL=1 \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>"$err"
   rc=$?
   set -e
@@ -2000,8 +2000,8 @@ EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/plain-clone-teardown-fake")
   log="$TMP_ROOT/plain-clone-teardown-fake/tmux.log"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/plain-clone-teardown-fake/pane.txt" \
-    FM_FAKE_TREEHOUSE_RETURN_FAIL=1 \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/plain-clone-teardown-fake/pane.txt" \
+    JG_FAKE_TREEHOUSE_RETURN_FAIL=1 \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>/dev/null \
     || fail "teardown failed for plain-clone secondmate home"
   grep -F "treehouse return --force $subhome_abs" "$log" >/dev/null && fail "teardown tried to return a plain-clone home through treehouse"
@@ -2043,11 +2043,11 @@ yolo=off
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/force-teardown-fake")
   log="$TMP_ROOT/force-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>&1; then
     fail "teardown allowed a secondmate with in-flight child work"
   fi
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-teardown-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>/dev/null \
     || fail "force teardown failed to discard child work"
   [ ! -d "$subhome" ] || fail "force teardown did not remove the retired secondmate home"
@@ -2098,8 +2098,8 @@ EOF
   log="$TMP_ROOT/force-duplicate-slot-fake/tmux.log"
 
   set +e
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-duplicate-slot-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-duplicate-slot-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"
   rc=$?
   set -e
@@ -2151,7 +2151,7 @@ EOF
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf 'treehouse %s\n' "$*" >> "${FM_FAKE_TMUX_LOG:-/dev/null}"
+printf 'treehouse %s\n' "$*" >> "${JG_FAKE_TMUX_LOG:-/dev/null}"
 case "${1:-}" in
   return)
     shift
@@ -2185,8 +2185,8 @@ SH
   touch -t 200001010000 "$lock"
 
   set +e
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-lock-child-fake/pane.txt" \
-    FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/force-lock-child-fake/pane.txt" \
+    JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"
   rc=$?
   set -e
@@ -2225,7 +2225,7 @@ EOF
     printf '%s\n' '- domain - design domain (home: '"$subhome"'; scope: design domain; projects: alpha; added 2026-06-22)' > "$home/data/secondmates.md"
     fakebin=$(make_fake_tmux "$TMP_ROOT/symlink-inside-teardown-fake-$opdir")
     log="$TMP_ROOT/symlink-inside-teardown-fake-$opdir/tmux.log"
-    PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-inside-teardown-fake-$opdir/pane.txt" \
+    PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-inside-teardown-fake-$opdir/pane.txt" \
       "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err" \
       || fail "force teardown refused $opdir symlinked inside the secondmate home"
     [ ! -e "$subhome" ] || fail "force teardown did not remove subhome with inside $opdir symlink"
@@ -2258,7 +2258,7 @@ EOF
   printf '%s\n' '- domain - design domain (home: '"$subhome"'; scope: design domain; projects: alpha; added 2026-06-22)' > "$home/data/secondmates.md"
   fakebin=$(make_fake_tmux "$TMP_ROOT/symlink-state-teardown-fake")
   log="$TMP_ROOT/symlink-state-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-state-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/symlink-state-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "force teardown accepted a symlinked secondmate state directory"
   fi
@@ -2315,8 +2315,8 @@ SH
     fakebin=$(make_fake_tmux "$base/fake")
     log="$base/fake/tmux.log"
     err="$base/teardown.err"
-    if PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fmroot" FM_HOME="$home" \
-      FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$base/fake/pane.txt" \
+    if PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fmroot" JG_HOME="$home" \
+      JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$base/fake/pane.txt" \
       "$ROOT/bin/jg-teardown.sh" "$tid" >/dev/null 2>"$err"; then
       fail "teardown ($row) accepted a hazardous secondmate home"
     fi
@@ -2371,7 +2371,7 @@ EOF
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/nested-teardown-fake")
   log="$TMP_ROOT/nested-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/nested-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/nested-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>"$err"; then
     fail "teardown removed a home containing another registered secondmate home"
   fi
@@ -2408,7 +2408,7 @@ EOF
   printf '%s\n' '- nested - nested domain (home: '"$nested"'; scope: nested domain; projects: beta; added 2026-06-22)' > "$subhome/data/secondmates.md"
   fakebin=$(make_fake_tmux "$TMP_ROOT/child-registry-teardown-fake")
   log="$TMP_ROOT/child-registry-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-registry-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-registry-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain >/dev/null 2>"$err"; then
     fail "teardown removed a home containing a child-registry secondmate home"
   fi
@@ -2451,7 +2451,7 @@ yolo=off
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/prevalidate-teardown-fake")
   log="$TMP_ROOT/prevalidate-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/prevalidate-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/prevalidate-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "force teardown discarded child work before validating subhome"
   fi
@@ -2587,8 +2587,8 @@ EOF
   err="$TMP_ROOT/taskset-state-file.err"
   fakebin=$(make_fake_tmux "$TMP_ROOT/taskset-state-file-fake")
   log="$TMP_ROOT/taskset-state-file-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-file-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-file-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "forced teardown accepted a non-directory descendant state path"
   fi
@@ -2612,8 +2612,8 @@ EOF
   err="$TMP_ROOT/taskset-state-symlink.err"
   fakebin=$(make_fake_tmux "$TMP_ROOT/taskset-state-symlink-fake")
   log="$TMP_ROOT/taskset-state-symlink-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-symlink-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-symlink-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "forced teardown accepted a symlinked descendant state path"
   fi
@@ -2642,8 +2642,8 @@ EOF
 #!/usr/bin/env bash
 set -u
 if [ "${1:-}" = sweep-home ] && [ "${2:-}" = --preflight ]; then
-  : > "$FM_TASK_SET_TEST_READY"
-  while [ ! -e "$FM_TASK_SET_TEST_RELEASE" ]; do sleep 0.05; done
+  : > "$JG_TASK_SET_TEST_READY"
+  while [ ! -e "$JG_TASK_SET_TEST_RELEASE" ]; do sleep 0.05; done
   exit 1
 fi
 exit 1
@@ -2652,10 +2652,10 @@ SH
   err="$TMP_ROOT/taskset-state-absent.err"
   fakebin=$(make_fake_tmux "$TMP_ROOT/taskset-state-absent-fake")
   log="$TMP_ROOT/taskset-state-absent-fake/tmux.log"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-absent-fake/pane.txt" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-absent-fake/pane.txt" \
     XDG_STATE_HOME="$TMP_ROOT/taskset-state-absent-xdg" \
-    FM_TASK_SET_TEST_READY="$ready" FM_TASK_SET_TEST_RELEASE="$release" \
+    JG_TASK_SET_TEST_READY="$ready" JG_TASK_SET_TEST_RELEASE="$release" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   pid=$!
@@ -2700,8 +2700,8 @@ EOF
   lock=${held#* }
   fakebin=$(make_fake_tmux "$TMP_ROOT/taskset-teardown-fake")
   log="$TMP_ROOT/taskset-teardown-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-teardown-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-teardown-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "forced teardown proceeded while a task was being published"
   fi
@@ -2729,7 +2729,7 @@ EOF
     || fail "could not stage a held task-set lock"
   holder=${held%% *}
   lock=${held#* }
-  if FM_HOME="$subhome" FM_SPAWN_NO_GUARD=1 \
+  if JG_HOME="$subhome" JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" newtask "$subhome/projects/alpha" --scout >/dev/null 2>"$err"; then
     kill "$holder" 2>/dev/null || true
     fail "a fresh spawn published a task while a forced teardown owned the set"
@@ -2756,7 +2756,7 @@ EOF
   held=$(hold_task_set_lock "$subhome/state" task-spawn) \
     || fail "could not stage a fresh spawn holding the task-set lock"
   holder=${held%% *}
-  if FM_HOME="$subhome" FM_SPAWN_NO_GUARD=1 \
+  if JG_HOME="$subhome" JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" newtask "$subhome/projects/alpha" --scout >/dev/null 2>"$err"; then
     kill "$holder" 2>/dev/null || true
     fail "a fresh spawn published while another spawn owned the task set"
@@ -2780,7 +2780,7 @@ test_fresh_remote_secondmate_spawn_refuses_while_task_set_is_owned() {
     || fail "could not stage a held remote-spawn task-set lock"
   holder=${held%% *}
   lock=${held#* }
-  if FM_HOME="$home" FM_SPAWN_NO_GUARD=1 \
+  if JG_HOME="$home" JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" remote-new --secondmate >/dev/null 2>"$err"; then
     kill "$holder" 2>/dev/null || true
     fail "a fresh remote secondmate spawn published while the task set was owned"
@@ -2829,9 +2829,9 @@ yolo=off
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/child-active-descendant-fake")
   log="$TMP_ROOT/child-active-descendant-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-active-descendant-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-active-descendant-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
-    fail "force teardown removed a child worktree inside active FM_HOME"
+    fail "force teardown removed a child worktree inside active JG_HOME"
   fi
   [ -d "$home/data" ] || fail "force teardown removed active home data"
   [ -d "$subhome" ] || fail "force teardown removed subhome after child validation refusal"
@@ -2880,9 +2880,9 @@ yolo=off
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/child-repo-descendant-fake")
   log="$TMP_ROOT/child-repo-descendant-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$fakeroot" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-repo-descendant-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_ROOT_OVERRIDE="$fakeroot" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/child-repo-descendant-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
-    fail "force teardown removed a child worktree inside FM_ROOT"
+    fail "force teardown removed a child worktree inside JG_ROOT"
   fi
   [ -d "$childwt" ] || fail "force teardown removed repo descendant worktree"
   [ -d "$subhome" ] || fail "force teardown removed subhome after repo child validation refusal"
@@ -2925,7 +2925,7 @@ yolo=off
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/unregistered-child-fake")
   log="$TMP_ROOT/unregistered-child-fake/tmux.log"
-  if PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/unregistered-child-fake/pane.txt" \
+  if PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_LOG="$log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/unregistered-child-fake/pane.txt" \
     "$ROOT/bin/jg-teardown.sh" domain --force >/dev/null 2>"$err"; then
     fail "force teardown removed an unregistered child worktree"
   fi
@@ -2954,8 +2954,8 @@ projects=alpha
 EOF
   fakebin=$(make_fake_tmux "$TMP_ROOT/watch-fake")
   out="$TMP_ROOT/watch-fake/watch.out"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_LOG="$TMP_ROOT/watch-fake/tmux.log" FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/watch-fake/pane.txt" \
-    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$ROOT/bin/jg-watch.sh" > "$out" &
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_FAKE_TMUX_WINDOW="$window" JG_FAKE_TMUX_LOG="$TMP_ROOT/watch-fake/tmux.log" JG_FAKE_TMUX_CAPTURE="$TMP_ROOT/watch-fake/pane.txt" \
+    JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$ROOT/bin/jg-watch.sh" > "$out" &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   pid=$!
   if ! wait_live "$pid" 25; then
@@ -3019,7 +3019,7 @@ EOF
 
   # A key matching neither backlog aborts atomically: nothing moves.
   before=$(cat "$home/data/backlog.md")
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design bug-z no-such-key >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design bug-z no-such-key >/dev/null 2>&1; then
     fail "handoff succeeded despite an unmatched key"
   fi
   [ "$before" = "$(cat "$home/data/backlog.md")" ] || fail "handoff with an unmatched key still mutated the main backlog"
@@ -3027,7 +3027,7 @@ EOF
 
   # An in-flight item is refused (active ownership lives in tmux + state too).
   before=$(cat "$home/data/backlog.md")
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design live-task >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" design live-task >/dev/null 2>&1; then
     fail "handoff accepted an in-flight backlog item"
   fi
   [ "$before" = "$(cat "$home/data/backlog.md")" ] || fail "handoff with an in-flight key mutated the main backlog"
@@ -3035,7 +3035,7 @@ EOF
   [ ! -e "$subhome/data/backlog.md" ] || ! grep -F 'live-task' "$subhome/data/backlog.md" >/dev/null     || fail "in-flight refusal copied the live task into the secondmate backlog"
 
   # An unregistered secondmate id is refused.
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" ghost bug-z >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" ghost bug-z >/dev/null 2>&1; then
     fail "handoff accepted an unregistered secondmate id"
   fi
   pass "jg-backlog-handoff aborts atomically on unmatched, in-flight, and unregistered targets"
@@ -3060,7 +3060,7 @@ test_backlog_handoff_refuses_done_items_and_non_secondmate_homes() {
   before_sub="$TMP_ROOT/handoff-safety-sub.before"
   cp "$home/data/backlog.md" "$before_main"
   cp "$subhome/data/backlog.md" "$before_sub"
-  if out=$(FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" archive shipped-task 2>&1); then
+  if out=$(JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" archive shipped-task 2>&1); then
     fail "handoff accepted a Done backlog item"
   fi
   printf '%s\n' "$out" | grep -F 'shipped-task' >/dev/null \
@@ -3077,7 +3077,7 @@ test_backlog_handoff_refuses_done_items_and_non_secondmate_homes() {
   jg_git_init_commit "$projhome"
   projhome_abs=$(cd "$projhome" && pwd -P)
   printf -- '- proj-sm - bogus (home: %s; scope: bogus; projects: alpha; added 2026-06-22)\n' "$projhome_abs" >> "$home/data/secondmates.md"
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" proj-sm shipped-task >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" proj-sm shipped-task >/dev/null 2>&1; then
     fail "handoff wrote into a destination that is not a seeded secondmate home"
   fi
   [ ! -e "$projhome/data/backlog.md" ] || fail "handoff created a backlog inside a non-secondmate home"
@@ -3090,7 +3090,7 @@ test_backlog_handoff_refuses_done_items_and_non_secondmate_homes() {
 ## Queued
 - [ ] marker-task - should not move (repo: alpha)
 EOF
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" marker-sm marker-task >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" marker-sm marker-task >/dev/null 2>&1; then
     fail "handoff accepted a marker-only directory as a secondmate home"
   fi
   [ ! -e "$markerhome/data/backlog.md" ] || fail "handoff wrote into a marker-only directory"
@@ -3106,7 +3106,7 @@ EOF
 ## Queued
 - [ ] symlink-task - should not move (repo: alpha)
 EOF
-  if FM_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" symlink-sm symlink-task >/dev/null 2>&1; then
+  if JG_HOME="$home" "$ROOT/bin/jg-backlog-handoff.sh" symlink-sm symlink-task >/dev/null 2>&1; then
     fail "handoff accepted a secondmate home with data outside the home"
   fi
   [ ! -e "$outside/backlog.md" ] || fail "handoff wrote through a symlinked secondmate data directory"

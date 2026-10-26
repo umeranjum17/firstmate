@@ -22,9 +22,9 @@
 # records, and never treat wrong-home or structured-home heuristics as
 # acknowledgement. A same-basename restatement-copy of the mate home's
 # state/<task_id>.status onto the parent channel is a repair of the
-# FM_HOME-relative mixup, not acknowledgement of an arbitrary mate-home file.
+# JG_HOME-relative mixup, not acknowledgement of an arbitrary mate-home file.
 #
-# Record location (parent FM_HOME):
+# Record location (parent JG_HOME):
 #   state/pending-replies/<corr_id>
 # One more durable input, owned by bin/jg-procevent-remote-reply.sh and read
 # here: state/remote-replies/<task_id>.caught-up, the remote reply mirror's
@@ -33,7 +33,7 @@
 #   schema=jg-pending-reply.v1
 #   corr_id=                privacy-safe correlation token
 #   task_id=                secondmate task id in the parent home
-#   parent_home=            absolute parent FM_HOME
+#   parent_home=            absolute parent JG_HOME
 #   parent_status=          absolute path of parent state/<task_id>.status
 #   parent_status_scan_signature=
 #   request_summary=        short sanitized summary (no secrets by design)
@@ -92,7 +92,7 @@
 #
 # Retryable undelivered escalation: a delivery-unknown escalation reports that
 # the request may never have reached the mate, so the request stays the owner's
-# to resend under the same correlation (jg-send's FM_PENDING_REPLY_EXISTING_CORR
+# to resend under the same correlation (jg-send's JG_PENDING_REPLY_EXISTING_CORR
 # contract; the remote enqueue deduplicates onto the same record). The resend
 # resets the record to awaiting_report and leaves the published escalation
 # decision open: a confirmed delivery does not settle the request, only a
@@ -112,52 +112,52 @@
 # tests. No side effects on source. set -u / set -e safe.
 #
 # Tunables (env):
-#   FM_PENDING_REPLY_GRACE_SECS   default 120; counted from the request turn's
+#   JG_PENDING_REPLY_GRACE_SECS   default 120; counted from the request turn's
 #                                 completion for the recovery repost, and from
 #                                 the recovery turn's completion for the
 #                                 missed-report escalation - never from delivery
-#   FM_PENDING_REPLY_DIR_OVERRIDE override the pending-replies directory (tests)
-#   FM_PENDING_REPLY_SEND_HOOK    optional command template for recovery delivery
+#   JG_PENDING_REPLY_DIR_OVERRIDE override the pending-replies directory (tests)
+#   JG_PENDING_REPLY_SEND_HOOK    optional command template for recovery delivery
 #                                 (tests); receives task_id and full message as args
-#   FM_PENDING_REPLY_NOW          optional fixed epoch for deterministic tests
+#   JG_PENDING_REPLY_NOW          optional fixed epoch for deterministic tests
 
-# This directive does double duty: it also binds _FM_PENDING_REPLY_LIB_DIR as
+# This directive does double duty: it also binds _JG_PENDING_REPLY_LIB_DIR as
 # the bin/ source prefix so the deliberately undirected lazy sources below
 # still resolve for ShellCheck instead of warning SC1091.
 # shellcheck source=bin/jg-marker-lib.sh
-_FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || _FM_PENDING_REPLY_LIB_DIR="."
+_JG_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || _JG_PENDING_REPLY_LIB_DIR="."
 # shellcheck source=bin/jg-marker-lib.sh
-. "$_FM_PENDING_REPLY_LIB_DIR/jg-marker-lib.sh"
+. "$_JG_PENDING_REPLY_LIB_DIR/jg-marker-lib.sh"
 # shellcheck source=bin/jg-backend.sh
-. "$_FM_PENDING_REPLY_LIB_DIR/jg-backend.sh"
+. "$_JG_PENDING_REPLY_LIB_DIR/jg-backend.sh"
 # Deliberately undirected: this library consumes no symbols from
 # bin/jg-tmux-lib.sh, so following it under ShellCheck's external-source
 # traversal would expand that graph for zero cross-file checks.
-. "$_FM_PENDING_REPLY_LIB_DIR/jg-tmux-lib.sh"
+. "$_JG_PENDING_REPLY_LIB_DIR/jg-tmux-lib.sh"
 # Deliberately undirected: bin/jg-classify-lib.sh is already expanded inside
 # bin/jg-wake-lib.sh's single directed expansion below; a second directive
 # here would re-expand the same transitive graph.
-. "$_FM_PENDING_REPLY_LIB_DIR/jg-classify-lib.sh"
+. "$_JG_PENDING_REPLY_LIB_DIR/jg-classify-lib.sh"
 # Parked-home gate (firstmate-addons/parked-homes); the shim answers "not parked" without the add-on.
 # shellcheck source=bin/jg-parked-homes-lib.sh
-. "$_FM_PENDING_REPLY_LIB_DIR/jg-parked-homes-lib.sh"
+. "$_JG_PENDING_REPLY_LIB_DIR/jg-parked-homes-lib.sh"
 
-FM_PENDING_REPLY_SCHEMA='jg-pending-reply.v1'
-FM_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'
-FM_PENDING_REPLY_GRACE_DEFAULT=120
+JG_PENDING_REPLY_SCHEMA='jg-pending-reply.v1'
+JG_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'
+JG_PENDING_REPLY_GRACE_DEFAULT=120
 
 jg_pending_reply_now() {
-  if [ -n "${FM_PENDING_REPLY_NOW:-}" ]; then
-    printf '%s' "$FM_PENDING_REPLY_NOW"
+  if [ -n "${JG_PENDING_REPLY_NOW:-}" ]; then
+    printf '%s' "$JG_PENDING_REPLY_NOW"
     return 0
   fi
   date +%s
 }
 
 jg_pending_reply_grace_secs() {
-  local g=${FM_PENDING_REPLY_GRACE_SECS:-$FM_PENDING_REPLY_GRACE_DEFAULT}
+  local g=${JG_PENDING_REPLY_GRACE_SECS:-$JG_PENDING_REPLY_GRACE_DEFAULT}
   case "$g" in
-    ''|*[!0-9]*) g=$FM_PENDING_REPLY_GRACE_DEFAULT ;;
+    ''|*[!0-9]*) g=$JG_PENDING_REPLY_GRACE_DEFAULT ;;
   esac
   printf '%s' "$g"
 }
@@ -165,8 +165,8 @@ jg_pending_reply_grace_secs() {
 # Directory holding durable pending-reply records for <state-dir>.
 jg_pending_reply_dir() {  # <state-dir>
   local state=$1
-  if [ -n "${FM_PENDING_REPLY_DIR_OVERRIDE:-}" ]; then
-    printf '%s' "$FM_PENDING_REPLY_DIR_OVERRIDE"
+  if [ -n "${JG_PENDING_REPLY_DIR_OVERRIDE:-}" ]; then
+    printf '%s' "$JG_PENDING_REPLY_DIR_OVERRIDE"
     return 0
   fi
   printf '%s/pending-replies' "$state"
@@ -201,7 +201,7 @@ jg_pending_reply_corr_token() {  # <corr_id> [out-var]
 # Extract the first corr=<16hex> token from free text, or empty.
 jg_pending_reply_extract_corr() {  # <text>
   local text=$1
-  printf '%s' "$text" | grep -oE "$FM_PENDING_REPLY_CORR_RE" 2>/dev/null | head -1 | cut -d= -f2- | tr 'A-F' 'a-f' || true
+  printf '%s' "$text" | grep -oE "$JG_PENDING_REPLY_CORR_RE" 2>/dev/null | head -1 | cut -d= -f2- | tr 'A-F' 'a-f' || true
 }
 
 # 0 if <text> carries the exact correlation token for <corr_id>, as a whole
@@ -218,7 +218,7 @@ jg_pending_reply_summarize() {  # <text>
   local text=$1 cleaned
   cleaned=$(printf '%s' "$text" | tr '\t\r\n' '   ' | tr -cd '\11\12\15\40-\176' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   # Drop an already-present marker/corr prefix so the durable summary stays short.
-  cleaned=${cleaned#"$FM_FROMFIRST_MARK"}
+  cleaned=${cleaned#"$JG_FROMFIRST_MARK"}
   cleaned=$(printf '%s' "$cleaned" | sed -E "s/^corr=[A-Fa-f0-9]{16}[[:space:]]*//")
   if [ "${#cleaned}" -gt 120 ]; then
     cleaned="${cleaned:0:117}..."
@@ -307,7 +307,7 @@ jg_pending_reply_embed_corr() {  # <message> <corr_id> <result-var>
   [ -n "$result_var" ] || return 2
   token=$(jg_pending_reply_corr_token "$corr")
   jg_message_mark_from_firstmate "$message" marked
-  body=${marked#"$FM_FROMFIRST_MARK"}
+  body=${marked#"$JG_FROMFIRST_MARK"}
   # Strip a leading corr=<16hex> plus following blanks (space/tab only).
   existing=${body:0:21}
   case "$existing" in
@@ -317,7 +317,7 @@ jg_pending_reply_embed_corr() {  # <message> <corr_id> <result-var>
       while [ "${body#$'\t'}" != "$body" ]; do body=${body#$'\t'}; done
       ;;
   esac
-  printf -v "$result_var" '%s' "${FM_FROMFIRST_MARK}${token} ${body}"
+  printf -v "$result_var" '%s' "${JG_FROMFIRST_MARK}${token} ${body}"
 }
 
 # Create a durable pending-reply expectation. Prints corr_id on success.
@@ -352,7 +352,7 @@ jg_pending_reply_create() {  # <parent-home> <state-dir> <task_id> <request-text
   esac
   tmp="$dir/.${corr}.tmp.$$"
   cat > "$tmp" <<EOF
-schema=$FM_PENDING_REPLY_SCHEMA
+schema=$JG_PENDING_REPLY_SCHEMA
 corr_id=$corr
 task_id=$task_id
 parent_home=$parent_home
@@ -435,10 +435,10 @@ jg_pending_reply_prepare_delivery() {  # <state-dir> <corr_id>
 
 jg_pending_reply_confirm_delivery() {  # <state-dir> <corr_id>
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_confirm_delivery_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -516,10 +516,10 @@ _jg_pending_reply_reconcile_delivery_locked() {  # <state-dir> <corr_id>
 
 jg_pending_reply_reconcile_delivery() {  # <state-dir> <corr_id>
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_reconcile_delivery_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -547,10 +547,10 @@ jg_pending_reply_delivery_attempt_unresolved() {  # <state-dir> <corr_id>
 # confirmed delivery can never be reset, whatever its phase.
 jg_pending_reply_reset_known_undelivered() {  # <state-dir> <corr_id>
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_reset_known_undelivered_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -667,11 +667,11 @@ jg_pending_reply_try_resolve() {  # <state-dir> <corr_id> [status-file-override]
   # The lock is released explicitly rather than from an EXIT trap, because a trap
   # in a plain function would clobber the caller's own.
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
   # shellcheck source=bin/jg-wake-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_try_resolve_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -954,14 +954,14 @@ jg_pending_reply_recovery_message() {  # <record-path>
 }
 
 # Deliver the recovery message once. Caller must hold phase awaiting_report with
-# turn completed and grace elapsed. Uses FM_PENDING_REPLY_SEND_HOOK when set
-# (tests), otherwise invokes jg-send with FM_PENDING_REPLY_EXISTING_CORR so a
+# turn completed and grace elapsed. Uses JG_PENDING_REPLY_SEND_HOOK when set
+# (tests), otherwise invokes jg-send with JG_PENDING_REPLY_EXISTING_CORR so a
 # second expectation is not created.
 jg_pending_reply_send_recovery() {  # <state-dir> <corr_id>
   local state=$1 corr=$2
   local rec phase completed delivered attempted grace now age task_id msg parent_home send_status=0
   local sender_pid sender_identity status_file lock
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   rec=$(jg_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
   phase=$(jg_pending_reply_get "$rec" phase)
@@ -988,7 +988,7 @@ jg_pending_reply_send_recovery() {  # <state-dir> <corr_id>
   jg_pending_reply_missing_report_is_evidence "$state" "$task_id" "$completed" || return 1
   # config/wait-no-turns: a mate waiting on its own open decision or blocker
   # is never poked. The recovery stays unattempted until the answer lands.
-  if [ -e "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/wait-no-turns" ]; then
+  if [ -e "${JG_CONFIG_OVERRIDE:-${JG_HOME:-}/config}/wait-no-turns" ]; then
     [ -z "$(status_own_open_decisions "$state/$task_id.status")" ] || return 1
   fi
   status_file=$(jg_pending_reply_get "$rec" parent_status)
@@ -1005,7 +1005,7 @@ jg_pending_reply_send_recovery() {  # <state-dir> <corr_id>
   # Deliberately undirected: bin/jg-wake-lib.sh is expanded once at the
   # jg_pending_reply_try_resolve site; each directed site would re-expand its
   # whole transitive graph under ShellCheck's external-source traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   # The phase is re-read after the resolve attempt, whatever it returned: a
   # resolve that failed on a later field write has still committed resolved.
   jg_lock_acquire_wait "$lock" || return 1
@@ -1019,17 +1019,17 @@ jg_pending_reply_send_recovery() {  # <state-dir> <corr_id>
     return 1
   fi
   jg_lock_release "$lock"
-  if [ -n "${FM_PENDING_REPLY_SEND_HOOK:-}" ]; then
+  if [ -n "${JG_PENDING_REPLY_SEND_HOOK:-}" ]; then
     # Hook receives: task_id message
     # shellcheck disable=SC2086
-    if ! eval "$FM_PENDING_REPLY_SEND_HOOK" "$(printf '%q' "$task_id")" "$(printf '%q' "$msg")"; then
+    if ! eval "$JG_PENDING_REPLY_SEND_HOOK" "$(printf '%q' "$task_id")" "$(printf '%q' "$msg")"; then
       send_status=1
     fi
   else
     if [ -z "$parent_home" ] || [ ! -d "$parent_home" ]; then
       send_status=1
-    elif ! env FM_HOME="$parent_home" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
-      "$_FM_PENDING_REPLY_LIB_DIR/jg-send.sh" "$task_id" "$msg"; then
+    elif ! env JG_HOME="$parent_home" JG_PENDING_REPLY_EXISTING_CORR="$corr" \
+      "$_JG_PENDING_REPLY_LIB_DIR/jg-send.sh" "$task_id" "$msg"; then
       send_status=1
     fi
   fi
@@ -1194,13 +1194,13 @@ jg_pending_reply_close_escalation() {  # <state-dir> <corr_id>
   # The lock is released explicitly rather than from an EXIT trap, because a trap
   # in a plain function would clobber the caller's own.
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
   # Deliberately undirected: bin/jg-wake-lib.sh is expanded once at the
   # jg_pending_reply_try_resolve site; each directed site would re-expand its
   # whole transitive graph under ShellCheck's external-source traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_close_escalation_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -1262,13 +1262,13 @@ jg_pending_reply_maybe_escalate() {  # <state-dir> <corr_id>
   # The lock is released explicitly rather than from an EXIT trap, because a trap
   # in a plain function would clobber the caller's own.
   local state=$1 corr=$2 lock rc=0
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
   STATE=$state
   lock="$state/.pending-reply-$corr.lock"
   # Deliberately undirected: bin/jg-wake-lib.sh is expanded once at the
   # jg_pending_reply_try_resolve site; each directed site would re-expand its
   # whole transitive graph under ShellCheck's external-source traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-wake-lib.sh"
   jg_lock_acquire_wait "$lock" || return 1
   _jg_pending_reply_maybe_escalate_locked "$@" || rc=$?
   jg_lock_release "$lock"
@@ -1384,9 +1384,9 @@ jg_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
   fi
   sightings=$(jg_pending_reply_get "$rec" wrong_home_sightings)
   # shellcheck source=bin/jg-parent-channel-lib.sh
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-parent-channel-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-parent-channel-lib.sh"
   if jg_parent_channel_destination "$sm_home" "$sm_home/state" >/dev/null 2>&1 \
-    && [ "$FM_PARENT_CHANNEL_ROUTE" = remote ]; then
+    && [ "$JG_PARENT_CHANNEL_ROUTE" = remote ]; then
     remote_parent_channel=1
   fi
   for status_file in "$sm_home"/state/*.status; do
@@ -1447,7 +1447,7 @@ jg_pending_reply_restatement_copy_same_basename() {  # <state-dir> <corr_id> <se
   # the jg_pending_reply_detect_wrong_home site; each directed site would
   # re-expand its whole transitive graph under ShellCheck's external-source
   # traversal.
-  . "$_FM_PENDING_REPLY_LIB_DIR/jg-parent-channel-lib.sh"
+  . "$_JG_PENDING_REPLY_LIB_DIR/jg-parent-channel-lib.sh"
   jg_parent_channel_append_once "$parent_status" "$line"
 }
 
@@ -1667,7 +1667,7 @@ jg_pending_reply_tick() {  # <state-dir>
         done
         if [ "$found" = 0 ]; then
           if [ -n "$remote_host" ]; then
-            observation=$("$_FM_PENDING_REPLY_LIB_DIR/jg-on.sh" "$task_id" \
+            observation=$("$_JG_PENDING_REPLY_LIB_DIR/jg-on.sh" "$task_id" \
               jg-remote-secondmate-control.sh observe "$task_id" < /dev/null 2>/dev/null || printf 'unknown')
             case "$observation" in busy|idle|fallback-idle|unknown) ;; *) observation=unknown ;; esac
           else

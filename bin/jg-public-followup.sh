@@ -22,7 +22,7 @@
 #
 # ZERO OVERHEAD FOR HOMES THAT DO NOT USE THE RELAY: every subcommand gates
 # first on the authoritative activation contract (a non-empty FMX_PAIRING_TOKEN
-# in $FM_HOME/.env). Read-side and cleanup paths then use an O(1) presence check
+# in $JG_HOME/.env). Read-side and cleanup paths then use an O(1) presence check
 # for registrations this home actually created. A relay-disabled home therefore
 # runs one [ -f ] test before any backlog work: no tasks-axi call, no backlog scan,
 # and no file created. Silent read-side commands return without output; commands
@@ -141,22 +141,22 @@
 # Requires jq and a compatible tasks-axi for registration, briefs,
 # reconciliation, delivery, cleanup guards, and retirement; only `active`
 # inspects local state alone.
-# FM_PF_RETRY_BACKOFF_SECS (default 900) sets the next-attempt time recorded with
+# JG_PF_RETRY_BACKOFF_SECS (default 900) sets the next-attempt time recorded with
 # a retryable delivery error.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-public-followup-lib.sh
 . "$SCRIPT_DIR/jg-public-followup-lib.sh"
 # shellcheck source=bin/jg-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
 
-RETRY_BACKOFF=${FM_PF_RETRY_BACKOFF_SECS:-900}
+RETRY_BACKOFF=${JG_PF_RETRY_BACKOFF_SECS:-900}
 case "$RETRY_BACKOFF" in ''|*[!0-9]*) RETRY_BACKOFF=900 ;; esac
 
 usage() {
@@ -221,16 +221,16 @@ require_tools() {
   command -v tasks-axi >/dev/null 2>&1 || die "tasks-axi is required" 1
 }
 
-# Every tasks-axi call addresses $FM_HOME/data, the home whose backlog owns the
-# obligation, through bin/jg-tasks-axi.sh. An inherited FM_DATA_OVERRIDE is
+# Every tasks-axi call addresses $JG_HOME/data, the home whose backlog owns the
+# obligation, through bin/jg-tasks-axi.sh. An inherited JG_DATA_OVERRIDE is
 # cleared because a caller such as a secondmate teardown names the parent home
-# in FM_HOME while its own data override is still in the environment.
-tx() { FM_HOME="$FM_HOME" FM_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" "$@"; }
+# in JG_HOME while its own data override is still in the environment.
+tx() { JG_HOME="$JG_HOME" JG_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" "$@"; }
 
 # obligation_json <id>: this home's typed obligation payload, through the shared
 # reader every consumer of the promised contract uses. tasks-axi stays the
 # single source of truth; the registration record is never consulted for state.
-obligation_json() { jg_pf_obligation_json "$FM_HOME" "$1"; }
+obligation_json() { jg_pf_obligation_json "$JG_HOME" "$1"; }
 
 pf_field() { printf '%s' "$1" | jq -r "$2 // empty" 2>/dev/null; }
 
@@ -240,14 +240,14 @@ pf_field() { printf '%s' "$1" | jq -r "$2 // empty" 2>/dev/null; }
 # with no output when this home has no public-followup work, so callers can
 # invoke unconditionally without a relay-disabled home paying anything.
 gate_or_exit() {
-  jg_pf_relay_active "$FM_HOME" || exit 0
+  jg_pf_relay_active "$JG_HOME" || exit 0
   jg_pf_has_registrations "$STATE" || jg_pf_has_events "$STATE" || exit 0
 }
 
 # --- subcommand: active -----------------------------------------------------
 
 cmd_active() {
-  jg_pf_relay_active "$FM_HOME" || exit 1
+  jg_pf_relay_active "$JG_HOME" || exit 1
   jg_pf_has_registrations "$STATE" || jg_pf_has_events "$STATE" || exit 1
   exit 0
 }
@@ -272,7 +272,7 @@ cmd_register() {
     shift || true
   done
 
-  jg_pf_relay_active "$FM_HOME" \
+  jg_pf_relay_active "$JG_HOME" \
     || die "this home has not opted into the myfirstmate relay, so it cannot own a public commitment" 1
   require_tools
 
@@ -374,11 +374,11 @@ brief_emit_target() {
   local work_home=$1 recorded_home=${2:-} sid kind root home configured_path
   case "$work_home" in
     secondmate:*) sid=${work_home#secondmate:} ;;
-    *) printf '%s\n--home %s\n' "$FM_ROOT/bin/jg-public-followup-emit.sh" "$FM_HOME"; return 0 ;;
+    *) printf '%s\n--home %s\n' "$JG_ROOT/bin/jg-public-followup-emit.sh" "$JG_HOME"; return 0 ;;
   esac
   kind=$(public_followup_route_kind "$sid" "$recorded_home") || return 1
   if [ "$kind" = local ]; then
-    printf '%s\n--home %s\n' "$FM_ROOT/bin/jg-public-followup-emit.sh" "$FM_HOME"
+    printf '%s\n--home %s\n' "$JG_ROOT/bin/jg-public-followup-emit.sh" "$JG_HOME"
     return 0
   fi
   root=$(secondmate_registry_field "$DATA/secondmates.md" "$sid" root 2>/dev/null) || root=
@@ -399,7 +399,7 @@ cmd_brief() {
   local emit_target emit_script emit_home_flag closing_note
   [ -n "$id" ] || { usage; exit 2; }
   jg_pf_slug_valid "$id" || die "unsafe obligation id: $id"
-  jg_pf_relay_active "$FM_HOME" || die "the relay is not active for this home" 1
+  jg_pf_relay_active "$JG_HOME" || die "the relay is not active for this home" 1
   [ -f "$(jg_pf_registry_dir "$STATE")/$id" ] \
     || die "no registration for '$id' in this home" 1
 
@@ -642,7 +642,7 @@ collect_remote_staged_events() {
       || die "jq is required to collect a terminal result from a remote work home" 1
 
     collect_rc=0
-    payload=$("$FM_ROOT/bin/jg-on.sh" "$sid" jg-public-followup-collect.sh drain "$id") \
+    payload=$("$JG_ROOT/bin/jg-on.sh" "$sid" jg-public-followup-collect.sh drain "$id") \
       || collect_rc=$?
     # jg-on.sh returns ssh's status unchanged, so 255 is the established
     # "delivered but completion unknown" status this codebase reconciles rather
@@ -662,7 +662,7 @@ collect_remote_staged_events() {
     while IFS= read -r line; do
       [ -n "$line" ] || continue
       event_id=$(printf '%s' "$line" | jq -r '.event_id // empty' 2>/dev/null)
-      if [ "${#line}" -gt "$FM_PF_EVENT_BYTES_MAX" ] \
+      if [ "${#line}" -gt "$JG_PF_EVENT_BYTES_MAX" ] \
         || [ -z "$event_id" ] || ! jg_pf_slug_valid "$event_id"; then
         printf 'unreached %s: the work home %s returned an unusable terminal result, which stays retained there\n' \
           "$id" "$sid"
@@ -684,7 +684,7 @@ collect_remote_staged_events() {
       # the event durably, and a retained copy is only ever collected again and
       # dropped as a duplicate.
       dropped=0
-      "$FM_ROOT/bin/jg-on.sh" "$sid" jg-public-followup-collect.sh drop "$id" "$event_id" \
+      "$JG_ROOT/bin/jg-on.sh" "$sid" jg-public-followup-collect.sh drop "$id" "$event_id" \
         >/dev/null 2>&1 || dropped=$?
       [ "$dropped" -eq 0 ] \
         || printf 'collected %s: the copy staged on %s could not be retired and will be collected again\n' \
@@ -734,8 +734,8 @@ cmd_consume() {
       continue
     fi
 
-    if [ "$(wc -c < "$file" 2>/dev/null || echo 0)" -gt "$FM_PF_EVENT_BYTES_MAX" ]; then
-      reject_event "$file" "$event_id" "event exceeds $FM_PF_EVENT_BYTES_MAX bytes" || consume_rc=1
+    if [ "$(wc -c < "$file" 2>/dev/null || echo 0)" -gt "$JG_PF_EVENT_BYTES_MAX" ]; then
+      reject_event "$file" "$event_id" "event exceeds $JG_PF_EVENT_BYTES_MAX bytes" || consume_rc=1
       continue
     fi
 
@@ -812,7 +812,7 @@ cmd_consume() {
 
   # A fresh event must be able to wake firstmate again, so drop the surfaced
   # signature once the inbox has been worked.
-  rm -f -- "$(jg_pf_root "$STATE")/$FM_PF_SURFACED_BASENAME" 2>/dev/null || true
+  rm -f -- "$(jg_pf_root "$STATE")/$JG_PF_SURFACED_BASENAME" 2>/dev/null || true
   return "$consume_rc"
 }
 
@@ -879,11 +879,11 @@ cmd_pending() {
       ' >/dev/null 2>&1; then
     if jg_pf_has_registrations "$STATE"; then
       printf 'cannot read this home'\''s public commitments through tasks-axi; %s registration(s) are still recorded under state/%s/registry\n' \
-        "$(jg_pf_registry_ids "$STATE" | grep -c . || true)" "$FM_PF_DIRNAME"
+        "$(jg_pf_registry_ids "$STATE" | grep -c . || true)" "$JG_PF_DIRNAME"
       printed=1
     fi
     if jg_pf_has_events "$STATE"; then
-      printf 'unconsumed terminal results are waiting; run %s/bin/jg-public-followup.sh consume\n' "$FM_ROOT"
+      printf 'unconsumed terminal results are waiting; run %s/bin/jg-public-followup.sh consume\n' "$JG_ROOT"
       printed=1
     fi
     [ "$printed" -eq 1 ] || exit 0
@@ -941,7 +941,7 @@ EOF
   # Events that arrived while no agent was present are actionable on their own,
   # so surface them even when every registration currently looks settled.
   if jg_pf_has_events "$STATE"; then
-    printf 'unconsumed terminal results are waiting; run %s/bin/jg-public-followup.sh consume\n' "$FM_ROOT"
+    printf 'unconsumed terminal results are waiting; run %s/bin/jg-public-followup.sh consume\n' "$JG_ROOT"
     printed=1
   fi
   [ "$printed" -eq 1 ] || exit 0
@@ -1015,7 +1015,7 @@ public_followup_route_is_remote() {
 # when the target has no link, so a reconciling retry is safe.
 clear_public_followup_link_remote() {
   local id=$1 work_id=$2 request_id=$3 rc=0
-  "$FM_ROOT/bin/jg-on.sh" "$id" jg-x-followup.sh --clear "$work_id" \
+  "$JG_ROOT/bin/jg-on.sh" "$id" jg-x-followup.sh --clear "$work_id" \
     --expect-request "$request_id" </dev/null >/dev/null || rc=$?
   [ "$rc" -ne 255 ] || return 255
   [ "$rc" -eq 0 ] || return 1
@@ -1033,7 +1033,7 @@ clear_public_followup_link() {
   [ -n "$work_home" ] && [ -n "$work_id" ] || return 1
   case "$work_home" in
     main)
-      home=$FM_HOME
+      home=$JG_HOME
       state=$STATE
       ;;
     secondmate:*)
@@ -1064,8 +1064,8 @@ clear_public_followup_link() {
       ;;
     *) return 1 ;;
   esac
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$FM_ROOT" \
-    "$FM_ROOT/bin/jg-x-followup.sh" --clear "$work_id" >/dev/null
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    "$JG_ROOT/bin/jg-x-followup.sh" --clear "$work_id" >/dev/null
 }
 
 # pf_link_clear_note <rc>: the qualifier appended to a refusal when a bound
@@ -1099,7 +1099,7 @@ public_followup_legacy_link_status() {
   while IFS=$'\t' read -r work_home work_id; do
     [ -n "$work_home" ] && [ -n "$work_id" ] || return 2
     case "$work_home" in
-      main) home=$FM_HOME ;;
+      main) home=$JG_HOME ;;
       secondmate:*) home=$(public_followup_secondmate_home "${work_home#secondmate:}") || return 2 ;;
       *) return 2 ;;
     esac
@@ -1174,7 +1174,7 @@ cmd_deliver() {
   done
 
   jg_pf_slug_valid "$id" || die "unsafe obligation id: $id"
-  jg_pf_relay_active "$FM_HOME" \
+  jg_pf_relay_active "$JG_HOME" \
     || die "this home has not opted into the myfirstmate relay, so it cannot post a public reply" 1
   require_tools
 
@@ -1264,8 +1264,8 @@ cmd_deliver() {
   esac
 
   rc=0
-  FMX_REPLY_PLATFORM="$platform" FM_HOME="$FM_HOME" \
-    "$FM_ROOT/bin/jg-x-reply.sh" "$request" --followup --receipt-file "$receipt" \
+  FMX_REPLY_PLATFORM="$platform" JG_HOME="$JG_HOME" \
+    "$JG_ROOT/bin/jg-x-reply.sh" "$request" --followup --receipt-file "$receipt" \
     --text-file "$tmp_text" >/dev/null || rc=$?
 
   if [ "$rc" -eq 0 ]; then
@@ -1333,7 +1333,7 @@ cmd_record_posted() {
   case "$attempt" in ''|*[!0-9]*) die "--attempt <n> is required and must be an integer" ;; esac
   case "$chunks" in ''|*[!0-9]*) die "--chunks <n> is required and must be a positive integer" ;; esac
   [ "$chunks" -ge 1 ] 2>/dev/null || die "--chunks <n> is required and must be a positive integer"
-  jg_pf_relay_active "$FM_HOME" || die "the relay is not active for this home" 1
+  jg_pf_relay_active "$JG_HOME" || die "the relay is not active for this home" 1
   public_followup_registration_valid "$id" \
     || die "public-followup registration for '$id' is missing or invalid; reconcile it before recording a receipt so any legacy X link can be cleared" 1
   require_tools
@@ -1361,7 +1361,7 @@ cmd_record_posted() {
 cmd_guard_work() {
   local work_home=${1:-} work_id=${2:-} bound id payload delivery task_state blocked=0
   [ -n "$work_home" ] && [ -n "$work_id" ] || { usage; exit 2; }
-  jg_pf_relay_active "$FM_HOME" || exit 0
+  jg_pf_relay_active "$JG_HOME" || exit 0
   jg_pf_has_registrations "$STATE" || exit 0
 
   # Reading the registration records needs no tools, so establish whether this
@@ -1426,7 +1426,7 @@ cmd_rechain() {
     shift || true
   done
 
-  jg_pf_relay_active "$FM_HOME" \
+  jg_pf_relay_active "$JG_HOME" \
     || die "this home has not opted into the myfirstmate relay, so it cannot own a public commitment" 1
   require_tools
   jg_pf_slug_valid "$new_id" || die "unsafe obligation id: $new_id"
@@ -1614,7 +1614,7 @@ cmd_retire() {
     shift || true
   done
   jg_pf_slug_valid "$id" || die "unsafe obligation id: $id"
-  jg_pf_relay_active "$FM_HOME" || exit 0
+  jg_pf_relay_active "$JG_HOME" || exit 0
   [ -n "$reason" ] || die "retire requires --reason \"<why the public loop is done>\"" 2
   reason=$(printf '%s' "$reason" | jg_pf_clean_outcome_text)
   [ -n "$reason" ] || die "retire requires --reason \"<why the public loop is done>\"" 2

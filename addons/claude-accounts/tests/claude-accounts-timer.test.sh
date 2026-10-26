@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # claude-accounts timer: install, dry run, no-op rerun and uninstall against a throwaway HOME, XDG paths and a
 # stub systemctl that only logs its calls. The installed reader copy then runs from the unit's own command line.
 set -u
@@ -21,9 +30,9 @@ t "$here/../install-timer.sh" "$w/fm" >/dev/null
 is "units and the reader copy are written" "$(ls "$units"; ls "$w/data/jg-claude-accounts")" "jg-claude-accounts-quota.service
 jg-claude-accounts-quota.timer
 claude-accounts-quota.sh"
-is "every 5 minutes, for this home" "$(grep -c 'OnUnitActiveSec=5min' "$units/jg-claude-accounts-quota.timer")|$(grep -c "Environment=FM_HOME=$w/fm" "$units/jg-claude-accounts-quota.service")" "1|1"
+is "every 5 minutes, for this home" "$(grep -c 'OnUnitActiveSec=5min' "$units/jg-claude-accounts-quota.timer")|$(grep -c "Environment=JG_HOME=$w/fm" "$units/jg-claude-accounts-quota.service")" "1|1"
 is "the timer is enabled now" "$(tail -1 "$w/systemctl.log")" "--user enable --now jg-claude-accounts-quota.timer"
-is "the unit's command writes the card file" "$(env -i PATH="$w/bin:$PATH" HOME="$w/home" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" "$w/data/jg-claude-accounts/claude-accounts-quota.sh" >/dev/null 2>&1; jq -r '.accounts[0] | "\(.five_hour.left)/\(.seven_day.left)"' "$w/home/state/claude-accounts.json")" "50/60"
+is "the unit's command writes the card file" "$(env -i PATH="$w/bin:$PATH" HOME="$w/home" JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" "$w/data/jg-claude-accounts/claude-accounts-quota.sh" >/dev/null 2>&1; jq -r '.accounts[0] | "\(.five_hour.left)/\(.seven_day.left)"' "$w/home/state/claude-accounts.json")" "50/60"
 : > "$w/systemctl.log"
 is "a rerun changes nothing" "$(t "$here/../install-timer.sh" "$w/fm")|$(wc -c < "$w/systemctl.log")" "unchanged: jg-claude-accounts-quota.timer|0"
 t "$here/../uninstall-timer.sh" >/dev/null

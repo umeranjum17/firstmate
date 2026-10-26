@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# Integration proof of the lead-wake seam. FM_TEST_FORK names a read-only Firstmate
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
+# Integration proof of the lead-wake seam. JG_TEST_FORK names a read-only Firstmate
 # checkout; its bin/ and tests/ are copied privately and only the proposed step-B replacements
 # are applied to the copy (tests/stage-step-b.py). The real watcher then runs the fork's lead-wake cases (tests/jg-lead-wake.test.sh):
 # add-on present = the fork's lead-wake behavior, add-on absent = Kun's (no wake, no error).
 # Needs tasks-axi, bash, python3.
 set -euo pipefail
 addons=$(cd "$(dirname "$0")/../.." && pwd)
-: "${FM_TEST_FORK:?set FM_TEST_FORK to a Firstmate checkout}"
+: "${JG_TEST_FORK:?set JG_TEST_FORK to a Firstmate checkout}"
 command -v tasks-axi >/dev/null || { echo "not ok - tasks-axi is required"; exit 1; }
 d=$(mktemp -d)
 cleanup() {
@@ -16,7 +25,7 @@ cleanup() {
 trap cleanup EXIT
 export HOME=$d/user XDG_CONFIG_HOME=$d/xdg-config XDG_DATA_HOME=$d/xdg-data TMPDIR=$d/tmp
 mkdir -p "$HOME" "$TMPDIR" "$d/fork" "$d/fakebin" "$d/empty"
-cp -a "$FM_TEST_FORK/bin" "$FM_TEST_FORK/tests" "$d/fork/"
+cp -a "$JG_TEST_FORK/bin" "$JG_TEST_FORK/tests" "$d/fork/"
 python3 "$addons/lead-wake/tests/stage-step-b.py" "$d/fork/bin"
 cp "$addons/lead-wake/tests/jg-lead-wake.test.sh" "$d/fork/tests/"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$d/fakebin/tmux"
@@ -25,7 +34,7 @@ chmod +x "$d/fakebin/"*
 
 fail() { echo "not ok - $*" >&2; exit 1; }
 ok() { echo "ok - $*"; }
-tasks() { FM_HOME=$home "$d/fork/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
+tasks() { JG_HOME=$home "$d/fork/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
 newhome() {  # <name>
   home=$d/$1; state=$home/state
   mkdir -p "$state" "$home/config" "$home/data"
@@ -36,9 +45,9 @@ newhome() {  # <name>
 watch() {
   local pid i=0 limit=${3:-100}
   rm -f "$state/.last-ready-work-check" "$state/.heartbeat-streak" "$state/.last-heartbeat"
-  PATH="$d/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_ADDONS_DIR="$1" \
-    FM_CREW_STATE_BIN="$d/fakebin/jg-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+  PATH="$d/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_ADDONS_DIR="$1" \
+    JG_CREW_STATE_BIN="$d/fakebin/jg-crew-state.sh" JG_POLL=1 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=1 JG_SECONDMATE_LIVENESS_SECS=99999999 \
     bash "$d/fork/bin/jg-watch.sh" > "$2" 2>"$2.err" &
   pid=$!
   while [ "$i" -lt "$limit" ] && kill -0 "$pid" 2>/dev/null; do sleep 0.1; i=$((i + 1)); done
@@ -47,8 +56,8 @@ watch() {
 }
 
 # Present: the fork's lead-wake cases on the staged watcher. Absent: Kun's ring text.
-FM_ADDONS_DIR=$addons bash "$d/fork/tests/jg-lead-wake.test.sh" || fail "fork lead-wake cases with the add-on present"
-FM_ADDONS_DIR=$d/empty RING_TEXT="Drain pending rows in this home's wake queue, then resume idle supervision." \
+JG_ADDONS_DIR=$addons bash "$d/fork/tests/jg-lead-wake.test.sh" || fail "fork lead-wake cases with the add-on present"
+JG_ADDONS_DIR=$d/empty RING_TEXT="Drain pending rows in this home's wake queue, then resume idle supervision." \
   bash "$d/fork/tests/jg-lead-wake.test.sh" ring || fail "absent add-on: Kun's drain ring"
 
 # Absent add-on: Kun behavior - no ready-work wake, no error.
@@ -61,6 +70,6 @@ watch "$d/empty" "$d/o5" 30 || true
 ok "absent: no ready-work wake and no error (Kun behavior)"
 
 # lane-target inheritance hook.
-inherit() { FM_HOME=$home FM_ADDONS_DIR=$1 bash -c '. "$1/jg-config-inherit-lib.sh"; printf "%s\n" "$FM_INHERITABLE_CONFIG"' _ "$d/fork/bin"; }
+inherit() { JG_HOME=$home JG_ADDONS_DIR=$1 bash -c '. "$1/jg-config-inherit-lib.sh"; printf "%s\n" "$JG_INHERITABLE_CONFIG"' _ "$d/fork/bin"; }
 case " $(inherit "$addons") " in *" lane-target "*) ok "present: lane-target is inheritable" ;; *) fail "lane-target not inheritable" ;; esac
 case " $(inherit "$d/empty") " in *" lane-target "*) fail "absent add-on still inherits lane-target" ;; *) ok "absent: Kun's inheritable list" ;; esac

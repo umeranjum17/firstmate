@@ -6,12 +6,12 @@
 # under test - a --secondmate spawn's tab landing in the secondmate's OWN
 # herdr workspace, and a crewmate spawned FROM a secondmate home landing there
 # too - only exists at jg-spawn.sh's own home-shadowing logic (the herdr case
-# arm) and at jg_backend_herdr_workspace_label's FM_HOME read; neither is
+# arm) and at jg_backend_herdr_workspace_label's JG_HOME read; neither is
 # exercised by the adapter-primitive smoke test.
 #
 # Mirrors tests/jg-backend-autodetect-smoke.test.sh's isolated-session
 # convention: a private throwaway HERDR_SESSION (never the captain's
-# default), scratch FM_HOME(s), and scratch local-only projects.
+# default), scratch JG_HOME(s), and scratch local-only projects.
 #
 # Safety (2026-07-02 incident, see tests/herdr-test-safety.sh): cleanup uses
 # ONLY herdr_safe_stop_and_delete, never a bare/inline-prefixed `herdr server
@@ -21,7 +21,7 @@
 #   - a primary-shaped home (no .jg-secondmate-home marker) spawning a
 #     crewmate into the "firstmate" workspace
 #   - a secondmate-shaped home (with .jg-secondmate-home) getting its own
-#     labeled workspace when the PRIMARY spawns it (jg-spawn.sh's FM_HOME
+#     labeled workspace when the PRIMARY spawns it (jg-spawn.sh's JG_HOME
 #     shadow for --secondmate)
 #   - a crewmate spawned FROM that secondmate-shaped home (the secondmate
 #     running its OWN jg-spawn.sh) landing in the secondmate's own workspace -
@@ -134,7 +134,7 @@ PROJ2="$TMP_ROOT/scratch-project-2"; make_scratch_project "$PROJ2"
 # --- 1. primary-shaped home: a crewmate spawns into the "firstmate" space ---
 
 CM1_OUT="$TMP_ROOT/cm1.out"; CM1_ERR="$TMP_ROOT/cm1.err"
-FM_SPAWN_NO_GUARD=1 FM_HOME="$PRIMARY_HOME" FM_ROOT_OVERRIDE="$ROOT" \
+JG_SPAWN_NO_GUARD=1 JG_HOME="$PRIMARY_HOME" JG_ROOT_OVERRIDE="$ROOT" \
   "$ROOT/bin/jg-spawn.sh" cm1 "$PROJ1" "sh -c 'echo primary-crew-ok'" --mode no-mistakes --yolo off --backend herdr \
   >"$CM1_OUT" 2>"$CM1_ERR"
 rc=$?
@@ -159,11 +159,11 @@ CM1_WS_LABEL=$(herdr workspace list --session "$SESSION" 2>&1 | jq -r --arg id "
 pass "real herdr E2E: the primary-shaped home's crewmate landed in the 'firstmate' workspace"
 
 # --- 2. the PRIMARY spawns a secondmate: its tab lands in the SECONDMATE's own space ---
-# (jg-spawn.sh's herdr case arm shadows FM_HOME to the secondmate's home for
+# (jg-spawn.sh's herdr case arm shadows JG_HOME to the secondmate's home for
 # exactly this call - AGENTS.md task herdr-sm-spaces-k4, requirement 3.)
 
 SM_OUT="$TMP_ROOT/sm.out"; SM_ERR="$TMP_ROOT/sm.err"
-FM_SPAWN_NO_GUARD=1 FM_HOME="$PRIMARY_HOME" FM_ROOT_OVERRIDE="$ROOT" \
+JG_SPAWN_NO_GUARD=1 JG_HOME="$PRIMARY_HOME" JG_ROOT_OVERRIDE="$ROOT" \
   "$ROOT/bin/jg-spawn.sh" e2esm1 "$SM_HOME" "sh -c 'echo secondmate-launch-ok'" --secondmate --backend herdr \
   >"$SM_OUT" 2>"$SM_ERR"
 rc=$?
@@ -189,7 +189,7 @@ pass "real herdr E2E: a --secondmate spawn by the PRIMARY lands in the SECONDMAT
 # secondmate workspace (this exact path has never run before this test) -----
 
 CM2_OUT="$TMP_ROOT/cm2.out"; CM2_ERR="$TMP_ROOT/cm2.err"
-FM_SPAWN_NO_GUARD=1 FM_HOME="$SM_HOME" FM_ROOT_OVERRIDE="$ROOT" \
+JG_SPAWN_NO_GUARD=1 JG_HOME="$SM_HOME" JG_ROOT_OVERRIDE="$ROOT" \
   "$ROOT/bin/jg-spawn.sh" cm2 "$PROJ2" "sh -c 'echo sm-crew-ok'" --mode no-mistakes --yolo off --backend herdr \
   >"$CM2_OUT" 2>"$CM2_ERR"
 rc=$?
@@ -214,13 +214,13 @@ pass "real herdr E2E: a crewmate spawned FROM the secondmate-shaped home lands i
 
 # --- 4. list-live recovery: each home sees only its own tabs ---------------
 
-PRIMARY_LIVE=$(FM_HOME="$PRIMARY_HOME" jg_backend_herdr_list_live "$SESSION")
+PRIMARY_LIVE=$(JG_HOME="$PRIMARY_HOME" jg_backend_herdr_list_live "$SESSION")
 assert_contains_local "$PRIMARY_LIVE" "jg-cm1" "the primary home's list_live did not see its own task"
 assert_not_contains_local "$PRIMARY_LIVE" "jg-e2esm1" "the primary home's list_live must not see the secondmate's own task"
 assert_not_contains_local "$PRIMARY_LIVE" "jg-cm2" "the primary home's list_live must not see the secondmate-owned crewmate's task"
 pass "real herdr E2E: list_live from the primary's own context sees only the primary's own task"
 
-SM_LIVE=$(FM_HOME="$SM_HOME" jg_backend_herdr_list_live "$SESSION")
+SM_LIVE=$(JG_HOME="$SM_HOME" jg_backend_herdr_list_live "$SESSION")
 assert_contains_local "$SM_LIVE" "jg-e2esm1" "the secondmate home's list_live did not see its own task"
 assert_contains_local "$SM_LIVE" "jg-cm2" "the secondmate home's list_live did not see the crewmate spawned from it"
 assert_not_contains_local "$SM_LIVE" "jg-cm1" "the secondmate home's list_live must not see the primary's task"
@@ -229,8 +229,8 @@ pass "real herdr E2E: list_live from the secondmate's own context sees only task
 # --- 5. teardown closes the RIGHT tab, and no other ------------------------
 
 TD1_OUT="$TMP_ROOT/td1.out"
-FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$PRIMARY_HOME/state" FM_DATA_OVERRIDE="$PRIMARY_HOME/data" \
-  FM_CONFIG_OVERRIDE="$PRIMARY_HOME/config" \
+JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$PRIMARY_HOME/state" JG_DATA_OVERRIDE="$PRIMARY_HOME/data" \
+  JG_CONFIG_OVERRIDE="$PRIMARY_HOME/config" \
   "$ROOT/bin/jg-teardown.sh" cm1 >"$TD1_OUT" 2>&1
 rc=$?
 [ "$rc" -eq 0 ] || fail "jg-teardown.sh failed for the primary-shaped crewmate cm1"$'\n'"$(cat "$TD1_OUT")"
@@ -248,8 +248,8 @@ WT1=
 pass "real herdr E2E: tearing down cm1 closes only its own tab - the secondmate's and cm2's tabs survive untouched"
 
 TD2_OUT="$TMP_ROOT/td2.out"
-FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$SM_HOME/state" FM_DATA_OVERRIDE="$SM_HOME/data" \
-  FM_CONFIG_OVERRIDE="$SM_HOME/config" \
+JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$SM_HOME/state" JG_DATA_OVERRIDE="$SM_HOME/data" \
+  JG_CONFIG_OVERRIDE="$SM_HOME/config" \
   "$ROOT/bin/jg-teardown.sh" cm2 >"$TD2_OUT" 2>&1
 rc=$?
 [ "$rc" -eq 0 ] || fail "jg-teardown.sh failed for the secondmate-owned crewmate cm2"$'\n'"$(cat "$TD2_OUT")"

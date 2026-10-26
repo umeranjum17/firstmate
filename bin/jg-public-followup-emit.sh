@@ -383,7 +383,7 @@ esac
 # jq bounds the outcome text by codepoint, so a long or non-ASCII sentence is
 # capped without ever splitting a multi-byte character.
 EVENT_JSON=$(jq -Sc -n \
-  --argjson schema_version "$FM_PF_EVENT_SCHEMA_VERSION" \
+  --argjson schema_version "$JG_PF_EVENT_SCHEMA_VERSION" \
   --arg event_id "$EVENT_ID" \
   --arg obligation_id "$OBLIGATION" \
   --arg relation_id "$RELATION" \
@@ -393,7 +393,7 @@ EVENT_JSON=$(jq -Sc -n \
   --arg outcome_type "$OUTCOME" \
   --argjson deliverables "$DELIVERABLES_JSON" \
   --arg public_safe_outcome "$OUTCOME_TEXT" \
-  --argjson outcome_max "$FM_PF_OUTCOME_TEXT_MAX" \
+  --argjson outcome_max "$JG_PF_OUTCOME_TEXT_MAX" \
   --arg occurred_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{schema_version:$schema_version, event_id:$event_id, obligation_id:$obligation_id,
     relation_id:$relation_id, work_id:$work_id, generation:$generation,
@@ -405,8 +405,8 @@ EVENT_JSON=$(jq -Sc -n \
 
 EVENT_BYTES=$(printf '%s\n' "$EVENT_JSON" | LC_ALL=C wc -c | tr -d ' ') \
   || die "could not measure the typed terminal event" 1
-[ "$EVENT_BYTES" -le "$FM_PF_EVENT_BYTES_MAX" ] \
-  || die "typed terminal event exceeds $FM_PF_EVENT_BYTES_MAX bytes" 2
+[ "$EVENT_BYTES" -le "$JG_PF_EVENT_BYTES_MAX" ] \
+  || die "typed terminal event exceeds $JG_PF_EVENT_BYTES_MAX bytes" 2
 
 if [ "$HOME_MODE" = owning ]; then
   DESTINATION=$(jg_pf_events_dir "$STATE")

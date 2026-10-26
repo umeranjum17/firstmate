@@ -23,9 +23,9 @@ jg_sup_stat_mtime() {
 
 # jg_supervision_status <state-dir> [grace-seconds]
 # Populates, for the state dir at $1:
-#   FM_SUP_IN_FLIGHT      count of state/*.meta (in-flight tasks)
-#   FM_SUP_SOURCES        count of registered process-to-event sources
-#   FM_SUP_CHECKS         count of registered custom checks: a state/<id>.check.sh
+#   JG_SUP_IN_FLIGHT      count of state/*.meta (in-flight tasks)
+#   JG_SUP_SOURCES        count of registered process-to-event sources
+#   JG_SUP_CHECKS         count of registered custom checks: a state/<id>.check.sh
 #                         with the state/<id>.check-trust binding that
 #                         bin/jg-check-register.sh writes. Task PR polls carry no
 #                         such binding and are torn down with their task, and the
@@ -35,33 +35,33 @@ jg_sup_stat_mtime() {
 #                         sweep's call at execution time, and a home whose check
 #                         no longer validates needs the watcher precisely so the
 #                         sweep can report the rejection instead of going quiet.
-#   FM_SUP_NEEDED         true/false - in-flight work, an X-mode relay poll, a
+#   JG_SUP_NEEDED         true/false - in-flight work, an X-mode relay poll, a
 #                         registered event source (a source is a wait on an
 #                         external process, not a task, so it has no metadata),
 #                         or a registered custom check
-#   FM_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window
-#   FM_SUP_BEACON_DESC    human-readable beacon age, for banners ("never" if absent)
-#   FM_SUP_QUEUE_PENDING  true/false - state/.wake-queue has unread records
-# grace-seconds defaults to $FM_GUARD_GRACE, then 300, matching jg-guard.sh.
+#   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window
+#   JG_SUP_BEACON_DESC    human-readable beacon age, for banners ("never" if absent)
+#   JG_SUP_QUEUE_PENDING  true/false - state/.wake-queue has unread records
+# grace-seconds defaults to $JG_GUARD_GRACE, then 300, matching jg-guard.sh.
 # Always returns 0; callers read the vars, or use jg_supervision_unhealthy below.
 jg_supervision_status() {
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} meta source check id beat m age
-  FM_SUP_IN_FLIGHT=0
-  FM_SUP_NEEDED=false
-  FM_SUP_WATCHER_FRESH=false
-  FM_SUP_BEACON_DESC=never
-  FM_SUP_QUEUE_PENDING=false
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age
+  JG_SUP_IN_FLIGHT=0
+  JG_SUP_NEEDED=false
+  JG_SUP_WATCHER_FRESH=false
+  JG_SUP_BEACON_DESC=never
+  JG_SUP_QUEUE_PENDING=false
 
   for meta in "$state"/*.meta; do
     [ -e "$meta" ] || continue
-    FM_SUP_IN_FLIGHT=$((FM_SUP_IN_FLIGHT + 1))
+    JG_SUP_IN_FLIGHT=$((JG_SUP_IN_FLIGHT + 1))
   done
-  FM_SUP_SOURCES=0
+  JG_SUP_SOURCES=0
   for source in "$state"/procevent/*.source; do
     [ -e "$source" ] || continue
-    FM_SUP_SOURCES=$((FM_SUP_SOURCES + 1))
+    JG_SUP_SOURCES=$((JG_SUP_SOURCES + 1))
   done
-  FM_SUP_CHECKS=0
+  JG_SUP_CHECKS=0
   for check in "$state"/*.check.sh; do
     [ -e "$check" ] || continue
     id=${check##*/}
@@ -70,13 +70,13 @@ jg_supervision_status() {
       continue
     fi
     [ -e "$state/$id.check-trust" ] || continue
-    FM_SUP_CHECKS=$((FM_SUP_CHECKS + 1))
+    JG_SUP_CHECKS=$((JG_SUP_CHECKS + 1))
   done
-  if [ "$FM_SUP_IN_FLIGHT" -gt 0 ] \
+  if [ "$JG_SUP_IN_FLIGHT" -gt 0 ] \
     || [ -f "$state/x-watch.check.sh" ] \
-    || [ "$FM_SUP_SOURCES" -gt 0 ] \
-    || [ "$FM_SUP_CHECKS" -gt 0 ]; then
-    FM_SUP_NEEDED=true
+    || [ "$JG_SUP_SOURCES" -gt 0 ] \
+    || [ "$JG_SUP_CHECKS" -gt 0 ]; then
+    JG_SUP_NEEDED=true
   fi
 
   beat="$state/.last-watcher-beat"
@@ -84,16 +84,16 @@ jg_supervision_status() {
     m=$(jg_sup_stat_mtime "$beat")
     if [ -n "$m" ]; then
       age=$(( $(date +%s) - m ))
-      FM_SUP_BEACON_DESC="${age}s ago"
-      [ "$age" -lt "$grace" ] && FM_SUP_WATCHER_FRESH=true
+      JG_SUP_BEACON_DESC="${age}s ago"
+      [ "$age" -lt "$grace" ] && JG_SUP_WATCHER_FRESH=true
     else
       # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
-      FM_SUP_BEACON_DESC=unknown
+      JG_SUP_BEACON_DESC=unknown
     fi
   fi
 
   # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
-  [ -s "$state/.wake-queue" ] && FM_SUP_QUEUE_PENDING=true
+  [ -s "$state/.wake-queue" ] && JG_SUP_QUEUE_PENDING=true
   return 0
 }
 
@@ -101,7 +101,7 @@ jg_supervision_status() {
 # Exit 0 (true) exactly when the home needs a watcher.
 jg_supervision_needed() {
   jg_supervision_status "$@"
-  [ "$FM_SUP_NEEDED" = true ]
+  [ "$JG_SUP_NEEDED" = true ]
 }
 
 # jg_supervision_unhealthy <state-dir> [grace-seconds]
@@ -109,5 +109,5 @@ jg_supervision_needed() {
 # beacon. Exit 1 (false) otherwise.
 jg_supervision_unhealthy() {
   jg_supervision_status "$@"
-  [ "$FM_SUP_NEEDED" = true ] && [ "$FM_SUP_WATCHER_FRESH" = false ]
+  [ "$JG_SUP_NEEDED" = true ] && [ "$JG_SUP_WATCHER_FRESH" = false ]
 }

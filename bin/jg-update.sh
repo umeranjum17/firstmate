@@ -68,10 +68,10 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-SECONDMATES_MD="$FM_HOME/data/secondmates.md"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+SECONDMATES_MD="$JG_HOME/data/secondmates.md"
 # shellcheck source=bin/jg-ff-lib.sh
 . "$SCRIPT_DIR/jg-ff-lib.sh"
 # shellcheck source=bin/jg-secondmate-restart-lib.sh
@@ -90,7 +90,7 @@ fi
 # --- main firstmate repo ---------------------------------------------------
 
 reread_firstmate="no"
-ff_target "$FM_ROOT" "firstmate" origin no no
+ff_target "$JG_ROOT" "firstmate" origin no no
 if [ "$FF_STATUS" = "updated" ]; then
   if [ -n "$FF_INSTR" ]; then
     reread_firstmate="yes"
@@ -98,12 +98,12 @@ if [ "$FF_STATUS" = "updated" ]; then
   # A fast-forward changes bin/'s bytes out from under any locally armed
   # jg-procevent-when watch's trust binding, with no tampering involved; left
   # alone, the very next fire is refused and the watch dies silently. Refresh
-  # every such watch now, right after the update that broke it. FM_ROOT_OVERRIDE
+  # every such watch now, right after the update that broke it. JG_ROOT_OVERRIDE
   # is passed explicitly rather than relying on the script's own location: this
-  # process's own FM_ROOT is the repo that was just updated, which is not
-  # always where this very script file happens to live (FM_ROOT_OVERRIDE, as
+  # process's own JG_ROOT is the repo that was just updated, which is not
+  # always where this very script file happens to live (JG_ROOT_OVERRIDE, as
   # this test suite uses to point jg-update.sh at a fixture checkout).
-  FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" "$SCRIPT_DIR/jg-procevent-when.sh" rebind-all || true
+  JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" "$SCRIPT_DIR/jg-procevent-when.sh" rebind-all || true
 fi
 
 # --- secondmates -----------------------------------------------------------
@@ -127,8 +127,8 @@ secondmate_agent_may_be_alive() {  # <id>
     state=$("$SCRIPT_DIR/jg-on.sh" "$id" \
       jg-remote-secondmate-control.sh state "$id" < /dev/null 2>/dev/null) || state=unreadable
   elif jg_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
-    state=$(jg_backend_agent_state "$FM_BACKEND_VALIDATED_BACKEND" \
-      "$FM_BACKEND_VALIDATED_TARGET" 2>/dev/null) || state=unreadable
+    state=$(jg_backend_agent_state "$JG_BACKEND_VALIDATED_BACKEND" \
+      "$JG_BACKEND_VALIDATED_TARGET" 2>/dev/null) || state=unreadable
   fi
   case "$state" in
     dead|missing) return 1 ;;
@@ -164,11 +164,11 @@ jg_ff_after_secondmate_settled() {  # <id> <home> <window> <status> <instr>
   # Same bin/-changed-out-from-under-a-watch problem as the primary home
   # above, for a local secondmate's own worktree; "current" means bin/ did
   # not move there this pass, so there is nothing to rebind. Run the
-  # secondmate's OWN copy of the script, explicitly overriding FM_ROOT to its
-  # own worktree rather than letting an outer FM_ROOT_OVERRIDE (this process's
+  # secondmate's OWN copy of the script, explicitly overriding JG_ROOT to its
+  # own worktree rather than letting an outer JG_ROOT_OVERRIDE (this process's
   # own, if the caller set one) leak into the child and misscope it.
   if [ "${4:-}" = "updated" ] && [ -x "$2/bin/jg-procevent-when.sh" ]; then
-    FM_HOME="$2" FM_ROOT_OVERRIDE="$2" "$2/bin/jg-procevent-when.sh" rebind-all || true
+    JG_HOME="$2" JG_ROOT_OVERRIDE="$2" "$2/bin/jg-procevent-when.sh" rebind-all || true
   fi
   claim_settled_secondmate "$1"
 }

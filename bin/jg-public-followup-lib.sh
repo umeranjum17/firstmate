@@ -83,18 +83,18 @@
 # publication primitives (atomic, single-link, mode-validated, non-executable);
 # those remain that file's contract and are not restated here.
 
-_FM_PF_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || _FM_PF_LIB_DIR="."
+_JG_PF_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || _JG_PF_LIB_DIR="."
 # shellcheck source=bin/jg-x-lib.sh
-. "$_FM_PF_LIB_DIR/jg-x-lib.sh"
+. "$_JG_PF_LIB_DIR/jg-x-lib.sh"
 
-FM_PF_DIRNAME='public-followup'
+JG_PF_DIRNAME='public-followup'
 # Consumed by the sourcing scripts, not by this library.
 # shellcheck disable=SC2034
-FM_PF_EVENT_SCHEMA_VERSION=1
+JG_PF_EVENT_SCHEMA_VERSION=1
 # Bounded so a public-safe outcome line can never carry a raw public message,
 # and so one event file stays small enough to read and validate cheaply.
-FM_PF_OUTCOME_TEXT_MAX=${FM_PF_OUTCOME_TEXT_MAX:-600}
-FM_PF_EVENT_BYTES_MAX=${FM_PF_EVENT_BYTES_MAX:-8192}
+JG_PF_OUTCOME_TEXT_MAX=${JG_PF_OUTCOME_TEXT_MAX:-600}
+JG_PF_EVENT_BYTES_MAX=${JG_PF_EVENT_BYTES_MAX:-8192}
 
 # --- gate 1: the authoritative relay activation contract --------------------
 
@@ -116,14 +116,14 @@ jg_pf_relay_active() {
 
 # --- gate 2: O(1) presence checks on relay-path-owned registrations ---------
 
-jg_pf_root()       { printf '%s\n' "$1/$FM_PF_DIRNAME"; }
-jg_pf_registry_dir() { printf '%s\n' "$1/$FM_PF_DIRNAME/registry"; }
-jg_pf_events_dir()   { printf '%s\n' "$1/$FM_PF_DIRNAME/events"; }
-jg_pf_outbox_dir()   { printf '%s\n' "$1/$FM_PF_DIRNAME/outbox"; }
-jg_pf_consumed_dir() { printf '%s\n' "$1/$FM_PF_DIRNAME/consumed"; }
-jg_pf_rejected_dir() { printf '%s\n' "$1/$FM_PF_DIRNAME/rejected"; }
-jg_pf_rejection_wakes_dir() { printf '%s\n' "$1/$FM_PF_DIRNAME/rejection-wakes"; }
-jg_pf_retired_dir()  { printf '%s\n' "$1/$FM_PF_DIRNAME/retired"; }
+jg_pf_root()       { printf '%s\n' "$1/$JG_PF_DIRNAME"; }
+jg_pf_registry_dir() { printf '%s\n' "$1/$JG_PF_DIRNAME/registry"; }
+jg_pf_events_dir()   { printf '%s\n' "$1/$JG_PF_DIRNAME/events"; }
+jg_pf_outbox_dir()   { printf '%s\n' "$1/$JG_PF_DIRNAME/outbox"; }
+jg_pf_consumed_dir() { printf '%s\n' "$1/$JG_PF_DIRNAME/consumed"; }
+jg_pf_rejected_dir() { printf '%s\n' "$1/$JG_PF_DIRNAME/rejected"; }
+jg_pf_rejection_wakes_dir() { printf '%s\n' "$1/$JG_PF_DIRNAME/rejection-wakes"; }
+jg_pf_retired_dir()  { printf '%s\n' "$1/$JG_PF_DIRNAME/retired"; }
 
 jg_pf_retirement_receipt_exists() {
   local file
@@ -396,12 +396,12 @@ jg_pf_deliverable_problem() {
 # read at all. Callers depend on that distinction to report the right thing, so
 # jq runs without -e here. tasks-axi is the single source of truth for what a
 # promise expects, so every reader of that contract comes through this one call
-# rather than a copy of it. An inherited FM_DATA_OVERRIDE is cleared because a
+# rather than a copy of it. An inherited JG_DATA_OVERRIDE is cleared because a
 # caller such as bound work names the owning home in the argument while its own
 # data override is still in the environment.
 jg_pf_obligation_json() {
   local home=$1 id=$2 out
-  out=$(FM_HOME="$home" FM_DATA_OVERRIDE='' "$_FM_PF_LIB_DIR/jg-tasks-axi.sh" \
+  out=$(JG_HOME="$home" JG_DATA_OVERRIDE='' "$_JG_PF_LIB_DIR/jg-tasks-axi.sh" \
     public-followup list --json 2>/dev/null) || return 1
   [ -n "$out" ] || return 1
   printf '%s' "$out" | jq -c --arg id "$id" \
@@ -545,7 +545,7 @@ jg_pf_registry_lock_acquire() {
   fmx_private_artifact_dir_prepare "$(jg_pf_root "$state")" >/dev/null || return 1
   if ! command -v jg_lock_acquire_wait >/dev/null 2>&1; then
     # shellcheck source=bin/jg-wake-lib.sh
-    . "$_FM_PF_LIB_DIR/jg-wake-lib.sh"
+    . "$_JG_PF_LIB_DIR/jg-wake-lib.sh"
   fi
   jg_lock_acquire_wait "$(jg_pf_registry_lock_path "$state" "$id")"
 }
@@ -580,7 +580,7 @@ jg_pf_registry_stamp_delivered() {
 
 # Consumed by the sourcing scripts, not by this library.
 # shellcheck disable=SC2034
-FM_PF_SURFACED_BASENAME=surfaced
+JG_PF_SURFACED_BASENAME=surfaced
 
 # jg_pf_events_signature <state>: a stable digest of the pending event id set.
 # The relay poll compares it against the surfaced record so an unconsumed event

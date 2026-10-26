@@ -3,6 +3,10 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.js";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 // Supervision host: a home opted in with config/supervision-host
 // (docs/configuration.md "Supervision host" owns the gate, which
@@ -18,10 +22,10 @@ import { encodeFirstmateOperationalInput } from "./lib/jg-operational-input.js";
 const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
 const WAKE_LINE = /^(signal:|stale:|check:|heartbeat($|:))/;
 const HOST_LINE = /^supervision-host:/;
-const ARM_RETIRE_TIMEOUT_MS = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
-const REARM_RETRY_BASE_MS = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
-const REARM_RETRY_MAX_MS = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
-const REARM_RETRY_LIMIT = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+const ARM_RETIRE_TIMEOUT_MS = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const REARM_RETRY_BASE_MS = positiveInteger("JG_WATCH_REARM_RETRY_BASE_MS", 250);
+const REARM_RETRY_MAX_MS = positiveInteger("JG_WATCH_REARM_RETRY_MAX_MS", 4000);
+const REARM_RETRY_LIMIT = positiveInteger("JG_WATCH_REARM_RETRY_LIMIT", 5);
 
 let child = null;
 let armStatus = "idle";
@@ -78,12 +82,12 @@ function runProcess(command, args, options = {}) {
 }
 
 async function armReadinessBudgetMs(paths, hostMode) {
-  const override = positiveInteger("FM_OPENCODE_ARM_READY_TIMEOUT_MS", 0);
+  const override = positiveInteger("JG_OPENCODE_ARM_READY_TIMEOUT_MS", 0);
   if (override) return hostMode ? Math.max(override, 30000) : override;
   const result = await runProcess("bash", ["-lc",
-    'config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
+    'config_dir="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; [ ! -f "$config_dir/x-mode.env" ] || . "$config_dir/x-mode.env"; . "$1" && jg_watcher_confirmation_budget "$2" "$3" "$4"',
     "jg-watcher-budget", fileURLToPath(new URL("../../bin/jg-wake-lib.sh", import.meta.url)), paths.state, `${paths.root}/bin/jg-watch.sh`, paths.home,
-  ], { env: { ...process.env, FM_HOME: paths.home, FM_CONFIG_OVERRIDE: paths.config, FM_STATE_OVERRIDE: paths.state } });
+  ], { env: { ...process.env, JG_HOME: paths.home, JG_CONFIG_OVERRIDE: paths.config, JG_STATE_OVERRIDE: paths.state } });
   const seconds = Number(result.stdout.trim());
   if (result.code !== 0 || !Number.isFinite(seconds) || seconds < 0) return 0;
   const timeout = seconds * 1000 + 2000;
@@ -107,10 +111,10 @@ function resolvePath(anchor) {
 }
 
 function effectivePaths(root) {
-  const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
-  const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || fmRoot;
-  const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
-  const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
+  const fmRoot = process.env.JG_ROOT_OVERRIDE || root;
+  const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || fmRoot;
+  const state = process.env.JG_STATE_OVERRIDE || `${fmHome}/state`;
+  const config = process.env.JG_CONFIG_OVERRIDE || `${fmHome}/config`;
   return { root: fmRoot, home: fmHome, state, config };
 }
 
@@ -182,7 +186,7 @@ function awayRecordPresent(paths) {
   if (!existsSync(`${paths.state}/.afk-contract`)) return false;
   const result = spawnSync("bash", [`${paths.root}/bin/jg-afk-contract.sh`, "mode"], {
     encoding: "utf8",
-    env: { ...process.env, FM_STATE_OVERRIDE: paths.state },
+    env: { ...process.env, JG_STATE_OVERRIDE: paths.state },
   });
   return String(result.stdout || "").trim() !== "quiet";
 }
@@ -294,7 +298,7 @@ function confirmHandlingDelivery(paths, recovery) {
       {
         cwd: paths.root,
         encoding: "utf8",
-        env: { ...process.env, FM_HOME: paths.home, FM_STATE_OVERRIDE: paths.state, FM_ROOT_OVERRIDE: paths.root },
+        env: { ...process.env, JG_HOME: paths.home, JG_STATE_OVERRIDE: paths.state, JG_ROOT_OVERRIDE: paths.root },
       },
     );
     if (result.status === 0) return { ok: true, detail: "" };
@@ -429,14 +433,14 @@ function spawnArm(paths, sessionID, client, predecessorArmPid, hostMode, timeout
   setArmStatus("starting");
   const env = {
     ...process.env,
-    FM_HOME: paths.home,
-    FM_ROOT_OVERRIDE: paths.root,
-    FM_CONFIG_OVERRIDE: paths.config,
-    FM_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
+    JG_HOME: paths.home,
+    JG_ROOT_OVERRIDE: paths.root,
+    JG_CONFIG_OVERRIDE: paths.config,
+    JG_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
   };
-  if (hostMode) env.FM_SUPERVISION_HOST_PRIMARY = "opencode";
-  const command = hostMode ? '"$FM_ROOT_OVERRIDE/bin/jg-supervision-host.sh" park --restart' : '"$FM_ROOT_OVERRIDE/bin/jg-watch-arm.sh" --restart';
-  const armChild = spawn("bash", ["-lc", `config_dir="\${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ -f "$config_dir/x-mode.env" ] && . "$config_dir/x-mode.env"; exec ${command}`], {
+  if (hostMode) env.JG_SUPERVISION_HOST_PRIMARY = "opencode";
+  const command = hostMode ? '"$JG_ROOT_OVERRIDE/bin/jg-supervision-host.sh" park --restart' : '"$JG_ROOT_OVERRIDE/bin/jg-watch-arm.sh" --restart';
+  const armChild = spawn("bash", ["-lc", `config_dir="\${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; [ -f "$config_dir/x-mode.env" ] && . "$config_dir/x-mode.env"; exec ${command}`], {
     cwd: paths.root,
     env,
     stdio: ["ignore", "pipe", "pipe"],

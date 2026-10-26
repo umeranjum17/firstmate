@@ -26,7 +26,7 @@ observe_window_progress() {  # <window-key> <task> <last-status>
 
 task_validation_active() {  # <task>
   [ -n "$1" ] || return 1
-  "$FM_CREW_STATE_BIN" "$1" 2>/dev/null | grep -q '^state: working · source: run-step · execution active ·'
+  "$JG_CREW_STATE_BIN" "$1" 2>/dev/null | grep -q '^state: working · source: run-step · execution active ·'
 }
 
 window_progress_absorbed() {  # <window> <task> <key> <hash> <previous-hash> <busy-now>

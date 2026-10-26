@@ -21,10 +21,10 @@
 # wake-helpers.sh, fixtures.sh) source this library for ROOT/fail/pass, and the
 # test that includes them may also source it directly. Re-sourcing must not wipe
 # the registered-cleanup array or reset state.
-if [ -n "${FM_TEST_LIB_SOURCED:-}" ]; then
+if [ -n "${JG_TEST_LIB_SOURCED:-}" ]; then
   return 0
 fi
-FM_TEST_LIB_SOURCED=1
+JG_TEST_LIB_SOURCED=1
 
 # Pin the fixture umask. Firstmate's state-root and process-event contracts
 # refuse group- or world-writable state directories, and a permissive ambient
@@ -45,18 +45,18 @@ umask 022
 # firstmate's own validation. A confused gate agent never sources this helper, so
 # the boundary against the real hazard is unaffected. tests/jg-gate-refuse.test.sh
 # strips this to verify real refusal.
-export FM_GATE_REFUSE_BYPASS=1
+export JG_GATE_REFUSE_BYPASS=1
 
 # Arms the test-only seams bin/ scripts expose (e.g. jg-afk-launch.sh's
-# FM_TEST_HARNESS harness pin). Normal primary launches do not arm it, so a
+# JG_TEST_HARNESS harness pin). Normal primary launches do not arm it, so a
 # leaked harness pin alone stays inert outside a suite.
-export FM_TEST_SEAM=1
+export JG_TEST_SEAM=1
 
 # Clear the task-worker marker bin/jg-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/jg-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
-unset FM_TASK_ID
+# under the marker. A case that verifies the refusal sets JG_TASK_ID itself.
+unset JG_TASK_ID
 
 # Clear the tasks-axi env overrides. An operator shell exports TASKS_AXI_FILE
 # (and may export TASKS_AXI_BACKEND) at its real home's backlog, and tasks-axi
@@ -176,19 +176,19 @@ jg_test_tmpdir() {
   printf '%s\n' "$base"
 }
 
-FM_TEST_TMPDIR=$(jg_test_tmpdir) || return 1
+JG_TEST_TMPDIR=$(jg_test_tmpdir) || return 1
 
-FM_TEST_CLEANUP_DIRS=()
-FM_TEST_CLEANUP_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.jg-test-cleanup.$$.XXXXXX") || return 1
+JG_TEST_CLEANUP_DIRS=()
+JG_TEST_CLEANUP_REGISTRY=$(mktemp "$JG_TEST_TMPDIR/.jg-test-cleanup.$$.XXXXXX") || return 1
 
 jg_test_pid_identity() {
   local pid=$1
-  FM_STATE_OVERRIDE="$FM_TEST_TMPDIR" bash -c \
+  JG_STATE_OVERRIDE="$JG_TEST_TMPDIR" bash -c \
     '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$pid"
 }
 
-FM_TEST_OWNER_IDENTITY=$(jg_test_pid_identity "$$") || {
-  rm -f "$FM_TEST_CLEANUP_REGISTRY"
+JG_TEST_OWNER_IDENTITY=$(jg_test_pid_identity "$$") || {
+  rm -f "$JG_TEST_CLEANUP_REGISTRY"
   return 1
 }
 
@@ -206,30 +206,30 @@ FM_TEST_OWNER_IDENTITY=$(jg_test_pid_identity "$$") || {
 # private one). It never matches on a script or process name, which would reach
 # into another home's live runners.
 
-FM_TEST_PROCEVENT_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.jg-test-procevent.$$.XXXXXX") || return 1
+JG_TEST_PROCEVENT_REGISTRY=$(mktemp "$JG_TEST_TMPDIR/.jg-test-procevent.$$.XXXXXX") || return 1
 
 jg_test_track_procevent_home() {  # <home> [claim-root]
   [ -n "${1:-}" ] || return 1
-  printf '%s\t%s\n' "$1" "${2-}" >> "$FM_TEST_PROCEVENT_REGISTRY"
+  printf '%s\t%s\n' "$1" "${2-}" >> "$JG_TEST_PROCEVENT_REGISTRY"
 }
 
 jg_test_reap_procevent_homes() {
   local home claim_root seen=$'\n'
-  [ -f "$FM_TEST_PROCEVENT_REGISTRY" ] || return 0
+  [ -f "$JG_TEST_PROCEVENT_REGISTRY" ] || return 0
   while IFS=$'\t' read -r home claim_root; do
     [ -n "$home" ] || continue
     case "$seen" in *$'\n'"$home"$'\n'*) continue ;; esac
     seen+="$home"$'\n'
     [ -d "$home/state/procevent" ] || continue
     if [ -n "$claim_root" ]; then
-      FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_PROCEVENT_CLAIM_ROOT="$claim_root" \
+      JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_PROCEVENT_CLAIM_ROOT="$claim_root" \
         "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
     else
-      FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+      JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
         "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
     fi
-  done < "$FM_TEST_PROCEVENT_REGISTRY"
-  rm -f "$FM_TEST_PROCEVENT_REGISTRY"
+  done < "$JG_TEST_PROCEVENT_REGISTRY"
+  rm -f "$JG_TEST_PROCEVENT_REGISTRY"
 }
 
 # --- armed watcher reaping ----------------------------------------------------
@@ -245,16 +245,16 @@ jg_test_reap_procevent_homes() {
 # deleted has no lock and is skipped; that watcher exits on its own home-gone
 # check within one poll.
 
-FM_TEST_WATCHER_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.jg-test-watcher.$$.XXXXXX") || return 1
+JG_TEST_WATCHER_REGISTRY=$(mktemp "$JG_TEST_TMPDIR/.jg-test-watcher.$$.XXXXXX") || return 1
 
 jg_test_track_watcher_state() {  # <state-dir>
   [ -n "${1:-}" ] || return 1
-  printf '%s\n' "$1" >> "$FM_TEST_WATCHER_REGISTRY"
+  printf '%s\n' "$1" >> "$JG_TEST_WATCHER_REGISTRY"
 }
 
 jg_test_reap_watchers() {
   local state lock_home seen=$'\n'
-  [ -f "$FM_TEST_WATCHER_REGISTRY" ] || return 0
+  [ -f "$JG_TEST_WATCHER_REGISTRY" ] || return 0
   while IFS= read -r state; do
     [ -n "$state" ] || continue
     case "$seen" in *$'\n'"$state"$'\n'*) continue ;; esac
@@ -267,10 +267,10 @@ jg_test_reap_watchers() {
     [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" != "$$" ] || continue
     lock_home=$(cat "$state/.watch.lock/jg-home" 2>/dev/null || true)
     [ -n "$lock_home" ] || continue
-    FM_HOME="$lock_home" FM_STATE_OVERRIDE="$state" \
+    JG_HOME="$lock_home" JG_STATE_OVERRIDE="$state" \
       "$ROOT/bin/jg-watch-arm.sh" --stop >/dev/null 2>&1 || true
-  done < "$FM_TEST_WATCHER_REGISTRY"
-  rm -f "$FM_TEST_WATCHER_REGISTRY"
+  done < "$JG_TEST_WATCHER_REGISTRY"
+  rm -f "$JG_TEST_WATCHER_REGISTRY"
 }
 
 # Ceiling on how long a fixture's blocking stub may keep polling. A stub that
@@ -280,8 +280,8 @@ jg_test_reap_watchers() {
 # process storm. Every blocking stub this suite writes stops itself at this
 # bound, so an escaped one is bounded in duration and cost on its own, before
 # its owner's guard reaps it.
-FM_TEST_STUB_MAX_BLOCK_SECONDS=${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}
-export FM_TEST_STUB_MAX_BLOCK_SECONDS
+JG_TEST_STUB_MAX_BLOCK_SECONDS=${JG_TEST_STUB_MAX_BLOCK_SECONDS:-120}
+export JG_TEST_STUB_MAX_BLOCK_SECONDS
 
 # Remove a fixture tree even when it holds a read-only directory, such as the
 # spawn-owned state/<id>.git-hooks strip directory.
@@ -297,14 +297,14 @@ jg_test_cleanup() {
   local d
   jg_test_reap_watchers
   jg_test_reap_procevent_homes
-  for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
+  for d in "${JG_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && jg_test_remove_tree "$d"
   done
-  if [ -f "$FM_TEST_CLEANUP_REGISTRY" ]; then
+  if [ -f "$JG_TEST_CLEANUP_REGISTRY" ]; then
     while IFS= read -r d; do
       [ -n "$d" ] && jg_test_remove_tree "$d"
-    done < "$FM_TEST_CLEANUP_REGISTRY"
-    rm -f "$FM_TEST_CLEANUP_REGISTRY"
+    done < "$JG_TEST_CLEANUP_REGISTRY"
+    rm -f "$JG_TEST_CLEANUP_REGISTRY"
   fi
 }
 
@@ -314,8 +314,8 @@ jg_test_tmproot() {
   tmp_base=${tmp_base%/}
   root=$(mktemp -d "$tmp_base/${prefix}.XXXXXX") || return 1
   root=$(cd -P -- "$root" && pwd -P) || return 1
-  if ! printf '%s\n%s\n' "$$" "$FM_TEST_OWNER_IDENTITY" > "$root/.jg-test-fixture" ||
-    ! printf '%s\n' "$root" >> "$FM_TEST_CLEANUP_REGISTRY"; then
+  if ! printf '%s\n%s\n' "$$" "$JG_TEST_OWNER_IDENTITY" > "$root/.jg-test-fixture" ||
+    ! printf '%s\n' "$root" >> "$JG_TEST_CLEANUP_REGISTRY"; then
     rm -rf "$root"
     return 1
   fi
@@ -335,12 +335,12 @@ trap 'jg_test_cleanup; exit 131' QUIT
 # from real (non-test) firstmate commands. The marker identifies the owning
 # shell across PID reuse, so the same live owner always wins over the age
 # fallback for dead or unowned roots.
-FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
+JG_TEST_ORPHAN_MAX_AGE_SECONDS=${JG_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 jg_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity
   now=$(date +%s)
-  for marker in "$FM_TEST_TMPDIR"/jg-*/.jg-test-fixture; do
+  for marker in "$JG_TEST_TMPDIR"/jg-*/.jg-test-fixture; do
     [ -e "$marker" ] || continue
     owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || owner_pid=
     owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || owner_identity=
@@ -354,7 +354,7 @@ jg_test_reap_orphans() {
         ;;
     esac
     mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
-    [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
+    [ $((now - mtime)) -ge "$JG_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     dir=$(dirname "$marker")
     jg_test_remove_tree "$dir"
   done
@@ -363,7 +363,7 @@ jg_test_reap_orphans() {
 # A parent coordinator can reap once before it starts isolated child sections.
 # Those children use their own EXIT cleanup and must not spend their bounded
 # execution window repeating the same global stale-fixture scan.
-if [ "${FM_TEST_SKIP_ORPHAN_REAP:-0}" != 1 ]; then
+if [ "${JG_TEST_SKIP_ORPHAN_REAP:-0}" != 1 ]; then
   jg_test_reap_orphans
 fi
 
@@ -386,13 +386,13 @@ fi
 # which stays deliberate. <vars> is the guard's own control variable, or a
 # comma-separated list when a guard has more than one entry point.
 #
-# Setting any of those variables to 1 (or FM_LIVE=1, for every guard at once)
+# Setting any of those variables to 1 (or JG_LIVE=1, for every guard at once)
 # both turns the guard on and makes an absent tool a hard failure rather than a
 # skip, which is how "run it after a harness upgrade" keeps proving the guard
-# actually ran. Setting one to 0 (or FM_LIVE=0) turns it off; a guard's own
-# variable wins over FM_LIVE.
+# actually ran. Setting one to 0 (or JG_LIVE=0) turns it off; a guard's own
+# variable wins over JG_LIVE.
 #
-# Sourcing this library also exports FM_GATE_REFUSE_BYPASS=1, which is what
+# Sourcing this library also exports JG_GATE_REFUSE_BYPASS=1, which is what
 # lets a live guard drive the real jg-spawn/jg-send/jg-teardown from inside a
 # no-mistakes gate worktree instead of being refused by
 # bin/jg-gate-refuse-lib.sh.
@@ -438,9 +438,9 @@ jg_live_gate() {
       printf 'skip: live: disabled by %s=0\n' "$disabled_by"
       exit 0
     fi
-    case "${FM_LIVE:-}" in
+    case "${JG_LIVE:-}" in
       0)
-        printf 'skip: live: disabled by FM_LIVE=0\n'
+        printf 'skip: live: disabled by JG_LIVE=0\n'
         exit 0
         ;;
       1) requested=1 ;;
@@ -491,7 +491,7 @@ jg_fake_exit0() {
 #!/usr/bin/env bash
 # Durable acquisition returns its path; other exit-0 tools stay silent.
 case "${0##*/}:$*" in
-  treehouse:get\ --lease*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;;
+  treehouse:get\ --lease*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}" ;;
 esac
 exit 0
 SH
@@ -586,7 +586,7 @@ SH
 # --add-dir argument to real paths, then fails with "would prompt" unless each
 # required Firstmate channel path lies within one of them - the launch record
 # its own doorbell argument names, plus every path listed one per line in the
-# file FM_FAKE_CLAUDE_REQUIREMENTS names (absent file or unset var: doorbell
+# file JG_FAKE_CLAUDE_REQUIREMENTS names (absent file or unset var: doorbell
 # record only). Paths need not exist; a nonexistent leaf resolves through its
 # parent so a lazily created channel dir is still checked. Evaluating the
 # captured launch command under this binary exercises the real spawn output
@@ -638,7 +638,7 @@ while IFS= read -r need; do
 "
 done <<EOF3
 $record
-$(cat "${FM_FAKE_CLAUDE_REQUIREMENTS:-/dev/null}" 2>/dev/null)
+$(cat "${JG_FAKE_CLAUDE_REQUIREMENTS:-/dev/null}" 2>/dev/null)
 EOF3
 if [ -n "$failures" ]; then
   printf 'fake-claude: would prompt outside working directories on:\n%s' "$failures" >&2
@@ -657,7 +657,7 @@ SH
 jg_eval_launch() {
   local launch=$1 pane=$2 fakebin=$3
   shift 3
-  (cd "$pane" && env "$@" PATH="$fakebin:${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c "$launch")
+  (cd "$pane" && env "$@" PATH="$fakebin:${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" bash -c "$launch")
 }
 
 # --- agent-named process stand-ins ------------------------------------------

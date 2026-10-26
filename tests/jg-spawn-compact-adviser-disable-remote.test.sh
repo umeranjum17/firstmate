@@ -32,7 +32,7 @@ HERDR_STATE="$TMP_ROOT/remote-herdr.state"
 CLAIMS="$TMP_ROOT/claims"
 mkdir -p "$PARENT/data" "$PARENT/state" "$PARENT/config" "$PARENT/projects" \
   "$REMOTE_ROOT" "$CLAIMS" "$PROBEBIN" "$TMP_ROOT/pane-home"
-trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
+trap 'JG_HOME="$PARENT" JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
 
 # A synthetic value the remote launch must override rather than inherit, so a
 # launch that only forwarded the ambient environment cannot pass as a floor.
@@ -72,7 +72,7 @@ entry=$2
 shift 2
 [ "$host" = remote-mac ] || exit 91
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
-cd "$FM_FAKE_REMOTE_CWD" || exit 93
+cd "$JG_FAKE_REMOTE_CWD" || exit 93
 # The readiness gate is answered here rather than by the real doctor, which
 # would inspect the RUNNER's own account; tests/jg-remote-doctor.test.sh owns
 # the doctor's behavior against controlled account fixtures.
@@ -80,7 +80,7 @@ if printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n' | head -1 | gre
   printf 'ok: remote second-mate readiness confirmed on this host\n'
   exit 0
 fi
-exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
@@ -99,15 +99,15 @@ printf '## In flight\n\n## Queued\n\n## Done\n' > "$PARENT/data/backlog.md"
 printf '%s\n' "$$" > "$PARENT/state/.lock"
 
 remote_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
-  FM_FAKE_REMOTE_CWD="$TMP_ROOT" \
-  FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_FAKE_REMOTE_CWD="$TMP_ROOT" \
+  JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 \
   "$@"
 }
 
@@ -132,8 +132,8 @@ remote_pane_exports() {
 }
 
 # Provision and register the remote route from the captain-facing primary.
-FM_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
-  FM_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
+JG_SECONDMATE_CHARTER='Own iOS delivery on the build Mac.' \
+  JG_SECONDMATE_SCOPE='iOS implementation and Xcode validation' \
   remote_env "$ROOT/bin/jg-remote-home-seed.sh" ios remote-mac "$REMOTE_ROOT" "$REMOTE_HOME" --no-projects >/dev/null \
   || fail "remote seed did not provision the route under test"
 

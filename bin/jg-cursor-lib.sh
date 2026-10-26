@@ -44,7 +44,7 @@
 # Bounded probe budget in seconds. Cursor's --help is local and returns
 # immediately; the bound exists so a hung or interactive impostor cannot wedge
 # a spawn or a readiness check.
-FM_CURSOR_PROBE_TIMEOUT=${FM_CURSOR_PROBE_TIMEOUT:-10}
+JG_CURSOR_PROBE_TIMEOUT=${JG_CURSOR_PROBE_TIMEOUT:-10}
 
 # Canonical absolute path for $1, or the input unchanged when it cannot be
 # resolved. Symlink resolution is what makes the structural signal work, since
@@ -94,7 +94,7 @@ jg_cursor_bounded_output() {  # <path> <args...>
   elif command -v gtimeout >/dev/null 2>&1; then runner=gtimeout
   fi
   [ -n "$runner" ] || return 1
-  "$runner" "$FM_CURSOR_PROBE_TIMEOUT" "$path" "$@" 2>/dev/null
+  "$runner" "$JG_CURSOR_PROBE_TIMEOUT" "$path" "$@" 2>/dev/null
 }
 
 jg_cursor_probe_is_cursor() {  # <path>
@@ -188,7 +188,7 @@ jg_cursor_resolve_binary() {
 
 # Read argv[0] without flattening it into a whitespace-delimited command line.
 jg_cursor_argv0_for_pid() {  # <pid> [comm-fallback]
-  local pid=$1 fallback=${2:-} proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} argv0=
+  local pid=$1 fallback=${2:-} proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc} argv0=
   if [ -r "$proc_root/$pid/cmdline" ]; then
     IFS= read -r -d '' argv0 < "$proc_root/$pid/cmdline" || true
     [ -n "$argv0" ] && { printf '%s\n' "$argv0"; return 0; }

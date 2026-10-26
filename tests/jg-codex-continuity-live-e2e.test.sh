@@ -6,7 +6,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_CODEX_LIVE_E2E codex
+jg_live_gate opt-in JG_CODEX_LIVE_E2E codex
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -35,7 +35,7 @@ PROMPT='Run exactly `bin/jg-watch-checkpoint.sh --seconds 1` as one foreground s
 (
   cd "$PROJECT" || exit 1
   printf '%s\n' "$$" > "$HOME_DIR/state/.lock"
-  FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$PROJECT" codex exec \
+  JG_HOME="$HOME_DIR" JG_ROOT_OVERRIDE="$PROJECT" codex exec \
     --dangerously-bypass-hook-trust \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \

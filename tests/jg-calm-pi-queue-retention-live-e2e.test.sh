@@ -13,14 +13,14 @@
 #
 # No model turn reaches any provider: a local faux provider holds one turn in a tool so a
 # message can queue, and a probe extension records the live session's members from Pi's
-# own queued-listing redraw. Scratch FM_HOME, project, Pi agent directory, session
+# own queued-listing redraw. Scratch JG_HOME, project, Pi agent directory, session
 # directory, and a private tmux socket; nothing global is touched.
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate default-on FM_CALM_PI_QUEUE_RETENTION_LIVE pi tmux node
+jg_live_gate default-on JG_CALM_PI_QUEUE_RETENTION_LIVE pi tmux node
 
 PI_VERSION=$(pi --version 2>/dev/null || printf 'unknown')
 SOCKET="jg-calm-queue-retention-$$"
@@ -119,7 +119,7 @@ export default function (pi: ExtensionAPI): void {
 TS
 
 tmux -L "$SOCKET" new-session -d -s "$SESSION" -x 160 -y 36 \
-  "cd '$PROJECT' && env FM_HOME='$TMP_ROOT/home' PI_CODING_AGENT_DIR='$TMP_ROOT/agent' QUEUE_RETENTION_PROBE_OUT='$PROBE_OUT' PI_OFFLINE=1 pi --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./queue-retention-probe.ts --session-dir '$TMP_ROOT/sessions'; sleep 30"
+  "cd '$PROJECT' && env JG_HOME='$TMP_ROOT/home' PI_CODING_AGENT_DIR='$TMP_ROOT/agent' QUEUE_RETENTION_PROBE_OUT='$PROBE_OUT' PI_OFFLINE=1 pi --approve --no-context-files --no-skills --no-prompt-templates --no-extensions -e ./queue-retention-probe.ts --session-dir '$TMP_ROOT/sessions'; sleep 30"
 
 i=0
 until tmux -L "$SOCKET" capture-pane -p -t "$SESSION" 2>/dev/null | grep -Fq 'queue-retention-probe.ts'; do

@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Integration: query the real flow CLI over isolated durable fleet records.
-# Run it with FM_BIN pointing at a Firstmate checkout's bin/: the reader sources
+# Run it with JG_BIN pointing at a Firstmate checkout's bin/: the reader sources
 # its helper libraries from there and the second block drives the fork's
 # model/skill statistics and outcome-recording readers, which did not move.
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-[ -n "${FM_BIN:-}" ] && [ -f "$FM_BIN/jg-classify-lib.sh" ] || {
-  echo "jg-flow test: set FM_BIN to a Firstmate checkout's bin/ (helper libraries live there)" >&2
+[ -n "${JG_BIN:-}" ] && [ -f "$JG_BIN/jg-classify-lib.sh" ] || {
+  echo "jg-flow test: set JG_BIN to a Firstmate checkout's bin/ (helper libraries live there)" >&2
   exit 2
 }
 TMP=$(mktemp -d)
@@ -45,7 +54,7 @@ def files():
     return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for h in (main, child) for p in h.rglob('*') if p.is_file()}
 def run():
     return subprocess.check_output(['bash', script, '--json', '--now', '100'],
-                                   env=dict((k, v) for k, v in dict(os.environ, FM_HOME=str(main), FM_DATA_OVERRIDE='').items()
+                                   env=dict((k, v) for k, v in dict(os.environ, JG_HOME=str(main), JG_DATA_OVERRIDE='').items()
                                             if k != 'TASKS_AXI_BACKEND'))
 before = files()
 a = run()
@@ -269,27 +278,27 @@ assert any(n['source'] == 'child/backlog' and n['reason'].startswith('unknown:')
            for n in unavailable['limitations']), 'unavailable alternate backend disclosed'
 (main / 'config/jg-flow-check.sh').write_text('unrecognized clock policy\n')
 assert next(l for l in json.loads(run())['lanes'] if l['task'] == 'memory')['stage_clock']['seconds'] is None
-(main / 'config/jg-mem-gate.sh').write_text('min=${FM_MEM_MIN_GB:-12}\n'
-    '[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-3}" ] && [ "$builds" -lt "${FM_GRADLE_MAX:-2}" ]\n'
-    'echo "${FM_MEM_JOB_GB:-10}G"\n')
-clean_env = dict(os.environ, FM_HOME=str(main))
-for key in ('FM_MAC_HOST', 'XDG_DATA_HOME', 'FM_MEM_MIN_GB', 'FM_EMU_MAX', 'FM_GRADLE_MAX', 'FM_MEM_JOB_GB'):
+(main / 'config/jg-mem-gate.sh').write_text('min=${JG_MEM_MIN_GB:-12}\n'
+    '[ "$psi" -lt 40 ] && [ "$running" -lt "${JG_EMU_MAX:-3}" ] && [ "$builds" -lt "${JG_GRADLE_MAX:-2}" ]\n'
+    'echo "${JG_MEM_JOB_GB:-10}G"\n')
+clean_env = dict(os.environ, JG_HOME=str(main))
+for key in ('JG_MAC_HOST', 'XDG_DATA_HOME', 'JG_MEM_MIN_GB', 'JG_EMU_MAX', 'JG_GRADLE_MAX', 'JG_MEM_JOB_GB'):
     clean_env.pop(key, None)
 before = files()
 c = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
 assert files() == before, 'native read-only census never writes the isolated home'
-assert c['limits']['FM_EMU_MAX'] == 3 and c['limits']['FM_GRADLE_MAX'] == 2
+assert c['limits']['JG_EMU_MAX'] == 3 and c['limits']['JG_GRADLE_MAX'] == 2
 assert c['gate_source'] == str(main / 'config/jg-mem-gate.sh')
 # Installed gate (host-memory/install.sh): config/jg-mem-gate.sh is a shim, so the policy is read from the copy.
 installed = tmp / 'home/.local/share/jg-host-memory/jg-mem-gate.sh'
 installed.parent.mkdir(parents=True)
-installed.write_text('min=${FM_MEM_MIN_GB:-12}\n[ "$psi" -lt 40 ] && [ "$running" -lt "${FM_EMU_MAX:-2}" ]\n'
-    '[ "$builds" -lt "${FM_GRADLE_MAX:-1}" ] && echo "${FM_MEM_JOB_GB:-10}G"\n')
+installed.write_text('min=${JG_MEM_MIN_GB:-12}\n[ "$psi" -lt 40 ] && [ "$running" -lt "${JG_EMU_MAX:-2}" ]\n'
+    '[ "$builds" -lt "${JG_GRADLE_MAX:-1}" ] && echo "${JG_MEM_JOB_GB:-10}G"\n')
 shim = (main / 'config/jg-mem-gate.sh').read_text()
 (main / 'config/jg-mem-gate.sh').write_text('#!/usr/bin/env bash\nexec "${XDG_DATA_HOME:-$HOME/.local/share}/jg-host-memory/jg-mem-gate.sh" "$@"\n')
 s = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'], env=clean_env))['capacity']
 assert s['gate_source'] == str(installed), s['gate_source']
-assert s['limits'] == dict(c['limits'], FM_EMU_MAX=2, FM_GRADLE_MAX=1), s['limits']
+assert s['limits'] == dict(c['limits'], JG_EMU_MAX=2, JG_GRADLE_MAX=1), s['limits']
 installed.unlink(); (main / 'config/jg-mem-gate.sh').write_text(shim)
 assert c['mac']['reachable'] is None and c['mac']['available_bytes'] is None and c['mac']['simulators'] is None
 if Path('/proc/meminfo').exists():
@@ -333,7 +342,7 @@ with socket.socket() as listener:
     wrapper.chmod(0o700)
     before = files()
     stalled = json.loads(subprocess.check_output(['bash', script, '--json', '--capacity'],
-        env=dict(clean_env, FM_MAC_HOST='nobody@127.0.0.1', PATH=str(route) + os.pathsep + os.environ['PATH']),
+        env=dict(clean_env, JG_MAC_HOST='nobody@127.0.0.1', PATH=str(route) + os.pathsep + os.environ['PATH']),
         timeout=45))
     thread.join(2)
     options = dict(line.split(None, 1) for line in effective.read_text().splitlines())
@@ -354,7 +363,7 @@ PY
 # over isolated durable records and read the JSON the dashboard's Models and Skills views consume.
 mkdir -p "$TMP/stats"
 HOME="$TMP/stats/home" XDG_CONFIG_HOME="$TMP/xdg" TMPDIR="$TMP/tmp" python3 - \
-  "$FM_BIN/jg-model-stats.sh" "$FM_BIN/jg-skill-stats.sh" "$FM_BIN/jg-task-outcome.sh" "$TMP/stats" <<'PY'
+  "$JG_BIN/jg-model-stats.sh" "$JG_BIN/jg-skill-stats.sh" "$JG_BIN/jg-task-outcome.sh" "$TMP/stats" <<'PY'
 import json, os, subprocess, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -364,7 +373,7 @@ now, day = 1700000000, 86400
 
 def run(script, home):
     return subprocess.check_output(['bash', script, '--json', '--now', str(now)],
-        env=dict(os.environ, FM_HOME=str(home), FM_DATA_OVERRIDE=''))
+        env=dict(os.environ, JG_HOME=str(home), JG_DATA_OVERRIDE=''))
 def iso(e):
     return datetime.fromtimestamp(e, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 def onday(off):
@@ -496,7 +505,7 @@ o = tmp / 'o'
 (o / 'data').mkdir()
 outcomes = o / 'data/metrics/task-outcomes.tsv'
 def rec(*args):
-    subprocess.run(['bash', writer, *args], env=dict(os.environ, FM_HOME=str(o), FM_DATA_OVERRIDE=''), check=True)
+    subprocess.run(['bash', writer, *args], env=dict(os.environ, JG_HOME=str(o), JG_DATA_OVERRIDE=''), check=True)
 def met(tid, *lines):
     (o / f'state/{tid}.meta').write_text(''.join(l + '\n' for l in lines))
 def hist(tid, *rows):

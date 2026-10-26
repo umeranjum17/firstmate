@@ -16,7 +16,7 @@
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
 # found while taking that lock was left by a drain that died mid-write; each
 # locked drain rotates such leftovers away before doing anything else.
-# FM_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
+# JG_STATUS_PRESENTATION_LOCK_TIMEOUT sets the positive whole-second wait for
 # presentation-path locks (default 10); queue mutation locks remain blocking.
 set -u
 
@@ -50,15 +50,15 @@ ACK_REMOVED=0
 PRESENTED_MAX=0
 ACK_FINGERPRINTS=
 ACK_NOTICE_FINGERPRINTS=
-PRESENTATION_LOCK_TIMEOUT=${FM_STATUS_PRESENTATION_LOCK_TIMEOUT:-10}
+PRESENTATION_LOCK_TIMEOUT=${JG_STATUS_PRESENTATION_LOCK_TIMEOUT:-10}
 BRANCH_OUTCOMES_RC=0
 case "$PRESENTATION_LOCK_TIMEOUT" in ''|*[!0-9]*|0) PRESENTATION_LOCK_TIMEOUT=10 ;; esac
 
 # --- per-actor consume (docs/watcher-continuity.md "Per-actor acknowledgement") --
-# main (FM_SUPERVISION_ACTOR unset or "main", via jg-lease-lib.sh's jg_lease_actor
+# main (JG_SUPERVISION_ACTOR unset or "main", via jg-lease-lib.sh's jg_lease_actor
 # - the same actor identity jg-send.sh/jg-control.sh/jg-teardown.sh already use)
 # claims every row not already granted to branch, then drains and acks only
-# that claimed set. branch (FM_SUPERVISION_ACTOR=branch, injected
+# that claimed set. branch (JG_SUPERVISION_ACTOR=branch, injected
 # deterministically by the Pi branch extension's bash tool - never agent
 # memory) drains and acks only the row set the extension granted to it.
 # .pi/extensions/lib/jg-branch-dispatch.ts is the single owner of that
@@ -113,15 +113,15 @@ reclaim_stale_branch_grant_locked() {
 # acknowledgeable, and failing the whole drain would strand them too.
 retire_unconsumable_rows_locked() {
   local retired unusable queued kept
-  [ -f "$FM_WAKE_QUEUE" ] || return 0
+  [ -f "$JG_WAKE_QUEUE" ] || return 0
   if DRAIN_TMP=$(mktemp "$STATE/.wake-queue.retire.XXXXXX") \
     && chmod 0600 "$DRAIN_TMP" \
     && unusable=$(awk -F '\t' -v keep="$DRAIN_TMP" '
       NF >= 5 && $2 ~ /^[0-9]+$/ { print > keep; next }
       { shown++; if (shown <= 20) printf "wake drain:   %s\n", $0 }
       END { if (shown > 20) printf "wake drain:   ... %d further unusable row(s) not shown\n", shown - 20 }
-    ' "$FM_WAKE_QUEUE"); then
-    queued=$(awk 'END { print NR }' "$FM_WAKE_QUEUE")
+    ' "$JG_WAKE_QUEUE"); then
+    queued=$(awk 'END { print NR }' "$JG_WAKE_QUEUE")
     kept=$(awk 'END { print NR }' "$DRAIN_TMP")
     retired=$(( queued - kept ))
     if [ "$retired" -eq 0 ]; then
@@ -129,7 +129,7 @@ retire_unconsumable_rows_locked() {
       DRAIN_TMP=
       return 0
     fi
-    if _jg_atomic_replace "$DRAIN_TMP" "$FM_WAKE_QUEUE"; then
+    if _jg_atomic_replace "$DRAIN_TMP" "$JG_WAKE_QUEUE"; then
       DRAIN_TMP=
       printf 'wake drain: retired %s unusable queue row(s) that carried no sequence to present or acknowledge:\n%s\n' \
         "$retired" "$unusable" >&2
@@ -137,7 +137,7 @@ retire_unconsumable_rows_locked() {
     fi
   fi
   printf 'wake drain: unusable queue row(s) could not be retired (check that %s is readable and %s is writable); continuing with the rows that remain usable\n' \
-    "$FM_WAKE_QUEUE" "$STATE" >&2
+    "$JG_WAKE_QUEUE" "$STATE" >&2
 }
 
 # One bounded line naming the rows a live branch grant is holding, so a main
@@ -178,7 +178,7 @@ claim_main_rows_locked() {
       if (!($2 in reserved) && (cutoff == "" || $2 + 0 <= cutoff + 0)) owned[$2]=1
     }
     END { for (seq in owned) if (seq in present) print seq }
-  ' "$FM_WAKE_QUEUE" | LC_ALL=C sort -n > "$DRAIN_TMP" || return 1
+  ' "$JG_WAKE_QUEUE" | LC_ALL=C sort -n > "$DRAIN_TMP" || return 1
   write_rows_file_locked "$MAIN_ROWS_FILE" "$DRAIN_TMP" || return 1
   DRAIN_TMP=
 }
@@ -240,7 +240,7 @@ esac
 # every wake-handling and recovery turn, so assert supervision health here too. A
 # lapsed supervision chain then surfaces on a plain drain-and-handle turn, not
 # only when a guarded supervision script (jg-peek/jg-send/...) happens to run.
-# Reuse jg-guard.sh's model-aware alarm and FM_GUARD_GRACE instead of duplicating
+# Reuse jg-guard.sh's model-aware alarm and JG_GUARD_GRACE instead of duplicating
 # its supervision verdict. Under Claude's between-turns auto-arm model, a normal
 # fire leaves a recent beacon well inside grace and stays silent mid-turn. Under
 # the Pi extension model, a fresh beacon also stays silent during a genuinely
@@ -265,7 +265,7 @@ inactive_outcome_fingerprints() { # <sequence> <key-prefix> [<rows-file>]
     case "$key" in
       "$prefix"*) printf '%s\n' "${key#"$prefix"}" ;;
     esac
-  done < "$FM_WAKE_QUEUE"
+  done < "$JG_WAKE_QUEUE"
 }
 
 acknowledge_inactive_outcomes() { # <mode> <newline-separated-fingerprints>
@@ -361,8 +361,8 @@ print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
     receipt=$(status_outcome_backstop_cursor_offset "$STATE/$task.status") || { rc=1; break; }
     [ "$receipt" -lt "$endpoint" ] || continue
     status_snapshot_latest_event "$STATE/$task.status" "$endpoint" "$ident" || continue
-    event=$FM_STATUS_SNAPSHOT_EVENT_LINE
-    event_endpoint=$FM_STATUS_SNAPSHOT_EVENT_ENDPOINT
+    event=$JG_STATUS_SNAPSHOT_EVENT_LINE
+    event_endpoint=$JG_STATUS_SNAPSHOT_EVENT_ENDPOINT
     [ "$receipt" -lt "$event_endpoint" ] || continue
     status_is_captain_relevant "$event" || continue
     verb=$(status_line_verb "$event")
@@ -390,7 +390,7 @@ print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
 
     line="$task $event"
     jg_cap_line_var "$line" $((item_bytes - 1))
-    line=$FM_LINE_CAP_LINE
+    line=$JG_LINE_CAP_LINE
     bytes=$(( ${#line} + 1 ))
     if [ $((used + bytes)) -gt "$global_bytes" ]; then
       omitted=$((omitted + 1))
@@ -488,7 +488,7 @@ print_open_decisions_section() {
     # section's global budget also pays for is this caller's, so the per-item
     # allowance passed down is one short of the cap.
     jg_cap_line_var "$line" $((item_bytes - 1))
-    line=$FM_LINE_CAP_LINE
+    line=$JG_LINE_CAP_LINE
     bytes=$(( ${#line} + 1 ))
     if [ $((used + bytes)) -gt "$global_bytes" ]; then
       omitted=$((omitted + 1))
@@ -534,7 +534,7 @@ print_record_divergence_section() {
 
   # A non-positive bound is not a bound (bin/jg-timeout-lib.sh), so a bad
   # override falls back to the default rather than disabling the deadline.
-  bound=${FM_DIVERGENCE_TIMEOUT:-20}
+  bound=${JG_DIVERGENCE_TIMEOUT:-20}
   case "$bound" in ''|*[!0-9]*|0) bound=20 ;; esac
 
   # Bounded, because this runs at the top of every supervision turn: a backlog
@@ -548,7 +548,7 @@ print_record_divergence_section() {
     line="$task [key=$key] reads resolved in $origin's status log but is still held for the captain"
     [ -z "$title" ] || line="$line: $title"
     jg_cap_line_var "$line" $((item_bytes - 1))
-    line=$FM_LINE_CAP_LINE
+    line=$JG_LINE_CAP_LINE
     bytes=$(( ${#line} + 1 ))
     if [ $((used + bytes)) -gt "$global_bytes" ]; then
       omitted=$((omitted + 1))
@@ -621,7 +621,7 @@ print_branch_outcomes_section() {
   local routine_lines='' routine_count=0 routine_shown=0
   local -a captain_tasks=() captain_lines=() captain_line_bytes=()
   [ "$ACTOR" = main ] || return 0
-  config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  config=${JG_CONFIG_OVERRIDE:-$JG_HOME/config}
   jg_supervision_host_outcomes_drained "$config" || return 0
   [ -s "$STATE/branch-outcomes.jsonl" ] || return 0
   ! jg_afk_contract_away_present "$STATE" || return 0
@@ -735,7 +735,7 @@ cap_outcome_line() {  # <line> <max-bytes>
     OUTCOME_LINE_BYTES=${#line}
     return 0
   fi
-  keep=$((max - ${#FM_LINE_CAP_SUFFIX}))
+  keep=$((max - ${#JG_LINE_CAP_SUFFIX}))
   [ "$keep" -ge 0 ] || keep=0
   body=${line:0:keep}
   tail=${body##*[!$'\x80'-$'\xbf']}
@@ -747,7 +747,7 @@ cap_outcome_line() {  # <line> <max-bytes>
     *) need=0 ;;
   esac
   [ "${#tail}" -ge "$need" ] || body=${rest%?}
-  OUTCOME_LINE=$body$FM_LINE_CAP_SUFFIX
+  OUTCOME_LINE=$body$JG_LINE_CAP_SUFFIX
   OUTCOME_LINE_BYTES=${#OUTCOME_LINE}
 }
 
@@ -788,7 +788,7 @@ print_status_presentation() {  # [<deduped-raw-rows>]
   else
     lock_rc=$?
     if [ "$lock_rc" -eq 124 ]; then
-      holder_pid=${FM_LOCK_HELD_PID:-unknown}
+      holder_pid=${JG_LOCK_HELD_PID:-unknown}
       printf 'STATUS PRESENTATION SKIPPED: lock remains held by live pid %s after %ss; retry on the next drain.\n' \
         "$holder_pid" "$PRESENTATION_LOCK_TIMEOUT"
     else
@@ -818,7 +818,7 @@ cleanup() {
   [ -z "$DRAIN_TMP" ] || rm -f -- "$DRAIN_TMP" 2>/dev/null || true
   [ -z "$DRAIN_VIEW_TMP" ] || rm -f -- "$DRAIN_VIEW_TMP" 2>/dev/null || true
   if [ "$DRAIN_LOCK_HELD" = true ]; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   fi
   exit "$status"
 }
@@ -828,14 +828,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 if [ -n "$ACK_THROUGH" ]; then
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
-elif jg_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" "$PRESENTATION_LOCK_TIMEOUT"; then
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
+elif jg_lock_acquire_wait_bounded "$JG_WAKE_QUEUE_LOCK" "$PRESENTATION_LOCK_TIMEOUT"; then
   :
 else
   lock_rc=$?
   if [ "$lock_rc" -eq 124 ]; then
     printf 'WAKE DRAIN SKIPPED: queue lock remains held by live pid %s after %ss; retry on the next drain.\n' \
-      "${FM_LOCK_HELD_PID:-unknown}" "$PRESENTATION_LOCK_TIMEOUT"
+      "${JG_LOCK_HELD_PID:-unknown}" "$PRESENTATION_LOCK_TIMEOUT"
     exit 0
   fi
   printf 'wake drain: queue lock could not be acquired safely\n' >&2
@@ -883,14 +883,14 @@ if [ -n "$ACK_THROUGH" ]; then
     ACK_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-outcome:' "$MAIN_ROWS_FILE") || exit 1
     ACK_NOTICE_FINGERPRINTS=$(inactive_outcome_fingerprints "$ACK_THROUGH" 'inactive-reconcile:' "$MAIN_ROWS_FILE") || exit 1
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false
   if ! acknowledge_inactive_outcomes acknowledge "$ACK_FINGERPRINTS" \
     || ! acknowledge_inactive_outcomes acknowledge-notice "$ACK_NOTICE_FINGERPRINTS"; then
     echo "wake drain: inactive outcome receipt could not be recorded safely" >&2
     exit 1
   fi
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=true
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1
@@ -902,7 +902,7 @@ if [ -n "$ACK_THROUGH" ]; then
     awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$ELIGIBLE_ROWS_FILE" '
       BEGIN { while ((getline line < seqs) > 0) if (line ~ /^[0-9]+$/) keep[line] = 1 }
       NF < 5 || $2 !~ /^[0-9]+$/ || $2 > cutoff || !($2 in keep) { print }
-    ' "$FM_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
+    ' "$JG_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
     jg_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$ELIGIBLE_ROWS_FILE" || {
       echo "wake drain: secondmate stall receipt could not be recorded safely" >&2
       exit 1
@@ -911,13 +911,13 @@ if [ -n "$ACK_THROUGH" ]; then
     awk -F '\t' -v cutoff="$ACK_THROUGH" -v seqs="$MAIN_ROWS_FILE" '
       BEGIN { while ((getline line < seqs) > 0) owned[line]=1 }
       NF < 5 || $2 !~ /^[0-9]+$/ || $2 > cutoff || !($2 in owned) { print }
-    ' "$FM_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
+    ' "$JG_WAKE_QUEUE" > "$DRAIN_TMP" || exit 1
     jg_wake_commit_secondmate_stall_receipts_through "$ACK_THROUGH" "$MAIN_ROWS_FILE" || {
       echo "wake drain: secondmate stall receipt could not be recorded safely" >&2
       exit 1
     }
   fi
-  ACK_REMOVED=$(( $(awk 'END { print NR }' "$FM_WAKE_QUEUE") - $(awk 'END { print NR }' "$DRAIN_TMP") ))
+  ACK_REMOVED=$(( $(awk 'END { print NR }' "$JG_WAKE_QUEUE") - $(awk 'END { print NR }' "$DRAIN_TMP") ))
   if [ ! -s "$DRAIN_TMP" ]; then
     jg_recovery_marker_ack "$RECOVERY_MARKER" "$ACK_GENERATION"
     RECOVERY_ACK_STATUS=$?
@@ -931,12 +931,12 @@ if [ -n "$ACK_THROUGH" ]; then
     esac
   else
     jg_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
-    RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+    RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
     if [ "${RECOVERY_MARKER_TOKEN##*:}" != "$ACK_GENERATION" ]; then
       RECOVERY_ACK_MOVED=true
     fi
   fi
-  if ! _jg_atomic_replace "$DRAIN_TMP" "$FM_WAKE_QUEUE"; then
+  if ! _jg_atomic_replace "$DRAIN_TMP" "$JG_WAKE_QUEUE"; then
     echo "wake drain: acknowledged wakes could not be consumed safely" >&2
     exit 1
   fi
@@ -946,7 +946,7 @@ if [ -n "$ACK_THROUGH" ]; then
   else
     consume_actor_rows_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false
   if [ "$ACK_REMOVED" -eq 0 ] && [ "$PRESENTED_MAX" -gt "$ACK_THROUGH" ]; then
     # Nothing at or below the cutoff was this actor's to consume, while a
@@ -973,22 +973,22 @@ if [ -n "$ACK_THROUGH" ]; then
   exit 0
 fi
 
-if [ ! -s "$FM_WAKE_QUEUE" ]; then
-  : > "$FM_WAKE_QUEUE"
+if [ ! -s "$JG_WAKE_QUEUE" ]; then
+  : > "$JG_WAKE_QUEUE"
   jg_recovery_marker_snapshot "$RECOVERY_MARKER" || true
-  RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+  RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
   case "$RECOVERY_MARKER_TOKEN" in
     pending:downtime:*|announced:downtime:*)
       jg_recovery_marker_begin_handling "$RECOVERY_MARKER" || {
         echo "wake drain: decision recovery could not begin handling safely" >&2
         exit 1
       }
-      RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+      RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
       RECOVERY_ACK_REQUIRED=true
       ;;
     pending:handling:*|announced:handling:*) RECOVERY_ACK_REQUIRED=true ;;
   esac
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false
   (print_status_presentation) || true
   print_branch_outcomes_section || BRANCH_OUTCOMES_RC=1
@@ -1010,7 +1010,7 @@ if [ "$ACTOR" = main ]; then
     # drain that prints nothing while the queue is visibly non-empty reads as a
     # lost wake, and leaves the caller with no idea who owns what is queued.
     print_branch_held_notice
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     DRAIN_LOCK_HELD=false
     (print_status_presentation) || true
     print_branch_outcomes_section || BRANCH_OUTCOMES_RC=1
@@ -1020,7 +1020,7 @@ if [ "$ACTOR" = main ]; then
 fi
 
 jg_recovery_marker_snapshot "$RECOVERY_MARKER" || true
-RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
 if [ -z "$RECOVERY_MARKER_TOKEN" ]; then
   if [ -e "$RECOVERY_MARKER" ] || [ -L "$RECOVERY_MARKER" ]; then
     echo "wake drain: durable wakes have invalid recovery state" >&2
@@ -1040,7 +1040,7 @@ jg_recovery_marker_begin_handling "$RECOVERY_MARKER" || {
   echo "wake drain: durable wakes could not begin handling safely" >&2
   exit 1
 }
-RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
 
 DRAIN_VIEW_TMP=$(mktemp "$STATE/.wake-queue.actor-view.XXXXXX") || exit 1
 if [ "$ACTOR" = branch ]; then
@@ -1051,26 +1051,26 @@ fi
 awk -F '\t' -v seqs="$ACTOR_ROWS_FILE" '
   BEGIN { while ((getline line < seqs) > 0) keep[line]=1 }
   NF >= 5 && ($2 in keep)
-' "$FM_WAKE_QUEUE" > "$DRAIN_VIEW_TMP" || exit 1
+' "$JG_WAKE_QUEUE" > "$DRAIN_VIEW_TMP" || exit 1
 RAW_ROWS=$(jg_wake_print_deduped "$DRAIN_VIEW_TMP") || exit "$?"
 rm -f -- "$DRAIN_VIEW_TMP" || exit 1
 DRAIN_VIEW_TMP=
 ACK_THROUGH=$(printf '%s\n' "$RAW_ROWS" | awk -F '\t' '$2 ~ /^[0-9]+$/ && $2 > max { max=$2 } END { print max + 0 }') || exit 1
-case "${FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
+case "${JG_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
   0) ;;
   ''|*[!0-9]*) ;;
-  *) sleep "$FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT" ;;
+  *) sleep "$JG_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT" ;;
 esac
 if [ -n "$RAW_ROWS" ]; then
   printf '%s\n' "$RAW_ROWS" || exit "$?"
 fi
 jg_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
-RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+RECOVERY_MARKER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
 case "$RECOVERY_MARKER_TOKEN" in
   pending:*|announced:*|acked:*) ;;
   *) echo "wake drain: durable wakes have no recovery generation" >&2; exit 1 ;;
 esac
-jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 DRAIN_LOCK_HELD=false
 printf 'WAKE_ACK_REQUIRED: after handling completes run bin/jg-wake-drain.sh --ack-through %s --recovery-generation %s\n' \
   "$ACK_THROUGH" "${RECOVERY_MARKER_TOKEN##*:}" >&2

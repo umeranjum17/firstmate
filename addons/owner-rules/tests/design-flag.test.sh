@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # owner-rules design flag: the backlog "design: required|none" line, the brief record, the typo guard and the nudge.
 # Usage: owner-rules/tests/design-flag.test.sh [<firstmate-checkout>]
 # Sources the real lib against a fixture backlog. With a checkout that carries the brief-inherit seam, it also
@@ -83,7 +92,7 @@ FM=${1:-}
 if [ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] && grep -q jg_brief_inherit_shared "$FM/bin/jg-brief.sh"; then
   export HOME=$work/user XDG_DATA_HOME=$work/data
   "$addons/owner-rules/install.sh" "$home" >/dev/null
-  brief() { FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$1" sample --mode direct-PR >/dev/null 2>&1; }
+  brief() { JG_HOME=$home JG_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$1" sample --mode direct-PR >/dev/null 2>&1; }
   brief req; grep -qx 'Design discovery: required' "$home/data/req/brief.md" && ok "brief.md carries the line when required" || no "brief.md lacks the line"
   brief none; [ -s "$home/data/none/brief.md" ] && ! grep -q 'Design discovery' "$home/data/none/brief.md" && ok "brief.md has no line for none" || no "brief.md for none"
   brief typo && no "typo briefed" || { [ ! -e "$home/data/typo" ] && ok "typo writes no brief" || no "typo left data/typo"; }

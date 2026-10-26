@@ -21,7 +21,7 @@ o = tmp / 'o'
 (o / 'data').mkdir()
 outcomes = o / 'data/metrics/task-outcomes.tsv'
 def rec(*args):
-    subprocess.run(['bash', writer, *args], env=dict(os.environ, FM_HOME=str(o), FM_DATA_OVERRIDE=''), check=True)
+    subprocess.run(['bash', writer, *args], env=dict(os.environ, JG_HOME=str(o), JG_DATA_OVERRIDE=''), check=True)
 def met(tid, *lines):
     (o / f'state/{tid}.meta').write_text(''.join(l + '\n' for l in lines))
 def hist(tid, *rows):

@@ -33,7 +33,7 @@
 # change lands in the home that owns the task regardless of the caller's working
 # directory. A configured non-markdown adapter is addressed by that root alone,
 # because `--file` would override the adapter's own workspace path. The parent of
-# the data directory is the addressing root rather than FM_HOME, so a home whose
+# the data directory is the addressing root rather than JG_HOME, so a home whose
 # data directory is relocated keeps its backlog and its archive together. A root
 # with no `.tasks.toml` gets tasks-axi's built-in defaults.
 # bin/jg-tasks-axi-lib.sh owns backend precedence and configuration failures.
@@ -61,20 +61,20 @@
 
 # Set by jg_backlog_transition_applies for a return-1 exemption.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-FM_BACKLOG_TRANSITION_SKIP=
+JG_BACKLOG_TRANSITION_SKIP=
 # Set by the mutating helpers when they return non-zero.
-FM_BACKLOG_TRANSITION_ERROR=
-FM_BACKLOG_ROW_RESULT=
-FM_BACKLOG_ROW_STATE=
-FM_BACKLOG_ROW_ERROR=
+JG_BACKLOG_TRANSITION_ERROR=
+JG_BACKLOG_ROW_RESULT=
+JG_BACKLOG_ROW_STATE=
+JG_BACKLOG_ROW_ERROR=
 # Set by jg_backlog_row_probe on a found row: the tasks-axi hold kind, empty when
 # the row is not held.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-FM_BACKLOG_ROW_HOLD_KIND=
+JG_BACKLOG_ROW_HOLD_KIND=
 # Set by jg_backlog_close_marker_replay: closed | closed_incomplete | retained |
 # retained_incomplete | answered | stale | noop.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
-FM_BACKLOG_CLOSE_REPLAY_RESULT=
+JG_BACKLOG_CLOSE_REPLAY_RESULT=
 
 # Bounded execution is jg-timeout-lib.sh's alone; source it rather than
 # re-deriving a deadline here. It is stateless, so the memoisation reason this
@@ -92,7 +92,7 @@ fi
 # Latched when a row read hits its bound. jg_backlog_row_show runs inside a
 # command substitution, so the subshell can READ this latch but cannot set it;
 # the callers that capture its status own the write.
-FM_BACKLOG_ROW_SHOW_WEDGED=0
+JG_BACKLOG_ROW_SHOW_WEDGED=0
 
 # Emit each byte of a value as a decimal number, locale-independently.
 # Deliberately perl rather than od: the spawn and teardown lifecycle runs under a
@@ -120,7 +120,7 @@ jg_backlog_directory_present() {
     check=${check%/}
   done
   if [ ! -d "$check" ] || [ -L "$check" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="$label is not a real directory at $path"
+    JG_BACKLOG_TRANSITION_ERROR="$label is not a real directory at $path"
     return 1
   fi
 }
@@ -137,7 +137,7 @@ jg_backlog_data_absolute() {
     check=${check%/}
   done
   if [ ! -d "$check" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="data directory is not a directory at $data"
+    JG_BACKLOG_TRANSITION_ERROR="data directory is not a directory at $data"
     return 1
   fi
   if ! data=$(CDPATH='' cd -- "$data" 2>/dev/null && pwd -P); then
@@ -149,7 +149,7 @@ jg_backlog_data_absolute() {
 jg_backlog_file() {  # <data-dir>
   local data
   data=$(jg_backlog_data_absolute "$1") || {
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
     return 1
   }
   if [ "$data" = / ]; then
@@ -163,7 +163,7 @@ jg_backlog_file() {  # <data-dir>
 jg_backlog_root() {  # <data-dir>
   local data parent
   data=$(jg_backlog_data_absolute "$1") || {
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
     return 1
   }
   case "$data" in
@@ -179,7 +179,7 @@ jg_backlog_root() {  # <data-dir>
 jg_backlog_data_relative() {  # <data-dir>
   local data root
   data=$(jg_backlog_data_absolute "$1") || {
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
     return 1
   }
   root=$(jg_backlog_root "$data") || return 1
@@ -199,8 +199,8 @@ jg_backlog_data_relative() {  # <data-dir>
 
 
 # The parent an authorized data directory was named from, kept in the caller's
-# own path shape. jg_backlog_record_parent_authorized only applies its FM_HOME
-# containment guard to a root that still spells out `$FM_HOME`, so a root
+# own path shape. jg_backlog_record_parent_authorized only applies its JG_HOME
+# containment guard to a root that still spells out `$JG_HOME`, so a root
 # already resolved through `pwd -P` would skip that guard whenever the data
 # directory is a symlink.
 jg_backlog_authorized_root() {  # <authorized-data-dir>
@@ -250,7 +250,7 @@ jg_backlog_source_present() {  # <data-dir> <authorized-data-dir> [root authoriz
   fi
   jg_backlog_config_present "$root" "$authorized_root" || return 1
   backend=$(jg_tasks_axi_backend "$root" 2>&1) || {
-    FM_BACKLOG_TRANSITION_ERROR=$backend
+    JG_BACKLOG_TRANSITION_ERROR=$backend
     return 2
   }
   file=$(jg_backlog_file "$data") || return 1
@@ -262,7 +262,7 @@ jg_backlog_source_present() {  # <data-dir> <authorized-data-dir> [root authoriz
 }
 
 # Resolve how the owning home's backlog is addressed, for reads and mutations
-# alike: sets FM_BACKLOG_AXI_ROOT to the cd target and FM_BACKLOG_AXI_FILE to
+# alike: sets JG_BACKLOG_AXI_ROOT to the cd target and JG_BACKLOG_AXI_FILE to
 # the markdown --file path, empty for every other backend. This is the single
 # place that decision is made. A markdown backlog is addressed as
 # <data>/backlog.md so the change lands in the home that owns the task
@@ -273,46 +273,46 @@ jg_backlog_source_present() {  # <data-dir> <authorized-data-dir> [root authoriz
 # layer between tasks-axi and the caller, which the lock-holding callers'
 # interruption contract counts on not existing.
 jg_backlog_tasks_axi_addressing() {  # <data-dir>
-  FM_BACKLOG_AXI_FILE=
+  JG_BACKLOG_AXI_FILE=
   local data root backend
   data=$(jg_backlog_data_absolute "$1") || return $?
   root=$(jg_backlog_root "$data") || return $?
   backend=$(jg_tasks_axi_backend "$root" 2>&1) || {
-    FM_BACKLOG_TRANSITION_ERROR=$backend
+    JG_BACKLOG_TRANSITION_ERROR=$backend
     return 2
   }
-  FM_BACKLOG_AXI_ROOT=$root
+  JG_BACKLOG_AXI_ROOT=$root
   if [ "$backend" = markdown ]; then
-    FM_BACKLOG_AXI_FILE=$(jg_backlog_file "$data") || return 1
+    JG_BACKLOG_AXI_FILE=$(jg_backlog_file "$data") || return 1
   fi
 }
 
 jg_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
   local config=$1 data authorized_data=$2 kind=$3 file root backend authorized_root
-  FM_BACKLOG_TRANSITION_SKIP=
+  JG_BACKLOG_TRANSITION_SKIP=
   if [ "$kind" = secondmate ]; then
-    FM_BACKLOG_TRANSITION_SKIP="secondmates are not backlog items"
+    JG_BACKLOG_TRANSITION_SKIP="secondmates are not backlog items"
     return 1
   fi
   if jg_backlog_backend_manual "$config"; then
-    FM_BACKLOG_TRANSITION_SKIP="config/backlog-backend selects manual editing"
+    JG_BACKLOG_TRANSITION_SKIP="config/backlog-backend selects manual editing"
     return 1
   fi
   if ! data=$(jg_backlog_data_absolute "$2"); then
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $2"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $2"
     return 2
   fi
   root=$(jg_backlog_root "$data") || return 2
   authorized_root=$(jg_backlog_authorized_root "$authorized_data")
   jg_backlog_config_present "$root" "$authorized_root" || return 2
   backend=$(jg_tasks_axi_backend "$root" 2>&1) || {
-    FM_BACKLOG_TRANSITION_ERROR=$backend
+    JG_BACKLOG_TRANSITION_ERROR=$backend
     return 2
   }
   if [ "$backend" = markdown ]; then
     file=$(jg_backlog_file "$data") || return 2
     if [ ! -e "$file" ] && [ ! -L "$file" ]; then
-      FM_BACKLOG_TRANSITION_SKIP="this home keeps no markdown backlog at $file"
+      JG_BACKLOG_TRANSITION_SKIP="this home keeps no markdown backlog at $file"
       return 1
     fi
   fi
@@ -320,13 +320,13 @@ jg_backlog_transition_applies() {  # <config-dir> <data-dir> <kind>
     return 2
   fi
   if ! jg_tasks_axi_compatible; then
-    FM_BACKLOG_TRANSITION_ERROR="automatic backlog transitions require tasks-axi ${FM_TASKS_AXI_MIN:-(unknown minimum)} or newer with the required update and mv features"
+    JG_BACKLOG_TRANSITION_ERROR="automatic backlog transitions require tasks-axi ${JG_TASKS_AXI_MIN:-(unknown minimum)} or newer with the required update and mv features"
     return 2
   fi
   return 0
 }
 
-# Run `tasks-axi` with an optional FM_TASKS_AXI_TIMEOUT bound. A caller that
+# Run `tasks-axi` with an optional JG_TASKS_AXI_TIMEOUT bound. A caller that
 # holds a lock across the call - the spawn commit and its preservation
 # read-back run under the per-task meta lock - sets the bound, so an
 # unresponsive tasks-axi cannot hold that lock open indefinitely. The bound is
@@ -343,7 +343,7 @@ jg_tasks_axi_timeout_expired() {  # <status>
 }
 
 jg_tasks_axi() {
-  local bound=${FM_TASKS_AXI_TIMEOUT:-}
+  local bound=${JG_TASKS_AXI_TIMEOUT:-}
   if [ -z "$bound" ]; then
     exec tasks-axi "$@"
   fi
@@ -358,14 +358,14 @@ jg_tasks_axi() {
 # Every read is bounded, because a wedged backend read here is what blinds a
 # whole session start: bin/jg-bootstrap.sh's reconcile and close-replay sweeps
 # call this once per item, and one unbounded read consumes the entire
-# FM_SESSION_START_TIMEOUT and truncates the digest before the wake queue,
+# JG_SESSION_START_TIMEOUT and truncates the digest before the wake queue,
 # supervision instructions, fleet state and context sections ever print. The
 # bound turns that into a loud partial reconcile: the caller reports the item it
 # could not read and moves to the next one.
 #
 # A per-item bound alone is not enough on a home carrying a large fleet, because
 # N wedged items still cost N bounds and the digest is truncated anyway. So the
-# first bound hit latches FM_BACKLOG_ROW_SHOW_WEDGED and every later read in the
+# first bound hit latches JG_BACKLOG_ROW_SHOW_WEDGED and every later read in the
 # same sweep returns immediately, still naming its own item so nothing is
 # silently skipped. This function only READS that latch: it runs inside a
 # command substitution, and a write here would die with the subshell, so the
@@ -373,7 +373,7 @@ jg_tasks_axi() {
 # process-wide because these scripts are short-lived and a backend that wedged
 # once will wedge again within the same run.
 jg_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
-  local data=$1 id=$2 out status addressing_status secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
+  local data=$1 id=$2 out status addressing_status secs=${JG_BACKLOG_ROW_TIMEOUT_SECS:-10}
   shift 2
   # A non-positive bound is not a bound (jg-timeout-lib.sh), and a padded zero
   # such as 00 is still zero, so the digits test alone would let the very read
@@ -384,19 +384,19 @@ jg_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
   jg_backlog_tasks_axi_addressing "$data"
   addressing_status=$?
   if [ "$addressing_status" -ne 0 ]; then
-    [ -z "${FM_BACKLOG_TRANSITION_ERROR:-}" ] || printf '%s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
+    [ -z "${JG_BACKLOG_TRANSITION_ERROR:-}" ] || printf '%s\n' "$JG_BACKLOG_TRANSITION_ERROR" >&2
     return "$addressing_status"
   fi
-  if [ "$FM_BACKLOG_ROW_SHOW_WEDGED" = 1 ]; then
+  if [ "$JG_BACKLOG_ROW_SHOW_WEDGED" = 1 ]; then
     printf 'tasks-axi show %s skipped: the backlog backend already exceeded its %ss read bound\n' "$id" "$secs"
     return 124
   fi
-  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
-    set -- "$@" --file "$FM_BACKLOG_AXI_FILE"
+  if [ -n "$JG_BACKLOG_AXI_FILE" ]; then
+    set -- "$@" --file "$JG_BACKLOG_AXI_FILE"
   fi
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
   out=$(jg_run_timed "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
-    _ "$FM_BACKLOG_AXI_ROOT" "$id" "$@" 2>&1)
+    _ "$JG_BACKLOG_AXI_ROOT" "$id" "$@" 2>&1)
   status=$?
   # A backend that wrote a header or a progress line before wedging leaves that
   # fragment as the first output line, and every caller reads the first line as
@@ -416,47 +416,47 @@ jg_backlog_row_list() {  # <resolved-data-dir> [flag...]
   jg_backlog_tasks_axi_addressing "$data"
   addressing_status=$?
   if [ "$addressing_status" -ne 0 ]; then
-    [ -z "${FM_BACKLOG_TRANSITION_ERROR:-}" ] || printf '%s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
+    [ -z "${JG_BACKLOG_TRANSITION_ERROR:-}" ] || printf '%s\n' "$JG_BACKLOG_TRANSITION_ERROR" >&2
     return "$addressing_status"
   fi
-  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
-    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi list "$@" --file "$FM_BACKLOG_AXI_FILE" 2>&1)
+  if [ -n "$JG_BACKLOG_AXI_FILE" ]; then
+    (cd "$JG_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi list "$@" --file "$JG_BACKLOG_AXI_FILE" 2>&1)
   else
-    (cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi list "$@" 2>&1)
+    (cd "$JG_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi list "$@" 2>&1)
   fi
 }
 
 jg_backlog_row_probe() {  # <data-dir> <id>
   local data authorized_data=$1 id=$2 out state held blocked hold_kind command_status source_status
   if ! data=$(jg_backlog_data_absolute "$1"); then
-    FM_BACKLOG_ROW_RESULT=error
-    FM_BACKLOG_ROW_STATE=
-    FM_BACKLOG_ROW_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_ROW_RESULT=error
+    JG_BACKLOG_ROW_STATE=
+    JG_BACKLOG_ROW_ERROR="data directory cannot be resolved: $1"
     return 1
   fi
-  FM_BACKLOG_ROW_RESULT=error
-  FM_BACKLOG_ROW_STATE=
-  FM_BACKLOG_ROW_HOLD_KIND=
-  FM_BACKLOG_ROW_ERROR=
+  JG_BACKLOG_ROW_RESULT=error
+  JG_BACKLOG_ROW_STATE=
+  JG_BACKLOG_ROW_HOLD_KIND=
+  JG_BACKLOG_ROW_ERROR=
   jg_backlog_source_present "$data" "$authorized_data"
   source_status=$?
   if [ "$source_status" -ne 0 ]; then
-    FM_BACKLOG_ROW_ERROR=$FM_BACKLOG_TRANSITION_ERROR
+    JG_BACKLOG_ROW_ERROR=$JG_BACKLOG_TRANSITION_ERROR
     return "$source_status"
   fi
   out=$(jg_backlog_row_show "$data" "$id")
   command_status=$?
-  [ "$command_status" -ne 124 ] || FM_BACKLOG_ROW_SHOW_WEDGED=1
+  [ "$command_status" -ne 124 ] || JG_BACKLOG_ROW_SHOW_WEDGED=1
   if [ "$command_status" -ne 0 ]; then
     if printf '%s\n' "$out" | grep -q '^code: NOT_FOUND$'; then
-      FM_BACKLOG_ROW_RESULT=not_found
+      JG_BACKLOG_ROW_RESULT=not_found
     else
-      FM_BACKLOG_ROW_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
-      if [ -z "$FM_BACKLOG_ROW_ERROR" ]; then
-        if jg_tasks_axi_timeout_expired "$command_status" && [ -n "${FM_TASKS_AXI_TIMEOUT:-}" ]; then
-          FM_BACKLOG_ROW_ERROR="tasks-axi show $id did not finish within ${FM_TASKS_AXI_TIMEOUT}s"
+      JG_BACKLOG_ROW_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
+      if [ -z "$JG_BACKLOG_ROW_ERROR" ]; then
+        if jg_tasks_axi_timeout_expired "$command_status" && [ -n "${JG_TASKS_AXI_TIMEOUT:-}" ]; then
+          JG_BACKLOG_ROW_ERROR="tasks-axi show $id did not finish within ${JG_TASKS_AXI_TIMEOUT}s"
         else
-          FM_BACKLOG_ROW_ERROR="tasks-axi show $id failed with no output"
+          JG_BACKLOG_ROW_ERROR="tasks-axi show $id failed with no output"
         fi
       fi
     fi
@@ -467,49 +467,49 @@ jg_backlog_row_probe() {  # <data-dir> <id>
   blocked=$(printf '%s\n' "$out" | sed -n 's/^  blocked: *//p' | head -1)
   hold_kind=$(printf '%s\n' "$out" | sed -n 's/^  hold_kind: *//p' | head -1)
   if [ -z "$state" ]; then
-    FM_BACKLOG_ROW_ERROR="tasks-axi show $id returned no state"
+    JG_BACKLOG_ROW_ERROR="tasks-axi show $id returned no state"
     return 1
   fi
-  FM_BACKLOG_ROW_RESULT=found
-  FM_BACKLOG_ROW_STATE="$state ${held:-no} ${blocked:-no}"
+  JG_BACKLOG_ROW_RESULT=found
+  JG_BACKLOG_ROW_STATE="$state ${held:-no} ${blocked:-no}"
   case "$hold_kind" in
-    ''|'"-"'|-) FM_BACKLOG_ROW_HOLD_KIND= ;;
-    *) FM_BACKLOG_ROW_HOLD_KIND=$hold_kind ;;
+    ''|'"-"'|-) JG_BACKLOG_ROW_HOLD_KIND= ;;
+    *) JG_BACKLOG_ROW_HOLD_KIND=$hold_kind ;;
   esac
   return 0
 }
 
 # Run one tasks-axi mutation against <home>'s backlog, capturing its first
-# output line in FM_BACKLOG_TRANSITION_ERROR on failure. The home boundary is
+# output line in JG_BACKLOG_TRANSITION_ERROR on failure. The home boundary is
 # authorized through jg_backlog_source_present first; jg_backlog_tasks_axi owns
 # how the selected adapter is addressed (ADDRESSING above).
 jg_backlog_mutate() {  # <data-dir> <verb> <id> [flag...]
   local data authorized_data=$1 verb=$2 id=$3 out command_status source_status
   if ! data=$(jg_backlog_data_absolute "$1"); then
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
     return 1
   fi
   shift 3
-  FM_BACKLOG_TRANSITION_ERROR=
+  JG_BACKLOG_TRANSITION_ERROR=
   jg_backlog_source_present "$data" "$authorized_data"
   source_status=$?
   [ "$source_status" -eq 0 ] || return "$source_status"
   jg_backlog_tasks_axi_addressing "$data"
   source_status=$?
   [ "$source_status" -eq 0 ] || return "$source_status"
-  if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
-    out=$(cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi "$verb" "$id" "$@" --file "$FM_BACKLOG_AXI_FILE" 2>&1)
+  if [ -n "$JG_BACKLOG_AXI_FILE" ]; then
+    out=$(cd "$JG_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi "$verb" "$id" "$@" --file "$JG_BACKLOG_AXI_FILE" 2>&1)
   else
-    out=$(cd "$FM_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi "$verb" "$id" "$@" 2>&1)
+    out=$(cd "$JG_BACKLOG_AXI_ROOT" 2>/dev/null && jg_tasks_axi "$verb" "$id" "$@" 2>&1)
   fi
   command_status=$?
   [ "$command_status" -ne 0 ] || return 0
-  FM_BACKLOG_TRANSITION_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
-  if [ -z "$FM_BACKLOG_TRANSITION_ERROR" ]; then
-    if jg_tasks_axi_timeout_expired "$command_status" && [ -n "${FM_TASKS_AXI_TIMEOUT:-}" ]; then
-      FM_BACKLOG_TRANSITION_ERROR="tasks-axi $verb $id did not finish within ${FM_TASKS_AXI_TIMEOUT}s"
+  JG_BACKLOG_TRANSITION_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
+  if [ -z "$JG_BACKLOG_TRANSITION_ERROR" ]; then
+    if jg_tasks_axi_timeout_expired "$command_status" && [ -n "${JG_TASKS_AXI_TIMEOUT:-}" ]; then
+      JG_BACKLOG_TRANSITION_ERROR="tasks-axi $verb $id did not finish within ${JG_TASKS_AXI_TIMEOUT}s"
     else
-      FM_BACKLOG_TRANSITION_ERROR="tasks-axi $verb $id failed with no output"
+      JG_BACKLOG_TRANSITION_ERROR="tasks-axi $verb $id failed with no output"
     fi
   fi
   return "$command_status"
@@ -522,9 +522,9 @@ jg_backlog_start() {  # <data-dir> <id>
 # tasks-axi takes a --pr link only as a canonical GitHub or Forgejo pull request
 # and refuses anything else, so a Gerrit change URL is recorded on the row as a
 # note instead. The subshell keeps the parse from overwriting a caller's
-# FM_PR_* identity.
+# JG_PR_* identity.
 jg_backlog_pr_is_gerrit_change() {  # <url>
-  ( jg_pr_url_parse "$1" && [ "$FM_PR_PROVIDER" = gerrit ] )
+  ( jg_pr_url_parse "$1" && [ "$JG_PR_PROVIDER" = gerrit ] )
 }
 
 jg_backlog_done() {  # <data-dir> <id> [flag...]
@@ -564,11 +564,11 @@ jg_backlog_retain() {  # <data-dir> <id> [flag...]
   local arg deliverable='' line body new_body tmp
   local -a row_args=()
   if ! data=$(jg_backlog_data_absolute "$1"); then
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $1"
     return 1
   fi
   shift 2
-  FM_BACKLOG_TRANSITION_ERROR=
+  JG_BACKLOG_TRANSITION_ERROR=
   for arg in "$@"; do
     case "$previous_arg" in
       --report)
@@ -592,11 +592,11 @@ jg_backlog_retain() {  # <data-dir> <id> [flag...]
   if [ -n "$deliverable" ]; then
     out=$(jg_backlog_row_show "$data" "$id" --full)
     command_status=$?
-    [ "$command_status" -ne 124 ] || FM_BACKLOG_ROW_SHOW_WEDGED=1
+    [ "$command_status" -ne 124 ] || JG_BACKLOG_ROW_SHOW_WEDGED=1
     if [ "$command_status" -ne 0 ]; then
-      FM_BACKLOG_TRANSITION_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
-      [ -n "$FM_BACKLOG_TRANSITION_ERROR" ] \
-        || FM_BACKLOG_TRANSITION_ERROR="tasks-axi show $id failed with no output"
+      JG_BACKLOG_TRANSITION_ERROR=$(printf '%s\n' "$out" | sed -n '1p')
+      [ -n "$JG_BACKLOG_TRANSITION_ERROR" ] \
+        || JG_BACKLOG_TRANSITION_ERROR="tasks-axi show $id failed with no output"
       return "$command_status"
     fi
     # The leading quote selects a JSON-encoded bare string, which is exactly the
@@ -617,7 +617,7 @@ jg_backlog_retain() {  # <data-dir> <id> [flag...]
         utf8::encode($value) if utf8::is_utf8($value);
         print $value unless $value eq "-";
       ') || {
-      FM_BACKLOG_TRANSITION_ERROR="could not decode the task body of $id"
+      JG_BACKLOG_TRANSITION_ERROR="could not decode the task body of $id"
       return 1
     }
     line="Deliverable of the finished work: $deliverable"
@@ -627,12 +627,12 @@ jg_backlog_retain() {  # <data-dir> <id> [flag...]
         new_body=$line
         [ -z "$body" ] || new_body=$(printf '%s\n\n%s' "$body" "$line")
         tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/jg-backlog-retain-body.XXXXXX") || {
-          FM_BACKLOG_TRANSITION_ERROR="cannot stage the deliverable for $id"
+          JG_BACKLOG_TRANSITION_ERROR="cannot stage the deliverable for $id"
           return 1
         }
         if ! printf '%s\n' "$new_body" > "$tmp"; then
           rm -f -- "$tmp"
-          FM_BACKLOG_TRANSITION_ERROR="cannot stage the deliverable for $id"
+          JG_BACKLOG_TRANSITION_ERROR="cannot stage the deliverable for $id"
           return 1
         fi
         if ! jg_backlog_mutate "$authorized_data" update "$id" --body-file "$tmp"; then
@@ -664,24 +664,24 @@ jg_backlog_record_parent_authorized() {  # <path> <label> <root> [parent-only]
   [ "$parent" != "$path" ] || parent=.
   base=${path##*/}
   root_resolved=$(jg_backlog_canonical_existing "$root") || {
-    FM_BACKLOG_TRANSITION_ERROR="$label authorized directory cannot be resolved at $root"
+    JG_BACKLOG_TRANSITION_ERROR="$label authorized directory cannot be resolved at $root"
     return 1
   }
   [ -d "$root_resolved" ] || {
-    FM_BACKLOG_TRANSITION_ERROR="$label authorized directory is not a directory at $root"
+    JG_BACKLOG_TRANSITION_ERROR="$label authorized directory is not a directory at $root"
     return 1
   }
-  if [ -n "${FM_HOME:-}" ]; then
+  if [ -n "${JG_HOME:-}" ]; then
     case "$root" in
-      "$FM_HOME"|"$FM_HOME"/*)
-        home_resolved=$(jg_backlog_canonical_existing "$FM_HOME") || {
-          FM_BACKLOG_TRANSITION_ERROR="$label home directory cannot be resolved at $FM_HOME"
+      "$JG_HOME"|"$JG_HOME"/*)
+        home_resolved=$(jg_backlog_canonical_existing "$JG_HOME") || {
+          JG_BACKLOG_TRANSITION_ERROR="$label home directory cannot be resolved at $JG_HOME"
           return 1
         }
         case "$root_resolved" in
           "$home_resolved"|"$home_resolved"/*) ;;
           *)
-            FM_BACKLOG_TRANSITION_ERROR="$label authorized directory resolves outside this home at $root"
+            JG_BACKLOG_TRANSITION_ERROR="$label authorized directory resolves outside this home at $root"
             return 1
             ;;
         esac
@@ -689,13 +689,13 @@ jg_backlog_record_parent_authorized() {  # <path> <label> <root> [parent-only]
     esac
   fi
   parent_resolved=$(jg_backlog_canonical_existing "$parent") || {
-    FM_BACKLOG_TRANSITION_ERROR="$label parent directory cannot be resolved at $path"
+    JG_BACKLOG_TRANSITION_ERROR="$label parent directory cannot be resolved at $path"
     return 1
   }
   expected_path=${parent_resolved%/}/$base
   if [ -z "$parent_only" ] && { [ -e "$path" ] || [ -L "$path" ]; }; then
     path_resolved=$(jg_backlog_canonical_existing "$path") || {
-      FM_BACKLOG_TRANSITION_ERROR="$label cannot be resolved at $path"
+      JG_BACKLOG_TRANSITION_ERROR="$label cannot be resolved at $path"
       return 1
     }
     [ "$path_resolved" = "$expected_path" ] || final_matches=0
@@ -706,12 +706,12 @@ jg_backlog_record_parent_authorized() {  # <path> <label> <root> [parent-only]
   case "$path_resolved" in
     "$root_prefix"*) ;;
     *)
-      FM_BACKLOG_TRANSITION_ERROR="$label resolves outside its authorized directory at $path"
+      JG_BACKLOG_TRANSITION_ERROR="$label resolves outside its authorized directory at $path"
       return 1
       ;;
   esac
   if [ "$final_matches" != 1 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="$label resolves through a different final path at $path"
+    JG_BACKLOG_TRANSITION_ERROR="$label resolves through a different final path at $path"
     return 1
   fi
 }
@@ -720,7 +720,7 @@ jg_backlog_record_present() {
   local path=$1 label=${2:-record} root=$3
   jg_backlog_record_parent_authorized "$path" "$label" "$root" || return 1
   if [ ! -f "$path" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="$label is not a regular file at $path"
+    JG_BACKLOG_TRANSITION_ERROR="$label is not a regular file at $path"
     return 1
   fi
   return 0
@@ -733,7 +733,7 @@ jg_backlog_record_remove() {
     jg_backlog_record_present "$path" "$label" "$root" || return 1
   fi
   if ! rm -f "$path" 2>/dev/null || [ -e "$path" ] || [ -L "$path" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
+    JG_BACKLOG_TRANSITION_ERROR="$label could not be removed at $path"
     return 1
   fi
   return 0
@@ -747,8 +747,8 @@ jg_backlog_record_publish() {
     jg_backlog_record_present "$target" "$label target" "$root" || return 1
   fi
   if ! mv -f "$source" "$target" 2>/dev/null || ! jg_backlog_record_present "$target" "$label" "$root"; then
-    [ -n "$FM_BACKLOG_TRANSITION_ERROR" ] \
-      || FM_BACKLOG_TRANSITION_ERROR="$label publication failed at $target"
+    [ -n "$JG_BACKLOG_TRANSITION_ERROR" ] \
+      || JG_BACKLOG_TRANSITION_ERROR="$label publication failed at $target"
     return 1
   fi
   return 0
@@ -756,27 +756,27 @@ jg_backlog_record_publish() {
 
 jg_backlog_meta_spawn_gen() {
   local meta=$1 state=$2 count value
-  FM_BACKLOG_META_SPAWN_GEN=
+  JG_BACKLOG_META_SPAWN_GEN=
   jg_backlog_record_present "$meta" "task record" "$state" || return 1
   count=$(LC_ALL=C awk -F= '$1 == "spawn_gen" { count++ } END { print count + 0 }' "$meta" 2>/dev/null) || {
-    FM_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
     return 1
   }
   if [ "$count" -ne 1 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="task record $meta has $count spawn generation fields; exactly one is required"
+    JG_BACKLOG_TRANSITION_ERROR="task record $meta has $count spawn generation fields; exactly one is required"
     return 1
   fi
   value=$(LC_ALL=C awk -F= '$1 == "spawn_gen" { sub(/^[^=]*=/, ""); print }' "$meta" 2>/dev/null) || {
-    FM_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
     return 1
   }
   case "$value" in
     ''|.*|*[!A-Za-z0-9._-]*)
-      FM_BACKLOG_TRANSITION_ERROR="invalid spawn generation in task record $meta"
+      JG_BACKLOG_TRANSITION_ERROR="invalid spawn generation in task record $meta"
       return 1
       ;;
   esac
-  FM_BACKLOG_META_SPAWN_GEN=$value
+  JG_BACKLOG_META_SPAWN_GEN=$value
 }
 
 # The same incarnation, read for a caller that only needs to notice a CHANGE.
@@ -787,10 +787,10 @@ jg_backlog_meta_spawn_gen() {
 # name one exact incarnation cannot be compared at all.
 jg_backlog_meta_spawn_gen_optional() {  # <meta> <state>
   local meta=$1 state=$2 count
-  FM_BACKLOG_META_SPAWN_GEN=
+  JG_BACKLOG_META_SPAWN_GEN=
   jg_backlog_record_present "$meta" "task record" "$state" || return 1
   count=$(LC_ALL=C awk -F= '$1 == "spawn_gen" { count++ } END { print count + 0 }' "$meta" 2>/dev/null) || {
-    FM_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable spawn generation in task record $meta"
     return 1
   }
   [ "$count" -ne 0 ] || return 0
@@ -810,16 +810,16 @@ jg_backlog_dispatch_transition() {
   jg_backlog_row_probe "$data" "$id"
   row_status=$?
   if [ "$row_status" -ne 0 ]; then
-    if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-      FM_BACKLOG_TRANSITION_ERROR="backlog item $id vanished before dispatch commit"
+    if [ "$JG_BACKLOG_ROW_RESULT" = not_found ]; then
+      JG_BACKLOG_TRANSITION_ERROR="backlog item $id vanished before dispatch commit"
     else
-      FM_BACKLOG_TRANSITION_ERROR=$FM_BACKLOG_ROW_ERROR
+      JG_BACKLOG_TRANSITION_ERROR=$JG_BACKLOG_ROW_ERROR
     fi
     return "$row_status"
   fi
-  row=$FM_BACKLOG_ROW_STATE
+  row=$JG_BACKLOG_ROW_STATE
   if ! jg_backlog_row_dispatchable "$row"; then
-    FM_BACKLOG_TRANSITION_ERROR="backlog item $id is not dispatchable in state $row"
+    JG_BACKLOG_TRANSITION_ERROR="backlog item $id is not dispatchable in state $row"
     return 1
   fi
   case "$row" in
@@ -839,7 +839,7 @@ jg_backlog_dispatch_rollback() {
     fi
   fi
   if [ "$failed" -ne 0 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="failed-dispatch cleanup did not remove both task and busy records for $id"
+    JG_BACKLOG_TRANSITION_ERROR="failed-dispatch cleanup did not remove both task and busy records for $id"
     return 1
   fi
   return 0
@@ -873,7 +873,7 @@ jg_backlog_atomic_transition() {
     rollback) jg_backlog_dispatch_rollback "$@" ;;
     close) jg_backlog_close_transition "$@" ;;
     retain) jg_backlog_retain_transition "$@" ;;
-    *) FM_BACKLOG_TRANSITION_ERROR="unknown backlog atomic transition $operation"; return 2 ;;
+    *) JG_BACKLOG_TRANSITION_ERROR="unknown backlog atomic transition $operation"; return 2 ;;
   esac
 }
 
@@ -888,19 +888,19 @@ jg_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
   local percent_tail percent_valid
   local id_count=0 data_count=0 spawn_gen_count=0 cleanup_incomplete_count=0 mode_count=0
   local args=()
-  FM_BACKLOG_CLOSE_VALIDATED_ID=
-  FM_BACKLOG_CLOSE_VALIDATED_DATA=
-  FM_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN=
-  FM_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE=0
-  FM_BACKLOG_CLOSE_VALIDATED_MODE=close
-  FM_BACKLOG_CLOSE_VALIDATED_ARGS=()
+  JG_BACKLOG_CLOSE_VALIDATED_ID=
+  JG_BACKLOG_CLOSE_VALIDATED_DATA=
+  JG_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN=
+  JG_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE=0
+  JG_BACKLOG_CLOSE_VALIDATED_MODE=close
+  JG_BACKLOG_CLOSE_VALIDATED_ARGS=()
   jg_backlog_record_present "$marker" "pending-close record" "$state" || return 1
   raw_bytes=$(jg_backlog_bytes_of_file "$marker" 2>/dev/null) || {
-    FM_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
     return 1
   }
   if ! jg_backlog_control_bytes_valid 1 "$raw_bytes"; then
-    FM_BACKLOG_TRANSITION_ERROR="invalid control byte in pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="invalid control byte in pending-close record $marker"
     return 1
   fi
   while IFS= read -r line || [ -n "$line" ]; do
@@ -911,69 +911,69 @@ jg_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
       cleanup_incomplete=*) cleanup_incomplete=${line#cleanup_incomplete=}; cleanup_incomplete_count=$((cleanup_incomplete_count + 1)) ;;
       mode=*) mode=${line#mode=}; mode_count=$((mode_count + 1)) ;;
       arg=*) args+=("${line#arg=}") ;;
-      *) FM_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"; return 1 ;;
+      *) JG_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"; return 1 ;;
     esac
   done < "$marker"
   if [ "$mode_count" -gt 1 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
     return 1
   fi
   case "$mode" in
     close|retain) ;;
     *)
-      FM_BACKLOG_TRANSITION_ERROR="invalid transition mode in pending-close record $marker"
+      JG_BACKLOG_TRANSITION_ERROR="invalid transition mode in pending-close record $marker"
       return 1
       ;;
   esac
   case "$id" in
     ''|.*|*[!A-Za-z0-9._-]*)
-      FM_BACKLOG_TRANSITION_ERROR="invalid task identity in pending-close record $marker"
+      JG_BACKLOG_TRANSITION_ERROR="invalid task identity in pending-close record $marker"
       return 1
       ;;
   esac
   if [ "$id_count" -ne 1 ] || [ "$id" != "$expected_id" ] \
      || [ "$data_count" -ne 1 ] || [ -z "$data" ] \
      || [ "$spawn_gen_count" -ne 1 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
     return 1
   fi
   case "$marker_spawn_gen" in
     ''|.*|*[!A-Za-z0-9._-]*)
-      FM_BACKLOG_TRANSITION_ERROR="invalid spawn generation in pending-close record $marker"
+      JG_BACKLOG_TRANSITION_ERROR="invalid spawn generation in pending-close record $marker"
       return 1
       ;;
   esac
   if [ "$cleanup_incomplete_count" -gt 1 ]; then
-    FM_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="unreadable pending-close record $marker"
     return 1
   fi
   case "$cleanup_incomplete" in
     0|1) ;;
     *)
-      FM_BACKLOG_TRANSITION_ERROR="invalid cleanup state in pending-close record $marker"
+      JG_BACKLOG_TRANSITION_ERROR="invalid cleanup state in pending-close record $marker"
       return 1
       ;;
   esac
   case "$data" in
     /*) ;;
-    *) FM_BACKLOG_TRANSITION_ERROR="invalid data directory in pending-close record $marker"; return 1 ;;
+    *) JG_BACKLOG_TRANSITION_ERROR="invalid data directory in pending-close record $marker"; return 1 ;;
   esac
   case "$data" in
     */../*|*/..)
-      FM_BACKLOG_TRANSITION_ERROR="invalid data directory in pending-close record $marker"
+      JG_BACKLOG_TRANSITION_ERROR="invalid data directory in pending-close record $marker"
       return 1
       ;;
   esac
   authorized_data=$(jg_backlog_data_absolute "$2") || {
-    FM_BACKLOG_TRANSITION_ERROR="authorized data directory cannot be resolved: $2"
+    JG_BACKLOG_TRANSITION_ERROR="authorized data directory cannot be resolved: $2"
     return 1
   }
   data_resolved=$(jg_backlog_data_absolute "$data") || {
-    FM_BACKLOG_TRANSITION_ERROR="data directory in pending-close record cannot be resolved: $data"
+    JG_BACKLOG_TRANSITION_ERROR="data directory in pending-close record cannot be resolved: $data"
     return 1
   }
   if [ "$data_resolved" != "$authorized_data" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="foreign data directory in pending-close record $marker"
+    JG_BACKLOG_TRANSITION_ERROR="foreign data directory in pending-close record $marker"
     return 1
   fi
   case "${#args[@]}" in
@@ -1041,16 +1041,16 @@ jg_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
             && case "$arg_value" in .|..|-*|/*|../*|*/../*|*/..) false ;; *) true ;; esac
           ;;
         *) false ;;
-      esac || { FM_BACKLOG_TRANSITION_ERROR="invalid pending-close arguments in $marker"; return 1; }
+      esac || { JG_BACKLOG_TRANSITION_ERROR="invalid pending-close arguments in $marker"; return 1; }
       ;;
-    *) FM_BACKLOG_TRANSITION_ERROR="invalid pending-close arguments in $marker"; return 1 ;;
+    *) JG_BACKLOG_TRANSITION_ERROR="invalid pending-close arguments in $marker"; return 1 ;;
   esac
-  FM_BACKLOG_CLOSE_VALIDATED_ID=$id
-  FM_BACKLOG_CLOSE_VALIDATED_DATA=$data_resolved
-  FM_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN=$marker_spawn_gen
-  FM_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE=$cleanup_incomplete
-  FM_BACKLOG_CLOSE_VALIDATED_MODE=$mode
-  FM_BACKLOG_CLOSE_VALIDATED_ARGS=("${args[@]+"${args[@]}"}")
+  JG_BACKLOG_CLOSE_VALIDATED_ID=$id
+  JG_BACKLOG_CLOSE_VALIDATED_DATA=$data_resolved
+  JG_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN=$marker_spawn_gen
+  JG_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE=$cleanup_incomplete
+  JG_BACKLOG_CLOSE_VALIDATED_MODE=$mode
+  JG_BACKLOG_CLOSE_VALIDATED_ARGS=("${args[@]+"${args[@]}"}")
 }
 
 # A leading `--retain` flag records the captain-held transition (`mode=retain`)
@@ -1060,17 +1060,17 @@ jg_backlog_close_marker_stage() {  # <temporary-path> <id> <data-dir> <spawn-gen
   local tmp=$1 id=$2 data spawn_gen=$4 state=$5 cleanup_incomplete=$6 arg previous_arg=''
   local mode=close serialized_args=()
   data=$(jg_backlog_data_absolute "$3") || {
-    FM_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $3"
+    JG_BACKLOG_TRANSITION_ERROR="data directory cannot be resolved: $3"
     return 1
   }
   jg_backlog_record_parent_authorized "$tmp" "pending-close staging path" "$state" || return 1
   if [ -e "$tmp" ] || [ -L "$tmp" ]; then
-    FM_BACKLOG_TRANSITION_ERROR="unsafe pending-close staging path $tmp"
+    JG_BACKLOG_TRANSITION_ERROR="unsafe pending-close staging path $tmp"
     return 1
   fi
   case "$cleanup_incomplete" in
     0|1) ;;
-    *) FM_BACKLOG_TRANSITION_ERROR="invalid pending-close cleanup state"; return 1 ;;
+    *) JG_BACKLOG_TRANSITION_ERROR="invalid pending-close cleanup state"; return 1 ;;
   esac
   shift 6
   if [ "${1:-}" = --retain ]; then
@@ -1138,40 +1138,40 @@ jg_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
   local state=$1 marker=$2 marker_name expected_id
   local id data marker_spawn_gen meta meta_spawn_gen row_state cleanup_incomplete mode
   local args=() mode_flags=()
-  FM_BACKLOG_CLOSE_REPLAY_RESULT=noop
+  JG_BACKLOG_CLOSE_REPLAY_RESULT=noop
   jg_backlog_directory_present "$state" "state directory" || return 1
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   marker_name=${marker##*/}
   case "$marker_name" in
     *.backlog-close) expected_id=${marker_name%.backlog-close} ;;
-    *) FM_BACKLOG_TRANSITION_ERROR="invalid pending-close record name $marker"; return 1 ;;
+    *) JG_BACKLOG_TRANSITION_ERROR="invalid pending-close record name $marker"; return 1 ;;
   esac
   jg_backlog_close_marker_validate "$marker" "$3" "$expected_id" "$state" || return 1
-  id=$FM_BACKLOG_CLOSE_VALIDATED_ID
-  data=$FM_BACKLOG_CLOSE_VALIDATED_DATA
-  marker_spawn_gen=$FM_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN
-  cleanup_incomplete=$FM_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE
-  mode=$FM_BACKLOG_CLOSE_VALIDATED_MODE
+  id=$JG_BACKLOG_CLOSE_VALIDATED_ID
+  data=$JG_BACKLOG_CLOSE_VALIDATED_DATA
+  marker_spawn_gen=$JG_BACKLOG_CLOSE_VALIDATED_SPAWN_GEN
+  cleanup_incomplete=$JG_BACKLOG_CLOSE_VALIDATED_CLEANUP_INCOMPLETE
+  mode=$JG_BACKLOG_CLOSE_VALIDATED_MODE
   [ "$mode" = close ] || mode_flags=(--retain)
-  args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
+  args=("${JG_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${JG_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
   if [ "${args[0]-}" = --note ]; then
     args[1]="local main"
   fi
   meta="$state/$id.meta"
   if [ -e "$meta" ] || [ -L "$meta" ]; then
     if ! jg_backlog_record_present "$meta" "task record" "$state"; then
-      FM_BACKLOG_TRANSITION_ERROR="unsafe interrupted task record at $meta"
+      JG_BACKLOG_TRANSITION_ERROR="unsafe interrupted task record at $meta"
       return 1
     fi
     jg_backlog_meta_spawn_gen "$meta" "$state" || return 1
-    meta_spawn_gen=$FM_BACKLOG_META_SPAWN_GEN
+    meta_spawn_gen=$JG_BACKLOG_META_SPAWN_GEN
     if [ "$meta_spawn_gen" != "$marker_spawn_gen" ]; then
       jg_backlog_close_marker_remove "$marker" "$state" || return 1
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=stale
+      JG_BACKLOG_CLOSE_REPLAY_RESULT=stale
       return 0
     fi
     if [ -e "$state/$id.scratch" ] || [ -L "$state/$id.scratch" ] || [ -d "$data/$id" ]; then
-      FM_BACKLOG_TRANSITION_ERROR="task scratch or retained-data process cleanup remains outstanding for $id; rerun teardown before replaying its backlog close"
+      JG_BACKLOG_TRANSITION_ERROR="task scratch or retained-data process cleanup remains outstanding for $id; rerun teardown before replaying its backlog close"
       return 1
     fi
     jg_backlog_close_marker_mark_cleanup_incomplete "$state" "$marker" "$id" "$data" \
@@ -1182,13 +1182,13 @@ jg_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       || return 1
   fi
   if jg_backlog_row_probe "$data" "$id"; then
-    row_state=$FM_BACKLOG_ROW_STATE
-    if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    row_state=$JG_BACKLOG_ROW_STATE
+    if [ "${row_state%% *}" != "done" ] && [ "$JG_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
     fi
   else
-    if [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then
-      FM_BACKLOG_TRANSITION_ERROR=$FM_BACKLOG_ROW_ERROR
+    if [ "$JG_BACKLOG_ROW_RESULT" != not_found ]; then
+      JG_BACKLOG_TRANSITION_ERROR=$JG_BACKLOG_ROW_ERROR
       return 1
     fi
     row_state=
@@ -1199,15 +1199,15 @@ jg_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
         # The captain's answer closed the row before this replay; the retained
         # transition owes it nothing more than retiring the record.
         jg_backlog_close_marker_remove "$marker" "$state" || return 1
-        FM_BACKLOG_CLOSE_REPLAY_RESULT=answered
+        JG_BACKLOG_CLOSE_REPLAY_RESULT=answered
         return 0
       fi
       if jg_backlog_atomic_transition close '' "$marker" "$data" "$id" "$state" \
           "${args[@]+"${args[@]}"}"; then
         if [ "$cleanup_incomplete" = 1 ]; then
-          FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
+          JG_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
         else
-          FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+          JG_BACKLOG_CLOSE_REPLAY_RESULT=closed
         fi
         return 0
       fi
@@ -1215,7 +1215,7 @@ jg_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       ;;
     '')
       jg_backlog_close_marker_remove "$marker" "$state" || return 1
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=stale
+      JG_BACKLOG_CLOSE_REPLAY_RESULT=stale
       return 0
       ;;
   esac
@@ -1223,14 +1223,14 @@ jg_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       "${args[@]+"${args[@]}"}"; then
     if [ "$mode" = retain ]; then
       if [ "$cleanup_incomplete" = 1 ]; then
-        FM_BACKLOG_CLOSE_REPLAY_RESULT=retained_incomplete
+        JG_BACKLOG_CLOSE_REPLAY_RESULT=retained_incomplete
       else
-        FM_BACKLOG_CLOSE_REPLAY_RESULT=retained
+        JG_BACKLOG_CLOSE_REPLAY_RESULT=retained
       fi
     elif [ "$cleanup_incomplete" = 1 ]; then
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
+      JG_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
     else
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+      JG_BACKLOG_CLOSE_REPLAY_RESULT=closed
     fi
     return 0
   fi

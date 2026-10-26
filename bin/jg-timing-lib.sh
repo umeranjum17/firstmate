@@ -12,17 +12,17 @@
 # manual tracing. These helpers record per-step elapsed times as the run happens,
 # so the next slow run is answerable from the durable record alone.
 #
-# OFF BY DEFAULT, AND INERT. Every helper is a no-op unless FM_TIMING_LOG names a
+# OFF BY DEFAULT, AND INERT. Every helper is a no-op unless JG_TIMING_LOG names a
 # file. Nothing here talks to the network, waits, locks, or changes control flow:
 # a failed append is discarded rather than propagated, because losing a diagnostic
 # line must never change what a sweep does or how it exits.
 #
 # ENVIRONMENT, both exported by the stage that owns a run:
-#   FM_TIMING_LOG       append-only record file. Unset or empty disables recording.
+#   JG_TIMING_LOG       append-only record file. Unset or empty disables recording.
 #                       Exported across process boundaries on purpose: the phases
 #                       being measured run in bin/jg-bootstrap.sh and
 #                       bin/jg-fleet-sync.sh, which are children of the stage.
-#   FM_TIMING_EPOCH_MS  the run's start instant, so every record carries an offset
+#   JG_TIMING_EPOCH_MS  the run's start instant, so every record carries an offset
 #                       from ONE origin even though the records are written by
 #                       several processes. Defaults to the first recording
 #                       process's own start, which keeps a hand-run child readable.
@@ -46,10 +46,10 @@
 # place.
 set -u
 
-FM_TIMING_DETAIL_MAX=${FM_TIMING_DETAIL_MAX:-80}
+JG_TIMING_DETAIL_MAX=${JG_TIMING_DETAIL_MAX:-80}
 
 jg_timing_enabled() {
-  [ -n "${FM_TIMING_LOG:-}" ]
+  [ -n "${JG_TIMING_LOG:-}" ]
 }
 
 # Milliseconds since the epoch. EPOCHREALTIME is a bash builtin (no fork) whose
@@ -78,20 +78,20 @@ jg_timing_now_ms() {
   printf '%s\n' "$(( sec * 1000 ))"
 }
 
-# Ensure FM_TIMING_EPOCH_MS holds the origin every offset is measured from.
+# Ensure JG_TIMING_EPOCH_MS holds the origin every offset is measured from.
 # Callers that own a run export it up front; a process that starts recording
 # without one adopts its own first measurement so its records stay internally
 # consistent instead of being silently dropped.
 #
 # This SETS the variable rather than printing it, because the caller must read it
-# as "$FM_TIMING_EPOCH_MS" and not through a command substitution: a substitution
+# as "$JG_TIMING_EPOCH_MS" and not through a command substitution: a substitution
 # runs in a subshell, so the lazily chosen origin would be discarded and every
 # record would recompute it, flattening every start offset to zero.
 jg_timing_epoch_ensure() {
-  case "${FM_TIMING_EPOCH_MS:-}" in
+  case "${JG_TIMING_EPOCH_MS:-}" in
     ''|*[!0-9]*)
-      FM_TIMING_EPOCH_MS=$(jg_timing_now_ms)
-      export FM_TIMING_EPOCH_MS
+      JG_TIMING_EPOCH_MS=$(jg_timing_now_ms)
+      export JG_TIMING_EPOCH_MS
       ;;
   esac
 }
@@ -103,9 +103,9 @@ jg_timing_start() {  # <file>
   local file=$1
   [ -n "$file" ] || return 0
   : > "$file" 2>/dev/null || return 0
-  FM_TIMING_LOG=$file
-  FM_TIMING_EPOCH_MS=$(jg_timing_now_ms)
-  export FM_TIMING_LOG FM_TIMING_EPOCH_MS
+  JG_TIMING_LOG=$file
+  JG_TIMING_EPOCH_MS=$(jg_timing_now_ms)
+  export JG_TIMING_LOG JG_TIMING_EPOCH_MS
 }
 
 jg_timing_sanitize() {  # <text>
@@ -114,7 +114,7 @@ jg_timing_sanitize() {  # <text>
     *[[:space:]]*) printf '%s\n' 'unrecordable'; return 0 ;;
   esac
   text=${text//[!A-Za-z0-9._@:\/+-]/_}
-  printf '%s\n' "${text:0:$FM_TIMING_DETAIL_MAX}"
+  printf '%s\n' "${text:0:$JG_TIMING_DETAIL_MAX}"
 }
 
 # Record one measured step. Never fails the caller: a missing log, an unwritable
@@ -125,14 +125,14 @@ jg_timing_record() {  # <scope> <name> <start-ms> [detail]
   case "$start" in ''|*[!0-9]*) return 0 ;; esac
   now=$(jg_timing_now_ms)
   jg_timing_epoch_ensure
-  offset=$(( start - FM_TIMING_EPOCH_MS ))
+  offset=$(( start - JG_TIMING_EPOCH_MS ))
   [ "$offset" -ge 0 ] || offset=0
   elapsed=$(( now - start ))
   [ "$elapsed" -ge 0 ] || elapsed=0
   printf 'v1\t%s\t%s\t%s\t%s\t%s\n' \
     "$(jg_timing_sanitize "$scope")" "$(jg_timing_sanitize "$name")" \
     "$offset" "$elapsed" "$(jg_timing_sanitize "$detail")" \
-    >> "$FM_TIMING_LOG" 2>/dev/null || true
+    >> "$JG_TIMING_LOG" 2>/dev/null || true
   return 0
 }
 

@@ -35,7 +35,7 @@ The parent therefore resolves the carrier against that task's own metadata under
 The parent records that returned value, so an already-alive remote endpoint that was not relaunched reports the identity its agent really received rather than one the parent merely intended.
 The remote host validates the delivered carrier as a strict W3C value before it can reach any pane, and a disabled parent passes nothing, leaving the remote launch identical to the untraced one.
 If the endpoint is already alive, no new launch or injection occurs; the parent still records any carrier that endpoint reports, even when the parent's current decision is `off`, so its metadata does not deny the running agent's actual identity.
-The enablement decision travels with it exactly as on the local path: the remote home inherits `config/trace-context` as declared inherited material and the new Secondmate process receives the parent's frozen `FM_TRACE_CONTEXT=on|off` snapshot.
+The enablement decision travels with it exactly as on the local path: the remote home inherits `config/trace-context` as declared inherited material and the new Secondmate process receives the parent's frozen `JG_TRACE_CONTEXT=on|off` snapshot.
 
 ## Root and recovery semantics
 
@@ -54,13 +54,13 @@ An actual disabled relaunch regenerates the task meta without `traceparent=`, so
 
 ### Enablement is home-session-scoped
 
-Each locked `bin/jg-session-start.sh` run resolves that home's `config/trace-context` plus `FM_TRACE_CONTEXT` exactly once into session-scoped effective state.
+Each locked `bin/jg-session-start.sh` run resolves that home's `config/trace-context` plus `JG_TRACE_CONTEXT` exactly once into session-scoped effective state.
 The decision is atomically published through a same-directory temporary file and bound to the current session lock, so a failed publication cannot reactivate a stale `on` record from an earlier session.
 Every spawn from that home reads only the frozen `on` or `off` decision.
 Later config or environment edits are ignored until that home starts a new session.
 Missing, stale, unreadable, invalid, or unsuccessfully published effective state defaults safely to `off`.
 
-When the primary launches a Secondmate, local or remote, it propagates `config/trace-context` into the Secondmate home and passes the primary session's frozen decision as a non-empty `FM_TRACE_CONTEXT=on|off` launch override.
+When the primary launches a Secondmate, local or remote, it propagates `config/trace-context` into the Secondmate home and passes the primary session's frozen decision as a non-empty `JG_TRACE_CONTEXT=on|off` launch override.
 The Secondmate resolves that inherited override when its own home session starts.
 That flag is session-scoped enablement rather than durable configuration, so it is transferred at the launch convergence point - where the frozen decision is handed over with it - and left untouched by live convergence into an already-running home, on local and remote routes alike.
 What propagates is the enablement decision, never trace identity: a Secondmate launched while enabled receives its own task carrier from the primary - the Secondmate agent's identity, reused verbatim when the Secondmate itself is relaunched - and each worker it spawns roots its own per-task trace.
@@ -88,7 +88,7 @@ This is a deliberate, source-owned choice:
 ## Safety
 
 - **Default-off.**
-  With no `config/trace-context` and no `FM_TRACE_CONTEXT`, a fresh spawn or actual relaunch injects nothing and writes no `traceparent=` line, so the generated meta and the launch environment are unchanged.
+  With no `config/trace-context` and no `JG_TRACE_CONTEXT`, a fresh spawn or actual relaunch injects nothing and writes no `traceparent=` line, so the generated meta and the launch environment are unchanged.
   Reusing an already-alive remote endpoint records any carrier that endpoint reports without injecting a new one.
   A locked session start makes the one config-file check, and each spawn sources one extra library and reads the frozen effective-state file, so the process is not literally byte-for-byte identical, but nothing an agent, an observer, or the task meta can see differs.
 - **What is and is not exposed.**

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Contract test: sign-off-axi's real board writer preserves the merge-card commit consumed by the gate.
 set -eu
 if ! command -v sign-off-axi >/dev/null 2>&1; then echo 'SKIP gate contract: sign-off-axi is not installed'; exit 0; fi
@@ -26,7 +35,7 @@ if ! jq -e --arg k "$key" --arg c "$head" 'any(.items[]; .key==$k and .kind=="ev
 run_gate() {
   printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["proof.png"],"run_id":"contract-run"}\n' "$1" > "$home/data/lane/.done-done/runs/run.json"
   printf 't\t%s\t%s\tpass\tok\n' "$pr" "$1" > "$home/data/checks-gate.log"
-  PATH="$work/bin:$PATH" FM_HOME="$home" FM_FLEET_BOARD="$board" "$home/config/merge-gate" lane - "$1" "$pr"
+  PATH="$work/bin:$PATH" JG_HOME="$home" JG_FLEET_BOARD="$board" "$home/config/merge-gate" lane - "$1" "$pr"
 }
 run_gate "$head" || { echo 'FAIL: gate refused matching sign-off card commit'; exit 1; }
 if run_gate 0000000000000000000000000000000000000000 >/dev/null 2>&1; then echo 'FAIL: gate accepted mismatched commit'; exit 1; fi

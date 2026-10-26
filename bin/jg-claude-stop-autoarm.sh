@@ -54,7 +54,7 @@
 #     deliver an actionable wake, so the fleet stays covered while the model
 #     handles it. After an actionable close, including an attached peer cycle
 #     that ended, this hook starts one successor bin/jg-watch-arm.sh with the
-#     closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID, the same handoff the
+#     closed arm's pid as JG_WATCH_PREDECESSOR_ARM_PID, the same handoff the
 #     Pi extension passes for its closed arm child, so the arm starts a
 #     handling-successor watcher and links the lifecycle ledger. A child of
 #     this hook cannot outlive the exit-2 rewake, so the successor is launched
@@ -140,14 +140,14 @@ if [ "$#" -gt 0 ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 OWNER_LOCK="$STATE/.claude-autoarm.lock"
 FAILURE_NOTICE="$STATE/.claude-autoarm-failure-notified"
 FAILURE_ALARM="$STATE/.claude-autoarm-failure-alarmed"
-AUTOARM_ATTEMPTS=${FM_CLAUDE_AUTOARM_ATTEMPTS:-2}
+AUTOARM_ATTEMPTS=${JG_CLAUDE_AUTOARM_ATTEMPTS:-2}
 case "$AUTOARM_ATTEMPTS" in
   1|2|3) : ;;
   *) AUTOARM_ATTEMPTS=2 ;;
@@ -168,10 +168,10 @@ esac
 
 # jg-watch.sh touches the liveness beacon once per cycle, immediately before
 # its terminal wait, so a healthy watcher's beacon can legitimately age up to
-# FM_POLL seconds between touches (docs/turnend-guard.md "Guard grace and the
+# JG_POLL seconds between touches (docs/turnend-guard.md "Guard grace and the
 # poll cadence"). jg_poll_derived_grace (bin/jg-wake-lib.sh) is the single
 # owner of that max(300, poll+60) derivation.
-GRACE=${FM_GUARD_GRACE:-$(jg_poll_derived_grace)}
+GRACE=${JG_GUARD_GRACE:-$(jg_poll_derived_grace)}
 
 # Consume the Stop payload once. The decisions below are state-based; the
 # payload is read so a slow writer can never wedge on a full pipe, and its host
@@ -201,7 +201,7 @@ if [ -n "$PAYLOAD" ] && command -v jq >/dev/null 2>&1; then
 fi
 
 # --- scope: genuine primary checkout only -----------------------------------
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 # --- identity: only the lock-owning session's hooks may arm ------------------
 # A prior session may have died after leaving its numeric harness pid in .lock.
@@ -259,7 +259,7 @@ if [ "$CLAIM_RC" -ne 0 ]; then
   jg_autoarm_release_abandoned "$STATE" "$GRACE" || exit 0
   jg_autoarm_claim_next "$STATE" "$GRACE" || exit 0
 fi
-MY_GEN=$FM_AUTOARM_MY_GEN
+MY_GEN=$JG_AUTOARM_MY_GEN
 [ -n "$MY_GEN" ] || exit 0
 
 # Commit <outcome> (optionally with the once-per-episode notice marker) for
@@ -283,10 +283,10 @@ autoarm_commit() {  # <outcome> [marker-file]
       AUTOARM_REFUSAL="the watcher recovery marker could not be read"
       return 2
     fi
-    case "$FM_RECOVERY_MARKER_TOKEN" in
-      pending:downtime:*|announced:downtime:*) recovery=${FM_RECOVERY_MARKER_TOKEN##*:} ;;
+    case "$JG_RECOVERY_MARKER_TOKEN" in
+      pending:downtime:*|announced:downtime:*) recovery=${JG_RECOVERY_MARKER_TOKEN##*:} ;;
       *)
-        AUTOARM_REFUSAL="the watcher recovery marker is '${FM_RECOVERY_MARKER_TOKEN:-absent}', not a downtime episode"
+        AUTOARM_REFUSAL="the watcher recovery marker is '${JG_RECOVERY_MARKER_TOKEN:-absent}', not a downtime episode"
         return 2
         ;;
     esac
@@ -367,9 +367,9 @@ ARM_PID=
 CLOSED_ARM_PID=
 run_arm() {  # <output file, or empty for none>
   if [ -n "$1" ]; then
-    FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" >"$1" 2>&1 &
+    JG_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" >"$1" 2>&1 &
   else
-    FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" >/dev/null 2>&1 &
+    JG_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" >/dev/null 2>&1 &
   fi
   ARM_PID=$!
   wait "$ARM_PID" || true
@@ -381,11 +381,11 @@ run_arm() {  # <output file, or empty for none>
 # Start the next arm before the rewake delivers the wake, as the Pi, omp, and
 # OpenCode adapters do from their child-close handlers, so a watcher covers the
 # handling turn instead of the home waiting uncovered for the next Stop. The
-# successor receives the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID; it
+# successor receives the closed arm's pid as JG_WATCH_PREDECESSOR_ARM_PID; it
 # must outlive this hook's exit, so it is detached three ways: nohup, stdio
 # away from the hook's pipes, and its own process group. Its one status line
 # is awaited within the arm's own confirmation budget plus slack, and an
-# unconfirmed launch is retried boundedly (FM_AUTOARM_SUCCESSOR_ATTEMPTS,
+# unconfirmed launch is retried boundedly (JG_AUTOARM_SUCCESSOR_ATTEMPTS,
 # default 2): a successor forked into session teardown meets exactly the
 # transient failures - a dying lock holder, a racing beacon - most likely to
 # clear on their own within one more budget, and one attempt that lands there
@@ -395,7 +395,7 @@ run_arm() {  # <output file, or empty for none>
 # about the wake delivery itself.
 SUCCESSOR_FAILURE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid deadline budget line monitor_was_on=0 attempt=0 attempts=${FM_AUTOARM_SUCCESSOR_ATTEMPTS:-2}
+  local out pid deadline budget line monitor_was_on=0 attempt=0 attempts=${JG_AUTOARM_SUCCESSOR_ATTEMPTS:-2}
   case "$attempts" in ''|*[!0-9]*) attempts=2 ;; esac
   [ "$attempts" -ge 1 ] || attempts=1
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
@@ -405,10 +405,10 @@ start_handling_successor() {  # <closed-arm-pid>
   while [ "$attempt" -lt "$attempts" ]; do
     attempt=$((attempt + 1))
     : > "$out"
-    budget=$(FM_GUARD_GRACE="$GRACE" jg_watcher_confirmation_budget "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$FM_HOME")
+    budget=$(JG_GUARD_GRACE="$GRACE" jg_watcher_confirmation_budget "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$JG_HOME")
     case $- in *m*) monitor_was_on=1 ;; esac
     set -m 2>/dev/null || true
-    FM_WATCH_PREDECESSOR_ARM_PID=$1 FM_GUARD_GRACE="$GRACE" \
+    JG_WATCH_PREDECESSOR_ARM_PID=$1 JG_GUARD_GRACE="$GRACE" \
       nohup "$SCRIPT_DIR/jg-watch-arm.sh" >"$out" 2>&1 </dev/null &
     pid=$!
     [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
@@ -454,8 +454,8 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   OUT=$(mktemp "$STATE/.claude-autoarm-output.XXXXXX") || OUT=
   if [ "$HOST_MODE" -eq 1 ]; then
     HOST_RC=0
-    FM_SUPERVISION_HOST_AUTOARM_GEN=$MY_GEN FM_SUPERVISION_HOST_OWNER_PID=$$ \
-      FM_SUPERVISION_HOST_PRIMARY=claude FM_GUARD_GRACE="$GRACE" \
+    JG_SUPERVISION_HOST_AUTOARM_GEN=$MY_GEN JG_SUPERVISION_HOST_OWNER_PID=$$ \
+      JG_SUPERVISION_HOST_PRIMARY=claude JG_GUARD_GRACE="$GRACE" \
       "$SCRIPT_DIR/jg-supervision-host.sh" park >"${OUT:-/dev/null}" 2>&1 || HOST_RC=$?
   else
     run_arm "$OUT"
@@ -498,7 +498,7 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
 
   # A non-actionable close is benign when another verified watcher already owns
   # this home and is still beating within the shared grace window.
-  if jg_watcher_healthy "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$GRACE" "$FM_HOME"; then
+  if jg_watcher_healthy "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$GRACE" "$JG_HOME"; then
     HEALTHY=1
     break
   fi
@@ -563,7 +563,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
       [ -n "$OUT" ] && grep -E '^(signal:|stale:|check:|heartbeat)' "$OUT" 2>/dev/null | head -8
     fi
     if [ "$HOST_MODE" -eq 1 ] && [ -e "$STATE/.afk-contract" ] \
-      && [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
+      && [ "$(JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
       printf 'This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.\n'
     fi
     [ -z "$SUCCESSOR_FAILURE" ] || printf '%s\n' "$SUCCESSOR_FAILURE"
@@ -581,7 +581,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
   printf '[%s] autoarm generation %s rewake refused: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MY_GEN" "$AUTOARM_REFUSAL" \
     >> "$STATE/.watch-triage.log" 2>/dev/null || true
   if jg_autoarm_still_owner "$STATE" "$MY_GEN" \
-    && ! { jg_recovery_marker_snapshot "$STATE/.watcher-down" && [[ "$FM_RECOVERY_MARKER_TOKEN" == acked:* ]]; }; then
+    && ! { jg_recovery_marker_snapshot "$STATE/.watcher-down" && [[ "$JG_RECOVERY_MARKER_TOKEN" == acked:* ]]; }; then
     REWAKE_FAILURE_COMMITTED=0
     if [ ! -e "$FAILURE_NOTICE" ]; then
       printf 'firstmate watcher auto-arm FAILED - an actionable wake closed the cycle, but its rewake could not be committed: %s.\n' "$AUTOARM_REFUSAL" >&2

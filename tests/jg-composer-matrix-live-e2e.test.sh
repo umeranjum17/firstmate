@@ -21,7 +21,7 @@
 #     composer must never make an idle composer read `pending`, because that
 #     verdict is what skips a steer's doorbell fleet-wide.
 #
-# Run explicitly with FM_COMPOSER_MATRIX_LIVE=1. No prompt is ever submitted
+# Run explicitly with JG_COMPOSER_MATRIX_LIVE=1. No prompt is ever submitted
 # to any harness, so no model tokens are spent. An absent harness is reported
 # explicitly and skipped; a run that verified nothing fails rather than
 # passing vacuously. Refresh docs/verification/runtime-backends.md ("Composer
@@ -37,7 +37,7 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-jg_live_gate opt-in FM_COMPOSER_MATRIX_LIVE tmux
+jg_live_gate opt-in JG_COMPOSER_MATRIX_LIVE tmux
 
 SOCKET="jg-cmx-live-$$"
 SESSION="cmxlive"
@@ -78,7 +78,7 @@ harness_version() {  # <binary>
 }
 
 check_harness_idle_empty() {  # <name> <launch-cmd...>
-  local name=$1 win="hx-$1" verdict='' i=0 budget=${FM_COMPOSER_MATRIX_LIVE_POLLS:-45} version dismissed=0 startup_screen
+  local name=$1 win="hx-$1" verdict='' i=0 budget=${JG_COMPOSER_MATRIX_LIVE_POLLS:-45} version dismissed=0 startup_screen
   shift
   version=$(harness_version "$1")
   tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win" -c "$ROOT" -- "$@" \
@@ -185,7 +185,7 @@ if command -v opencode >/dev/null 2>&1; then
   tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$wrap_win" -c "$wrap_cwd" -- opencode \
     || fail "opencode ($wrap_version): wrapped-footer check could not launch"
   tmux -L "$SOCKET" resize-window -t "$SESSION:$wrap_win" -x 90 -y 45 2>/dev/null || true
-  wrap_verdict=''; wrap_i=0; wrap_budget=${FM_COMPOSER_MATRIX_LIVE_POLLS:-45}; wrap_dismissed=0
+  wrap_verdict=''; wrap_i=0; wrap_budget=${JG_COMPOSER_MATRIX_LIVE_POLLS:-45}; wrap_dismissed=0
   while [ "$wrap_i" -lt "$wrap_budget" ]; do
     wrap_verdict=$(jg_tmux_composer_state "$SESSION:$wrap_win")
     [ "$wrap_verdict" = empty ] && break
@@ -243,7 +243,7 @@ tmux -L "$SOCKET" kill-window -t "$SESSION:strictblank" 2>/dev/null || true
 if command -v zellij >/dev/null 2>&1; then
   zj_version=$(zellij --version 2>/dev/null | head -1)
   [ -n "$zj_version" ] || zj_version='version-unknown'
-  export FM_ROOT_OVERRIDE="$ROOT"
+  export JG_ROOT_OVERRIDE="$ROOT"
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-backend.sh"
   jg_backend_source zellij 2>/dev/null \

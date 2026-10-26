@@ -14,12 +14,12 @@ Prerequisites:
 - `jq` for JSON responses.
 - The universal harness and toolchain requirements in [`configuration.md`](configuration.md#toolchain).
 
-Select it with local `config/backend` containing `zellij`, `FM_BACKEND=zellij` for one launch, or an explicit request to Juggernaut.
+Select it with local `config/backend` containing `zellij`, `JG_BACKEND=zellij` for one launch, or an explicit request to Juggernaut.
 It is never auto-detected.
 A spawn stops before creating a session or acquiring a worktree when Zellij or `jq` is missing or Zellij is below 0.44.
 
 Juggernaut uses one shared session named `firstmate` by default.
-`FM_ZELLIJ_SESSION` can select another name for isolated verification.
+`JG_ZELLIJ_SESSION` can select another name for isolated verification.
 Attach with:
 
 ```sh
@@ -27,7 +27,7 @@ zellij attach <session-name>
 ```
 
 Routine supervision does not require attachment.
-Use `bin/jg-peek.sh <id>` and `FM_HOME=<home> bin/jg-send.sh <id> '<text>'` against the metadata-routed endpoint.
+Use `bin/jg-peek.sh <id>` and `JG_HOME=<home> bin/jg-send.sh <id> '<text>'` against the metadata-routed endpoint.
 
 Verify setup by spawning a small task and confirming metadata contains `backend=zellij`, `zellij_session=`, `zellij_tab_id=`, and `zellij_pane_id=`.
 

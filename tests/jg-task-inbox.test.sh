@@ -46,7 +46,7 @@ TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 inbox_lib() {  # <state> <function> [args...]
   local state=$1
   shift
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fn=$2
     shift 2
@@ -54,10 +54,10 @@ inbox_lib() {  # <state> <function> [args...]
   ' _ "$ROOT/bin/jg-task-inbox-lib.sh" "$@"
 }
 
-# A fake tmux for the watcher cases: capture-pane replays FM_FAKE_TMUX_CAPTURE,
+# A fake tmux for the watcher cases: capture-pane replays JG_FAKE_TMUX_CAPTURE,
 # display-message yields a numeric cursor row, and every literal send-keys is
-# logged to FM_SEND_LOG so a doorbell ring is observable. With
-# FM_FAKE_TMUX_AGENT set, the inventory lists window jg-t1 and its
+# logged to JG_SEND_LOG so a doorbell ring is observable. With
+# JG_FAKE_TMUX_AGENT set, the inventory lists window jg-t1 and its
 # #{pane_current_command} answers with that value, so `zsh` makes
 # jg_backend_tmux_agent_state read the pane as a dead bare shell.
 make_watch_stubs() {  # <dir> -> echoes fakebin dir
@@ -68,8 +68,8 @@ make_watch_stubs() {  # <dir> -> echoes fakebin dir
 set -u
 case "${1:-}" in
   send-keys)
-    if [ "${FM_FAKE_TMUX_SEND_FAIL:-0}" = 1 ]; then
-      printf 'send failed\n' >> "${FM_SEND_LOG:-/dev/null}"
+    if [ "${JG_FAKE_TMUX_SEND_FAIL:-0}" = 1 ]; then
+      printf 'send failed\n' >> "${JG_SEND_LOG:-/dev/null}"
       exit 1
     fi
     shift
@@ -82,13 +82,13 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s\n' "${1:-}" >> "${FM_SEND_LOG:-/dev/null}"
-      if [ -n "${FM_ACK_RECORD:-}" ] && [ -f "$FM_ACK_RECORD" ]; then
-        mv "$FM_ACK_RECORD" "${FM_ACK_RECORD%/*}/handled/"
+      printf '%s\n' "${1:-}" >> "${JG_SEND_LOG:-/dev/null}"
+      if [ -n "${JG_ACK_RECORD:-}" ] && [ -f "$JG_ACK_RECORD" ]; then
+        mv "$JG_ACK_RECORD" "${JG_ACK_RECORD%/*}/handled/"
       fi
       # A concurrent fire-and-forget send marking its newer record mid-ring.
-      if [ -n "${FM_RING_MARKS_RETRY:-}" ]; then
-        printf '%s\n' "${FM_RING_MARKS_RETRY##*/}" > "${FM_RING_MARKS_RETRY%/*}/.retry-ring"
+      if [ -n "${JG_RING_MARKS_RETRY:-}" ]; then
+        printf '%s\n' "${JG_RING_MARKS_RETRY##*/}" > "${JG_RING_MARKS_RETRY%/*}/.retry-ring"
       fi
     fi
     exit 0 ;;
@@ -96,19 +96,19 @@ case "${1:-}" in
     for a in "$@"; do
       case "$a" in
         *cursor_y*) printf '1\n'; exit 0 ;;
-        *pane_current_command*) [ -z "${FM_FAKE_TMUX_AGENT:-}" ] || { printf '%s\n' "$FM_FAKE_TMUX_AGENT"; exit 0; } ;;
-        *pane_tty*) [ -z "${FM_FAKE_TMUX_AGENT:-}" ] || { printf '\n'; exit 0; } ;;
+        *pane_current_command*) [ -z "${JG_FAKE_TMUX_AGENT:-}" ] || { printf '%s\n' "$JG_FAKE_TMUX_AGENT"; exit 0; } ;;
+        *pane_tty*) [ -z "${JG_FAKE_TMUX_AGENT:-}" ] || { printf '\n'; exit 0; } ;;
       esac
     done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
-    if [ -n "${FM_FAKE_TMUX_CAPTURE:-}" ] && [ -f "$FM_FAKE_TMUX_CAPTURE" ]; then
-      cat "$FM_FAKE_TMUX_CAPTURE"
+    if [ -n "${JG_FAKE_TMUX_CAPTURE:-}" ] && [ -f "$JG_FAKE_TMUX_CAPTURE" ]; then
+      cat "$JG_FAKE_TMUX_CAPTURE"
     else
       printf '╭────╮\n│    │\n╰────╯\n'
     fi
     exit 0 ;;
-  list-windows) [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] || printf 'jg-t1\n'; exit 0 ;;
+  list-windows) [ "${JG_FAKE_TMUX_MISSING:-0}" = 1 ] || printf 'jg-t1\n'; exit 0 ;;
 esac
 exit 0
 SH
@@ -120,11 +120,11 @@ SH
 watch_bg() {  # <state> <fakebin> <out> [extra env assignments...]
   local state=$1 fakebin=$2 out=$3
   shift 3
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" \
-    FM_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" \
-    FM_FAKE_CREW_STATE='state: working · source: run-step · validating (running)' \
-    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_TASK_INBOX_GRACE_SECS=1 \
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" \
+    JG_CREW_STATE_BIN="$fakebin/jg-crew-state.sh" \
+    JG_FAKE_CREW_STATE='state: working · source: run-step · validating (running)' \
+    JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_TASK_INBOX_GRACE_SECS=1 \
     env "$@" "$WATCH" > "$out" 2>/dev/null &
 }
 
@@ -173,7 +173,7 @@ test_write_is_durable_and_exact() {
   doorbell2=$(inbox_lib "$state" jg_task_inbox_doorbell_line "$rec2")
   [ "$doorbell" = "$doorbell2" ] \
     || fail "every record in one inbox should ring the same drain-all doorbell"
-  assert_contains "$doorbell" "list \"\$FM_TASK_INBOX\"/*.msg" "doorbell should list all unhandled records through FM_TASK_INBOX"
+  assert_contains "$doorbell" "list \"\$JG_TASK_INBOX\"/*.msg" "doorbell should list all unhandled records through JG_TASK_INBOX"
   assert_contains "$doorbell" "'t1.inbox' steering inbox" "doorbell should quote and name the inbox"
   assert_contains "$doorbell" "numeric order" "doorbell should require ordered processing"
   assert_contains "$doorbell" "handled/" "doorbell should name the handled dir"
@@ -209,7 +209,7 @@ test_doorbell_is_a_shell_noop() {
   before=$(ls -R "$state/$task.inbox")
   for sh in sh bash zsh; do
     command -v "$sh" >/dev/null 2>&1 || continue
-    out=$(cd "$state" && FM_TASK_INBOX="$state/$task.inbox" "$sh" -c "$doorbell" 2>&1) \
+    out=$(cd "$state" && JG_TASK_INBOX="$state/$task.inbox" "$sh" -c "$doorbell" 2>&1) \
       || fail "$sh executed the hostile-path doorbell with a non-zero status: $out"
     [ -z "$out" ] || fail "$sh produced output while executing the hostile-path doorbell: $out"
     [ ! -e "$marker" ] || fail "$sh executed shell syntax embedded in the inbox name"
@@ -217,7 +217,7 @@ test_doorbell_is_a_shell_noop() {
   # An interactive-style zsh with the line fed on stdin, the closest portable
   # stand-in for a dead pane's login shell reading typed keystrokes.
   if command -v zsh >/dev/null 2>&1; then
-    out=$(cd "$state" && printf '%s\n' "$doorbell" | FM_TASK_INBOX="$state/$task.inbox" zsh -s 2>&1) \
+    out=$(cd "$state" && printf '%s\n' "$doorbell" | JG_TASK_INBOX="$state/$task.inbox" zsh -s 2>&1) \
       || fail "zsh reading the hostile-path doorbell from stdin failed: $out"
     [ -z "$out" ] || fail "zsh printed while reading the hostile-path doorbell: $out"
     [ ! -e "$marker" ] || fail "zsh executed shell syntax from the stdin doorbell"
@@ -249,7 +249,7 @@ test_doorbell_rejects_terminal_controls() {
     [ -z "$doorbell" ] || fail "a rejected $label inbox name emitted doorbell bytes"
     log="$dir/$label.send.log"; : > "$log"
     rc=0
-    PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" \
+    PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" \
       inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
     [ "$rc" = 2 ] || fail "a rejected $label inbox name should return send-failed status 2, got $rc"
     [ ! -s "$log" ] || fail "a $label inbox name reached send-keys:"$'\n'"$(cat "$log")"
@@ -272,25 +272,25 @@ test_ring_skips_dead_agent() {
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "please continue")
   log="$dir/send.log"; : > "$log"
   rc=0
-  PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" FM_FAKE_TMUX_AGENT=zsh \
+  PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" JG_FAKE_TMUX_AGENT=zsh \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 3 ] || fail "a dead agent should return 3 from the ring, got $rc"
   [ ! -s "$log" ] || fail "a dead pane was typed into:"$'\n'"$(cat "$log")"
   [ -f "$rec" ] || fail "skipping the ring must leave the durable record in place"
   rc=0
-  PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" FM_FAKE_TMUX_MISSING=1 \
+  PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" JG_FAKE_TMUX_MISSING=1 \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 3 ] || fail "a missing endpoint should return 3 from the ring, got $rc"
   [ ! -s "$log" ] || fail "a missing endpoint was typed into:"$'\n'"$(cat "$log")"
   [ -f "$rec" ] || fail "skipping a missing endpoint must leave the durable record in place"
   rc=0
-  PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" FM_FAKE_TMUX_AGENT=claude \
+  PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" JG_FAKE_TMUX_AGENT=claude \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 0 ] || fail "a live agent should still be rung, got $rc"
   grep -qF 'Firstmate instruction waiting' "$log" || fail "a live agent did not receive the doorbell"
   : > "$log"
   rc=0
-  PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" \
+  PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" \
     inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1 || rc=$?
   [ "$rc" = 0 ] || fail "an endpoint the classifier cannot see should still be rung, got $rc"
   grep -qF 'Firstmate instruction waiting' "$log" || fail "an unclassifiable endpoint did not receive the doorbell"
@@ -298,9 +298,9 @@ test_ring_skips_dead_agent() {
 }
 
 # A fake tmux whose pane is a Claude-style composer that keeps its content in
-# FM_FAKE_COMPOSER: literal input appends to it, capture renders it wrapped
+# JG_FAKE_COMPOSER: literal input appends to it, capture renders it wrapped
 # between rules, and Enter submits it (logged as SUBMIT) unless
-# FM_FAKE_DROP_ENTERS still holds a count of Enters to swallow.
+# JG_FAKE_DROP_ENTERS still holds a count of Enters to swallow.
 make_composer_stub() {  # <dir>
   mkdir -p "$1/fakebin"
   cat > "$1/fakebin/tmux" <<'SH'
@@ -318,14 +318,14 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "$1" >> "$FM_FAKE_COMPOSER"
+      printf '%s' "$1" >> "$JG_FAKE_COMPOSER"
     elif [ "${1:-}" = Enter ]; then
-      drops=$(cat "$FM_FAKE_DROP_ENTERS" 2>/dev/null || echo 0)
+      drops=$(cat "$JG_FAKE_DROP_ENTERS" 2>/dev/null || echo 0)
       if [ "$drops" -gt 0 ]; then
-        echo $((drops - 1)) > "$FM_FAKE_DROP_ENTERS"
-      elif [ -s "$FM_FAKE_COMPOSER" ]; then
-        printf 'SUBMIT: %s\n' "$(cat "$FM_FAKE_COMPOSER")" >> "$FM_SEND_LOG"
-        : > "$FM_FAKE_COMPOSER"
+        echo $((drops - 1)) > "$JG_FAKE_DROP_ENTERS"
+      elif [ -s "$JG_FAKE_COMPOSER" ]; then
+        printf 'SUBMIT: %s\n' "$(cat "$JG_FAKE_COMPOSER")" >> "$JG_SEND_LOG"
+        : > "$JG_FAKE_COMPOSER"
       fi
     fi
     exit 0 ;;
@@ -335,8 +335,8 @@ case "${1:-}" in
   capture-pane)
     rule=$(printf '─%.0s' $(seq 64))
     printf '● done\n%s\n' "$rule"
-    if [ -s "$FM_FAKE_COMPOSER" ]; then
-      fold -w 60 "$FM_FAKE_COMPOSER" | awk 'NR == 1 { print "❯ " $0; next } { print "  " $0 }'
+    if [ -s "$JG_FAKE_COMPOSER" ]; then
+      fold -w 60 "$JG_FAKE_COMPOSER" | awk 'NR == 1 { print "❯ " $0; next } { print "  " $0 }'
     else
       printf '❯ \n'
     fi
@@ -363,8 +363,8 @@ test_ring_submits_its_own_stuck_doorbell() {
   doorbell=$(inbox_lib "$state" jg_task_inbox_doorbell_line "$rec")
   log="$dir/send.log"; composer="$dir/composer"; drops="$dir/drops"
   ring() {
-    PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" FM_FAKE_COMPOSER="$composer" \
-      FM_FAKE_DROP_ENTERS="$drops" inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1
+    PATH="$dir/fakebin:$PATH" JG_SEND_LOG="$log" JG_FAKE_COMPOSER="$composer" \
+      JG_FAKE_DROP_ENTERS="$drops" inbox_lib "$state" jg_task_inbox_ring tmux sess:jg-t1 "$rec" jg-t1
   }
 
   : > "$log"; printf '%s' "$doorbell" > "$composer"
@@ -436,7 +436,7 @@ test_idempotent_write_follows_concurrent_ack() {
   text="acknowledge while dedup scans"
   rec=$(inbox_lib "$state" jg_task_inbox_write_idempotent "$state" t1 "$text") \
     || fail "race fixture write failed"
-  result=$(FM_STATE_OVERRIDE="$state" bash -c '
+  result=$(JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     eval "$(declare -f jg_task_inbox_body | sed "1s/jg_task_inbox_body/_original_jg_task_inbox_body/")"
     jg_task_inbox_body() {
@@ -513,15 +513,15 @@ test_writer_retries_after_a_vanished_lock_collision() {
   cat > "$fakebin/ln" <<'SH'
 #!/usr/bin/env bash
 set -u
-if [ ! -e "$FM_FAKE_LN_MARKER" ]; then
-  : > "$FM_FAKE_LN_MARKER"
+if [ ! -e "$JG_FAKE_LN_MARKER" ]; then
+  : > "$JG_FAKE_LN_MARKER"
   exit 1
 fi
-exec "$FM_REAL_LN" "$@"
+exec "$JG_REAL_LN" "$@"
 SH
   chmod +x "$fakebin/ln"
 
-  rec=$(PATH="$fakebin:$PATH" FM_REAL_LN="$real_ln" FM_FAKE_LN_MARKER="$marker" \
+  rec=$(PATH="$fakebin:$PATH" JG_REAL_LN="$real_ln" JG_FAKE_LN_MARKER="$marker" \
     inbox_lib "$state" jg_task_inbox_write "$state" t1 "steer after collision") \
     || fail "a writer abandoned an acquisition whose competing lock had already vanished"
   [ -f "$rec" ] || fail "the retry after a vanished lock collision did not write its record"
@@ -546,12 +546,12 @@ test_fire_and_forget_records_never_enter_the_ladder() {
   state="$TMP_ROOT/fire-and-forget/state"; mkdir -p "$state"
   fire=$(inbox_lib "$state" jg_task_inbox_write_idempotent "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
-  action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
+  action=$(JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_RING_MAX=0 \
     inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a fire-and-forget record entered the re-ring ladder: $action"
   tracked=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "tracked steer")
   age_path "$tracked"
-  action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
+  action=$(JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_RING_MAX=0 \
     inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "escalate $tracked 0" ] \
     || fail "a fire-and-forget record hid the later tracked steer: $action"
@@ -563,36 +563,36 @@ test_fire_and_forget_retry_is_owed_once() {
   local state fire tracked action
   state="$TMP_ROOT/faf-retry/state"; mkdir -p "$state" "$TMP_ROOT/faf-retry/config"
   : > "$TMP_ROOT/faf-retry/config/wait-no-turns"
-  export FM_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry/config"
+  export JG_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry/config"
   fire=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
   inbox_lib "$state" jg_task_inbox_mark_retry "$state" t1 "$fire"
-  action=$(FM_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a retry inside grace should be quiet, got: $action"
   age_path "$state/t1.inbox/.retry-ring"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "retry $fire" ] || fail "an aged retry mark should be due its ring, got: $action"
   # An ordinary record's ladder rings the same inbox, so the retry waits behind it.
   tracked=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "tracked steer")
   age_path "$tracked"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $tracked" ] || fail "a pending ordinary record should own the ring, got: $action"
   mv "$tracked" "$state/t1.inbox/handled/"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "retry $fire" ] || fail "the retry should resume once the ordinary record is handled, got: $action"
   # Once spent, the record is quiet for good: no second retry and no escalation.
   inbox_lib "$state" jg_task_inbox_clear_retry "$state" t1 "$fire"
-  action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
+  action=$(JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_RING_MAX=0 \
     inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a spent retry rang or escalated again: $action"
   # An acknowledged record drops its mark.
   inbox_lib "$state" jg_task_inbox_mark_retry "$state" t1 "$fire"
   age_path "$state/t1.inbox/.retry-ring"
   mv "$fire" "$state/t1.inbox/handled/"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an acknowledged record's retry should be dropped, got: $action"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "an acknowledged record kept its retry mark"
-  unset FM_CONFIG_OVERRIDE
+  unset JG_CONFIG_OVERRIDE
   pass "inbox: a fire-and-forget record whose ring did not land is owed exactly one retry"
 }
 
@@ -600,15 +600,15 @@ test_fire_and_forget_retry_is_owed_once() {
 test_fire_and_forget_retry_is_quiet_without_the_flag() {
   local state fire action
   state="$TMP_ROOT/faf-retry-off/state"; mkdir -p "$state" "$TMP_ROOT/faf-retry-off/config"
-  export FM_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry-off/config"
+  export JG_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry-off/config"
   fire=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
   inbox_lib "$state" jg_task_inbox_mark_retry "$state" t1 "$fire"
   age_path "$state/t1.inbox/.retry-ring"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an absent flag still owed a retry ring, got: $action"
   [ -e "$state/t1.inbox/.retry-ring" ] || fail "an absent flag removed a retry mark it should have left"
-  unset FM_CONFIG_OVERRIDE
+  unset JG_CONFIG_OVERRIDE
   pass "inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet"
 }
 
@@ -617,36 +617,36 @@ test_ring_ladder_policy() {
   state="$TMP_ROOT/ladder/state"; mkdir -p "$state"
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "do the thing")
   # Within grace: quiet.
-  action=$(FM_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a fresh unhandled message inside grace should be quiet, got: $action"
   # Past grace: one ring is due.
   age_path "$rec"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "an aged unhandled message should be due a ring, got: $action"
   # A just-recorded ring holds the spacing: quiet until another grace elapses.
   inbox_lib "$state" jg_task_inbox_record_ring "$state" t1 "$rec"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a ring within the spacing window should be quiet, got: $action"
   # Backdate the ladder: the next ring becomes due, and at the budget the
   # action turns into a single escalation.
   printf '001.msg\t1\t100\n' > "$state/t1.inbox/.ring-state"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 JG_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "an aged ladder should ring again, got: $action"
   printf '001.msg\t3\t100\n' > "$state/t1.inbox/.ring-state"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 JG_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "escalate $rec 3" ] || fail "a spent ring budget should escalate, got: $action"
   # Escalation fires at most once per message.
   inbox_lib "$state" jg_task_inbox_record_escalated "$state" t1 "$rec"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 JG_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an escalated message should stay quiet for recovery, got: $action"
   # The acknowledgement resets the ladder: the next message starts fresh.
   mv "$rec" "$state/t1.inbox/handled/"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a handled inbox should be quiet, got: $action"
   [ ! -e "$state/t1.inbox/.escalated" ] || fail "the ack should clear the escalation marker"
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "next thing")
   age_path "$rec"
-  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
+  action=$(JG_TASK_INBOX_GRACE_SECS=60 JG_TASK_INBOX_RING_MAX=3 inbox_lib "$state" jg_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "the next message should start a fresh ladder, got: $action"
   pass "inbox: the re-ring ladder paces by grace, escalates once, and resets on ack"
 }
@@ -672,8 +672,8 @@ test_watcher_rerings_idle_pane_quietly() {
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "please continue")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_TASK_INBOX_RING_MAX=99
   pid=$!
   local i=0
   while [ "$i" -lt 100 ]; do
@@ -682,7 +682,7 @@ test_watcher_rerings_idle_pane_quietly() {
     sleep 0.1
     i=$((i + 1))
   done
-  grep -qF "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
+  grep -qF "Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never re-rang the doorbell:"$'\n'"$(cat "$log")"; }
   kill -0 "$pid" 2>/dev/null \
     || fail "a healthy re-ring must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"
@@ -700,9 +700,9 @@ test_watcher_rerings_idle_pane_quietly() {
 
 # A fresh process for each check proves the busy budget survives watcher restarts.
 busy_steer_check() {  # <case-dir> [capture] [busy-max]
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" FM_SEND_LOG="$1/send.log" \
-    FM_FAKE_TMUX_CAPTURE="${2:-$1/busy.capture}" FM_BUSY_REGEX=BUSYTOKEN \
-    FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_BUSY_MAX="${3-2}" \
+  PATH="$1/fakebin:$PATH" JG_STATE_OVERRIDE="$1/state" JG_SEND_LOG="$1/send.log" \
+    JG_FAKE_TMUX_CAPTURE="${2:-$1/busy.capture}" JG_BUSY_REGEX=BUSYTOKEN \
+    JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_BUSY_MAX="${3-2}" \
     bash -c '. "$1" && inbox_steer_check sess:jg-t1 t1' _ "$WATCH" > "$1/check.out" 2>&1
 }
 
@@ -864,7 +864,7 @@ test_watcher_retry_ignores_busy_reset_failure() {
   inbox_lib "$dir/state" jg_task_inbox_mark_retry "$dir/state" t1 "$rec"
   block_busy_reset "$dir"
   for check in 1 2 3; do
-    FM_CONFIG_OVERRIDE="$dir/config" busy_steer_check "$dir" "$(idle_capture "$dir")"
+    JG_CONFIG_OVERRIDE="$dir/config" busy_steer_check "$dir" "$(idle_capture "$dir")"
     [ ! -s "$dir/state/.wake-queue" ] || fail "fire-and-forget retry escalated a busy reset failure on check $check"
   done
   [ "$(grep -c 'Firstmate instruction waiting' "$dir/send.log")" = 1 ] || fail "fire-and-forget retry did not ring exactly once"
@@ -890,10 +890,10 @@ test_watcher_successor_escalation_stays_quiet() {
     missing) missing=1 ;;
     unwritable) mkdir "$dir/state/t1.inbox/.busy-state" ;;
   esac
-  FM_FAKE_TMUX_AGENT="$agent" FM_FAKE_TMUX_MISSING="$missing" busy_steer_check "$dir"
+  JG_FAKE_TMUX_AGENT="$agent" JG_FAKE_TMUX_MISSING="$missing" busy_steer_check "$dir"
   grep -qF "$rec" "$dir/state/.wake-queue" || fail "$mode successor did not escalate"
   for check in 1 2 3; do
-    FM_FAKE_TMUX_AGENT="$agent" FM_FAKE_TMUX_MISSING="$missing" busy_steer_check "$dir"
+    JG_FAKE_TMUX_AGENT="$agent" JG_FAKE_TMUX_MISSING="$missing" busy_steer_check "$dir"
     [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" = 1 ] \
       || fail "$mode successor escalation repeated on check $check with stale predecessor ring history"
   done
@@ -903,7 +903,7 @@ test_watcher_successor_escalation_stays_quiet() {
   [ -f "$rec" ] || fail "$mode successor lost its unhandled instruction"
   mv "$rec" "$dir/state/t1.inbox/handled/"
   rec=$(inbox_lib "$dir/state" jg_task_inbox_write "$dir/state" t1 "next instruction")
-  [ "$(FM_TASK_INBOX_GRACE_SECS=0 inbox_lib "$dir/state" jg_task_inbox_due_action "$dir/state" t1)" = "ring $rec" ] \
+  [ "$(JG_TASK_INBOX_GRACE_SECS=0 inbox_lib "$dir/state" jg_task_inbox_due_action "$dir/state" t1)" = "ring $rec" ] \
     || fail "$mode successor escalation suppressed the next instruction"
   pass "watcher: $mode successor escalates once despite stale predecessor ring history"
 }
@@ -920,7 +920,7 @@ test_watcher_nonbusy_attempt_resets_busy_streak() {
       ;;
     failed) send_fail=1 ;;
   esac
-  FM_FAKE_TMUX_SEND_FAIL="$send_fail" busy_steer_check "$dir" "$capture"
+  JG_FAKE_TMUX_SEND_FAIL="$send_fail" busy_steer_check "$dir" "$capture"
   case "$mode" in
     protected) [ ! -s "$dir/send.log" ] || fail "protected composer was typed into" ;;
     failed) grep -q '^send failed$' "$dir/send.log" || fail "delivery failure was not exercised" ;;
@@ -944,8 +944,8 @@ test_watcher_quiet_on_healthy_inbox() {
   state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; : > "$log"
   mkdir -p "$state/t1.inbox/handled"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_TASK_INBOX_RING_MAX=99
   pid=$!
   sleep 4
   kill -0 "$pid" 2>/dev/null || fail "the watcher exited on a healthy empty inbox:"$'\n'"$(cat "$out")"
@@ -963,8 +963,8 @@ test_watcher_ack_silences_unwritable_ladder() {
   age_path "$rec"
   mkdir "$state/t1.inbox/.ring-state"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_ACK_RECORD="$rec" FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_ACK_RECORD="$rec" JG_TASK_INBOX_RING_MAX=99
   pid=$!
   while [ "$i" -lt 100 ]; do
     [ -f "$state/t1.inbox/handled/001.msg" ] && break
@@ -993,8 +993,8 @@ test_watcher_surfaces_unwritable_ladder() {
   age_path "$rec"
   mkdir "$state/t1.inbox/.ring-state"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_TASK_INBOX_RING_MAX=99
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher silently retried with unwritable ladder bookkeeping"; }
@@ -1022,9 +1022,9 @@ test_watcher_pays_fire_and_forget_retry_once() {
   inbox_lib "$state" jg_task_inbox_mark_retry "$state" t1 "$fire"
   age_path "$state/t1.inbox/.retry-ring"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_CONFIG_OVERRIDE="$dir/config" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_TASK_INBOX_RING_MAX=1
+    JG_CONFIG_OVERRIDE="$dir/config" \
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_TASK_INBOX_RING_MAX=1
   pid=$!
   while [ "$i" -lt 100 ]; do
     grep -qF 'Firstmate instruction waiting' "$log" 2>/dev/null && break
@@ -1048,8 +1048,8 @@ test_watcher_pays_fire_and_forget_retry_once() {
 # One watcher inbox check against an idle pane, through the production watcher
 # functions, so a status log the case writes is not also read as a wake.
 steer_check_once() {  # <case-dir>
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" FM_SEND_LOG="$1/send.log" \
-    FM_FAKE_TMUX_CAPTURE="$(idle_capture "$1")" FM_TASK_INBOX_GRACE_SECS=1 \
+  PATH="$1/fakebin:$PATH" JG_STATE_OVERRIDE="$1/state" JG_SEND_LOG="$1/send.log" \
+    JG_FAKE_TMUX_CAPTURE="$(idle_capture "$1")" JG_TASK_INBOX_GRACE_SECS=1 \
     bash -c '. "$1" && inbox_steer_check sess:jg-t1 t1' _ "$WATCH" >/dev/null 2>&1
 }
 
@@ -1058,7 +1058,7 @@ test_watcher_holds_retry_while_the_worker_decides() {
   dir=$(setup_watch_case faf-retry-decision)
   mkdir -p "$dir/config"
   : > "$dir/config/wait-no-turns"
-  export FM_CONFIG_OVERRIDE="$dir/config"
+  export JG_CONFIG_OVERRIDE="$dir/config"
   state="$dir/state"; log="$dir/send.log"; : > "$log"
   fire=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
@@ -1076,7 +1076,7 @@ test_watcher_holds_retry_while_the_worker_decides() {
   rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected exactly one retry ring once the decision closed, got $rings:"$'\n'"$(cat "$log")"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the retry mark"
-  unset FM_CONFIG_OVERRIDE
+  unset JG_CONFIG_OVERRIDE
   pass "watcher: a fire-and-forget retry waits out the worker's own decision, then rings once"
 }
 
@@ -1085,14 +1085,14 @@ test_watcher_retry_keeps_a_newer_mark() {
   dir=$(setup_watch_case faf-retry-newer)
   mkdir -p "$dir/config"
   : > "$dir/config/wait-no-turns"
-  export FM_CONFIG_OVERRIDE="$dir/config"
+  export JG_CONFIG_OVERRIDE="$dir/config"
   state="$dir/state"; log="$dir/send.log"; : > "$log"
   fire=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
   inbox_lib "$state" jg_task_inbox_mark_retry "$state" t1 "$fire"
   age_path "$state/t1.inbox/.retry-ring"
   newer=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
-  FM_RING_MARKS_RETRY="$newer" steer_check_once "$dir"
+  JG_RING_MARKS_RETRY="$newer" steer_check_once "$dir"
   rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected the owed retry to ring once, got $rings:"$'\n'"$(cat "$log")"
   [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
@@ -1102,7 +1102,7 @@ test_watcher_retry_keeps_a_newer_mark() {
   rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
   [ "$rings" = 2 ] || fail "the newer record's retry did not ring, got $rings:"$'\n'"$(cat "$log")"
   [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the newer retry mark"
-  unset FM_CONFIG_OVERRIDE
+  unset JG_CONFIG_OVERRIDE
   pass "watcher: spending a retry keeps a newer record's mark written during its ring"
 }
 
@@ -1113,8 +1113,8 @@ test_watcher_escalates_once_after_budget() {
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "please continue")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_TASK_INBOX_RING_MAX=1
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_TASK_INBOX_RING_MAX=1
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never escalated a spent ring budget"; }
@@ -1137,8 +1137,8 @@ test_watcher_dead_pane_escalates_once_without_ringing() {
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "please continue")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
-    FM_FAKE_TMUX_AGENT=zsh FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    JG_FAKE_TMUX_AGENT=zsh JG_TASK_INBOX_RING_MAX=99
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never surfaced a dead pane's unhandled instruction"; }
@@ -1167,8 +1167,8 @@ test_watcher_dead_pane_ignores_stale_busy_state() {
   rec=$(inbox_lib "$state" jg_task_inbox_write "$state" t1 "please continue")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$dir/busy.capture" \
-    FM_FAKE_TMUX_AGENT=zsh FM_BUSY_REGEX=BUSYTOKEN FM_TASK_INBOX_RING_MAX=99
+    JG_SEND_LOG="$log" JG_FAKE_TMUX_CAPTURE="$dir/busy.capture" \
+    JG_FAKE_TMUX_AGENT=zsh JG_BUSY_REGEX=BUSYTOKEN JG_TASK_INBOX_RING_MAX=99
   pid=$!
   wait_watcher_gone "$pid" \
     || { kill "$pid" 2>/dev/null; fail "stale busy state hid a dead pane's unhandled instruction"; }

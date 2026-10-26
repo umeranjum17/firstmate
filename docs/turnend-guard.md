@@ -201,7 +201,7 @@ The guard still requires a fresh beacon, with these results:
 - A daemon that stops restarting its watcher still blocks once the beacon passes grace.
 - A home with no daemon and no watcher blocks exactly as it did before.
 
-That beacon check uses the poll-derived grace described below rather than the flat `FM_GUARD_GRACE` default.
+That beacon check uses the poll-derived grace described below rather than the flat `JG_GUARD_GRACE` default.
 It uses that grace because the daemon starts a fresh one-shot watcher only after it finishes handling the previous wake.
 That handling can legitimately outrun a fixed 300-second window under load (a slow registered check, a busy supervisor pane) with the daemon perfectly healthy throughout.
 
@@ -209,8 +209,8 @@ With `state/.afk` absent the daemon lock proves nothing and the strict watcher p
 
 ### State directory, grace, and missing input
 
-- `FM_STATE_OVERRIDE` wins over `FM_HOME/state`, and `FM_HOME` wins over repository-root `state/`.
-- `FM_GUARD_GRACE` controls beacon freshness and defaults to 300 seconds.
+- `JG_STATE_OVERRIDE` wins over `JG_HOME/state`, and `JG_HOME` wins over repository-root `state/`.
+- `JG_GUARD_GRACE` controls beacon freshness and defaults to 300 seconds.
 - If `jq` is missing or hook stdin is empty, the guard exits 0 because it cannot safely read loop-guard fields.
 
 ### Guard grace and the poll cadence
@@ -219,21 +219,21 @@ Only `bin/jg-watch.sh` publishes `state/.last-watcher-beat`: it clears the prede
 Startup confirmation therefore requires resumed supervision; an actionable wake that exits before the beacon is handled through the arm's delivery path instead.
 A healthy watcher's beacon ages through the terminal wait and the following scan, so slow task checks also count toward its age.
 
-A fixed 300-second grace default stops correctly bounding staleness once a home's `FM_POLL` reaches or exceeds it.
+A fixed 300-second grace default stops correctly bounding staleness once a home's `JG_POLL` reaches or exceeds it.
 A perfectly healthy watcher mid-wait would then read stale at the edge of every full poll cycle by definition.
-That is exactly what a long-poll home (`FM_POLL=300`) hit against the Claude Stop-hook auto-arm (`bin/jg-claude-stop-autoarm.sh`).
+That is exactly what a long-poll home (`JG_POLL=300`) hit against the Claude Stop-hook auto-arm (`bin/jg-claude-stop-autoarm.sh`).
 
 Two readers derive their default grace from the configured poll instead of a bare constant:
 
 - That hook.
 - `bin/jg-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal).
 
-Both use `max(300, FM_POLL + 60)`.
+Both use `max(300, JG_POLL + 60)`.
 The default never drops below the historical 300-second floor for the common short-poll case, but grows with the poll cadence once that cadence would otherwise outrun it.
 `jg_poll_derived_grace` in `bin/jg-wake-lib.sh` is the single owner of that formula.
 
 That refusal has a ceiling.
-Once the live holder's beacon is stale past `FM_WATCHER_STALL_BOUND` (default three times the grace), or its lock's PID record reaches that age without a first beacon, the re-arm takes these steps:
+Once the live holder's beacon is stale past `JG_WATCHER_STALL_BOUND` (default three times the grace), or its lock's PID record reaches that age without a first beacon, the re-arm takes these steps:
 
 1. It re-verifies the holder against the lock's recorded identity.
 2. It retires the holder and its recorded descendants, matching each child's PID and start identity even after reparenting; unrelated or reused PIDs are protected.
@@ -248,14 +248,14 @@ Below that bound a stale beacon alone does not end an attached arm's watch of a 
 At the bound the arm reports a typed stalled-holder failure so its owner's retry can replace the holder.
 `jg_watcher_stall_bound` in `bin/jg-wake-lib.sh` owns the shared derivation; `bin/jg-watch-arm.sh`'s header owns the exact attached-arm close behavior.
 
-The auto-arm hook additionally exports its resolved `FM_GUARD_GRACE` when it forks `bin/jg-watch-arm.sh`.
+The auto-arm hook additionally exports its resolved `JG_GUARD_GRACE` when it forks `bin/jg-watch-arm.sh`.
 The arm wrapper and the watcher it may start then judge staleness with the exact same value the hook just judged it with, whether that value came from an operator override or the poll-derived default.
 
 `bin/jg-turnend-guard.sh`'s daemon-ownership branch (`jg_afk_daemon_owns_supervision`, above, covering both away and quiet mode) also derives its beacon grace from `jg_poll_derived_grace` rather than falling back to the bare 300-second default.
 The reason is the same.
 The daemon's watcher-restart cadence there is not a fixed poll loop, so a flat grace misreads a daemon that is genuinely still cycling as down.
 
-Every other direct `FM_GUARD_GRACE` reader still falls back to the bare 300-second default unless `FM_GUARD_GRACE` is set explicitly in the environment.
+Every other direct `JG_GUARD_GRACE` reader still falls back to the bare 300-second default unless `JG_GUARD_GRACE` is set explicitly in the environment.
 Those readers are:
 
 - `bin/jg-guard.sh`.
@@ -329,7 +329,7 @@ Under the default one-shot behavior, that re-opened the 2026-07-21 blind window.
 
 Before the Claude cooperative budget can re-block a Stop, the guard checks for a live foreign session-lock owner and takes the same safe diagnostic exit described under "Guard predicates" ([foreign session-lock owner](#foreign-session-lock-owner)).
 
-The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 800 milliseconds).
+The Claude mode waits up to `JG_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 800 milliseconds).
 It allows the stop when any of these holds:
 
 - The watcher is healthy.
@@ -405,7 +405,7 @@ Claude drops that exit 2 when it terminated the hook at the configured timeout i
 
 The first fresh exhausted-failure epoch preserves its handoff without consuming a blocked-stop count.
 Later fresh failed epochs advance the same monotonic progression instead of resetting it.
-When none of those proofs appears, the guard re-blocks up to `FM_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude's 8-block override).
+When none of those proofs appears, the guard re-blocks up to `JG_CLAUDE_TURNEND_BLOCK_BUDGET` times (default 3, below Claude's 8-block override).
 In Claude mode, positive watcher recovery clears the block budget, failure notice, and attended alarm together under the existing budget lock before either hook reports ordinary recovery.
 
 The block budget is charged by two rules:
@@ -489,14 +489,14 @@ When either Cursor identity marker is present, the park still runs despite a lea
 #### Cursor repair nag and loop bounds
 
 When the park cannot establish a cycle it asks this shared guard with `--cursor` and renders a returned exit 2 as one bounded `turn-end-guard` follow-up.
-Those nags are capped by `FM_CURSOR_TURNEND_BLOCK_BUDGET` (default 3) consecutive unproductive nags per session.
+Those nags are capped by `JG_CURSOR_TURNEND_BLOCK_BUDGET` (default 3) consecutive unproductive nags per session.
 A delivered wake resets that budget because it is productive work.
 
 The follow-up loop is bounded TWICE, because either bound alone is insufficient:
 
 - `loop_limit` in `.cursor/hooks.json` is Cursor's own ceiling and the only one that still holds if the adapter is broken or replaced.
   Once `loop_count` reaches it Cursor stops invoking the hook, verified live.
-- `FM_CURSOR_TURNEND_LOOP_CEILING` (default 180) bounds the payload's `loop_count` from inside and sits deliberately BELOW the registered `loop_limit`.
+- `JG_CURSOR_TURNEND_LOOP_CEILING` (default 180) bounds the payload's `loop_count` from inside and sits deliberately BELOW the registered `loop_limit`.
   Juggernaut's bound therefore bites first and emits one final loud notice instead of supervision going silently dark at Cursor's ceiling.
 
 `loop_count` is Cursor's richer analogue of `stop_hook_active`.
@@ -560,7 +560,7 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 - The predicate.
 - Main and secondmate primary scope.
 - Child-worktree exclusion.
-- `FM_HOME` and `FM_STATE_OVERRIDE` precedence.
+- `JG_HOME` and `JG_STATE_OVERRIDE` precedence.
 - The live-lock and fresh-beacon guard predicate.
 - The cooperative `--claude` open-generation claim wait.
 - Monotonic failed-epoch progression.
@@ -570,7 +570,7 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 - Positive recovery reset.
 - Generation and legacy claim cases that must block or clear instead of allowing a blind stop.
 - Away-mode daemon ownership between watcher cycles and over a watcher lock left behind by an exited watcher, plus its dead, pid-reused, absent, stale-beacon, and away-mode-off negatives.
-- The away-mode beacon's poll-derived grace widening for a live daemon still mid-cycle and its bound against a dead daemon, a beacon older than that wider grace, and FM_POLL's inapplicability with away mode off.
+- The away-mode beacon's poll-derived grace widening for a live daemon still mid-cycle and its bound against a dead daemon, a beacon older than that wider grace, and JG_POLL's inapplicability with away mode off.
 - Pi logical-run latching.
 - Missing-`jq` behavior.
 - All five primary registrations.
@@ -608,8 +608,8 @@ It also covers true-reason banner wording and reason-keyed episode dedup survivi
 
 The opt-in live tests are:
 
-- `FM_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` is the opt-in guard that proves the Cursor park behavior covered by `tests/jg-cursor-primary.test.sh` against the installed cursor-agent and fails naming the harness and version.
-- `FM_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh` is the opt-in isolated Pi path.
-- `FM_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh` is the opt-in isolated omp path.
+- `JG_CURSOR_PRIMARY_LIVE_E2E=1 tests/jg-cursor-primary-live-e2e.test.sh` is the opt-in guard that proves the Cursor park behavior covered by `tests/jg-cursor-primary.test.sh` against the installed cursor-agent and fails naming the harness and version.
+- `JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh` is the opt-in isolated Pi path.
+- `JG_OMP_LIVE_E2E=1 tests/jg-omp-primary-live-e2e.test.sh` is the opt-in isolated omp path.
 
 [`verification/supervision.md`](verification/supervision.md#turn-end-guard) records the active cross-harness empirical evidence, including the current Claude `asyncRewake` revalidation.

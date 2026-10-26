@@ -42,7 +42,7 @@ run_everywhere() {  # <label> <script> [args...]
   shift 2
   while IFS= read -r interpreter; do
     while IFS= read -r loc; do
-      out=$(LC_ALL=$loc FM_STATE_OVERRIDE="$TMP_ROOT/state" "$interpreter" "$script" "$ROOT" "$@" 2>&1) \
+      out=$(LC_ALL=$loc JG_STATE_OVERRIDE="$TMP_ROOT/state" "$interpreter" "$script" "$ROOT" "$@" 2>&1) \
         || fail "$label failed under $interpreter ($loc): $out"
       [ -z "$out" ] || fail "$label differs under $interpreter ($loc):"$'\n'"$out"
     done < <(test_locales)
@@ -151,7 +151,7 @@ for marker in "$2"/*; do
         case "${line##*:}" in ''|*[!A-Za-z0-9._-]*) ;; *) want="accept:$line" ;; esac ;;
     esac
   fi
-  if jg_recovery_marker_read "$marker"; then got="accept:$FM_RECOVERY_MARKER_TOKEN"; else got=reject; fi
+  if jg_recovery_marker_read "$marker"; then got="accept:$JG_RECOVERY_MARKER_TOKEN"; else got=reject; fi
   [ "$got" = "$want" ] || printf 'marker %s: helper %q, reference %q\n' "${marker##*/}" "$got" "$want"
 done
 SH
@@ -225,8 +225,8 @@ SH
   pass "classify stat helpers resolve the kernel name once per process"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
+if [ -n "${JG_TEST_ONLY:-}" ]; then
+  "$JG_TEST_ONLY"
 else
   test_path_helpers_match_dirname_and_basename
   test_epoch_helper_matches_date_and_never_forks_more

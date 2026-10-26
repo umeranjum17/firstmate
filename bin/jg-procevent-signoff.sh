@@ -59,7 +59,7 @@
 # closes nothing.
 #
 # Board keys are `jg-<tag>-<task-id>-<stamp>`, where <tag> is a stable digest of
-# FM_HOME and <stamp> is the hold-set stamp in alphanumerics only. The default
+# JG_HOME and <stamp> is the hold-set stamp in alphanumerics only. The default
 # board is shared by every home on the machine, so the tag keeps one home from
 # being handed another home's answer, and the stamp gives each hold occurrence
 # its own card. sign-off-axi must be on PATH: without it `arm`
@@ -72,10 +72,10 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-export FM_HOME
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+export JG_HOME
 
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
@@ -104,7 +104,7 @@ signoff() {
 }
 
 home_key_prefix() {
-  printf 'jg-%s-' "$(printf '%s' "$FM_HOME" | cksum | awk '{printf "%08x", $1}')"
+  printf 'jg-%s-' "$(printf '%s' "$JG_HOME" | cksum | awk '{printf "%08x", $1}')"
 }
 
 stamp_token() { printf '%s' "$1" | tr -cd 'A-Za-z0-9'; }

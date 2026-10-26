@@ -10,18 +10,18 @@ the live watcher runs today.
 
 Step A of the fork exit: the library runs from this directory. Its sibling
 libraries (`jg-parent-channel-lib.sh`, `jg-timeout-lib.sh`) are read from the
-fork's `bin/` (`$SCRIPT_DIR`, else `$FM_PUSH_TRANSITION_LIB_DIR`, else
-`$FM_HOME/bin`). The library body is otherwise identical to the fork copy.
+fork's `bin/` (`$SCRIPT_DIR`, else `$JG_PUSH_TRANSITION_LIB_DIR`, else
+`$JG_HOME/bin`). The library body is otherwise identical to the fork copy.
 
 ## Step-B hook lines (fork)
 
 - `bin/jg-watch.sh` and `bin/jg-push-transition-lib.sh`: replace the sourcing of
   the fork's `jg-wait-timers-lib.sh` with
-  `[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"`.
+  `[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"`.
 - Tick: `if declare -F jg_wait_timers_tick >/dev/null; then jg_wait_timers_tick || { echo "watcher: waiting-state timer check failed" >&2; exit 1; }; fi`.
 - Push: `if [ -n "$task" ] && declare -F jg_wait_timer_push_delivered >/dev/null; then jg_wait_timer_push_delivered "$task" "$window" || exit 1; fi`.
 
-`tests/wait-timers-hook-e2e.sh` (set `FM_TEST_FORK` to a Firstmate checkout)
+`tests/wait-timers-hook-e2e.sh` (set `JG_TEST_FORK` to a Firstmate checkout)
 uses the fork's post-step-B hook lines unchanged, copies this add-on's moved
 `tests/jg-wait-timers.test.sh` journey into a private fork copy, and runs it with
 this library installed; it also checks that the optional hooks are no-ops when
@@ -41,7 +41,7 @@ the add-on is absent.
 
 ## Frozen contract (identical to the fork)
 
-- Entry: `jg_wait_timers_tick` (no arguments; reads `FM_HOME` and `STATE`).
+- Entry: `jg_wait_timers_tick` (no arguments; reads `JG_HOME` and `STATE`).
   Called once per watcher poll.
 - `jg_wait_timer_push_delivered <task> <window>` — records that an immediate
   native push already told the owner about this blocked lane, so the poll
@@ -50,8 +50,8 @@ the add-on is absent.
   <misses>`, `jg_wait_timer_report <status-line>`,
   `jg_wait_timer_owner_delivered` — episode persistence, parent reporting,
   and the post-wake hook the owner alert installs.
-- Environment: `FM_WAIT_ALERT_SECS` (default 300) for the owner recheck,
-  `FM_WAIT_ESCALATE_SECS` (default 900) for escalation; a declared pause
+- Environment: `JG_WAIT_ALERT_SECS` (default 300) for the owner recheck,
+  `JG_WAIT_ESCALATE_SECS` (default 900) for escalation; a declared pause
   rechecks at the pause cadence instead, never the owner-alert threshold.
 - Episode record: one tab-separated line per lane at
   `state/.waiting-timers/<task>` holding signature, first-observed time,

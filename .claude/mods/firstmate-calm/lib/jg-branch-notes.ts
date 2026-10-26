@@ -17,9 +17,9 @@ export const BRANCH_NOTES_REPLAY_LIMIT = 20;
 export const BRANCH_NOTES_SESSIONS_KEPT = 20;
 
 export type FirstmateStateEnvironment = {
-  readonly FM_HOME?: string | undefined;
-  readonly FM_ROOT_OVERRIDE?: string | undefined;
-  readonly FM_STATE_OVERRIDE?: string | undefined;
+  readonly JG_HOME?: string | undefined;
+  readonly JG_ROOT_OVERRIDE?: string | undefined;
+  readonly JG_STATE_OVERRIDE?: string | undefined;
 };
 
 export type OutcomeRow = {
@@ -33,7 +33,7 @@ export type OutcomeRow = {
 
 /** The home's state directory, resolved as the Pi extension resolves it. */
 export function firstmateStateDirectory(env: FirstmateStateEnvironment, pluginRoot: string): string {
-  return env.FM_STATE_OVERRIDE || `${env.FM_HOME || env.FM_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/state`;
+  return env.JG_STATE_OVERRIDE || `${env.JG_HOME || env.JG_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/state`;
 }
 
 function parseOutcomeRow(value: unknown): OutcomeRow | undefined {

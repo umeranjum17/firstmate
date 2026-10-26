@@ -12,7 +12,7 @@
 #       Recreate <hooks-dir> as a core.hooksPath for this launch: a commit-msg
 #       hook that runs this strip, plus one wrapper per client-side hook name
 #       git documents except reference-transaction and post-index-change,
-#       which are deliberately excluded (see FM_GIT_CLIENT_HOOKS below).
+#       which are deliberately excluded (see JG_GIT_CLIENT_HOOKS below).
 #       Each wrapper removes this directory's own core.hooksPath entry from
 #       GIT_CONFIG_*, keeping every inherited entry (a scoped credential.helper,
 #       safe.directory) for the repository's hook, and then resolves
@@ -233,7 +233,7 @@ EOF
 # one commit goes ~76ms -> ~276ms, and a 60-commit rebase 0.74s -> 3.7s. They
 # stay because git-lfs installs post-commit, post-checkout, post-merge and
 # pre-push, and a slower rebase inside a pane is the accepted price.
-FM_GIT_CLIENT_HOOKS='applypatch-msg pre-applypatch post-applypatch pre-commit
+JG_GIT_CLIENT_HOOKS='applypatch-msg pre-applypatch post-applypatch pre-commit
 pre-merge-commit prepare-commit-msg post-commit pre-rebase post-checkout
 post-merge pre-push post-rewrite pre-auto-gc sendemail-validate'
 
@@ -290,7 +290,7 @@ $(quote_for_hook "$SELF") "\$1" || exit \$?
 $(runtime_chain_body "$hooks_dir")
 EOF
 
-  for name in $FM_GIT_CLIENT_HOOKS; do
+  for name in $JG_GIT_CLIENT_HOOKS; do
     write_executable "$hooks_dir/$name" <<EOF
 #!/usr/bin/env bash
 set -u

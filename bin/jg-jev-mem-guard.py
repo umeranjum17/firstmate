@@ -38,7 +38,7 @@ Settings are owned by docs/configuration.md "Host memory guard".
 The former diagnostic --check, --json, and percentage-threshold flags are unsupported.
 Consumers are summed RSS plus swap per owner, using the longest matching recorded
 worktree or explicit home path for the process's working directory.
-A matching FM_TASK_ID must also qualify against that task's recorded worktree or
+A matching JG_TASK_ID must also qualify against that task's recorded worktree or
 explicit home; an ID alone never establishes ownership, and unmatched processes
 are named by command and PID rather than interrupted.
 Home identity comes from each --state-dir HOME DIR pair, never DIR's parent.
@@ -47,7 +47,7 @@ local secondmate's home remains owned by its parent-recorded secondmate task.
 RSS includes shared pages per process, so these totals rank consumers rather than
 accounting for unique physical memory.
 Remote records (remote_host set) never contribute local task or home owners.
-The proc root is FM_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
+The proc root is JG_HOST_MEMORY_PROC (default /proc). Exit 2: usage or an invalid
 config file, with the reason on stderr.
 """
 
@@ -58,10 +58,10 @@ import sys
 import tempfile
 import time
 
-PROC = os.environ.get("FM_HOST_MEMORY_PROC") or "/proc"
+PROC = os.environ.get("JG_HOST_MEMORY_PROC") or "/proc"
 DEFAULTS = {"wait_pressure": 20.0, "wait_available_gb": 12.0, "alert_pressure": 35.0, "alert_available_gb": 6.0}
 KEEP_ROWS = 8640
-CGROUP_ROOT = os.environ.get("FM_HOST_MEMORY_CGROUP_ROOT") or "/sys/fs/cgroup"
+CGROUP_ROOT = os.environ.get("JG_HOST_MEMORY_CGROUP_ROOT") or "/sys/fs/cgroup"
 GIB_KB = 1048576
 
 
@@ -222,7 +222,7 @@ def consumers(state_dirs, top=3):
         matches = []
         try:
             tid = next((e[11:].decode(errors="replace") for e in open(f"{base}/environ", "rb").read().split(b"\0")
-                        if e.startswith(b"FM_TASK_ID=")), "")
+                        if e.startswith(b"JG_TASK_ID=")), "")
             matches = tasks.get(tid, [])
         except OSError:
             pass

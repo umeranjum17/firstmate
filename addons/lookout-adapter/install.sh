@@ -1,17 +1,26 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # install.sh [--dry-run] [--rollback]: replace the old fleet dashboard (jg-dashboard.service) with Lookout on its address.
 #   (default)    start the new unit's command on a spare port, check it with curl, then swap: stop the old unit and start the new
 #                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
 #   --dry-run    print every step and the unit; change nothing.
 #   --rollback   stop and remove the new unit, start the old one again (with --dry-run: print only).
-# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), FM_HOME (default ~/firstmate),
+# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), JG_HOME (default ~/firstmate),
 # PORT (the old dashboard's port, default 4390), BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 mode=apply dry=no
 for arg in "$@"; do case $arg in --dry-run) dry=yes ;; --rollback) mode=rollback ;; *) echo "usage: install.sh [--dry-run] [--rollback]" >&2; exit 2 ;; esac; done
 [ "$dry" = no ] || { [ "$mode" = rollback ] && mode=rollback-dry || mode=dry; }
-FM_HOME=${FM_HOME:-$HOME/firstmate} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
+JG_HOME=${JG_HOME:-$HOME/firstmate} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
 OLD=jg-dashboard.service NEW=jg-dashboard-lookout.service
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 BIND=${BIND:-$(tailscale ip -4 | head -1)}
@@ -23,7 +32,7 @@ Description=Firstmate fleet dashboard: Lookout on the adapter (tailnet only)
 After=tailscaled.service network-online.target
 
 [Service]
-Environment=FM_HOME=$FM_HOME LOOKOUT_DIR=$LOOKOUT_DIR PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=JG_HOME=$JG_HOME LOOKOUT_DIR=$LOOKOUT_DIR PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=$here/fleet-serve --bind $BIND --port $PORT
 Restart=always
 RestartSec=10
@@ -46,7 +55,7 @@ fi
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
 probe=jg-dashboard-lookout-probe
-run systemd-run --user --collect --unit "$probe" --setenv=FM_HOME="$FM_HOME" --setenv=LOOKOUT_DIR="$LOOKOUT_DIR" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
+run systemd-run --user --collect --unit "$probe" --setenv=JG_HOME="$JG_HOME" --setenv=LOOKOUT_DIR="$LOOKOUT_DIR" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
 if [ "$mode" = apply ]; then
   trap 'systemctl --user stop "$probe" 2>/dev/null || true' EXIT
   for _ in $(seq 100); do curl -fs "http://$BIND:$SPARE_PORT/api/fleet" -o /dev/null && break; sleep 0.3; done

@@ -13,7 +13,7 @@
 #     read-once contract precedes both
 #   - context-aware next-step guidance for read-only, AFK, X mode, and normal
 #     watcher ownership
-#   - status-tail bounding, default and FM_SESSION_START_STATUS_TAIL override
+#   - status-tail bounding, default and JG_SESSION_START_STATUS_TAIL override
 #   - the per-line status-tail cap and its truncation marker
 #   - startup backlog composition: done rows dropped, every in-flight/held/
 #     blocked row kept whole, the dispatchable queued listing bounded with an
@@ -37,14 +37,14 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/wake-helpers.sh"
 
 SESSION_START="$ROOT/bin/jg-session-start.sh"
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-session-start-tests)
 SESSION_START_TEST_HARNESS_PID=$$
 SESSION_START_SECOND_MATE_ID="fmtest-sm-${TMP_ROOT##*.}"
 SESSION_START_SECOND_MATE_TMP="/tmp/jg-$SESSION_START_SECOND_MATE_ID"
 SESSION_START_HERDR_SECOND_MATE_ID="fmtest-herdr-${TMP_ROOT##*.}"
 SESSION_START_HERDR_SECOND_MATE_TMP="/tmp/jg-$SESSION_START_HERDR_SECOND_MATE_ID"
-FM_TEST_CLEANUP_DIRS+=("$TMP_ROOT" "$SESSION_START_SECOND_MATE_TMP" "$SESSION_START_HERDR_SECOND_MATE_TMP")
+JG_TEST_CLEANUP_DIRS+=("$TMP_ROOT" "$SESSION_START_SECOND_MATE_TMP" "$SESSION_START_HERDR_SECOND_MATE_TMP")
 trap jg_test_cleanup EXIT
 jg_git_identity fmtest fmtest@example.invalid
 
@@ -52,7 +52,7 @@ jg_git_identity fmtest fmtest@example.invalid
 
 # new_world <name>: a real, throwaway git repo on `main` (so the worktree-tangle
 # and default-branch checks behave exactly as they do against the real
-# firstmate repo) to use as FM_ROOT_OVERRIDE, plus an empty FM_HOME with
+# firstmate repo) to use as JG_ROOT_OVERRIDE, plus an empty JG_HOME with
 # state/, data/, config/, and a fakebin. Echoes "<root-dir>|<home-dir>|<fakebin>".
 new_world() {
   local name=$1 w root home fakebin
@@ -72,7 +72,7 @@ new_world() {
 make_fake_toolchain() {
   local fakebin=$1
   jg_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -112,16 +112,16 @@ SH
 # four group filters the startup listing composes (in-flight, held, blocked
 # queued, and the dispatchable ready set) and REFUSES anything the recovery
 # listing must never ask for: a body field, an unfiltered whole-backlog listing,
-# or done rows. FM_FAKE_TASKS_AXI_READY sizes the ready set so the queued bound
+# or done rows. JG_FAKE_TASKS_AXI_READY sizes the ready set so the queued bound
 # can be driven past its limit.
 make_fake_tasks_axi_compact() {
   local fakebin=$1
   cat > "$fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
 set -u
-log=${FM_FAKE_TASKS_AXI_LOG:-}
+log=${JG_FAKE_TASKS_AXI_LOG:-}
 [ -n "$log" ] && printf '%s\n' "$*" >> "$log"
-ready_count=${FM_FAKE_TASKS_AXI_READY:-2}
+ready_count=${JG_FAKE_TASKS_AXI_READY:-2}
 require_file() {
   case "$*" in *'--file '*) return 0 ;; esac
   printf '%s\n' 'missing explicit backlog file' >&2
@@ -220,8 +220,8 @@ make_fake_ps_harness() {
 set -u
 # The ancestry this stub reports defaults to the harness the fixture was built
 # for, so a case that builds a pi (or codex) fixture gets pi (or codex) ancestry
-# without having to repeat it per run; FM_FAKE_HARNESS still overrides it.
-harness=\${FM_FAKE_HARNESS:-$harness}
+# without having to repeat it per run; JG_FAKE_HARNESS still overrides it.
+harness=\${JG_FAKE_HARNESS:-$harness}
 SH
   cat >> "$fakebin/ps" <<'SH'
 pid=
@@ -232,8 +232,8 @@ for argument in "$@"; do
 done
 case "$*" in
   *"comm="*)
-    if [ -z "${FM_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$FM_FAKE_HARNESS_PID" ] \
-      || [ "$pid" = "${FM_FAKE_LIVE_HOLDER_PID:-}" ]; then
+    if [ -z "${JG_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$JG_FAKE_HARNESS_PID" ] \
+      || [ "$pid" = "${JG_FAKE_LIVE_HOLDER_PID:-}" ]; then
       printf '/usr/local/bin/%s\n' "$harness"
     else
       printf '/bin/bash\n'
@@ -241,8 +241,8 @@ case "$*" in
     exit 0
     ;;
   *"args="*)
-    if [ -z "${FM_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$FM_FAKE_HARNESS_PID" ] \
-      || [ "$pid" = "${FM_FAKE_LIVE_HOLDER_PID:-}" ]; then
+    if [ -z "${JG_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$JG_FAKE_HARNESS_PID" ] \
+      || [ "$pid" = "${JG_FAKE_LIVE_HOLDER_PID:-}" ]; then
       printf '%s\n' "$harness"
     else
       printf 'bash\n'
@@ -250,7 +250,7 @@ case "$*" in
     exit 0
     ;;
   *"ppid="*)
-    [ -n "${FM_FAKE_HARNESS_PID:-}" ] || exit 1
+    [ -n "${JG_FAKE_HARNESS_PID:-}" ] || exit 1
     /bin/ps -o ppid= -p "$pid"
     ;;
 esac
@@ -322,19 +322,19 @@ SH
 
 # make_fake_tmux_secondmate_recovery <fakebin>: a stateful tmux boundary
 # fixture for the real session-start -> bootstrap -> spawn path.
-# FM_FAKE_TMUX_MODE selects missing, ambiguous, unreadable, or shell; missing
+# JG_FAKE_TMUX_MODE selects missing, ambiguous, unreadable, or shell; missing
 # reproduces real tmux's active-window fallback while inventory omits the mate.
 make_fake_tmux_secondmate_recovery() {
   local fakebin=$1
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-mode=${FM_FAKE_TMUX_MODE:?}
-log=${FM_FAKE_TMUX_LOG:?}
-spawned=${FM_FAKE_TMUX_SPAWNED:?}
+mode=${JG_FAKE_TMUX_MODE:?}
+log=${JG_FAKE_TMUX_LOG:?}
+spawned=${JG_FAKE_TMUX_SPAWNED:?}
 killed=${spawned}.killed
-mate_home=${FM_FAKE_SECOND_MATE_HOME:?}
-mate_id=${FM_FAKE_SECOND_MATE_ID:?}
+mate_home=${JG_FAKE_SECOND_MATE_HOME:?}
+mate_id=${JG_FAKE_SECOND_MATE_ID:?}
 mate_window="jg-$mate_id"
 case "${1:-}" in
   display-message)
@@ -417,9 +417,9 @@ make_fake_herdr_secondmate_recovery() {
   cat > "$fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-log=${FM_FAKE_HERDR_LOG:?}
-state=${FM_FAKE_HERDR_STATE:?}
-mate_id=${FM_FAKE_SECOND_MATE_ID:?}
+log=${JG_FAKE_HERDR_LOG:?}
+state=${JG_FAKE_HERDR_STATE:?}
+mate_id=${JG_FAKE_SECOND_MATE_ID:?}
 killed="${state}.killed"
 spawned="${state}.spawned"
 printf '%s\n' "$*" >> "$log"
@@ -557,7 +557,7 @@ SH
 # run_session_start <home> <root> <path>
 # Drop every harness env marker from bin/jg-harness.sh detect_own so the
 # surrounding interactive shell cannot leak past the suite's fake ps harness.
-# Markers today: CLAUDECODE (claude), PI_CODING_AGENT plus FM_PI_HARNESS
+# Markers today: CLAUDECODE (claude), PI_CODING_AGENT plus JG_PI_HARNESS
 # (Pi family), GROK_AGENT (grok).
 # codex and opencode have no env markers (ancestry only). Without this, a local
 # claude/pi/grok session fails cases that pin a different fake harness while CI
@@ -565,12 +565,12 @@ SH
 run_session_start() {
   local home=$1 root=$2 path=$3 pi_harness=${4:-}
   if [ -n "$pi_harness" ]; then
-    env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true FM_PI_HARNESS="$pi_harness" \
-      FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$path" \
+    env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true JG_PI_HARNESS="$pi_harness" \
+      JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$path" \
       "$SESSION_START"
   else
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-      FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$path" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+      JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$path" \
       "$SESSION_START"
   fi
 }
@@ -578,18 +578,18 @@ run_session_start() {
 run_pi_session_start() {  # <home> <root> <path> [jg-session-start args...]
   local home=$1 root=$2 path=$3
   shift 3
-  env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true FM_PI_HARNESS=pi \
-    FM_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$path" \
+  env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true JG_PI_HARNESS=pi \
+    JG_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$path" \
     "$SESSION_START" "$@"
 }
 
 run_named_harness_session_start() {  # <harness> <home> <root> <path> [jg-session-start args...]
   local harness=$1 home=$2 root=$3 path=$4
   shift 4
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    FM_FAKE_HARNESS="$harness" FM_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$path" \
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    JG_FAKE_HARNESS="$harness" JG_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$path" \
     "$SESSION_START" "$@"
 }
 
@@ -632,10 +632,10 @@ EOF
 
 run_session_start_secondmate() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 spawned=$6 mode=$7
-  TMUX='' FM_BACKEND=tmux FM_FAKE_TMUX_MODE="$mode" FM_FAKE_TMUX_LOG="$log" \
-    FM_FAKE_TMUX_SPAWNED="$spawned" FM_FAKE_SECOND_MATE_HOME="$mate" \
-    FM_FAKE_SECOND_MATE_ID="$SESSION_START_SECOND_MATE_ID" \
-    FM_FAKE_HARNESS_PID=$$ \
+  TMUX='' JG_BACKEND=tmux JG_FAKE_TMUX_MODE="$mode" JG_FAKE_TMUX_LOG="$log" \
+    JG_FAKE_TMUX_SPAWNED="$spawned" JG_FAKE_SECOND_MATE_HOME="$mate" \
+    JG_FAKE_SECOND_MATE_ID="$SESSION_START_SECOND_MATE_ID" \
+    JG_FAKE_HARNESS_PID=$$ \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 
@@ -681,9 +681,9 @@ EOF
 
 run_session_start_herdr_secondmate() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 state=$6
-  FM_BACKEND=herdr FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_STATE="$state" \
-    FM_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
-    FM_FAKE_HARNESS_PID=$$ \
+  JG_BACKEND=herdr JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_STATE="$state" \
+    JG_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
+    JG_FAKE_HARNESS_PID=$$ \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 
@@ -694,7 +694,7 @@ run_session_start_herdr_secondmate() {
 # here instead of straight off the digest's own output.
 wait_for_network_stage() {
   local home=$1 root=$2 limit=${3:-30}
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
     "$ROOT/bin/jg-startup-network.sh" wait "$limit"
 }
 
@@ -710,7 +710,7 @@ wait_for_network_wake() {
 
 network_stage_report() {
   local home=$1 root=$2
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$ROOT/bin/jg-startup-network.sh" report
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$root" "$ROOT/bin/jg-startup-network.sh" report
 }
 
 hash_file_for_test() {
@@ -831,7 +831,7 @@ EOF
   # bootstrap sweep's secondmate_sync ran (a MUTATING step), it would try to
   # fast-forward this "home" and/or report a SECONDMATE_SYNC/NUDGE_SECONDMATES
   # line. Absence of any such line is this test's proof that
-  # FM_BOOTSTRAP_DETECT_ONLY=1 actually suppressed the mutating sweep.
+  # JG_BOOTSTRAP_DETECT_ONLY=1 actually suppressed the mutating sweep.
   mkdir -p "$home/other-secondmate/state"
   jg_write_secondmate_meta "$home/state/sm-x.meta" "$home/other-secondmate" "firstmate:jg-sm-x" alpha
   append_wake "$home/state" signal sm-x "done: surfaced before refusal" || fail "seed wake failed"
@@ -915,12 +915,12 @@ EOF
   make_fake_ps_claude "$fakebin"
   : > "$home/config/trace-context"
 
-  FM_TRACE_CONTEXT=off run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
+  JG_TRACE_CONTEXT=off run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
   [ "$(awk '{print $2}' "$home/state/.trace-context-effective")" = off ] \
     || fail "session start must freeze an env-off override over a present config flag"
 
   rm "$home/config/trace-context"
-  FM_TRACE_CONTEXT=on run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
+  JG_TRACE_CONTEXT=on run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
   [ "$(awk '{print $2}' "$home/state/.trace-context-effective")" = on ] \
     || fail "a new session start must freeze an env-on override over an absent config flag"
   frozen=$(cat "$home/state/.trace-context-effective")
@@ -928,7 +928,7 @@ EOF
   sleep 300 &
   holder_pid=$!
   printf '%s\n' "$holder_pid" > "$home/state/.lock"
-  out=$(FM_TRACE_CONTEXT=off run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_TRACE_CONTEXT=off run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
   assert_contains "$out" "READ-ONLY SESSION" "trace-context refusal fixture did not enter read-only mode"
@@ -960,20 +960,20 @@ for argument in "$@"; do
 done
 case "$*" in
   *"comm="*)
-    if [ -f "$FM_FAKE_LOCK_STATE/harness-$pid" ]; then
+    if [ -f "$JG_FAKE_LOCK_STATE/harness-$pid" ]; then
       printf '%s\n' /usr/local/bin/claude
     else
       printf '%s\n' /bin/bash
     fi
     ;;
   *"args="*)
-    if [ -f "$FM_FAKE_LOCK_STATE/harness-$pid" ]; then
+    if [ -f "$JG_FAKE_LOCK_STATE/harness-$pid" ]; then
       printf '%s\n' claude
     else
       printf '%s\n' bash
     fi
     ;;
-  *"ppid="*) printf '%s\n' "$FM_FAKE_HARNESS_PID" ;;
+  *"ppid="*) printf '%s\n' "$JG_FAKE_HARNESS_PID" ;;
   *) exit 1 ;;
 esac
 SH
@@ -989,8 +989,8 @@ SH
       while [ "$(find "$ready" -type f | wc -l | tr -d ' ')" -lt 40 ]; do
         sleep 0.01
       done
-      if FM_HOME="$home" FM_FAKE_LOCK_STATE="$home/state" \
-        FM_FAKE_HARNESS_PID="$harness_pid" PATH="$fakebin:$BASE_PATH" \
+      if JG_HOME="$home" JG_FAKE_LOCK_STATE="$home/state" \
+        JG_FAKE_HARNESS_PID="$harness_pid" PATH="$fakebin:$BASE_PATH" \
         "$ROOT/bin/jg-lock.sh" >/dev/null 2>&1; then
         printf '%s\n' "$harness_pid" >> "$winners"
       fi
@@ -1163,9 +1163,9 @@ EOF
   assert_contains "$out" "$home/state/task-a.status" "digest did not print the full status log path for a deeper read"
   assert_contains "$out" "a bounded tail of every state/*.status" "read-once contract does not distinguish bounded status tails"
 
-  out=$(FM_SESSION_START_STATUS_TAIL=2 run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
-  assert_contains "$out" "working: step 7" "FM_SESSION_START_STATUS_TAIL=2 tail missing the most recent line"
-  assert_not_contains "$out" "working: step 5" "FM_SESSION_START_STATUS_TAIL=2 did not bound the tail to 2 lines"
+  out=$(JG_SESSION_START_STATUS_TAIL=2 run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  assert_contains "$out" "working: step 7" "JG_SESSION_START_STATUS_TAIL=2 tail missing the most recent line"
+  assert_not_contains "$out" "working: step 5" "JG_SESSION_START_STATUS_TAIL=2 did not bound the tail to 2 lines"
 
   pass "status tail is bounded to the configured line count, with the full log path always printed"
 }
@@ -1441,7 +1441,7 @@ EOF
   printf 'working: doomed task marker\n' > "$home/state/task-a-doom.status"
   printf 'window=sess:p-live\nkind=ship\nbackend=herdr\n' > "$home/state/task-z-live.meta"
 
-  out=$(FM_SESSION_START_ENDPOINT_TIMEOUT=bogus run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  out=$(JG_SESSION_START_ENDPOINT_TIMEOUT=bogus run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "one killed endpoint read must not fail the digest"
   assert_contains "$out" \
@@ -1479,7 +1479,7 @@ EOF
   # The same fake hangs the side-band home summary before the endpoint section.
   # Bound that unrelated refresh at 5s instead of paying its production 60s;
   # the endpoint's own 2s bound and descendant-cleanup assertions stay real.
-  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=2 \
+  out=$(JG_HOME_SUMMARY_TIMEOUT=5 JG_SESSION_START_ENDPOINT_TIMEOUT=2 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a hung endpoint read must not fail the digest"
@@ -1514,7 +1514,7 @@ EOF
 
   # Only the unrelated summary gets a shorter fixture budget. The invalid
   # endpoint value must still fall back to the real 10s production bound.
-  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=00 \
+  out=$(JG_HOME_SUMMARY_TIMEOUT=5 JG_SESSION_START_ENDPOINT_TIMEOUT=00 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a padded-zero per-read bound must not fail the digest"
@@ -1567,7 +1567,7 @@ EOF
   # lock stage's own command substitution leaves a subshell whose argv is
   # still `jg-session-start.sh` - only the topmost match is the digest bash
   # itself. That digest child is the topmost ancestor whose ENVIRON carries
-  # FM_SESSION_START_STAGE_FILE: the parent wrapper mktemps the file and hands
+  # JG_SESSION_START_STAGE_FILE: the parent wrapper mktemps the file and hands
   # it over with env (which never keeps it for itself), the bash -c inner
   # shell and timeout sit BELOW env, and the parent wrapper never holds it -
   # so the env marker stops the walk above the digest child and below the
@@ -1584,7 +1584,7 @@ case "\$(tr '\\0' ' ' < /proc/\$PPID/cmdline 2>/dev/null)" in
     matched=0
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
       [ -n "\$pid" ] && [ "\$pid" != 1 ] || break
-      if tr '\\0' '\\n' < /proc/\$pid/environ 2>/dev/null | grep -q '^FM_SESSION_START_STAGE_FILE=' \
+      if tr '\\0' '\\n' < /proc/\$pid/environ 2>/dev/null | grep -q '^JG_SESSION_START_STAGE_FILE=' \
         && case "\$(tr '\\0' ' ' < /proc/\$pid/cmdline 2>/dev/null)" in *jg-session-start.sh*) true ;; *) false ;; esac; then
         target=\$pid
         matched=1
@@ -1615,7 +1615,7 @@ SH
     "an abnormal death was misreported as the runtime bound firing"
   assert_contains "$out" "report the exit status and the stage" \
     "the abnormal-death banner did not tell the reader to report the exit status"
-  assert_not_contains "$out" "raise FM_SESSION_START_TIMEOUT" \
+  assert_not_contains "$out" "raise JG_SESSION_START_TIMEOUT" \
     "the abnormal-death banner advised raising a bound that did not fire"
   assert_not_contains "$out" "NEXT STEP" \
     "a digest that died mid-stage claimed to have reached its closing reminder"
@@ -1665,14 +1665,14 @@ EOF
   # A crash window the locked start must preserve: the supervision branch
   # stored a leading routine row and a captain row that never reached Pi, plus one lease whose
   # supervising process died and one still held by a live process.
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
     --task task-a --verdict routine --summary 'worker recovered automatically' >/dev/null \
     || fail "could not seed the unread routine branch outcome"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
     --task task-b --verdict captain --summary 'PR https://example.com/pr/b checks green' >/dev/null \
     || fail "could not seed the unread branch outcome"
   printf 'branch\t999999\t123\n' > "$home/state/.lease-task-dead"
-  FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_LEASE_HOLDER_PID=$$ "$ROOT/bin/jg-lease.sh" claim task-live --actor branch \
+  JG_HOME="$home" JG_SUPERVISION_ACTOR=branch JG_LEASE_HOLDER_PID=$$ "$ROOT/bin/jg-lease.sh" claim task-live --actor branch \
     || fail "could not seed the live lease"
 
   out=$(run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH")
@@ -1680,7 +1680,7 @@ EOF
     "locked start did not replay the leading routine branch outcome"
   assert_contains "$out" "worker recovered automatically" "replayed routine outcome lost its content"
   assert_not_contains "$out" "https://example.com/pr/b" "locked start crossed the captain delivery barrier"
-  assert_contains "$(FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unread)" \
+  assert_contains "$(JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unread)" \
     "https://example.com/pr/b" "locked start marked the unrendered captain outcome read"
   [ "$(cat "$home/state/.branch-outcomes-cursor")" = 1 ] || fail "locked start advanced past the captain row"
   [ ! -e "$home/state/.lease-task-dead" ] || fail "locked start left a provably dead lease in place"
@@ -1692,7 +1692,7 @@ EOF
   case "$out" in
     *"BRANCH OUTCOMES"*) fail "second start re-presented already-replayed branch outcomes" ;;
   esac
-  assert_contains "$(FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unread)" \
+  assert_contains "$(JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" unread)" \
     "https://example.com/pr/b" "second start consumed the captain row without a Pi entry"
   pass "locked Pi session start replays leading routine outcomes, preserves the captain barrier, and sweeps only dead leases"
 }
@@ -1709,7 +1709,7 @@ EOF
   # outcomes; this case pins a home that does not run it.
   : > "$home/config/supervision-host-off"
 
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
     --task task-b --verdict captain --summary 'unread Pi branch outcome' >/dev/null \
     || fail "could not seed the non-Pi unread branch outcome"
   rm -f "$home/state/.branch-outcomes-cursor"
@@ -1734,12 +1734,12 @@ EOF
   make_fake_ps_claude "$fakebin"
   store="$home/state/branch-outcomes.jsonl"
   tail="$home/state/.branch-outcomes-tail.jsonl"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" append \
     --task task-a --verdict captain --summary 'decision still waiting' >/dev/null \
     || fail "could not store the captain outcome"
-  FM_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-read --through 1 || fail "could not mark the outcome read"
+  JG_HOME="$home" "$ROOT/bin/jg-branch-outcome.sh" mark-read --through 1 || fail "could not mark the outcome read"
   rm -f "$tail"
-  FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter --words 'away for the afternoon' >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter --words 'away for the afternoon' >/dev/null \
     || fail "could not record the away posture"
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
@@ -1804,20 +1804,20 @@ if [ "${1:-}" = --version ]; then
   exit 0
 fi
 if [ "${1:-} ${2:-}" = 'axi status' ]; then
-  if [ "${FM_BOOTSTRAP_NETWORK:-}" = only ]; then
-    printf '%s\n' 'deferred' >> "${FM_FAKE_NM_CALLS:?}"
+  if [ "${JG_BOOTSTRAP_NETWORK:-}" = only ]; then
+    printf '%s\n' 'deferred' >> "${JG_FAKE_NM_CALLS:?}"
   else
-    printf '%s\n' 'blocking' >> "${FM_FAKE_NM_CALLS:?}"
+    printf '%s\n' 'blocking' >> "${JG_FAKE_NM_CALLS:?}"
   fi
   # Stay outstanding until the case releases this read. A caller that waits for
   # it therefore waits indefinitely rather than for a fixed interval a loaded
   # host could out-run. The tick bound only stops a broken case hanging forever.
   ticks=0
-  while [ ! -e "${FM_FAKE_NM_RELEASE:?}" ] && [ "$ticks" -lt 300 ]; do
+  while [ ! -e "${JG_FAKE_NM_RELEASE:?}" ] && [ "$ticks" -lt 300 ]; do
     sleep 0.1
     ticks=$((ticks + 1))
   done
-  : > "${FM_FAKE_NM_READ_FINISHED:?}"
+  : > "${JG_FAKE_NM_READ_FINISHED:?}"
   printf '%s\n' 'slow validation state answered'
 fi
 exit 0
@@ -1838,10 +1838,10 @@ SH
   touch -t 202001010000 "$home/state/slow-child.meta" \
     "$home/state/slow-child.status" "$home/state/slow-child.turn-ended"
 
-  out=$(FM_BACKEND=tmux FM_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
-    FM_FAKE_NM_CALLS="$calls" FM_FAKE_NM_RELEASE="$release_gate" \
-    FM_FAKE_NM_READ_FINISHED="$read_finished" FM_INACTIVE_RECONCILE_SECS=60 \
-    FM_INACTIVE_RECONCILE_BUDGET_SECS=30 FM_INACTIVE_CREW_STATE_BIN="$crew_state" \
+  out=$(JG_BACKEND=tmux JG_FAKE_HARNESS_PID="$SESSION_START_TEST_HARNESS_PID" \
+    JG_FAKE_NM_CALLS="$calls" JG_FAKE_NM_RELEASE="$release_gate" \
+    JG_FAKE_NM_READ_FINISHED="$read_finished" JG_INACTIVE_RECONCILE_SECS=60 \
+    JG_INACTIVE_RECONCILE_BUDGET_SECS=30 JG_INACTIVE_CREW_STATE_BIN="$crew_state" \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   assert_contains "$out" "SESSION START" "the digest did not complete"
@@ -1968,7 +1968,7 @@ EOF
   log="$home/tasks-axi.log"
   printf '# Backlog\n\n## In flight\n\n## Queued\n' > "$home/data/backlog.md"
 
-  FM_FAKE_TASKS_AXI_LOG="$log" run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
+  JG_FAKE_TASKS_AXI_LOG="$log" run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
 
   probes=$(grep -c -- '--version' "$log" || true)
   [ "$probes" -eq 1 ] \
@@ -2026,7 +2026,7 @@ EOF
     > "$home/state/compact-startup.meta"
   log="$home/tasks-axi.log"
 
-  out=$(FM_FAKE_TASKS_AXI_LOG="$log" FM_FAKE_TASKS_AXI_READY=3 \
+  out=$(JG_FAKE_TASKS_AXI_LOG="$log" JG_FAKE_TASKS_AXI_READY=3 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   assert_contains "$out" "compact backlog listing (tasks-axi; done rows omitted; every in-flight, held, and blocked row shown in full; ready queued bounded to 20; task bodies omitted)" \
@@ -2082,7 +2082,7 @@ EOF
   make_fake_ps_claude "$fakebin"
   write_long_body_backlog "$home/data/backlog.md"
 
-  out=$(FM_FAKE_TASKS_AXI_READY=7 FM_SESSION_START_QUEUED_LIMIT=3 \
+  out=$(JG_FAKE_TASKS_AXI_READY=7 JG_SESSION_START_QUEUED_LIMIT=3 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   assert_contains "$out" "ready-3,queued,ship,firstmate,Ready item 3" \
@@ -2115,7 +2115,7 @@ EOF
   printf '%s\n' manual > "$home/config/backlog-backend"
   write_long_body_backlog "$home/data/backlog.md"
 
-  out=$(FM_SESSION_START_QUEUED_LIMIT=4 run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_SESSION_START_QUEUED_LIMIT=4 run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   assert_contains "$out" "compact backlog listing (manual backend; done rows omitted; every in-flight, held, and blocked title line kept; other queued bounded to 4; indented task bodies omitted)" \
     "manual backend did not use compact title-line rendering"
@@ -2138,7 +2138,7 @@ EOF
     "manual compact rendering did not bound its plain queued listing"
   assert_contains "$out" "(shown 1 in-flight, 2 held or blocked queued, 4 of 25 other queued title line(s); 1 done row(s) omitted)" \
     "manual compact rendering did not report its bound accounting"
-  assert_contains "$out" "(21 more queued - raise FM_SESSION_START_QUEUED_LIMIT or read data/backlog.md for the rest)" \
+  assert_contains "$out" "(21 more queued - raise JG_SESSION_START_QUEUED_LIMIT or read data/backlog.md for the rest)" \
     "manual compact rendering did not disclose an exact queued remainder"
   assert_contains "$out" "or data/backlog.md" "manual compact digest omitted the data/backlog.md full-body pointer"
 
@@ -2229,11 +2229,11 @@ EOF
   make_fake_ps_claude "$fakebin"
   make_hanging_tool "$fakebin" git
 
-  mechanism=$(FM_TIMEOUT_MECHANISM_OVERRIDE=bash bash -c '. "$1"; jg_timeout_mechanism' \
+  mechanism=$(JG_TIMEOUT_MECHANISM_OVERRIDE=bash bash -c '. "$1"; jg_timeout_mechanism' \
     _ "$ROOT/bin/jg-timeout-lib.sh")
   [ "$mechanism" = bash ] || fail "the forced pure-Bash timeout fixture selected '$mechanism'"
 
-  out=$(FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_SESSION_START_TIMEOUT=3 FM_STARTUP_NETWORK_TIMEOUT=2 \
+  out=$(JG_TIMEOUT_MECHANISM_OVERRIDE=bash JG_SESSION_START_TIMEOUT=3 JG_STARTUP_NETWORK_TIMEOUT=2 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a truncated session start must still exit 0 so the session can open"
@@ -2255,14 +2255,14 @@ EOF
   # deferred network stage's own - because a truncated digest must not kill work
   # it was never waiting for. So the guarantee asserted here is the one that
   # actually matters: once BOTH deadlines have passed, nothing hung is left.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_STARTUP_NETWORK_TIMEOUT=2 \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$root" JG_STARTUP_NETWORK_TIMEOUT=2 \
     "$ROOT/bin/jg-startup-network.sh" wait 30 >/dev/null || true
   sleep 1
   stray=$(pgrep -f "$fakebin/git" 2>/dev/null | wc -l | tr -d ' ')
   [ "$stray" -eq 0 ] || fail "the runtime bound left $stray hung subprocess(es) behind"
 
   status=0
-  FM_TIMEOUT_MECHANISM_OVERRIDE=bash bash -c \
+  JG_TIMEOUT_MECHANISM_OVERRIDE=bash bash -c \
     '. "$1"; jg_run_timed 2 bash -c "exit 137"' _ "$ROOT/bin/jg-timeout-lib.sh" || status=$?
   expect_code 137 "$status" "pure-Bash natural command exit 137"
 
@@ -2345,11 +2345,11 @@ for argument in "$@"; do
 done
 case "$*" in
   *"comm="*)
-    if [ "$pid" = "${FM_FAKE_HARNESS_PID:-}" ]; then printf '%s\n' /usr/local/bin/claude
+    if [ "$pid" = "${JG_FAKE_HARNESS_PID:-}" ]; then printf '%s\n' /usr/local/bin/claude
     else printf '%s\n' /bin/bash; fi
     ;;
   *"args="*)
-    if [ "$pid" = "${FM_FAKE_HARNESS_PID:-}" ]; then printf '%s\n' claude
+    if [ "$pid" = "${JG_FAKE_HARNESS_PID:-}" ]; then printf '%s\n' claude
     else printf '%s\n' bash; fi
     ;;
   *"ppid="*) /bin/ps -o ppid= -p "$pid" ;;
@@ -2374,9 +2374,9 @@ SH
   chmod +x "$nest"
 
   # shellcheck disable=SC2016 # $$ must expand in the launched shell, not here.
-  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
-    bash -c 'export FM_FAKE_HARNESS_PID=$$; exec "$1" 8 "$2"' _ "$nest" "$SESSION_START")
+  out=$(env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
+    bash -c 'export JG_FAKE_HARNESS_PID=$$; exec "$1" 8 "$2"' _ "$nest" "$SESSION_START")
 
   assert_contains "$out" "lock acquired: harness pid" \
     "the runtime bound's wrapper processes pushed the harness out of the bounded ancestry walk"
@@ -2401,7 +2401,7 @@ EOF
   append_wake "$home/state" signal task-r "done: queued after startup" || fail "seed wake failed"
 
   # A full startup reconciles the secondmate sweep and reports it.
-  FM_FAKE_HARNESS_PID=$$ run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
+  JG_FAKE_HARNESS_PID=$$ run_session_start "$home" "$root" "$fakebin:$BASE_PATH" >/dev/null
   wait_for_network_stage "$home" "$root" \
     || fail "the full startup fixture's deferred network stage never published"
   network_report=$(network_stage_report "$home" "$root")
@@ -2409,8 +2409,8 @@ EOF
     "the full startup fixture did not exercise a mutating sweep"
 
   append_wake "$home/state" signal task-r "done: queued after the re-emit too" || fail "seed second wake failed"
-  reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  reemit=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$root" JG_FAKE_HARNESS_PID=$$ PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     "$SESSION_START" --reemit)
 
   assert_contains "$reemit" "SESSION START (CONTEXT RE-EMIT) - $home" "--reemit did not label itself"
@@ -2421,7 +2421,7 @@ EOF
   generation=$(printf '%s\n' "$reemit" | sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' | tail -1)
   [ -n "$sequence" ] && [ -n "$generation" ] \
     || fail "--reemit omitted the generation-bound wake acknowledgement"
-  FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-wake-drain.sh" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-wake-drain.sh" --ack-through "$sequence" \
     --recovery-generation "$generation" || fail "--reemit wake acknowledgement failed"
   [ ! -s "$home/state/.wake-queue" ] || fail "--reemit acknowledgement left queued wakes behind"
   assert_contains "$reemit" "CONTEXT" "--reemit dropped the context digest"
@@ -2444,7 +2444,7 @@ FIRSTMATE_TEST_INSTRUCTION=original
 Keep this original instruction.
 EOF
 
-  startup=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup)
+  startup=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup)
   assert_contains "$startup" "SESSION START - $home" "true startup did not run the full digest"
   assert_present "$home/state/.session-start-agents-baseline" "true startup did not record an AGENTS baseline"
   baseline=$(cat "$home/state/.session-start-agents-baseline")
@@ -2452,7 +2452,7 @@ EOF
   [ "$(printf '%s\n' "$baseline" | sed -n '2p')" = "$expected_hash" ] \
     || fail "true startup baseline did not record the original AGENTS hash: $baseline"
 
-  compact_equal=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_equal=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_not_contains "$compact_equal" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "an unchanged AGENTS file was unnecessarily re-emitted"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
@@ -2462,13 +2462,13 @@ EOF
 FIRSTMATE_TEST_INSTRUCTION=updated
 The complete updated instruction must survive every stale rebuild.
 EOF
-  resume_out=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source resume)
+  resume_out=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source resume)
   assert_not_contains "$resume_out" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "a context-preserving continuation emitted a replacement contract"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "a context-preserving continuation rebased the true-start baseline"
 
-  compact_first=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_first" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "a drifted Pi compact did not emit the replacement instructions"
   assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
@@ -2480,33 +2480,33 @@ EOF
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "a drifted compact rebased the original-session baseline"
 
-  compact_second=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_second=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_second" "FIRSTMATE_TEST_INSTRUCTION=updated" \
     "a second drifted compact suppressed the required replacement instructions"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "a repeated compact rebased the original-session baseline"
 
-  clear_out=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source clear)
+  clear_out=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source clear)
   assert_not_contains "$clear_out" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "a Pi clear, which creates a fresh runtime, unnecessarily emitted a replacement contract"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "a clear rebuild rebased the original-session baseline"
 
-  reset_out=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source reset)
+  reset_out=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source reset)
   assert_not_contains "$reset_out" "CURRENT AGENTS.md - INSTRUCTION REFRESH" \
     "an unrecognized reset source emitted a replacement contract"
   [ "$(cat "$home/state/.session-start-agents-baseline")" = "$baseline" ] \
     || fail "reset rebased the original-session baseline"
 
   rm -f "$home/state/.session-start-agents-baseline"
-  compact_first=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
     "a missing baseline did not trigger first-post-fix replacement instructions"
   assert_absent "$home/state/.session-start-agents-baseline" \
     "a rebuild fabricated a baseline instead of preserving true-start-only ownership"
 
   printf 'wrong-session\n%s\n' "$(hash_file_for_test "$root/AGENTS.md")" > "$home/state/.session-start-agents-baseline"
-  compact_first=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_first=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_first" "FIRSTMATE_TEST_INSTRUCTION=updated" \
     "a wrong-session baseline did not trigger replacement instructions"
   baseline_after=$(cat "$home/state/.session-start-agents-baseline")
@@ -2526,7 +2526,7 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_harness "$fakebin" pi
   printf '%s\n' 'READ_ONLY_AGENTS=current' > "$root/AGENTS.md"
-  FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
+  JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
 
   sleep 300 &
   holder_pid=$!
@@ -2536,7 +2536,7 @@ EOF
   baseline_before=$(cat "$home/state/.session-start-agents-baseline")
   completion_before=$(cat "$home/state/.session-start-complete")
 
-  out=$(FM_FAKE_HARNESS=pi FM_FAKE_LIVE_HOLDER_PID="$holder_pid" \
+  out=$(JG_FAKE_HARNESS=pi JG_FAKE_LIVE_HOLDER_PID="$holder_pid" \
     run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
@@ -2592,11 +2592,11 @@ EOF
   printf '#!/usr/bin/env bash\nexit 1\n' > "$fakebin/sha256sum"
   chmod +x "$fakebin/shasum" "$fakebin/sha256sum"
 
-  FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
+  JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
   assert_absent "$home/state/.session-start-agents-baseline" \
     "startup recorded a non-SHA-256 instruction baseline when both SHA-256 tools failed"
   printf '%s\n' 'AGENTS_SHA_TEST=updated' > "$root/AGENTS.md"
-  compact_out=$(FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
+  compact_out=$(JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --reemit --source compact)
   assert_contains "$compact_out" "AGENTS_SHA_TEST=updated" \
     "a missing SHA-256 baseline did not conservatively refresh a supported rebuild"
 
@@ -2609,7 +2609,7 @@ esac
 exec /bin/mv "\$@"
 SH
   chmod +x "$fakebin/mv"
-  FM_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
+  JG_FAKE_HARNESS=pi run_pi_session_start "$home" "$root" "$fakebin:$BASE_PATH" --source startup >/dev/null
   assert_absent "$home/state/.session-start-complete" \
     "startup published completion despite the atomic completion write failure"
   assert_absent "$home/state/.session-start-agents-baseline" \
@@ -2628,8 +2628,8 @@ EOF
   make_fake_ps_claude "$fakebin"
   git -C "$root" checkout -q -B fm/reemit-tangle
 
-  reemit=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  reemit=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     "$SESSION_START" --reemit)
 
   # A re-emit skips the sweeps because it ALREADY ran them, not because it lacks
@@ -2643,8 +2643,8 @@ EOF
   sleep 300 &
   holder_pid=$!
   printf '%s\n' "$holder_pid" > "$home/state/.lock"
-  readonly_out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
-    env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  readonly_out=$(JG_HOME="$home" JG_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
     "$SESSION_START" --reemit)
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
@@ -2751,7 +2751,7 @@ $rec
 EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
-  FM_AFK_MODE=quiet FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null 2>&1 || fail "quiet entry failed"
+  JG_AFK_MODE=quiet JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null 2>&1 || fail "quiet entry failed"
   printf 'quiet\n%s\n' "$(date '+%s')" > "$home/state/.afk"
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
@@ -2761,7 +2761,7 @@ EOF
   assert_contains "$out" "the quiet daemon owns the watcher" "AFK digest lost the quiet daemon line"
   assert_not_contains "$out" "hold-for-return" "AFK digest read the quiet record as hold-for-return"
 
-  FM_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null 2>&1 || fail "away entry over quiet failed"
+  JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter >/dev/null 2>&1 || fail "away entry over quiet failed"
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   assert_contains "$out" "present - away posture recorded at" "AFK digest did not name the away record"
   assert_contains "$out" "hold-for-return only" "AFK digest lost hold-for-return for an away record"
@@ -2797,7 +2797,7 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_harness "$fakebin" pi
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   block_count=$(printf '%s\n' "$out" | grep -c '^SUPERVISION OPERATING INSTRUCTIONS - primary harness:')
   [ "$block_count" -eq 1 ] || fail "expected exactly one supervision block, got $block_count"
@@ -2824,7 +2824,7 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_harness "$fakebin" pi-signed
 
-  out=$(FM_FAKE_HARNESS=pi-signed run_session_start "$home" "$root" "$fakebin:$BASE_PATH" pi-signed)
+  out=$(JG_FAKE_HARNESS=pi-signed run_session_start "$home" "$root" "$fakebin:$BASE_PATH" pi-signed)
 
   assert_contains "$out" "SUPERVISION OPERATING INSTRUCTIONS - primary harness: pi-signed" \
     "session start normalized a pi-signed primary to pi"
@@ -2856,7 +2856,7 @@ EOF
   write_pi_turnend_loaded_marker "$home" "$root" "$holder_pid"
   touch -t 203001010000 "$marker" 2>/dev/null || touch "$marker"
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -2884,7 +2884,7 @@ EOF
   printf 'generation=1 phase=handoff\n' >> "$marker.tmp"
   mv "$marker.tmp" "$marker"
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -2910,7 +2910,7 @@ EOF
 
   write_pi_loaded_markers "$home" "$root" "$holder_pid"
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -2928,7 +2928,7 @@ EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_harness "$fakebin" omp
 
-  out=$(FM_FAKE_HARNESS=omp run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=omp run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   block_count=$(printf '%s\n' "$out" | grep -c '^SUPERVISION OPERATING INSTRUCTIONS - primary harness:')
   [ "$block_count" -eq 1 ] || fail "expected exactly one supervision block, got $block_count"
@@ -2955,7 +2955,7 @@ EOF
   install_omp_extension_fixtures "$root"
   write_omp_loaded_markers "$home" "$root" "$holder_pid"
 
-  out=$(FM_FAKE_HARNESS=omp run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=omp run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -2980,7 +2980,7 @@ EOF
 
   write_pi_watch_loaded_marker "$home" "$root" "$holder_pid"
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -3007,7 +3007,7 @@ EOF
   printf '%s\n999999\n' "$version" > "$marker"
   write_pi_turnend_loaded_marker "$home" "$root" "$holder_pid"
 
-  out=$(FM_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(JG_FAKE_HARNESS=pi run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 

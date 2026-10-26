@@ -3,7 +3,7 @@
 #
 # These exercise argument routing only: each spawn attempt fails fast at the
 # missing-brief check, which is reached before any tmux/treehouse side effect, so
-# the tests create no windows or worktrees. FM_SPAWN_NO_GUARD=1 keeps them off the
+# the tests create no windows or worktrees. JG_SPAWN_NO_GUARD=1 keeps them off the
 # live watcher guard / state. Parser and path-scoping cases are table-driven; the
 # only behavior asserted on its own is "a multi-pair batch does not stop after the
 # first failure".
@@ -14,17 +14,17 @@ set -u
 
 SPAWN="$ROOT/bin/jg-spawn.sh"
 TMP_ROOT=$(jg_test_tmproot jg-spawn-batch)
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 # Clear ambient firstmate overrides so the behavior test owns its environment.
 run_spawn() {
-  FM_ROOT_OVERRIDE='' \
-    FM_HOME='' \
-    FM_STATE_OVERRIDE='' \
-    FM_DATA_OVERRIDE='' \
-    FM_PROJECTS_OVERRIDE='' \
-    FM_CONFIG_OVERRIDE='' \
-    FM_SPAWN_NO_GUARD=1 \
+  JG_ROOT_OVERRIDE='' \
+    JG_HOME='' \
+    JG_STATE_OVERRIDE='' \
+    JG_DATA_OVERRIDE='' \
+    JG_PROJECTS_OVERRIDE='' \
+    JG_CONFIG_OVERRIDE='' \
+    JG_SPAWN_NO_GUARD=1 \
     "$SPAWN" "$@" 2>&1
 }
 
@@ -86,14 +86,14 @@ test_projects_path_scoping() {
     mkdir -p "$home/data" "$projects/alpha"
     git -C "$projects/alpha" init -q || fail "$label: could not initialize project fixture"
     if [ "$use_override" = yes ]; then
-      out=$(FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
-        FM_HOME="$home" FM_PROJECTS_OVERRIDE="$projects" FM_SPAWN_NO_GUARD=1 \
+      out=$(JG_ROOT_OVERRIDE='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_CONFIG_OVERRIDE='' \
+        JG_HOME="$home" JG_PROJECTS_OVERRIDE="$projects" JG_SPAWN_NO_GUARD=1 \
         "$SPAWN" "$id" projects/alpha codex --mode no-mistakes --yolo off 2>&1)
     else
       mkdir -p "$home/projects/alpha"
       git -C "$home/projects/alpha" init -q || fail "$label: could not initialize home project fixture"
-      out=$(FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
-        FM_HOME="$home" FM_SPAWN_NO_GUARD=1 \
+      out=$(JG_ROOT_OVERRIDE='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' \
+        JG_HOME="$home" JG_SPAWN_NO_GUARD=1 \
         "$SPAWN" "$id" projects/alpha codex --mode no-mistakes --yolo off 2>&1)
     fi
     status=$?
@@ -104,8 +104,8 @@ test_projects_path_scoping() {
     printf '%s\n' "$out" | grep -F 'cd: projects/alpha' >/dev/null \
       && fail "$label: spawn resolved projects/alpha from the caller cwd"
   done <<'ROWS'
-FM_HOME scopes projects/|no|nope-home-z7
-FM_PROJECTS_OVERRIDE scopes projects/|yes|nope-override-z8
+JG_HOME scopes projects/|no|nope-home-z7
+JG_PROJECTS_OVERRIDE scopes projects/|yes|nope-override-z8
 ROWS
   pass "projects/ paths are scoped through the firstmate home for single-task spawn"
 }

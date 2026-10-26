@@ -354,12 +354,12 @@ test_closing_verb_honors_overridden_transition_verbs() {
     printf 'note: routine reply\nworking: still going\nContinuation prose here.\n' >> "$f"
   done
   printf 'answered [key=route]: settled\n' >> "$f"
-  [ "$(FM_CLASSIFY_RESOLVE_VERB=answered status_key_closing_verb "$f" route)" = answered ] \
+  [ "$(JG_CLASSIFY_RESOLVE_VERB=answered status_key_closing_verb "$f" route)" = answered ] \
     || fail "an overridden resolve verb stopped closing its key"
   [ "$(status_key_closing_verb "$f" route)" = blocked ] \
     || fail "without the override the same line must leave the key open"
   printf 'blocked [key=access]: waiting\nawaiting-captain [key=access]: handed off\n' >> "$f"
-  [ "$(FM_CLASSIFY_CAPTAIN_HELD_VERB=awaiting-captain status_key_closing_verb "$f" access)" = awaiting-captain ] \
+  [ "$(JG_CLASSIFY_CAPTAIN_HELD_VERB=awaiting-captain status_key_closing_verb "$f" access)" = awaiting-captain ] \
     || fail "an overridden durable-transfer verb stopped closing its key"
   pass "overridden resolve and durable-transfer verbs still close keys behind unrelated history"
 }
@@ -547,7 +547,7 @@ test_declared_wait_survives_answers_past_the_event_window() {
   f="$dir/answered.status"
   printf 'needs-decision: which color\npaused: waiting on the vendor release\n' > "$f"
   i=0
-  while [ "$i" -le "$FM_CLASSIFY_EVENT_WINDOW_LINES" ]; do
+  while [ "$i" -le "$JG_CLASSIFY_EVENT_WINDOW_LINES" ]; do
     printf 'resolved [key=q%s]: answered\n' "$i" >> "$f"
     i=$((i + 1))
   done

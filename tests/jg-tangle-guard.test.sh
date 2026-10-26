@@ -3,7 +3,7 @@
 #
 # Firstmate is a treehouse-pooled git repo of itself: linked worktrees and
 # secondmate homes all sit at a detached HEAD on the default branch, while the
-# PRIMARY checkout (FM_ROOT) is a normal checkout on a real branch. The "tangle"
+# PRIMARY checkout (JG_ROOT) is a normal checkout on a real branch. The "tangle"
 # is a crewmate branching/committing in the primary instead of its own worktree,
 # stranding the primary on a feature branch. Two guards cover it:
 #   GUARD 1 (prevention) - the brief asserts isolation before its branch step, and
@@ -65,7 +65,7 @@ ROWS
 
 run_guard() {
   # Scope the guard to a temp repo as the primary checkout; state lives under it.
-  FM_ROOT_OVERRIDE="$1" FM_HOME="$1" "$ROOT/bin/jg-guard.sh" 2>&1
+  JG_ROOT_OVERRIDE="$1" JG_HOME="$1" "$ROOT/bin/jg-guard.sh" 2>&1
 }
 
 test_guard_banner() {
@@ -84,7 +84,7 @@ test_guard_banner() {
   assert_contains "$out" "WORKTREE TANGLE" "guard did not alarm on a feature branch in the primary"
   assert_contains "$out" "fm/tangle-aa1" "guard banner did not name the offending branch"
   assert_contains "$out" "checkout main" "guard banner did not print the restore remediation"
-  out=$(FM_GUARD_READ_ONLY=1 run_guard "$repo")
+  out=$(JG_GUARD_READ_ONLY=1 run_guard "$repo")
   assert_contains "$out" "WORKTREE TANGLE" "read-only guard did not keep the tangle alarm"
   assert_contains "$out" "read-only session must leave restore work" "read-only guard did not explain restore ownership"
   assert_not_contains "$out" "checkout main" "read-only guard printed a state-changing restore command"
@@ -95,7 +95,7 @@ test_guard_banner() {
 
 run_bootstrap() {
   # No projects/ under the home keeps fleet sync inert; grep isolates the line.
-  FM_ROOT_OVERRIDE="$1" FM_HOME="$1" "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
+  JG_ROOT_OVERRIDE="$1" JG_HOME="$1" "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
 }
 
 test_bootstrap_line() {
@@ -113,7 +113,7 @@ test_bootstrap_line() {
   out=$(run_bootstrap "$repo" | grep '^TANGLE:' || true)
   assert_contains "$out" "fm/tangle-bb2" "bootstrap did not report the tangled branch"
   assert_contains "$out" "checkout main" "bootstrap TANGLE line lacked the restore remediation"
-  out=$(FM_ROOT_OVERRIDE="$repo" FM_HOME="$repo" FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null | grep '^TANGLE:' || true)
+  out=$(JG_ROOT_OVERRIDE="$repo" JG_HOME="$repo" JG_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null | grep '^TANGLE:' || true)
   assert_contains "$out" "fm/tangle-bb2" "detect-only bootstrap did not report the tangled branch"
   assert_contains "$out" "read-only session must leave restore work" "detect-only bootstrap did not explain restore ownership"
   assert_not_contains "$out" "checkout main" "detect-only bootstrap printed a state-changing restore command"
@@ -128,7 +128,7 @@ test_brief_assertion_precedes_branch() {
   local home brief iso br
   home="$TMP_ROOT/brief-home"
   mkdir -p "$home/data"
-  FM_HOME="$home" "$ROOT/bin/jg-brief.sh" tangle-brief-cc3 alpha --mode no-mistakes >/dev/null 2>&1
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" tangle-brief-cc3 alpha --mode no-mistakes >/dev/null 2>&1
   brief="$home/data/tangle-brief-cc3/brief.md"
   assert_present "$brief" "brief was not scaffolded"
   # shellcheck disable=SC2016 # The generated instruction keeps the stamp literal.
@@ -226,9 +226,9 @@ make_spawn_record_fakebin() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-[ -n "${FM_TMUX_REC:-}" ] && printf 'tmux %s\n' "$*" >> "$FM_TMUX_REC"
+[ -n "${JG_TMUX_REC:-}" ] && printf 'tmux %s\n' "$*" >> "$JG_TMUX_REC"
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
@@ -246,7 +246,7 @@ SH
 run_spawn_record() {
   local home=$1 id=$2 proj=$3 pane=$4 fakebin=$5 rec=$6
   jg_test_spawn_brief "$home" "$id" brief
-  FM_TMUX_REC="$rec" \
+  JG_TMUX_REC="$rec" \
     jg_test_run_spawn "$home" "$pane" "$fakebin" \
     "$id" "$proj" codex --mode no-mistakes --yolo off
 }

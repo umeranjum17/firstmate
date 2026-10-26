@@ -5,7 +5,7 @@
 # meta's "remote:<id>" window through the local backend adapters and handed it
 # to tmux, which failed with "can't find session: remote" - a healthy remote
 # mate misreported as an unreadable endpoint. These tests drive the real
-# jg-peek + jg-on executables with a stubbed ssh transport (FM_SSH_BIN seam)
+# jg-peek + jg-on executables with a stubbed ssh transport (JG_SSH_BIN seam)
 # and a poisoned local tmux, pinning:
 #   1. A remote selector routes the capture over the remote transport and
 #      prints the remote pane tail; the local adapters are never consulted.
@@ -28,13 +28,13 @@ make_stubs() {  # <dir> -> echoes fakebin dir
   cat > "$fb/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 cat > /dev/null
-[ -z "${FM_FAKE_REMOTE_CAPTURE:-}" ] || printf '%s\n' "$FM_FAKE_REMOTE_CAPTURE"
-exit "${FM_FAKE_SSH_RC:-0}"
+[ -z "${JG_FAKE_REMOTE_CAPTURE:-}" ] || printf '%s\n' "$JG_FAKE_REMOTE_CAPTURE"
+exit "${JG_FAKE_SSH_RC:-0}"
 SH
   chmod +x "$fb/fake-ssh"
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
-printf 'tmux\n' >> "${FM_FAKE_TMUX_TOUCHED:?}"
+printf 'tmux\n' >> "${JG_FAKE_TMUX_TOUCHED:?}"
 exit 1
 SH
   chmod +x "$fb/tmux"
@@ -69,10 +69,10 @@ test_remote_peek_reads_remote_pane() {
   touched="$dir/tmux-touched"; : > "$touched"
 
   out=$(env PATH="$fb:$PATH" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_SSH_BIN="$fb/fake-ssh" FM_FAKE_SSH_RC=0 \
-    FM_FAKE_REMOTE_CAPTURE='● the remote mate is mid-refactor' \
-    FM_FAKE_TMUX_TOUCHED="$touched" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_SSH_BIN="$fb/fake-ssh" JG_FAKE_SSH_RC=0 \
+    JG_FAKE_REMOTE_CAPTURE='● the remote mate is mid-refactor' \
+    JG_FAKE_TMUX_TOUCHED="$touched" \
     "$PEEK" rsm 20 2>"$dir/err"); rc=$?
   expect_code 0 "$rc" "a healthy remote peek should succeed"
   assert_contains "$out" "the remote mate is mid-refactor" \
@@ -91,9 +91,9 @@ test_remote_peek_unreachable_fails_loudly_without_death_claim() {
   touched="$dir/tmux-touched"; : > "$touched"
 
   env PATH="$fb:$PATH" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_SSH_BIN="$fb/fake-ssh" FM_FAKE_SSH_RC=255 \
-    FM_FAKE_TMUX_TOUCHED="$touched" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_SSH_BIN="$fb/fake-ssh" JG_FAKE_SSH_RC=255 \
+    JG_FAKE_TMUX_TOUCHED="$touched" \
     "$PEEK" rsm >"$dir/out" 2>"$dir/err"; rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "an unreachable remote peek must exit nonzero"

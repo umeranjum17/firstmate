@@ -24,7 +24,7 @@ const OPERATIONAL_PREFIX = `${OPERATIONAL_MARK}FIRSTMATE_OP: `;
 const OPERATIONAL_VERSION = "v1";
 const OPERATIONAL_HEADER_PREFIX = `${OPERATIONAL_PREFIX}${OPERATIONAL_VERSION} `;
 
-/** The kinds the owner's `FM_OPERATIONAL_KINDS` names, in its order. */
+/** The kinds the owner's `JG_OPERATIONAL_KINDS` names, in its order. */
 export const FIRSTMATE_OPERATIONAL_GENERIC_KINDS = [
   "session-start",
   "watcher",

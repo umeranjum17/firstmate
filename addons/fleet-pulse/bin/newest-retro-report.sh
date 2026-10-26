@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Print the newest data/*retro*/report.md across the main home and known sibling
 # firstmate homes (secondmates.md and ~/.treehouse/firstmate-*/*/firstmate), by
 # mtime. No output when none exist. Usage: newest-retro-report.sh <main-home>
@@ -9,7 +18,7 @@ if [ "$#" -ne 1 ]; then
   exit 2
 fi
 main=$(cd "$1" && pwd -P)
-treehouse=${FM_TREEHOUSE:-$HOME/.treehouse}
+treehouse=${JG_TREEHOUSE:-$HOME/.treehouse}
 
 datas=
 add_data() {

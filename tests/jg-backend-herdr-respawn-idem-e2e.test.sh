@@ -70,7 +70,7 @@ jg_backend_herdr_version_check || fail "version_check failed against the real in
 # jg_backend_herdr_create_task is the ONE function both bin/jg-spawn.sh's
 # ordinary crewmate/scout path and its --secondmate path call, so exercising
 # it directly here covers both paths identically - already proven distinct
-# only in FM_HOME-shadowing (tests/jg-backend-herdr-workspace-per-home-e2e.test.sh),
+# only in JG_HOME-shadowing (tests/jg-backend-herdr-workspace-per-home-e2e.test.sh),
 # never in this duplicate-guard logic, which has no home-specific branching.
 
 PROJ_CWD="$SCRATCH/proj"

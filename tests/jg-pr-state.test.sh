@@ -29,10 +29,10 @@ head=c2eac54c17a1ddc2633ad51b83e21e5fe888142e
 serve() {
   case "$*" in
     "pr view "*" --json state,mergedAt,isDraft,headRefOid,author,mergeable,reviewDecision --jq "*)
-      jq -n --arg head "$head" --arg state "${FM_TEST_STATE-OPEN}" \
-        --arg merged "${FM_TEST_MERGED_AT-}" --arg draft "${FM_TEST_DRAFT-false}" \
-        --arg mergeable "${FM_TEST_VIEW_MERGEABLE-MERGEABLE}" \
-        --arg decision "${FM_TEST_VIEW_REVIEW_DECISION-APPROVED}" \
+      jq -n --arg head "$head" --arg state "${JG_TEST_STATE-OPEN}" \
+        --arg merged "${JG_TEST_MERGED_AT-}" --arg draft "${JG_TEST_DRAFT-false}" \
+        --arg mergeable "${JG_TEST_VIEW_MERGEABLE-MERGEABLE}" \
+        --arg decision "${JG_TEST_VIEW_REVIEW_DECISION-APPROVED}" \
         '{state: $state, mergedAt: (if $merged == "" then null else $merged end),
           isDraft: ($draft == "true"), headRefOid: $head,
           author: {login: "prauthor", is_bot: false},
@@ -40,15 +40,15 @@ serve() {
           reviewDecision: $decision}'
       ;;
     "api /repos/o/r/pulls/7/reviews?per_page=100 --paginate --jq "*)
-      printf '%s\n' "${FM_TEST_REVIEWS:-[]}"
+      printf '%s\n' "${JG_TEST_REVIEWS:-[]}"
       ;;
     "pr checks "*" --required --json name,state,bucket --jq "*)
-      if [ -n "${FM_TEST_CHECKS_ERROR-}" ]; then
-        printf '%s\n' "$FM_TEST_CHECKS_ERROR" >&2
+      if [ -n "${JG_TEST_CHECKS_ERROR-}" ]; then
+        printf '%s\n' "$JG_TEST_CHECKS_ERROR" >&2
         exit 1
       fi
       checks='[{"name":"lint","state":"SUCCESS","bucket":"pass","workflow":"ci"},{"name":"optional","state":"SKIPPED","bucket":"skipping","workflow":"ci"}]'
-      printf '%s\n' "${FM_TEST_REQUIRED_CHECKS:-$checks}"
+      printf '%s\n' "${JG_TEST_REQUIRED_CHECKS:-$checks}"
       ;;
     *)
       printf 'unexpected gh call: %s\n' "$*" >&2
@@ -86,13 +86,13 @@ test_clean_pr_is_silent_and_ignores_skipped_checks() {
 
 test_terminal_state_is_the_whole_report() {
   local out
-  out=$(FM_TEST_STATE=CLOSED FM_TEST_VIEW_MERGEABLE=null run_state) \
+  out=$(JG_TEST_STATE=CLOSED JG_TEST_VIEW_MERGEABLE=null run_state) \
     || fail "closed fixture was refused"
   [ "$out" = 'STATE: closed' ] \
     || fail "a closed pull request leaves the author nothing else to read, got: $out"
 
-  out=$(FM_TEST_STATE=MERGED FM_TEST_MERGED_AT=2019-10-04T16:01:04Z \
-    FM_TEST_VIEW_MERGEABLE=null FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED run_state) \
+  out=$(JG_TEST_STATE=MERGED JG_TEST_MERGED_AT=2019-10-04T16:01:04Z \
+    JG_TEST_VIEW_MERGEABLE=null JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED run_state) \
     || fail "merged fixture was refused"
   [ "$out" = 'STATE: merged at 2019-10-04T16:01:04Z' ] \
     || fail "a merged pull request says so and reports no blocker after it, got: $out"
@@ -101,7 +101,7 @@ test_terminal_state_is_the_whole_report() {
 
 test_draft_is_a_blocker() {
   local out
-  out=$(FM_TEST_DRAFT=true run_state) || fail "draft fixture was refused"
+  out=$(JG_TEST_DRAFT=true run_state) || fail "draft fixture was refused"
   assert_contains "$out" 'DRAFT: pull request is not ready for review' \
     "a draft pull request leaves the author something to do"
   pass "draft state blocks readiness"
@@ -114,7 +114,7 @@ test_stale_blocking_reviews_explain_a_blocking_decision() {
     "coderabbitai[bot] Bot CHANGES_REQUESTED $OLD_HEAD_2 2026-09-01T23:02:13Z" \
     "commenter User COMMENTED $OLD_HEAD_2 2026-09-01T23:10:00Z" \
     "alice User APPROVED $OLD_HEAD_2 2026-09-01T23:11:00Z")
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED FM_TEST_REVIEWS=$history run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED JG_TEST_REVIEWS=$history run_state) \
     || fail "voided-review fixture was refused"
   expected=$(printf 'REVIEW DECISION: CHANGES_REQUESTED\nSTALE BLOCKING REVIEW: coderabbitai[bot] CHANGES_REQUESTED at %s' "$OLD_HEAD_2")
   [ "$out" = "$expected" ] \
@@ -134,7 +134,7 @@ test_approved_pr_with_only_stale_changes_requested_is_silent() {
     "coderabbitai[bot] Bot CHANGES_REQUESTED $OLD_HEAD_1 2026-09-01T00:15:44Z" \
     "coderabbitai[bot] Bot CHANGES_REQUESTED $HEAD 2026-09-02T13:53:41Z" \
     "coderabbitai[bot] Bot APPROVED $HEAD 2026-09-02T14:05:42Z")
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=APPROVED FM_TEST_REVIEWS=$history run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=APPROVED JG_TEST_REVIEWS=$history run_state) \
     || fail "approved stale-review fixture was refused"
   [ -z "$out" ] || fail "an approved PR with only stale review history should be silent, got: $out"
   pass "approved PR ignores stale changes-requested history"
@@ -143,7 +143,7 @@ test_approved_pr_with_only_stale_changes_requested_is_silent() {
 test_current_changes_requested_review_is_a_blocker() {
   local out history
   history=$(reviews "coderabbitai[bot] Bot CHANGES_REQUESTED $HEAD 2026-09-02T13:53:41Z")
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED FM_TEST_REVIEWS=$history run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED JG_TEST_REVIEWS=$history run_state) \
     || fail "current-review fixture was refused"
   [ "$out" = $'REVIEW DECISION: CHANGES_REQUESTED\nREVIEW: coderabbitai[bot] CHANGES_REQUESTED' ] \
     || fail "a verdict left at the head under review blocks readiness and names no head, got: $out"
@@ -155,12 +155,12 @@ test_changes_requested_decision_is_never_silent() {
   history=$(reviews \
     "bob User CHANGES_REQUESTED $HEAD 2026-09-02T13:53:41Z" \
     "bob User COMMENTED $HEAD 2026-09-02T14:05:42Z")
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED FM_TEST_REVIEWS=$history run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED JG_TEST_REVIEWS=$history run_state) \
     || fail "comment-after-changes fixture was refused"
   [ "$out" = $'REVIEW DECISION: CHANGES_REQUESTED\nREVIEW: bob CHANGES_REQUESTED' ] \
     || fail "a later COMMENTED review does not clear the reviewer's change request, got: $out"
 
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED run_state) \
     || fail "decision-only fixture was refused"
   [ "$out" = 'REVIEW DECISION: CHANGES_REQUESTED' ] \
     || fail "GitHub's blocking decision must be printed even without an explaining review, got: $out"
@@ -170,7 +170,7 @@ test_changes_requested_decision_is_never_silent() {
 test_authors_own_changes_requested_review_is_not_a_blocker() {
   local out history
   history=$(reviews "prauthor User CHANGES_REQUESTED $HEAD 2026-09-02T13:53:41Z")
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED FM_TEST_REVIEWS=$history run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=CHANGES_REQUESTED JG_TEST_REVIEWS=$history run_state) \
     || fail "self-review fixture was refused"
   assert_not_contains "$out" 'REVIEW: prauthor' \
     "the author's own verdict is not a reviewer blocking them"
@@ -179,7 +179,7 @@ test_authors_own_changes_requested_review_is_not_a_blocker() {
 
 test_pending_approval_is_not_a_blocker() {
   local out
-  out=$(FM_TEST_VIEW_REVIEW_DECISION=REVIEW_REQUIRED run_state) \
+  out=$(JG_TEST_VIEW_REVIEW_DECISION=REVIEW_REQUIRED run_state) \
     || fail "review-required fixture was refused"
   [ -z "$out" ] || fail "awaiting approval is not a blocker this command reports, got: $out"
   pass "a pending approval is not reported as a blocker"
@@ -187,7 +187,7 @@ test_pending_approval_is_not_a_blocker() {
 
 test_required_failure_is_a_blocker() {
   local out
-  out=$(FM_TEST_REQUIRED_CHECKS='[{"name":"CI Status","state":"FAILURE","bucket":"fail","workflow":"ci"},{"name":"lint","state":"SUCCESS","bucket":"pass","workflow":"ci"}]' run_state) \
+  out=$(JG_TEST_REQUIRED_CHECKS='[{"name":"CI Status","state":"FAILURE","bucket":"fail","workflow":"ci"},{"name":"lint","state":"SUCCESS","bucket":"pass","workflow":"ci"}]' run_state) \
     || fail "blocked fixture was refused"
   assert_contains "$out" 'REQUIRED CHECK: CI Status (FAILURE)' \
     "required failure was not reported"
@@ -197,26 +197,26 @@ test_required_failure_is_a_blocker() {
 }
 
 # The next two cases supply gh's own "nothing reported" sentences through
-# FM_TEST_CHECKS_ERROR, so they prove the behaviour GIVEN those strings and
+# JG_TEST_CHECKS_ERROR, so they prove the behaviour GIVEN those strings and
 # nothing about the strings themselves. A gh reword is invisible to this
 # hermetic suite; only a run against a real gh would catch one.
 test_unreported_required_checks_are_unconfirmed() {
   local out status
-  out=$(FM_TEST_CHECKS_ERROR="no required checks reported on the 'fm/fixture' branch" run_state) \
+  out=$(JG_TEST_CHECKS_ERROR="no required checks reported on the 'fm/fixture' branch" run_state) \
     || fail "a head without reported required checks was refused"
   [ "$out" = 'CHECKS: no required check has reported; readiness unconfirmed' ] \
     || fail "a head where nothing required has reported must not pass silently as ready, got: $out"
   # This asserts the branch taken for that sentence, not that gh still says it.
 
   status=0
-  FM_TEST_CHECKS_ERROR='HTTP 502: Bad Gateway' run_state >/dev/null 2>&1 || status=$?
+  JG_TEST_CHECKS_ERROR='HTTP 502: Bad Gateway' run_state >/dev/null 2>&1 || status=$?
   [ "$status" -ne 0 ] || fail "a real check lookup failure must still refuse"
   pass "given gh's sentence, an unreported required check is unconfirmed, other check lookup failures refuse"
 }
 
 test_no_reported_checks_is_unverified() {
   local out
-  out=$(FM_TEST_CHECKS_ERROR="no checks reported on the 'fm/fixture' branch" run_state) \
+  out=$(JG_TEST_CHECKS_ERROR="no checks reported on the 'fm/fixture' branch" run_state) \
     || fail "a head without reported checks was refused"
   [ "$out" = 'CHECKS: none reported yet' ] \
     || fail "a head with no reported checks must read as unverified, not ready, got: $out"
@@ -238,12 +238,12 @@ test_help_states_what_silence_means_and_what_is_out_of_scope() {
 
 test_unknown_mergeability_is_a_blocker() {
   local out
-  out=$(FM_TEST_VIEW_MERGEABLE=null run_state) \
+  out=$(JG_TEST_VIEW_MERGEABLE=null run_state) \
     || fail "unknown-mergeability fixture was refused"
   assert_contains "$out" 'MERGEABILITY: unknown' \
     "null mergeability must not be treated as clean"
 
-  out=$(FM_TEST_VIEW_MERGEABLE=CONFLICTING run_state) \
+  out=$(JG_TEST_VIEW_MERGEABLE=CONFLICTING run_state) \
     || fail "conflicting fixture was refused"
   assert_contains "$out" 'MERGEABILITY: conflicting' \
     "a conflicting merge state must be reported"

@@ -40,7 +40,7 @@ make_orca_fakebin() {
   cat > "$fb/orca" <<'SH'
 #!/usr/bin/env bash
 set -u
-DIR="${FM_TEST_ORCA_DIR:?}"
+DIR="${JG_TEST_ORCA_DIR:?}"
 case "$1 $2" in
   "status --json")
     printf '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}\n'
@@ -101,10 +101,10 @@ Confirm the launch enters the worktree Orca created for it.
 EOF
   fb=$(make_orca_fakebin "$case_dir")
 
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$case_dir/user-home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_TEST_ORCA_DIR="$case_dir" PATH="$fb:$PATH" \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME="$home" HOME="$case_dir/user-home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_TEST_ORCA_DIR="$case_dir" PATH="$fb:$PATH" \
     "$SPAWN" "$id" "$case_dir/project" --mode no-mistakes --yolo off --backend orca 2>&1)
   status=$?
 
@@ -151,10 +151,10 @@ EOF
     echo "terminal=term-1"
   } > "$home/state/$id.meta"
 
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" HOME="$case_dir/user-home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME="$home" HOME="$case_dir/user-home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$SPAWN" "$id" --relaunch 2>&1)
   status=$?
 

@@ -28,8 +28,8 @@ SPAWN="$ROOT/bin/jg-spawn.sh"
 TMP_ROOT=$(jg_test_tmproot jg-spawn-worktree-settle)
 
 # make_settle_fakebin <dir> builds a fake tmux whose `#{pane_current_path}`
-# query returns FM_FAKE_PANE_STALE for the first FM_FAKE_PANE_STALE_READS
-# calls, then FM_FAKE_PANE_PATH forever after - reproducing a pane that
+# query returns JG_FAKE_PANE_STALE for the first JG_FAKE_PANE_STALE_READS
+# calls, then JG_FAKE_PANE_PATH forever after - reproducing a pane that
 # transiently reports a stale cwd before settling into the real worktree.
 make_settle_fakebin() {
   local dir=$1 fakebin
@@ -39,15 +39,15 @@ make_settle_fakebin() {
 set -u
 case "$*" in
   *"#{pane_current_path}"*)
-    countfile="${FM_FAKE_PANE_COUNTFILE:?FM_FAKE_PANE_COUNTFILE unset}"
+    countfile="${JG_FAKE_PANE_COUNTFILE:?JG_FAKE_PANE_COUNTFILE unset}"
     n=0
     [ -f "$countfile" ] && n=$(cat "$countfile")
     n=$((n + 1))
     printf '%s\n' "$n" > "$countfile"
-    if [ "$n" -le "${FM_FAKE_PANE_STALE_READS:-0}" ]; then
-      printf '%s\n' "${FM_FAKE_PANE_STALE:-}"
+    if [ "$n" -le "${JG_FAKE_PANE_STALE_READS:-0}" ]; then
+      printf '%s\n' "${JG_FAKE_PANE_STALE:-}"
     else
-      printf '%s\n' "${FM_FAKE_PANE_PATH:-}"
+      printf '%s\n' "${JG_FAKE_PANE_PATH:-}"
     fi
     exit 0
     ;;
@@ -104,12 +104,12 @@ EOF
 
 run_settle_spawn() {
   local id=$1
-  FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
-    FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
-    FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
+    JG_FAKE_PANE_PATH="$WT_DIR" JG_FAKE_PANE_STALE="$STALE_DIR" \
+    JG_FAKE_PANE_STALE_READS="$STALE_READS" JG_FAKE_PANE_COUNTFILE="$COUNTFILE" \
     PATH="$FAKEBIN_DIR:$PATH" \
     "$SPAWN" "$id" "$PROJ_DIR" --mode no-mistakes --yolo off 2>&1
 }

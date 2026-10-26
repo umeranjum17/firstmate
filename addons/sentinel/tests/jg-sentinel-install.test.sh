@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # tests/jg-sentinel-install.test.sh - hermetic install and uninstall of the sentinel add-on.
 #
 # A throwaway HOME and XDG dirs hold a fork-shaped jg-sentinel unit, and a stub
@@ -35,7 +44,7 @@ cat > "$UNIT" <<'UNIT_TEXT'
 Description=Firstmate sentinel (fork copy)
 
 [Service]
-Environment="FM_HOME=/home/example/firstmate"
+Environment="JG_HOME=/home/example/firstmate"
 ExecStart="/home/example/firstmate/bin/jg-sentinel.sh" loop
 Restart=always
 RestartSec=10
@@ -59,7 +68,7 @@ pass "dry-run install writes nothing and calls no systemctl"
 "$INSTALL" "$FMH" >"$d/out/install" || fail "install failed: $(cat "$d/out/install")"
 [ -x "$DEST/bin/jg-sentinel.sh" ] || fail "install did not copy the sentinel"
 grep -qx "ExecStart=\"$DEST/bin/jg-sentinel.sh\" loop" "$UNIT" || fail "unit does not run the installed copy"
-grep -qx "Environment=\"FM_HOME=$(cd "$FMH" && pwd -P)\"" "$UNIT" || fail "unit does not carry the home"
+grep -qx "Environment=\"JG_HOME=$(cd "$FMH" && pwd -P)\"" "$UNIT" || fail "unit does not carry the home"
 cmp -s "$DEST/unit.before" "$d/expect/unit" || fail "pre-install unit was not recorded"
 [ "$(cat "$LOG")" = "$(printf -- '--user daemon-reload\n--user restart jg-sentinel.service')" ] \
   || fail "install did not reload and restart in order: $(cat "$LOG")"

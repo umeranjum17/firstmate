@@ -14,7 +14,7 @@
 # all otherwise, so it composes with the existing watcher state-check contract
 # instead of needing a schedule of its own. `arm` writes
 # state/tool-updates.check.sh and binds its bytes with jg-check-register.sh, so
-# the watcher dispatches it on its normal FM_CHECK_INTERVAL cadence and turns
+# the watcher dispatches it on its normal JG_CHECK_INTERVAL cadence and turns
 # its one line into a `check:` wake. `disarm` removes the shim, its trust
 # binding, and the report record.
 #
@@ -48,15 +48,15 @@
 # edit, never a code change. docs/configuration.md owns that schema.
 #
 # Probing costs real time, so `check` runs its probes at most once per
-# FM_TOOL_UPDATE_INTERVAL (default 900, 0 disables the gate, otherwise 60..86400)
+# JG_TOOL_UPDATE_INTERVAL (default 900, 0 disables the gate, otherwise 60..86400)
 # and stays silent in between. Each probe is bounded by
-# FM_TOOL_UPDATE_PROBE_SECS (default 5, valid 1..30) and a whole sweep by
-# FM_TOOL_UPDATE_BUDGET_SECS (default 20, valid 1..120).
+# JG_TOOL_UPDATE_PROBE_SECS (default 5, valid 1..30) and a whole sweep by
+# JG_TOOL_UPDATE_BUDGET_SECS (default 20, valid 1..120).
 #
 # The sweep has to finish inside the watcher's own per check bound, because a run
 # the watcher kills prints nothing and writes no record, so it would repeat that
 # silence on every poll. That coupling is enforced rather than assumed: a budget
-# larger than FM_CHECK_TIMEOUT (default 30, read from this check's own
+# larger than JG_CHECK_TIMEOUT (default 30, read from this check's own
 # environment because the watcher runs it as a direct child) allows is cut down
 # to what fits, and the cut is reported in the report line so the operator sees
 # it. A budget that cannot be read as a whole number from 1 to 120 is still
@@ -75,9 +75,9 @@ export LC_ALL=C
 export GIT_TERMINAL_PROMPT=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/watched-tools.json"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/watched-tools.json"
 RECORD="$STATE/.tool-updates"
 CHECK_ID=tool-updates
 CHECK_SHIM="$STATE/$CHECK_ID.check.sh"
@@ -116,39 +116,39 @@ die_usage() {
   exit 2
 }
 
-INTERVAL=${FM_TOOL_UPDATE_INTERVAL:-900}
+INTERVAL=${JG_TOOL_UPDATE_INTERVAL:-900}
 case "$INTERVAL" in
   ''|*[!0-9]*)
-    printf 'jg-tool-update-check: FM_TOOL_UPDATE_INTERVAL must be 0 or a whole number from 60 to 86400\n' >&2
+    printf 'jg-tool-update-check: JG_TOOL_UPDATE_INTERVAL must be 0 or a whole number from 60 to 86400\n' >&2
     exit 2
     ;;
 esac
 if [ "$INTERVAL" -ne 0 ] && { [ "$INTERVAL" -lt 60 ] || [ "$INTERVAL" -gt 86400 ]; }; then
-  printf 'jg-tool-update-check: FM_TOOL_UPDATE_INTERVAL must be 0 or a whole number from 60 to 86400\n' >&2
+  printf 'jg-tool-update-check: JG_TOOL_UPDATE_INTERVAL must be 0 or a whole number from 60 to 86400\n' >&2
   exit 2
 fi
 
-PROBE_SECS=${FM_TOOL_UPDATE_PROBE_SECS:-5}
+PROBE_SECS=${JG_TOOL_UPDATE_PROBE_SECS:-5}
 case "$PROBE_SECS" in
   ''|*[!0-9]*|0)
-    printf 'jg-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
+    printf 'jg-tool-update-check: JG_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
     exit 2
     ;;
 esac
 if [ "$PROBE_SECS" -gt 30 ]; then
-  printf 'jg-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
+  printf 'jg-tool-update-check: JG_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
   exit 2
 fi
 
-BUDGET_SECS=${FM_TOOL_UPDATE_BUDGET_SECS:-20}
+BUDGET_SECS=${JG_TOOL_UPDATE_BUDGET_SECS:-20}
 case "$BUDGET_SECS" in
   ''|*[!0-9]*|0)
-    printf 'jg-tool-update-check: FM_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
+    printf 'jg-tool-update-check: JG_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
     exit 2
     ;;
 esac
 if [ "$BUDGET_SECS" -gt 120 ]; then
-  printf 'jg-tool-update-check: FM_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
+  printf 'jg-tool-update-check: JG_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
   exit 2
 fi
 
@@ -166,7 +166,7 @@ KILL_GRACE_SECS=1
 # The watcher's per check bound, read from this check's own environment. The
 # watcher runs the check as a direct child, so an operator who raised it is seen
 # here too, and when it is unset both sides resolve the same default.
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
+CHECK_TIMEOUT=${JG_CHECK_TIMEOUT:-30}
 case "$CHECK_TIMEOUT" in
   ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;;
 esac
@@ -188,9 +188,9 @@ fi
 # The record epoch is overridable so a test can drive the cadence gate; the
 # sweep budget always uses real time so a frozen epoch cannot disable it.
 record_epoch_now() {
-  case "${FM_TOOL_UPDATE_NOW:-}" in
+  case "${JG_TOOL_UPDATE_NOW:-}" in
     ''|*[!0-9]*) date +%s ;;
-    *) printf '%s\n' "$FM_TOOL_UPDATE_NOW" ;;
+    *) printf '%s\n' "$JG_TOOL_UPDATE_NOW" ;;
   esac
 }
 
@@ -742,7 +742,7 @@ action_check() {
     # visible truncation marker the digests use, instead of ending mid-finding
     # as if that were all of it.
     jg_cap_line_var "tool updates: $FINDINGS" "$MAX_LINE"
-    line=$FM_LINE_CAP_LINE
+    line=$JG_LINE_CAP_LINE
   fi
 
   # The cut line is what gets printed, but the whole finding set is what decides
@@ -767,7 +767,7 @@ shim_content() {
     '#!/usr/bin/env bash' \
     '# Auto-generated by jg-tool-update-check.sh - watched tool update poll shim.' \
     '# The watcher validates these bytes, then dispatches the trusted check script.' \
-    "export FM_HOME=$(printf '%q' "$home")" \
+    "export JG_HOME=$(printf '%q' "$home")" \
     "exec $(printf '%q' "$SCRIPT_DIR/jg-tool-update-check.sh") check"
 }
 
@@ -863,11 +863,11 @@ action_arm() {
     return 1
   fi
   mkdir -p "$STATE" || return 1
-  case "$FM_HOME" in
-    /*) home=$FM_HOME ;;
+  case "$JG_HOME" in
+    /*) home=$JG_HOME ;;
     *)
-      home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) || {
-        printf 'jg-tool-update-check: cannot resolve FM_HOME %s\n' "$FM_HOME" >&2
+      home=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) || {
+        printf 'jg-tool-update-check: cannot resolve JG_HOME %s\n' "$JG_HOME" >&2
         return 1
       }
       ;;
@@ -889,7 +889,7 @@ action_arm() {
     printf 'jg-tool-update-check: could not write %s\n' "$CHECK_SHIM" >&2
     return 1
   fi
-  if ! FM_HOME="$home" "$REGISTER_BIN" "$CHECK_ID" >/dev/null; then
+  if ! JG_HOME="$home" "$REGISTER_BIN" "$CHECK_ID" >/dev/null; then
     trap - HUP INT TERM
     arm_rollback
     printf 'jg-tool-update-check: could not register %s\n' "$CHECK_SHIM" >&2

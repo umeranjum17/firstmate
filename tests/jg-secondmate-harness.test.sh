@@ -57,13 +57,13 @@ set -u
 # everything these cases set up wherever ancestry is silent. Drop the ambient
 # markers so what this suite asserts does not depend on which harness it was
 # launched from; every case states the marker it means to test.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 jg_git_identity fmtest fmtest@example.com
 TMP_ROOT=$(jg_test_tmproot jg-secondmate-harness)
 mkdir -p "$TMP_ROOT/no-addons"
-export FM_BACKEND=tmux
+export JG_BACKEND=tmux
 
 # Every claude launch pre-registers workspace trust for the directory it starts
 # in, and for a secondmate that directory is the home (bin/jg-claude-trust.sh).
@@ -98,8 +98,8 @@ test_harness_resolution() {
     mkdir -p "$cfg"
     [ "$crew" = "-" ] || printf '%s\n' "$crew" > "$cfg/crew-harness"
     [ "$sm" = "-" ] || printf '%s\n' "$sm" > "$cfg/secondmate-harness"
-    got_sm=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
-    got_crew=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" crew)
+    got_sm=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
+    got_crew=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" crew)
     [ "$got_sm" = "$exp_sm" ] || fail "$label: secondmate resolved '$got_sm', expected '$exp_sm'"
     [ "$got_crew" = "$exp_crew" ] || fail "$label: crew resolved '$got_crew', expected '$exp_crew'"
   done <<'ROWS'
@@ -155,9 +155,9 @@ test_secondmate_model_effort_tokens() {
     cfg="$case_dir/config"
     mkdir -p "$cfg"
     [ "$line" = ABSENT ] || printf '%b\n' "$line" > "$cfg/secondmate-harness"
-    got_h=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
-    got_m=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-model)
-    got_e=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 FM_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-effort)
+    got_h=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate)
+    got_m=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-model)
+    got_e=$(PATH="$BLIND_BIN:$BASE_PATH" CLAUDECODE=1 JG_CONFIG_OVERRIDE="$cfg" "$ROOT/bin/jg-harness.sh" secondmate-effort)
     [ "$got_h" = "$exp_harness" ] || fail "$label: harness resolved '$got_h', expected '$exp_harness'"
     [ "$got_m" = "$exp_model" ] || fail "$label: model resolved '$got_m', expected '$exp_model'"
     [ "$got_e" = "$exp_effort" ] || fail "$label: effort resolved '$got_e', expected '$exp_effort'"
@@ -192,7 +192,7 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-case "$pid:$field:${FM_TEST_SIGNED_SHAPE:-exact}" in
+case "$pid:$field:${JG_TEST_SIGNED_SHAPE:-exact}" in
   100:comm=:*) printf '%s\n' '/test/Pi.app/bin/pi' ;;
   100:args=:*) printf '%s\n' 'Pi' ;;
   100:ppid=:*) printf '%s\n' 200 ;;
@@ -212,17 +212,17 @@ SH
 
   got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "unmarked shared signed-wrapper ancestry resolved '$got', expected pi"
-  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true FM_PI_HARNESS=pi-signed "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true JG_PI_HARNESS=pi-signed "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi-signed ] || fail "selected signed wrapper resolved '$got', expected pi-signed"
-  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true FM_PI_HARNESS=pi "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true JG_PI_HARNESS=pi "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "selected plain Pi resolved '$got', expected pi"
-  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true FM_PI_HARNESS=pi-signed-helper "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true JG_PI_HARNESS=pi-signed-helper "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "inexact signed selection marker resolved '$got', expected pi"
-  got=$(env -u CLAUDECODE -u GROK_AGENT -u PI_CODING_AGENT PATH="$fakebin:$BASE_PATH" FM_PI_HARNESS=pi-signed "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT -u PI_CODING_AGENT PATH="$fakebin:$BASE_PATH" JG_PI_HARNESS=pi-signed "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "signed selection marker without Pi's family marker resolved '$got', expected pi"
-  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true FM_TEST_SIGNED_SHAPE=plain "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true JG_TEST_SIGNED_SHAPE=plain "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "plain Pi marker resolved '$got', expected pi"
-  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true FM_TEST_SIGNED_SHAPE=helper "$ROOT/bin/jg-harness.sh")
+  got=$(env -u CLAUDECODE -u GROK_AGENT PATH="$fakebin:$BASE_PATH" PI_CODING_AGENT=true JG_TEST_SIGNED_SHAPE=helper "$ROOT/bin/jg-harness.sh")
   [ "$got" = pi ] || fail "unrelated pi-signed-helper ancestry resolved '$got', expected pi"
 
   got=$(PATH="$fakebin:$BASE_PATH" bash -c \
@@ -231,7 +231,7 @@ SH
   PATH="$fakebin:$BASE_PATH" bash -c \
     '. "$0/bin/jg-session-lock-lib.sh"; kill() { return 0; }; jg_harness_pid_alive 200' "$ROOT" \
     || fail "session-lock liveness rejected exact pi-signed holder"
-  if PATH="$fakebin:$BASE_PATH" FM_TEST_SIGNED_SHAPE=helper bash -c \
+  if PATH="$fakebin:$BASE_PATH" JG_TEST_SIGNED_SHAPE=helper bash -c \
     '. "$0/bin/jg-session-lock-lib.sh"; kill() { return 0; }; jg_harness_pid_alive 200' "$ROOT"; then
     fail "session-lock liveness accepted unrelated pi-signed-helper"
   fi
@@ -254,17 +254,17 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-[ -n "${FM_TEST_PS_LOG:-}" ] && printf '%s:%s\n' "$pid" "$field" >> "$FM_TEST_PS_LOG"
+[ -n "${JG_TEST_PS_LOG:-}" ] && printf '%s:%s\n' "$pid" "$field" >> "$JG_TEST_PS_LOG"
 case "$pid:$field" in
   4242:comm=) printf '%s\n' '/opt/test/bin/codex' ;;
   4242:args=) printf '%s\n' 'codex' ;;
   4242:ppid=) printf '%s\n' 1 ;;
-  5252:comm=) if [ -n "${FM_TEST_PS_LIVENESS_PROBE:-}" ]; then printf '%s\n' '-codex'; else printf '%s\n' '-zsh'; fi ;;
-  5252:args=) if [ -n "${FM_TEST_PS_LIVENESS_PROBE:-}" ]; then printf '%s\n' '-codex'; else printf '%s\n' '-zsh'; fi ;;
+  5252:comm=) if [ -n "${JG_TEST_PS_LIVENESS_PROBE:-}" ]; then printf '%s\n' '-codex'; else printf '%s\n' '-zsh'; fi ;;
+  5252:args=) if [ -n "${JG_TEST_PS_LIVENESS_PROBE:-}" ]; then printf '%s\n' '-codex'; else printf '%s\n' '-zsh'; fi ;;
   5252:ppid=) printf '%s\n' 4242 ;;
   *:comm=) printf '%s\n' '-zsh' ;;
   *:args=) printf '%s\n' '-zsh' ;;
-  *:ppid=) printf '%s\n' "${FM_TEST_PS_PARENT:-4242}" ;;
+  *:ppid=) printf '%s\n' "${JG_TEST_PS_PARENT:-4242}" ;;
 esac
 SH
   chmod +x "$fakebin/ps"
@@ -286,7 +286,7 @@ SH
   # through it as an ordinary shell and still select 4242.
   err="$dir/jg-session-lock-ancestry-collision.err"
   collision_log="$dir/jg-session-lock-ancestry-collision.log"
-  got=$(FM_TEST_PS_PARENT=5252 FM_TEST_PS_LOG="$collision_log" PATH="$fakebin:$BASE_PATH" bash -c \
+  got=$(JG_TEST_PS_PARENT=5252 JG_TEST_PS_LOG="$collision_log" PATH="$fakebin:$BASE_PATH" bash -c \
     '. "$0/bin/jg-session-lock-lib.sh"; jg_harness_ancestry_pid' "$ROOT" 2>"$err")
   [ "$got" = 4242 ] || fail "session-lock ancestry with pid 5252 as a real ancestor selected '$got', expected pid 4242"
   assert_contains "$(cat "$collision_log")" "5252:" \
@@ -294,7 +294,7 @@ SH
   [ ! -s "$err" ] || fail "session-lock collision ancestry wrote noise: $(cat "$err")"
 
   err="$dir/jg-session-lock-alive.err"
-  FM_TEST_PS_LIVENESS_PROBE=1 PATH="$fakebin:$BASE_PATH" bash -c \
+  JG_TEST_PS_LIVENESS_PROBE=1 PATH="$fakebin:$BASE_PATH" bash -c \
     '. "$0/bin/jg-session-lock-lib.sh"; kill() { return 0; }; jg_harness_pid_alive 5252' \
     "$ROOT" 2>"$err"; status=$?
   expect_code 0 "$status" "session-lock liveness should accept literal -codex as a harness process name"
@@ -449,7 +449,7 @@ test_propagate_lib() {
   printf '{"default":{"harness":"grok"}}\n' > "$src/crew-dispatch.json"
   stdout="$d/guard-skip.out"
   stderr="$d/guard-skip.err"
-  FM_ADDONS_DIR="$TMP_ROOT/no-addons" FM_INHERITABLE_CONFIG=crew-dispatch.json propagate_inheritable_config "$src" "$guard_repo/config" >"$stdout" 2>"$stderr" \
+  JG_ADDONS_DIR="$TMP_ROOT/no-addons" JG_INHERITABLE_CONFIG=crew-dispatch.json propagate_inheritable_config "$src" "$guard_repo/config" >"$stdout" 2>"$stderr" \
     || fail "guard skip should not make propagation fail"
   [ ! -s "$stdout" ] || fail "guard skip wrote to stdout"
   err_text=$(cat "$stderr")
@@ -496,7 +496,7 @@ make_seeded_home() {
 }
 
 # spawn_secondmate <world> <id> <home> [explicit-harness]
-# Runs jg-spawn.sh in secondmate mode. FM_ROOT is the real repo (so jg-harness.sh
+# Runs jg-spawn.sh in secondmate mode. JG_ROOT is the real repo (so jg-harness.sh
 # resolves), the primary config dir is <world>/home/config, and CLAUDECODE over a
 # blinded ancestry walk pins detect_own. stderr is discarded (the local-HEAD ff sync harmlessly skips a
 # non-worktree home). Inspect <world>/home/state/<id>.meta and <home>/config after.
@@ -510,10 +510,10 @@ spawn_secondmate() {
   [ -n "$harness" ] && spawn_args+=("$harness")
   spawn_args+=(--secondmate)
   PATH="$fakebin:$BLIND_BIN:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$world/home" HOME="$world/home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
-    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$world/home" HOME="$world/home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
+    JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" "${spawn_args[@]}" >/dev/null 2>&1 || true
 }
 
@@ -629,10 +629,10 @@ test_spawn_unverified_secondmate_harness_refused() {
   err="$w/spawn.err"
   rc=0
   PATH="$fakebin:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate >/dev/null 2>"$err" || rc=$?
 
   [ "$rc" -ne 0 ] || fail "unverified: spawn should have failed"
@@ -656,10 +656,10 @@ test_spawn_cursor_secondmate_launches_with_its_primary_contract() {
   : > "$launchlog"
   rc=0
   PATH="$fakebin:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" FM_FAKE_PANE_PATH="$sm" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" JG_FAKE_PANE_PATH="$sm" \
     "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate >/dev/null 2>&1 || rc=$?
 
   [ "$rc" -eq 0 ] || {
@@ -674,7 +674,7 @@ test_spawn_cursor_secondmate_launches_with_its_primary_contract() {
     "a cursor secondmate must launch with --trust, or none of its project hooks load and its home has no supervision at all"
   assert_contains "$launch" "--workspace" \
     "a cursor secondmate must be pinned to its own home as the workspace"
-  assert_contains "$launch" "FM_SUPERVISION_MODEL=autoarm" \
+  assert_contains "$launch" "JG_SUPERVISION_MODEL=autoarm" \
     "cursor's stop-hook park runs the watcher only between turns, so its home must inherit the autoarm model"
   pass "Cursor is accepted for secondmates and launches with the contract its park needs"
 }
@@ -687,10 +687,10 @@ test_spawn_cursor_secondmate_launches_with_its_primary_contract() {
 meta_field() { grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2-; }
 
 # A tmux stub that behaves like make_noop_tmux but also captures the literal
-# `send-keys -l <cmd>` launch command into FM_FAKE_LAUNCH_LOG, mirroring the
+# `send-keys -l <cmd>` launch command into JG_FAKE_LAUNCH_LOG, mirroring the
 # capture technique in jg-spawn-dispatch-profile.test.sh so the constructed
 # launch command (not just meta) can be asserted on. Also answers the
-# `#{pane_current_path}` probe from FM_FAKE_PANE_PATH so this same stub works
+# `#{pane_current_path}` probe from JG_FAKE_PANE_PATH so this same stub works
 # for a crew/scout (non-secondmate) spawn's treehouse-worktree wait loop.
 make_launch_capturing_tmux() {
   local dir=$1 fakebin="$1/fakebin"
@@ -699,21 +699,21 @@ make_launch_capturing_tmux() {
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "${JG_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys)
-    if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
+    if [ -n "${JG_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do
         if [ "$prev" = "-l" ]; then
           case "$a" in
             ". '"*"'") staged=${a#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || a=$(cat "$staged") ;;
           esac
-          printf '%s\n' "$a" >> "$FM_FAKE_LAUNCH_LOG"
+          printf '%s\n' "$a" >> "$JG_FAKE_LAUNCH_LOG"
         fi
         prev=$a
       done
@@ -760,10 +760,10 @@ spawn_secondmate_capture() {
   fakebin=$(make_launch_capturing_tmux "$world/tmux-$id")
   : > "$launchlog"
   PATH="$fakebin:$BLIND_BIN:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$world/home" HOME="$world/home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
-    FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$world/home" HOME="$world/home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$world/home/state" JG_DATA_OVERRIDE="$world/home/data" \
+    JG_PROJECTS_OVERRIDE="$world/home/projects" JG_CONFIG_OVERRIDE="$world/home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$home" "$@" --secondmate
 }
 
@@ -776,17 +776,17 @@ test_spawn_backend_precedence_over_inherited_config() {
   printf 'herdr\n' > "$w/home/config/backend"
   make_seeded_home "$sm" sm
 
-  out=$(FM_BACKEND=tmux spawn_secondmate_capture \
+  out=$(JG_BACKEND=tmux spawn_secondmate_capture \
     "$w" sm "$sm" "$launchlog" 2>&1); status=$?
   expect_code 0 "$status" \
-    "FM_BACKEND=tmux should beat inherited config/backend=herdr"$'\n'"$out"
+    "JG_BACKEND=tmux should beat inherited config/backend=herdr"$'\n'"$out"
 
   meta="$w/home/state/sm.meta"
   [ "$(cat "$sm/config/backend")" = herdr ] \
     || fail "backend precedence fixture did not inherit config/backend=herdr"
   assert_no_grep '^backend=' "$meta" \
-    "FM_BACKEND=tmux did not beat inherited config/backend=herdr"
-  pass "B5b spawn: FM_BACKEND wins over inherited config/backend"
+    "JG_BACKEND=tmux did not beat inherited config/backend=herdr"
+  pass "B5b spawn: JG_BACKEND wins over inherited config/backend"
 }
 
 test_spawn_explicit_backend_precedence_over_env_and_inherited_config() {
@@ -798,17 +798,17 @@ test_spawn_explicit_backend_precedence_over_env_and_inherited_config() {
   printf 'herdr\n' > "$w/home/config/backend"
   make_seeded_home "$sm" sm
 
-  out=$(FM_BACKEND=zellij spawn_secondmate_capture \
+  out=$(JG_BACKEND=zellij spawn_secondmate_capture \
     "$w" sm "$sm" "$launchlog" --backend tmux 2>&1); status=$?
   expect_code 0 "$status" \
-    "explicit --backend tmux should beat FM_BACKEND=zellij and inherited config/backend=herdr"$'\n'"$out"
+    "explicit --backend tmux should beat JG_BACKEND=zellij and inherited config/backend=herdr"$'\n'"$out"
 
   meta="$w/home/state/sm.meta"
   [ "$(cat "$sm/config/backend")" = herdr ] \
     || fail "explicit backend precedence fixture did not inherit config/backend=herdr"
   assert_no_grep '^backend=' "$meta" \
-    "explicit --backend tmux did not beat FM_BACKEND=zellij and inherited config/backend=herdr"
-  pass "B5c spawn: explicit --backend wins over FM_BACKEND and inherited config/backend"
+    "explicit --backend tmux did not beat JG_BACKEND=zellij and inherited config/backend=herdr"
+  pass "B5c spawn: explicit --backend wins over JG_BACKEND and inherited config/backend"
 }
 
 # A bare "<harness>" secondmate-harness file (today's format) must launch with
@@ -999,7 +999,7 @@ test_spawned_secondmate_uses_its_harness_supervision_model() {
     # whether this assertion passes.
     cat > "$fakebin/$harness" <<SH
 #!/usr/bin/env bash
-FM_ROOT_OVERRIDE="$sm" "$ROOT/bin/jg-guard.sh"
+JG_ROOT_OVERRIDE="$sm" "$ROOT/bin/jg-guard.sh"
 SH
     chmod +x "$fakebin/$harness"
     launch=$(cat "$launchlog")
@@ -1060,10 +1060,10 @@ Verify secondmate harness settings do not affect it.
 EOF
   : > "$launchlog"
   PATH="$fakebin:$BASE_PATH" TMUX="fake,1,0" CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" FM_FAKE_LAUNCH_LOG="$launchlog" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" JG_FAKE_LAUNCH_LOG="$launchlog" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$proj" --mode no-mistakes --yolo off >/dev/null 2>&1
   meta="$home/state/$id.meta"
   [ "$(meta_field "$meta" kind)" = ship ] || fail "crew-unaffected: expected an ordinary ship task"
@@ -1109,7 +1109,7 @@ new_world() {
 
 record_live_watcher_fixture() {
   local home=$1 identity
-  identity=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pid_identity "$2"' _ \
+  identity=$(JG_STATE_OVERRIDE="$home/state" bash -c '. "$1"; jg_pid_identity "$2"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$$") || fail "could not identify the live watcher fixture"
   mkdir "$home/state/.watch.lock"
   printf '%s\n' "$$" > "$home/state/.watch.lock/pid"
@@ -1137,7 +1137,7 @@ make_fake_toolchain() {
   fakebin="$dir/fakebin"
   mkdir -p "$fakebin"
   jg_fake_exit0 "$fakebin" node chrome-devtools-axi
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -1148,15 +1148,15 @@ exit 0
 SH
   chmod +x "$fakebin/gh-axi"
   # tmux fake supports jg-send's composer-verified submit path and optional
-  # FM_FAKE_TMUX_LOG / FM_FAKE_TMUX_FAIL_LITERAL for reread-nudge assertions.
+  # JG_FAKE_TMUX_LOG / JG_FAKE_TMUX_FAIL_LITERAL for reread-nudge assertions.
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-if [ -n "${FM_FAKE_TMUX_LOG:-}" ]; then
-  printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
+if [ -n "${JG_FAKE_TMUX_LOG:-}" ]; then
+  printf '%s\n' "$*" >> "$JG_FAKE_TMUX_LOG"
 fi
 case "$*" in
   list-windows*)
-    sed -n 's/^window=[^:]*://p' "${FM_HOME:?}"/state/*.meta
+    sed -n 's/^window=[^:]*://p' "${JG_HOME:?}"/state/*.meta
     exit 0
     ;;
   *display-message*'#{pane_current_command}'*) printf '%s\n' codex; exit 0 ;;
@@ -1164,11 +1164,11 @@ case "$*" in
   *display-message*'#{cursor_y}'*) printf '%s\n' 0; exit 0 ;;
   *capture-pane*) printf '❯\n'; exit 0 ;;
   *'send-keys'*' -l '*)
-    [ "${FM_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
     exit 0
     ;;
   *send-keys*)
-    [ "${FM_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_FAIL_LITERAL:-0}" = 1 ] && exit 1
     exit 0
     ;;
 esac
@@ -1223,12 +1223,12 @@ run_bootstrap() {
   local w=$1 fakebin log=${2:-}
   fakebin=$(make_fake_toolchain "$w")
   if [ -n "$log" ]; then
-    PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-      FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+    PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+      JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
       "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
   else
-    PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-      FM_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
+    PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+      JG_SEND_SETTLE=0 "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null
   fi
 }
 
@@ -1236,12 +1236,12 @@ run_config_push() {
   local w=$1 fakebin log=${2:-}
   fakebin=$(make_fake_toolchain "$w")
   if [ -n "$log" ]; then
-    PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-      FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+    PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+      JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
       "$ROOT/bin/jg-config-push.sh"
   else
-    PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-      FM_SEND_SETTLE=0 \
+    PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+      JG_SEND_SETTLE=0 \
       "$ROOT/bin/jg-config-push.sh"
   fi
 }
@@ -1529,10 +1529,10 @@ test_spawn_secondmate_claude_grants_parent_inbox_dir() {
     : > "$launchlog"
     out=$(
       PATH="$fakebin:$BLIND_BIN:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-        FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
-        FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-        FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-        FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+        JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
+        JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+        JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+        JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
         "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate 2>&1
     )
     status=$?
@@ -1541,7 +1541,7 @@ test_spawn_secondmate_claude_grants_parent_inbox_dir() {
 
     reqs="$w/channel-requirements.txt"
     printf '%s\n' "$w/home/state/sm.inbox" > "$reqs"
-    eval_out=$(jg_eval_launch "$launch" "$sm" "$fakebin" "FM_FAKE_CLAUDE_REQUIREMENTS=$reqs" 2>&1)
+    eval_out=$(jg_eval_launch "$launch" "$sm" "$fakebin" "JG_FAKE_CLAUDE_REQUIREMENTS=$reqs" 2>&1)
     eval_rc=$?
     [ "$eval_rc" -eq 0 ] \
       || fail "claude secondmate launch under $mode would hit the outside-read gate on its parent inbox"$'\n'"$eval_out"
@@ -1941,7 +1941,7 @@ test_config_reread_per_home_changed_sets_and_exact_bytes() {
   assert_contains "$(cat "$instr_a")" "config/crew-harness" "alpha missing harness path"
   assert_contains "$(cat "$instr_a")" "config/backlog-backend" "alpha missing backlog path"
   assert_contains "$(cat "$instr_a")" "config/backend" "alpha missing backend path"
-  # Path order follows FM_INHERITABLE_CONFIG.
+  # Path order follows JG_INHERITABLE_CONFIG.
   awk '
     /config\/crew-dispatch\.json/ { d=NR }
     /config\/crew-harness/ { h=NR }
@@ -2070,7 +2070,7 @@ test_config_reread_isolation_and_absent_and_send_failure() {
   printf 'claude\n' > "$w/home/config/crew-harness"
   err="$w/config-reread-send-fail.err"
   out=$(PATH="$(make_fake_toolchain "$w"):$BASE_PATH" \
-    FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" FM_SEND_SETTLE=0 \
+    JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-config-push.sh" 2>"$err"); status=$?
   expect_code 1 "$status" "send failure should make config-push exit non-zero"
   assert_contains "$out" "CONFIG_REREAD: secondmate" "send failure diagnostic missing"
@@ -2090,7 +2090,7 @@ test_config_reread_isolation_and_absent_and_send_failure() {
   printf 'pi\n' > "$w/home/config/crew-harness"
   err="$w/config-reread-send-fail-second.err"
   out2=$(PATH="$(make_fake_toolchain "$w"):$BASE_PATH" \
-    FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" FM_SEND_SETTLE=0 \
+    JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-config-push.sh" 2>"$err"); status2=$?
   expect_code 1 "$status2" "second send failure should make config-push exit non-zero"
   assert_not_contains "$out2" "config-reread: sent" \
@@ -2142,8 +2142,8 @@ esac
 exec "$real_mv" "\$@"
 SH
   chmod +x "$fakebin/mv"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
   expect_code 1 "$status" "publication failure should remain diagnostic"
   assert_contains "$out" "CONFIG_REREAD: secondmate" "publication failure diagnostic missing"
   assert_not_contains "$out" "config-reread: sent" \
@@ -2199,8 +2199,8 @@ esac
 exec "$real_mv" "\$@"
 SH
   chmod +x "$fakebin/mv"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
   expect_code 1 "$status" "instruction-write failure should remain diagnostic"
   assert_contains "$out" "retained exact retry generation" \
     "instruction-write failure did not retain exact retry bytes"
@@ -2264,8 +2264,8 @@ esac
 exec "$real_cp" "\$@"
 SH
   chmod +x "$fakebin/cp"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
   expect_code 1 "$status" "exact temporary fallback failure should remain diagnostic"
   assert_contains "$out" "retained exact retry temporary" \
     "exact temporary fallback failure did not retain the immutable bytes"
@@ -2329,8 +2329,8 @@ SH
 
   first_out="$w/first-push.out"
   (
-    PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-      FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+    PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+      JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
       "$ROOT/bin/jg-config-push.sh" > "$first_out" 2>&1
   ) &
   first_pid=$!
@@ -2345,8 +2345,8 @@ SH
     || fail "first concurrent push did not publish its generation"
   printf 'two\n' > "$w/home/config/crew-harness"
   second_out="$w/second-push.out"
-  PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-config-push.sh" > "$second_out" 2>&1
   second_status=$?
   wait "$first_pid"; first_status=$?
@@ -2383,8 +2383,8 @@ test_config_reread_full_retry_queue_drains_before_new_push() {
   done
   fakebin=$(make_fake_toolchain "$w")
   log="$w/config-reread-full-queue.tmux.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-config-push.sh" 2>&1); status=$?
   expect_code 0 "$status" "a full retry queue should drain before a new push"
   assert_contains "$out" "config-reread: sent" \
@@ -2433,8 +2433,8 @@ SH
   chmod +x "$fakebin/mv"
   report="$w/empty-reread.report"
   : > "$report"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 jg_config_send_reread_nudge sm "$w/sm" "$report" 2>&1); status=$?
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 jg_config_send_reread_nudge sm "$w/sm" "$report" 2>&1); status=$?
   expect_code 1 "$status" "mixed delivery failure should remain diagnostic"
   assert_contains "$out" "CONFIG_REREAD: secondmate sm: send failed" \
     "mixed delivery failure diagnostic missing"
@@ -2479,8 +2479,8 @@ SH
   report="$w/empty-reread.report"
   : > "$report"
   log="$w/config-reread-order.tmux.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     jg_config_send_reread_nudge sm "$w/sm" "$report" 2>&1); status=$?
   expect_code 1 "$status" "an older failed generation should remain diagnostic"
   assert_contains "$out" "CONFIG_REREAD: secondmate sm: send failed" \
@@ -2497,8 +2497,8 @@ test_bootstrap_detect_only_does_not_create_state() {
   w=$(new_world bootstrap-detect-only)
   detect_state="$w/detect-state"
   fakebin=$(make_fake_toolchain "$w")
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_STATE_OVERRIDE="$detect_state" FM_BOOTSTRAP_DETECT_ONLY=1 \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_STATE_OVERRIDE="$detect_state" JG_BOOTSTRAP_DETECT_ONLY=1 \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1); status=$?
   expect_code 0 "$status" "detect-only bootstrap should succeed"
   [ ! -e "$detect_state" ] || fail "detect-only bootstrap created its state directory"
@@ -2580,8 +2580,8 @@ test_config_reread_bootstrap_path_and_spawn_flexibility() {
 
   fakebin=$(make_fake_toolchain "$w")
   log="$w/bootstrap-reread.tmux.log"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
   [ "$(cat "$w/sm/config/crew-harness")" = codex ] || fail "bootstrap did not push harness"
   instr=$(reread_instruction_path "$w/sm") || fail "bootstrap reread instruction missing"
@@ -2656,8 +2656,8 @@ case "\$*" in
 esac
 SH
   chmod +x "$fakebin/tmux"
-  PATH="$fakebin:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/main" \
-    FM_SEND_SETTLE=0 FM_FAKE_TMUX_LOG="$log" \
+  PATH="$fakebin:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/main" \
+    JG_SEND_SETTLE=0 JG_FAKE_TMUX_LOG="$log" \
     "$ROOT/bin/jg-bootstrap.sh" >/dev/null 2>&1
   assert_contains "$(cat "$log")" "spawn" \
     "bootstrap did not respawn the dead secondmate"
@@ -2707,10 +2707,10 @@ SH
   chmod +x "$fakebin/rm"
   launchlog="$w/spawn-quarantine.launch.log"
   out=$(PATH="$fakebin:$BASE_PATH" TMUX='' CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$w/home/state" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_PROJECTS_OVERRIDE="$w/home/projects" FM_CONFIG_OVERRIDE="$w/home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$w/home" HOME="$w/home/user-home" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$w/home/state" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_PROJECTS_OVERRIDE="$w/home/projects" JG_CONFIG_OVERRIDE="$w/home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
     "$ROOT/bin/jg-spawn.sh" sm "$sm" --secondmate 2>&1); status=$?
   expect_code 0 "$status" "spawn should remain available after reread cleanup failure"
   assert_contains "$out" "CONFIG_REREAD: secondmate sm: quarantined pre-relaunch generations" \

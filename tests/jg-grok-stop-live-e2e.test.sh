@@ -10,17 +10,17 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_GROK_STOP_LIVE_E2E tmux jq
+jg_live_gate opt-in JG_GROK_STOP_LIVE_E2E tmux jq
 
-NATIVE_BIN=${FM_GROK_NATIVE_BIN:-}
-LEGACY_BIN=${FM_GROK_LEGACY_BIN:-}
-AUTH=${FM_GROK_AUTH_FILE:-$HOME/.grok/auth.json}
+NATIVE_BIN=${JG_GROK_NATIVE_BIN:-}
+LEGACY_BIN=${JG_GROK_LEGACY_BIN:-}
+AUTH=${JG_GROK_AUTH_FILE:-$HOME/.grok/auth.json}
 REAL_TMUX=$(command -v tmux || true)
 ACTIVE_LAB=
 
-[ -x "$NATIVE_BIN" ] || fail "FM_GROK_NATIVE_BIN must be an exact executable path"
-[ -x "$LEGACY_BIN" ] || fail "FM_GROK_LEGACY_BIN must be an exact executable path"
-[ -f "$AUTH" ] || fail "FM_GROK_AUTH_FILE must name the already-managed auth artifact"
+[ -x "$NATIVE_BIN" ] || fail "JG_GROK_NATIVE_BIN must be an exact executable path"
+[ -x "$LEGACY_BIN" ] || fail "JG_GROK_LEGACY_BIN must be an exact executable path"
+[ -f "$AUTH" ] || fail "JG_GROK_AUTH_FILE must name the already-managed auth artifact"
 [ -n "$REAL_TMUX" ] || fail "tmux not found"
 
 NATIVE_VERSION=$($NATIVE_BIN --version)
@@ -48,7 +48,7 @@ cleanup_exact_cell() {
     echo "blocked: live target identity differs from creation record; preserving $lab" >&2
     return 1
   }
-  FM_E2E_TMUX_SOCKET_ID="$lab/dedicated.sock" PATH="$lab/bin:$PATH" \
+  JG_E2E_TMUX_SOCKET_ID="$lab/dedicated.sock" PATH="$lab/bin:$PATH" \
     env -u TMUX -u TMUX_PANE "$lab/bin/tmux" kill-window -t "$session:$target" || return 1
   windows=$(cd "$lab" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S dedicated.sock \
     list-windows -t "$session" -F '#{window_name}') || return 1
@@ -60,7 +60,7 @@ cleanup_exact_cell() {
     echo "blocked: exact target survived cleanup; preserving $lab" >&2
     return 1
   }
-  FM_E2E_TMUX_SOCKET_ID="$lab/dedicated.sock" PATH="$lab/bin:$PATH" \
+  JG_E2E_TMUX_SOCKET_ID="$lab/dedicated.sock" PATH="$lab/bin:$PATH" \
     env -u TMUX -u TMUX_PANE "$lab/bin/tmux" kill-server || return 1
   rm -rf -- "$lab"
   ACTIVE_LAB=
@@ -100,7 +100,7 @@ run_cell() {  # <native|legacy> <exact-binary>
 set -eu
 expected='$lab/dedicated.sock'
 [ -z "\${TMUX:-}" ] && [ -z "\${TMUX_PANE:-}" ] || exit 91
-[ "\${FM_E2E_TMUX_SOCKET_ID:-}" = "\$expected" ] || exit 92
+[ "\${JG_E2E_TMUX_SOCKET_ID:-}" = "\$expected" ] || exit 92
 [ "\$(cat '$lab/tmux.socket-identity')" = "\$expected" ] || exit 93
 for arg in "\$@"; do case "\$arg" in -S|-L) exit 94 ;; esac; done
 printf 'tmux' >> '$lab/tmux-wrapper.log'
@@ -111,10 +111,10 @@ exec '$REAL_TMUX' -S dedicated.sock "\$@"
 EOF
   cat > "$lab/bin/grok" <<'EOF'
 #!/usr/bin/env bash
-printf 'active=%s' "${GROK_TURNEND_GUARD_ACTIVE:-}" >> "${FM_GROK_E2E_ROOT:?}/resume-invocations.log"
-printf ' <%s>' "$@" >> "${FM_GROK_E2E_ROOT:?}/resume-invocations.log"
-printf '\n' >> "${FM_GROK_E2E_ROOT:?}/resume-invocations.log"
-exec "${FM_GROK_E2E_BIN:?}" "$@"
+printf 'active=%s' "${GROK_TURNEND_GUARD_ACTIVE:-}" >> "${JG_GROK_E2E_ROOT:?}/resume-invocations.log"
+printf ' <%s>' "$@" >> "${JG_GROK_E2E_ROOT:?}/resume-invocations.log"
+printf '\n' >> "${JG_GROK_E2E_ROOT:?}/resume-invocations.log"
+exec "${JG_GROK_E2E_BIN:?}" "$@"
 EOF
   chmod +x "$lab/bin/tmux" "$lab/bin/grok"
   : > "$lab/tmux-wrapper.log"
@@ -149,8 +149,8 @@ EOF
 set -u
 cd '$lab/project' || exit 70
 env -u TMUX -u TMUX_PANE HOME='$lab/home' GROK_HOME='$lab/grok-home' GROK_AGENT=1 \
-  FM_HOME='$lab/fmhome' FM_ROOT_OVERRIDE='$lab/project' FM_GROK_E2E_ROOT='$lab' \
-  FM_GROK_E2E_BIN='$binary' FM_E2E_TMUX_SOCKET_ID='$lab/dedicated.sock' PATH='$lab/bin':"\$PATH" \
+  JG_HOME='$lab/fmhome' JG_ROOT_OVERRIDE='$lab/project' JG_GROK_E2E_ROOT='$lab' \
+  JG_GROK_E2E_BIN='$binary' JG_E2E_TMUX_SOCKET_ID='$lab/dedicated.sock' PATH='$lab/bin':"\$PATH" \
   '$binary' $([ "$kind" = native ] && printf '%s' '--trust ')--always-approve --reasoning-effort low \
     --output-format json --leader-socket '$lab/leader.sock' -p $(printf '%q' "$prompt") \
     > '$lab/outer.json' 2> '$lab/outer.err' &
@@ -174,7 +174,7 @@ EOF
     > "$lab/target.identity"
 
   i=0
-  while [ "$i" -lt "${FM_GROK_STOP_LIVE_TIMEOUT:-600}" ] && [ ! -f "$lab/done" ]; do
+  while [ "$i" -lt "${JG_GROK_STOP_LIVE_TIMEOUT:-600}" ] && [ ! -f "$lab/done" ]; do
     sleep 1
     i=$((i + 1))
   done

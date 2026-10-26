@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Opt-in real-Pi regression for a post-start AGENTS.md update followed by
 # compaction. It runs an isolated tmux server, throwaway Firstmate checkout,
-# and scratch FM_HOME, so it never drives the caller's Pi session or fleet.
+# and scratch JG_HOME, so it never drives the caller's Pi session or fleet.
 #
 # The portable session-start tests own baseline and output logic. This guard
 # proves the vendor-dependent fact they cannot: Pi's actual session_compact
@@ -10,15 +10,15 @@
 #
 # Run after Pi upgrades and before recording refreshed verification evidence:
 #
-#   FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
+#   JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
 #     tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
 #
 # To reproduce a historical stale implementation before verifying the fixed
 # branch, select a ref that lacks this change and expect the old marker:
 #
-#   FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
-#   FM_SESSIONSTART_INSTRUCTION_REFRESH_REF=origin/main \
-#   FM_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=stale \
+#   JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 \
+#   JG_SESSIONSTART_INSTRUCTION_REFRESH_REF=origin/main \
+#   JG_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=stale \
 #     tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh
 #
 # This costs real Pi model turns and requires its normal authenticated profile.
@@ -27,7 +27,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E pi tmux git
+jg_live_gate opt-in JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E pi tmux git
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMUX_SOCKET="jg-sessionstart-instruction-refresh-$$"
@@ -40,15 +40,15 @@ NONCE=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
 OLD_MARKER="AGENTS_MARKER=old-$NONCE"
 NEW_MARKER="AGENTS_MARKER=new-$NONCE"
 READY_MARKER="INSTRUCTION_REFRESH_READY=$NONCE"
-TEST_REF=${FM_SESSIONSTART_INSTRUCTION_REFRESH_REF:-HEAD}
+TEST_REF=${JG_SESSIONSTART_INSTRUCTION_REFRESH_REF:-HEAD}
 TEST_COMMIT=$(git -C "$ROOT" rev-parse --verify "$TEST_REF^{commit}" 2>/dev/null) || {
   printf 'not ok - could not resolve isolated test ref %s\n' "$TEST_REF" >&2
   exit 2
 }
-EXPECTATION=${FM_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT:-updated}
+EXPECTATION=${JG_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT:-updated}
 case "$EXPECTATION" in
   updated|stale) ;;
-  *) printf 'not ok - expected FM_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=updated or stale, got: %s\n' "$EXPECTATION" >&2; exit 2 ;;
+  *) printf 'not ok - expected JG_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=updated or stale, got: %s\n' "$EXPECTATION" >&2; exit 2 ;;
 esac
 
 fail() {
@@ -123,8 +123,8 @@ cat > "$PROJECT/bin/jg-sessionstart-run.sh" <<'SH'
 #!/usr/bin/env bash
 set -o pipefail
 set -u
-state="${FM_HOME:?}/state"
-printf 'argv=%s pi=%s root=%s home=%s\n' "$*" "${PI_CODING_AGENT:-absent}" "${FM_ROOT_OVERRIDE:-absent}" "${FM_HOME:-absent}" \
+state="${JG_HOME:?}/state"
+printf 'argv=%s pi=%s root=%s home=%s\n' "$*" "${PI_CODING_AGENT:-absent}" "${JG_ROOT_OVERRIDE:-absent}" "${JG_HOME:-absent}" \
   >> "$state/.sessionstart-e2e-sources"
 "$(dirname "$0")/.jg-sessionstart-run.real.sh" "$@" | tee -a "$state/.sessionstart-e2e-output"
 exit "${PIPESTATUS[0]}"
@@ -138,7 +138,7 @@ git -C "$PROJECT" commit -q -m "test: initial instruction contract" || fail "cou
 printf '%s\n' '{"compaction":{"keepRecentTokens":200}}' > "$PROJECT/.pi/settings.json"
 
 tmux -L "$TMUX_SOCKET" new-session -d -s "$TMUX_SESSION" -c "$PROJECT" -x 220 -y 55 \
-  -e "FM_HOME=$HOME_DIR" -e "FM_ROOT_OVERRIDE=$PROJECT" -e "FM_GATE_REFUSE_BYPASS=1" \
+  -e "JG_HOME=$HOME_DIR" -e "JG_ROOT_OVERRIDE=$PROJECT" -e "JG_GATE_REFUSE_BYPASS=1" \
   pi --no-tools -e "$PROJECT/.pi/extensions/jg-primary-turnend-guard.ts" \
   || fail "could not start isolated Pi session"
 

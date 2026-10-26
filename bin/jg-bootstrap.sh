@@ -35,7 +35,7 @@
 #          without moving the host's Firstmate copy. If either placement changes
 #          its loaded instruction surface
 #          (AGENTS.md, bin/, or .agents/skills/), bootstrap immediately nudges it
-#          via FM_HOME=<active-home> bin/jg-send.sh jg-<id> so meta resolves the
+#          via JG_HOME=<active-home> bin/jg-send.sh jg-<id> so meta resolves the
 #          current route and the standard from-firstmate marker is applied. A
 #          successful send prints one BOOTSTRAP_INFO line with the exact target
 #          and message sent; a failed send leaves an idempotent retry marker
@@ -54,8 +54,8 @@
 #          process, an unreadable target, and an unverified backend; respawn
 #          failed names whether the endpoint was missing or agent-less.
 #          Already-live and successfully relaunched secondmates are silent
-#          unless FM_BOOTSTRAP_VERBOSE_FACTS=1 requests BOOTSTRAP_INFO facts.
-#          A TANGLE line means the firstmate primary checkout (FM_ROOT) is stranded
+#          unless JG_BOOTSTRAP_VERBOSE_FACTS=1 requests BOOTSTRAP_INFO facts.
+#          A TANGLE line means the firstmate primary checkout (JG_ROOT) is stranded
 #          on a feature branch instead of its default branch - a crewmate's work
 #          landed in the primary instead of its own worktree; restore it per the line.
 #          treehouse is also MISSING when its installed version lacks
@@ -79,18 +79,18 @@
 #          guesses at malformed or unsafe existing files, and secondmate homes
 #          await the primary-authoritative inherited value instead of creating
 #          their own.
-#          X mode is OPTIONAL and inert unless FM_HOME/.env has a non-empty
+#          X mode is OPTIONAL and inert unless JG_HOME/.env has a non-empty
 #          FMX_PAIRING_TOKEN. When opted in, bootstrap requires curl+jq, writes
 #          the relay poll shim and 30s cadence config, and prints an FMX line.
 #          Fleet sync fetches, fast-forwards safe default-branch states, reports
 #          recovered and STUCK clone drift, and prunes gone local branches; it is
-#          bounded by FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT when it is a non-empty
+#          bounded by JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT when it is a non-empty
 #          numeric override, while non-numeric values fall back to 20s.
 #          When the override is unset or blank, the timeout is
 #          max(20, 5 + 3 * origin-backed project clone count). A timed-out
 #          refresh relays any completed jg-fleet-sync.sh output before the
 #          aggregate timeout skip line with timeout and elapsed seconds.
-#          Set FM_FLEET_PRUNE=0 to skip branch pruning during that refresh.
+#          Set JG_FLEET_PRUNE=0 to skip branch pruning during that refresh.
 #          BACKLOG_RECONCILE lines report what backlog_record_reconcile could not
 #          settle in THIS home. Every ordinary dispatch and completion now moves
 #          the backlog row inside the script that moves the task's record
@@ -106,7 +106,7 @@
 #          The `code-root <file>` variant is a detect-only local check that runs
 #          even in a read-only session; detect_code_root_backlog_fork owns what
 #          it reports.
-#          Set FM_BOOTSTRAP_DETECT_ONLY=1 to skip the six MUTATING sweeps
+#          Set JG_BOOTSTRAP_DETECT_ONLY=1 to skip the six MUTATING sweeps
 #          (backlog_record_reconcile, secondmate_sync,
 #          secondmate_liveness_sweep, secondmate_handoff_resume, x_mode_setup,
 #          fleet_sync) while still
@@ -119,7 +119,7 @@
 #          X-mode artifacts, project clones, or repair instructions.
 #          Unset/0 (the default) runs all six sweeps - this flag is purely
 #          additive.
-#          Set FM_BOOTSTRAP_NETWORK to split this run by whether a step talks to
+#          Set JG_BOOTSTRAP_NETWORK to split this run by whether a step talks to
 #          the network, so a session start can print its digest from local reads
 #          alone and run the network half off the digest's blocking path:
 #            all  (default, and any unrecognized value) - every local and network
@@ -132,7 +132,7 @@
 #                 no version floors, no tangle check, no backlog
 #                 reconciliation, no x_mode_setup: those already ran on the
 #                 local pass.
-#          FM_BOOTSTRAP_DETECT_ONLY composes with it unchanged, so `only` plus
+#          JG_BOOTSTRAP_DETECT_ONLY composes with it unchanged, so `only` plus
 #          detect-only is the read-only `gh auth status` probe on its own.
 #          bin/jg-startup-network.sh owns the deferral: it runs the `only` phase
 #          in a detached bounded worker and publishes the result. This file stays
@@ -147,7 +147,7 @@
 #          A relaunch that the liveness sweep performs during an `only` run is
 #          always reported, because a digest composed before that run already
 #          printed the superseded endpoint record.
-#          Set FM_BOOTSTRAP_LOCKED=1 alongside it when the sweeps are skipped
+#          Set JG_BOOTSTRAP_LOCKED=1 alongside it when the sweeps are skipped
 #          because THIS session already ran them while holding the fleet lock,
 #          rather than because it has no lock at all. The two cases differ in
 #          exactly one place: repair ownership. A locked session is told to
@@ -172,12 +172,12 @@ export -n TYPESAFE_API_KEY_PRIVATE 2>/dev/null || true
 unset TYPESAFE_API_KEY
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+PROJECTS="${JG_PROJECTS_OVERRIDE:-$JG_HOME/projects}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 # shellcheck source=bin/jg-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-tasks-axi-lib.sh"
 # shellcheck source=bin/jg-backlog-transition-lib.sh disable=SC1091
@@ -215,7 +215,7 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # from identical evidence through an identical path.
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-secondmate-liveness-lib.sh"
-# jg-timing-lib.sh is inert unless FM_TIMING_LOG names a file, which only the
+# jg-timing-lib.sh is inert unless JG_TIMING_LOG names a file, which only the
 # deferred network stage sets, so an ordinary bootstrap run records nothing.
 # shellcheck source=bin/jg-timing-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-timing-lib.sh"
@@ -223,15 +223,15 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # Network-phase selection (see the header). An unrecognized value resolves to
 # `all` so a malformed override runs every step rather than silently dropping a
 # safety sweep.
-case "${FM_BOOTSTRAP_NETWORK:-all}" in
-  skip|only) FM_BOOTSTRAP_NETWORK_PHASE=${FM_BOOTSTRAP_NETWORK:-all} ;;
-  *) FM_BOOTSTRAP_NETWORK_PHASE=all ;;
+case "${JG_BOOTSTRAP_NETWORK:-all}" in
+  skip|only) JG_BOOTSTRAP_NETWORK_PHASE=${JG_BOOTSTRAP_NETWORK:-all} ;;
+  *) JG_BOOTSTRAP_NETWORK_PHASE=all ;;
 esac
-local_phase() { [ "$FM_BOOTSTRAP_NETWORK_PHASE" != only ]; }
-network_phase() { [ "$FM_BOOTSTRAP_NETWORK_PHASE" != skip ]; }
+local_phase() { [ "$JG_BOOTSTRAP_NETWORK_PHASE" != only ]; }
+network_phase() { [ "$JG_BOOTSTRAP_NETWORK_PHASE" != skip ]; }
 
 network_mutation_authorized() {
-  local expected=${FM_BOOTSTRAP_NETWORK_LOCK_PID:-} current
+  local expected=${JG_BOOTSTRAP_NETWORK_LOCK_PID:-} current
   [ -n "$expected" ] || return 0
   case "$expected" in *[!0-9]*) return 1 ;; esac
   [ -f "$STATE/.lock" ] && [ ! -L "$STATE/.lock" ] || return 1
@@ -257,8 +257,8 @@ network_sweep_authorized() {
 bootstrap_parallel_begin() {
   BOOTSTRAP_PAR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/jg-bootstrap-par.XXXXXX") || return 1
   BOOTSTRAP_PAR_N=0
-  FM_BOOTSTRAP_PARALLEL_DIR=$BOOTSTRAP_PAR_DIR
-  export FM_BOOTSTRAP_PARALLEL_DIR
+  JG_BOOTSTRAP_PARALLEL_DIR=$BOOTSTRAP_PAR_DIR
+  export JG_BOOTSTRAP_PARALLEL_DIR
 }
 
 bootstrap_parallel_spawn() {
@@ -288,13 +288,13 @@ bootstrap_parallel_finish() {
     SECONDMATE_RESPAWNED_IDS="$SECONDMATE_RESPAWNED_IDS $(tr -d '\n' < "$f")"
   done
   rm -rf "$BOOTSTRAP_PAR_DIR"
-  unset FM_BOOTSTRAP_PARALLEL_DIR BOOTSTRAP_PAR_DIR BOOTSTRAP_PAR_N
+  unset JG_BOOTSTRAP_PARALLEL_DIR BOOTSTRAP_PAR_DIR BOOTSTRAP_PAR_N
 }
 
 secondmate_note_respawned() {  # <id>
   SECONDMATE_RESPAWNED_IDS="$SECONDMATE_RESPAWNED_IDS $1"
-  [ -n "${FM_BOOTSTRAP_PARALLEL_DIR:-}" ] || return 0
-  printf '%s\n' "$1" > "$FM_BOOTSTRAP_PARALLEL_DIR/respawned.$1"
+  [ -n "${JG_BOOTSTRAP_PARALLEL_DIR:-}" ] || return 0
+  printf '%s\n' "$1" > "$JG_BOOTSTRAP_PARALLEL_DIR/respawned.$1"
 }
 
 fleet_sync_origin_backed_project_count() {
@@ -320,12 +320,12 @@ every_project_local_only() {
   [ -f "$DATA/projects.md" ] || return 1
   for proj in "$PROJECTS"/*; do
     [ -d "$proj" ] || continue
-    mode=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "${proj##*/}" 2>/dev/null) || return 1
+    mode=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "${proj##*/}" 2>/dev/null) || return 1
     [ "${mode%% *}" = local-only ] || return 1
   done
   while IFS= read -r name; do
     [ -d "$PROJECTS/$name" ] || return 1
-    mode=$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "$name" 2>/dev/null) || return 1
+    mode=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SCRIPT_DIR/jg-project-mode.sh" "$name" 2>/dev/null) || return 1
     [ "${mode%% *}" = local-only ] || return 1
     seen=1
   done < <(sed -nE 's/^- (.+)$/\1/p' "$DATA/projects.md" | sed -E 's/ (\[| - ).*//')
@@ -334,10 +334,10 @@ every_project_local_only() {
 
 fleet_sync_bootstrap_timeout() {
   local count timeout
-  if [ -n "${FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT:-}" ]; then
-    case "$FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT" in
+  if [ -n "${JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT:-}" ]; then
+    case "$JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT" in
       *[!0-9]*) echo 20 ;;
-      *) echo "$FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT" ;;
+      *) echo "$JG_FLEET_SYNC_BOOTSTRAP_TIMEOUT" ;;
     esac
     return 0
   fi
@@ -370,7 +370,7 @@ fleet_sync_relay_all_output() {
 }
 
 fleet_sync() {
-  [ -x "$FM_ROOT/bin/jg-fleet-sync.sh" ] || return 0
+  [ -x "$JG_ROOT/bin/jg-fleet-sync.sh" ] || return 0
   [ -d "$PROJECTS" ] || return 0
 
   tmp=$(mktemp "${TMPDIR:-/tmp}/jg-fleet-sync.XXXXXX" 2>/dev/null) || return 0
@@ -378,7 +378,7 @@ fleet_sync() {
   monitor_was_on=0
   case $- in *m*) monitor_was_on=1 ;; esac
   set -m 2>/dev/null || true
-  "$FM_ROOT/bin/jg-fleet-sync.sh" >"$tmp" 2>/dev/null &
+  "$JG_ROOT/bin/jg-fleet-sync.sh" >"$tmp" 2>/dev/null &
   pid=$!
 
   start=$SECONDS
@@ -420,7 +420,7 @@ secondmate_sync() {
   # preserving failed sends as NUDGE_SECONDMATES retry markers.
   [ -d "$STATE" ] || return 0
   local primary_head
-  if ! primary_head=$(primary_head_commit "$FM_ROOT"); then
+  if ! primary_head=$(primary_head_commit "$JG_ROOT"); then
     local meta id
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
@@ -432,8 +432,8 @@ secondmate_sync() {
   fi
   FF_NUDGE_WINDOWS=""
   FF_SEEN_HOMES=""
-  SECOND_MATE_NUDGE_MESSAGE=$FM_SECOND_MATE_NUDGE_MESSAGE
-  REMOTE_SECOND_MATE_NUDGE_MESSAGE=$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE
+  SECOND_MATE_NUDGE_MESSAGE=$JG_SECOND_MATE_NUDGE_MESSAGE
+  REMOTE_SECOND_MATE_NUDGE_MESSAGE=$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE
   SECOND_MATE_NUDGE_PENDING_DIR="$STATE/.secondmate-nudge-pending"
 
   secondmate_nudge_marker_path() {
@@ -456,7 +456,7 @@ secondmate_sync() {
       echo "NUDGE_SECONDMATES: secondmate $id: send failed: cannot record retry marker"
       return 0
     fi
-    if out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
+    if out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
       rm -f "$marker"
       echo "BOOTSTRAP_INFO: nudged $selector with '$SECOND_MATE_NUDGE_MESSAGE'"
     else
@@ -529,7 +529,7 @@ secondmate_sync() {
         echo "NUDGE_SECONDMATES: secondmate $id: send failed: retry target is not at recorded instruction commit"
         continue
       }
-      if out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
+      if out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$selector" "$SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
         rm -f "$marker"
         echo "BOOTSTRAP_INFO: nudged $selector with '$SECOND_MATE_NUDGE_MESSAGE'"
       else
@@ -593,9 +593,9 @@ secondmate_sync() {
       *" $id "*) reread_skip_pending=1 ;;
     esac
     if [ "$reread_skip_pending" -eq 0 ] \
-      && jg_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+      && jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
       jg_config_reread_retry_pending "$id" "$home_real" || true
-      if jg_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+      if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
         echo "CONFIG_REREAD: secondmate $id: send failed: retry instruction queue is full"
         jg_lock_release "$home_lock" || true
         continue
@@ -606,15 +606,15 @@ secondmate_sync() {
       jg_lock_release "$home_lock" || true
       continue
     }
-    if FM_CONFIG_INHERIT_REPORT="$report" FM_CONFIG_INHERIT_LIVE=1 \
-      propagate_secondmate_inheritance "$FM_HOME" "$home_real" "$CONFIG" "$DATA"; then
+    if JG_CONFIG_INHERIT_REPORT="$report" JG_CONFIG_INHERIT_LIVE=1 \
+      propagate_secondmate_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
       :
     else
       echo "SECONDMATE_SYNC: secondmate $id: skipped: inheritance failed"
     fi
-    if ! reread_out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" \
-      FM_STATE_OVERRIDE="$STATE" \
-      FM_CONFIG_REREAD_SKIP_PENDING="$reread_skip_pending" \
+    if ! reread_out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" \
+      JG_STATE_OVERRIDE="$STATE" \
+      JG_CONFIG_REREAD_SKIP_PENDING="$reread_skip_pending" \
       jg_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
       if [ -n "$reread_out" ]; then
         printf '%s\n' "$reread_out"
@@ -667,7 +667,7 @@ secondmate_sync() {
       echo "SECONDMATE_SYNC: secondmate $id: skipped: remote tracked-file sync failed on $remote_host: $(remote_sync_failure_reason "$sync_rc" "$sync_out")"
       converged=0
     fi
-    if inherit_out=$(FM_CONFIG_INHERIT_LIVE=1 \
+    if inherit_out=$(JG_CONFIG_INHERIT_LIVE=1 \
       "$SCRIPT_DIR/jg-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
       if printf '%s\n' "$inherit_out" | grep -Eq '^(pushed|removed):'; then nudge_needed=1; fi
     else
@@ -676,10 +676,10 @@ secondmate_sync() {
     fi
     [ "$remote_pending" -eq 0 ] || nudge_needed=1
     if [ "$converged" -eq 1 ] && [ "$nudge_needed" -eq 1 ]; then
-      if out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
+      if out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" \
         "$SCRIPT_DIR/jg-send.sh" "jg-$id" "$REMOTE_SECOND_MATE_NUDGE_MESSAGE" 2>&1); then
         rm -f "$remote_marker"
-        [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: nudged remote jg-$id after convergence"
+        [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: nudged remote jg-$id after convergence"
       else
         echo "NUDGE_SECONDMATES: secondmate $id: send failed: $(first_line "$out")"
       fi
@@ -723,11 +723,11 @@ secondmate_sync() {
 
 # A relaunch replaces the endpoint record a digest may already have printed. On
 # the local pass that digest has not been composed yet, so the fact stays behind
-# FM_BOOTSTRAP_VERBOSE_FACTS as before; on the deferred network pass the digest
+# JG_BOOTSTRAP_VERBOSE_FACTS as before; on the deferred network pass the digest
 # is already out, so reporting it is what keeps the superseded record from being
 # acted on.
 report_relaunch() {  # <id> <cause> <where>
-  [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] || ! local_phase || return 0
+  [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] || ! local_phase || return 0
   echo "BOOTSTRAP_INFO: secondmate $1 relaunched after $2 ($3)"
 }
 
@@ -793,24 +793,24 @@ secondmate_liveness_one() {  # <meta> <id>
     return 0
   fi
   jg_secondmate_liveness_probe "$meta" "$id" full
-  case "$FM_SM_LIVE_STATUS" in
+  case "$JG_SM_LIVE_STATUS" in
     silent)
       ;;
     alive)
-      [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: $FM_SM_LIVE_LINE"
+      [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" != 1 ] || echo "BOOTSTRAP_INFO: $JG_SM_LIVE_LINE"
       ;;
     relaunchable)
       if jg_secondmate_liveness_relaunch "$meta" "$id"; then
         secondmate_note_respawned "$id"
-        report_relaunch "$id" "$FM_SM_LIVE_CAUSE" "$FM_SM_LIVE_WHERE"
-      elif [ "$FM_SM_LIVE_STATUS" = skipped ] || [ "$FM_SM_LIVE_STATUS" = deferred ]; then
-        echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $FM_SM_LIVE_REASON"
+        report_relaunch "$id" "$JG_SM_LIVE_CAUSE" "$JG_SM_LIVE_WHERE"
+      elif [ "$JG_SM_LIVE_STATUS" = skipped ] || [ "$JG_SM_LIVE_STATUS" = deferred ]; then
+        echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $JG_SM_LIVE_REASON"
       else
-        echo "SECONDMATE_LIVENESS: secondmate $id: respawn failed after $FM_SM_LIVE_CAUSE: $(first_line "$FM_SM_LIVE_OUT")"
+        echo "SECONDMATE_LIVENESS: secondmate $id: respawn failed after $JG_SM_LIVE_CAUSE: $(first_line "$JG_SM_LIVE_OUT")"
       fi
       ;;
     skipped)
-      echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $FM_SM_LIVE_REASON"
+      echo "SECONDMATE_LIVENESS: secondmate $id: skipped: $JG_SM_LIVE_REASON"
       ;;
   esac
   jg_secondmate_liveness_unlock "$id"
@@ -991,7 +991,7 @@ x_mode_remove_artifact() {
 # Drops two idempotent, gitignored artifacts:
 #   state/x-watch.check.sh - byte-static identity shim; the watcher validates
 #                            its bytes and invokes bin/jg-x-poll.sh directly
-#   config/x-mode.env      - exports FM_CHECK_INTERVAL=30, sourced by the watcher
+#   config/x-mode.env      - exports JG_CHECK_INTERVAL=30, sourced by the watcher
 #                            arm so only an X instance polls at the 30s cadence
 # On opt-out (no token, or empty) it removes any such artifacts so the instance
 # reverts to the default 300s no-poll behavior. Absent a token AND with no leftover
@@ -1002,7 +1002,7 @@ x_mode_remove_artifact() {
 # the emitted harness-aware supervision repair instruction.
 x_mode_setup() {
   local env_file token shim cadence shim_body cadence_body tool missing shim_home
-  env_file="$FM_HOME/.env"
+  env_file="$JG_HOME/.env"
   shim="$STATE/x-watch.check.sh"
   cadence="$CONFIG/x-mode.env"
 
@@ -1064,16 +1064,16 @@ x_mode_setup() {
 
   mkdir -p "$STATE" "$CONFIG" 2>/dev/null || { fmx_arm_failed; return 0; }
 
-  case "$FM_HOME" in
-    /*) shim_home=$FM_HOME ;;
+  case "$JG_HOME" in
+    /*) shim_home=$JG_HOME ;;
     *)
-      shim_home=$(CDPATH='' cd -- "$FM_HOME" 2>/dev/null && pwd -P) \
+      shim_home=$(CDPATH='' cd -- "$JG_HOME" 2>/dev/null && pwd -P) \
         || { fmx_arm_failed; return 0; }
       ;;
   esac
-  shim_body=$(fmx_poll_shim_content "$shim_home" "$FM_ROOT")
+  shim_body=$(fmx_poll_shim_content "$shim_home" "$JG_ROOT")
   x_mode_write_if_changed "$shim" "$shim_body" 700 || { fmx_arm_failed; return 0; }
-  fmx_poll_shim_valid "$shim" "$shim_home" "$FM_ROOT" \
+  fmx_poll_shim_valid "$shim" "$shim_home" "$JG_ROOT" \
     || { fmx_arm_failed; return 0; }
 
   cadence_body=$(cat <<'EOF'
@@ -1081,7 +1081,7 @@ x_mode_setup() {
 # Source this before the active harness protocol starts a watcher process so
 # jg-watch.sh polls the X check every 30s. Non-X instances have no such file and
 # keep the default 300s cadence.
-export FM_CHECK_INTERVAL=30
+export JG_CHECK_INTERVAL=30
 EOF
 )
   x_mode_write_if_changed "$cadence" "$cadence_body" 600 || { fmx_arm_failed; return 0; }
@@ -1102,14 +1102,14 @@ crew_dispatch_validate() {
     return 0
   fi
   typed_key=$TYPESAFE_API_KEY_PRIVATE
-  [ -n "$typed_key" ] || typed_key=$(fmx_env_get TYPESAFE_API_KEY "$FM_HOME/.env")
+  [ -n "$typed_key" ] || typed_key=$(fmx_env_get TYPESAFE_API_KEY "$JG_HOME/.env")
   [ -z "$typed_key" ] || typed_active=true
   if $typed_active; then
     verified_harnesses=$(jg_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
   else
     verified_harnesses='["claude","codex","opencode","pi","pi-signed","grok","kimi","cursor","agy","muse","rovo","omp","devin"]'
   fi
-  err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+  err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$JG_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);
     def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
     def effort_ok($h; $m; $e):
@@ -1203,7 +1203,7 @@ crew_dispatch_validate() {
     echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $err"
     return 0
   fi
-  if [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ]; then
+  if [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ]; then
     jq -r '
     def profile($p):
       ($p.harness | tostring)
@@ -1238,7 +1238,7 @@ backlog_record_reconcile() {
   # Keep bootstrap diagnostics working without creating state just for a no-op.
   [ -e "$STATE" ] || [ -L "$STATE" ] || return 0
   if ! jg_backlog_directory_present "$STATE" "state directory"; then
-    echo "error: backlog reconciliation refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    echo "error: backlog reconciliation refused: $JG_BACKLOG_TRANSITION_ERROR" >&2
     return 2
   fi
   if jg_backlog_transition_applies "$CONFIG" "$DATA" "$BOOTSTRAP_BACKLOG_GATE_KIND"; then
@@ -1246,13 +1246,13 @@ backlog_record_reconcile() {
   else
     gate_status=$?
     if [ "$gate_status" -eq 2 ]; then
-      echo "error: backlog reconciliation cannot access configured data directory $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+      echo "error: backlog reconciliation cannot access configured data directory $DATA ($JG_BACKLOG_TRANSITION_ERROR)" >&2
       return 2
     fi
     return 0
   fi
   # Keep the wake/lock library's source-time state-directory creation inside
-  # this mutating sweep, so FM_BOOTSTRAP_DETECT_ONLY remains read-only.
+  # this mutating sweep, so JG_BOOTSTRAP_DETECT_ONLY remains read-only.
   # shellcheck source=bin/jg-wake-lib.sh disable=SC1091
   . "$SCRIPT_DIR/jg-wake-lib.sh"
 
@@ -1260,7 +1260,7 @@ backlog_record_reconcile() {
   for marker in "$STATE"/*.backlog-close; do
     [ -e "$marker" ] || [ -L "$marker" ] || continue
     if ! jg_backlog_record_present "$marker" "pending-close record" "$STATE"; then
-      echo "BACKLOG_RECONCILE: unsafe pending close refused: $FM_BACKLOG_TRANSITION_ERROR"
+      echo "BACKLOG_RECONCILE: unsafe pending close refused: $JG_BACKLOG_TRANSITION_ERROR"
       return 2
     fi
     label=$(basename "$marker" .backlog-close)
@@ -1272,7 +1272,7 @@ backlog_record_reconcile() {
       continue
     fi
     if jg_backlog_close_marker_replay "$STATE" "$marker" "$DATA"; then
-      case "$FM_BACKLOG_CLOSE_REPLAY_RESULT" in
+      case "$JG_BACKLOG_CLOSE_REPLAY_RESULT" in
         closed)
           echo "BOOTSTRAP_INFO: closed the backlog item for $label that an interrupted cleanup left open"
           ;;
@@ -1290,7 +1290,7 @@ backlog_record_reconcile() {
           ;;
       esac
     else
-      echo "BACKLOG_RECONCILE: $label: recorded backlog close could not be replayed: $FM_BACKLOG_TRANSITION_ERROR"
+      echo "BACKLOG_RECONCILE: $label: recorded backlog close could not be replayed: $JG_BACKLOG_TRANSITION_ERROR"
     fi
     jg_lock_release "$meta_lock"
     jg_lock_release "$control_lock"
@@ -1302,7 +1302,7 @@ backlog_record_reconcile() {
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || [ -L "$meta" ] || continue
     if ! jg_backlog_record_present "$meta" "task record" "$STATE"; then
-      echo "BACKLOG_RECONCILE: unsafe worker record refused: $FM_BACKLOG_TRANSITION_ERROR"
+      echo "BACKLOG_RECONCILE: unsafe worker record refused: $JG_BACKLOG_TRANSITION_ERROR"
       return 2
     fi
     has_record=1
@@ -1312,7 +1312,7 @@ backlog_record_reconcile() {
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || [ -L "$meta" ] || continue
     if ! jg_backlog_record_present "$meta" "task record" "$STATE"; then
-      echo "BACKLOG_RECONCILE: unsafe worker record refused: $FM_BACKLOG_TRANSITION_ERROR"
+      echo "BACKLOG_RECONCILE: unsafe worker record refused: $JG_BACKLOG_TRANSITION_ERROR"
       return 2
     fi
     id=$(basename "$meta" .meta)
@@ -1323,7 +1323,7 @@ backlog_record_reconcile() {
       continue
     fi
     if ! jg_backlog_record_present "$meta" "task record" "$STATE"; then
-      echo "BACKLOG_RECONCILE: $id: post-lock worker record check refused: $FM_BACKLOG_TRANSITION_ERROR"
+      echo "BACKLOG_RECONCILE: $id: post-lock worker record check refused: $JG_BACKLOG_TRANSITION_ERROR"
       jg_lock_release "$meta_lock"
       return 2
     fi
@@ -1331,9 +1331,9 @@ backlog_record_reconcile() {
        && [ "$(jg_meta_get "$meta" cleanup_recovery)" != orca ]; then
       row=
       if jg_backlog_row_probe "$DATA" "$id"; then
-        row=$FM_BACKLOG_ROW_STATE
-      elif [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then
-        echo "BACKLOG_RECONCILE: $id: worker record exists but its backlog item could not be read: $FM_BACKLOG_ROW_ERROR"
+        row=$JG_BACKLOG_ROW_STATE
+      elif [ "$JG_BACKLOG_ROW_RESULT" != not_found ]; then
+        echo "BACKLOG_RECONCILE: $id: worker record exists but its backlog item could not be read: $JG_BACKLOG_ROW_ERROR"
       fi
       # Heal only the unambiguous case: a queued row for a record this home
       # already owns. A held row is the captain's to move, and a closed row is a
@@ -1342,7 +1342,7 @@ backlog_record_reconcile() {
         if jg_backlog_start "$DATA" "$id"; then
           echo "BOOTSTRAP_INFO: marked $id in flight to match the worker this home already owns"
         else
-          echo "BACKLOG_RECONCILE: $id: worker record exists but its backlog item could not be moved to In flight: $FM_BACKLOG_TRANSITION_ERROR"
+          echo "BACKLOG_RECONCILE: $id: worker record exists but its backlog item could not be moved to In flight: $JG_BACKLOG_TRANSITION_ERROR"
         fi
       fi
     fi
@@ -1354,11 +1354,11 @@ startup_memory_budget_setup() {
   # Primary bootstrap owns default publication. A secondmate is deliberately
   # passive here because its setting must converge from the primary through the
   # inherited-local-material contract rather than becoming a local authority.
-  if [ -e "$FM_HOME/.jg-secondmate-home" ] || [ -L "$FM_HOME/.jg-secondmate-home" ]; then
+  if [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ]; then
     return 0
   fi
   if ! jg_startup_memory_budget_materialize "$CONFIG"; then
-    echo "STARTUP_MEMORY_BUDGET: invalid config/$FM_STARTUP_MEMORY_BUDGET_FILE - $FM_STARTUP_MEMORY_BUDGET_ERROR"
+    echo "STARTUP_MEMORY_BUDGET: invalid config/$JG_STARTUP_MEMORY_BUDGET_FILE - $JG_STARTUP_MEMORY_BUDGET_ERROR"
   fi
 }
 
@@ -1393,17 +1393,17 @@ fi
 # This is the first mutating sweep at a locked session boundary. Detect-only
 # sessions never touch state, and the deferred network pass never repeats it:
 # the local pass that ran first already closed that window.
-if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
+if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
   BOOTSTRAP_BACKLOG_GATE_KIND=secondmate
   if [ -e "$STATE" ] || [ -L "$STATE" ]; then
     if ! jg_backlog_directory_present "$STATE" "state directory"; then
-      echo "error: bootstrap cannot reconcile task state ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+      echo "error: bootstrap cannot reconcile task state ($JG_BACKLOG_TRANSITION_ERROR)" >&2
       exit 1
     fi
     for BOOTSTRAP_BACKLOG_MARKER in "$STATE"/*.backlog-close; do
       [ -e "$BOOTSTRAP_BACKLOG_MARKER" ] || [ -L "$BOOTSTRAP_BACKLOG_MARKER" ] || continue
       if ! jg_backlog_record_present "$BOOTSTRAP_BACKLOG_MARKER" "pending-close record" "$STATE"; then
-        echo "error: bootstrap refused unsafe pending close ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+        echo "error: bootstrap refused unsafe pending close ($JG_BACKLOG_TRANSITION_ERROR)" >&2
         exit 1
       fi
       BOOTSTRAP_BACKLOG_GATE_KIND=ship
@@ -1413,7 +1413,7 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
       for BOOTSTRAP_BACKLOG_META in "$STATE"/*.meta; do
         [ -e "$BOOTSTRAP_BACKLOG_META" ] || [ -L "$BOOTSTRAP_BACKLOG_META" ] || continue
         if ! jg_backlog_record_present "$BOOTSTRAP_BACKLOG_META" "task record" "$STATE"; then
-          echo "error: bootstrap refused unsafe worker record ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+          echo "error: bootstrap refused unsafe worker record ($JG_BACKLOG_TRANSITION_ERROR)" >&2
           exit 1
         fi
         if [ "$(jg_meta_get "$BOOTSTRAP_BACKLOG_META" kind)" != secondmate ] \
@@ -1429,7 +1429,7 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase; then
   else
     BOOTSTRAP_BACKLOG_GATE_STATUS=$?
     if [ "$BOOTSTRAP_BACKLOG_GATE_STATUS" -eq 2 ]; then
-      echo "error: bootstrap cannot access configured backlog data directory $DATA ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+      echo "error: bootstrap cannot access configured backlog data directory $DATA ($JG_BACKLOG_TRANSITION_ERROR)" >&2
       exit 1
     fi
   fi
@@ -1448,7 +1448,7 @@ fi
 # leaves this machine, so it stays on the session-start critical path.
 detect_local_tools() {
   if [ "$BACKEND_VALID" -eq 0 ]; then
-    echo "BACKEND_INVALID: $BACKEND (known: $FM_BACKEND_KNOWN)"
+    echo "BACKEND_INVALID: $BACKEND (known: $JG_BACKEND_KNOWN)"
   fi
   for t in $BACKEND_TOOLS; do
     jg_backend_required_tool_available "$BACKEND" "$t" \
@@ -1487,21 +1487,21 @@ detect_local_tools() {
 }
 
 detect_local_config() {
-  # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
+  # Worktree-tangle check: the firstmate primary checkout (JG_ROOT) must sit on its
   # default branch, not a feature branch (see jg-tangle-lib.sh). Scoped to the
   # primary only; detached-HEAD worktrees and secondmate homes never trip it.
-  tangle_branch=$(jg_primary_tangle_branch "$FM_ROOT" 2>/dev/null || true)
+  tangle_branch=$(jg_primary_tangle_branch "$JG_ROOT" 2>/dev/null || true)
   if [ -n "$tangle_branch" ]; then
-    tangle_default=$(jg_default_branch "$FM_ROOT" 2>/dev/null || echo main)
-    if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" = 1 ] && [ "${FM_BOOTSTRAP_LOCKED:-0}" != 1 ]; then
+    tangle_default=$(jg_default_branch "$JG_ROOT" 2>/dev/null || echo main)
+    if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" = 1 ] && [ "${JG_BOOTSTRAP_LOCKED:-0}" != 1 ]; then
       echo "TANGLE: primary checkout on feature branch '$tangle_branch' (expected '$tangle_default'); the work is safe on that ref - read-only session must leave restore work to the session holding the fleet lock"
     else
-      echo "TANGLE: primary checkout on feature branch '$tangle_branch' (expected '$tangle_default'); the work is safe on that ref - restore the primary with: git -C $FM_ROOT checkout $tangle_default, then re-validate the branch in a proper worktree"
+      echo "TANGLE: primary checkout on feature branch '$tangle_branch' (expected '$tangle_default'); the work is safe on that ref - restore the primary with: git -C $JG_ROOT checkout $tangle_default, then re-validate the branch in a proper worktree"
     fi
   fi
   crew=
   [ -f "$CONFIG/crew-harness" ] && crew=$(tr -d '[:space:]' < "$CONFIG/crew-harness" || true)
-  if [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] && [ -n "$crew" ] && [ "$crew" != "default" ]; then
+  if [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] && [ -n "$crew" ] && [ "$crew" != "default" ]; then
     echo "BOOTSTRAP_INFO: crew harness override active: $crew"
   fi
   # A configured cursor crew harness needs a cursor executable present, and
@@ -1513,7 +1513,7 @@ detect_local_config() {
     echo "MISSING_MANUAL: cursor-agent (instructions: $(manual_install_url cursor-agent))"
   fi
   crew_dispatch_validate
-  if [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] \
+  if [ "${JG_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] \
     && ! jg_backlog_backend_manual "$CONFIG" && jg_tasks_axi_compatible; then
     echo "BOOTSTRAP_INFO: tasks-axi available"
   fi
@@ -1528,13 +1528,13 @@ detect_local_config() {
 # primary Herdr home on a systemd host says so on every start until installed.
 detect_sentinel_service() {
   [ "$BACKEND" = herdr ] || return 0
-  [ -e "$FM_HOME/.jg-secondmate-home" ] || [ -L "$FM_HOME/.jg-secondmate-home" ] && return 0
+  [ -e "$JG_HOME/.jg-secondmate-home" ] || [ -L "$JG_HOME/.jg-secondmate-home" ] && return 0
   command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || return 0
   systemctl --user is-active --quiet jg-sentinel && return 0
   local quoted_home quoted_sentinel
-  printf -v quoted_home %q "$FM_HOME"
-  printf -v quoted_sentinel %q "$FM_ROOT/bin/jg-sentinel.sh"
-  echo "SENTINEL: jg-sentinel is not running, so a killed Herdr server leaves supervision and workers down until someone notices (install: mkdir -p ~/.config/systemd/user && FM_HOME=$quoted_home $quoted_sentinel unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel)"
+  printf -v quoted_home %q "$JG_HOME"
+  printf -v quoted_sentinel %q "$JG_ROOT/bin/jg-sentinel.sh"
+  echo "SENTINEL: jg-sentinel is not running, so a killed Herdr server leaves supervision and workers down until someone notices (install: mkdir -p ~/.config/systemd/user && JG_HOME=$quoted_home $quoted_sentinel unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel)"
 }
 
 # Shadow-backlog check. When this home's data directory is not the code root's,
@@ -1545,9 +1545,9 @@ detect_sentinel_service() {
 # merged here.
 detect_code_root_backlog_fork() {
   local name root_copy
-  [ "$FM_ROOT/data" -ef "$DATA" ] && return 0
+  [ "$JG_ROOT/data" -ef "$DATA" ] && return 0
   for name in backlog.md done-archive.md; do
-    root_copy="$FM_ROOT/data/$name"
+    root_copy="$JG_ROOT/data/$name"
     [ -e "$root_copy" ] || [ -L "$root_copy" ] || continue
     [ "$root_copy" -ef "$DATA/$name" ] && continue
     echo "BACKLOG_RECONCILE: code-root $root_copy is not this home's $DATA/$name; tasks-axi wrote the code root instead of this home, so rows in it may be missing here - merge it into this home's copy and move it aside"
@@ -1562,13 +1562,13 @@ detect_code_root_backlog_fork() {
 #
 # So read that same record here, where a session start already looks, and say so
 # once when the evidence is a pattern rather than a blip: the ledger has not
-# been (re)published, and at least FM_HOME_SUMMARY_FAILURE_REPORT attempts have
+# been (re)published, and at least JG_HOME_SUMMARY_FAILURE_REPORT attempts have
 # failed since whenever it last was. No new record, no new state, no retry
 # policy - just the existing evidence, surfaced.
 detect_home_summary_publication() {
   local log="$STATE/.home-summary-refresh.log" ledger="$STATE/home-summary.json"
   local since='' counted failures last threshold
-  threshold=${FM_HOME_SUMMARY_FAILURE_REPORT:-2}
+  threshold=${JG_HOME_SUMMARY_FAILURE_REPORT:-2}
   case "$threshold" in ''|*[!0-9]*|0) threshold=2 ;; esac
   [ -f "$log" ] && [ -r "$log" ] && [ ! -L "$log" ] || return 0
   if [ -f "$ledger" ] && [ -r "$ledger" ] && [ ! -L "$ledger" ]; then
@@ -1625,7 +1625,7 @@ if network_phase; then
 fi
 local_phase && detect_local_config
 
-if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
+if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   # secondmate_sync consumes SECONDMATE_RESPAWNED_IDS from the liveness sweep, so
   # those two always run together in the same phase. Clone refresh does not
   # depend on them, so it starts in the background and overlaps their wall clock.

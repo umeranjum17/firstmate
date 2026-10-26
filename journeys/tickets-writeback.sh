@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # done-done journey: prove the ticket write-back end to end - the port, the lifecycle
 # writer, the drift check, the fork shim, and the dashboard's stale count - and write the
 # transcripts, captures and step record into $DONE_DONE_EVIDENCE_ROOT under fixed names.
@@ -10,7 +19,7 @@ failed=0
 
 # 1. The port plus the writer and the check, through the add-on's own suite and a
 #    disposable fleet board: real tasks-axi, real sign-off-axi, no live board.
-FM_TEST_FORK=$REPO bash addons/tickets-sync/tests/sync.test.sh >"$OUT/tickets-sync-test.log" 2>&1 || failed=1
+JG_TEST_FORK=$REPO bash addons/tickets-sync/tests/sync.test.sh >"$OUT/tickets-sync-test.log" 2>&1 || failed=1
 if grep -q '^PASS:' "$OUT/tickets-sync-test.log" && ! grep -q '^FAIL' "$OUT/tickets-sync-test.log"; then
   grep '^PASS:' "$OUT/tickets-sync-test.log" >"$OUT/tickets-sync-passed.log"
 else
@@ -23,7 +32,7 @@ bash tests/jg-ticket.test.sh >"$OUT/jg-ticket-test.log" 2>&1 || failed=1
 
 # 3. The dashboard's own core journey serves a seeded home at phone width; its
 #    Tickets hero must name the open tickets nothing has updated for a day.
-FM_BIN=$REPO/bin FM_ADDONS_DIR=$REPO/addons bash addons/fleet-dashboard/run-core-proof.sh \
+JG_BIN=$REPO/bin JG_ADDONS_DIR=$REPO/addons bash addons/fleet-dashboard/run-core-proof.sh \
   >"$OUT/fleet-dashboard-proof.log" 2>&1 || failed=1
 stale=$(sed -n '/^stale tickets on the seeded board:/p' "$OUT/fleet-dashboard-proof.log")
 [ -n "$stale" ] || failed=1

@@ -81,7 +81,7 @@ EOF
   expect_code 0 "$status" "grok spawn should succeed before teardown"
   token=$(sed -n 's/^token=//p' "$wt/.jg-grok-turnend")
 
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     GROK_HOME="$grok_home" PATH="$fakebin:$PATH" \
     "$TEARDOWN" "$id" --force >/dev/null 2>&1 \
     || fail "grok teardown failed"
@@ -107,7 +107,7 @@ esac
 exit 1
 SH
   chmod +x "$fakebin/ps"
-  out=$(FM_HOME="$home" PATH="$fakebin:$PATH" "$ROOT/bin/jg-lock.sh" status)
+  out=$(JG_HOME="$home" PATH="$fakebin:$PATH" "$ROOT/bin/jg-lock.sh" status)
   assert_contains "$out" "lock: held by live harness pid" "jg-lock did not recognize grok as a live holder"
   pass "jg-lock recognizes grok harness processes"
 }

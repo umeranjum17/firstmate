@@ -25,18 +25,18 @@ from email.header import decode_header, make_header
 from email.message import EmailMessage
 from email.utils import formatdate
 
-USER = os.environ['FM_MAIL_USER']
-PW = os.environ['FM_MAIL_PASS']
-IMH = os.environ['FM_IMAP_HOST']
-IMP = int(os.environ['FM_IMAP_PORT'])
-STH = os.environ['FM_SMTP_HOST']
-STP = int(os.environ['FM_SMTP_PORT'])
+USER = os.environ['JG_MAIL_USER']
+PW = os.environ['JG_MAIL_PASS']
+IMH = os.environ['JG_IMAP_HOST']
+IMP = int(os.environ['JG_IMAP_PORT'])
+STH = os.environ['JG_SMTP_HOST']
+STP = int(os.environ['JG_SMTP_PORT'])
 CTX = ssl.create_default_context()
 
 
 def mail_timeout():
     """Seconds for IMAP/SMTP sockets. Invalid or non-positive values become 20."""
-    raw = os.environ.get('FM_MAIL_TIMEOUT', '20')
+    raw = os.environ.get('JG_MAIL_TIMEOUT', '20')
     try:
         value = float(raw)
     except (TypeError, ValueError):
@@ -271,12 +271,12 @@ def cmd_poll_list():
     # cannot permanently replace real metadata with degraded placeholders. A
     # bounded window of candidates is scanned to fill the per-poll cap, new
     # uids first so a large retry backlog can never starve new mail.
-    cap = int(os.environ.get('FM_MAIL_POLL_MAX_WAKES') or '20')
+    cap = int(os.environ.get('JG_MAIL_POLL_MAX_WAKES') or '20')
     if cap < 1:
         cap = 20
-    stored_gen, seen = load_cursor(os.environ.get('FM_MAIL_CURSOR', ''))
-    retry, retry_order = load_retry(os.environ.get('FM_MAIL_RETRY', ''))
-    retry_pos_path = os.environ.get('FM_MAIL_RETRY_POS', '')
+    stored_gen, seen = load_cursor(os.environ.get('JG_MAIL_CURSOR', ''))
+    retry, retry_order = load_retry(os.environ.get('JG_MAIL_RETRY', ''))
+    retry_pos_path = os.environ.get('JG_MAIL_RETRY_POS', '')
     retry_pos = load_retry_pos(retry_pos_path, len(retry_order))
     m = None
     try:
@@ -317,7 +317,7 @@ def cmd_poll_list():
         # retry set.
         retry_window = retry_scan_window(retry_order, retry_pos, window)
         retry_candidates = [u for u in retry_window if u in seen]
-        turn_path = os.environ.get('FM_MAIL_TURN', '')
+        turn_path = os.environ.get('JG_MAIL_TURN', '')
         next_turn = None
         if cap == 1 and new_candidates and retry_candidates:
             # A single contended slot alternates between new surfacing and

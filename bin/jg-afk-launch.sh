@@ -44,7 +44,7 @@
 # host lacks one of those parts, `quiet-check` names it and quiet mode enters
 # through the daemon as it does without the host. A quiet `enter` records its
 # mode, so `start` and `start-native` launch the quiet daemon without
-# FM_AFK_MODE; a running quiet daemon is refreshed by a later `/quiet` and runs
+# JG_AFK_MODE; a running quiet daemon is refreshed by a later `/quiet` and runs
 # until `/quiet off`. A quiet `start` or `start-native` that fails while no
 # daemon runs ends quiet mode as `stop` does, so no quiet record outlives its
 # daemon to park a present captain's main.
@@ -65,7 +65,7 @@
 # from its OWN inherited env (discover_supervisor_target). Running it in a
 # separate terminal would make it discover its OWN pane, so this captures the
 # captain pane FIRST (from the pane this script runs in) and passes it in as
-# FM_SUPERVISOR_TARGET/FM_SUPERVISOR_BACKEND explicitly.
+# JG_SUPERVISOR_TARGET/JG_SUPERVISOR_BACKEND explicitly.
 #
 # Usage:
 #   jg-afk-launch.sh enter [--words-file <path> | --words <text>]
@@ -103,98 +103,98 @@
 # Supported backends: herdr, tmux. Others (zellij, orca, cmux) have no verified
 # non-visible-launch primitive here yet and refuse loudly.
 #
-# Test seam: FM_AFK_LAUNCH_ENTRY overrides the command run in the created
+# Test seam: JG_AFK_LAUNCH_ENTRY overrides the command run in the created
 # terminal (default bin/jg-afk-start.sh), so a topology test can run a harmless
-# placeholder instead of a real daemon. FM_SUPERVISOR_TARGET/FM_SUPERVISOR_BACKEND
+# placeholder instead of a real daemon. JG_SUPERVISOR_TARGET/JG_SUPERVISOR_BACKEND
 # override the captured captain pane/backend (an isolated lab pane in tests).
-# FM_AFK_MODE (away|quiet, default away) declares which mode an `enter` writes;
+# JG_AFK_MODE (away|quiet, default away) declares which mode an `enter` writes;
 # with it unset, a daemon start/refresh uses the record's mode.
-# FM_TEST_HARNESS pins the primary harness this launch path judges, through
+# JG_TEST_HARNESS pins the primary harness this launch path judges, through
 # jg_supervision_host_primary (bin/jg-supervision-engine-lib.sh owns the seam).
 set -u
 
-FM_AFK_LAUNCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_AFK_LAUNCH_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-case "$FM_HOME" in
+JG_AFK_LAUNCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$JG_AFK_LAUNCH_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+case "$JG_HOME" in
   /*) ;;
   *)
-    FM_AFK_LAUNCH_HOME_INPUT=$FM_HOME
-    FM_HOME=$(CDPATH='' cd -- "$FM_AFK_LAUNCH_HOME_INPUT" 2>/dev/null && pwd -P) || {
-      echo "error: FM_HOME directory cannot be resolved: $FM_AFK_LAUNCH_HOME_INPUT" >&2
+    JG_AFK_LAUNCH_HOME_INPUT=$JG_HOME
+    JG_HOME=$(CDPATH='' cd -- "$JG_AFK_LAUNCH_HOME_INPUT" 2>/dev/null && pwd -P) || {
+      echo "error: JG_HOME directory cannot be resolved: $JG_AFK_LAUNCH_HOME_INPUT" >&2
       exit 1
     }
     ;;
 esac
-if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
-  case "$FM_STATE_OVERRIDE" in
+if [ -n "${JG_STATE_OVERRIDE:-}" ]; then
+  case "$JG_STATE_OVERRIDE" in
     /*) ;;
     *)
-      FM_AFK_LAUNCH_STATE_INPUT=$FM_STATE_OVERRIDE
-      FM_STATE_OVERRIDE=$(CDPATH='' cd -- "$FM_AFK_LAUNCH_STATE_INPUT" 2>/dev/null && pwd -P) || {
-        echo "error: FM_STATE_OVERRIDE directory cannot be resolved: $FM_AFK_LAUNCH_STATE_INPUT" >&2
+      JG_AFK_LAUNCH_STATE_INPUT=$JG_STATE_OVERRIDE
+      JG_STATE_OVERRIDE=$(CDPATH='' cd -- "$JG_AFK_LAUNCH_STATE_INPUT" 2>/dev/null && pwd -P) || {
+        echo "error: JG_STATE_OVERRIDE directory cannot be resolved: $JG_AFK_LAUNCH_STATE_INPUT" >&2
         exit 1
       }
       ;;
   esac
 fi
-FM_AFK_LAUNCH_STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-FM_AFK_LAUNCH_RECORD="$FM_AFK_LAUNCH_STATE/.afk-daemon-terminal"
-FM_AFK_LAUNCH_LOCK="$FM_AFK_LAUNCH_STATE/.afk-launch.lock"
-FM_AFK_LAUNCH_WS_LABEL="firstmate-afk-daemon"
+JG_AFK_LAUNCH_STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+JG_AFK_LAUNCH_RECORD="$JG_AFK_LAUNCH_STATE/.afk-daemon-terminal"
+JG_AFK_LAUNCH_LOCK="$JG_AFK_LAUNCH_STATE/.afk-launch.lock"
+JG_AFK_LAUNCH_WS_LABEL="firstmate-afk-daemon"
 
 # shellcheck source=bin/jg-backend.sh
-. "$FM_AFK_LAUNCH_DIR/jg-backend.sh"
+. "$JG_AFK_LAUNCH_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-supervisor-target-lib.sh
-. "$FM_AFK_LAUNCH_DIR/jg-supervisor-target-lib.sh"
+. "$JG_AFK_LAUNCH_DIR/jg-supervisor-target-lib.sh"
 # jg-afk-start.sh provides the daemon-lock liveness helpers and
 # jg_afk_clear_stale_artifacts; it is sourceable (BASH_SOURCE guard) and its
 # main does not run on source. It sets `set -eu`, so turn errexit back off for
 # this script's best-effort flow immediately after.
 # shellcheck source=bin/jg-afk-start.sh
-. "$FM_AFK_LAUNCH_DIR/jg-afk-start.sh"
+. "$JG_AFK_LAUNCH_DIR/jg-afk-start.sh"
 set +e
 # The away-posture record owner; sourced for its path helpers, driven as a
 # command for every record mutation so its output reaches the captain.
 # shellcheck source=bin/jg-afk-contract.sh
-. "$FM_AFK_LAUNCH_DIR/jg-afk-contract.sh"
-FM_AFK_CONTRACT_CMD="$FM_AFK_LAUNCH_DIR/jg-afk-contract.sh"
+. "$JG_AFK_LAUNCH_DIR/jg-afk-contract.sh"
+JG_AFK_CONTRACT_CMD="$JG_AFK_LAUNCH_DIR/jg-afk-contract.sh"
 # The supervision host's home gate and attended readiness check.
 # shellcheck source=bin/jg-supervision-engine-lib.sh
-. "$FM_AFK_LAUNCH_DIR/jg-supervision-engine-lib.sh"
+. "$JG_AFK_LAUNCH_DIR/jg-supervision-engine-lib.sh"
 
 jg_afk_launch_log() { printf 'jg-afk-launch: %s\n' "$*" >&2; }
 
 jg_afk_launch_lock_owned() {
   local pid expected actual
-  [ -d "$FM_AFK_LAUNCH_LOCK" ] || return 1
-  pid=$(cat "$FM_AFK_LAUNCH_LOCK/pid" 2>/dev/null) || return 1
-  expected=$(cat "$FM_AFK_LAUNCH_LOCK/pid-identity" 2>/dev/null) || return 1
+  [ -d "$JG_AFK_LAUNCH_LOCK" ] || return 1
+  pid=$(cat "$JG_AFK_LAUNCH_LOCK/pid" 2>/dev/null) || return 1
+  expected=$(cat "$JG_AFK_LAUNCH_LOCK/pid-identity" 2>/dev/null) || return 1
   actual=$(jg_pid_identity "$pid" 2>/dev/null) || return 1
   [ -n "$expected" ] && [ "$actual" = "$expected" ]
 }
 
 jg_afk_launch_lock_acquire() {
   local attempt=0 incomplete=0 identity
-  mkdir -p "$FM_AFK_LAUNCH_STATE" || return 1
+  mkdir -p "$JG_AFK_LAUNCH_STATE" || return 1
   while [ "$attempt" -lt 200 ]; do
     attempt=$((attempt + 1))
-    if mkdir "$FM_AFK_LAUNCH_LOCK" 2>/dev/null; then
-      if ! printf '%s' "$$" > "$FM_AFK_LAUNCH_LOCK/pid"; then
-        rm -rf "$FM_AFK_LAUNCH_LOCK"
+    if mkdir "$JG_AFK_LAUNCH_LOCK" 2>/dev/null; then
+      if ! printf '%s' "$$" > "$JG_AFK_LAUNCH_LOCK/pid"; then
+        rm -rf "$JG_AFK_LAUNCH_LOCK"
         return 1
       fi
       identity=$(jg_pid_identity "$$" 2>/dev/null) || {
-        rm -rf "$FM_AFK_LAUNCH_LOCK"
+        rm -rf "$JG_AFK_LAUNCH_LOCK"
         return 1
       }
-      if [ -z "$identity" ] || ! printf '%s' "$identity" > "$FM_AFK_LAUNCH_LOCK/pid-identity"; then
-        rm -rf "$FM_AFK_LAUNCH_LOCK"
+      if [ -z "$identity" ] || ! printf '%s' "$identity" > "$JG_AFK_LAUNCH_LOCK/pid-identity"; then
+        rm -rf "$JG_AFK_LAUNCH_LOCK"
         return 1
       fi
       return 0
     fi
-    if [ ! -s "$FM_AFK_LAUNCH_LOCK/pid" ] || [ ! -s "$FM_AFK_LAUNCH_LOCK/pid-identity" ]; then
+    if [ ! -s "$JG_AFK_LAUNCH_LOCK/pid" ] || [ ! -s "$JG_AFK_LAUNCH_LOCK/pid-identity" ]; then
       incomplete=$((incomplete + 1))
       if [ "$incomplete" -lt 20 ]; then
         sleep 0.05
@@ -204,7 +204,7 @@ jg_afk_launch_lock_acquire() {
       incomplete=0
     fi
     if ! jg_afk_launch_lock_owned; then
-      rm -rf "$FM_AFK_LAUNCH_LOCK" 2>/dev/null || return 1
+      rm -rf "$JG_AFK_LAUNCH_LOCK" 2>/dev/null || return 1
       incomplete=0
       continue
     fi
@@ -216,9 +216,9 @@ jg_afk_launch_lock_acquire() {
 
 jg_afk_launch_lock_release() {
   local pid
-  pid=$(cat "$FM_AFK_LAUNCH_LOCK/pid" 2>/dev/null || true)
+  pid=$(cat "$JG_AFK_LAUNCH_LOCK/pid" 2>/dev/null || true)
   [ "$pid" = "$$" ] || return 0
-  rm -rf "$FM_AFK_LAUNCH_LOCK"
+  rm -rf "$JG_AFK_LAUNCH_LOCK"
 }
 
 jg_afk_launch_usage() {
@@ -240,45 +240,45 @@ jg_afk_launch_host_primary() {  # <harness>
 
 # True when the posture record is a quiet entry's (bin/jg-afk-contract.sh mode).
 jg_afk_launch_record_quiet() {
-  [ "$(jg_afk_contract_mode "$FM_AFK_LAUNCH_STATE")" = quiet ]
+  [ "$(jg_afk_contract_mode "$JG_AFK_LAUNCH_STATE")" = quiet ]
 }
 
 # An explicit request takes precedence; otherwise the record owns the mode
 # for both a new daemon and a refresh of an existing one.
 jg_afk_launch_requested_mode() {
-  if [ -n "${FM_AFK_MODE:-}" ]; then
-    printf '%s' "$FM_AFK_MODE"
+  if [ -n "${JG_AFK_MODE:-}" ]; then
+    printf '%s' "$JG_AFK_MODE"
   else
-    jg_afk_contract_mode "$FM_AFK_LAUNCH_STATE"
+    jg_afk_contract_mode "$JG_AFK_LAUNCH_STATE"
   fi
 }
 
 # Whether /quiet needs anything here (the header's QUIET MODE): 0 when it needs
 # nothing; 2 while an away record is live on a home that runs the host;
-# otherwise 1, with FM_AFK_LAUNCH_QUIET_WHY naming what the attended host
+# otherwise 1, with JG_AFK_LAUNCH_QUIET_WHY naming what the attended host
 # lacks on a home that runs it, or empty where quiet mode is the daemon's as
 # it is without the host (no host, another primary, or quiet mode already
 # entered).
 jg_afk_launch_quiet_needs_nothing() {
   local harness config
-  FM_AFK_LAUNCH_QUIET_WHY=
+  JG_AFK_LAUNCH_QUIET_WHY=
   harness=$(jg_afk_launch_primary_harness)
   jg_afk_launch_host_primary "$harness" || return 1
-  config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  config=${JG_CONFIG_OVERRIDE:-$JG_HOME/config}
   jg_supervision_host_enabled "$config" "$harness" || return 1
-  if jg_afk_contract_present "$FM_AFK_LAUNCH_STATE"; then
+  if jg_afk_contract_present "$JG_AFK_LAUNCH_STATE"; then
     jg_afk_launch_record_quiet || return 2
     return 1
   fi
-  [ ! -e "$FM_AFK_LAUNCH_STATE/.afk" ] || return 1
+  [ ! -e "$JG_AFK_LAUNCH_STATE/.afk" ] || return 1
   if ! jg_supervision_host_attended_ready "$config" "$harness"; then
-    FM_AFK_LAUNCH_QUIET_WHY="$FM_SUPERVISION_HOST_UNREADY${FM_SUPERVISION_ENGINE_PROBLEM:+: $FM_SUPERVISION_ENGINE_PROBLEM}"
-  elif ! jg_supervision_host_main_key "$FM_AFK_LAUNCH_STATE" >/dev/null; then
-    FM_AFK_LAUNCH_QUIET_WHY="the main session could not be identified"
-  elif ! FM_STATE_OVERRIDE="$FM_AFK_LAUNCH_STATE" "$FM_AFK_LAUNCH_DIR/jg-host-mirror.sh" check; then
-    FM_AFK_LAUNCH_QUIET_WHY="the dialog mirror is missing or could not be read"
+    JG_AFK_LAUNCH_QUIET_WHY="$JG_SUPERVISION_HOST_UNREADY${JG_SUPERVISION_ENGINE_PROBLEM:+: $JG_SUPERVISION_ENGINE_PROBLEM}"
+  elif ! jg_supervision_host_main_key "$JG_AFK_LAUNCH_STATE" >/dev/null; then
+    JG_AFK_LAUNCH_QUIET_WHY="the main session could not be identified"
+  elif ! JG_STATE_OVERRIDE="$JG_AFK_LAUNCH_STATE" "$JG_AFK_LAUNCH_DIR/jg-host-mirror.sh" check; then
+    JG_AFK_LAUNCH_QUIET_WHY="the dialog mirror is missing or could not be read"
   fi
-  [ -z "$FM_AFK_LAUNCH_QUIET_WHY" ]
+  [ -z "$JG_AFK_LAUNCH_QUIET_WHY" ]
 }
 
 jg_afk_launch_quiet_check() {
@@ -290,11 +290,11 @@ jg_afk_launch_quiet_check() {
     return 2
   fi
   if [ "$rc" -ne 0 ]; then
-    [ -z "$FM_AFK_LAUNCH_QUIET_WHY" ] \
-      || printf 'Quiet mode is not already the ordinary posture on this home, because %s, so every attended wake reaches this conversation; quiet mode enters through the quiet daemon instead.\n' "$FM_AFK_LAUNCH_QUIET_WHY"
+    [ -z "$JG_AFK_LAUNCH_QUIET_WHY" ] \
+      || printf 'Quiet mode is not already the ordinary posture on this home, because %s, so every attended wake reaches this conversation; quiet mode enters through the quiet daemon instead.\n' "$JG_AFK_LAUNCH_QUIET_WHY"
     return 1
   fi
-  if retry=$(jg_supervision_host_paused_until "$FM_AFK_LAUNCH_STATE"); then
+  if retry=$(jg_supervision_host_paused_until "$JG_AFK_LAUNCH_STATE"); then
     if [ "$(date +%s)" -lt "$retry" ]; then
       retry="its next retry is due at $(jg_supervision_host_clock "$retry")"
     else
@@ -322,10 +322,10 @@ jg_afk_launch_daemon_allowed() {
       return 1 ;;
   esac
   jg_afk_launch_host_primary "$harness" || return 0
-  jg_supervision_host_enabled "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$harness" || return 0
+  jg_supervision_host_enabled "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$harness" || return 0
   mode=$(jg_afk_launch_requested_mode)
-  if [ -z "$mode" ] && [ -f "$FM_AFK_LAUNCH_STATE/.afk" ]; then
-    mode=$(head -n 1 "$FM_AFK_LAUNCH_STATE/.afk" 2>/dev/null || true)
+  if [ -z "$mode" ] && [ -f "$JG_AFK_LAUNCH_STATE/.afk" ]; then
+    mode=$(head -n 1 "$JG_AFK_LAUNCH_STATE/.afk" 2>/dev/null || true)
   fi
   [ "$mode" != quiet ] || return 0
   jg_afk_launch_log "the away daemon is not launched on this $harness home, which runs the supervision host (docs/supervision-host.md); the away-posture record is the posture here (run bin/jg-afk-launch.sh enter and stop)"
@@ -337,18 +337,18 @@ jg_afk_launch_daemon_allowed() {
 # the away posture would hand every wake to main.
 jg_afk_launch_host_engine_note() {
   local harness config
-  [ "${FM_AFK_MODE:-}" != quiet ] || return 0
-  config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  [ "${JG_AFK_MODE:-}" != quiet ] || return 0
+  config=${JG_CONFIG_OVERRIDE:-$JG_HOME/config}
   harness=$(jg_afk_launch_primary_harness)
   jg_afk_launch_host_primary "$harness" || return 0
   jg_supervision_host_config "$config" "$harness" || return 0
-  [ -z "$FM_SUPERVISION_ENGINE" ] || return 0
+  [ -z "$JG_SUPERVISION_ENGINE" ] || return 0
   printf 'Supervision host: no engine runs the away session on this home (%s), so every away wake reaches this conversation; name a verified engine in config/supervision-host (for example "claude").\n' \
-    "$FM_SUPERVISION_ENGINE_PROBLEM"
+    "$JG_SUPERVISION_ENGINE_PROBLEM"
 }
 
 jg_afk_launch_catchup_pending() {
-  if [ -e "$FM_AFK_LAUNCH_STATE/.afk-return-catchup" ]; then
+  if [ -e "$JG_AFK_LAUNCH_STATE/.afk-return-catchup" ]; then
     jg_afk_launch_log "return catch-up is still pending; run bin/jg-afk-return.sh check before re-entering away mode"
     return 0
   fi
@@ -357,8 +357,8 @@ jg_afk_launch_catchup_pending() {
 
 jg_afk_launch_record_require() {
   local record
-  record=$(jg_afk_contract_path "$FM_AFK_LAUNCH_STATE")
-  if ! jg_afk_contract_present "$FM_AFK_LAUNCH_STATE"; then
+  record=$(jg_afk_contract_path "$JG_AFK_LAUNCH_STATE")
+  if ! jg_afk_contract_present "$JG_AFK_LAUNCH_STATE"; then
     jg_afk_launch_log "an away-posture record is required; run enter before starting the daemon"
     return 1
   fi
@@ -370,7 +370,7 @@ jg_afk_launch_record_require() {
 
 jg_afk_launch_enter() {
   jg_afk_launch_catchup_pending && return 1
-  if [ "${FM_AFK_MODE:-}" = quiet ]; then
+  if [ "${JG_AFK_MODE:-}" = quiet ]; then
     jg_afk_launch_quiet_needs_nothing
     case $? in
       0)
@@ -381,14 +381,14 @@ jg_afk_launch_enter() {
         return 3 ;;
     esac
   fi
-  "$FM_AFK_CONTRACT_CMD" enter "$@" || return
+  "$JG_AFK_CONTRACT_CMD" enter "$@" || return
   jg_afk_launch_host_engine_note
 }
 
 # The command run inside the created terminal. Real launch runs the shared
 # daemon entry; a test overrides it with a harmless placeholder.
 jg_afk_launch_entry_cmd() {
-  printf '%s' "${FM_AFK_LAUNCH_ENTRY:-$FM_ROOT/bin/jg-afk-start.sh}"
+  printf '%s' "${JG_AFK_LAUNCH_ENTRY:-$JG_ROOT/bin/jg-afk-start.sh}"
 }
 
 # The shell command a created daemon terminal runs. The terminal is not in the
@@ -396,43 +396,43 @@ jg_afk_launch_entry_cmd() {
 # itself; the launcher names it here (bin/jg-supervise-daemon.sh
 # jg_daemon_primary_harness).
 jg_afk_launch_daemon_cmd() {  # <captain-target> <captain-backend>
-  printf 'exec env FM_HOME=%q FM_SUPERVISOR_TARGET=%q FM_SUPERVISOR_BACKEND=%q FM_DAEMON_PRIMARY_HARNESS=%q %q' \
-    "$FM_HOME" "$1" "$2" "$(jg_afk_launch_primary_harness)" "$(jg_afk_launch_entry_cmd)"
+  printf 'exec env JG_HOME=%q JG_SUPERVISOR_TARGET=%q JG_SUPERVISOR_BACKEND=%q JG_DAEMON_PRIMARY_HARNESS=%q %q' \
+    "$JG_HOME" "$1" "$2" "$(jg_afk_launch_primary_harness)" "$(jg_afk_launch_entry_cmd)"
 }
 
 jg_afk_launch_record_write() {  # <backend> <target> <extra>
   local pending
-  mkdir -p "$FM_AFK_LAUNCH_STATE" || return 1
-  pending=$(mktemp "$FM_AFK_LAUNCH_STATE/.afk-daemon-terminal.pending.XXXXXX") || return 1
+  mkdir -p "$JG_AFK_LAUNCH_STATE" || return 1
+  pending=$(mktemp "$JG_AFK_LAUNCH_STATE/.afk-daemon-terminal.pending.XXXXXX") || return 1
   printf '%s\t%s\t%s\n' "$1" "$2" "$3" > "$pending" || { rm -f "$pending"; return 1; }
-  mv "$pending" "$FM_AFK_LAUNCH_RECORD" || { rm -f "$pending"; return 1; }
+  mv "$pending" "$JG_AFK_LAUNCH_RECORD" || { rm -f "$pending"; return 1; }
 }
 
 jg_afk_launch_flag_write() {
   # Use the explicit request or the record's mode, so /afk over a quiet
   # record switches a running daemon's flag to away on refresh.
-  jg_afk_flag_write "$FM_AFK_LAUNCH_STATE" "$(jg_afk_launch_requested_mode)"
+  jg_afk_flag_write "$JG_AFK_LAUNCH_STATE" "$(jg_afk_launch_requested_mode)"
 }
 
-# Read the recorded terminal into FM_AFK_REC_BACKEND/FM_AFK_REC_TARGET. The third
+# Read the recorded terminal into JG_AFK_REC_BACKEND/JG_AFK_REC_TARGET. The third
 # field (a herdr workspace id, kept for the record's own documentation) is not
 # needed to close by id, so it is discarded. Returns 1 when no record exists.
 jg_afk_launch_record_read() {
   local extra record
-  FM_AFK_REC_BACKEND=""; FM_AFK_REC_TARGET=""; extra=""
-  [ -f "$FM_AFK_LAUNCH_RECORD" ] || return 1
-  record=$(cat "$FM_AFK_LAUNCH_RECORD" 2>/dev/null) || record=""
-  IFS=$'\t' read -r FM_AFK_REC_BACKEND FM_AFK_REC_TARGET extra \
-    < "$FM_AFK_LAUNCH_RECORD" || true
+  JG_AFK_REC_BACKEND=""; JG_AFK_REC_TARGET=""; extra=""
+  [ -f "$JG_AFK_LAUNCH_RECORD" ] || return 1
+  record=$(cat "$JG_AFK_LAUNCH_RECORD" 2>/dev/null) || record=""
+  IFS=$'\t' read -r JG_AFK_REC_BACKEND JG_AFK_REC_TARGET extra \
+    < "$JG_AFK_LAUNCH_RECORD" || true
   if ! printf '%s\n' "$record" | awk -F '\t' 'NF != 3 { bad=1 } END { exit !(NR == 1 && !bad) }' \
-    || [ -z "$FM_AFK_REC_BACKEND" ] || [ -z "$FM_AFK_REC_TARGET" ]; then
+    || [ -z "$JG_AFK_REC_BACKEND" ] || [ -z "$JG_AFK_REC_TARGET" ]; then
     jg_afk_launch_log "daemon terminal record is malformed; refusing to act on it"
     return 2
   fi
-  case "$FM_AFK_REC_BACKEND" in
+  case "$JG_AFK_REC_BACKEND" in
     herdr) [ -n "$extra" ] ;;
     tmux) : ;;
-    none) [ "$FM_AFK_REC_TARGET" = - ] && [ "$extra" = native ] ;;
+    none) [ "$JG_AFK_REC_TARGET" = - ] && [ "$extra" = native ] ;;
     *) return 2 ;;
   esac || { jg_afk_launch_log "daemon terminal record is malformed; refusing to act on it"; return 2; }
 }
@@ -498,9 +498,9 @@ jg_afk_launch_terminal_absent() {  # <backend> <target>
 
 jg_afk_launch_close_recorded() {
   local close_result=0
-  jg_afk_launch_close_terminal "$FM_AFK_REC_BACKEND" "$FM_AFK_REC_TARGET" || close_result=$?
-  if jg_afk_launch_terminal_absent "$FM_AFK_REC_BACKEND" "$FM_AFK_REC_TARGET"; then
-    rm -f "$FM_AFK_LAUNCH_RECORD" || return 1
+  jg_afk_launch_close_terminal "$JG_AFK_REC_BACKEND" "$JG_AFK_REC_TARGET" || close_result=$?
+  if jg_afk_launch_terminal_absent "$JG_AFK_REC_BACKEND" "$JG_AFK_REC_TARGET"; then
+    rm -f "$JG_AFK_LAUNCH_RECORD" || return 1
     [ "$close_result" -eq 0 ] || jg_afk_launch_log "terminal close command failed, but exact absence was confirmed"
     return 0
   fi
@@ -526,7 +526,7 @@ jg_afk_launch_terminal_alive() {  # <backend> <target>
 
 jg_afk_launch_wait_ready() {  # <backend> <target>
   local backend=$1 target=$2 attempt=0
-  if [ -n "${FM_AFK_LAUNCH_ENTRY:-}" ]; then
+  if [ -n "${JG_AFK_LAUNCH_ENTRY:-}" ]; then
     jg_afk_launch_terminal_alive "$backend" "$target"
     return
   fi
@@ -548,8 +548,8 @@ jg_afk_launch_commit_terminal() {  # <backend> <target> <extra> [already-recorde
   fi
   if ! jg_afk_launch_wait_ready "$backend" "$target"; then
     jg_afk_launch_log "daemon did not become ready; closing $backend:$target"
-    FM_AFK_REC_BACKEND=$backend
-    FM_AFK_REC_TARGET=$target
+    JG_AFK_REC_BACKEND=$backend
+    JG_AFK_REC_TARGET=$target
     jg_afk_launch_close_recorded
     return 1
   fi
@@ -595,7 +595,7 @@ jg_afk_launch_reconcile() {
   jg_afk_launch_record_read
   read_result=$?
   if [ "$read_result" -eq 0 ]; then
-    jg_afk_launch_log "reconciling leaked daemon terminal ${FM_AFK_REC_BACKEND}:${FM_AFK_REC_TARGET}"
+    jg_afk_launch_log "reconciling leaked daemon terminal ${JG_AFK_REC_BACKEND}:${JG_AFK_REC_TARGET}"
     jg_afk_launch_close_recorded
   elif [ "$read_result" -eq 2 ]; then
     return 1
@@ -604,17 +604,17 @@ jg_afk_launch_reconcile() {
 
 jg_afk_launch_restore_backup() {  # <backup> <had-afk>
   local backup=$1 had_afk=$2 artifact result=0
-  rm -f "$FM_AFK_LAUNCH_STATE/.afk" \
-    "$FM_AFK_LAUNCH_STATE/.subsuper-escalations" \
-    "$FM_AFK_LAUNCH_STATE/.subsuper-escalations.since" \
-    "$FM_AFK_LAUNCH_STATE/.subsuper-inject-wedged" \
-    "$FM_AFK_LAUNCH_STATE/.subsuper-unknown-acked" || result=1
+  rm -f "$JG_AFK_LAUNCH_STATE/.afk" \
+    "$JG_AFK_LAUNCH_STATE/.subsuper-escalations" \
+    "$JG_AFK_LAUNCH_STATE/.subsuper-escalations.since" \
+    "$JG_AFK_LAUNCH_STATE/.subsuper-inject-wedged" \
+    "$JG_AFK_LAUNCH_STATE/.subsuper-unknown-acked" || result=1
   if [ "$had_afk" -eq 1 ]; then
-    cp "$backup/.afk" "$FM_AFK_LAUNCH_STATE/.afk" || result=1
+    cp "$backup/.afk" "$JG_AFK_LAUNCH_STATE/.afk" || result=1
   fi
   for artifact in .subsuper-escalations .subsuper-escalations.since .subsuper-inject-wedged .subsuper-unknown-acked; do
     if [ -e "$backup/$artifact" ]; then
-      cp -p "$backup/$artifact" "$FM_AFK_LAUNCH_STATE/$artifact" || result=1
+      cp -p "$backup/$artifact" "$JG_AFK_LAUNCH_STATE/$artifact" || result=1
     fi
   done
   if [ "$result" -eq 0 ]; then
@@ -638,16 +638,16 @@ jg_afk_launch_create_herdr() {  # <captain-target> <captain-backend>
   fi
   jg_backend_source herdr || return 1
   jg_backend_herdr_server_ensure "$session" || { jg_afk_launch_log "herdr server not ready for session '$session'"; return 1; }
-  label=${FM_AFK_LAUNCH_LABEL:-"$FM_AFK_LAUNCH_WS_LABEL-$$-${RANDOM:-0}-$(date '+%s')"}
-  out=$(jg_backend_herdr_cli "$session" workspace create --cwd "$FM_HOME" --label "$label" --no-focus 2>/dev/null)
+  label=${JG_AFK_LAUNCH_LABEL:-"$JG_AFK_LAUNCH_WS_LABEL-$$-${RANDOM:-0}-$(date '+%s')"}
+  out=$(jg_backend_herdr_cli "$session" workspace create --cwd "$JG_HOME" --label "$label" --no-focus 2>/dev/null)
   create_result=$?
   wsid=$(printf '%s' "$out" | jq -r '.result.workspace.workspace_id // empty' 2>/dev/null)
   pane=$(printf '%s' "$out" | jq -r '.result.root_pane.pane_id // empty' 2>/dev/null)
   if [ "$create_result" -ne 0 ] && [ -n "$wsid" ] && [ -n "$pane" ]; then
     jg_afk_launch_log "herdr create failed after returning exact ids; closing $session:$pane"
     if jg_afk_launch_record_write herdr "$session:$pane" "$wsid"; then
-      FM_AFK_REC_BACKEND=herdr
-      FM_AFK_REC_TARGET="$session:$pane"
+      JG_AFK_REC_BACKEND=herdr
+      JG_AFK_REC_TARGET="$session:$pane"
       jg_afk_launch_close_recorded || true
     else
       jg_afk_launch_log "failed to persist exact id for failed herdr create"
@@ -669,8 +669,8 @@ jg_afk_launch_create_herdr() {  # <captain-target> <captain-backend>
   fi
   if ! jg_backend_herdr_cli "$session" pane run "$pane" "$cmd" >/dev/null 2>&1; then
     jg_afk_launch_log "failed to run daemon in herdr pane $session:$pane; closing it"
-    FM_AFK_REC_BACKEND=herdr
-    FM_AFK_REC_TARGET="$session:$pane"
+    JG_AFK_REC_BACKEND=herdr
+    JG_AFK_REC_TARGET="$session:$pane"
     jg_afk_launch_close_recorded || true
     return 1
   fi
@@ -683,7 +683,7 @@ jg_afk_launch_create_herdr() {  # <captain-target> <captain-backend>
 # captain pane by its %id from this separate session.
 jg_afk_launch_create_tmux() {  # <captain-target> <captain-backend>
   local captain_target=$1 captain_backend=$2 session cmd hash nonce
-  hash=$(printf '%s' "$FM_HOME" | cksum | cut -d' ' -f1)
+  hash=$(printf '%s' "$JG_HOME" | cksum | cut -d' ' -f1)
   nonce="$$-${RANDOM:-0}-$(date '+%s')"
   session="jg-afk-daemon-$hash-$nonce"
   cmd=$(jg_afk_launch_daemon_cmd "$captain_target" "$captain_backend")
@@ -693,7 +693,7 @@ jg_afk_launch_create_tmux() {  # <captain-target> <captain-backend>
   fi
   if ! tmux new-session -d -s "$session" "$cmd" 2>/dev/null; then
     jg_afk_launch_log "failed to create detached tmux daemon session '$session'"
-    if ! rm -f "$FM_AFK_LAUNCH_RECORD"; then
+    if ! rm -f "$JG_AFK_LAUNCH_RECORD"; then
       jg_afk_launch_log "failed to remove planned tmux daemon record after creation failure"
     fi
     return 1
@@ -709,13 +709,13 @@ jg_afk_launch_start() {
   jg_afk_launch_record_require || return 1
   # Capture the captain pane FIRST, before creating anything.
   captain_target=$(discover_supervisor_target) || {
-    jg_afk_launch_log "could not resolve the captain supervisor pane (set FM_SUPERVISOR_TARGET)"
+    jg_afk_launch_log "could not resolve the captain supervisor pane (set JG_SUPERVISOR_TARGET)"
     return 1; }
   captain_backend=$(discover_supervisor_backend) || {
-    jg_afk_launch_log "could not resolve the captain supervisor backend (set FM_SUPERVISOR_BACKEND)"
+    jg_afk_launch_log "could not resolve the captain supervisor backend (set JG_SUPERVISOR_BACKEND)"
     return 1; }
 
-  mkdir -p "$FM_AFK_LAUNCH_STATE"
+  mkdir -p "$JG_AFK_LAUNCH_STATE"
 
   if daemon_lock_held_by_live_daemon; then
     jg_afk_launch_record_validate_if_present || return 1
@@ -727,20 +727,20 @@ jg_afk_launch_start() {
     return 0
   fi
 
-  backup=$(mktemp -d "$FM_AFK_LAUNCH_STATE/.afk-launch-backup.XXXXXX") || return 1
-  if [ -f "$FM_AFK_LAUNCH_STATE/.afk" ]; then
+  backup=$(mktemp -d "$JG_AFK_LAUNCH_STATE/.afk-launch-backup.XXXXXX") || return 1
+  if [ -f "$JG_AFK_LAUNCH_STATE/.afk" ]; then
     had_afk=1
-    cp "$FM_AFK_LAUNCH_STATE/.afk" "$backup/.afk" || { rm -rf "$backup"; return 1; }
+    cp "$JG_AFK_LAUNCH_STATE/.afk" "$backup/.afk" || { rm -rf "$backup"; return 1; }
   fi
   for artifact in .subsuper-escalations .subsuper-escalations.since .subsuper-inject-wedged .subsuper-unknown-acked; do
-    if [ -e "$FM_AFK_LAUNCH_STATE/$artifact" ]; then
-      cp -p "$FM_AFK_LAUNCH_STATE/$artifact" "$backup/$artifact" || { rm -rf "$backup"; return 1; }
+    if [ -e "$JG_AFK_LAUNCH_STATE/$artifact" ]; then
+      cp -p "$JG_AFK_LAUNCH_STATE/$artifact" "$backup/$artifact" || { rm -rf "$backup"; return 1; }
     fi
   done
   if ! jg_afk_launch_reconcile; then
     result=1
   else
-    if jg_afk_clear_stale_artifacts "$FM_AFK_LAUNCH_STATE"; then
+    if jg_afk_clear_stale_artifacts "$JG_AFK_LAUNCH_STATE"; then
       result=0
     else
       jg_afk_launch_log "failed to clear stale away-mode artifacts"
@@ -774,7 +774,7 @@ jg_afk_launch_start() {
 
 jg_afk_launch_start_native() {
   local backup artifact had_afk=0 result=0
-  mkdir -p "$FM_AFK_LAUNCH_STATE" || return 1
+  mkdir -p "$JG_AFK_LAUNCH_STATE" || return 1
   jg_afk_launch_catchup_pending && return 1
   jg_afk_launch_daemon_allowed || return 1
   jg_afk_launch_record_require || return 1
@@ -784,19 +784,19 @@ jg_afk_launch_start_native() {
     jg_afk_launch_log "daemon already running; refreshed away-mode flag"
     return 0
   fi
-  backup=$(mktemp -d "$FM_AFK_LAUNCH_STATE/.afk-launch-backup.XXXXXX") || return 1
-  if [ -f "$FM_AFK_LAUNCH_STATE/.afk" ]; then
+  backup=$(mktemp -d "$JG_AFK_LAUNCH_STATE/.afk-launch-backup.XXXXXX") || return 1
+  if [ -f "$JG_AFK_LAUNCH_STATE/.afk" ]; then
     had_afk=1
-    cp "$FM_AFK_LAUNCH_STATE/.afk" "$backup/.afk" || { rm -rf "$backup"; return 1; }
+    cp "$JG_AFK_LAUNCH_STATE/.afk" "$backup/.afk" || { rm -rf "$backup"; return 1; }
   fi
   for artifact in .subsuper-escalations .subsuper-escalations.since .subsuper-inject-wedged .subsuper-unknown-acked; do
-    if [ -e "$FM_AFK_LAUNCH_STATE/$artifact" ]; then
-      cp -p "$FM_AFK_LAUNCH_STATE/$artifact" "$backup/$artifact" || { rm -rf "$backup"; return 1; }
+    if [ -e "$JG_AFK_LAUNCH_STATE/$artifact" ]; then
+      cp -p "$JG_AFK_LAUNCH_STATE/$artifact" "$backup/$artifact" || { rm -rf "$backup"; return 1; }
     fi
   done
   jg_afk_launch_reconcile || result=1
   if [ "$result" -eq 0 ]; then
-    if ! jg_afk_clear_stale_artifacts "$FM_AFK_LAUNCH_STATE"; then
+    if ! jg_afk_clear_stale_artifacts "$JG_AFK_LAUNCH_STATE"; then
       jg_afk_launch_log "failed to clear stale away-mode artifacts"
       result=1
     elif ! jg_afk_launch_flag_write; then
@@ -855,7 +855,7 @@ jg_afk_launch_stop() {
   # an absent record means no terminal existed for this entry (Pi never
   # launches one).
   if [ "$read_result" -eq 0 ]; then
-    if [ "$FM_AFK_REC_BACKEND" != none ]; then
+    if [ "$JG_AFK_REC_BACKEND" != none ]; then
       closed_daemon_terminal=1
     fi
     jg_afk_launch_close_recorded || result=1
@@ -863,12 +863,12 @@ jg_afk_launch_stop() {
   fi
   # (3) Clear the away-mode flag, then (4) archive the posture record LAST so the
   # posture ends only once every daemon-side artifact is down.
-  if ! rm -f "$FM_AFK_LAUNCH_STATE/.afk"; then
+  if ! rm -f "$JG_AFK_LAUNCH_STATE/.afk"; then
     jg_afk_launch_log "failed to clear away-mode flag"
     result=1
   fi
-  if [ "$result" -eq 0 ] && jg_afk_contract_present "$FM_AFK_LAUNCH_STATE"; then
-    if archived=$("$FM_AFK_CONTRACT_CMD" archive); then
+  if [ "$result" -eq 0 ] && jg_afk_contract_present "$JG_AFK_LAUNCH_STATE"; then
+    if archived=$("$JG_AFK_CONTRACT_CMD" archive); then
       jg_afk_launch_log "away-posture record archived at $archived"
     else
       jg_afk_launch_log "failed to archive the away-posture record; it still stands"

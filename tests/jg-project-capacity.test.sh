@@ -76,21 +76,21 @@ make_case() {  # <name> [task-id...]
   : > "$case_dir/calls.log"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+printf '%s\n' "$*" >> "$JG_FAKE_CALL_LOG"
 case "$*" in
   *"#{pane_current_path}"*)
     # A spawn that is told to hold waits here, after its capacity check and
     # while it still holds the project lock, until the test releases it.
-    if [ -n "${FM_FAKE_HOLD:-}" ]; then
-      : > "$FM_FAKE_HOLD.reached"
+    if [ -n "${JG_FAKE_HOLD:-}" ]; then
+      : > "$JG_FAKE_HOLD.reached"
       i=0
-      while [ ! -f "$FM_FAKE_HOLD.release" ]; do
+      while [ ! -f "$JG_FAKE_HOLD.release" ]; do
         i=$((i + 1))
         [ "$i" -lt 400 ] || exit 1
         sleep 0.05
       done
     fi
-    printf '%s\n' "${FM_FAKE_PANE_PATH:-}"
+    printf '%s\n' "${JG_FAKE_PANE_PATH:-}"
     exit 0
     ;;
 esac
@@ -99,9 +99,9 @@ exit 0
 SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
-printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+printf 'treehouse %s\n' "$*" >> "$JG_FAKE_CALL_LOG"
 # A lease prints the leased copy's path; spawn refuses an empty answer.
-case "${1:-}" in get) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;; esac
+case "${1:-}" in get) printf '%s\n' "${JG_FAKE_PANE_PATH:-}" ;; esac
 exit 0
 SH
   chmod +x "$fakebin/tmux" "$fakebin/treehouse"
@@ -161,10 +161,10 @@ new_worktree() {  # <case-dir> <name>
 run_spawn() {  # <case-dir> <home> <pane-path> <args...>
   local case_dir=$1 home=$2 pane=$3
   shift 3
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
-    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" FM_BACKEND=tmux \
-    FM_FAKE_PANE_PATH="$pane" FM_FAKE_CALL_LOG="$case_dir/calls.log" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' \
+    JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" JG_BACKEND=tmux \
+    JG_FAKE_PANE_PATH="$pane" JG_FAKE_CALL_LOG="$case_dir/calls.log" \
     PATH="$case_dir/fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
 }
@@ -358,8 +358,8 @@ test_release_frees_a_place() {
 
   # Cleanup: the real teardown removes the record, which frees its place.
   rc=0
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
-    FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME="$home" JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_CONFIG_OVERRIDE='' \
+    JG_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
     "$TEARDOWN" live-b 2>&1) || rc=$?
   expect_code 0 "$rc" "cleanup of a live worker failed: $out"
   assert_absent "$home/state/live-b.meta" "cleanup left the worker's record"
@@ -477,7 +477,7 @@ test_concurrent_spawns_cannot_both_take_the_last_place() {
   declare_capacity "$home" "project 1"
   hold="$case_dir/hold"
   wt=$(new_worktree "$case_dir" task-a)
-  FM_FAKE_HOLD="$hold" spawn_ship "$case_dir" task-a "$wt" > "$case_dir/a.out" 2>&1 &
+  JG_FAKE_HOLD="$hold" spawn_ship "$case_dir" task-a "$wt" > "$case_dir/a.out" 2>&1 &
   i=0
   while [ ! -f "$hold.reached" ]; do
     i=$((i + 1))
@@ -577,7 +577,7 @@ if [ "${1:-}" = status ]; then
   printf '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}\n'
   exit 0
 fi
-printf 'orca %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+printf 'orca %s\n' "$*" >> "$JG_FAKE_CALL_LOG"
 exit 1
 SH
   chmod +x "$case_dir/fakebin/orca"
@@ -585,7 +585,7 @@ SH
   declare_capacity "$home" "project 1"
 
   # shellcheck disable=SC2016 # expanded by the holder's own shell
-  FM_HOME="$home" FM_STATE_OVERRIDE='' bash -c '
+  JG_HOME="$home" JG_STATE_OVERRIDE='' bash -c '
     . "$1/bin/jg-wake-lib.sh"
     lock=$(jg_treehouse_project_lock_path "$2") || exit 1
     jg_lock_try_acquire "$lock" || exit 1

@@ -7,7 +7,7 @@
 # steering inbox and rings the remote doorbell best-effort. These tests drive
 # the real jg-send + jg-on executables with a stubbed ssh transport that
 # EXECUTES the real host-local leg against a seeded remote-home fixture (the
-# FM_SSH_BIN seam tests/jg-on.test.sh proves preserves exit status), and pin:
+# JG_SSH_BIN seam tests/jg-on.test.sh proves preserves exit status), and pin:
 #   1. A remote text steer lands as a durable record in the remote home's
 #      steering inbox, marker and corr token in the body, exits 0, and marks
 #      the pending-reply expectation delivered at enqueue; a failed doorbell
@@ -47,13 +47,13 @@ TMP_ROOT=$(jg_test_tmproot jg-send-remote-delivery)
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 
 # Stub tmux for the local typed-plane legs: logs literal typed text to
-# FM_SEND_LOG. The default composer reads empty (clean submit);
-# FM_FAKE_TMUX_PENDING=1 keeps a proven pending composer with no busy footer,
+# JG_SEND_LOG. The default composer reads empty (clean submit);
+# JG_FAKE_TMUX_PENDING=1 keeps a proven pending composer with no busy footer,
 # so the real submit core exhausts its Enter budget and reports the pending
 # verdict. The ssh stub counts invocations, logs the wire line, and either
-# fails with FM_FAKE_SSH_RC (emitting FM_FAKE_SSH_STDERR as the remote
+# fails with JG_FAKE_SSH_RC (emitting JG_FAKE_SSH_STDERR as the remote
 # stderr), or decodes the entrypoint argv and executes the REAL host-local
-# command against the decoded remote home - with FM_FAKE_SSH_AMBIGUOUS=1
+# command against the decoded remote home - with JG_FAKE_SSH_AMBIGUOUS=1
 # reporting ssh exit 255 after that execution (completion unknown, but the
 # remote leg actually ran).
 make_stubs() {  # <dir> -> echoes fakebin dir
@@ -74,14 +74,14 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "${1:-}" >> "$FM_SEND_LOG"
+      printf '%s' "${1:-}" >> "$JG_SEND_LOG"
     fi
     exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
-    if [ "${FM_FAKE_TMUX_PENDING:-0}" = 1 ]; then
+    if [ "${JG_FAKE_TMUX_PENDING:-0}" = 1 ]; then
       printf '╭────────────╮\n│ > steer    │\n╰────────────╯\n'
     else
       printf '╭────╮\n│    │\n╰────╯\n'
@@ -101,22 +101,22 @@ SH
 #!/usr/bin/env bash
 set -u
 cat > /dev/null
-count=$(cat "$FM_SSH_COUNT" 2>/dev/null || echo 0)
+count=$(cat "$JG_SSH_COUNT" 2>/dev/null || echo 0)
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_SSH_COUNT"
-printf '%s\n' "$*" >> "$FM_SSH_LOG"
-if [ -n "${FM_FAKE_SSH_HANG:-}" ]; then
+printf '%s\n' "$count" > "$JG_SSH_COUNT"
+printf '%s\n' "$*" >> "$JG_SSH_LOG"
+if [ -n "${JG_FAKE_SSH_HANG:-}" ]; then
   # A busy remote lane: the transport attempt never returns on its own. The
   # real sleep, because the stubbed one on PATH returns immediately.
-  /bin/sleep "$FM_FAKE_SSH_HANG"
+  /bin/sleep "$JG_FAKE_SSH_HANG"
   exit 255
 fi
-if [ "${FM_FAKE_SSH_AFTER_AMBIGUOUS_RC:-0}" -ne 0 ] && [ "$count" -gt 1 ]; then
-  exit "$FM_FAKE_SSH_AFTER_AMBIGUOUS_RC"
+if [ "${JG_FAKE_SSH_AFTER_AMBIGUOUS_RC:-0}" -ne 0 ] && [ "$count" -gt 1 ]; then
+  exit "$JG_FAKE_SSH_AFTER_AMBIGUOUS_RC"
 fi
-if [ "${FM_FAKE_SSH_RC:-0}" -ne 0 ]; then
-  [ -z "${FM_FAKE_SSH_STDERR:-}" ] || printf '%s\n' "$FM_FAKE_SSH_STDERR" >&2
-  exit "${FM_FAKE_SSH_RC}"
+if [ "${JG_FAKE_SSH_RC:-0}" -ne 0 ]; then
+  [ -z "${JG_FAKE_SSH_STDERR:-}" ] || printf '%s\n' "$JG_FAKE_SSH_STDERR" >&2
+  exit "${JG_FAKE_SSH_RC}"
 fi
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
@@ -130,10 +130,10 @@ while IFS= read -r -d '' a; do rargs+=("$a"); done \
   < <(perl -MMIME::Base64=decode_base64 -e 'print decode_base64($ARGV[0])' "$argv_b64")
 cmd=${rargs[0]}
 rc=0
-env FM_HOME="$remote_home" FM_ROOT_OVERRIDE="$FM_REMOTE_CODE_ROOT" \
-  "$FM_REMOTE_CODE_ROOT/bin/$cmd" "${rargs[@]:1}" || rc=$?
-if [ "${FM_FAKE_SSH_AMBIGUOUS:-0}" = 1 ] \
-  || { [ "${FM_FAKE_SSH_AFTER_AMBIGUOUS_RC:-0}" -ne 0 ] && [ "$count" -eq 1 ]; }; then
+env JG_HOME="$remote_home" JG_ROOT_OVERRIDE="$JG_REMOTE_CODE_ROOT" \
+  "$JG_REMOTE_CODE_ROOT/bin/$cmd" "${rargs[@]:1}" || rc=$?
+if [ "${JG_FAKE_SSH_AMBIGUOUS:-0}" = 1 ] \
+  || { [ "${JG_FAKE_SSH_AFTER_AMBIGUOUS_RC:-0}" -ne 0 ] && [ "$count" -eq 1 ]; }; then
   exit 255
 fi
 exit "$rc"
@@ -204,16 +204,16 @@ pending_record() {  # <home>
 }
 
 drain_out() {  # <home>
-  FM_STATE_OVERRIDE="$1/state" "$DRAIN" 2>/dev/null
+  JG_STATE_OVERRIDE="$1/state" "$DRAIN" 2>/dev/null
 }
 
 send_env() {  # <fakebin> <parent-home> <ssh-log> [extra env...] -- <cmd...>
   local fb=$1 home=$2 ssh_log=$3
   shift 3
   env PATH="$fb:$PATH" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_SEND_SETTLE=0 \
-    FM_SSH_BIN="$fb/fake-ssh" FM_SSH_LOG="$ssh_log" \
-    FM_SSH_COUNT="$ssh_log.count" FM_REMOTE_CODE_ROOT="$ROOT" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_SEND_SETTLE=0 \
+    JG_SSH_BIN="$fb/fake-ssh" JG_SSH_LOG="$ssh_log" \
+    JG_SSH_COUNT="$ssh_log.count" JG_REMOTE_CODE_ROOT="$ROOT" \
     "$@"
 }
 
@@ -241,7 +241,7 @@ test_remote_steer_lands_in_remote_inbox() {
   printf '%s' "$body" | grep -Eq 'corr=[a-f0-9]{16}' \
     || fail "the remote record must carry the marked request's corr token: $body"
   case "$body" in
-    *"$FM_FROMFIRST_MARK"*) : ;;
+    *"$JG_FROMFIRST_MARK"*) : ;;
     *) fail "the remote record must carry the from-firstmate marker: $body" ;;
   esac
   # The doorbell could not reach the fixture pane (no herdr CLI here); that
@@ -271,7 +271,7 @@ test_remote_rerun_is_idempotent() {
   rc=0
   (
     cd "$TMP_ROOT" || exit 1
-    send_env "$fb" "${home#"$TMP_ROOT/"}" "$ssh_log" FM_FAKE_SSH_AMBIGUOUS=1 \
+    send_env "$fb" "${home#"$TMP_ROOT/"}" "$ssh_log" JG_FAKE_SSH_AMBIGUOUS=1 \
       "$SEND" rsm "please rename the metric"
   ) >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
@@ -291,7 +291,7 @@ test_remote_rerun_is_idempotent() {
     || fail "the preserved expectation must record unknown delivery: $(cat "$pend")"
   corr=$(jg_pending_reply_get "$pend" corr_id)
   printf -v quoted '%q' "$home"
-  expected_cmd="FM_HOME=$quoted FM_PENDING_REPLY_EXISTING_CORR=$corr"
+  expected_cmd="JG_HOME=$quoted JG_PENDING_REPLY_EXISTING_CORR=$corr"
   for arg in "$SEND" rsm "please rename the metric"; do
     printf -v quoted '%q' "$arg"
     expected_cmd="$expected_cmd $quoted"
@@ -307,7 +307,7 @@ test_remote_rerun_is_idempotent() {
     || fail "could not advance the delivered expectation to the escalated fixture phase"
   ssh_before=$(cat "$ssh_log.count")
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+  send_env "$fb" "$home" "$ssh_log" JG_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SEND" rsm "please rename the metric" >"$dir/stale-resend.out" 2>"$dir/stale-resend.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "an explicitly requested non-reusable correlation must fail closed"
   assert_contains "$(cat "$dir/stale-resend.err")" "refusing to mint a replacement correlation" \
@@ -329,13 +329,13 @@ test_remote_rerun_is_idempotent() {
   resend_cmd=$(tail -1 "$dir/err")
   rc=0
   (
-    unset FM_HOME
-    env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_SEND_SETTLE=0 \
-      FM_SSH_BIN="$fb/fake-ssh" FM_SSH_LOG="$ssh_log" \
-      FM_SSH_COUNT="$ssh_log.count" FM_REMOTE_CODE_ROOT="$ROOT" \
+    unset JG_HOME
+    env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_SEND_SETTLE=0 \
+      JG_SSH_BIN="$fb/fake-ssh" JG_SSH_LOG="$ssh_log" \
+      JG_SSH_COUNT="$ssh_log.count" JG_REMOTE_CODE_ROOT="$ROOT" \
       bash -c "$resend_cmd"
   ) >"$dir/resend.out" 2>"$dir/resend.err" || rc=$?
-  expect_code 0 "$rc" "the printed correlation-reusing resend must succeed without an inherited FM_HOME"
+  expect_code 0 "$rc" "the printed correlation-reusing resend must succeed without an inherited JG_HOME"
   count=$(find "$rhome/state/parent-route/rsm.inbox" -name '*.msg' | wc -l | tr -d ' ')
   [ "$count" = 1 ] || fail "the correlation-reusing resend must leave exactly one remote record, found $count"
   rec=$(find "$rhome/state/parent-route/rsm.inbox" -name '*.msg' | head -1)
@@ -356,7 +356,7 @@ test_remote_retry_failure_preserves_ambiguous_expectation() {
   home=$(setup_remote_parent_home remote-ambiguous-then-fail "$rhome")
 
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_AFTER_AMBIGUOUS_RC=1 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_AFTER_AMBIGUOUS_RC=1 \
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "a failed retry after unknown completion must not claim delivery"
@@ -380,7 +380,7 @@ test_remote_fire_and_forget_never_arms_reply_recovery() {
   delivery=0123456789abcdef
 
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_AFTER_AMBIGUOUS_RC=1 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_AFTER_AMBIGUOUS_RC=1 \
     "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
     >"$dir/out" 2>"$dir/err" || rc=$?
   expect_code 3 "$rc" "an ambiguous fire-and-forget delivery must report unconfirmed"
@@ -388,7 +388,7 @@ test_remote_fire_and_forget_never_arms_reply_recovery() {
     || fail "fire-and-forget delivery created a pending-reply expectation"
   count=$(find "$rhome/state/parent-route/rsm.inbox" -name '*.msg' | wc -l | tr -d ' ')
   [ "$count" = 1 ] || fail "the ambiguous fire-and-forget delivery did not land exactly once"
-  action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
+  action=$(JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_RING_MAX=0 \
     jg_task_inbox_due_action "$rhome/state/parent-route" rsm)
   [ "$action" = quiet ] || fail "the remote fire-and-forget record armed inbox escalation: $action"
 
@@ -411,7 +411,7 @@ test_remote_send_revalidates_after_retirement_lock() {
   lock="$rhome/state/parent-route/.meta-rsm.lock"
   ready="$dir/lock-ready"
   release="$dir/release-lock"
-  FM_STATE_OVERRIDE="$rhome/state/parent-route" bash -c '
+  JG_STATE_OVERRIDE="$rhome/state/parent-route" bash -c '
     . "$1"
     jg_task_inbox_lock_acquire "$2" || exit 91
     : > "$3"
@@ -423,7 +423,7 @@ test_remote_send_revalidates_after_retirement_lock() {
   while [ ! -e "$ready" ]; do kill -0 "$holder_pid" 2>/dev/null || fail "metadata-lock holder exited early"; sleep 0.05; done
 
   rc=0
-  env FM_HOME="$rhome" FM_ROOT_OVERRIDE="$ROOT" \
+  env JG_HOME="$rhome" JG_ROOT_OVERRIDE="$ROOT" \
     "$ROOT/bin/jg-remote-secondmate-control.sh" send rsm "retirement-race steer" \
     >"$dir/out" 2>"$dir/err" &
   sender_pid=$!
@@ -447,7 +447,7 @@ test_remote_send_revalidates_parent_route_after_retirement_lock() {
   lock="$home/state/.meta-rsm.lock"
   ready="$dir/lock-ready"
   release="$dir/release-lock"
-  FM_STATE_OVERRIDE="$home/state" bash -c '
+  JG_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
     jg_task_inbox_lock_acquire "$2" || exit 91
     : > "$3"
@@ -483,7 +483,7 @@ test_remote_expected_host_revalidates_final_route() {
 
   rc=0
   send_env "$fb" "$home" "$ssh_log" \
-    FM_SEND_EXPECTED_SPAWN_GEN="" FM_SEND_EXPECTED_REMOTE_HOST=remote-mac \
+    JG_SEND_EXPECTED_SPAWN_GEN="" JG_SEND_EXPECTED_REMOTE_HOST=remote-mac \
     "$SEND" rsm --fire-and-forget 1111111111111111 "matching expected host" \
     >"$dir/match.out" 2>"$dir/match.err" || rc=$?
   expect_code 0 "$rc" "a matching expected remote host must allow delivery"
@@ -492,7 +492,7 @@ test_remote_expected_host_revalidates_final_route() {
 
   rc=0
   send_env "$fb" "$home" "$ssh_log" \
-    FM_SEND_EXPECTED_SPAWN_GEN="" FM_SEND_EXPECTED_REMOTE_HOST=retired-mac \
+    JG_SEND_EXPECTED_SPAWN_GEN="" JG_SEND_EXPECTED_REMOTE_HOST=retired-mac \
     "$SEND" rsm --fire-and-forget 2222222222222222 "stale expected host" \
     >"$dir/mismatch.out" 2>"$dir/mismatch.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "a mismatched expected remote host reported delivery"
@@ -553,8 +553,8 @@ test_remote_real_failure_still_fails() {
   home=$(setup_remote_parent_home remote-fail "$rhome")
 
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=1 \
-    FM_FAKE_SSH_STDERR='error: remote secondmate rsm endpoint metadata is invalid; refusing access until it is explicitly migrated' \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_RC=1 \
+    JG_FAKE_SSH_STDERR='error: remote secondmate rsm endpoint metadata is invalid; refusing access until it is explicitly migrated' \
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "a genuinely failed remote send must exit nonzero"
@@ -580,7 +580,7 @@ test_remote_exit3_no_longer_delivered() {
   # confirmation pending". That transport is deleted: any nonzero remote leg
   # status is a failure, never a delivery claim.
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=3 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_RC=3 \
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "a nonzero remote leg must no longer be remapped to delivered"
@@ -601,7 +601,7 @@ test_remote_transport_loss_preserves_expectation() {
   home=$(setup_remote_parent_home remote-255 "$rhome")
 
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_RC=255 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_RC=255 \
     "$SEND" rsm "please rename the metric" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   [ "$rc" -ne 0 ] || fail "an unknown-completion transport loss must exit nonzero"
@@ -627,7 +627,7 @@ test_remote_send_budget_bounds_busy_lane() {
   delivery=aaaabbbbccccdddd
 
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_SEND_REMOTE_BUDGET=invalid \
+  send_env "$fb" "$home" "$ssh_log" JG_SEND_REMOTE_BUDGET=invalid \
     "$SEND" rsm --key Enter >"$dir/key-invalid.out" 2>"$dir/key-invalid.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "an invalid remote key budget must fail"
   assert_contains "$(cat "$dir/key-invalid.err")" "must be a positive integer" \
@@ -636,7 +636,7 @@ test_remote_send_budget_bounds_busy_lane() {
 
   began=$(date +%s)
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_HANG=60 JG_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm --key Enter >"$dir/key.out" 2>"$dir/key.err" || rc=$?
   elapsed=$(( $(date +%s) - began ))
   expect_code 1 "$rc" "a bounded remote key must preserve the existing failure contract"
@@ -651,7 +651,7 @@ test_remote_send_budget_bounds_busy_lane() {
   # unconfirmed result within its own budget instead of waiting the lane out.
   began=$(date +%s)
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_HANG=60 JG_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm --fire-and-forget "$delivery" "reconcile your own books" \
     >"$dir/out" 2>"$dir/err" || rc=$?
   elapsed=$(( $(date +%s) - began ))
@@ -675,7 +675,7 @@ test_remote_send_budget_bounds_busy_lane() {
   # A reply-bearing send names the budget and prints the correlation-reusing
   # resend command, with the expectation preserved as delivery-unknown.
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_FAKE_SSH_HANG=60 FM_SEND_REMOTE_BUDGET=2 \
+  send_env "$fb" "$home" "$ssh_log" JG_FAKE_SSH_HANG=60 JG_SEND_REMOTE_BUDGET=2 \
     "$SEND" rsm "please rename the metric" >"$dir/reply.out" 2>"$dir/reply.err" || rc=$?
   err=$(cat "$dir/reply.err")
   [ "$rc" -ne 0 ] || fail "a budget-bounded reply-bearing send must not claim confirmed delivery"
@@ -694,8 +694,8 @@ test_remote_send_budget_bounds_busy_lane() {
   cp "$pend" "$dir/pending-before-invalid-budget"
   ssh_before=$(cat "$ssh_log.count")
   rc=0
-  send_env "$fb" "$home" "$ssh_log" FM_SEND_REMOTE_BUDGET=invalid \
-    FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+  send_env "$fb" "$home" "$ssh_log" JG_SEND_REMOTE_BUDGET=invalid \
+    JG_PENDING_REPLY_EXISTING_CORR="$corr" \
     "$SEND" rsm "please rename the metric" >"$dir/invalid.out" 2>"$dir/invalid.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "an invalid remote budget must fail the resend"
   assert_contains "$(cat "$dir/invalid.err")" "must be a positive integer" \
@@ -719,8 +719,8 @@ test_local_secondmate_pending_keeps_expectation_armed() {
   # secondmate target, so this pins the kept armed-expectation semantics there.
   : > "$log"
   rc=0
-  env PATH="$fb:$PATH" FM_FAKE_TMUX_PENDING=1 \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_FAKE_TMUX_PENDING=1 \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     "$SEND" lsm "/audit the ledger" >/dev/null 2>&1 || rc=$?
   expect_code 3 "$rc" "an unconfirmed local secondmate submit must exit delivered-unconfirmed"
   rec=$(pending_record "$home")
@@ -746,8 +746,8 @@ test_local_pending_reports_delivered_unconfirmed() {
   # governs it.
   : > "$log"
   rc=0
-  env PATH="$fb:$PATH" FM_FAKE_TMUX_PENDING=1 \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_FAKE_TMUX_PENDING=1 \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     "$SEND" sess:win "steer text" >"$dir/out" 2>"$dir/err" || rc=$?
   err=$(cat "$dir/err")
   expect_code 3 "$rc" "an unconfirmed local submit must exit with the delivered-unconfirmed status"
@@ -772,8 +772,8 @@ test_local_pending_does_not_close_resolve_key() {
   # ladder still governs it; a plain-text answer would close at enqueue instead.
   : > "$log"
   rc=0
-  env PATH="$fb:$PATH" FM_FAKE_TMUX_PENDING=1 \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_FAKE_TMUX_PENDING=1 \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     "$SEND" t2 --resolve-key creds "/vault fetch deploy-token" >/dev/null 2>&1 || rc=$?
   expect_code 3 "$rc" "an unconfirmed local answer must exit with the delivered-unconfirmed status"
   if grep -F 'resolved' "$home/state/t2.status" >/dev/null; then

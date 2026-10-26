@@ -16,22 +16,22 @@
 #
 # jg_backend_hometag() derives a short, stable tag: a readable prefix
 # ("firstmate" for the primary home, "2ndmate-<id>" for a secondmate home
-# carrying .jg-secondmate-home) plus a short hash of the resolved FM_ROOT
+# carrying .jg-secondmate-home) plus a short hash of the resolved JG_ROOT
 # path, so distinct installations - including multiple primaries on one
 # machine - never collide even though they share one backend-global
 # namespace. Callers source this file AFTER resolving their own
-# FM_HOME/FM_ROOT fallbacks (both adapters already do this for their own
+# JG_HOME/JG_ROOT fallbacks (both adapters already do this for their own
 # purposes before any other function runs).
 #
-# Moving/relocating a firstmate installation changes its FM_ROOT path and
+# Moving/relocating a firstmate installation changes its JG_ROOT path and
 # therefore its tag; titles created under the old tag simply stop matching -
 # an accepted limitation, no worse than the existing fact that a task's
 # recorded absolute worktree path does not survive a move either.
 
-FM_BACKEND_HOMETAG_SECONDMATE_MARKER=".jg-secondmate-home"
+JG_BACKEND_HOMETAG_SECONDMATE_MARKER=".jg-secondmate-home"
 
 jg_backend_hometag() {
-  local marker="$FM_HOME/$FM_BACKEND_HOMETAG_SECONDMATE_MARKER" id prefix root hash
+  local marker="$JG_HOME/$JG_BACKEND_HOMETAG_SECONDMATE_MARKER" id prefix root hash
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
@@ -42,7 +42,7 @@ jg_backend_hometag() {
   else
     prefix="firstmate"
   fi
-  root=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || root=$FM_ROOT
+  root=$(cd "$JG_ROOT" 2>/dev/null && pwd -P) || root=$JG_ROOT
   if command -v shasum >/dev/null 2>&1; then
     hash=$(printf '%s' "$root" | shasum -a 256 | awk '{print substr($1,1,8)}')
   elif command -v sha256sum >/dev/null 2>&1; then

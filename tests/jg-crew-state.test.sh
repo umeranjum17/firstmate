@@ -68,9 +68,9 @@ make_repo_on_branch() {  # <dir> <branch>
   git -C "$dir" commit -q --allow-empty -m init
   git -C "$dir" checkout -q -b "$branch"
   git -C "$dir" update-ref refs/remotes/origin/main "$(git -C "$dir" rev-parse HEAD)"
-  # Real worktree HEAD for run head-binding (fixtures read FM_FAKE_RUN_HEAD).
-  FM_FAKE_RUN_HEAD=$(git -C "$dir" rev-parse HEAD)
-  export FM_FAKE_RUN_HEAD
+  # Real worktree HEAD for run head-binding (fixtures read JG_FAKE_RUN_HEAD).
+  JG_FAKE_RUN_HEAD=$(git -C "$dir" rev-parse HEAD)
+  export JG_FAKE_RUN_HEAD
 }
 
 # A fakebin with a fake `no-mistakes` (serves the env-driven run output) and a
@@ -80,7 +80,7 @@ make_repo_on_branch() {  # <dir> <branch>
 # `axi` surface - no runs-listing subcommand exists under it, verified against
 # the real CLI), and the actual top-level run-listing command, `no-mistakes
 # runs --limit N`, which is plain text - no run id, no quoting - serving
-# FM_FAKE_RUNS_LIST verbatim.
+# JG_FAKE_RUNS_LIST verbatim.
 make_fakebin() {  # <dir> -> echoes fakebin path
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -91,18 +91,18 @@ case "${1:-}" in
   axi)
     shift
     if [ "$#" = 0 ]; then
-      printf '%s\n' "${FM_FAKE_AXI_HOME:-${FM_FAKE_AXI_STATUS:-}}"
-      exit "${FM_FAKE_AXI_HOME_ERROR:-0}"
+      printf '%s\n' "${JG_FAKE_AXI_HOME:-${JG_FAKE_AXI_STATUS:-}}"
+      exit "${JG_FAKE_AXI_HOME_ERROR:-0}"
     fi
     case "${1:-}" in
       status)
         shift
         if [ "${1:-}" = --run ]; then
-          printf '%s\n' "${FM_FAKE_AXI_STATUS_RUN:-}"
-          exit "${FM_FAKE_AXI_STATUS_RUN_ERROR:-0}"
+          printf '%s\n' "${JG_FAKE_AXI_STATUS_RUN:-}"
+          exit "${JG_FAKE_AXI_STATUS_RUN_ERROR:-0}"
         else
-          printf '%s\n' "${FM_FAKE_AXI_STATUS:-}"
-          exit "${FM_FAKE_AXI_STATUS_ERROR:-0}"
+          printf '%s\n' "${JG_FAKE_AXI_STATUS:-}"
+          exit "${JG_FAKE_AXI_STATUS_ERROR:-0}"
         fi ;;
       logs)
         shift
@@ -114,22 +114,22 @@ case "${1:-}" in
           [ "$arg" = --full ] && full=1
         done
         if [ "$full" = 1 ]; then
-          printf '%s\n' "${FM_FAKE_CI_LOGS:-}"
+          printf '%s\n' "${JG_FAKE_CI_LOGS:-}"
         else
-          printf '%s\n' "${FM_FAKE_CI_LOGS:-}" | tail -40
+          printf '%s\n' "${JG_FAKE_CI_LOGS:-}" | tail -40
         fi ;;
     esac
     ;;
   runs)
-    printf '%s\n' "${FM_FAKE_RUNS_LIST:-}" ;;
+    printf '%s\n' "${JG_FAKE_RUNS_LIST:-}" ;;
   daemon)
-    # FM_FAKE_DAEMON_DOWN: the explicit down-probe fails, as the real
+    # JG_FAKE_DAEMON_DOWN: the explicit down-probe fails, as the real
     # `no-mistakes daemon status` does when the daemon is not running.
-    # FM_FAKE_DAEMON_TIMEOUT: the probe does not answer at all, which is what
+    # JG_FAKE_DAEMON_TIMEOUT: the probe does not answer at all, which is what
     # the bounded call reports as 124 when `timeout` kills a slow daemon status.
-    [ -z "${FM_FAKE_DAEMON_PROBE_LOG:-}" ] || printf 'probe\n' >> "$FM_FAKE_DAEMON_PROBE_LOG"
-    [ "${FM_FAKE_DAEMON_TIMEOUT:-0}" = 1 ] && exit 124
-    [ "${FM_FAKE_DAEMON_DOWN:-0}" = 1 ] && exit 1
+    [ -z "${JG_FAKE_DAEMON_PROBE_LOG:-}" ] || printf 'probe\n' >> "$JG_FAKE_DAEMON_PROBE_LOG"
+    [ "${JG_FAKE_DAEMON_TIMEOUT:-0}" = 1 ] && exit 124
+    [ "${JG_FAKE_DAEMON_DOWN:-0}" = 1 ] && exit 1
     printf '%s\n' 'daemon running (pid 4242)'
     exit 0 ;;
 esac
@@ -140,7 +140,7 @@ SH
 set -u
 case "${1:-} ${2:-}" in
   "api graphql")
-    [ -z "${FM_FAKE_PR_READ_LOG:-}" ] || printf 'gh\n' >> "$FM_FAKE_PR_READ_LOG"
+    [ -z "${JG_FAKE_PR_READ_LOG:-}" ] || printf 'gh\n' >> "$JG_FAKE_PR_READ_LOG"
     number=1
     for arg in "$@"; do
       case "$arg" in
@@ -148,11 +148,11 @@ case "${1:-} ${2:-}" in
       esac
     done
     case "$number" in *[!0-9]*|'') number=1 ;; esac
-    state=${FM_FAKE_PR_STATE:-MERGED}
-    merged=${FM_FAKE_PR_MERGED:-true}
-    eval "state=\${FM_FAKE_PR_${number}_STATE:-\$state}"
-    eval "merged=\${FM_FAKE_PR_${number}_MERGED:-\$merged}"
-    [ "${FM_FAKE_PR_READ_FAIL:-0}" = 1 ] && exit 1
+    state=${JG_FAKE_PR_STATE:-MERGED}
+    merged=${JG_FAKE_PR_MERGED:-true}
+    eval "state=\${JG_FAKE_PR_${number}_STATE:-\$state}"
+    eval "merged=\${JG_FAKE_PR_${number}_MERGED:-\$merged}"
+    [ "${JG_FAKE_PR_READ_FAIL:-0}" = 1 ] && exit 1
     printf 'state=%s\nmerged=%s\n' "$state" "$merged"
     exit 0 ;;
 esac
@@ -163,9 +163,9 @@ SH
 set -u
 case "${1:-} ${2:-}" in
   "pr view")
-    [ -z "${FM_FAKE_PR_READ_LOG:-}" ] || printf 'gh-axi\n' >> "$FM_FAKE_PR_READ_LOG"
-    [ "${FM_FAKE_PR_READ_FAIL:-0}" = 1 ] && exit 1
-    printf 'pull_request:\n  number: %s\n  state: %s\n' "${3:-1}" "${FM_FAKE_PR_STATE_AXI:-merged}"
+    [ -z "${JG_FAKE_PR_READ_LOG:-}" ] || printf 'gh-axi\n' >> "$JG_FAKE_PR_READ_LOG"
+    [ "${JG_FAKE_PR_READ_FAIL:-0}" = 1 ] && exit 1
+    printf 'pull_request:\n  number: %s\n  state: %s\n' "${3:-1}" "${JG_FAKE_PR_STATE_AXI:-merged}"
     exit 0 ;;
 esac
 exit 1
@@ -175,9 +175,9 @@ SH
 set -u
 case "${1:-} ${2:-}" in
   "mr view")
-    [ -z "${FM_FAKE_GLAB_READ_LOG:-}" ] || printf '%s|%s\n' "${GITLAB_HOST:-}" "$*" >> "$FM_FAKE_GLAB_READ_LOG"
-    [ "${FM_FAKE_GLAB_READ_FAIL:-0}" = 1 ] && exit 1
-    printf '{"state":"%s"}\n' "${FM_FAKE_GLAB_STATE:-merged}"
+    [ -z "${JG_FAKE_GLAB_READ_LOG:-}" ] || printf '%s|%s\n' "${GITLAB_HOST:-}" "$*" >> "$JG_FAKE_GLAB_READ_LOG"
+    [ "${JG_FAKE_GLAB_READ_FAIL:-0}" = 1 ] && exit 1
+    printf '{"state":"%s"}\n' "${JG_FAKE_GLAB_STATE:-merged}"
     exit 0 ;;
 esac
 exit 1
@@ -193,26 +193,26 @@ if [ "${1:-} ${2:-}" = "login list" ]; then
   exit 0
 fi
 [ "${1:-}" = api ] || exit 1
-[ -z "${FM_FAKE_TEA_READ_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_TEA_READ_LOG"
-if [ "${FM_FAKE_TEA_READ_FAIL:-0}" = 1 ]; then
+[ -z "${JG_FAKE_TEA_READ_LOG:-}" ] || printf '%s\n' "$*" >> "$JG_FAKE_TEA_READ_LOG"
+if [ "${JG_FAKE_TEA_READ_FAIL:-0}" = 1 ]; then
   printf '{"message":"not found"}\n'
   exit 0
 fi
 printf '{"state":"%s","merged":%s,"head":{"sha":"abc"}}\n' \
-  "${FM_FAKE_TEA_STATE:-closed}" "${FM_FAKE_TEA_MERGED:-true}"
+  "${JG_FAKE_TEA_STATE:-closed}" "${JG_FAKE_TEA_MERGED:-true}"
 SH
   cat > "$fb/gerrit-axi" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
   show)
-    [ -z "${FM_FAKE_GERRIT_READ_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_GERRIT_READ_LOG"
-    [ "${FM_FAKE_GERRIT_READ_FAIL:-0}" = 1 ] && exit 1
+    [ -z "${JG_FAKE_GERRIT_READ_LOG:-}" ] || printf '%s\n' "$*" >> "$JG_FAKE_GERRIT_READ_LOG"
+    [ "${JG_FAKE_GERRIT_READ_FAIL:-0}" = 1 ] && exit 1
     # url defaults to null, the shape a server whose gerrit.canonicalWebUrl is
     # unset returns, so every case here reads a record that carries no URL.
     printf '{"ok":true,"op":"show","changes":[{"change":%s,"subject":"fixture change","status":"%s","url":%s}]}\n' \
-      "${FM_FAKE_GERRIT_CHANGE:-${2:-0}}" "${FM_FAKE_GERRIT_STATUS:-MERGED}" \
-      "${FM_FAKE_GERRIT_URL_JSON:-null}"
+      "${JG_FAKE_GERRIT_CHANGE:-${2:-0}}" "${JG_FAKE_GERRIT_STATUS:-MERGED}" \
+      "${JG_FAKE_GERRIT_URL_JSON:-null}"
     exit 0 ;;
 esac
 exit 1
@@ -220,14 +220,14 @@ SH
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-# FM_FAKE_TMUX_MISSING: the window is authoritatively gone - every addressed
+# JG_FAKE_TMUX_MISSING: the window is authoritatively gone - every addressed
 # call fails, but the session inventory still answers successfully and simply
 # omits the window, which is what proves absence.
-# FM_FAKE_TMUX_UNREADABLE: tmux itself cannot answer - it fails to execute (a
+# JG_FAKE_TMUX_UNREADABLE: tmux itself cannot answer - it fails to execute (a
 # trimmed PATH) or errors non-definitively - so even the inventory fails, with
 # a message that is NOT one of the definitive no-session/no-server/no-socket
 # responses that jg_backend_tmux_agent_state owns as death.
-[ "${FM_FAKE_TMUX_UNREADABLE:-0}" = 1 ] && { printf 'no current client\n' >&2; exit 1; }
+[ "${JG_FAKE_TMUX_UNREADABLE:-0}" = 1 ] && { printf 'no current client\n' >&2; exit 1; }
 case "${1:-}" in
   list-windows)
     # A successful but empty inventory: it omits the crew's window, so absence
@@ -235,11 +235,11 @@ case "${1:-}" in
     # reached once display-message has already failed.
     ;;
   display-message)
-    [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
     printf '%%1\n' ;;
   capture-pane)
-    [ "${FM_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
-    if [ "${FM_FAKE_BUSY:-0}" = 1 ]; then printf 'work in progress\n%s\n' "${FM_FAKE_BUSY_TEXT:-esc to interrupt}"
+    [ "${JG_FAKE_TMUX_MISSING:-0}" = 1 ] && exit 1
+    if [ "${JG_FAKE_BUSY:-0}" = 1 ]; then printf 'work in progress\n%s\n' "${JG_FAKE_BUSY_TEXT:-esc to interrupt}"
     else printf 'all quiet\n> \n'; fi ;;
 esac
 exit 0
@@ -258,13 +258,13 @@ case "${1:-}" in
   pane)
     case "${2:-}" in
       read)
-        [ "${FM_FAKE_HERDR_MISSING:-0}" = 1 ] && exit 1
-        [ "${FM_FAKE_HERDR_READ_FAIL:-0}" = 1 ] && exit 1
-        if [ "${FM_FAKE_HERDR_BUSY:-0}" = 1 ]; then printf 'work in progress\nesc to interrupt\n'
+        [ "${JG_FAKE_HERDR_MISSING:-0}" = 1 ] && exit 1
+        [ "${JG_FAKE_HERDR_READ_FAIL:-0}" = 1 ] && exit 1
+        if [ "${JG_FAKE_HERDR_BUSY:-0}" = 1 ]; then printf 'work in progress\nesc to interrupt\n'
         else printf 'all quiet\n> \n'; fi
         exit 0 ;;
       get)
-        if [ "${FM_FAKE_HERDR_MISSING:-0}" = 1 ]; then
+        if [ "${JG_FAKE_HERDR_MISSING:-0}" = 1 ]; then
           printf '{"error":{"code":"pane_not_found","message":"no such pane"}}\n'
           exit 1
         fi
@@ -277,21 +277,21 @@ case "${1:-}" in
         # harness descendant, so the adapter's real process-table walk finds
         # it), and anything else answers nothing (unreadable).
         pane=""; args=("$@"); for ((i=0; i<${#args[@]}; i++)); do [ "${args[$i]}" = --pane ] && pane=${args[$((i+1))]:-}; done
-        case "${FM_FAKE_HERDR_PROCESS:-agent}" in
-          agent) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":424242,"foreground_processes":[{"pid":424242,"name":"claude","argv0":"claude"}]}}}\n' "$pane" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
-          shell) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"zsh","argv0":"zsh","argv":["-zsh"]}]}}}\n' "$pane" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
+        case "${JG_FAKE_HERDR_PROCESS:-agent}" in
+          agent) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":424242,"foreground_processes":[{"pid":424242,"name":"claude","argv0":"claude"}]}}}\n' "$pane" "${JG_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
+          shell) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"zsh","argv0":"zsh","argv":["-zsh"]}]}}}\n' "$pane" "${JG_FAKE_HERDR_SHELL_PID:-$PPID}" "${JG_FAKE_HERDR_SHELL_PID:-$PPID}" "${JG_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
         esac
         exit 0 ;;
     esac ;;
   agent)
     case "${2:-}" in
       get)
-        if [ "${FM_FAKE_HERDR_HUSK:-0}" = 1 ]; then
+        if [ "${JG_FAKE_HERDR_HUSK:-0}" = 1 ]; then
           printf '{"error":{"code":"agent_not_found","message":"no agent in pane"}}\n'
           exit 0
         fi
-        [ -n "${FM_FAKE_HERDR_AGENT_STATUS:-}" ] || exit 1
-        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$FM_FAKE_HERDR_AGENT_STATUS"
+        [ -n "${JG_FAKE_HERDR_AGENT_STATUS:-}" ] || exit 1
+        printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$JG_FAKE_HERDR_AGENT_STATUS"
         exit 0 ;;
     esac ;;
 esac
@@ -312,10 +312,10 @@ make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
   printf '%s\n' "$tb"
 }
 
-# Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
+# Run the helper for one case dir. JG_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
 run_crew_state() {  # <case-dir> <id>
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
+  PATH="$1/fakebin:$PATH" JG_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
 }
 
 new_case() {  # <name> -> echoes case dir with an empty state/
@@ -337,66 +337,66 @@ arm_idle_record() {  # <state-dir> <id>
 reset_fakes() {
   NM_HOME="$TMP_ROOT/no-mistakes-unused"
   export NM_HOME
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_AXI_STATUS_ERROR=0
-  FM_FAKE_AXI_HOME=""
-  FM_FAKE_AXI_HOME_ERROR=0
-  FM_FAKE_AXI_STATUS_RUN_ERROR=0
-  FM_FAKE_AXI_STATUS_RUN=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
-  FM_FAKE_BUSY_TEXT=
-  FM_FAKE_TMUX_MISSING=0
-  FM_FAKE_TMUX_UNREADABLE=0
-  FM_FAKE_HERDR_BUSY=0
-  FM_FAKE_HERDR_MISSING=0
-  FM_FAKE_HERDR_READ_FAIL=0
-  FM_FAKE_HERDR_HUSK=0
-  FM_FAKE_HERDR_AGENT_STATUS=""
-  FM_FAKE_HERDR_PROCESS=agent
-  FM_FAKE_HERDR_SHELL_PID=$$
-  FM_FAKE_CI_LOGS=""
-  FM_FAKE_DAEMON_DOWN=0
-  FM_FAKE_DAEMON_TIMEOUT=0
-  FM_FAKE_DAEMON_PROBE_LOG=
-  FM_FAKE_PR_STATE=MERGED
-  FM_FAKE_PR_MERGED=true
-  FM_FAKE_PR_READ_FAIL=0
-  FM_FAKE_PR_READ_LOG=
-  FM_FAKE_PR_STATE_AXI=merged
-  FM_FAKE_GLAB_STATE=merged
-  FM_FAKE_GLAB_READ_FAIL=0
-  FM_FAKE_GLAB_READ_LOG=
-  FM_FAKE_TEA_STATE=closed
-  FM_FAKE_TEA_MERGED=true
-  FM_FAKE_TEA_READ_FAIL=0
-  FM_FAKE_TEA_READ_LOG=
-  FM_FAKE_GERRIT_STATUS=MERGED
-  FM_FAKE_GERRIT_CHANGE=
-  FM_FAKE_GERRIT_URL_JSON=
-  FM_FAKE_GERRIT_READ_FAIL=0
-  FM_FAKE_GERRIT_READ_LOG=
-  unset FM_FAKE_PR_47_STATE FM_FAKE_PR_47_MERGED FM_FAKE_PR_48_STATE FM_FAKE_PR_48_MERGED
-  export FM_FAKE_AXI_STATUS FM_FAKE_AXI_STATUS_RUN FM_FAKE_RUNS_LIST FM_FAKE_BUSY FM_FAKE_BUSY_TEXT FM_FAKE_TMUX_MISSING FM_FAKE_TMUX_UNREADABLE
-  export FM_FAKE_HERDR_BUSY FM_FAKE_HERDR_MISSING FM_FAKE_HERDR_READ_FAIL FM_FAKE_HERDR_HUSK FM_FAKE_HERDR_AGENT_STATUS FM_FAKE_HERDR_PROCESS FM_FAKE_HERDR_SHELL_PID FM_FAKE_CI_LOGS
-  export FM_FAKE_DAEMON_DOWN FM_FAKE_DAEMON_TIMEOUT FM_FAKE_DAEMON_PROBE_LOG FM_FAKE_AXI_HOME
-  export FM_FAKE_AXI_HOME_ERROR FM_FAKE_AXI_STATUS_RUN_ERROR FM_FAKE_AXI_STATUS_ERROR
-  export FM_FAKE_PR_STATE FM_FAKE_PR_MERGED FM_FAKE_PR_READ_FAIL FM_FAKE_PR_READ_LOG FM_FAKE_PR_STATE_AXI
-  export FM_FAKE_GLAB_STATE FM_FAKE_GLAB_READ_FAIL FM_FAKE_GLAB_READ_LOG
-  export FM_FAKE_TEA_STATE FM_FAKE_TEA_MERGED FM_FAKE_TEA_READ_FAIL FM_FAKE_TEA_READ_LOG
-  export FM_FAKE_GERRIT_STATUS FM_FAKE_GERRIT_CHANGE FM_FAKE_GERRIT_URL_JSON
-  export FM_FAKE_GERRIT_READ_FAIL FM_FAKE_GERRIT_READ_LOG
-  export FM_FAKE_PR_47_STATE FM_FAKE_PR_47_MERGED FM_FAKE_PR_48_STATE FM_FAKE_PR_48_MERGED
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_AXI_STATUS_ERROR=0
+  JG_FAKE_AXI_HOME=""
+  JG_FAKE_AXI_HOME_ERROR=0
+  JG_FAKE_AXI_STATUS_RUN_ERROR=0
+  JG_FAKE_AXI_STATUS_RUN=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
+  JG_FAKE_BUSY_TEXT=
+  JG_FAKE_TMUX_MISSING=0
+  JG_FAKE_TMUX_UNREADABLE=0
+  JG_FAKE_HERDR_BUSY=0
+  JG_FAKE_HERDR_MISSING=0
+  JG_FAKE_HERDR_READ_FAIL=0
+  JG_FAKE_HERDR_HUSK=0
+  JG_FAKE_HERDR_AGENT_STATUS=""
+  JG_FAKE_HERDR_PROCESS=agent
+  JG_FAKE_HERDR_SHELL_PID=$$
+  JG_FAKE_CI_LOGS=""
+  JG_FAKE_DAEMON_DOWN=0
+  JG_FAKE_DAEMON_TIMEOUT=0
+  JG_FAKE_DAEMON_PROBE_LOG=
+  JG_FAKE_PR_STATE=MERGED
+  JG_FAKE_PR_MERGED=true
+  JG_FAKE_PR_READ_FAIL=0
+  JG_FAKE_PR_READ_LOG=
+  JG_FAKE_PR_STATE_AXI=merged
+  JG_FAKE_GLAB_STATE=merged
+  JG_FAKE_GLAB_READ_FAIL=0
+  JG_FAKE_GLAB_READ_LOG=
+  JG_FAKE_TEA_STATE=closed
+  JG_FAKE_TEA_MERGED=true
+  JG_FAKE_TEA_READ_FAIL=0
+  JG_FAKE_TEA_READ_LOG=
+  JG_FAKE_GERRIT_STATUS=MERGED
+  JG_FAKE_GERRIT_CHANGE=
+  JG_FAKE_GERRIT_URL_JSON=
+  JG_FAKE_GERRIT_READ_FAIL=0
+  JG_FAKE_GERRIT_READ_LOG=
+  unset JG_FAKE_PR_47_STATE JG_FAKE_PR_47_MERGED JG_FAKE_PR_48_STATE JG_FAKE_PR_48_MERGED
+  export JG_FAKE_AXI_STATUS JG_FAKE_AXI_STATUS_RUN JG_FAKE_RUNS_LIST JG_FAKE_BUSY JG_FAKE_BUSY_TEXT JG_FAKE_TMUX_MISSING JG_FAKE_TMUX_UNREADABLE
+  export JG_FAKE_HERDR_BUSY JG_FAKE_HERDR_MISSING JG_FAKE_HERDR_READ_FAIL JG_FAKE_HERDR_HUSK JG_FAKE_HERDR_AGENT_STATUS JG_FAKE_HERDR_PROCESS JG_FAKE_HERDR_SHELL_PID JG_FAKE_CI_LOGS
+  export JG_FAKE_DAEMON_DOWN JG_FAKE_DAEMON_TIMEOUT JG_FAKE_DAEMON_PROBE_LOG JG_FAKE_AXI_HOME
+  export JG_FAKE_AXI_HOME_ERROR JG_FAKE_AXI_STATUS_RUN_ERROR JG_FAKE_AXI_STATUS_ERROR
+  export JG_FAKE_PR_STATE JG_FAKE_PR_MERGED JG_FAKE_PR_READ_FAIL JG_FAKE_PR_READ_LOG JG_FAKE_PR_STATE_AXI
+  export JG_FAKE_GLAB_STATE JG_FAKE_GLAB_READ_FAIL JG_FAKE_GLAB_READ_LOG
+  export JG_FAKE_TEA_STATE JG_FAKE_TEA_MERGED JG_FAKE_TEA_READ_FAIL JG_FAKE_TEA_READ_LOG
+  export JG_FAKE_GERRIT_STATUS JG_FAKE_GERRIT_CHANGE JG_FAKE_GERRIT_URL_JSON
+  export JG_FAKE_GERRIT_READ_FAIL JG_FAKE_GERRIT_READ_LOG
+  export JG_FAKE_PR_47_STATE JG_FAKE_PR_47_MERGED JG_FAKE_PR_48_STATE JG_FAKE_PR_48_MERGED
 }
 
 seed_retired_pr_receipt() {  # <state> <id> <url>
   local state=$1 id=$2 url=$3 template provider host path number
   template="$ROOT/bin/jg-pr-poll.sh"
   jg_pr_url_parse "$url" || fail "retirement fixture URL was invalid"
-  provider=$FM_PR_PROVIDER
-  host=$FM_PR_HOST
-  path=$FM_PR_PATH
-  number=$FM_PR_NUMBER
+  provider=$JG_PR_PROVIDER
+  host=$JG_PR_HOST
+  path=$JG_PR_PATH
+  number=$JG_PR_NUMBER
   jg_pr_poll_prepare "$state" "$id" "$provider" "$url" "$host" "$path" "$number" "$template" \
     || fail "could not prepare retirement fixture"
   jg_pr_poll_publish_prepared || fail "could not publish retirement fixture"
@@ -413,7 +413,7 @@ run:
   id: "01RUN"
   branch: $1
   status: running
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
   steps[2]{step,status,findings,duration_ms}:
@@ -428,7 +428,7 @@ run:
   id: "01RUN"
   branch: $1
   status: fixing
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
 EOF
@@ -444,7 +444,7 @@ run:
   id: "01RUN"
   branch: $1
   status: fixing
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
   active_steps[1]{step,active_for,last_activity,agent_pid,round}:
@@ -461,7 +461,7 @@ run:
   id: "01RUN"
   branch: $1
   status: fixing
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
   active_steps[1]{step,active_for,last_activity,agent_pid,round}:
@@ -475,7 +475,7 @@ run:
   id: "01RUN"
   branch: $1
   status: ci
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/2"
   findings: none
 EOF
@@ -488,7 +488,7 @@ run:
   branch: $1
   status: awaiting_approval
   awaiting_agent: parked 2m10s
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[2]{id,severity,file,line,action,description}:
     r1,warning,a.go,,auto-fix,ignored error
@@ -511,7 +511,7 @@ run:
   branch: $1
   status: fix_review
   awaiting_agent: parked 2m10s
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[2]{id,severity,file,line,action,description}:
     r1,warning,a.go,,auto-fix,the action field is one of no-op, auto-fix, ask-user, so pick one
@@ -530,7 +530,7 @@ run:
   branch: $1
   status: awaiting_approval
   awaiting_agent: parked 2m10s
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[2]{severity,action,id,file,line,description}:
     warning,auto-fix,r1,a.go,,ignored error
@@ -552,7 +552,7 @@ run:
   branch: $1
   status: fix_review
   awaiting_agent: parked 2m10s
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[1]{id,severity,file,line,description,action}:
     r1,warning,a.go,12,the action field is one of auto-fix, ask-user,auto-fix
@@ -575,7 +575,7 @@ run:
   branch: $1
   status: fix_review
   awaiting_agent: parked 2m10s
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[2]:
     prior-1,warning,a.go,ask-user,an earlier already-resolved block
@@ -592,7 +592,7 @@ run:
   id: "01RUN"
   branch: $1
   status: running
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[1]{id,severity,file,line,action,description}:
     r1,error,b.go,,ask-user,changes product behavior
@@ -606,7 +606,7 @@ run:
   id: "01RUN"
   branch: $1
   status: running
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings[1]{id,severity,file,line,action,description}:
     r1,error,b.go,,ask-user,changes product behavior
@@ -626,7 +626,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/1"
   findings: none
 outcome: passed
@@ -639,7 +639,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/1"
   findings: none
 outcome: passed-with-override
@@ -653,7 +653,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/1"
   findings: none
 outcome: passed-with-skips
@@ -667,7 +667,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "$2"
   findings: none
 outcome: passed
@@ -680,7 +680,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
 outcome: passed
@@ -693,7 +693,7 @@ run:
   id: "01RUN"
   branch: $1
   status: completed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: ""
   findings: none
 outcome: failed
@@ -709,7 +709,7 @@ run:
   id: "01RUN"
   branch: $1
   status: failed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/203"
   findings: none
 outcome: failed
@@ -733,7 +733,7 @@ run:
   id: "01RUN"
   branch: $1
   status: failed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/203"
   findings: none
 steps[9]{step,status,findings,duration_ms}:
@@ -756,7 +756,7 @@ run:
   id: "01RUN"
   branch: $1
   status: failed
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/203"
   findings: none
 steps[9]{step,status,findings,duration_ms}:
@@ -778,7 +778,7 @@ run:
   id: "01RUN"
   branch: $1
   status: running
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/2"
   findings: none
   steps[4]{step,status,findings,duration_ms}:
@@ -795,7 +795,7 @@ run:
   id: "01RUN"
   branch: $1
   status: fixing
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/2"
   findings: none
   steps[4]{step,status,findings,duration_ms}:
@@ -812,7 +812,7 @@ run:
   id: "01RUN"
   branch: $1
   status: fixing
-  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  head: "${JG_FAKE_RUN_HEAD:-abc1234}"
   pr: "https://github.com/o/r/pull/2"
   findings: none
   steps[4]{step,status,findings,duration_ms}:
@@ -831,7 +831,7 @@ test_active_run_is_authoritative() {
   make_repo_on_branch "$d/wt" fm/feat-a
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-a.meta" "window=fm:jg-feat-a" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-a)"
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-a)"
   local out; out=$(run_crew_state "$d" feat-a)
   assert_contains "$out" "state: working" "active run -> working"
   assert_contains "$out" "source: run-step" "active run -> run-step source"
@@ -847,7 +847,7 @@ test_stale_needs_decision_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-b.meta" "window=fm:jg-feat-b" "worktree=$d/wt" "kind=ship"
   printf 'working: started\nneeds-decision: pick A or B\n' > "$d/state/feat-b.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing fm/feat-b)"
+  JG_FAKE_AXI_STATUS="$(run_fixing fm/feat-b)"
   local out; out=$(run_crew_state "$d" feat-b)
   assert_contains "$out" "state: working" "resumed run -> working despite needs-decision log"
   assert_contains "$out" "source: run-step" "resumed run -> run-step source"
@@ -863,7 +863,7 @@ test_stale_blocked_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-bb.meta" "window=fm:jg-feat-bb" "worktree=$d/wt" "kind=ship"
   printf 'blocked: waiting on review answer\n' > "$d/state/feat-bb.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-bb)"
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-bb)"
   local out; out=$(run_crew_state "$d" feat-bb)
   assert_contains "$out" "state: working" "resumed run -> working despite blocked log"
   assert_contains "$out" "superseded" "stale blocked log flagged superseded"
@@ -883,7 +883,7 @@ test_daemon_claim_over_live_run_reads_run_alive() {
   jg_write_meta "$d/state/feat-dl.meta" "window=fm:jg-feat-dl" "worktree=$d/wt" "kind=ship"
   printf 'blocked: no-mistakes daemon unreachable, drive run: read response: i/o timeout\n' \
     > "$d/state/feat-dl.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-dl)"
+  JG_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-dl)"
   local out; out=$(run_crew_state "$d" feat-dl)
   assert_contains "$out" "state: working" "live run beats the crew's death claim"
   assert_contains "$out" "source: run-step" "live run -> run-step source"
@@ -891,11 +891,11 @@ test_daemon_claim_over_live_run_reads_run_alive() {
   assert_contains "$out" "reattach" "the reading names the reattach steer"
   assert_contains "$out" "source: run-step · execution active ·" "recent step activity is explicit in the state protocol"
   printf 'working: validating\n' > "$d/state/feat-dl.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing_active_quiet fm/feat-dl)"
+  JG_FAKE_AXI_STATUS="$(run_fixing_active_quiet fm/feat-dl)"
   local quiet_out; quiet_out=$(run_crew_state "$d" feat-dl)
   assert_contains "$quiet_out" "state: working" "a quiet running record keeps its semantic state"
   assert_not_contains "$quiet_out" "execution active" "quiet execution cannot suppress escalation"
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-dl)"
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-dl)"
   quiet_out=$(run_crew_state "$d" feat-dl)
   assert_not_contains "$quiet_out" "execution active" "a running record without activity cannot suppress escalation"
   assert_not_contains "$out" "superseded by active run" \
@@ -913,7 +913,7 @@ test_socket_refusal_over_stale_fixing_run_reports_blocked() {
   jg_write_meta "$d/state/feat-dq.meta" "window=fm:jg-feat-dq" "worktree=$d/wt" "kind=ship"
   printf 'blocked: no-mistakes daemon socket refused connections\n' \
     > "$d/state/feat-dq.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing_active_quiet fm/feat-dq)"
+  JG_FAKE_AXI_STATUS="$(run_fixing_active_quiet fm/feat-dq)"
   local out; out=$(run_crew_state "$d" feat-dq)
   assert_contains "$out" "state: blocked" "socket refusal outranks a stale fixing record"
   assert_contains "$out" "source: status-log" "socket refusal remains status-log evidence"
@@ -947,7 +947,7 @@ test_socket_refusal_over_terminal_run_reports_blocked() {
   jg_write_meta "$d/state/feat-dqt.meta" "window=fm:jg-feat-dqt" "worktree=$d/wt" "kind=ship"
   printf 'blocked: no-mistakes daemon socket refused connections\n' \
     > "$d/state/feat-dqt.status"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-dqt)"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-dqt)"
   local out; out=$(run_crew_state "$d" feat-dqt)
   assert_contains "$out" "state: blocked" "socket refusal outranks a terminal run record"
   assert_contains "$out" "source: status-log" "terminal run cannot suppress socket-failure evidence"
@@ -965,7 +965,7 @@ test_socket_refusal_override_expires_when_the_crew_moves_on() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ds.meta" "window=fm:jg-feat-ds" "worktree=$d/wt" "kind=ship"
   printf 'blocked: no-mistakes daemon socket is missing\n' > "$d/state/feat-ds.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-ds)"
+  JG_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-ds)"
   out=$(run_crew_state "$d" feat-ds)
   assert_contains "$out" "state: blocked" "socket-down as the latest event still outranks a live run"
   assert_contains "$out" "source: status-log" "the override remains status-log evidence"
@@ -1002,7 +1002,7 @@ test_ordinary_blocked_over_live_run_keeps_plain_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ob.meta" "window=fm:jg-feat-ob" "worktree=$d/wt" "kind=ship"
   printf 'blocked: database upload failed with broken pipe\n' > "$d/state/feat-ob.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-ob)"
+  JG_FAKE_AXI_STATUS="$(run_fixing_active_recent fm/feat-ob)"
   local out; out=$(run_crew_state "$d" feat-ob)
   assert_contains "$out" "state: working" "ordinary blocked log over an active run -> working"
   assert_contains "$out" "superseded by active run" "ordinary blocked keeps the generic reading"
@@ -1019,8 +1019,8 @@ test_genuine_daemon_down_reports_blocked() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dd.meta" "window=fm:jg-feat-dd" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'blocked: no-mistakes daemon socket refused connections\n' > "$d/state/feat-dd.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-dd
   local out; out=$(run_crew_state "$d" feat-dd)
   assert_contains "$out" "state: blocked" "a genuine daemon-down claim with no run stays blocked"
@@ -1037,7 +1037,7 @@ test_genuine_parked_not_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-c.meta" "window=fm:jg-feat-c" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-c.status"
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-c)"
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-c)"
   local out; out=$(run_crew_state "$d" feat-c)
   assert_contains "$out" "state: parked" "genuine parked run -> parked"
   assert_contains "$out" "source: run-step" "parked -> run-step source"
@@ -1059,7 +1059,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-au.meta" "window=fm:jg-feat-au" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-au.status"
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-au)"
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-au)"
   out=$(run_crew_state "$d" feat-au)
   assert_contains "$out" "state: parked" "an ask-user row still reports parked"
   assert_contains "$out" " · ask-user: authority decision" \
@@ -1075,13 +1075,13 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ap.meta" "window=fm:jg-feat-ap" "worktree=$d/wt" "kind=ship"
   printf 'working: validation under way\n' > "$d/state/feat-ap.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_crewmate_gate_with_ask_user_prose fm/ask-user-authority-fix)"
+  JG_FAKE_AXI_STATUS="$(run_parked_crewmate_gate_with_ask_user_prose fm/ask-user-authority-fix)"
   # Guard the counterexample against going vacuous: the payload this gate is read
   # from must really contain the token in a position a substring or unanchored
   # regex would accept, or the case below proves nothing.
-  assert_contains "$FM_FAKE_AXI_STATUS" ", ask-user," \
+  assert_contains "$JG_FAKE_AXI_STATUS" ", ask-user," \
     "the counterexample payload must carry the token where a naive match accepts it"
-  assert_contains "$FM_FAKE_AXI_STATUS" "branch: fm/ask-user-authority-fix" \
+  assert_contains "$JG_FAKE_AXI_STATUS" "branch: fm/ask-user-authority-fix" \
     "the counterexample payload must also carry the token in its branch name"
   out=$(run_crew_state "$d" feat-ap)
   assert_contains "$out" "state: parked" "a crewmate-owed gate still reports parked"
@@ -1095,7 +1095,7 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ar.meta" "window=fm:jg-feat-ar" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-ar.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_reordered_columns fm/feat-ar)"
+  JG_FAKE_AXI_STATUS="$(run_parked_reordered_columns fm/feat-ar)"
   out=$(run_crew_state "$d" feat-ar)
   assert_contains "$out" " · ask-user: authority decision" \
     "the action column is located by header index, not by fixed position"
@@ -1111,12 +1111,12 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-af.meta" "window=fm:jg-feat-af" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-af.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_free_text_before_action fm/feat-af)"
+  JG_FAKE_AXI_STATUS="$(run_parked_free_text_before_action fm/feat-af)"
   # Non-vacuity: the payload must really carry the token at the comma offset the
   # `action` index resolves to, or the case below proves nothing.
-  assert_contains "$FM_FAKE_AXI_STATUS" "findings[1]{id,severity,file,line,description,action}:" \
+  assert_contains "$JG_FAKE_AXI_STATUS" "findings[1]{id,severity,file,line,description,action}:" \
     "the fixture must really place free text before the action column"
-  assert_contains "$FM_FAKE_AXI_STATUS" ", ask-user," \
+  assert_contains "$JG_FAKE_AXI_STATUS" ", ask-user," \
     "the fixture description must carry the token where the comma walk would accept it"
   out=$(run_crew_state "$d" feat-af)
   assert_contains "$out" "state: parked" "an unsafe findings header still reports parked"
@@ -1136,12 +1136,12 @@ test_parked_human_decision_comes_from_the_action_column() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ub.meta" "window=fm:jg-feat-ub" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-ub.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_unbraced_findings_precursor fm/feat-ub)"
+  JG_FAKE_AXI_STATUS="$(run_parked_unbraced_findings_precursor fm/feat-ub)"
   # Non-vacuity: the payload must really carry an unbraced findings block ahead
   # of the braced one, with the token at the offset the walk would land on.
-  assert_contains "$FM_FAKE_AXI_STATUS" "findings[2]:" \
+  assert_contains "$JG_FAKE_AXI_STATUS" "findings[2]:" \
     "the fixture must really place an unbraced findings block before the gate's table"
-  assert_contains "$FM_FAKE_AXI_STATUS" ",ask-user," \
+  assert_contains "$JG_FAKE_AXI_STATUS" ",ask-user," \
     "the earlier block must carry the token where the wrong-block walk would accept it"
   out=$(run_crew_state "$d" feat-ub)
   assert_contains "$out" "state: parked" "an unbraced findings precursor still reports parked"
@@ -1157,7 +1157,7 @@ test_scalar_gate_parked_not_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cs.meta" "window=fm:jg-feat-cs" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-cs.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_scalar_gate_running fm/feat-cs)"
+  JG_FAKE_AXI_STATUS="$(run_parked_scalar_gate_running fm/feat-cs)"
   local out; out=$(run_crew_state "$d" feat-cs)
   assert_contains "$out" "state: parked" "scalar gate wait -> parked"
   assert_contains "$out" "source: run-step" "scalar gate wait -> run-step source"
@@ -1174,7 +1174,7 @@ test_gate_block_parked_not_superseded() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cb.meta" "window=fm:jg-feat-cb" "worktree=$d/wt" "kind=ship"
   printf 'needs-decision: review gate\n' > "$d/state/feat-cb.status"
-  FM_FAKE_AXI_STATUS="$(run_parked_in_gate_block fm/feat-cb)"
+  JG_FAKE_AXI_STATUS="$(run_parked_in_gate_block fm/feat-cb)"
   local out; out=$(run_crew_state "$d" feat-cb)
   assert_contains "$out" "state: parked" "gate block wait -> parked"
   assert_contains "$out" "source: run-step" "gate block wait -> run-step source"
@@ -1191,7 +1191,7 @@ test_ci_ready_done_log_beats_monitoring_run() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ci.meta" "window=fm:jg-feat-ci" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/2 checks green\n' > "$d/state/feat-ci.status"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-ci)"
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-ci)"
   local out; out=$(run_crew_state "$d" feat-ci)
   assert_contains "$out" "state: done" "ci-ready status log -> done"
   assert_contains "$out" "source: status-log" "ci-ready state comes from the status log"
@@ -1212,8 +1212,8 @@ test_ci_monitoring_checks_green_surfaces_done() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cigreen.meta" "window=fm:jg-feat-cigreen" "worktree=$d/wt" "kind=ship"
   # No final declaration: checks are green, but task acceptance is pending.
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cigreen)"
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cigreen)"
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 CI checks running, waiting for results...
 all CI checks passed - still monitoring until merged or closed
 EOF
@@ -1232,8 +1232,8 @@ test_top_level_ci_checks_green_surfaces_done() {
   make_repo_on_branch "$d/wt" fm/feat-topcigreen
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-topcigreen.meta" "window=fm:jg-feat-topcigreen" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_top_level_ci fm/feat-topcigreen)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+  JG_FAKE_AXI_STATUS="$(run_top_level_ci fm/feat-topcigreen)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
   local out; out=$(run_crew_state "$d" feat-topcigreen)
   assert_contains "$out" "state: paused" "top-level green CI alone awaits acceptance"
   assert_contains "$out" "source: run-step" "top-level ci green -> run-step source"
@@ -1248,8 +1248,8 @@ test_ci_monitoring_no_checks_terminal_surfaces_done() {
   make_repo_on_branch "$d/wt" fm/feat-cinochecks
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cinochecks.meta" "window=fm:jg-feat-cinochecks" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cinochecks)"
-  FM_FAKE_CI_LOGS="no CI checks reported - still monitoring until merged or closed"
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cinochecks)"
+  JG_FAKE_CI_LOGS="no CI checks reported - still monitoring until merged or closed"
   local out; out=$(run_crew_state "$d" feat-cinochecks)
   assert_contains "$out" "state: paused" "no-checks CI alone awaits final acceptance"
   assert_contains "$out" "checks green" "terminal no-checks ci-monitor detail mentions checks green"
@@ -1266,8 +1266,8 @@ test_ci_monitoring_green_then_rearm_stays_green() {
   make_repo_on_branch "$d/wt" fm/feat-cirearm
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cirearm.meta" "window=fm:jg-feat-cirearm" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cirearm)"
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cirearm)"
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 all CI checks passed - still monitoring until merged or closed
 base branch advanced (aaaaaaa..bbbbbbb), re-arming CI monitor timeout
 base branch advanced (bbbbbbb..ccccccc), re-arming CI monitor timeout
@@ -1292,8 +1292,8 @@ test_ci_monitoring_green_before_log_tail_stays_green() {
   make_repo_on_branch "$d/wt" fm/feat-citail
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-citail.meta" "window=fm:jg-feat-citail" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-citail)"
-  FM_FAKE_CI_LOGS=$({
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-citail)"
+  JG_FAKE_CI_LOGS=$({
     printf 'monitoring CI for PR #2 (timeout: 4h0m0s)...\n'
     printf 'all CI checks passed - still monitoring until merged or closed\n'
     for i in $(seq 1 60); do
@@ -1315,8 +1315,8 @@ test_ci_monitoring_no_checks_yet_stays_working() {
   make_repo_on_branch "$d/wt" fm/feat-cinochecksyet
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cinochecksyet.meta" "window=fm:jg-feat-cinochecksyet" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cinochecksyet)"
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cinochecksyet)"
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 no CI checks reported - still monitoring until merged or closed
 base branch advanced (aaaaaaa..bbbbbbb), re-arming CI monitor timeout
 no CI checks reported yet, waiting for checks to register...
@@ -1335,8 +1335,8 @@ test_ci_monitoring_still_waiting_stays_working() {
   make_repo_on_branch "$d/wt" fm/feat-ciwait
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ciwait.meta" "window=fm:jg-feat-ciwait" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-ciwait)"
-  FM_FAKE_CI_LOGS="CI checks running, waiting for results..."
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-ciwait)"
+  JG_FAKE_CI_LOGS="CI checks running, waiting for results..."
   local out; out=$(run_crew_state "$d" feat-ciwait)
   assert_contains "$out" "state: working" "ci step still red -> working"
   assert_not_contains "$out" "checks green" "no green marker present -> no checks-green detail"
@@ -1351,8 +1351,8 @@ test_ci_monitoring_green_then_new_issue_stays_working() {
   make_repo_on_branch "$d/wt" fm/feat-cirelapse
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cirelapse.meta" "window=fm:jg-feat-cirelapse" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cirelapse)"
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cirelapse)"
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 all CI checks passed - still monitoring until merged or closed
 base branch advanced (aaaaaaa..bbbbbbb), re-arming CI monitor timeout
 issues detected: merge conflict - auto-fixing (attempt 2/10)...
@@ -1371,8 +1371,8 @@ test_ci_ready_done_log_relapse_stays_working() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cireadyrelapse.meta" "window=fm:jg-feat-cireadyrelapse" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/2 checks green\n' > "$d/state/feat-cireadyrelapse.status"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cireadyrelapse)"
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-cireadyrelapse)"
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 all CI checks passed - still monitoring until merged or closed
 base branch advanced (aaaaaaa..bbbbbbb), re-arming CI monitor timeout
 CI checks running, waiting for results...
@@ -1392,8 +1392,8 @@ test_ci_fixing_after_green_stays_working() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cifixing.meta" "window=fm:jg-feat-cifixing" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/2 checks green\n' > "$d/state/feat-cifixing.status"
-  FM_FAKE_AXI_STATUS="$(run_ci_fixing fm/feat-cifixing)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+  JG_FAKE_AXI_STATUS="$(run_ci_fixing fm/feat-cifixing)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
   local out; out=$(run_crew_state "$d" feat-cifixing)
   assert_contains "$out" "state: working" "ci fixing step must stay working"
   assert_contains "$out" "source: run-step" "ci fixing remains run-step sourced"
@@ -1407,8 +1407,8 @@ test_top_level_fixing_ci_running_after_green_stays_working() {
   make_repo_on_branch "$d/wt" fm/feat-topfixingci
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-topfixingci.meta" "window=fm:jg-feat-topfixingci" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_fixing_ci_running fm/feat-topfixingci)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+  JG_FAKE_AXI_STATUS="$(run_fixing_ci_running fm/feat-topfixingci)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
   local out; out=$(run_crew_state "$d" feat-topfixingci)
   assert_contains "$out" "state: working" "top-level fixing with ci running must stay working"
   assert_contains "$out" "source: run-step" "top-level fixing with ci running remains run-step sourced"
@@ -1424,8 +1424,8 @@ test_top_level_fixing_done_log_stays_working() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-topfixing.meta" "window=fm:jg-feat-topfixing" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/2 checks green\n' > "$d/state/feat-topfixing.status"
-  FM_FAKE_AXI_STATUS="$(run_fixing fm/feat-topfixing)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+  JG_FAKE_AXI_STATUS="$(run_fixing fm/feat-topfixing)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
   local out; out=$(run_crew_state "$d" feat-topfixing)
   assert_contains "$out" "state: working" "top-level fixing must stay working"
   assert_contains "$out" "source: run-step" "top-level fixing remains run-step sourced"
@@ -1446,14 +1446,14 @@ test_validation_ready_requires_final_acceptance() {
   for payload in "$(run_passed_no_pr fm/output-acceptance)" \
     "$(run_passed_with_skips fm/output-acceptance)" \
     "$(run_passed_no_pr fm/output-acceptance | sed '/^outcome:/d')"; do
-    FM_FAKE_AXI_STATUS=$payload
+    JG_FAKE_AXI_STATUS=$payload
     printf 'paused [at=1790876000]: product output acceptance pending\n' > "$d/state/output-acceptance.status"
     out=$(run_crew_state "$d" output-acceptance)
     assert_contains "$out" 'state: paused' 'completed validation cannot close unfinished output'
     assert_contains "$out" 'product output acceptance pending' 'actual wait survives validation'
     assert_not_contains "$out" 'superseded' 'output wait is not stale validation'
   done
-  FM_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
+  JG_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
   printf 'blocked [at=1790876001]: product output incorrect\n' > "$d/state/output-acceptance.status"
   out=$(run_crew_state "$d" output-acceptance)
   assert_contains "$out" 'state: blocked' 'genuinely later product blocker survives'
@@ -1465,17 +1465,17 @@ test_validation_ready_requires_final_acceptance() {
   out=$(run_crew_state "$d" output-acceptance)
   assert_contains "$out" 'state: done' 'legacy final-ready declaration plus head proof accepts'
   assert_contains "$out" 'run passed: PR state unknown' 'acceptance does not invent forge disposition'
-  FM_FAKE_AXI_STATUS="$FM_FAKE_AXI_STATUS
+  JG_FAKE_AXI_STATUS="$JG_FAKE_AXI_STATUS
 branch_sync:
   state: pipeline_owned
   next_action:
     code: recover_custody"
   # Even recorded forge proof cannot erase explicitly unreturned custody.
-  printf 'pr=https://example.test/o/r/pull/1\npr_head=%s\n' "$FM_FAKE_RUN_HEAD" >> "$d/state/output-acceptance.meta"
+  printf 'pr=https://example.test/o/r/pull/1\npr_head=%s\n' "$JG_FAKE_RUN_HEAD" >> "$d/state/output-acceptance.meta"
   out=$(run_crew_state "$d" output-acceptance)
   assert_contains "$out" 'state: blocked' 'final-ready cannot bypass outstanding custody'
   assert_contains "$out" 'recover_custody' 'custody refusal retains actionable reason'
-  FM_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
+  JG_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
   rm "$d/state/output-acceptance.status"
   out=$(run_crew_state "$d" output-acceptance)
   assert_contains "$out" 'state: paused' 'a pass alone never declares acceptance'
@@ -1490,14 +1490,14 @@ branch_sync:
   printf 'fake pipeline fix\n' > "$d/wt/result.txt"
   git -C "$d/wt" add result.txt
   git -C "$d/wt" commit -q -m 'fake pipeline result'
-  FM_FAKE_RUN_HEAD=$(git -C "$d/wt" rev-parse HEAD)
+  JG_FAKE_RUN_HEAD=$(git -C "$d/wt" rev-parse HEAD)
   git -C "$d/wt" checkout -q fm/output-acceptance
-  FM_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
+  JG_FAKE_AXI_STATUS=$(run_passed_no_pr fm/output-acceptance)
   out=$(run_crew_state "$d" output-acceptance)
   assert_contains "$out" 'state: blocked' 'local-only cannot accept an unrecovered pipeline tree'
   assert_contains "$out" 'does not carry' 'tree custody refusal is explicit'
   # Unrelated run custody must never contaminate the no-attributed-run fallback.
-  FM_FAKE_AXI_STATUS="$(run_passed_no_pr fm/other-task)
+  JG_FAKE_AXI_STATUS="$(run_passed_no_pr fm/other-task)
 branch_sync:
   next_action:
     code: recover_custody"
@@ -1514,7 +1514,7 @@ test_terminal_passed() {
   make_repo_on_branch "$d/wt" fm/feat-d
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-d.meta" "window=fm:jg-feat-d" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_passed fm/feat-d)"
+  JG_FAKE_AXI_STATUS="$(run_passed fm/feat-d)"
   local out; out=$(run_crew_state "$d" feat-d)
   assert_contains "$out" "state: paused" "passed run alone awaits final acceptance"
   assert_contains "$out" "source: run-step" "passed -> run-step source"
@@ -1529,7 +1529,7 @@ test_terminal_passed_with_override() {
   make_repo_on_branch "$d/wt" fm/feat-override
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-override.meta" "window=fm:jg-feat-override" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_passed_with_override fm/feat-override)"
+  JG_FAKE_AXI_STATUS="$(run_passed_with_override fm/feat-override)"
   local out; out=$(run_crew_state "$d" feat-override)
   assert_contains "$out" "state: paused" "passed-with-override alone awaits final acceptance"
   assert_contains "$out" "source: run-step" "passed-with-override -> run-step source"
@@ -1545,7 +1545,7 @@ test_terminal_passed_with_skips() {
   make_repo_on_branch "$d/wt" fm/feat-skips
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-skips.meta" "window=fm:jg-feat-skips" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_passed_with_skips fm/feat-skips)"
+  JG_FAKE_AXI_STATUS="$(run_passed_with_skips fm/feat-skips)"
   local out; out=$(run_crew_state "$d" feat-skips)
   assert_contains "$out" "state: paused" "passed-with-skips alone awaits final acceptance"
   assert_contains "$out" "source: run-step" "passed-with-skips -> run-step source"
@@ -1568,9 +1568,9 @@ test_terminal_passed_uses_matching_retirement_receipt_without_forge() {
   seed_retired_pr_receipt "$d/state" feat-dreceipt "$url"
   read_log="$d/pr-read.log"
   : > "$read_log"
-  FM_FAKE_PR_READ_LOG=$read_log
-  FM_FAKE_PR_READ_FAIL=1
-  FM_FAKE_AXI_STATUS="$(run_passed_no_pr fm/feat-dreceipt)"
+  JG_FAKE_PR_READ_LOG=$read_log
+  JG_FAKE_PR_READ_FAIL=1
+  JG_FAKE_AXI_STATUS="$(run_passed_no_pr fm/feat-dreceipt)"
   out=$(run_crew_state "$d" feat-dreceipt)
   assert_contains "$out" "state: paused" "merged evidence alone cannot attest to output acceptance"
   assert_contains "$out" "run passed: PR merged" "matching retirement receipt is local merged evidence"
@@ -1589,16 +1589,16 @@ test_terminal_passed_no_forge_switch_skips_read_but_keeps_receipt() {
     "worktree=$d/wt" "kind=ship" "pr=$url"
   read_log="$d/pr-read.log"
   : > "$read_log"
-  FM_FAKE_PR_READ_LOG=$read_log
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dnoforge "$url")"
+  JG_FAKE_PR_READ_LOG=$read_log
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dnoforge "$url")"
 
-  out=$(FM_CREW_STATE_NO_FORGE=1 run_crew_state "$d" feat-dnoforge)
+  out=$(JG_CREW_STATE_NO_FORGE=1 run_crew_state "$d" feat-dnoforge)
   assert_contains "$out" "run passed: PR state unknown (forge read skipped)" "no-forge mode reports skipped read"
   assert_not_contains "$out" "PR merged" "no-forge mode without a receipt must not report merged"
   [ ! -s "$read_log" ] || fail "no-forge mode invoked a forge read"
 
   seed_retired_pr_receipt "$d/state" feat-dnoforge "$url"
-  out=$(FM_CREW_STATE_NO_FORGE=1 run_crew_state "$d" feat-dnoforge)
+  out=$(JG_CREW_STATE_NO_FORGE=1 run_crew_state "$d" feat-dnoforge)
   assert_contains "$out" "run passed: PR merged" "no-forge mode still trusts a matching retirement receipt"
   [ ! -s "$read_log" ] || fail "no-forge mode with a receipt invoked a forge read"
   pass "terminal passed no-forge mode preserves local receipt evidence"
@@ -1611,9 +1611,9 @@ test_terminal_passed_with_open_pr_does_not_claim_merged() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dopen.meta" "window=fm:jg-feat-dopen" \
     "worktree=$d/wt" "kind=ship" "pr=https://github.com/o/r/pull/1"
-  FM_FAKE_PR_STATE=OPEN
-  FM_FAKE_PR_MERGED=false
-  FM_FAKE_AXI_STATUS="$(run_passed fm/feat-dopen)"
+  JG_FAKE_PR_STATE=OPEN
+  JG_FAKE_PR_MERGED=false
+  JG_FAKE_AXI_STATUS="$(run_passed fm/feat-dopen)"
   local out; out=$(run_crew_state "$d" feat-dopen)
   assert_contains "$out" "state: paused" "open PR alone cannot attest to output acceptance"
   assert_contains "$out" "run passed: PR open" "open PR state is named"
@@ -1629,11 +1629,11 @@ test_terminal_passed_run_pr_overrides_stale_metadata() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dstale.meta" "window=fm:jg-feat-dstale" \
     "worktree=$d/wt" "kind=ship" "pr=https://github.com/o/r/pull/47"
-  FM_FAKE_PR_47_STATE=MERGED
-  FM_FAKE_PR_47_MERGED=true
-  FM_FAKE_PR_48_STATE=OPEN
-  FM_FAKE_PR_48_MERGED=false
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dstale https://github.com/o/r/pull/48)"
+  JG_FAKE_PR_47_STATE=MERGED
+  JG_FAKE_PR_47_MERGED=true
+  JG_FAKE_PR_48_STATE=OPEN
+  JG_FAKE_PR_48_MERGED=false
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dstale https://github.com/o/r/pull/48)"
   local out; out=$(run_crew_state "$d" feat-dstale)
   assert_contains "$out" "state: paused" "passing validation alone awaits final acceptance"
   assert_contains "$out" "run passed: PR open" "run PR identity outranks stale task metadata"
@@ -1647,7 +1647,7 @@ test_terminal_passed_without_readable_pr_identity_reports_unknown() {
   make_repo_on_branch "$d/wt" fm/feat-dnopr
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dnopr.meta" "window=fm:jg-feat-dnopr" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_passed_no_pr fm/feat-dnopr)"
+  JG_FAKE_AXI_STATUS="$(run_passed_no_pr fm/feat-dnopr)"
   local out; out=$(run_crew_state "$d" feat-dnopr)
   assert_contains "$out" "state: paused" "unknown publication without a final declaration is not accepted"
   assert_contains "$out" "run passed: PR state unknown (no PR identity)" "missing PR identity is honest unknown"
@@ -1666,9 +1666,9 @@ test_terminal_passed_with_open_gitlab_mr_does_not_claim_merged() {
     "worktree=$d/wt" "kind=ship" "pr=https://git.example.com/group/subgroup/repo/-/merge_requests/9"
   read_log="$d/glab-read.log"
   : > "$read_log"
-  FM_FAKE_GLAB_READ_LOG=$read_log
-  FM_FAKE_GLAB_STATE=opened
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabopen https://git.example.com/group/subgroup/repo/-/merge_requests/9)"
+  JG_FAKE_GLAB_READ_LOG=$read_log
+  JG_FAKE_GLAB_STATE=opened
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabopen https://git.example.com/group/subgroup/repo/-/merge_requests/9)"
   out=$(run_crew_state "$d" feat-dgitlabopen)
   assert_contains "$out" "run passed: PR open" "open GitLab MR state is named"
   assert_not_contains "$out" "PR merged" "open GitLab MR must not be reported merged"
@@ -1685,8 +1685,8 @@ test_terminal_passed_with_merged_gitlab_mr_reports_merged() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dgitlabmerged.meta" "window=fm:jg-feat-dgitlabmerged" \
     "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/10"
-  FM_FAKE_GLAB_STATE=merged
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabmerged https://gitlab.com/group/repo/-/merge_requests/10)"
+  JG_FAKE_GLAB_STATE=merged
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabmerged https://gitlab.com/group/repo/-/merge_requests/10)"
   out=$(run_crew_state "$d" feat-dgitlabmerged)
   assert_contains "$out" "run passed: PR merged" "merged GitLab MR is reported merged"
   pass "terminal passed run reads merged GitLab MR state"
@@ -1700,8 +1700,8 @@ test_terminal_passed_with_failed_gitlab_read_reports_unknown() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dgitlabunknown.meta" "window=fm:jg-feat-dgitlabunknown" \
     "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/11"
-  FM_FAKE_GLAB_READ_FAIL=1
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabunknown https://gitlab.com/group/repo/-/merge_requests/11)"
+  JG_FAKE_GLAB_READ_FAIL=1
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgitlabunknown https://gitlab.com/group/repo/-/merge_requests/11)"
   out=$(run_crew_state "$d" feat-dgitlabunknown)
   assert_contains "$out" "run passed: PR state unknown (unreadable)" "failed GitLab read is honest unknown"
   assert_not_contains "$out" "PR merged" "failed GitLab read must not be reported merged"
@@ -1723,11 +1723,11 @@ test_terminal_passed_with_forgejo_pull_reports_its_state() {
       "worktree=$d/wt" "kind=ship" "pr=https://git.example.org/team/repo/pulls/12"
     read_log="$d/tea-read.log"
     : > "$read_log"
-    FM_FAKE_TEA_READ_LOG=$read_log
-    FM_FAKE_TEA_STATE=$state
-    FM_FAKE_TEA_MERGED=$merged
-    FM_FAKE_TEA_READ_FAIL=$fail
-    FM_FAKE_AXI_STATUS="$(run_passed_with_pr "fm/feat-dforgejo$name" https://git.example.org/team/repo/pulls/12)"
+    JG_FAKE_TEA_READ_LOG=$read_log
+    JG_FAKE_TEA_STATE=$state
+    JG_FAKE_TEA_MERGED=$merged
+    JG_FAKE_TEA_READ_FAIL=$fail
+    JG_FAKE_AXI_STATUS="$(run_passed_with_pr "fm/feat-dforgejo$name" https://git.example.org/team/repo/pulls/12)"
     out=$(run_crew_state "$d" "feat-dforgejo$name")
     assert_contains "$out" "$expected" "Forgejo pull request reading $name is reported"
     [ "$name" = merged ] || assert_not_contains "$out" "PR merged" "Forgejo $name pull request must not be reported merged"
@@ -1748,9 +1748,9 @@ test_terminal_passed_with_open_gerrit_change_does_not_claim_merged() {
     "worktree=$d/wt" "kind=ship" "pr=$url"
   read_log="$d/gerrit-read.log"
   : > "$read_log"
-  FM_FAKE_GERRIT_READ_LOG=$read_log
-  FM_FAKE_GERRIT_STATUS=NEW
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritopen "$url")"
+  JG_FAKE_GERRIT_READ_LOG=$read_log
+  JG_FAKE_GERRIT_STATUS=NEW
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritopen "$url")"
   out=$(run_crew_state "$d" feat-dgerritopen)
   assert_contains "$out" "run passed: PR open" "open Gerrit change state is named"
   assert_not_contains "$out" "PR merged" "open Gerrit change must not be reported merged"
@@ -1768,8 +1768,8 @@ test_terminal_passed_with_merged_gerrit_change_reports_merged() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dgerritmerged.meta" "window=fm:jg-feat-dgerritmerged" \
     "worktree=$d/wt" "kind=ship" "pr=$url"
-  FM_FAKE_GERRIT_STATUS=MERGED
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritmerged "$url")"
+  JG_FAKE_GERRIT_STATUS=MERGED
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritmerged "$url")"
   out=$(run_crew_state "$d" feat-dgerritmerged)
   # The fixture record carries a null url, the shape a server with no
   # gerrit.canonicalWebUrl returns, so the merge is reported off the change
@@ -1778,7 +1778,7 @@ test_terminal_passed_with_merged_gerrit_change_reports_merged() {
   assert_contains "$out" "run passed: PR merged" "merged Gerrit change is reported merged"
 
   # An abandoned change is this report's closed, and is never merged.
-  FM_FAKE_GERRIT_STATUS=ABANDONED
+  JG_FAKE_GERRIT_STATUS=ABANDONED
   out=$(run_crew_state "$d" feat-dgerritmerged)
   assert_contains "$out" "run passed: PR closed" "abandoned Gerrit change is reported closed"
   assert_not_contains "$out" "PR merged" "abandoned Gerrit change must not be reported merged"
@@ -1794,8 +1794,8 @@ test_terminal_passed_with_unreadable_gerrit_change_reports_unknown() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dgerritunknown.meta" "window=fm:jg-feat-dgerritunknown" \
     "worktree=$d/wt" "kind=ship" "pr=$url"
-  FM_FAKE_GERRIT_READ_FAIL=1
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritunknown "$url")"
+  JG_FAKE_GERRIT_READ_FAIL=1
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritunknown "$url")"
   out=$(run_crew_state "$d" feat-dgerritunknown)
   assert_contains "$out" "run passed: PR state unknown (unreadable)" "failed Gerrit read is honest unknown"
   assert_not_contains "$out" "PR merged" "failed Gerrit read must not be reported merged"
@@ -1804,9 +1804,9 @@ test_terminal_passed_with_unreadable_gerrit_change_reports_unknown() {
   # server came to return it. The change number is the whole identity of the
   # match, so a wrong one is an unreadable record rather than a merge.
   reset_fakes
-  FM_FAKE_GERRIT_STATUS=MERGED
-  FM_FAKE_GERRIT_CHANGE=4203
-  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritunknown "$url")"
+  JG_FAKE_GERRIT_STATUS=MERGED
+  JG_FAKE_GERRIT_CHANGE=4203
+  JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dgerritunknown "$url")"
   out=$(run_crew_state "$d" feat-dgerritunknown)
   assert_contains "$out" "run passed: PR state unknown (unreadable)" "mismatched Gerrit record is honest unknown"
   assert_not_contains "$out" "PR merged" "another change's merged record must not report merged"
@@ -1819,8 +1819,8 @@ test_terminal_failed() {
   make_repo_on_branch "$d/wt" fm/feat-e
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-e.meta" "window=fm:jg-feat-e" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-e)"
-  FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/status: completed/status: failed}
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-e)"
+  JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/status: completed/status: failed}
   local out; out=$(run_crew_state "$d" feat-e)
   assert_contains "$out" "state: failed" "failed run -> failed"
   assert_contains "$out" "source: run-step" "failed -> run-step source"
@@ -1840,20 +1840,20 @@ test_cancelled_delivery_and_skipped_rebase() {
       make_fakebin "$d" >/dev/null
       jg_write_meta "$d/state/delivery.meta" "window=fm:jg-delivery" "worktree=$d/wt" "kind=ship"
       printf 'done: PR https://github.com/o/r/pull/203 checks green\n' > "$d/state/delivery.status"
-      FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/delivery)"
+      JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/delivery)"
       case "$scenario" in
-        cancelled*) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled} ;;
+        cancelled*) JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled} ;;
       esac
       case "$scenario" in
-        *skipped-rebase) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/rebase,completed/rebase,skipped} ;;
-        cancelled-status) FM_FAKE_AXI_STATUS=$(printf '%s\n' "$FM_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
-        passed) FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/delivery https://github.com/o/r/pull/203)" ;;
+        *skipped-rebase) JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/rebase,completed/rebase,skipped} ;;
+        cancelled-status) JG_FAKE_AXI_STATUS=$(printf '%s\n' "$JG_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
+        passed) JG_FAKE_AXI_STATUS="$(run_passed_with_pr fm/delivery https://github.com/o/r/pull/203)" ;;
       esac
-      FM_FAKE_PR_STATE=OPEN
-      FM_FAKE_PR_MERGED=false
-      FM_FAKE_PR_STATE_AXI=open
-      FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
-      out=$(FM_HOME="$d" run_crew_state "$d" delivery)
+      JG_FAKE_PR_STATE=OPEN
+      JG_FAKE_PR_MERGED=false
+      JG_FAKE_PR_STATE_AXI=open
+      JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+      out=$(JG_HOME="$d" run_crew_state "$d" delivery)
       assert_contains "$out" "state: done" "$scenario: delivered work remains done: $out"
       assert_not_contains "$out" "PR merged" "$scenario: terminal record cannot prove a merge"
       if [ "$scenario" != passed ]; then
@@ -1879,52 +1879,52 @@ test_terminal_green_delivery_disposition() {
           make_repo_on_branch "$d/wt" fm/disposition
           make_fakebin "$d" >/dev/null
           jg_write_meta "$d/state/delivery.meta" "window=fm:jg-delivery" "worktree=$d/wt" "kind=ship"
-          FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/disposition)"
+          JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/disposition)"
           case "$route" in
-            cancelled-*) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled} ;;
+            cancelled-*) JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled} ;;
           esac
           case "$route" in
-            *-status) FM_FAKE_AXI_STATUS=$(printf '%s\n' "$FM_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
+            *-status) JG_FAKE_AXI_STATUS=$(printf '%s\n' "$JG_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
           esac
           case "$provider" in
             github) url=https://github.com/o/r/pull/203 ;;
             gitlab) url=https://gitlab.com/o/r/-/merge_requests/203 ;;
             gerrit) url=https://review.example.com/c/r/+/203 ;;
           esac
-          FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//https:\/\/github.com\/o\/r\/pull\/203/$url}
+          JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//https:\/\/github.com\/o\/r\/pull\/203/$url}
           case "$disposition" in
             open|merged)
               printf 'done: PR %s checks green\n' "$url" > "$d/state/delivery.status"
-              printf 'pr=%s\npr_head=%s\n' "$url" "$FM_FAKE_RUN_HEAD" >> "$d/state/delivery.meta" ;;
+              printf 'pr=%s\npr_head=%s\n' "$url" "$JG_FAKE_RUN_HEAD" >> "$d/state/delivery.meta" ;;
           esac
-          FM_FAKE_PR_STATE=OPEN
-          FM_FAKE_PR_MERGED=false
-          FM_FAKE_PR_STATE_AXI=open
-          FM_FAKE_GLAB_STATE=opened
-          FM_FAKE_GERRIT_STATUS=NEW
+          JG_FAKE_PR_STATE=OPEN
+          JG_FAKE_PR_MERGED=false
+          JG_FAKE_PR_STATE_AXI=open
+          JG_FAKE_GLAB_STATE=opened
+          JG_FAKE_GERRIT_STATUS=NEW
           case "$disposition" in
-            no-identity) FM_FAKE_AXI_STATUS=$(printf '%s\n' "$FM_FAKE_AXI_STATUS" | sed '/^[[:space:]]*pr:/d') ;;
+            no-identity) JG_FAKE_AXI_STATUS=$(printf '%s\n' "$JG_FAKE_AXI_STATUS" | sed '/^[[:space:]]*pr:/d') ;;
             merged)
-              FM_FAKE_PR_STATE=MERGED
-              FM_FAKE_PR_MERGED=true
-              FM_FAKE_PR_STATE_AXI=merged
-              FM_FAKE_GLAB_STATE=merged
-              FM_FAKE_GERRIT_STATUS=MERGED ;;
+              JG_FAKE_PR_STATE=MERGED
+              JG_FAKE_PR_MERGED=true
+              JG_FAKE_PR_STATE_AXI=merged
+              JG_FAKE_GLAB_STATE=merged
+              JG_FAKE_GERRIT_STATUS=MERGED ;;
             closed)
-              FM_FAKE_PR_STATE=CLOSED
-              FM_FAKE_PR_STATE_AXI=closed
-              FM_FAKE_GLAB_STATE=closed
-              FM_FAKE_GERRIT_STATUS=ABANDONED ;;
+              JG_FAKE_PR_STATE=CLOSED
+              JG_FAKE_PR_STATE_AXI=closed
+              JG_FAKE_GLAB_STATE=closed
+              JG_FAKE_GERRIT_STATUS=ABANDONED ;;
             unreadable)
-              FM_FAKE_PR_READ_FAIL=1
-              FM_FAKE_GLAB_READ_FAIL=1
-              FM_FAKE_GERRIT_READ_FAIL=1 ;;
+              JG_FAKE_PR_READ_FAIL=1
+              JG_FAKE_GLAB_READ_FAIL=1
+              JG_FAKE_GERRIT_READ_FAIL=1 ;;
           esac
-          FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+          JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
           if [ "$disposition" = skipped ]; then
-            out=$(FM_CREW_STATE_NO_FORGE=1 FM_HOME="$d" run_crew_state "$d" delivery)
+            out=$(JG_CREW_STATE_NO_FORGE=1 JG_HOME="$d" run_crew_state "$d" delivery)
           else
-            out=$(FM_HOME="$d" run_crew_state "$d" delivery)
+            out=$(JG_HOME="$d" run_crew_state "$d" delivery)
           fi
           case "$disposition" in
             open|merged)
@@ -1965,35 +1965,35 @@ test_cancelled_without_delivery_has_no_verdict() {
       make_repo_on_branch "$d/wt" fm/cancelled
       make_fakebin "$d" >/dev/null
       jg_write_meta "$d/state/cancelled.meta" "window=fm:jg-cancelled" "worktree=$d/wt" "kind=ship"
-      FM_FAKE_AXI_STATUS="$(run_failed fm/cancelled)"
-      FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled}
-      FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/status: completed/status: cancelled}
+      JG_FAKE_AXI_STATUS="$(run_failed fm/cancelled)"
+      JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled}
+      JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/status: completed/status: cancelled}
       case "$scenario" in
-        status) FM_FAKE_AXI_STATUS=$(printf '%s\n' "$FM_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
+        status) JG_FAKE_AXI_STATUS=$(printf '%s\n' "$JG_FAKE_AXI_STATUS" | sed '/^outcome:/d') ;;
         selected)
-          FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
-          FM_FAKE_AXI_HOME="count: 1 of 1 total
+          JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
+          JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
-  01RUN,fm/cancelled,cancelled,$FM_FAKE_RUN_HEAD,\"\""
+  01RUN,fm/cancelled,cancelled,$JG_FAKE_RUN_HEAD,\"\""
           ;;
         coarse)
-          FM_FAKE_AXI_STATUS="$(run_running fm/another)"
-          FM_FAKE_RUNS_LIST="  cancelled  fm/cancelled $FM_FAKE_RUN_HEAD  2026-09-26 17:00"
+          JG_FAKE_AXI_STATUS="$(run_running fm/another)"
+          JG_FAKE_RUNS_LIST="  cancelled  fm/cancelled $JG_FAKE_RUN_HEAD  2026-09-26 17:00"
           ;;
         no-ci-log|red-ci|cancelled-test|skipped-test)
-          FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/cancelled)"
-          FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled}
-          FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
+          JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/cancelled)"
+          JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled}
+          JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed"
           case "$scenario" in
-            no-ci-log) FM_FAKE_CI_LOGS= ;;
-            red-ci) FM_FAKE_CI_LOGS="$FM_FAKE_CI_LOGS
+            no-ci-log) JG_FAKE_CI_LOGS= ;;
+            red-ci) JG_FAKE_CI_LOGS="$JG_FAKE_CI_LOGS
 checks failed: 1 of 2 checks red" ;;
-            cancelled-test) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,cancelled} ;;
-            skipped-test) FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/test,completed/test,skipped} ;;
+            cancelled-test) JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/test,completed/test,cancelled} ;;
+            skipped-test) JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/test,completed/test,skipped} ;;
           esac
           ;;
       esac
-      out=$(FM_HOME="$d" run_crew_state "$d" cancelled)
+      out=$(JG_HOME="$d" run_crew_state "$d" cancelled)
       assert_contains "$out" "state: unknown" "$scenario: cancellation alone has no verdict: $out"
       assert_contains "$out" "run cancelled: no verdict" "$scenario: explicit reason"
       assert_contains "$out" "source: run-step" "$scenario: keep attribution"
@@ -2026,26 +2026,26 @@ EOF
   printf 'failed: historical cancellation projection\n' > "$d/state/cancelled.status"
   backlog_before=$(cat "$d/data/backlog.md")
   status_before=$(cat "$d/state/cancelled.status")
-  FM_FAKE_AXI_STATUS="$(run_running fm/cancelled)"
-  out=$(FM_HOME="$d" run_crew_state "$d" cancelled)
+  JG_FAKE_AXI_STATUS="$(run_running fm/cancelled)"
+  out=$(JG_HOME="$d" run_crew_state "$d" cancelled)
   assert_contains "$out" 'state: working' 'fixture begins with active validation'
   # Deliberately transition the external instrument fixture to cancelled.
   # This executes Firstmate end to end; it does not cancel a real daemon run.
-  FM_FAKE_AXI_STATUS="$(run_failed fm/cancelled)"
-  FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS//failed/cancelled}
-  FM_FAKE_AXI_STATUS=${FM_FAKE_AXI_STATUS/status: completed/status: cancelled}
+  JG_FAKE_AXI_STATUS="$(run_failed fm/cancelled)"
+  JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS//failed/cancelled}
+  JG_FAKE_AXI_STATUS=${JG_FAKE_AXI_STATUS/status: completed/status: cancelled}
   if [ "$scenario" = captured ]; then
     # Real record supplied read-only from axi status --run
     # 01M2SXM5NDEWK2KY5TG8DDYJMV; only branch/head are rebound for attribution.
     # Skipped rebase and cancelled CI monitoring remain synthetic cases above.
-    FM_FAKE_AXI_STATUS="$(cat <<EOF
+    JG_FAKE_AXI_STATUS="$(cat <<EOF
 current_branch: fm/jg-abort-autorise-nest-pas-un-echec
 other_branch_run:
 id: "01M2SXM5NDEWK2KY5TG8DDYJMV"
 branch: fm/cancelled
 status: cancelled
-head: ${FM_FAKE_RUN_HEAD:0:8}
-head_sha: $FM_FAKE_RUN_HEAD
+head: ${JG_FAKE_RUN_HEAD:0:8}
+head_sha: $JG_FAKE_RUN_HEAD
 pr: "https://github.com/kunchenguid/firstmate/pull/4818"
 findings: 2 awaiting
 steps[9]{step,status,findings,duration_ms}:
@@ -2063,13 +2063,13 @@ error: "cancelled: aborted by user"
 EOF
 )"
   fi
-  out=$(FM_HOME="$d" run_crew_state "$d" cancelled)
+  out=$(JG_HOME="$d" run_crew_state "$d" cancelled)
   assert_contains "$out" 'state: unknown' "$scenario cancellation has no verdict: $out"
   assert_contains "$out" 'source: run-step' "$scenario retains run attribution"
   assert_contains "$out" 'run cancelled: no verdict' "$scenario cancellation outweighs interrupted steps"
   assert_not_contains "$out" 'state: failed' "$scenario cancellation is not a failure"
   assert_not_contains "$out" 'held for merge' "$scenario has no positive delivery evidence"
-  summary=$(PATH="$d/fakebin:$PATH" FM_HOME="$d" FM_ROOT_OVERRIDE="$d/fixture-root" \
+  summary=$(PATH="$d/fakebin:$PATH" JG_HOME="$d" JG_ROOT_OVERRIDE="$d/fixture-root" \
     "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary)
   printf '%s' "$summary" | jq -e '
     .state == "unknown" and .valid == false
@@ -2094,8 +2094,8 @@ test_terminal_failed_ci_orphan_after_green_reads_done() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ci-orphan.meta" "window=fm:jg-feat-ci-orphan" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/203 checks green\n' > "$d/state/feat-ci-orphan.status"
-  FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/feat-ci-orphan)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
+  JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/feat-ci-orphan)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
 daemon shutting down"
   local out; out=$(run_crew_state "$d" feat-ci-orphan)
   assert_contains "$out" "state: done" "orphaned ci monitor after green must read done, not failed"
@@ -2112,8 +2112,8 @@ test_terminal_failed_ci_orphan_status_only_reads_done() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ci-orphan2.meta" "window=fm:jg-feat-ci-orphan2" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/203 checks green\n' > "$d/state/feat-ci-orphan2.status"
-  FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan_status_only fm/feat-ci-orphan2)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
+  JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan_status_only fm/feat-ci-orphan2)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
 daemon shutting down"
   local out; out=$(run_crew_state "$d" feat-ci-orphan2)
   assert_contains "$out" "state: done" "status-only failed orphaned monitor after green reads done"
@@ -2127,8 +2127,8 @@ test_terminal_failed_ci_genuine_red_stays_failed() {
   make_repo_on_branch "$d/wt" fm/feat-ci-red
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ci-red.meta" "window=fm:jg-feat-ci-red" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/feat-ci-red)"
-  FM_FAKE_CI_LOGS="CI checks running
+  JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan fm/feat-ci-red)"
+  JG_FAKE_CI_LOGS="CI checks running
 checks failed: 1 of 2 checks red
 daemon shutting down"
   local out; out=$(run_crew_state "$d" feat-ci-red)
@@ -2143,8 +2143,8 @@ test_terminal_failed_ci_orphan_second_failed_step_stays_failed() {
   make_repo_on_branch "$d/wt" fm/feat-ci-2fail
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-ci-2fail.meta" "window=fm:jg-feat-ci-2fail" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_failed_ci_orphan_second_failure fm/feat-ci-2fail)"
-  FM_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
+  JG_FAKE_AXI_STATUS="$(run_failed_ci_orphan_second_failure fm/feat-ci-2fail)"
+  JG_FAKE_CI_LOGS="all CI checks passed - still monitoring until merged or closed
 daemon shutting down"
   local out; out=$(run_crew_state "$d" feat-ci-2fail)
   assert_contains "$out" "state: failed" "a second failed step keeps the run failed"
@@ -2170,10 +2170,10 @@ test_cross_branch_attribution_via_runs_list() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f.meta" "window=fm:jg-feat-f" "worktree=$d/wt" "kind=ship"
   # The repo-wide active/most-recent run belongs to a different crew's branch.
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
   # Real `no-mistakes runs` shape: plain text, newest-first, no run id, no
   # quoting - "<status> <branch> <short-sha> <date> [<pr-url>]".
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
   running    fm/feat-f ${short}  2026-07-02 22:05
 EOF
@@ -2194,8 +2194,8 @@ test_coarse_socket_refusal_reports_blocked() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-coarse-down.meta" "window=fm:jg-feat-coarse-down" "worktree=$d/wt" "kind=ship"
   printf 'blocked: no-mistakes daemon connection refused\n' > "$d/state/feat-coarse-down.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
   running    fm/feat-coarse-down ${short}  2026-07-02 22:05
 EOF
@@ -2228,9 +2228,9 @@ test_coarse_failed_ledger_with_daemon_down_reports_unknown() {
   # daemon serves the whole repo), so attribution falls to the coarse runs
   # ledger, whose newest row for this branch is terminal failed at this
   # worktree's own head.
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="  failed     fm/feat-coarsedown ${short}  2026-09-05 21:00"
-  FM_FAKE_DAEMON_DOWN=1
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="  failed     fm/feat-coarsedown ${short}  2026-09-05 21:00"
+  JG_FAKE_DAEMON_DOWN=1
   local out; out=$(run_crew_state "$d" feat-coarsedown)
   assert_contains "$out" "state: unknown" "daemon down + failed ledger record -> unknown"
   assert_contains "$out" "no-mistakes daemon unreachable; last ledger record failed - unverified" \
@@ -2239,7 +2239,7 @@ test_coarse_failed_ledger_with_daemon_down_reports_unknown() {
   assert_contains "$out" "source: run-step" "the ledger row is still this branch's attributed run"
 
   # Daemon provably up again: the same row stays a failure.
-  FM_FAKE_DAEMON_DOWN=0
+  JG_FAKE_DAEMON_DOWN=0
   out=$(run_crew_state "$d" feat-coarsedown)
   assert_contains "$out" "state: failed" "daemon up keeps the failed verdict over the failed record"
   assert_not_contains "$out" "unverified" "no unverified qualifier while the daemon answers"
@@ -2253,8 +2253,8 @@ test_cross_branch_attribution_picks_most_recent_row() {
   short=$(git -C "$d/wt" rev-parse --short=7 HEAD)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-fq.meta" "window=fm:jg-feat-fq" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
   running    fm/feat-fq ${short}  2026-07-02 21:50
   completed  fm/feat-fq bbbbbbb  2026-07-02 20:00  https://github.com/o/r/pull/1
@@ -2285,10 +2285,10 @@ test_terminal_run_keeps_newer_failure_over_live_sibling() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/corpse.meta" "window=fm:jg-corpse" "worktree=$d/wt" "kind=ship"
   # The newest run failed at this worktree's own commit.
-  FM_FAKE_RUN_HEAD="$base_head"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-corpse)"
+  JG_FAKE_RUN_HEAD="$base_head"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-corpse)"
   # The older live run may have advanced its tip, but it did not replace this run.
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   failed     fm/feat-corpse ${short_base}  2026-08-05 11:20
   running    fm/feat-corpse ${short_live}  2026-08-05 10:05
 EOF
@@ -2315,8 +2315,8 @@ test_runs_list_newer_failure_outranks_older_live_row() {
   short_live=$(git -C "$d/wt" rev-parse --short=7 "$live_head")
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/liverow.meta" "window=fm:jg-liverow" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-05 11:30
   failed     fm/feat-liverow ${short_base}  2026-08-05 11:20
   running    fm/feat-liverow ${short_live}  2026-08-05 10:05
@@ -2341,9 +2341,9 @@ test_unfetched_older_live_sibling_does_not_hide_failure() {
     && fail "the unfetched head must not resolve in the task copy"
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/unfetched.meta" "window=fm:jg-unfetched" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_RUN_HEAD="$base_head"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-unfetched)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUN_HEAD="$base_head"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-unfetched)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   failed     fm/feat-unfetched ${short_base}  2026-08-05 11:20
   running    fm/feat-unfetched ${unfetched}  2026-08-05 10:05
 EOF
@@ -2369,8 +2369,8 @@ test_only_terminal_rows_keep_newest_first_precedence() {
   short_older=$(git -C "$d/wt" rev-parse --short=7 "$older_head")
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/allterminal.meta" "window=fm:jg-allterminal" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-05 11:30
   cancelled  fm/feat-allterminal ${short_base}  2026-08-05 11:20
   completed  fm/feat-allterminal ${short_older}  2026-08-05 10:05
@@ -2399,8 +2399,8 @@ test_unknown_status_row_keeps_newest_first_precedence() {
   short_live=$(git -C "$d/wt" rev-parse --short=7 "$live_head")
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/unknownrow.meta" "window=fm:jg-unknownrow" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-05 11:30
   quarantined fm/feat-unknownrow ${short_base}  2026-08-05 11:20
   running    fm/feat-unknownrow ${short_live}  2026-08-05 10:05
@@ -2428,9 +2428,9 @@ test_terminal_run_without_live_sibling_is_unchanged() {
   short_other=$(git -C "$d/wt" rev-parse --short=7 "$other_head")
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/nosibling.meta" "window=fm:jg-nosibling" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_RUN_HEAD="$base_head"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-nosibling)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUN_HEAD="$base_head"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-nosibling)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   failed     fm/feat-nosibling ${short_base}  2026-08-05 11:20
   completed  fm/feat-nosibling ${short_other}  2026-08-05 10:05
 EOF
@@ -2450,13 +2450,13 @@ test_coarse_run_does_not_probe_other_branch_ci_log_for_ready_status() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-coarseready.meta" "window=fm:jg-feat-coarseready" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/4 checks green\n' > "$d/state/feat-coarseready.status"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
   running    fm/feat-coarseready ${short}  2026-07-02 22:05
 EOF
 )"
-  FM_FAKE_CI_LOGS="CI checks running, waiting for results..."
+  JG_FAKE_CI_LOGS="CI checks running, waiting for results..."
   local out; out=$(run_crew_state "$d" feat-coarseready)
   assert_contains "$out" "state: done" "coarse ready status -> done"
   assert_contains "$out" "source: status-log" "coarse ready status remains status-log sourced"
@@ -2473,12 +2473,12 @@ test_other_branch_run_ignored() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-g.meta" "window=fm:jg-feat-g" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'done: implemented, ready to validate\n' > "$d/state/feat-g.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/some-other)"
-  FM_FAKE_RUNS_LIST="$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_running fm/some-other)"
+  JG_FAKE_RUNS_LIST="$(cat <<'EOF'
   running    fm/some-other aaaaaaa  2026-07-02 22:10
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-g
   local out; out=$(run_crew_state "$d" feat-g)
   assert_not_contains "$out" "source: run-step" "another branch's run not misattributed"
@@ -2503,9 +2503,9 @@ test_unpushed_ship_done_is_blocked() {
     "kind=ship" "mode=no-mistakes" "harness=claude"
   printf 'done: PR https://example.test/o/r/pull/9 checks green\n' \
     > "$d/state/unpushed.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" unpushed
   out=$(run_crew_state "$d" unpushed)
   assert_contains "$out" "state: blocked" "unpushed ship done: must not read as done"
@@ -2542,9 +2542,9 @@ SH
     "window=fm:jg-forkgreen" "worktree=$d/wt" "project=$d/wt" \
     "kind=ship" "mode=direct-PR" "harness=claude"
   printf 'done: PR https://github.com/o/r/pull/92\n' > "$d/state/forkgreen.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" forkgreen
   out=$(run_crew_state "$d" forkgreen)
   assert_contains "$out" "state: done" \
@@ -2574,11 +2574,11 @@ test_merged_pr_reads_done_under_captured_meta() {
   printf 'done: PR https://github.com/o/r/pull/7\n' > "$d/state/merged.status"
   mkdir -p "$d/captured"
   cp "$d/state/merged.meta" "$d/captured/merged.meta"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" merged
-  out=$(FM_CREW_STATE_META_OVERRIDE="$d/captured/merged.meta" run_crew_state "$d" merged)
+  out=$(JG_CREW_STATE_META_OVERRIDE="$d/captured/merged.meta" run_crew_state "$d" merged)
   assert_contains "$out" "state: done" "recorded merged PR must read done under a captured meta"
   assert_not_contains "$out" "state: blocked" "merge marker must be read from the live state dir"
   pass "recorded merged PR reads done under the fleet snapshot's captured meta"
@@ -2595,9 +2595,9 @@ test_no_mistakes_prevalidation_done_stays_done() {
     "window=fm:jg-preval" "worktree=$d/wt" "project=$d/wt" \
     "kind=ship" "mode=no-mistakes" "harness=claude"
   printf 'done: implementation complete\n' > "$d/state/preval.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" preval
   out=$(run_crew_state "$d" preval)
   assert_contains "$out" "state: done" "no-mistakes pre-validation done: remains done"
@@ -2619,9 +2619,9 @@ test_moved_remote_branch_without_named_head_is_blocked() {
     "window=fm:jg-moved" "worktree=$d/wt" "project=$d/wt" \
     "kind=ship" "mode=direct-PR" "harness=claude"
   printf 'done: PR https://example.test/o/r/pull/8\n' > "$d/state/moved.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" moved
   out=$(run_crew_state "$d" moved)
   assert_contains "$out" "state: blocked" "a moved remote branch must not count as preserved"
@@ -2639,9 +2639,9 @@ test_no_run_busy_pane() {
   jg_write_meta "$d/state/feat-h.meta" "window=fm:jg-feat-h" "worktree=$d/wt" "kind=ship" "harness=claude"
   # No matching run anywhere. The busy verdict comes from the crew's own
   # semantic lifecycle record (bin/jg-busy-lib.sh), not from rendered text.
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-h)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-h busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -2668,14 +2668,14 @@ test_no_run_launch_prompt_parked_is_not_working() {
   make_repo_on_branch "$d/wt" fm/feat-lp
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-lp.meta" "window=fm:jg-feat-lp" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
-  FM_FAKE_BUSY_TEXT='Quick safety check: Is this a project you created or one you trust? ...
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
+  JG_FAKE_BUSY_TEXT='Quick safety check: Is this a project you created or one you trust? ...
 > No, exit
   Yes, I trust this folder
 Enter to confirm . Esc to cancel'
-  export FM_FAKE_BUSY_TEXT
+  export JG_FAKE_BUSY_TEXT
   # arm only, never apply: the launch turn has never advanced past the seed
   # jg-spawn.sh writes at spawn time.
   "$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-lp >/dev/null
@@ -2695,9 +2695,9 @@ test_no_run_footer_text_alone_is_not_working() {
   make_repo_on_branch "$d/wt" fm/feat-h2
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-h2.meta" "window=fm:jg-feat-h2" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
   printf 'done: stale completion event\n' > "$d/state/feat-h2.status"
   local out; out=$(run_crew_state "$d" feat-h2)
   assert_not_contains "$out" "state: working" "a footer alone must not read working for a converted adapter"
@@ -2715,11 +2715,11 @@ test_no_run_grok_uses_isolated_fallback() {
   make_repo_on_branch "$d/wt" fm/feat-h3
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-h3.meta" "window=fm:jg-feat-h3" "worktree=$d/wt" "kind=ship" "harness=grok"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
-  FM_FAKE_BUSY_TEXT='Ctrl+c:cancel'
-  export FM_FAKE_BUSY_TEXT
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
+  JG_FAKE_BUSY_TEXT='Ctrl+c:cancel'
+  export JG_FAKE_BUSY_TEXT
   local out; out=$(run_crew_state "$d" feat-h3)
   assert_contains "$out" "state: working" "grok busy tail -> working"
   assert_contains "$out" "grok-regex" "the grok verdict names its isolated fallback source"
@@ -2734,11 +2734,11 @@ test_no_run_herdr_unknown_uses_backend_capture() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-herdr.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_BUSY=1
-  FM_FAKE_HERDR_AGENT_STATUS=working
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_BUSY=1
+  JG_FAKE_HERDR_AGENT_STATUS=working
   local out; out=$(run_crew_state "$d" feat-herdr)
   assert_contains "$out" "state: working" "herdr native busy -> working"
   assert_contains "$out" "source: pane" "herdr native busy -> pane source"
@@ -2772,9 +2772,9 @@ SH
   chmod +x "$d/fakebin/herdr"
   jg_write_meta "$d/state/feat-herdr-cli.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
   local out; out=$(run_crew_state "$d" feat-herdr-cli)
   assert_contains "$out" "state: unknown" "a failed herdr CLI must stay unknown"
   assert_contains "$out" "source: none" "a failed herdr CLI has no state source"
@@ -2794,13 +2794,13 @@ test_no_run_herdr_alive_with_failed_read_stays_live() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-herdr-alive.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
   # The 200-line scrollback read fails while the cheap pane get / agent get
   # pair answers: the pane is present and its agent is working.
-  FM_FAKE_HERDR_READ_FAIL=1
-  FM_FAKE_HERDR_AGENT_STATUS=working
+  JG_FAKE_HERDR_READ_FAIL=1
+  JG_FAKE_HERDR_AGENT_STATUS=working
   local out; out=$(run_crew_state "$d" feat-herdr-alive)
   assert_contains "$out" "state: working" "an alive endpoint with a failed scrollback read stays live"
   assert_not_contains "$out" "backend unreachable" "an authoritative alive answer is never unreachable"
@@ -2820,10 +2820,10 @@ test_no_run_herdr_stale_registration_over_shell_reads_agent_gone() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-herdr-stale.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=pi"
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_READ_FAIL=1
-  FM_FAKE_HERDR_AGENT_STATUS=idle
-  FM_FAKE_HERDR_PROCESS=shell
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_READ_FAIL=1
+  JG_FAKE_HERDR_AGENT_STATUS=idle
+  JG_FAKE_HERDR_PROCESS=shell
   local out; out=$(run_crew_state "$d" feat-herdr-stale)
   assert_contains "$out" "state: unknown" "a stale registration over a shell-only pane is not a live state"
   assert_contains "$out" "backend target gone" "a stale registration over a shell-only pane must read as positive agent-gone evidence"
@@ -2842,14 +2842,14 @@ test_no_run_herdr_stale_working_record_is_never_busy() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-herdr-stale-working.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=pi"
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_AGENT_STATUS=working
-  FM_FAKE_HERDR_PROCESS=shell
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_AGENT_STATUS=working
+  JG_FAKE_HERDR_PROCESS=shell
   local out; out=$(run_crew_state "$d" feat-herdr-stale-working)
   assert_not_contains "$out" "state: working" "a stale working record over a shell-only pane must never read busy"
   assert_not_contains "$out" "herdr-native" "the native busy verdict must not be trusted for a shell-only pane"
   # The control: the same record with a live harness in the foreground is busy.
-  FM_FAKE_HERDR_PROCESS=agent
+  JG_FAKE_HERDR_PROCESS=agent
   out=$(run_crew_state "$d" feat-herdr-stale-working)
   assert_contains "$out" "state: working" "the same working record with a live harness process must still read working"
   pass "herdr stale working record never reports a shell-only pane busy"
@@ -2870,19 +2870,19 @@ test_no_run_herdr_busy_record_over_shell_reads_agent_gone() {
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-herdr-busy-record)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-herdr-busy-record busy --gen "$gen" \
     --source pi-ext --event agent-start
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_AGENT_STATUS=working
-  FM_FAKE_HERDR_PROCESS=shell
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_AGENT_STATUS=working
+  JG_FAKE_HERDR_PROCESS=shell
   out=$(run_crew_state "$d" feat-herdr-busy-record)
   assert_not_contains "$out" "state: working" "a busy record over a shell-only pane must never read working"
   assert_contains "$out" "agent not running under its busy record (dead agent-exited)" "the busy record must yield to the exited harness"
-  FM_FAKE_HERDR_PROCESS=agent
+  JG_FAKE_HERDR_PROCESS=agent
   out=$(run_crew_state "$d" feat-herdr-busy-record)
   assert_contains "$out" "state: working" "the same busy record with a live harness must still read working"
   assert_contains "$out" "pi-ext" "the live verdict must come from the busy record"
   # Herdr answers agent_not_found for live harnesses it does not detect, so a
   # missing registration over a running harness is never exit evidence.
-  FM_FAKE_HERDR_HUSK=1
+  JG_FAKE_HERDR_HUSK=1
   out=$(run_crew_state "$d" feat-herdr-busy-record)
   assert_contains "$out" "state: working" "an unregistered but running harness must still read working"
   pass "a busy record over a pane whose harness exited reads agent gone, and a running one stays working with or without a registration"
@@ -2899,13 +2899,13 @@ test_no_run_herdr_husk_dead_still_reads_gone() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-herdr-husk.meta" "window=default:w1:p2" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=claude"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
   # The pane exists and answers pane get, but no agent is registered in it,
   # and the scrollback read fails besides.
-  FM_FAKE_HERDR_READ_FAIL=1
-  FM_FAKE_HERDR_HUSK=1
+  JG_FAKE_HERDR_READ_FAIL=1
+  JG_FAKE_HERDR_HUSK=1
   local out; out=$(run_crew_state "$d" feat-herdr-husk)
   assert_contains "$out" "state: unknown" "a husk pane has no live current state"
   assert_contains "$out" "backend target gone" "a husk pane keeps its gone-class death evidence"
@@ -2933,11 +2933,11 @@ test_no_run_herdr_idle_agent_status_outranked_by_record() {
   # No run attributable (mirrors a no-mistakes run-step lookup that found no
   # matching row within the configured runs-list window): the crew's semantic
   # busy state is the only remaining signal.
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_AGENT_STATUS=idle
-  FM_FAKE_HERDR_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_AGENT_STATUS=idle
+  JG_FAKE_HERDR_BUSY=0
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-herdr-idle)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-herdr-idle busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -2958,11 +2958,11 @@ test_no_run_herdr_idle_agent_status_and_idle_record_stays_idle() {
   jg_write_meta "$d/state/feat-herdr-stopped.meta" "window=default:w1:p4" "worktree=$d/wt" "kind=ship" \
     "backend=herdr" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-herdr-stopped.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
-  FM_FAKE_HERDR_AGENT_STATUS=idle
-  FM_FAKE_HERDR_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
+  JG_FAKE_HERDR_AGENT_STATUS=idle
+  JG_FAKE_HERDR_BUSY=0
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-herdr-stopped)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-herdr-stopped idle --gen "$gen" \
     --source claude-hook --event stop
@@ -2980,8 +2980,8 @@ test_no_run_idle_pane_uses_log() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-i.meta" "window=fm:jg-feat-i" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: which database?\n' > "$d/state/feat-i.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-i
   local out; out=$(run_crew_state "$d" feat-i)
   assert_contains "$out" "state: parked" "needs-decision log -> parked"
@@ -2996,8 +2996,8 @@ test_no_run_idle_pane_uses_keyed_log() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-keyed.meta" "window=fm:jg-feat-keyed" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision [key=q1]: which database?\n' > "$d/state/feat-keyed.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-keyed
   local out; out=$(run_crew_state "$d" feat-keyed)
   assert_contains "$out" "state: parked" "keyed needs-decision log -> parked"
@@ -3015,8 +3015,8 @@ test_no_run_idle_pane_paused() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-pause.meta" "window=fm:jg-feat-pause" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'paused: holding for the upstream tool release\n' > "$d/state/feat-pause.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-pause
   local out; out=$(run_crew_state "$d" feat-pause)
   assert_contains "$out" "state: paused" "paused log -> paused"
@@ -3133,9 +3133,9 @@ test_latest_status_preserves_legacy_completions() {
   done
   (
     shopt -u nocasematch
-    FM_CAPTAIN_RE='custom-event:' status_is_captain_relevant 'CUSTOM-EVENT: ready' || fail "custom captain regex lost case-insensitive matching"
+    JG_CAPTAIN_RE='custom-event:' status_is_captain_relevant 'CUSTOM-EVENT: ready' || fail "custom captain regex lost case-insensitive matching"
     shopt -q nocasematch && fail "captain matching changed caller shell options"
-    FM_CAPTAIN_RE='custom-event:' status_is_captain_relevant 'done: ready' && fail "custom captain regex did not replace defaults"
+    JG_CAPTAIN_RE='custom-event:' status_is_captain_relevant 'done: ready' && fail "custom captain regex did not replace defaults"
     shopt -s nocasematch
     status_is_captain_relevant 'unrelated prose' && fail "ordinary prose became captain-relevant"
     shopt -q nocasematch || fail "captain matching cleared caller shell options"
@@ -3146,7 +3146,7 @@ test_latest_status_preserves_legacy_completions() {
 test_latest_status_subshell_work_does_not_grow_with_history() {
   local d size i level small large window
   d=$(new_case latest-processes)
-  window=${FM_CLASSIFY_EVENT_WINDOW_LINES:-200}
+  window=${JG_CLASSIFY_EVENT_WINDOW_LINES:-200}
   for size in "$window" "$((window * 10))"; do
     {
       for ((i = 0; i < size; i++)); do
@@ -3181,15 +3181,15 @@ test_no_run_idle_pane_custom_paused_verb() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-custom-pause.meta" "window=fm:jg-feat-custom-pause" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'awaiting: vendor maintenance window\n' > "$d/state/feat-custom-pause.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-custom-pause
-  local out; out=$(FM_CLASSIFY_PAUSED_VERB=awaiting run_crew_state "$d" feat-custom-pause)
+  local out; out=$(JG_CLASSIFY_PAUSED_VERB=awaiting run_crew_state "$d" feat-custom-pause)
   assert_contains "$out" "state: paused" "custom paused verb -> paused"
   assert_contains "$out" "source: status-log" "custom paused verb -> status-log source"
   assert_contains "$out" "vendor maintenance window" "custom pause preserves its reason"
   printf 'paused: default verb no longer selected\n' > "$d/state/feat-custom-pause.status"
-  out=$(FM_CLASSIFY_PAUSED_VERB=awaiting run_crew_state "$d" feat-custom-pause)
+  out=$(JG_CLASSIFY_PAUSED_VERB=awaiting run_crew_state "$d" feat-custom-pause)
   assert_contains "$out" "state: unknown" "custom paused verb replaces the default"
   pass "no run + idle pane honors the configured paused verb"
 }
@@ -3209,8 +3209,8 @@ test_no_run_idle_secondmate_resolved_event_not_state() {
   jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=secondmate" "home=$d/wt"
   printf 'needs-decision [key=race]: pick subscribe order\n' > "$d/state/mate.status"
   printf 'resolved [key=race]: went with subscribe-before-write\n' >> "$d/state/mate.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_BUSY=0
   local out; out=$(run_crew_state "$d" mate)
   assert_contains "$out" "state: unknown" "resolved-then-idle secondmate is not a spurious run-state"
   assert_contains "$out" "source: none" "a resolved event is not treated as a status-log state source"
@@ -3235,9 +3235,9 @@ test_dead_window_ignores_stale_status_log() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dead.meta" "window=fm:jg-feat-dead" "worktree=$d/wt" "kind=ship"
   printf 'done: old completion event\n' > "$d/state/feat-dead.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_MISSING=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_MISSING=1
   local out; out=$(run_crew_state "$d" feat-dead)
   assert_contains "$out" "state: unknown" "dead window -> unknown"
   assert_contains "$out" "source: none" "dead window -> none source"
@@ -3264,9 +3264,9 @@ test_no_run_tmux_unreadable_reads_unreachable_not_gone() {
   jg_write_meta "$d/state/feat-tmux-unread.meta" "window=fm:jg-feat-tmux-unread" \
     "worktree=$d/wt" "kind=ship"
   printf 'done: old completion event\n' > "$d/state/feat-tmux-unread.status"
-  FM_FAKE_AXI_STATUS=""
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_TMUX_UNREADABLE=1
+  JG_FAKE_AXI_STATUS=""
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_TMUX_UNREADABLE=1
   local out; out=$(run_crew_state "$d" feat-tmux-unread)
   assert_contains "$out" "state: unknown" "an unreadable tmux must stay unknown"
   assert_contains "$out" "source: none" "an unreadable tmux has no state source"
@@ -3286,8 +3286,8 @@ test_dead_window_still_reports_terminal_run_step() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dead-done.meta" "window=fm:jg-feat-dead-done" "worktree=$d/wt" "kind=ship"
   printf 'done: PR https://github.com/o/r/pull/3 checks green\n' > "$d/state/feat-dead-done.status"
-  FM_FAKE_AXI_STATUS="$(run_passed fm/feat-dead-done)"
-  FM_FAKE_TMUX_MISSING=1   # the crew's window has closed
+  JG_FAKE_AXI_STATUS="$(run_passed fm/feat-dead-done)"
+  JG_FAKE_TMUX_MISSING=1   # the crew's window has closed
   local out; out=$(run_crew_state "$d" feat-dead-done)
   assert_contains "$out" "state: done" "closed pane still reports terminal run-step done"
   assert_contains "$out" "source: run-step" "closed pane does not mask the run-step"
@@ -3303,8 +3303,8 @@ test_dead_window_still_reports_active_run_step() {
   make_repo_on_branch "$d/wt" fm/feat-dead-act
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-dead-act.meta" "window=fm:jg-feat-dead-act" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-dead-act)"
-  FM_FAKE_TMUX_MISSING=1
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-dead-act)"
+  JG_FAKE_TMUX_MISSING=1
   local out; out=$(run_crew_state "$d" feat-dead-act)
   assert_contains "$out" "state: working" "closed pane still reports active run-step"
   assert_contains "$out" "source: run-step" "closed pane does not mask the active run-step"
@@ -3322,19 +3322,19 @@ test_no_timeout_uses_perl_bound() {
   : > "$calls_file"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
+printf '%s\n' "$*" >> "${JG_FAKE_NM_CALLS:-/dev/null}"
 while :; do :; done
 SH
   chmod +x "$d/fakebin/no-mistakes"
   toolbin=$(make_no_timeout_toolbin "$d")
   jg_write_meta "$d/state/feat-timeout.meta" "window=fm:jg-feat-timeout" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
-  FM_FAKE_BUSY=1
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-timeout)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
   start=$SECONDS
-  out=$(FM_FAKE_NM_CALLS="$calls_file" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
+  out=$(JG_FAKE_NM_CALLS="$calls_file" PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" JG_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
   elapsed=$((SECONDS - start))
   assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
   assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
@@ -3353,8 +3353,8 @@ test_scout_skips_run_lookup() {
   jg_write_meta "$d/state/scout-j.meta" "window=fm:jg-scout-j" "worktree=$d/wt" "kind=scout" \
     "harness=claude"
   # Even if a run existed on this branch, a scout must not read it.
-  FM_FAKE_AXI_STATUS="$(run_running fm/scout-j)"
-  FM_FAKE_BUSY=1
+  JG_FAKE_AXI_STATUS="$(run_running fm/scout-j)"
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" scout-j)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" scout-j busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -3383,9 +3383,9 @@ test_torn_down_worktree() {
 # probe or a local backend adapter: the recorded worktree and pane live on the
 # remote host, and the old local reads misreported a healthy remote mate as
 # "worktree gone". These cases drive the real helper over the real jg-on.sh
-# route with a stubbed ssh transport (FM_SSH_BIN seam): the stub prints
-# FM_FAKE_REMOTE_STATE_OUT as the remote endpoint's recovery-grade state and
-# exits FM_FAKE_SSH_RC.
+# route with a stubbed ssh transport (JG_SSH_BIN seam): the stub prints
+# JG_FAKE_REMOTE_STATE_OUT as the remote endpoint's recovery-grade state and
+# exits JG_FAKE_SSH_RC.
 
 setup_remote_case() {  # <name> -> echoes case dir with remote meta + registry
   local d
@@ -3409,16 +3409,16 @@ EOF
   cat > "$d/fakebin/fake-ssh" <<'SH'
 #!/usr/bin/env bash
 cat > /dev/null
-[ -z "${FM_FAKE_REMOTE_STATE_OUT:-}" ] || printf '%s\n' "$FM_FAKE_REMOTE_STATE_OUT"
-exit "${FM_FAKE_SSH_RC:-0}"
+[ -z "${JG_FAKE_REMOTE_STATE_OUT:-}" ] || printf '%s\n' "$JG_FAKE_REMOTE_STATE_OUT"
+exit "${JG_FAKE_SSH_RC:-0}"
 SH
   chmod +x "$d/fakebin/fake-ssh"
   printf '%s\n' "$d"
 }
 
 run_remote_crew_state() {  # <case-dir> <id>
-  PATH="$1/fakebin:$PATH" FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" \
-    FM_SSH_BIN="$1/fakebin/fake-ssh" "$CREW_STATE" "$2"
+  PATH="$1/fakebin:$PATH" JG_HOME="$1" JG_STATE_OVERRIDE="$1/state" \
+    JG_SSH_BIN="$1/fakebin/fake-ssh" "$CREW_STATE" "$2"
 }
 
 test_remote_alive_with_log_uses_status_log() {
@@ -3427,7 +3427,7 @@ test_remote_alive_with_log_uses_status_log() {
   d=$(setup_remote_case remote-alive-log)
   make_fakebin "$d" >/dev/null
   printf 'working: refactoring the quota adapter\n' > "$d/state/rsm.status"
-  out=$(FM_FAKE_REMOTE_STATE_OUT=alive FM_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
+  out=$(JG_FAKE_REMOTE_STATE_OUT=alive JG_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
   expect_code 0 "$rc" "remote alive exits 0"
   assert_contains "$out" "state: working" "alive remote mate with a working log reads working"
   assert_contains "$out" "source: status-log" "alive remote mate reads current activity from the routed log"
@@ -3441,7 +3441,7 @@ test_remote_alive_idle_is_healthy_not_gone() {
   local d out rc
   d=$(setup_remote_case remote-alive-idle)
   make_fakebin "$d" >/dev/null
-  out=$(FM_FAKE_REMOTE_STATE_OUT=alive FM_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
+  out=$(JG_FAKE_REMOTE_STATE_OUT=alive JG_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
   expect_code 0 "$rc" "remote alive-idle exits 0"
   assert_contains "$out" "source: remote-endpoint" "the remote endpoint is the reported source"
   assert_contains "$out" "alive on remote-mac" "an idle remote mate reads alive"
@@ -3456,7 +3456,7 @@ test_remote_unreachable_is_unknown_remote_not_dead() {
   d=$(setup_remote_case remote-unreachable)
   make_fakebin "$d" >/dev/null
   printf 'working: refactoring the quota adapter\n' > "$d/state/rsm.status"
-  out=$(FM_FAKE_SSH_RC=255 run_remote_crew_state "$d" rsm); rc=$?
+  out=$(JG_FAKE_SSH_RC=255 run_remote_crew_state "$d" rsm); rc=$?
   expect_code 0 "$rc" "unreachable remote exits 0"
   assert_contains "$out" "unknown-remote" "an unreachable remote must be labeled unknown-remote"
   assert_contains "$out" "not proof of death" "an unreachable remote must not read as dead"
@@ -3470,7 +3470,7 @@ test_remote_dead_reports_remote_verdict() {
   local d out rc
   d=$(setup_remote_case remote-dead)
   make_fakebin "$d" >/dev/null
-  out=$(FM_FAKE_REMOTE_STATE_OUT=dead FM_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
+  out=$(JG_FAKE_REMOTE_STATE_OUT=dead JG_FAKE_SSH_RC=0 run_remote_crew_state "$d" rsm); rc=$?
   expect_code 0 "$rc" "remote dead exits 0"
   assert_contains "$out" "remote endpoint dead on remote-mac" \
     "a genuinely dead remote endpoint reports the remote host's own verdict"
@@ -3503,13 +3503,13 @@ test_provably_working_via_runs_list_fallback() {
   short=$(git -C "$d/wt" rev-parse --short=7 HEAD)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-provable.meta" "window=fm:jg-feat-provable" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
   running    fm/feat-provable ${short}  2026-07-02 22:05
 EOF
 )"
-  PATH="$d/fakebin:$PATH" FM_STATE_OVERRIDE="$d/state" crew_is_provably_working feat-provable \
+  PATH="$d/fakebin:$PATH" JG_STATE_OVERRIDE="$d/state" crew_is_provably_working feat-provable \
     || fail "cross-branch attribution via the runs list was not treated as provably working"
   pass "crew_is_provably_working absorbs a validating crew found only via the runs-list fallback"
 }
@@ -3523,13 +3523,13 @@ test_not_provably_working_when_stopped() {
   # Repo-wide run belongs to someone else, and this branch has no row in the
   # runs list either (it never validated, or genuinely finished/stopped) - the
   # only remaining signal is the pane, which is idle.
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<'EOF'
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<'EOF'
   running    fm/other-crew aaaaaaa  2026-07-02 22:10
 EOF
 )"
-  FM_FAKE_BUSY=0
-  PATH="$d/fakebin:$PATH" FM_STATE_OVERRIDE="$d/state" crew_is_provably_working feat-stopped \
+  JG_FAKE_BUSY=0
+  PATH="$d/fakebin:$PATH" JG_STATE_OVERRIDE="$d/state" crew_is_provably_working feat-stopped \
     && fail "a stopped crew with no run anywhere and an idle pane was treated as provably working"
   pass "crew_is_provably_working still surfaces a genuinely stopped crew (safety property preserved)"
 }
@@ -3561,9 +3561,9 @@ test_historical_same_branch_rewritten_head_not_current() {
   jg_write_meta "$d/state/wishlist.meta" "window=fm:jg-wishlist" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: stage 2 setup complete rebased onto merged #76\n' > "$d/state/wishlist.status"
   # Historical run still reports the pre-rewrite head on the reused branch.
-  FM_FAKE_RUN_HEAD="$old_head"
-  FM_FAKE_AXI_STATUS="$(run_parked fm/todo-flag)"
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUN_HEAD="$old_head"
+  JG_FAKE_AXI_STATUS="$(run_parked fm/todo-flag)"
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" wishlist
   out=$(run_crew_state "$d" wishlist)
   assert_not_contains "$out" "source: run-step" "historical rewritten head must not use run-step"
@@ -3587,8 +3587,8 @@ test_active_run_descendant_fix_head_remains_current() {
   git -C "$d/wt" reset -q --hard "$base_head"
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/pipe.meta" "window=fm:jg-pipe" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_RUN_HEAD="$fix_head"
-  FM_FAKE_AXI_STATUS="$(run_fixing fm/feat-pipeline)"
+  JG_FAKE_RUN_HEAD="$fix_head"
+  JG_FAKE_AXI_STATUS="$(run_fixing fm/feat-pipeline)"
   out=$(run_crew_state "$d" pipe)
   assert_contains "$out" "source: run-step" "descendant pipeline fix head remains run-step"
   assert_contains "$out" "state: working" "active fixing run remains working"
@@ -3606,9 +3606,9 @@ test_local_advanced_past_run_head_invalidates() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/adv.meta" "window=fm:jg-adv" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: stage 2 implementation in progress\n' > "$d/state/adv.status"
-  FM_FAKE_RUN_HEAD="$run_head"
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-adv)"
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUN_HEAD="$run_head"
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-adv)"
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" adv
   out=$(run_crew_state "$d" adv)
   assert_not_contains "$out" "source: run-step" "local-advanced tip must not use historical run"
@@ -3657,8 +3657,8 @@ test_pipeline_owned_active_run_beats_superseded_failed_row() {
   short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10.meta" "window=fm:jg-feat-f10" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10 f0f0f0f0)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10 f0f0f0f0)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-f10 f0f0f0f0  2026-08-27 13:53
   failed     fm/feat-f10 ${short}  2026-08-27 12:09
 EOF
@@ -3679,8 +3679,8 @@ test_failed_run_with_no_later_run_still_surfaces() {
   short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10b.meta" "window=fm:jg-feat-f10b" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-f10b)"
-  FM_FAKE_RUNS_LIST="  failed     fm/feat-f10b ${short}  2026-08-27 12:09"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-f10b)"
+  JG_FAKE_RUNS_LIST="  failed     fm/feat-f10b ${short}  2026-08-27 12:09"
   local out; out=$(run_crew_state "$d" feat-f10b)
   assert_contains "$out" "state: failed" "a genuinely failed run with no later run still reports failed"
   assert_contains "$out" "source: run-step" "the genuine failure is run-step sourced"
@@ -3700,14 +3700,14 @@ test_coarse_unresolvable_active_row_never_falls_to_older_row() {
   short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10c.meta" "window=fm:jg-feat-f10c" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-27 14:00
   running    fm/feat-f10c f0f0f0f0  2026-08-27 13:53
   failed     fm/feat-f10c ${short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_BUSY=1
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-f10c)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-f10c busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -3732,14 +3732,14 @@ test_coarse_mismatched_anchor_falls_to_pane_not_older_row() {
   old_short=$(git -C "$d/wt" rev-parse --short=8 HEAD~1)
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10g.meta" "window=fm:jg-feat-f10g" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-27 14:00
   running    fm/feat-f10g f0f0f0f0  2026-08-27 13:53
   failed     fm/feat-f10g ${old_short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_BUSY=1
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-f10g)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-f10g busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -3760,13 +3760,13 @@ test_coarse_terminal_row_at_foreign_head_not_attributed() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10h.meta" "window=fm:jg-feat-f10h" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-f10h.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-27 14:00
   failed     fm/feat-f10h f0f0f0f0  2026-08-27 13:53
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-f10h
   local out; out=$(run_crew_state "$d" feat-f10h)
   assert_not_contains "$out" "source: run-step" "a terminal row at an unresolvable head must not bind"
@@ -3785,9 +3785,9 @@ test_executing_run_binds_without_pipeline_owned_sync() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10d.meta" "window=fm:jg-feat-f10d" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-f10d.status"
-  FM_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10d f0f0f0f0 synced)"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10d f0f0f0f0 synced)"
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-f10d
   local out; out=$(run_crew_state "$d" feat-f10d)
   assert_contains "$out" "source: run-step" "an executing run binds without the pipeline_owned label"
@@ -3807,12 +3807,12 @@ test_non_pipeline_owned_parked_unresolvable_head_not_attributed() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10p.meta" "window=fm:jg-feat-f10p" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-f10p.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-f10p)
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-f10p)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="  running    fm/feat-f10p f0f0f0f0  2026-08-27 13:53"
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST="  running    fm/feat-f10p f0f0f0f0  2026-08-27 13:53"
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-f10p
   local out; out=$(run_crew_state "$d" feat-f10p)
   assert_not_contains "$out" "source: run-step" "a non-pipeline-owned parked run at an unresolvable head must not bind"
@@ -3835,12 +3835,12 @@ test_gate_parked_run_with_live_status_word_not_attributed() {
     make_fakebin "$d" >/dev/null
     jg_write_meta "$d/state/feat-f10q.meta" "window=fm:jg-feat-f10q" "worktree=$d/wt" "kind=ship" "harness=claude"
     printf 'working: implementing\n' > "$d/state/feat-f10q.status"
-    FM_FAKE_RUN_HEAD=f0f0f0f0
-    FM_FAKE_AXI_STATUS="$($fixture fm/feat-f10q)
+    JG_FAKE_RUN_HEAD=f0f0f0f0
+    JG_FAKE_AXI_STATUS="$($fixture fm/feat-f10q)
 branch_sync:
   state: synced"
-    FM_FAKE_RUNS_LIST=""
-    FM_FAKE_BUSY=0
+    JG_FAKE_RUNS_LIST=""
+    JG_FAKE_BUSY=0
     arm_idle_record "$d/state" feat-f10q
     out=$(run_crew_state "$d" feat-f10q)
     assert_not_contains "$out" "source: run-step" "$fixture: a gate-parked run at an unresolvable head must not bind"
@@ -3860,10 +3860,10 @@ test_pipeline_owned_terminal_run_not_exempt() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-f10e.meta" "window=fm:jg-feat-f10e" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: stage 2 in progress\n' > "$d/state/feat-f10e.status"
-  FM_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10e f0f0f0f0)
+  JG_FAKE_AXI_STATUS="$(run_running_pipeline_owned fm/feat-f10e f0f0f0f0)
 outcome: failed"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-f10e
   local out; out=$(run_crew_state "$d" feat-f10e)
   assert_not_contains "$out" "source: run-step" "a terminal run must not bind through the exemption"
@@ -3879,9 +3879,9 @@ test_missing_run_head_falls_back_to_current_state() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/no-head.meta" "window=fm:jg-no-head" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: current stage still in progress\n' > "$d/state/no-head.status"
-  FM_FAKE_AXI_STATUS=$(run_parked fm/feat-no-head | grep -v '^  head:')
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS=$(run_parked fm/feat-no-head | grep -v '^  head:')
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" no-head
   out=$(run_crew_state "$d" no-head)
   assert_not_contains "$out" "source: run-step" "missing run head must not permit branch-only attribution"
@@ -3923,9 +3923,9 @@ test_active_fix_round_unfetched_pipeline_head_reports_current() {
   [ "$h1" != "$h2" ] || fail "fix head did not advance past the submitted head"
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/unfetched.meta" "window=fm:jg-unfetched" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_STATUS="$(run_fixing fm/feat-unfetched)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_STATUS="$(run_fixing fm/feat-unfetched)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other aaaaaaa  2026-07-30 22:10
   running    fm/feat-unfetched $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-unfetched $(git -C "$d/wt" rev-parse --short=7 HEAD)  2026-07-29 20:00
@@ -3955,17 +3955,17 @@ test_unanchored_unfetched_active_row_still_binds() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/noanchor.meta" "window=fm:jg-noanchor" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'failed: earlier stage run\n' > "$d/state/noanchor.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_STATUS="$(run_fixing fm/feat-noanchor)"
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_STATUS="$(run_fixing fm/feat-noanchor)"
   # The row before the active one is an OLDER commit, not this worktree's
   # head: the ledger anchor proves nothing, and the live run binds anyway.
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other aaaaaaa  2026-07-30 22:10
   running    fm/feat-noanchor $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-noanchor $(git -C "$d/wt" rev-parse --short=7 HEAD~1)  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" noanchor
   out=$(run_crew_state "$d" noanchor)
   assert_contains "$out" "source: run-step" "an unanchored active row on the branch still binds"
@@ -3991,13 +3991,13 @@ test_unresolved_terminal_row_is_history_not_current() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/hist.meta" "window=fm:jg-hist" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: stage 2 in progress\n' > "$d/state/hist.status"
-  FM_FAKE_RUN_HEAD="$h_old"
-  FM_FAKE_AXI_STATUS="$(run_failed fm/feat-hist)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUN_HEAD="$h_old"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/feat-hist)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   failed     fm/feat-hist $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-01 20:00
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" hist
   out=$(run_crew_state "$d" hist)
   assert_not_contains "$out" "source: run-step" "an unresolvable terminal row is history, not current state"
@@ -4018,8 +4018,8 @@ test_runs_list_continuation_found_when_axi_answers_other_branch() {
   h2=$(mint_unfetched_fix_head "$d/wt")
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/coarsefix.meta" "window=fm:jg-coarsefix" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-07-30 22:10
   running    fm/feat-coarsefix $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-coarsefix $(git -C "$d/wt" rev-parse --short=7 HEAD)  2026-07-29 20:00
@@ -4042,11 +4042,11 @@ make_competing_runs_case() {  # <name> <new-status> <old-status>
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/competing.meta" "window=fm:jg-competing" "worktree=$d/wt" "kind=ship"
   short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
-  FM_FAKE_AXI_HOME="count: 2 of 2 total
+  JG_FAKE_AXI_HOME="count: 2 of 2 total
 runs[2]{id,branch,status,head,pr}:
   \"01NEW\",fm/competing,$2,$short,\"\"
   \"01OLD\",fm/competing,$3,$short,\"\""
-  FM_FAKE_RUNS_LIST="  $2 fm/competing $short 2026-09-14 12:01
+  JG_FAKE_RUNS_LIST="  $2 fm/competing $short 2026-09-14 12:01
   $3 fm/competing $short 2026-09-14 12:00"
 }
 
@@ -4055,7 +4055,7 @@ make_capped_runs_case() {
   local d=$TMP_ROOT/$1
   NM_HOME="$d/nm"
   mkdir -p "$NM_HOME"
-  FM_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$2" "$3" "$FM_FAKE_RUN_HEAD" "${4:-visible}" <<'PY'
+  JG_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$2" "$3" "$JG_FAKE_RUN_HEAD" "${4:-visible}" <<'PY'
 import csv
 import json
 import sqlite3
@@ -4085,8 +4085,8 @@ for row in rows[:10]:
     csv.writer(sys.stdout, lineterminator="\n").writerow([*row, ""])
 PY
   ) || fail 'could not create the persisted run inventory fixture'
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
 }
 
 test_capped_competing_live_runs_report_both_ids() {
@@ -4123,7 +4123,7 @@ test_capped_overview_with_no_branch_runs_reports_absent() {
   NM_HOME="$d/nm"
   mkdir -p "$NM_HOME"
   local head; head=$(git -C "$d/wt" rev-parse --short=8 HEAD)
-  FM_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$head" <<'PY'
+  JG_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$head" <<'PY'
 import json
 import sqlite3
 import sys
@@ -4146,8 +4146,8 @@ for i in range(10):
     print('  "01OTHER%02d",fm/other-%d,running,%s,""' % (i, i, head))
 PY
 )
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" orphan)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" orphan busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -4175,7 +4175,7 @@ test_no_branch_run_beside_a_live_run_elsewhere_reads_absent() {
   NM_HOME="$d/nm"
   mkdir -p "$NM_HOME"
   local head; head=$(git -C "$d/wt" rev-parse HEAD)
-  FM_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$head" <<'PY'
+  JG_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$d/wt" "$head" <<'PY'
 import json
 import sqlite3
 import sys
@@ -4198,9 +4198,9 @@ for i in range(10):
     print('  "01OTHER%02d",fm/other-%d,running,%s,""' % (i, i, head))
 PY
 )
-  FM_FAKE_AXI_STATUS=$(run_running fm/other-0)
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
+  JG_FAKE_AXI_STATUS=$(run_running fm/other-0)
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" orphan)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" orphan busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -4224,12 +4224,12 @@ test_capped_inventory_reader_is_time_bounded() {
 sleep 30
 SH
   chmod +x "$d/fakebin/python3"
-  FM_CREW_STATE_NM_TIMEOUT=1
-  export FM_CREW_STATE_NM_TIMEOUT
+  JG_CREW_STATE_NM_TIMEOUT=1
+  export JG_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
   out=$(run_crew_state "$d" competing)
   elapsed=$((SECONDS - started))
-  unset FM_CREW_STATE_NM_TIMEOUT
+  unset JG_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
   assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
@@ -4243,7 +4243,7 @@ SH
 test_capped_inventory_requires_exact_repo_path() {
   make_capped_runs_case capped-noncanonical running pending hidden
   local d=$TMP_ROOT/capped-noncanonical out
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed "s|^repo: .*|repo: \"$d/wt/./\"|")
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed "s|^repo: .*|repo: \"$d/wt/./\"|")
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'an unmatched repo spelling cannot establish a verdict'
   assert_contains "$out" 'unreadable' 'an unmatched repo lookup reports the inventory unreadable'
@@ -4269,13 +4269,13 @@ test_linked_worktree_green_merge_monitoring_reads_held_for_merge() {
   git -C "$d/clone" init -q
   git -C "$d/clone" commit -q --allow-empty -m init
   git -C "$d/clone" worktree add -q -b fm/feat-green "$d/wt"
-  FM_FAKE_RUN_HEAD=$(git -C "$d/wt" rev-parse HEAD)
-  export FM_FAKE_RUN_HEAD
+  JG_FAKE_RUN_HEAD=$(git -C "$d/wt" rev-parse HEAD)
+  export JG_FAKE_RUN_HEAD
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-green.meta" "window=fm:jg-feat-green" "worktree=$d/wt" "kind=ship"
   NM_HOME="$d/nm"
   mkdir -p "$NM_HOME"
-  overview=$(python3 - "$NM_HOME/state.sqlite" "$d/clone" "$FM_FAKE_RUN_HEAD" <<'PY'
+  overview=$(python3 - "$NM_HOME/state.sqlite" "$d/clone" "$JG_FAKE_RUN_HEAD" <<'PY'
 import json
 import sqlite3
 import sys
@@ -4307,10 +4307,10 @@ PY
   [ "$(git -C "$d/wt" rev-parse --show-toplevel)" != "$(git -C "$d/clone" rev-parse --show-toplevel)" ] \
     || fail 'the fixture task copy must not be the registered clone'
   assert_contains "$overview" 'count: 10 of 12 total' 'the fixture overview must be capped'
-  FM_FAKE_AXI_HOME=$overview
-  FM_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-green | sed 's/01RUN/01GREEN/')"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
-  FM_FAKE_CI_LOGS=$(cat <<'EOF'
+  JG_FAKE_AXI_HOME=$overview
+  JG_FAKE_AXI_STATUS="$(run_ci_monitoring fm/feat-green | sed 's/01RUN/01GREEN/')"
+  JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
+  JG_FAKE_CI_LOGS=$(cat <<'EOF'
 monitoring CI for PR #2 (timeout: 4h0m0s)...
 CI checks running, waiting for results...
 all CI checks passed - still monitoring until merged or closed
@@ -4319,7 +4319,7 @@ base branch advanced (6f0f139962ea..c5131a33a1b2), re-arming CI monitor timeout
 EOF
 )
   printf 'done: PR https://github.com/o/r/pull/2 checks green\n' > "$d/state/feat-green.status"
-  printf 'pr=https://github.com/o/r/pull/2\npr_head=%s\n' "$FM_FAKE_RUN_HEAD" >> "$d/state/feat-green.meta"
+  printf 'pr=https://github.com/o/r/pull/2\npr_head=%s\n' "$JG_FAKE_RUN_HEAD" >> "$d/state/feat-green.meta"
   out=$(run_crew_state "$d" feat-green)
   assert_not_contains "$out" 'unreadable' 'a linked worktree reads its run through the repo line'
   assert_not_contains "$out" 'state: unknown' 'a green PR in merge monitoring is never unknown'
@@ -4334,7 +4334,7 @@ test_capped_replacement_keeps_gate_and_inventory_unchanged() {
   make_capped_runs_case "capped reviewer's replacement" running cancelled
   local d="$TMP_ROOT/capped reviewer's replacement" out before after
   before=$(git hash-object "$NM_HOME/state.sqlite")
-  FM_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')"
+  JG_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')"
   out=$(run_crew_state "$d" competing)
   after=$(git hash-object "$NM_HOME/state.sqlite")
   assert_contains "$out" 'state: parked' 'the live replacement keeps its review gate beyond the history cap'
@@ -4354,7 +4354,7 @@ test_capped_inventory_failures_report_unknown() {
     (
       make_capped_runs_case "capped-unreadable-$mode" running running
       d=$TMP_ROOT/capped-unreadable-$mode
-      overview=$FM_FAKE_AXI_HOME
+      overview=$JG_FAKE_AXI_HOME
       case "$mode" in
         missing) rm "$NM_HOME/state.sqlite" ;;
         corrupt) printf 'invalid database\n' > "$NM_HOME/state.sqlite" ;;
@@ -4372,7 +4372,7 @@ PY
         count) overview=$(printf '%s\n' "$overview" | sed '/^count:/d') ;;
         norepo) overview=$(printf '%s\n' "$overview" | sed '/^repo:/d') ;;
       esac
-      out=$(FM_FAKE_AXI_HOME="$overview" run_crew_state "$d" competing)
+      out=$(JG_FAKE_AXI_HOME="$overview" run_crew_state "$d" competing)
       assert_contains "$out" 'state: unknown' "$mode cannot fall back to a confident verdict from capped rows"
       assert_contains "$out" '01NEW' "$mode preserves the available run identity"
       if [ "$mode" = missing ]; then
@@ -4403,17 +4403,17 @@ test_complete_inventory_ignores_unrelated_semantics() {
     d=$TMP_ROOT/unrelated-semantics-$i
     git -C "$d/wt" check-ref-format --branch "$branch" >/dev/null || fail 'fixture branch must be valid Git syntax'
     encoded=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$branch")
-    FM_FAKE_AXI_HOME="$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/2 of 2/3 of 3/; s/runs\[2\]/runs[3]/')
-  01OTHER,$encoded,running,$FM_FAKE_RUN_HEAD,\"\""
-    FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
-    FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+    JG_FAKE_AXI_HOME="$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/2 of 2/3 of 3/; s/runs\[2\]/runs[3]/')
+  01OTHER,$encoded,running,$JG_FAKE_RUN_HEAD,\"\""
+    JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
+    JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
     toolbin=$(make_no_python_toolbin "$d")
-    out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+    out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
     assert_contains "$out" 'state: parked' 'R6 unrelated branch syntax must not suppress the requested gate'
     assert_contains "$out" '01NEW' 'selection retains the requested run identity'
-    FM_FAKE_AXI_HOME="$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed '/^  01OTHER,/d')
+    JG_FAKE_AXI_HOME="$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed '/^  01OTHER,/d')
   foreign.id,$encoded,FUTURE,unresolved,\"\""
-    out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+    out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
     assert_contains "$out" 'state: parked' 'unrelated id status and head semantics cannot suppress the requested gate'
     assert_not_contains "$out" 'foreign.id' 'unrelated identities are not candidates'
   done
@@ -4428,12 +4428,12 @@ test_requested_branch_has_no_character_whitelist() {
     d=$TMP_ROOT/requested-branch-syntax-$i
     git -C "$d/wt" branch -m "$branch"
     encoded=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$branch")
-    FM_FAKE_AXI_HOME="count: 2 of 2 total
+    JG_FAKE_AXI_HOME="count: 2 of 2 total
 runs[2]{id,branch,status,head,pr}:
-  01NEW,$encoded,running,$FM_FAKE_RUN_HEAD,\"\"
-  01OLD,$encoded,cancelled,$FM_FAKE_RUN_HEAD,\"\""
-    FM_FAKE_AXI_STATUS="$(run_running "$branch" | sed 's/01RUN/01NEW/')"
-    FM_FAKE_AXI_STATUS_RUN="$(run_parked "$branch" | sed 's/01RUN/01NEW/')"
+  01NEW,$encoded,running,$JG_FAKE_RUN_HEAD,\"\"
+  01OLD,$encoded,cancelled,$JG_FAKE_RUN_HEAD,\"\""
+    JG_FAKE_AXI_STATUS="$(run_running "$branch" | sed 's/01RUN/01NEW/')"
+    JG_FAKE_AXI_STATUS_RUN="$(run_parked "$branch" | sed 's/01RUN/01NEW/')"
     out=$(run_crew_state "$d" competing)
     assert_contains "$out" 'state: parked' 'R6 requested branch identity must not depend on a character whitelist'
     assert_contains "$out" '01NEW' 'the requested branch keeps its selected run'
@@ -4444,7 +4444,7 @@ runs[2]{id,branch,status,head,pr}:
 test_capped_inventory_ignores_unrelated_semantics() {
   make_capped_runs_case capped-unrelated-semantics running running
   local d=$TMP_ROOT/capped-unrelated-semantics out
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's@01OTHER00,fm/other-0,running,[^,]*,@foreign.id,"fix/a,b",FUTURE,unresolved,@')
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's@01OTHER00,fm/other-0,running,[^,]*,@foreign.id,"fix/a,b",FUTURE,unresolved,@')
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'competing runs remain ambiguous beside unrelated metadata'
   assert_contains "$out" '01NEW' 'capped ambiguity retains the visible id'
@@ -4456,7 +4456,7 @@ test_capped_inventory_ignores_unrelated_semantics() {
 test_capped_requested_semantics_do_not_hide_ids() {
   make_capped_runs_case capped-requested-semantics running running
   local d=$TMP_ROOT/capped-requested-semantics out
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's@01NEW,fm/competing,running,[^,]*,@01NEW,fm/competing,FUTURE,unresolved,@')
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's@01NEW,fm/competing,running,[^,]*,@01NEW,fm/competing,FUTURE,unresolved,@')
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'readable competing identities remain ambiguous'
   assert_contains "$out" '01NEW' 'the visible requested run remains identified'
@@ -4474,9 +4474,9 @@ import sys
 with sqlite3.connect(sys.argv[1]) as db:
     db.execute("UPDATE runs SET branch = ? WHERE repo_id = 'repo' AND branch = 'fm/competing'", (sys.argv[2],))
 PY
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's@fm/competing@"fix/a,b"@g')
-  FM_FAKE_AXI_STATUS="$(run_running "$branch" | sed 's/01RUN/01NEW/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked "$branch" | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's@fm/competing@"fix/a,b"@g')
+  JG_FAKE_AXI_STATUS="$(run_running "$branch" | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked "$branch" | sed 's/01RUN/01NEW/')"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'quoted branch fields retain ambiguous authority'
   assert_contains "$out" '01NEW' 'the quoted requested branch retains its visible run'
@@ -4489,13 +4489,13 @@ test_inventory_structure_and_requested_semantics_remain_checked() {
   for mode in columns count status head; do
     make_competing_runs_case "requested-validation-$mode" running cancelled
     d=$TMP_ROOT/requested-validation-$mode
-    FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
-    FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+    JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
+    JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
     case "$mode" in
-      columns) FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed '/01NEW/s/,""$//') ;;
-      count) FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/2 of 2/1 of 2/') ;;
-      status) FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/,running,/,FUTURE,/') ;;
-      head) FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed '/01NEW/s/,[a-f0-9]*,""$/,unresolved,""/') ;;
+      columns) JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed '/01NEW/s/,""$//') ;;
+      count) JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/2 of 2/1 of 2/') ;;
+      status) JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/,running,/,FUTURE,/') ;;
+      head) JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed '/01NEW/s/,[a-f0-9]*,""$/,unresolved,""/') ;;
     esac
     out=$(run_crew_state "$d" competing)
     assert_contains "$out" 'state: unknown' "$mode still prevents a confident selection"
@@ -4509,9 +4509,9 @@ test_complete_inventory_without_python_keeps_gate() {
   make_competing_runs_case no-python-complete running cancelled
   local d=$TMP_ROOT/no-python-complete toolbin out
   toolbin=$(make_no_python_toolbin "$d")
-  FM_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
-  out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+  JG_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+  out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
   assert_contains "$out" 'state: parked' 'R5 complete inventory keeps its gate without Python'
   assert_contains "$out" 'parked at review: 2 finding(s)' 'optional dependencies do not remove gate detail'
   assert_contains "$out" '01NEW' 'complete inventory retains the selected id without Python'
@@ -4522,8 +4522,8 @@ test_complete_ambiguity_without_python_names_both_ids() {
   make_competing_runs_case no-python-ambiguous running pending
   local d=$TMP_ROOT/no-python-ambiguous toolbin out
   toolbin=$(make_no_python_toolbin "$d")
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
-  out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
+  out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
   assert_contains "$out" 'state: unknown' 'complete competing runs remain ambiguous without Python'
   assert_contains "$out" '01NEW' 'R5 complete ambiguity retains the newer id without Python'
   assert_contains "$out" '01OLD' 'complete ambiguity retains the older id without Python'
@@ -4536,7 +4536,7 @@ test_capped_without_python_preserves_available_ids() {
     make_capped_runs_case "no-python-capped-$placement" running pending "$placement"
     d=$TMP_ROOT/no-python-capped-$placement
     toolbin=$(make_no_python_toolbin "$d")
-    out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+    out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
     assert_contains "$out" 'state: unknown' 'unreadable complete inventory must fail closed'
     assert_contains "$out" '01NEW' 'R5 capped lookup retains available ids without Python'
     assert_contains "$out" 'inventory' 'unknown explains that complete inventory could not be read'
@@ -4618,10 +4618,10 @@ test_complete_empty_inventory_crew_state_is_not_unknown() {
   make_repo_on_branch "$d/wt" fm/fresh-branch
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/fresh.meta" "window=fm:jg-fresh-branch" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS=$(printf 'current_branch: fm/fresh-branch\nruns_on_current_branch: 0\ncount: 0 of 0 total\nruns[0]{id,branch,status,head,pr}:\n')
-  FM_FAKE_AXI_HOME=$(printf 'repo: %s\ncount: 0 of 0 total\nruns[0]{id,branch,status,head,pr}:\n' "$d/wt")
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_BUSY=1
+  JG_FAKE_AXI_STATUS=$(printf 'current_branch: fm/fresh-branch\nruns_on_current_branch: 0\ncount: 0 of 0 total\nruns[0]{id,branch,status,head,pr}:\n')
+  JG_FAKE_AXI_HOME=$(printf 'repo: %s\ncount: 0 of 0 total\nruns[0]{id,branch,status,head,pr}:\n' "$d/wt")
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_BUSY=1
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" fresh)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" fresh busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -4636,15 +4636,15 @@ test_complete_empty_inventory_crew_state_is_not_unknown() {
 test_live_to_terminal_inventory_disagreement_is_unknown() {
   make_competing_runs_case live-to-terminal running cancelled
   local d=$TMP_ROOT/live-to-terminal out
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_failed fm/competing | sed 's/01RUN/01NEW/; s/failed/cancelled/')"
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_failed fm/competing | sed 's/01RUN/01NEW/; s/failed/cancelled/')"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'R1 live selection becoming terminal cannot publish a stale failure'
   assert_contains "$out" 'status disagrees with inventory' 'the selection race is identified'
   assert_contains "$out" '01NEW' 'the changing run remains identifiable'
   assert_not_contains "$out" 'state: failed' 'a cancelled stale selection is not a work failure'
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/,running,/,cancelled,/')
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/,running,/,cancelled,/')
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'terminal-to-live disagreement remains rejected'
   pass 'R1 both directions of inventory liveness disagreement read unknown'
@@ -4657,9 +4657,9 @@ make_uninitialized_worker_case() {
   make_repo_on_branch "$d/wt" fm/no-gate
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/worker.meta" "window=fm:jg-worker" "worktree=$d/wt" "kind=ship" "harness=claude"
-  FM_FAKE_AXI_STATUS=$(cat "$ROOT/tests/captures/no-mistakes-v1.70.1/uninitialized.toon")
-  FM_FAKE_AXI_STATUS_ERROR=1
-  FM_FAKE_AXI_HOME_ERROR=1
+  JG_FAKE_AXI_STATUS=$(cat "$ROOT/tests/captures/no-mistakes-v1.70.1/uninitialized.toon")
+  JG_FAKE_AXI_STATUS_ERROR=1
+  JG_FAKE_AXI_HOME_ERROR=1
   printf 'working: implementation continues\n' > "$d/state/worker.status"
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" worker)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" worker "$2" --gen "$gen" \
@@ -4673,7 +4673,7 @@ test_uninitialized_busy_worker_uses_pane() {
   assert_contains "$out" 'state: working' 'R2 an uninitialized gate must preserve a busy worker'
   assert_contains "$out" 'source: pane' 'a busy worker without a gate uses current pane evidence'
   assert_not_contains "$out" 'source: run-step' 'an initialization error is not a run'
-  FM_FAKE_AXI_STATUS='error: "database locked"'
+  JG_FAKE_AXI_STATUS='error: "database locked"'
   out=$(run_crew_state "$d" worker)
   assert_contains "$out" 'state: unknown' 'other inventory errors must not be mistaken for no gate'
   pass 'R2 uninitialized busy workers retain pane reporting'
@@ -4692,8 +4692,8 @@ test_uninitialized_idle_worker_uses_status() {
 make_historical_inventory_case() {
   make_competing_runs_case "$1" completed cancelled
   local d=$TMP_ROOT/$1 gen
-  FM_FAKE_AXI_STATUS="$(run_passed fm/competing | sed 's/01RUN/01NEW/')"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  JG_FAKE_AXI_STATUS="$(run_passed fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
   git -C "$d/wt" commit -q --allow-empty -m 'current work after completed validation'
   jg_write_meta "$d/state/competing.meta" "window=fm:jg-competing" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementation after validation\n' > "$d/state/competing.status"
@@ -4725,14 +4725,14 @@ test_historical_inventory_uses_current_status() {
 test_superseded_cancelled_run_preserves_replacement_gate() {
   make_competing_runs_case superseded-gate running cancelled
   local d=$TMP_ROOT/superseded-gate out
-  FM_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')
+  JG_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01OLD/; s/failed/cancelled/')
 error: \"cancelled: superseded by new push\""
   # The rerun's rebased head is not in the submitted worktree's object store.
-  FM_FAKE_RUN_HEAD=0123abcd
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')
+  JG_FAKE_RUN_HEAD=0123abcd
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')
 branch_sync:
   state: pipeline_owned"
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed '/01NEW/s/,[a-f0-9]*,""$/,0123abcd,""/')
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed '/01NEW/s/,[a-f0-9]*,""$/,0123abcd,""/')
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: parked' 'superseded cancelled run must expose the live review gate'
   assert_contains "$out" 'parked at review: 2 finding(s)' 'replacement gate detail survives selection'
@@ -4759,12 +4759,12 @@ test_live_rebased_run_beats_older_failed_run_at_local_head() {
   make_competing_runs_case live-rebased running failed
   local d=$TMP_ROOT/live-rebased out rebased
   rebased=$(make_rebased_head "$d/wt")
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01NEW/')
 branch_sync:
   state: synced"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
   printf 'working: validating\n' > "$d/state/competing.status"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: working' 'a live run on the branch reads working despite its rebased head'
@@ -4784,10 +4784,10 @@ test_live_rebased_run_reads_working_for_every_executing_status() {
     make_competing_runs_case "live-rebased-$status" "$status" failed
     d=$TMP_ROOT/live-rebased-$status
     rebased=$(make_rebased_head "$d/wt")
-    FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
-    FM_FAKE_RUN_HEAD=$rebased
-    FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed "s/01RUN/01NEW/; s/status: running/status: $status/")"
-    FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+    JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
+    JG_FAKE_RUN_HEAD=$rebased
+    JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed "s/01RUN/01NEW/; s/status: running/status: $status/")"
+    JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
     out=$(run_crew_state "$d" competing)
     assert_contains "$out" 'state: working' "$status run with a rebased head reads working"
     assert_contains "$out" 'source: run-step' "$status run with a rebased head is run-step sourced"
@@ -4810,12 +4810,12 @@ test_legacy_surface_binds_fixing_and_ci_at_a_rebased_head() {
     make_fakebin "$d" >/dev/null
     jg_write_meta "$d/state/feat-legacylive.meta" "window=fm:jg-feat-legacylive" "worktree=$d/wt" "kind=ship" "harness=claude"
     printf 'failed: earlier stage run\n' > "$d/state/feat-legacylive.status"
-    FM_FAKE_RUN_HEAD=$rebased
-    FM_FAKE_AXI_STATUS="$(run_running fm/feat-legacylive | sed "s/status: running/status: $status/")
+    JG_FAKE_RUN_HEAD=$rebased
+    JG_FAKE_AXI_STATUS="$(run_running fm/feat-legacylive | sed "s/status: running/status: $status/")
 branch_sync:
   state: synced"
-    FM_FAKE_RUNS_LIST=""
-    FM_FAKE_BUSY=0
+    JG_FAKE_RUNS_LIST=""
+    JG_FAKE_BUSY=0
     arm_idle_record "$d/state" feat-legacylive
     out=$(run_crew_state "$d" feat-legacylive)
     assert_contains "$out" "source: run-step" "a legacy $status run at a rebased head binds"
@@ -4837,11 +4837,11 @@ test_legacy_live_rebased_run_is_authoritative() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-rebased.meta" "window=fm:jg-feat-rebased" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: validating\n' > "$d/state/feat-rebased.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-rebased)
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-rebased)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-rebased ${rebased}  2026-08-23 13:53
   failed     fm/feat-rebased ${short}  2026-08-23 12:09
 EOF
@@ -4864,13 +4864,13 @@ test_live_record_at_diverged_head_does_not_bind_an_unproven_record() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-zombie.meta" "window=fm:jg-feat-zombie" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: validating\n' > "$d/state/feat-zombie.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-zombie)
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-zombie)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-zombie
   out=$(run_crew_state "$d" feat-zombie)
   assert_not_contains "$out" "source: run-step" "a record with neither head nor anchor identity must not bind"
@@ -4890,17 +4890,17 @@ test_parked_gate_survives_a_dead_daemon() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-parkdd.meta" "window=fm:jg-feat-parkdd" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/feat-parkdd.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-parkdd)
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-parkdd)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-parkdd f0f0f0f0  2026-08-27 13:53
   completed  fm/feat-parkdd ${local_short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-parkdd
   out=$(run_crew_state "$d" feat-parkdd)
   assert_contains "$out" "state: parked" "an open gate stays parked when the instrument dies"
@@ -4921,15 +4921,15 @@ test_selected_run_diverged_head_does_not_bind_an_unproven_record() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/seldiv.meta" "window=fm:jg-seldiv" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: validating\n' > "$d/state/seldiv.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-seldiv,running,$rebased,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-seldiv)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-seldiv)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" seldiv
   out=$(run_crew_state "$d" seldiv)
   assert_not_contains "$out" "source: run-step" "an unproven record must not bind on the selected route either"
@@ -4948,17 +4948,17 @@ test_socket_refused_log_survives_the_dead_daemon_verdict() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-sockdiv.meta" "window=fm:jg-feat-sockdiv" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'blocked: no-mistakes daemon socket refused connections\n' > "$d/state/feat-sockdiv.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-sockdiv)
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-sockdiv)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-sockdiv f0f0f0f0  2026-08-27 13:53
   completed  fm/feat-sockdiv ${local_short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-sockdiv
   out=$(run_crew_state "$d" feat-sockdiv)
   assert_contains "$out" "state: blocked" "a first-hand socket refusal is not demoted to a generic unknown"
@@ -4979,19 +4979,19 @@ test_ordinary_blocked_tip_survives_the_dead_daemon_verdict() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-obanch.meta" "window=fm:jg-feat-obanch" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'blocked: database upload failed with broken pipe\n' > "$d/state/feat-obanch.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-obanch,running,$h2,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-obanch)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-obanch)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-obanch $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-obanch ${short}  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-obanch
   out=$(run_crew_state "$d" feat-obanch)
   assert_contains "$out" "state: blocked" "an ordinary blocker stays blocked when the record is unverified"
@@ -5013,13 +5013,13 @@ test_unproven_record_with_dead_daemon_does_not_override_a_busy_pane() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-unproven.meta" "window=fm:jg-feat-unproven" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-unproven.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-unproven)
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-unproven)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=1
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=1
   gen=$("$ROOT/bin/jg-busy-event.sh" arm "$d/state" feat-unproven)
   "$ROOT/bin/jg-busy-event.sh" apply "$d/state" feat-unproven busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
@@ -5040,13 +5040,13 @@ test_coarse_live_row_over_ordinary_blocked_keeps_superseded_reading() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cob.meta" "window=fm:jg-feat-cob" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'blocked: database upload failed with broken pipe\n' > "$d/state/feat-cob.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-cob ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cob
   out=$(run_crew_state "$d" feat-cob)
   assert_contains "$out" "state: working" "an ordinary blocker over a live coarse row keeps working"
@@ -5065,13 +5065,13 @@ test_live_record_at_diverged_head_binds_while_daemon_answers() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-livedaemon.meta" "window=fm:jg-feat-livedaemon" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: validating\n' > "$d/state/feat-livedaemon.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-livedaemon)
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-livedaemon)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_DAEMON_DOWN=0
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_DAEMON_DOWN=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-livedaemon
   out=$(run_crew_state "$d" feat-livedaemon)
   assert_contains "$out" "source: run-step" "a reachable daemon keeps the rebased live run authoritative"
@@ -5090,17 +5090,17 @@ test_anchored_continuation_binds_while_daemon_answers() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-anchorup.meta" "window=fm:jg-feat-anchorup" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: validating\n' > "$d/state/feat-anchorup.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-anchorup)
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-anchorup)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-anchorup f0f0f0f0  2026-08-27 13:53
   completed  fm/feat-anchorup ${local_short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=0
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-anchorup
   out=$(run_crew_state "$d" feat-anchorup)
   assert_contains "$out" "source: run-step" "the anchored continuation still binds with the daemon answering"
@@ -5118,14 +5118,14 @@ test_unverified_coarse_record_makes_no_supersede_claim() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cus.meta" "window=fm:jg-feat-cus" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/feat-cus.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-cus ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cus
   out=$(run_crew_state "$d" feat-cus)
   assert_contains "$out" "state: working" "a head-tied coarse row keeps its working reading whatever the daemon answers"
@@ -5147,19 +5147,19 @@ test_selected_run_anchored_continuation_needs_a_live_daemon() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/selanchor.meta" "window=fm:jg-selanchor" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/selanchor.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-selanchor,running,$h2,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-selanchor)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-selanchor)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-selanchor $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-selanchor ${short}  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" selanchor
   out=$(run_crew_state "$d" selanchor)
   assert_not_contains "$out" "state: working" "the selected anchored route must not read working with the daemon answering down"
@@ -5180,21 +5180,21 @@ test_selected_run_anchored_parked_keeps_its_gate_with_a_dead_daemon() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/selpark.meta" "window=fm:jg-selpark" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/selpark.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-selpark,running,f0f0f0f0,\"\""
-  FM_FAKE_AXI_STATUS="$(run_parked fm/feat-selpark)
+  JG_FAKE_AXI_STATUS="$(run_parked fm/feat-selpark)
 branch_sync:
   state: synced"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-selpark f0f0f0f0  2026-08-27 13:53
   completed  fm/feat-selpark ${local_short}  2026-08-27 12:09
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" selpark
   out=$(run_crew_state "$d" selpark)
   assert_contains "$out" "state: parked" "an anchored parked run stays parked when the instrument dies"
@@ -5216,19 +5216,19 @@ test_selected_run_dead_daemon_leaves_the_open_decision_open() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/seldec.meta" "window=fm:jg-seldec" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/seldec.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-seldec,running,$h2,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-seldec)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-seldec)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-seldec $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-seldec ${short}  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" seldec
   out=$(run_crew_state "$d" seldec)
   assert_contains "$out" "state: parked" "the open decision is not hidden behind the unverified record"
@@ -5251,14 +5251,14 @@ test_unanswered_probe_does_not_turn_a_failed_coarse_record_into_a_gate() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cfpt.meta" "window=fm:jg-feat-cfpt" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/feat-cfpt.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   failed     fm/feat-cfpt ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_DAEMON_TIMEOUT=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_TIMEOUT=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cfpt
   out=$(run_crew_state "$d" feat-cfpt)
   assert_contains "$out" "state: unknown" "an unanswered probe still degrades the terminal record"
@@ -5279,19 +5279,19 @@ test_selected_route_dead_daemon_names_the_run_once() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/selonce.meta" "window=fm:jg-selonce" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/selonce.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-selonce,running,$h2,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-selonce)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-selonce)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-selonce $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-selonce ${short}  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" selonce
   out=$(run_crew_state "$d" selonce)
   ids=$(printf '%s\n' "$out" | grep -o '01RUN' | wc -l | tr -d ' ')
@@ -5316,19 +5316,19 @@ test_head_tied_row_reads_the_same_whichever_run_axi_names() {
     jg_write_meta "$d/state/feat-htied.meta" "window=fm:jg-feat-htied" "worktree=$d/wt" "kind=ship" "harness=claude"
     printf 'working: implementing\n' > "$d/state/feat-htied.status"
     if [ "$who" = self ]; then
-      FM_FAKE_AXI_STATUS="$(run_running fm/feat-htied)
+      JG_FAKE_AXI_STATUS="$(run_running fm/feat-htied)
 branch_sync:
   state: synced"
     else
-      FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+      JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
     fi
-    FM_FAKE_RUNS_LIST="$(cat <<EOF
+    JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-htied ${local_short}  2026-08-23 13:53
 EOF
 )"
-    FM_FAKE_DAEMON_DOWN=1
-    FM_FAKE_BUSY=0
+    JG_FAKE_DAEMON_DOWN=1
+    JG_FAKE_BUSY=0
     arm_idle_record "$d/state" feat-htied
     out=$(run_crew_state "$d" feat-htied)
     assert_contains "$out" "state: working" "$who: a head-tied run reads working with the daemon down"
@@ -5350,13 +5350,13 @@ test_coarse_head_tied_row_is_exempt_even_when_the_record_head_diverged() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-chtd.meta" "window=fm:jg-feat-chtd" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-chtd.status"
-  FM_FAKE_RUN_HEAD=f0f0f0f0
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-chtd)
+  JG_FAKE_RUN_HEAD=f0f0f0f0
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-chtd)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST="  running    fm/feat-chtd ${local_short}  2026-08-23 13:53"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST="  running    fm/feat-chtd ${local_short}  2026-08-23 13:53"
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-chtd
   out=$(run_crew_state "$d" feat-chtd)
   assert_contains "$out" "state: working" "a head-tied ledger row keeps its working reading"
@@ -5376,14 +5376,14 @@ test_unrecognised_ledger_word_keeps_the_ordinary_supersede_note() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-uws.meta" "window=fm:jg-feat-uws" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/feat-uws.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   pending    fm/feat-uws ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=0
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-uws
   out=$(run_crew_state "$d" feat-uws)
   assert_contains "$out" "state: unknown" "an unrecognised word still reads unknown"
@@ -5402,13 +5402,13 @@ test_coarse_pending_ledger_word_reads_unknown() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cpend.meta" "window=fm:jg-feat-cpend" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-cpend.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   pending    fm/feat-cpend ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cpend
   out=$(run_crew_state "$d" feat-cpend)
   assert_contains "$out" "state: unknown" "a pending ledger word is not a working claim"
@@ -5427,19 +5427,19 @@ test_selected_run_anchored_continuation_binds_while_daemon_answers() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/selanchorup.meta" "window=fm:jg-selanchorup" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/selanchorup.status"
-  FM_FAKE_RUN_HEAD="$h2"
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  JG_FAKE_RUN_HEAD="$h2"
+  JG_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
   \"01RUN\",fm/feat-selanchorup,running,$h2,\"\""
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-selanchorup)"
-  FM_FAKE_AXI_STATUS_RUN="$FM_FAKE_AXI_STATUS"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-selanchorup)"
+  JG_FAKE_AXI_STATUS_RUN="$JG_FAKE_AXI_STATUS"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/feat-selanchorup $(git -C "$d/wt.pipe" rev-parse --short=7 HEAD)  2026-07-30 22:05
   failed     fm/feat-selanchorup ${short}  2026-07-29 20:00
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=0
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" selanchorup
   out=$(run_crew_state "$d" selanchorup)
   assert_contains "$out" "source: run-step" "the selected anchored route binds with the daemon answering"
@@ -5460,14 +5460,14 @@ test_coarse_failed_record_with_dead_daemon_reads_unknown() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cfs.meta" "window=fm:jg-feat-cfs" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: approve the schema change\n' > "$d/state/feat-cfs.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   failed     fm/feat-cfs ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cfs
   out=$(run_crew_state "$d" feat-cfs)
   assert_contains "$out" "state: unknown" "a dead daemon degrades the terminal record to unknown"
@@ -5488,13 +5488,13 @@ test_unanswered_daemon_probe_does_not_suppress_live_run() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-probeto.meta" "window=fm:jg-feat-probeto" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'failed: earlier run failed\n' > "$d/state/feat-probeto.status"
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_running fm/feat-probeto)
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_running fm/feat-probeto)
 branch_sync:
   state: synced"
-  FM_FAKE_RUNS_LIST=""
-  FM_FAKE_DAEMON_TIMEOUT=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_RUNS_LIST=""
+  JG_FAKE_DAEMON_TIMEOUT=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-probeto
   out=$(run_crew_state "$d" feat-probeto)
   assert_contains "$out" "source: run-step" "an unanswered probe must not unbind the live run"
@@ -5514,14 +5514,14 @@ test_coarse_live_row_is_exempt_from_the_dead_daemon_verdict() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cldd.meta" "window=fm:jg-feat-cldd" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-cldd.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-cldd ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_DAEMON_DOWN=1
-  FM_FAKE_BUSY=0
+  JG_FAKE_DAEMON_DOWN=1
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cldd
   out=$(run_crew_state "$d" feat-cldd)
   assert_contains "$out" "state: working" "a head-tied coarse row keeps its working reading"
@@ -5541,13 +5541,13 @@ test_coarse_live_row_keeps_the_original_supersede_note() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-cg.meta" "window=fm:jg-feat-cg" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'needs-decision: review gate has an ask-user finding\n' > "$d/state/feat-cg.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-cg ${local_short}  2026-08-23 13:53
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-cg
   out=$(run_crew_state "$d" feat-cg)
   assert_contains "$out" "state: working" "a genuinely validating crew is not reported as awaiting a human"
@@ -5568,14 +5568,14 @@ test_coarse_live_rebased_row_is_not_attributed() {
   make_fakebin "$d" >/dev/null
   jg_write_meta "$d/state/feat-rebased2.meta" "window=fm:jg-feat-rebased2" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/feat-rebased2.status"
-  FM_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
-  FM_FAKE_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(run_running fm/other-crew)"
+  JG_FAKE_RUNS_LIST="$(cat <<EOF
   running    fm/other-crew aaaaaaa  2026-08-23 14:00
   running    fm/feat-rebased2 ${rebased}  2026-08-23 13:53
   failed     fm/feat-rebased2 ${short}  2026-08-23 12:09
 EOF
 )"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-rebased2
   out=$(run_crew_state "$d" feat-rebased2)
   assert_not_contains "$out" 'source: run-step' 'a branch-name-only live row must not bind'
@@ -5591,13 +5591,13 @@ test_terminal_rebased_run_is_not_attributed() {
   make_competing_runs_case terminal-rebased failed completed
   local d=$TMP_ROOT/terminal-rebased out rebased
   rebased=$(make_rebased_head "$d/wt")
-  FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
-  FM_FAKE_RUN_HEAD=$rebased
-  FM_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01NEW/')"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed "/01NEW/s/,[a-f0-9]*,\"\"\$/,$rebased,\"\"/")
+  JG_FAKE_RUN_HEAD=$rebased
+  JG_FAKE_AXI_STATUS="$(run_failed fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
   jg_write_meta "$d/state/competing.meta" "window=fm:jg-competing" "worktree=$d/wt" "kind=ship" "harness=claude"
   printf 'working: implementing\n' > "$d/state/competing.status"
-  FM_FAKE_BUSY=0
+  JG_FAKE_BUSY=0
   arm_idle_record "$d/state" competing
   out=$(run_crew_state "$d" competing)
   assert_not_contains "$out" 'source: run-step' 'a terminal run on a diverged head is not attributed'
@@ -5608,8 +5608,8 @@ test_terminal_rebased_run_is_not_attributed() {
 test_competing_live_runs_report_unknown_with_both_ids() {
   make_competing_runs_case ambiguous-runs running running
   local d=$TMP_ROOT/ambiguous-runs out
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
   printf 'done: old completion event\n' > "$d/state/competing.status"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'two live runs cannot establish exclusive authority'
@@ -5621,8 +5621,8 @@ test_competing_live_runs_report_unknown_with_both_ids() {
 test_newer_failed_run_is_not_hidden_by_older_live_run() {
   make_competing_runs_case newest-failed failed running
   local d=$TMP_ROOT/newest-failed out
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
-  FM_FAKE_AXI_STATUS_RUN="$(run_failed fm/competing | sed 's/01RUN/01NEW/')"
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
+  JG_FAKE_AXI_STATUS_RUN="$(run_failed fm/competing | sed 's/01RUN/01NEW/')"
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: failed' 'the newer failed run must not be hidden by an older live run'
   assert_contains "$out" '01NEW' 'the genuine failure identifies its run'
@@ -5635,19 +5635,19 @@ test_unverifiable_run_selection_reports_unknown() {
     (
       make_competing_runs_case "unverified-$mode" running cancelled
       d=$TMP_ROOT/unverified-$mode
-      FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
-      FM_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
+      JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
+      JG_FAKE_AXI_STATUS_RUN="$(run_parked fm/competing | sed 's/01RUN/01NEW/')"
       case "$mode" in
-        missing) FM_FAKE_AXI_STATUS_RUN='' ;;
-        wrong-id) FM_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$FM_FAKE_AXI_STATUS_RUN" | sed 's/01NEW/01OLD/') ;;
-        wrong-branch) FM_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$FM_FAKE_AXI_STATUS_RUN" | sed 's@fm/competing@fm/another-task@') ;;
+        missing) JG_FAKE_AXI_STATUS_RUN='' ;;
+        wrong-id) JG_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$JG_FAKE_AXI_STATUS_RUN" | sed 's/01NEW/01OLD/') ;;
+        wrong-branch) JG_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$JG_FAKE_AXI_STATUS_RUN" | sed 's@fm/competing@fm/another-task@') ;;
         wrong-head)
-          FM_FAKE_AXI_STATUS_RUN="$(FM_FAKE_RUN_HEAD=0123abcd run_parked fm/competing | sed 's/01RUN/01NEW/')"
+          JG_FAKE_AXI_STATUS_RUN="$(JG_FAKE_RUN_HEAD=0123abcd run_parked fm/competing | sed 's/01RUN/01NEW/')"
           ;;
-        missing-status) FM_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$FM_FAKE_AXI_STATUS_RUN" | sed '/status:/d') ;;
-        malformed-table) FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/runs\[2\]/runs[3]/') ;;
-        inventory-error) FM_FAKE_AXI_HOME_ERROR=1 ;;
-        selected-error) FM_FAKE_AXI_STATUS_RUN_ERROR=1 ;;
+        missing-status) JG_FAKE_AXI_STATUS_RUN=$(printf '%s\n' "$JG_FAKE_AXI_STATUS_RUN" | sed '/status:/d') ;;
+        malformed-table) JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/runs\[2\]/runs[3]/') ;;
+        inventory-error) JG_FAKE_AXI_HOME_ERROR=1 ;;
+        selected-error) JG_FAKE_AXI_STATUS_RUN_ERROR=1 ;;
       esac
       out=$(run_crew_state "$d" competing)
       assert_contains "$out" 'state: unknown' "$mode selection must not assert a run state"
@@ -5662,8 +5662,8 @@ test_unverifiable_run_selection_reports_unknown() {
 test_legacy_conflicting_run_records_report_unknown() {
   make_competing_runs_case legacy-conflict failed running
   local d=$TMP_ROOT/legacy-conflict out
-  FM_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
-  FM_FAKE_AXI_HOME=$FM_FAKE_AXI_STATUS
+  JG_FAKE_AXI_STATUS="$(run_running fm/competing | sed 's/01RUN/01OLD/')"
+  JG_FAKE_AXI_HOME=$JG_FAKE_AXI_STATUS
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'conflicting records without identities cannot prove authority'
   assert_contains "$out" '01OLD' 'legacy ambiguity preserves the available run id'
@@ -5676,7 +5676,7 @@ test_legacy_conflicting_run_records_report_unknown() {
 # outcome, steps, findings, and gate bytes stay as emitted. The capture README
 # distinguishes genuine histories from deliberately composed scenarios.
 captured_axi_status() {  # <capture> [branch] [run-id]
-  awk -v branch="${2:-fm/competing}" -v id="${3:-01NEW}" -v head="$FM_FAKE_RUN_HEAD" '
+  awk -v branch="${2:-fm/competing}" -v id="${3:-01NEW}" -v head="$JG_FAKE_RUN_HEAD" '
     /^  id:/ { print "  id: \"" id "\""; next }
     /^  branch:/ { print "  branch: " branch; next }
     /^  head:/ { print "  head: " head; next }
@@ -5692,12 +5692,12 @@ test_captured_axi_status_shapes() {
     case "$shape" in parked) expected=parked ;; failed) status=failed; expected=failed ;; esac
     make_competing_runs_case "captured-$shape" "$status" cancelled
     d=$TMP_ROOT/captured-$shape
-    FM_FAKE_AXI_STATUS=$(captured_axi_status superseded fm/competing 01OLD)
-    FM_FAKE_AXI_STATUS_RUN=$(captured_axi_status "$shape")
+    JG_FAKE_AXI_STATUS=$(captured_axi_status superseded fm/competing 01OLD)
+    JG_FAKE_AXI_STATUS_RUN=$(captured_axi_status "$shape")
     # A newer failure must remain visible even with an older live record.
     if [ "$shape" = failed ]; then
-      FM_FAKE_AXI_HOME=$(printf '%s\n' "$FM_FAKE_AXI_HOME" | sed 's/,cancelled,/,running,/')
-      FM_FAKE_AXI_STATUS=$(captured_axi_status replacement fm/competing 01OLD)
+      JG_FAKE_AXI_HOME=$(printf '%s\n' "$JG_FAKE_AXI_HOME" | sed 's/,cancelled,/,running,/')
+      JG_FAKE_AXI_STATUS=$(captured_axi_status replacement fm/competing 01OLD)
     fi
     out=$(run_crew_state "$d" competing)
     assert_contains "$out" "state: $expected" "captured $shape status is understood"
@@ -5707,7 +5707,7 @@ test_captured_axi_status_shapes() {
       assert_contains "$out" ' · ask-user: authority decision' \
         'the captured gate mints the human-decision component from the real column layout'
       toolbin=$(make_no_python_toolbin "$d")
-      out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+      out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
       assert_contains "$out" 'parked at test: 1 finding(s)' 'a complete captured gate remains readable without Python'
       assert_contains "$out" ' · ask-user: authority decision' \
         'the captured gate mints the human-decision component without Python'
@@ -5735,17 +5735,17 @@ with sqlite3.connect(sys.argv[1]) as db:
         for r in json.load(open(sys.argv[2]))
     ])
 PY
-  FM_FAKE_AXI_HOME="repo: $d/wt
+  JG_FAKE_AXI_HOME="repo: $d/wt
 $(cat "$ROOT/tests/captures/no-mistakes-v1.70.1/overview.toon")"
-  FM_FAKE_AXI_STATUS=$(captured_axi_status superseded "$branch" 01M2FNFPK984YP0EHFTD1XEF8P)
-  FM_FAKE_AXI_STATUS_RUN=$(captured_axi_status replacement "$branch" "$newer")
+  JG_FAKE_AXI_STATUS=$(captured_axi_status superseded "$branch" 01M2FNFPK984YP0EHFTD1XEF8P)
+  JG_FAKE_AXI_STATUS_RUN=$(captured_axi_status replacement "$branch" "$newer")
   before=$(git hash-object "$NM_HOME/state.sqlite")
   out=$(run_crew_state "$d" competing)
   after=$(git hash-object "$NM_HOME/state.sqlite")
   assert_contains "$out" 'state: working' 'the recorded live successor outranks its superseded cancellation'
   assert_contains "$out" "$newer" 'the recorded successor keeps its real run id'
   [ "$before" = "$after" ] || fail 'captured inventory replay wrote to the database'
-  assert_not_contains "$FM_FAKE_AXI_HOME" "$older" 'the competing candidate is outside the real overview window'
+  assert_not_contains "$JG_FAKE_AXI_HOME" "$older" 'the competing candidate is outside the real overview window'
   # Counterfactual, not a recorded competing-live history: revive one hidden
   # cancelled row, keeping its captured id, branch, head, and creation order.
   python3 - "$NM_HOME/state.sqlite" "$older" <<'PY'
@@ -5759,7 +5759,7 @@ PY
   assert_contains "$out" "$newer" 'captured ambiguity retains the visible id'
   assert_contains "$out" "$older" 'captured ambiguity retains the hidden id'
   toolbin=$(make_no_python_toolbin "$d")
-  out=$(PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
+  out=$(PATH="$d/fakebin:$toolbin" JG_STATE_OVERRIDE="$d/state" "$CREW_STATE" competing)
   assert_contains "$out" 'state: unknown' 'missing optional lookup cannot imply exclusive authority'
   assert_contains "$out" "$newer" 'unavailable lookup retains the captured visible id'
   assert_contains "$out" 'inventory' 'unavailable lookup reports its evidence gap'
@@ -5769,8 +5769,8 @@ PY
 test_captured_authority_transition() {
   make_competing_runs_case captured-transition running cancelled
   local d=$TMP_ROOT/captured-transition out
-  FM_FAKE_AXI_STATUS=$(captured_axi_status replacement)
-  FM_FAKE_AXI_STATUS_RUN=$(captured_axi_status superseded)
+  JG_FAKE_AXI_STATUS=$(captured_axi_status replacement)
+  JG_FAKE_AXI_STATUS_RUN=$(captured_axi_status superseded)
   out=$(run_crew_state "$d" competing)
   assert_contains "$out" 'state: unknown' 'captured terminal output cannot validate a live selection'
   assert_contains "$out" '01NEW' 'the changing selected id is preserved'
@@ -5783,8 +5783,8 @@ test_captured_completed_history() {
   for activity in busy idle; do
     make_historical_inventory_case "captured-history-$activity" "$activity"
     d=$TMP_ROOT/captured-history-$activity
-    FM_FAKE_AXI_STATUS=$(captured_axi_status completed)
-    FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+    JG_FAKE_AXI_STATUS=$(captured_axi_status completed)
+    JG_FAKE_AXI_STATUS_RUN=$JG_FAKE_AXI_STATUS
     source=pane; [ "$activity" = busy ] || source='status-log'
     out=$(run_crew_state "$d" competing)
     assert_contains "$out" 'state: working' 'captured completion does not hide subsequent development'

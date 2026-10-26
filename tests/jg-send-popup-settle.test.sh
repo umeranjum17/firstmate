@@ -22,7 +22,7 @@
 #
 # The popup-settle is the FIRST sleep recorded: jg_tmux_submit_core types the text,
 # then `sleep "$settle"`, then the Enter-retry loop (sleep 0.4 each) and finally
-# jg-send's own post-submit FM_SEND_SETTLE pause. So tail-vs-head matters: this
+# jg-send's own post-submit JG_SEND_SETTLE pause. So tail-vs-head matters: this
 # suite asserts on the HEAD sleep, distinct from jg-send-settle.test.sh which pins
 # the TAIL (post-submit) pause. The retried Enter in jg_tmux_submit_core remains the
 # real safety net; this settle is only the optimization that lets the popup clear so
@@ -44,7 +44,7 @@ TMP_ROOT=$(jg_test_tmproot jg-send-popup-settle)
 
 # Same stub shape as jg-send-settle.test.sh: a fake tmux that drives the submit
 # path to a clean "empty" verdict on the first Enter, and a fake sleep that records
-# every requested duration (one per line) into FM_SLEEP_LOG instead of sleeping.
+# every requested duration (one per line) into JG_SLEEP_LOG instead of sleeping.
 make_stubs() {  # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -64,7 +64,7 @@ SH
   chmod +x "$fb/tmux"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${1:-}" >> "$FM_SLEEP_LOG"
+printf '%s\n' "${1:-}" >> "$JG_SLEEP_LOG"
 exit 0
 SH
   chmod +x "$fb/sleep"
@@ -74,9 +74,9 @@ SH
 # first_settle <expected> <label> <harness|--explicit> <message> [selector-form]: build a fresh
 # home, send <message> to a target whose meta records <harness> (or to a bare
 # session:window with NO meta when --explicit), and assert the FIRST recorded sleep
-# (the popup-settle) equals <expected>. FM_SEND_SETTLE=0 strips the trailing
+# (the popup-settle) equals <expected>. JG_SEND_SETTLE=0 strips the trailing
 # post-submit pause so the log holds only the popup-settle plus the 0.4 Enter wait,
-# keeping the head assertion crisp. FM_ROOT_OVERRIDE points at a non-repo dir so
+# keeping the head assertion crisp. JG_ROOT_OVERRIDE points at a non-repo dir so
 # jg-guard's tangle check stays silent; its watcher-liveness note goes to stderr
 # (discarded).
 first_settle() {  # <expected> <label> <harness|--explicit> <message> [selector-form]
@@ -104,8 +104,8 @@ first_settle() {  # <expected> <label> <harness|--explicit> <message> [selector-
     jg_write_meta "$home/state/$meta_id.meta" "window=sess:win" "harness=$harness"
   fi
   : > "$log"
-  env FM_SEND_SETTLE=0 PATH="$fb:$PATH" \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SLEEP_LOG="$log" \
+  env JG_SEND_SETTLE=0 PATH="$fb:$PATH" \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SLEEP_LOG="$log" \
     "$SEND" "$target" "$msg" 2>/dev/null; rc=$?
   expect_code 0 "$rc" "$label: send should succeed"
   first=$(head -1 "$log")
@@ -126,8 +126,8 @@ rides_inbox() {  # <label> <harness> <message>
   fb=$(make_stubs "$dir"); log="$dir/sleep.log"; home="$dir"
   jg_write_meta "$home/state/popupcase.meta" "window=sess:win" "harness=$harness"
   : > "$log"
-  env FM_SEND_SETTLE=0 PATH="$fb:$PATH" \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SLEEP_LOG="$log" \
+  env JG_SEND_SETTLE=0 PATH="$fb:$PATH" \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SLEEP_LOG="$log" \
     "$SEND" jg-popupcase "$msg" 2>/dev/null; rc=$?
   expect_code 0 "$rc" "$label: send should succeed"
   grep -qF -- "$msg" "$home/state/popupcase.inbox/001.msg" \

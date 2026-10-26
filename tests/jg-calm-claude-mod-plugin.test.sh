@@ -15,7 +15,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate default-on FM_CLAUDE_CALM_PLUGIN_TEST claude
+jg_live_gate default-on JG_CLAUDE_CALM_PLUGIN_TEST claude
 
 MOD="$ROOT/.claude/mods/firstmate-calm"
 AUTOLOAD_PATH="$ROOT/.claude/skills/firstmate-calm"
@@ -50,7 +50,7 @@ test_validate_strict() {
     expect_in_report "$report" "ui.render{component=UserMessage}" "the scan of $path does not hook user rows"
     expect_in_report "$report" "ui.render{component=AssistantMessage}" "the scan of $path does not hook assistant rows"
     expect_in_report "$report" "command.run{command=calm}" "the scan of $path does not serve /calm"
-    expect_in_report "$report" "env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, FM_CONFIG_OVERRIDE, FM_HOME, FM_ROOT_OVERRIDE, FM_STATE_OVERRIDE" "the scan of $path reads a different environment"
+    expect_in_report "$report" "env reads: CLAUDE_CODE_ENABLE_FUNCTION_HOOKS, JG_CONFIG_OVERRIDE, JG_HOME, JG_ROOT_OVERRIDE, JG_STATE_OVERRIDE" "the scan of $path reads a different environment"
     expect_in_report "$report" "env writes: nothing" "the scan of $path writes the environment"
     expect_in_report "$report" '$.ui.log (via' "the scan of $path does not write supervision notes to the transcript"
     case "$report" in

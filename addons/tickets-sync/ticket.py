@@ -3,7 +3,7 @@
 
 Usage: ticket.py <task> [--stage WORD] [--state WORD] [--pr URL] [--release TEXT]
 
-FM_HOME names the home whose config/fleet-board owns this task, and the task is
+JG_HOME names the home whose config/fleet-board owns this task, and the task is
 its backlog item id, published as the ticket for main/<task> (the sync's own
 home name, bin/jg-watch.sh's check environment included).
 
@@ -26,6 +26,10 @@ from pathlib import Path
 import subprocess as sp
 import sys
 import os
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 STAGES = ('queued', 'building', 'review', 'merging', 'done')
 STATES = ('queued', 'in progress', 'on hold', 'done')
@@ -48,7 +52,7 @@ def main(argv):
         return die('task must be one backlog item id')
     if (options.stage, options.state, options.pr, options.release) == (None, None, None, None):
         return die('nothing to record: pass --stage, --state, --pr or --release')
-    home = Path(os.environ.get('FM_HOME') or '.').resolve()
+    home = Path(os.environ.get('JG_HOME') or '.').resolve()
     pointer = home / 'config/fleet-board'
     if not pointer.exists():
         return 0

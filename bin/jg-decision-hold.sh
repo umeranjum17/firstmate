@@ -31,8 +31,8 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 CAPTAIN_HOLD="$SCRIPT_DIR/jg-captain-hold.sh"
 
 usage() {
@@ -61,7 +61,7 @@ compose() {  # <origin> <key>
 }
 
 task_show() {
-  FM_HOME="$FM_HOME" FM_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" show "$1" --full 2>/dev/null
+  JG_HOME="$JG_HOME" JG_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" show "$1" --full 2>/dev/null
 }
 
 show_field() {
@@ -171,7 +171,7 @@ command_resolve() {
   for dep in $routed; do
     show=$(task_show "$dep") || fail "routed task $dep disappeared before routing"
     if list_has_key "$(normalized_blocked_by "$show")" "$id"; then
-      FM_HOME="$FM_HOME" FM_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" unblock "$dep" --by "$id" >/dev/null \
+      JG_HOME="$JG_HOME" JG_DATA_OVERRIDE='' "$SCRIPT_DIR/jg-tasks-axi.sh" unblock "$dep" --by "$id" >/dev/null \
         || fail "could not route the recorded decision to $dep"
     fi
   done

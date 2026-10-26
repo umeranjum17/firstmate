@@ -68,7 +68,7 @@ JSON
   cat > "$repo/node_modules/@earendil-works/pi-coding-agent/index.js" <<'JS'
 import { writeFileSync } from "node:fs";
 
-export const VERSION = process.env.FM_STUB_PI_VERSION || "0.99.0";
+export const VERSION = process.env.JG_STUB_PI_VERSION || "0.99.0";
 
 export function getAgentDir() {
   return "/stub-agent-dir";
@@ -426,8 +426,8 @@ const { spawnSync } = await import("node:child_process");
 const { mkdirSync, writeFileSync } = await import("node:fs");
 const { pathToFileURL } = await import("node:url");
 
-const home = process.env.FM_HOME;
-const realRoot = process.env.FM_ROOT_OVERRIDE;
+const home = process.env.JG_HOME;
+const realRoot = process.env.JG_ROOT_OVERRIDE;
 const approvedProject = `${home}/projects/approved`;
 mkdirSync(`${home}/state`, { recursive: true });
 mkdirSync(`${home}/config`, { recursive: true });
@@ -437,7 +437,7 @@ writeFileSync(`${home}/state/branch-driver.meta`, `project=${approvedProject}\nw
 // any more.
 // The branch acts only for the session that owns the fleet lock; drivers own
 // it by default, while cold-start and secondary-session scenarios opt out.
-if (!process.env.FM_TEST_SKIP_LOCK) {
+if (!process.env.JG_TEST_SKIP_LOCK) {
   writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
 }
 
@@ -647,7 +647,7 @@ async function settle(predicate, label) {
 function outcomeScript(args) {
   const result = spawnSync("bash", [`${realRoot}/bin/jg-branch-outcome.sh`, ...args], {
     encoding: "utf8",
-    env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state` },
+    env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state` },
   });
   if (result.status !== 0) throw new Error(`jg-branch-outcome.sh ${args.join(" ")} failed: ${result.stderr}`);
   return (result.stdout || "").trim();
@@ -663,7 +663,7 @@ test_branch_dispatch_two_stage_filter_and_prefix_contract() {
   home="$TMP_ROOT/dispatch-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { pi, fire, dispatch, settle, outcomeScript, sentToMain, mainUserMessages, mainTools, renderers, entryRenderers, mainEntries, defaultSessionCtx, home, realRoot }; })()`);
@@ -704,8 +704,8 @@ if (!loader.options.systemPrompt || !loader.options.systemPrompt.startsWith("You
 if (loader.options.systemPrompt.length < 4096) throw new Error("branch prompt is below the provider caching minimum");
 const bashTool = session.options.customTools.find((tool) => tool.name === "bash");
 const hooked = bashTool.__options.spawnHook({ command: "true", cwd: "/x", env: { PATH: "/bin" } });
-if (hooked.env.FM_SUPERVISION_ACTOR !== "branch") throw new Error("branch bash does not inject the branch actor");
-if (hooked.env.FM_LEASE_HOLDER_PID !== String(process.ppid)) throw new Error("branch bash does not pin the verified session-lock holder pid");
+if (hooked.env.JG_SUPERVISION_ACTOR !== "branch") throw new Error("branch bash does not inject the branch actor");
+if (hooked.env.JG_LEASE_HOLDER_PID !== String(process.ppid)) throw new Error("branch bash does not pin the verified session-lock holder pid");
 
 // 3. Shared per-home prompt_cache_key: overrides only payloads that already
 // carry one, stable within the home.
@@ -958,7 +958,7 @@ test_requested_healthy_outcome_and_unsolicited_routine_outcome_delivery() {
   home="$TMP_ROOT/requested-outcome-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, mainTools, home, realRoot }; })()`);
@@ -1174,7 +1174,7 @@ test_captain_outcome_is_exactly_once_across_crash_reload_and_unrelated_response(
   home="$TMP_ROOT/visible-outcome-recovery-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, sentToMain, mainEntries, entryRenderers, outcomeScript, defaultSessionCtx }; })()`);
@@ -1264,7 +1264,7 @@ test_captain_outcome_processing_turn_is_sequence_keyed_and_re_presented() {
   home="$TMP_ROOT/processing-turn-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainEntries, mainTools, outcomeScript, defaultSessionCtx, home, bus, markdownTransformers }; })()`);
@@ -1617,7 +1617,7 @@ test_abbreviated_processing_request_points_to_full_outcome() {
   home="$TMP_ROOT/abbreviated-outcome-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, sentToMain, mainEntries, outcomeScript, defaultSessionCtx }; })()`);
@@ -1655,7 +1655,7 @@ test_large_unprocessed_backlog_replays_in_batches() {
   home="$TMP_ROOT/large-backlog-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, sentToMain, mainTools, outcomeScript, defaultSessionCtx, home }; })()`);
@@ -1701,10 +1701,10 @@ test_undated_unprocessed_outcome_surfaces_and_stays_unprocessed() {
   for f in "$ROOT"/bin/*; do ln -s "$f" "$fake_root/bin/${f##*/}"; done
   rm "$fake_root/bin/jg-branch-outcome.sh"
   # A store whose unprocessed listing breaks its contract by dropping the age
-  # while $FM_HOME/strip-age exists.
+  # while $JG_HOME/strip-age exists.
   cat > "$fake_root/bin/jg-branch-outcome.sh" <<SH
 #!/usr/bin/env bash
-if [ "\${1:-}" = unprocessed ] && [ -e "\$FM_HOME/strip-age" ]; then
+if [ "\${1:-}" = unprocessed ] && [ -e "\$JG_HOME/strip-age" ]; then
   set -o pipefail
   "$ROOT/bin/jg-branch-outcome.sh" "\$@" | jq -c 'del(.recordedAgo)'
   exit
@@ -1712,7 +1712,7 @@ fi
 exec "$ROOT/bin/jg-branch-outcome.sh" "\$@"
 SH
   chmod +x "$fake_root/bin/jg-branch-outcome.sh"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$fake_root" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, sentToMain, mainEntries, outcomeScript, defaultSessionCtx, home }; })()`);
@@ -1756,7 +1756,7 @@ test_branch_cache_key_is_per_home_stable() {
   mkdir -p "$home_a/state" "$home_a/config" "$home_b/state" "$home_b/config"
   install_pi_branch_extension_fixture "$repo"
   probe() {
-    PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$1" FM_ROOT_OVERRIDE="$ROOT" \
+    PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$1" JG_ROOT_OVERRIDE="$ROOT" \
       DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, settle }; })()`);
@@ -1797,7 +1797,7 @@ echo "synthetic generator failure" >&2
 exit 1
 SH
   chmod +x "$broken/bin/jg-branch-prompt.sh"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, sentToMain, mainEntries, mainTools, outcomeScript, defaultSessionCtx }; })()`);
@@ -1956,7 +1956,7 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "default-on eligibility, heartbeat routing, and legacy-flag indifference must bind: $out"
 
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$TMP_ROOT/gating-home-2" FM_ROOT_OVERRIDE="$broken" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$TMP_ROOT/gating-home-2" JG_ROOT_OVERRIDE="$broken" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, settle, mainUserMessages }; })()`);
@@ -2001,7 +2001,7 @@ test_away_record_parks_main_and_presents_after_archive() {
   home="$TMP_ROOT/away-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, defaultSessionCtx, home, realRoot, bus, approvedProject }; })()`);
@@ -2012,7 +2012,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const contract = (args) => {
   const result = spawnSync("bash", [`${realRoot}/bin/jg-afk-contract.sh`, ...args], {
     encoding: "utf8",
-    env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state` },
+    env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state` },
   });
   if (result.status !== 0) throw new Error(`jg-afk-contract.sh ${args.join(" ")} failed: ${result.stderr}`);
   return result.stdout || "";
@@ -2240,7 +2240,7 @@ test_away_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event() {
     || fail "fixture: could not age the held task's records"
   printf '#!/usr/bin/env bash\nprintf "state: done · source: fake\\n"\n' > "$home/fakebin/jg-crew-state.sh"
   chmod +x "$home/fakebin/jg-crew-state.sh"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, bus, makeOffer, outcomeScript, defaultSessionCtx, home, realRoot, approvedProject }; })()`);
@@ -2249,7 +2249,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, utimesSync } from "node:fs";
 
 const state = `${home}/state`;
-const env = { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_CONFIG_OVERRIDE: `${home}/config` };
+const env = { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: state, JG_CONFIG_OVERRIDE: `${home}/config` };
 const run = (args, label, extra = {}) => {
   const result = spawnSync("bash", args, { encoding: "utf8", env: { ...env, ...extra } });
   if (result.status !== 0) throw new Error(`${label} failed: ${result.stderr}`);
@@ -2312,8 +2312,8 @@ async function cadence(n) {
     utimesSync(marker, past, past);
   }
   run([`${realRoot}/bin/jg-inactive-reconcile.sh`, "scan"], `cadence ${n}`, {
-    FM_INACTIVE_RECONCILE_SECS: "60",
-    FM_INACTIVE_CREW_STATE_BIN: `${home}/fakebin/jg-crew-state.sh`,
+    JG_INACTIVE_RECONCILE_SECS: "60",
+    JG_INACTIVE_CREW_STATE_BIN: `${home}/fakebin/jg-crew-state.sh`,
   });
   if (queued().length > 0) await wakeBranch("check: inactive-outcome");
 }
@@ -2353,7 +2353,7 @@ test_away_only_wake_rejects_when_record_is_archived_before_drain() {
   home="$TMP_ROOT/away-only-recheck-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, home, realRoot, bus, makeOffer, mainUserMessages, approvedProject }; })()`);
@@ -2364,7 +2364,7 @@ import { writeFileSync } from "node:fs";
 const contract = (args) => {
   const result = spawnSync("bash", [`${realRoot}/bin/jg-afk-contract.sh`, ...args], {
     encoding: "utf8",
-    env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state` },
+    env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state` },
   });
   if (result.status !== 0) throw new Error(`jg-afk-contract.sh ${args.join(" ")} failed: ${result.stderr}`);
   return result.stdout || "";
@@ -2418,7 +2418,7 @@ test_away_claimed_heartbeat_on_a_task_wake_lifts_task_scoping() {
   home="$TMP_ROOT/away-heartbeat-scope-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, settle, home, realRoot, bus, makeOffer, approvedProject, defaultSessionCtx }; })()`);
@@ -2429,7 +2429,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const contract = (args) => {
   const result = spawnSync("bash", [`${realRoot}/bin/jg-afk-contract.sh`, ...args], {
     encoding: "utf8",
-    env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state` },
+    env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state` },
   });
   if (result.status !== 0) throw new Error(`jg-afk-contract.sh ${args.join(" ")} failed: ${result.stderr}`);
   return result.stdout || "";
@@ -2469,7 +2469,7 @@ test_branch_predrain_recheck_keeps_a_heartbeat_a_co_present_check_arrives_under(
   home="$TMP_ROOT/predrain-recheck-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, mainUserMessages }; })()`);
@@ -2522,7 +2522,7 @@ test_branch_report_refuses_a_task_the_wake_did_not_name() {
   home="$TMP_ROOT/ghost-report-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, settle, approvedProject, defaultSessionCtx }; })()`);
@@ -2613,7 +2613,7 @@ test_branch_predrain_recheck_excludes_new_main_owned_row_without_deferring_eligi
   home="$TMP_ROOT/predrain-partial-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, mainUserMessages }; })()`);
@@ -2674,7 +2674,7 @@ test_branch_predrain_needs_decision_keeps_routine_row_branch_eligible() {
   home="$TMP_ROOT/predrain-needs-decision-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { bus, fire, home, makeOffer, realRoot }; })()`);
@@ -2713,7 +2713,7 @@ if (existsSync(`${home}/state/.branch-eligible-rows`)) {
 }
 const drain = spawnSync("bash", [`${realRoot}/bin/jg-wake-drain.sh`], {
   encoding: "utf8",
-  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state`, FM_ROOT_OVERRIDE: realRoot },
+  env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state`, JG_ROOT_OVERRIDE: realRoot },
 });
 if (drain.status !== 0) throw new Error(`main fallback drain failed: ${drain.stderr}`);
 if (!drain.stdout.includes("\t1\tsignal\tbranch-driver.status\t") ||
@@ -2734,7 +2734,7 @@ test_settled_branch_prompt_releases_unacknowledged_grant() {
   home="$TMP_ROOT/settled-grant-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, realRoot, mainUserMessages }; })()`);
@@ -2765,7 +2765,7 @@ if (existsSync(`${home}/state/.branch-eligible-rows`)) {
 }
 const drain = spawnSync("bash", [`${realRoot}/bin/jg-wake-drain.sh`], {
   encoding: "utf8",
-  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state`, FM_ROOT_OVERRIDE: realRoot },
+  env: { ...process.env, JG_HOME: home, JG_STATE_OVERRIDE: `${home}/state`, JG_ROOT_OVERRIDE: realRoot },
 });
 if (drain.status !== 0) throw new Error(`main drain failed after grant release: ${drain.stderr}`);
 if (!drain.stdout.includes("\tsignal\tbranch-driver.status\t")) {
@@ -2785,7 +2785,7 @@ test_post_construction_provider_error_falls_back_latches_and_recovers_on_cooldow
   home="$TMP_ROOT/provider-error-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { pi, makeOffer, dispatch, fire, settle, home, mainUserMessages, sentToMain }; })()`);
@@ -2973,7 +2973,7 @@ test_selection_change_does_not_corrupt_inflight_provider_state() {
   home="$TMP_ROOT/provider-selection-race-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, mainUserMessages }; })()`);
@@ -3054,7 +3054,7 @@ test_main_owned_grant_result_falls_back_to_main() {
   home="$TMP_ROOT/main-owned-fallback-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, mainUserMessages }; })()`);
@@ -3092,7 +3092,7 @@ test_branch_predrain_recheck_noops_already_drained_wake() {
   home="$TMP_ROOT/predrain-empty-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, mainUserMessages }; })()`);
@@ -3146,7 +3146,7 @@ test_branch_mirror_filters_order_and_cursor() {
   home="$TMP_ROOT/mirror-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home }; })()`);
@@ -3237,7 +3237,7 @@ test_branch_mirror_reanchors_for_the_new_session_branch_conversation() {
   home="$TMP_ROOT/mirror-reanchor-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, home }; })()`);
@@ -3307,7 +3307,7 @@ test_branch_session_is_new_at_every_main_session_start() {
   home="$TMP_ROOT/fresh-session-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, home }; })()`);
@@ -3366,15 +3366,15 @@ EOF
   esac
   # A restart is a main session start too: the recorded conversation from the
   # previous process is left on disk and never becomes the live one.
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_PRIOR_POINTER="$first_pointer" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_PRIOR_POINTER="$first_pointer" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, home }; })()`);
 const { fire, dispatch, settle, makeCtx, home } = globalThis.__t;
 import { existsSync, readFileSync } from "node:fs";
 
-const prior = process.env.FM_TEST_PRIOR_POINTER;
+const prior = process.env.JG_TEST_PRIOR_POINTER;
 if (!existsSync(prior)) throw new Error("the previous process left no recorded branch conversation to guard against");
 if (readFileSync(`${home}/state/.branch-session`, "utf8").trim() !== prior) {
   throw new Error("the restart did not start from the previous process's recorded pointer");
@@ -3404,7 +3404,7 @@ test_branch_model_pin_applies_and_absent_pin_keeps_the_default() {
   home="$TMP_ROOT/modelpin-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
@@ -3501,7 +3501,7 @@ test_unpinned_branch_follows_main_model_changes_live() {
   home="$TMP_ROOT/model-live-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
@@ -3560,7 +3560,7 @@ test_supervision_model_command_persists_and_rebinds_the_live_branch() {
   home="$TMP_ROOT/modelcmd-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, commands, registryModels, uiSelections, uiPrompts, notices, home }; })()`);
@@ -3756,7 +3756,7 @@ test_branch_effort_pin_applies_and_absent_pin_follows_main() {
   home="$TMP_ROOT/effortpin-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, setMainThinkingLevel, home }; })()`);
@@ -3881,7 +3881,7 @@ test_unpinned_branch_follows_main_effort_changes_live() {
   home="$TMP_ROOT/effort-live-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, setMainThinkingLevel, home }; })()`);
@@ -3945,7 +3945,7 @@ test_supervision_model_picker_is_bounded_searchable_and_branch_only() {
   home="$TMP_ROOT/pickerux-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, makeCtx, makeTuiCtx, commands, registryModels, uiSelections, uiKeystrokes, mainModelWrites, home }; })()`);
@@ -4074,7 +4074,7 @@ test_supervision_model_command_picks_effort_after_the_model() {
   home="$TMP_ROOT/effortcmd-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, commands, registryModels, uiSelections, uiPrompts, notices, setMainThinkingLevel, home }; })()`);
@@ -4236,7 +4236,7 @@ test_unusable_model_pin_falls_back_to_main() {
   home="$TMP_ROOT/modelbad-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, mainUserMessages, home }; })()`);
@@ -4309,16 +4309,16 @@ test_replacement_activation_cleans_leases_and_retries_failure() {
   install_pi_branch_extension_fixture "$repo"
   cat > "$fakebin/bash" <<'SH'
 #!/bin/sh
-if [ "$1" = "$FM_TEST_LEASE_SCRIPT" ] && [ ! -e "$FM_TEST_FAIL_MARKER" ]; then
-  : > "$FM_TEST_FAIL_MARKER"
+if [ "$1" = "$JG_TEST_LEASE_SCRIPT" ] && [ ! -e "$JG_TEST_FAIL_MARKER" ]; then
+  : > "$JG_TEST_FAIL_MARKER"
   exit 7
 fi
-exec "$FM_TEST_REAL_BASH" "$@"
+exec "$JG_TEST_REAL_BASH" "$@"
 SH
   chmod +x "$fakebin/bash"
-  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_REAL_BASH="$real_bash" FM_TEST_LEASE_SCRIPT="$ROOT/bin/jg-lease.sh" \
-    FM_TEST_FAIL_MARKER="$home/state/release-failed-once" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_REAL_BASH="$real_bash" JG_TEST_LEASE_SCRIPT="$ROOT/bin/jg-lease.sh" \
+    JG_TEST_FAIL_MARKER="$home/state/release-failed-once" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, realRoot }; })()`);
@@ -4349,8 +4349,8 @@ test_cold_start_activates_after_lock_acquisition() {
   home="$TMP_ROOT/coldstart-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_SKIP_LOCK=1 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_SKIP_LOCK=1 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, mainEntries, outcomeScript, defaultSessionCtx }; })()`);
 const { fire, dispatch, settle, home, mainEntries, outcomeScript, defaultSessionCtx } = globalThis.__t;
@@ -4392,7 +4392,7 @@ test_queued_actions_recheck_lock_ownership() {
   home="$TMP_ROOT/queued-ownership-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, mainUserMessages }; })()`);
@@ -4438,7 +4438,7 @@ test_stale_generation_boundaries_are_side_effect_free() {
   home="$TMP_ROOT/stale-boundaries-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, sentToMain }; })()`);
@@ -4520,13 +4520,13 @@ test_secondary_session_stays_inert() {
   sleep 60 &
   foreign_pid=$!
   printf 'branch\t%s\t123\n' "$foreign_pid" > "$home/state/.lease-task-x"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_SKIP_LOCK=1 FM_TEST_LOCK_PID=$foreign_pid DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_SKIP_LOCK=1 JG_TEST_LOCK_PID=$foreign_pid DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, home }; })()`);
 const { dispatch, home } = globalThis.__t;
 import { existsSync, writeFileSync } from "node:fs";
-writeFileSync(`${home}/state/.lock`, `${process.env.FM_TEST_LOCK_PID}\n`);
+writeFileSync(`${home}/state/.lock`, `${process.env.JG_TEST_LOCK_PID}\n`);
 if (dispatch("signal: secondary probe").accepted) throw new Error("secondary session accepted a wake it does not own");
 if (existsSync(`${home}/state/.pi-branch-extension-loaded`)) {
   throw new Error("secondary session wrote the primary's marker");
@@ -4549,7 +4549,7 @@ test_rebind_remirrors_undelivered_dialog_from_durable_cursor() {
   home="$TMP_ROOT/rebind-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, home }; })()`);
@@ -4645,7 +4645,7 @@ test_branch_dispatch_classifies_main_only_rows_and_writes_the_eligible_snapshot(
   cp "$ROOT/.pi/extensions/lib/jg-async-exec.ts" "$repo/.pi/extensions/lib/jg-async-exec.ts"
   cp "$ROOT/.pi/extensions/lib/jg-branch-model-picker.ts" "$repo/.pi/extensions/lib/jg-branch-model-picker.ts"
   printf 'project=%s/projects/approved\nwindow=jg-window\n' "$home" > "$home/state/task-a.meta"
-  LIB="$repo/.pi/extensions/lib/jg-branch-dispatch.ts" FM_HOME="$home" GRANT="$ROOT/bin/jg-wake-grant.sh" \
+  LIB="$repo/.pi/extensions/lib/jg-branch-dispatch.ts" JG_HOME="$home" GRANT="$ROOT/bin/jg-wake-grant.sh" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { syncBuiltinESMExports } from "node:module";
@@ -4662,8 +4662,8 @@ syncBuiltinESMExports();
 
 const { activateEligibleRowsOwner, scopeForUnreadWake, writeEligibleRowsSnapshot, releaseEligibleRowsSnapshot, BRANCH_ELIGIBLE_ROWS_FILE } =
   await import(pathToFileURL(process.env.LIB).href);
-const state = `${process.env.FM_HOME}/state`;
-const project = `${process.env.FM_HOME}/projects/approved`;
+const state = `${process.env.JG_HOME}/state`;
+const project = `${process.env.JG_HOME}/projects/approved`;
 
 // Every legitimately main-only class is a check-kind row under a different
 // key; classification never looks at the key, only the kind, so one
@@ -4790,7 +4790,7 @@ if (openDecisionMixed.needsDecisionKeys.join(",") !== "jg-window") {
   throw new Error(`the open-decision stale key was not marked main-owned: ${JSON.stringify(openDecisionMixed)}`);
 }
 
-process.env.FM_CLASSIFY_RESOLVE_VERB = "answered";
+process.env.JG_CLASSIFY_RESOLVE_VERB = "answered";
 writeFileSync(
   `${state}/task-a.status`,
   "needs-decision [key=cleanup]: choose destructive cleanup\nanswered [key=cleanup]: remove generated files\n",
@@ -4801,17 +4801,17 @@ if (!customResolved.eligible || customResolved.eligibleSeqs.slice().sort().join(
   throw new Error(`a custom resolution verb left the stale decision open: ${JSON.stringify(customResolved)}`);
 }
 
-process.env.FM_CLASSIFY_CAPTAIN_HELD_VERB = "awaiting-captain";
+process.env.JG_CLASSIFY_CAPTAIN_HELD_VERB = "awaiting-captain";
 writeFileSync(`${state}/task-a.status`, "awaiting-captain [key=cleanup]: awaiting the captain\n");
 const customHeld = scopeForUnreadWake(state, false);
 if (!customHeld.eligible || customHeld.eligibleSeqs.join(",") !== "2" ||
   customHeld.needsDecisionKeys.join(",") !== "jg-window") {
   throw new Error(`a custom captain-held verb was offered to the branch: ${JSON.stringify(customHeld)}`);
 }
-delete process.env.FM_CLASSIFY_RESOLVE_VERB;
-delete process.env.FM_CLASSIFY_CAPTAIN_HELD_VERB;
+delete process.env.JG_CLASSIFY_RESOLVE_VERB;
+delete process.env.JG_CLASSIFY_CAPTAIN_HELD_VERB;
 
-process.env.FM_CLASSIFY_RESERVED_KEY_PREFIXES = "secret-";
+process.env.JG_CLASSIFY_RESERVED_KEY_PREFIXES = "secret-";
 writeFileSync(
   `${state}/task-a.status`,
   "needs-decision [key=pending-reply-x]: choose destructive cleanup\nworking: routine follow-up\n",
@@ -4821,7 +4821,7 @@ if (!customReservedPrefixes.eligible || customReservedPrefixes.eligibleSeqs.join
   customReservedPrefixes.needsDecisionKeys.join(",") !== "jg-window") {
   throw new Error(`configured reserved prefixes lost an open stale decision: ${JSON.stringify(customReservedPrefixes)}`);
 }
-delete process.env.FM_CLASSIFY_RESERVED_KEY_PREFIXES;
+delete process.env.JG_CLASSIFY_RESERVED_KEY_PREFIXES;
 
 writeFileSync(`${state}/symlink-target.status`, "needs-decision: external choice\n");
 unlinkSync(`${state}/task-a.status`);
@@ -4964,14 +4964,14 @@ test_branch_dispatch_routes_secondmate_signal_by_new_span() {
   cp "$ROOT/.pi/extensions/lib/jg-branch-model-picker.ts" "$repo/.pi/extensions/lib/jg-branch-model-picker.ts"
   printf 'project=%s/projects/approved\nwindow=mate-window\nkind=secondmate\n' "$home" > "$home/state/mate.meta"
   printf 'project=%s/projects/approved\nwindow=crew-window\nkind=ship\n' "$home" > "$home/state/crew.meta"
-  LIB="$repo/.pi/extensions/lib/jg-branch-dispatch.ts" FM_HOME="$home" CLASSIFY_LIB="$ROOT/bin/jg-classify-lib.sh" \
+  LIB="$repo/.pi/extensions/lib/jg-branch-dispatch.ts" JG_HOME="$home" CLASSIFY_LIB="$ROOT/bin/jg-classify-lib.sh" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, rmSync, writeFileSync } from "node:fs";
 
 const { branchOfferForWake, scopeForUnreadWake } = await import(pathToFileURL(process.env.LIB).href);
-const state = `${process.env.FM_HOME}/state`;
+const state = `${process.env.JG_HOME}/state`;
 const signalRow = (task) => `1\t1\tsignal\t${task}.status\tsignal: ${task}.status`;
 
 // Write the already-presented history, commit the presentation cursor at its
@@ -5074,7 +5074,7 @@ test_real_pi_picker_primitives_stay_bounded_and_searchable() {
     return
   fi
   local package_dir fixture original_dir out status
-  package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+  package_dir=${JG_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
   if [ ! -f "$package_dir/package.json" ]; then
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
     return
@@ -5165,11 +5165,11 @@ test_outcomes_tool_call_headers_follow_the_loaded_pi_version() {
   repo="$TMP_ROOT/call-header-versions"
   install_pi_branch_extension_fixture "$repo"
   for version in 0.87.0 0.99.0; do
-    FM_STUB_PI_VERSION="$version" EXT="$repo/.pi/extensions/jg-branch-supervision.ts" \
+    JG_STUB_PI_VERSION="$version" EXT="$repo/.pi/extensions/jg-branch-supervision.ts" \
       node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'JS'
 import { pathToFileURL } from "node:url";
 
-const version = process.env.FM_STUB_PI_VERSION;
+const version = process.env.JG_STUB_PI_VERSION;
 const tools = [];
 const pi = {
   events: { on() {}, emit() {} },
@@ -5220,7 +5220,7 @@ test_outcomes_tool_uses_stock_execution_and_export_consumers() {
     return
   fi
   local package_dir package_version fixture out status
-  package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+  package_dir=${JG_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
   if [ ! -f "$package_dir/package.json" ]; then
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
     return
@@ -5403,7 +5403,7 @@ test_delivery_keeps_the_event_loop_live_and_ordered() {
   home="$TMP_ROOT/delivery-responsiveness-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, defaultSessionCtx }; })()`);
@@ -5552,17 +5552,17 @@ test_session_replacement_during_delivery_neither_loses_nor_duplicates() {
   install_pi_branch_extension_fixture "$repo"
   cat > "$fakebin/ps" <<'SH'
 #!/bin/sh
-if [ -f "$FM_TEST_PS_ARM" ]; then
-  rm -f "$FM_TEST_PS_ARM"
-  : > "$FM_TEST_PS_ENTERED"
-  while [ ! -f "$FM_TEST_PS_RELEASE" ]; do sleep 0.01; done
+if [ -f "$JG_TEST_PS_ARM" ]; then
+  rm -f "$JG_TEST_PS_ARM"
+  : > "$JG_TEST_PS_ENTERED"
+  while [ ! -f "$JG_TEST_PS_RELEASE" ]; do sleep 0.01; done
 fi
-exec "$FM_TEST_REAL_PS" "$@"
+exec "$JG_TEST_REAL_PS" "$@"
 SH
   chmod +x "$fakebin/ps"
-  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_REAL_PS="$real_ps" FM_TEST_PS_ARM="$home/state/ps-arm" \
-    FM_TEST_PS_ENTERED="$home/state/ps-entered" FM_TEST_PS_RELEASE="$home/state/ps-release" \
+  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_REAL_PS="$real_ps" JG_TEST_PS_ARM="$home/state/ps-arm" \
+    JG_TEST_PS_ENTERED="$home/state/ps-entered" JG_TEST_PS_RELEASE="$home/state/ps-release" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, home }; })()`);
@@ -5593,7 +5593,7 @@ const toolGeneration = 1;
 
 // A delivery that is still in flight when the captain replaces the session
 // (/new, /resume, /fork, reload) must stop acting into the replaced session.
-writeFileSync(process.env.FM_TEST_PS_ARM, "");
+writeFileSync(process.env.JG_TEST_PS_ARM, "");
 const inFlight = report.execute(
   "replaced-mid-delivery",
   { task: "branch-driver", verdict: "captain", summary: "reported as the session was replaced" },
@@ -5601,10 +5601,10 @@ const inFlight = report.execute(
   undefined,
   {},
 );
-await settle(() => existsSync(process.env.FM_TEST_PS_ENTERED), "in-flight ownership subprocess");
+await settle(() => existsSync(process.env.JG_TEST_PS_ENTERED), "in-flight ownership subprocess");
 await fire("session_shutdown", {});
 const replacementStart = fire("session_start", {}, secondCtx);
-writeFileSync(process.env.FM_TEST_PS_RELEASE, "");
+writeFileSync(process.env.JG_TEST_PS_RELEASE, "");
 await replacementStart;
 const replaced = await inFlight;
 if (!replaced.isError) {
@@ -5669,25 +5669,25 @@ test_store_failure_during_delivery_neither_loses_nor_duplicates() {
   # child environment when it loads.
   cat > "$fakebin/bash" <<'SH'
 #!/bin/sh
-armed=$(cat "$FM_TEST_FAIL_ARM" 2>/dev/null || printf '')
-if [ -n "$armed" ] && [ "$1" = "$FM_TEST_OUTCOME_SCRIPT" ] && [ "$2" = "$armed" ]; then
-  : > "$FM_TEST_FAIL_ARM"
+armed=$(cat "$JG_TEST_FAIL_ARM" 2>/dev/null || printf '')
+if [ -n "$armed" ] && [ "$1" = "$JG_TEST_OUTCOME_SCRIPT" ] && [ "$2" = "$armed" ]; then
+  : > "$JG_TEST_FAIL_ARM"
   echo "injected store failure" >&2
   exit 9
 fi
-exec "$FM_TEST_REAL_BASH" "$@"
+exec "$JG_TEST_REAL_BASH" "$@"
 SH
   chmod +x "$fakebin/bash"
-  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_REAL_BASH="$real_bash" FM_TEST_OUTCOME_SCRIPT="$ROOT/bin/jg-branch-outcome.sh" \
-    FM_TEST_FAIL_ARM="$home/state/store-fail-arm" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_REAL_BASH="$real_bash" JG_TEST_OUTCOME_SCRIPT="$ROOT/bin/jg-branch-outcome.sh" \
+    JG_TEST_FAIL_ARM="$home/state/store-fail-arm" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, defaultSessionCtx }; })()`);
 const { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, defaultSessionCtx } = globalThis.__t;
 import { writeFileSync } from "node:fs";
 
-const failArm = process.env.FM_TEST_FAIL_ARM;
+const failArm = process.env.JG_TEST_FAIL_ARM;
 const armStoreFailure = (subcommand) => writeFileSync(failArm, subcommand);
 await fire("session_start", {}, defaultSessionCtx);
 let finishWakePrompt;
@@ -5764,25 +5764,25 @@ test_mark_read_failure_keeps_routine_redelivery_and_captain_deduplication() {
   install_pi_branch_extension_fixture "$repo"
   cat > "$fakebin/bash" <<'SH'
 #!/bin/sh
-armed=$(cat "$FM_TEST_FAIL_ARM" 2>/dev/null || printf '')
-if [ -n "$armed" ] && [ "$1" = "$FM_TEST_OUTCOME_SCRIPT" ] && [ "$2" = "$armed" ]; then
-  : > "$FM_TEST_FAIL_ARM"
+armed=$(cat "$JG_TEST_FAIL_ARM" 2>/dev/null || printf '')
+if [ -n "$armed" ] && [ "$1" = "$JG_TEST_OUTCOME_SCRIPT" ] && [ "$2" = "$armed" ]; then
+  : > "$JG_TEST_FAIL_ARM"
   echo "injected store failure" >&2
   exit 9
 fi
-exec "$FM_TEST_REAL_BASH" "$@"
+exec "$JG_TEST_REAL_BASH" "$@"
 SH
   chmod +x "$fakebin/bash"
-  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_REAL_BASH="$real_bash" FM_TEST_OUTCOME_SCRIPT="$ROOT/bin/jg-branch-outcome.sh" \
-    FM_TEST_FAIL_ARM="$home/state/store-fail-arm" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+  PATH="$fakebin:$PATH" PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_TEST_REAL_BASH="$real_bash" JG_TEST_OUTCOME_SCRIPT="$ROOT/bin/jg-branch-outcome.sh" \
+    JG_TEST_FAIL_ARM="$home/state/store-fail-arm" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, defaultSessionCtx }; })()`);
 const { fire, dispatch, settle, outcomeScript, sentToMain, mainEntries, defaultSessionCtx } = globalThis.__t;
 import { writeFileSync } from "node:fs";
 
-const failArm = process.env.FM_TEST_FAIL_ARM;
+const failArm = process.env.JG_TEST_FAIL_ARM;
 const armStoreFailure = (subcommand) => writeFileSync(failArm, subcommand);
 const storedRows = () => outcomeScript(["list", "--recent", "50"]).split("\n").filter(Boolean).map((line) => JSON.parse(line));
 const routineCopies = (summary) => sentToMain.filter(
@@ -5872,7 +5872,7 @@ test_extension_registered_provider_resolves_in_the_branch() {
   home="$TMP_ROOT/extprov-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/jg-branch-supervision.ts" JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, uiSelections, uiPrompts, notices, commands, home }; })()`);

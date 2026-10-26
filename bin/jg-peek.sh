@@ -13,9 +13,9 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-backend.sh
 . "$SCRIPT_DIR/jg-backend.sh"
@@ -32,7 +32,7 @@ if [ -n "$REMOTE_META" ] && [ -n "$(jg_meta_get "$REMOTE_META" remote_host)" ]; 
   REMOTE_HOST=$(jg_meta_get "$REMOTE_META" remote_host)
   case "$N" in ''|*[!0-9]*|0) N=40 ;; esac
   [ "$N" -le 100 ] || N=100
-  if ! FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-on.sh" "$REMOTE_ID" \
+  if ! JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-on.sh" "$REMOTE_ID" \
     jg-remote-secondmate-control.sh capture "$REMOTE_ID" "$N" < /dev/null; then
     echo "error: could not read the remote pane of $REMOTE_ID on $REMOTE_HOST (host unreachable or endpoint unreadable; the mate is not thereby dead)" >&2
     exit 1

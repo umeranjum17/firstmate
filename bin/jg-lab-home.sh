@@ -3,9 +3,9 @@
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-lab-home.sh - mint a disposable firstmate "lab" home.
 #
-# A lab home is a throwaway FM_HOME that a no-mistakes GATE agent may drive
+# A lab home is a throwaway JG_HOME that a no-mistakes GATE agent may drive
 # through the fleet lifecycle entrypoints: bin/jg-gate-refuse-lib.sh refuses
-# those calls inside a gate agent unless FM_HOME carries the marker file this
+# those calls inside a gate agent unless JG_HOME carries the marker file this
 # helper writes (the lib owns the marker format and authorization decision;
 # this script is the supported writer).
 #
@@ -16,7 +16,7 @@
 #
 # A lab home is the stock layout only - state/, data/, config/, projects/ - and
 # callers remove it with ordinary rm -rf when done. Drive it with plain
-# FM_HOME=<dir>; any FM_*_OVERRIDE relocation defeats the allowance.
+# JG_HOME=<dir>; any JG_*_OVERRIDE relocation defeats the allowance.
 # tmux-dir is the single owner of the short private socket directory: callers
 # use TMUX_TMPDIR=<printed-dir> and call teardown from their cleanup trap after
 # killing only the server addressed through that directory.

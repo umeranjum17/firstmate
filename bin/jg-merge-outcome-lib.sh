@@ -27,14 +27,14 @@
 # Sourced by bin/jg-pr-merge.sh, bin/jg-watch.sh, and tests. No side effects on
 # source beyond its sourced libraries.
 
-_FM_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-pr-lib.sh
-. "$_FM_MERGE_OUTCOME_LIB_DIR/jg-pr-lib.sh"
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-parent-channel-lib.sh
-. "$_FM_MERGE_OUTCOME_LIB_DIR/jg-parent-channel-lib.sh"
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-parent-channel-lib.sh"
 
 # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
-FM_MERGE_OUTCOME_ALREADY_RECORDED=false
+JG_MERGE_OUTCOME_ALREADY_RECORDED=false
 
 # jg_merge_outcome_report <home> <state> <task-id> <pr-url> <origin> [authority]
 #
@@ -62,8 +62,8 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   local self_rc=0 destination='' line lock status=0
   local provider host path number
   # shellcheck disable=SC2034 # Sourced wake helpers consume these scoped globals.
-  local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
-  FM_MERGE_OUTCOME_ALREADY_RECORDED=false
+  local STATE JG_WAKE_QUEUE JG_WAKE_QUEUE_LOCK
+  JG_MERGE_OUTCOME_ALREADY_RECORDED=false
   case "$origin" in self|poll) ;; *) return 2 ;; esac
   case "$authority" in
     away|external|yolo|away-grant) suffix=" $authority" ;;
@@ -72,14 +72,14 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   esac
   jg_pr_task_id_valid "$id" || return 2
   jg_pr_url_parse "$url" || return 2
-  provider=$FM_PR_PROVIDER
-  host=$FM_PR_HOST
-  path=$FM_PR_PATH
-  number=$FM_PR_NUMBER
+  provider=$JG_PR_PROVIDER
+  host=$JG_PR_HOST
+  path=$JG_PR_PATH
+  number=$JG_PR_NUMBER
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
 
   if destination=$(jg_parent_channel_destination "$home" "$state"); then
-    line="done [key=merged-$id]: merged $id $FM_PR_URL$suffix"
+    line="done [key=merged-$id]: merged $id $JG_PR_URL$suffix"
   else
     self_rc=$?
     [ "$self_rc" -eq 1 ] || return 3
@@ -88,13 +88,13 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 
   STATE=$state
   # shellcheck source=bin/jg-wake-lib.sh
-  . "$_FM_MERGE_OUTCOME_LIB_DIR/jg-wake-lib.sh"
+  . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-wake-lib.sh"
   lock="$state/$id.pr-poll-merge-notified.lock"
   jg_lock_acquire_wait "$lock" || return 1
   if jg_pr_poll_merge_already_notified "$state" "$id" \
     "$provider" "$host" "$path" "$number"; then
     # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
-    FM_MERGE_OUTCOME_ALREADY_RECORDED=true
+    JG_MERGE_OUTCOME_ALREADY_RECORDED=true
     jg_lock_release "$lock"
     return 0
   fi
@@ -103,8 +103,8 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
     jg_parent_channel_append_once "$destination" "$(status_stamp_line "$line")" || status=1
   fi
   if [ "$status" -eq 0 ] && { [ "$origin" = poll ] || [ -z "$destination" ]; }; then
-    jg_wake_append check "merged-$id-$FM_PR_URL" \
-      "check: merge landed: $id $FM_PR_URL$suffix" || status=1
+    jg_wake_append check "merged-$id-$JG_PR_URL" \
+      "check: merge landed: $id $JG_PR_URL$suffix" || status=1
   fi
   if [ "$status" -eq 0 ]; then
     jg_pr_poll_merge_mark_notified "$state" "$id" \
@@ -112,14 +112,14 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   fi
   jg_lock_release "$lock"
   # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
-  [ ! -e "${FM_CONFIG_OVERRIDE:-$home/config}/fleet-ledger" ] || [ "$status" -ne 0 ] || FM_HOME=$home FM_STATE_OVERRIDE=$state "$_FM_MERGE_OUTCOME_LIB_DIR/jg-fleet-ledger.sh" merged "$id" pr "$FM_PR_URL" || true
+  [ ! -e "${JG_CONFIG_OVERRIDE:-$home/config}/fleet-ledger" ] || [ "$status" -ne 0 ] || JG_HOME=$home JG_STATE_OVERRIDE=$state "$_JG_MERGE_OUTCOME_LIB_DIR/jg-fleet-ledger.sh" merged "$id" pr "$JG_PR_URL" || true
   # The ticket closes with the merge and carries the delivered PR, not the link
   # some earlier status line happened to mention.
-  [ "$status" -ne 0 ] || FM_HOME=$home FM_STATE_OVERRIDE=$state "$_FM_MERGE_OUTCOME_LIB_DIR/jg-ticket.sh" "$id" --stage "done" --state "done" --pr "$FM_PR_URL" || true
-  if [ "$status" -eq 0 ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${FM_CONFIG_OVERRIDE:-$home/config}" "$home" "$id" "$state/$id.meta" - "$FM_PR_URL" >&2; fi
+  [ "$status" -ne 0 ] || JG_HOME=$home JG_STATE_OVERRIDE=$state "$_JG_MERGE_OUTCOME_LIB_DIR/jg-ticket.sh" "$id" --stage "done" --state "done" --pr "$JG_PR_URL" || true
+  if [ "$status" -eq 0 ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${JG_CONFIG_OVERRIDE:-$home/config}" "$home" "$id" "$state/$id.meta" - "$JG_PR_URL" >&2; fi
   return "$status"
 }
 
 # Optional merge-card add-on: defines jg_merge_post_hook.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-$_FM_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-$_FM_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/firstmate-addons}/merge-card/bin/jg-merge-hooks-lib.sh"

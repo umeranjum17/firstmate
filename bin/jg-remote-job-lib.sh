@@ -5,7 +5,7 @@
 #
 # Source this file from the fixed SSH entrypoint, the long-lived worker, or the
 # remote doctor. It owns the per-account queue at
-# ~/.firstmate/remote-job (override only with FM_REMOTE_JOB_STATE_ROOT for
+# ~/.firstmate/remote-job (override only with JG_REMOTE_JOB_STATE_ROOT for
 # isolated tests), the bounded job record, worker installation, and the remote
 # runtime PATH.
 #
@@ -51,18 +51,18 @@
 # the worker skips a cancelled queued job and terminates a running cancelled
 # job's process group, and whichever side observes terminal publication reaps
 # the finalized record because no result consumer remains. jg_remote_job_wait
-# honors an optional FM_REMOTE_JOB_DISCONNECT_PROBE function name. When set,
+# honors an optional JG_REMOTE_JOB_DISCONNECT_PROBE function name. When set,
 # the probe runs about once per second; a failure cancels the job and fails
 # the wait. The staging entrypoint arms it with a parent-liveness probe so an
 # ssh channel
 # that dies without delivering a signal still cancels the abandoned job.
 # Abandoned .stage.* staging litter older than
-# FM_REMOTE_JOB_STAGE_REAP_SECONDS is reaped by the worker's stale sweep.
+# JG_REMOTE_JOB_STAGE_REAP_SECONDS is reaped by the worker's stale sweep.
 #
 # Result consumers and active-command monitors sample every 0.25 seconds by
 # default; the dispatcher's post-activity burst still samples every 0.05 seconds.
-# FM_REMOTE_JOB_ACTIVE_POLL_SECONDS overrides the active/result interval; an
-# explicitly supplied FM_REMOTE_JOB_POLL_SECONDS remains the legacy fallback
+# JG_REMOTE_JOB_ACTIVE_POLL_SECONDS overrides the active/result interval; an
+# explicitly supplied JG_REMOTE_JOB_POLL_SECONDS remains the legacy fallback
 # for both intervals. Resolve the active default before filling the dispatcher
 # default, and retain it when the library is sourced again.
 # Once-per-second cancellation, preemption, and disconnect checks can overshoot
@@ -72,8 +72,8 @@
 # and the separate cancellation/preemption TERM-to-KILL grace are unchanged.
 #
 # The worker accepts only a tracked, non-symlink executable named jg-*.sh below
-# its configured FM_ROOT/bin. Every child receives env -i with the composed
-# PATH, HOME, FM_HOME, FM_ROOT_OVERRIDE, and FM_REMOTE_JOB_ACTIVE=1. The PATH
+# its configured JG_ROOT/bin. Every child receives env -i with the composed
+# PATH, HOME, JG_HOME, JG_ROOT_OVERRIDE, and JG_REMOTE_JOB_ACTIVE=1. The PATH
 # is intentionally filesystem-discovered rather than login-shell-derived:
 # ~/.local/bin; nvm, asdf, and mise shims/install bins; Nix; Homebrew; and the
 # system tail. No shell startup files are evaluated. Each discovered set is
@@ -99,30 +99,30 @@
 # bin/jg-remote-job-reap-orphans.sh uses it to reap workers that were already
 # orphaned that way.
 
-FM_REMOTE_JOB_LABEL=dev.firstmate.remote-job
-FM_REMOTE_JOB_MAX_BYTES=${FM_REMOTE_JOB_MAX_BYTES:-1048576}
-FM_REMOTE_JOB_QUEUE_TIMEOUT=${FM_REMOTE_JOB_QUEUE_TIMEOUT:-360}
-FM_REMOTE_JOB_TIMEOUT=${FM_REMOTE_JOB_TIMEOUT:-360}
-FM_REMOTE_JOB_WAIT_GRACE=${FM_REMOTE_JOB_WAIT_GRACE:-30}
-FM_REMOTE_JOB_ACTIVE_POLL_SECONDS=${FM_REMOTE_JOB_ACTIVE_POLL_SECONDS:-${FM_REMOTE_JOB_POLL_SECONDS:-0.25}}
-FM_REMOTE_JOB_POLL_SECONDS=${FM_REMOTE_JOB_POLL_SECONDS:-0.05}
-FM_REMOTE_JOB_REAP_SECONDS=${FM_REMOTE_JOB_REAP_SECONDS:-3600}
-FM_REMOTE_JOB_STAGE_REAP_SECONDS=${FM_REMOTE_JOB_STAGE_REAP_SECONDS:-600}
-FM_REMOTE_JOB_SEQ_CLAIM_REAP_SECONDS=86400
-FM_REMOTE_JOB_SEQ_CLAIM_REAP_INTERVAL=3600
+JG_REMOTE_JOB_LABEL=dev.firstmate.remote-job
+JG_REMOTE_JOB_MAX_BYTES=${JG_REMOTE_JOB_MAX_BYTES:-1048576}
+JG_REMOTE_JOB_QUEUE_TIMEOUT=${JG_REMOTE_JOB_QUEUE_TIMEOUT:-360}
+JG_REMOTE_JOB_TIMEOUT=${JG_REMOTE_JOB_TIMEOUT:-360}
+JG_REMOTE_JOB_WAIT_GRACE=${JG_REMOTE_JOB_WAIT_GRACE:-30}
+JG_REMOTE_JOB_ACTIVE_POLL_SECONDS=${JG_REMOTE_JOB_ACTIVE_POLL_SECONDS:-${JG_REMOTE_JOB_POLL_SECONDS:-0.25}}
+JG_REMOTE_JOB_POLL_SECONDS=${JG_REMOTE_JOB_POLL_SECONDS:-0.05}
+JG_REMOTE_JOB_REAP_SECONDS=${JG_REMOTE_JOB_REAP_SECONDS:-3600}
+JG_REMOTE_JOB_STAGE_REAP_SECONDS=${JG_REMOTE_JOB_STAGE_REAP_SECONDS:-600}
+JG_REMOTE_JOB_SEQ_CLAIM_REAP_SECONDS=86400
+JG_REMOTE_JOB_SEQ_CLAIM_REAP_INTERVAL=3600
 # shellcheck disable=SC2034 # Shared protocol constant consumed by the worker and sourcing callers.
-FM_REMOTE_JOB_PREEMPTED_EXIT=76
-FM_REMOTE_JOB_OPERATOR_PATH=
-FM_REMOTE_JOB_CHILD_PATH=
-FM_REMOTE_JOB_STATE=
-FM_REMOTE_JOB_JOBS=
-FM_REMOTE_JOB_SEQ_CLAIMS=
-FM_REMOTE_JOB_ID=
-FM_REMOTE_JOB_STDOUT=
-FM_REMOTE_JOB_STDERR=
-FM_REMOTE_JOB_EXIT=
-FM_REMOTE_JOB_ERROR=
-FM_REMOTE_JOB_REPAIRED=0
+JG_REMOTE_JOB_PREEMPTED_EXIT=76
+JG_REMOTE_JOB_OPERATOR_PATH=
+JG_REMOTE_JOB_CHILD_PATH=
+JG_REMOTE_JOB_STATE=
+JG_REMOTE_JOB_JOBS=
+JG_REMOTE_JOB_SEQ_CLAIMS=
+JG_REMOTE_JOB_ID=
+JG_REMOTE_JOB_STDOUT=
+JG_REMOTE_JOB_STDERR=
+JG_REMOTE_JOB_EXIT=
+JG_REMOTE_JOB_ERROR=
+JG_REMOTE_JOB_REPAIRED=0
 
 jg_remote_job_die() {
   printf 'error: %s\n' "$1" >&2
@@ -138,21 +138,21 @@ jg_remote_job_command_preemptible() { # <staged argv command>
 }
 
 jg_remote_job_validate_settings() {
-  case "$FM_REMOTE_JOB_MAX_BYTES" in ''|*[!0-9]*|0) return 1 ;; esac
-  [ "$FM_REMOTE_JOB_MAX_BYTES" -le 1048576 ] || return 1
-  case "$FM_REMOTE_JOB_QUEUE_TIMEOUT" in ''|*[!0-9]*|0) return 1 ;; esac
-  [ "$FM_REMOTE_JOB_QUEUE_TIMEOUT" -le 3600 ] || return 1
-  case "$FM_REMOTE_JOB_TIMEOUT" in ''|*[!0-9]*|0) return 1 ;; esac
-  [ "$FM_REMOTE_JOB_TIMEOUT" -le 3600 ] || return 1
-  case "$FM_REMOTE_JOB_WAIT_GRACE" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$FM_REMOTE_JOB_WAIT_GRACE" -le 300 ] || return 1
-  case "$FM_REMOTE_JOB_REAP_SECONDS" in ''|*[!0-9]*|0) return 1 ;; esac
-  case "$FM_REMOTE_JOB_STAGE_REAP_SECONDS" in ''|*[!0-9]*|0) return 1 ;; esac
+  case "$JG_REMOTE_JOB_MAX_BYTES" in ''|*[!0-9]*|0) return 1 ;; esac
+  [ "$JG_REMOTE_JOB_MAX_BYTES" -le 1048576 ] || return 1
+  case "$JG_REMOTE_JOB_QUEUE_TIMEOUT" in ''|*[!0-9]*|0) return 1 ;; esac
+  [ "$JG_REMOTE_JOB_QUEUE_TIMEOUT" -le 3600 ] || return 1
+  case "$JG_REMOTE_JOB_TIMEOUT" in ''|*[!0-9]*|0) return 1 ;; esac
+  [ "$JG_REMOTE_JOB_TIMEOUT" -le 3600 ] || return 1
+  case "$JG_REMOTE_JOB_WAIT_GRACE" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$JG_REMOTE_JOB_WAIT_GRACE" -le 300 ] || return 1
+  case "$JG_REMOTE_JOB_REAP_SECONDS" in ''|*[!0-9]*|0) return 1 ;; esac
+  case "$JG_REMOTE_JOB_STAGE_REAP_SECONDS" in ''|*[!0-9]*|0) return 1 ;; esac
   return 0
 }
 
 jg_remote_job_platform() {
-  local raw=${FM_REMOTE_JOB_PLATFORM_OVERRIDE:-}
+  local raw=${JG_REMOTE_JOB_PLATFORM_OVERRIDE:-}
   [ -n "$raw" ] || raw=$(uname -s 2>/dev/null || true)
   case "$raw" in
     Darwin|darwin) printf 'darwin\n' ;;
@@ -163,8 +163,8 @@ jg_remote_job_platform() {
 }
 
 jg_remote_job_path_append() { # <directory>
-  case ":$FM_REMOTE_JOB_OPERATOR_PATH:" in *":$1:"*) return 0 ;; esac
-  FM_REMOTE_JOB_OPERATOR_PATH="${FM_REMOTE_JOB_OPERATOR_PATH:+$FM_REMOTE_JOB_OPERATOR_PATH:}$1"
+  case ":$JG_REMOTE_JOB_OPERATOR_PATH:" in *":$1:"*) return 0 ;; esac
+  JG_REMOTE_JOB_OPERATOR_PATH="${JG_REMOTE_JOB_OPERATOR_PATH:+$JG_REMOTE_JOB_OPERATOR_PATH:}$1"
 }
 
 jg_remote_job_path_append_if_dir() { # <directory>
@@ -274,7 +274,7 @@ jg_remote_job_nvm_selected_bin() { # <account-home>
 
 jg_remote_job_compose_operator_path() { # <account-home>
   local account_home=$1 account_user nvm_bin
-  FM_REMOTE_JOB_OPERATOR_PATH=
+  JG_REMOTE_JOB_OPERATOR_PATH=
   jg_remote_job_path_append_if_dir "$account_home/.local/bin"
   nvm_bin=$(jg_remote_job_nvm_selected_bin "$account_home" 2>/dev/null || true)
   [ -z "$nvm_bin" ] || jg_remote_job_path_append "$nvm_bin"
@@ -296,29 +296,29 @@ jg_remote_job_compose_operator_path() { # <account-home>
   jg_remote_job_path_append /bin
   jg_remote_job_path_append /usr/sbin
   jg_remote_job_path_append /sbin
-  printf '%s\n' "$FM_REMOTE_JOB_OPERATOR_PATH"
+  printf '%s\n' "$JG_REMOTE_JOB_OPERATOR_PATH"
 }
 
 jg_remote_job_build_child_path() { # <remote-root>
   local root=$1 directory old_ifs
-  FM_REMOTE_JOB_CHILD_PATH="$root/bin"
+  JG_REMOTE_JOB_CHILD_PATH="$root/bin"
   old_ifs=$IFS
   IFS=:
-  for directory in $FM_REMOTE_JOB_OPERATOR_PATH; do
-    case ":$FM_REMOTE_JOB_CHILD_PATH:" in *":$directory:"*) continue ;; esac
-    FM_REMOTE_JOB_CHILD_PATH="$FM_REMOTE_JOB_CHILD_PATH:$directory"
+  for directory in $JG_REMOTE_JOB_OPERATOR_PATH; do
+    case ":$JG_REMOTE_JOB_CHILD_PATH:" in *":$directory:"*) continue ;; esac
+    JG_REMOTE_JOB_CHILD_PATH="$JG_REMOTE_JOB_CHILD_PATH:$directory"
   done
   IFS=$old_ifs
-  printf '%s\n' "$FM_REMOTE_JOB_CHILD_PATH"
+  printf '%s\n' "$JG_REMOTE_JOB_CHILD_PATH"
 }
 
 jg_remote_job_operator_tool() { # <tool>; resolves only outside the checkout bin
   local tool=$1 resolved
-  resolved=$(PATH="$FM_REMOTE_JOB_OPERATOR_PATH" command -v "$tool" 2>/dev/null || true)
+  resolved=$(PATH="$JG_REMOTE_JOB_OPERATOR_PATH" command -v "$tool" 2>/dev/null || true)
   case "$resolved" in
     /*)
       [ -x "$resolved" ] || return 1
-      case ":$FM_REMOTE_JOB_OPERATOR_PATH:" in *":${resolved%/*}:"*) printf '%s\n' "$resolved" ;; *) return 1 ;; esac
+      case ":$JG_REMOTE_JOB_OPERATOR_PATH:" in *":${resolved%/*}:"*) printf '%s\n' "$resolved" ;; *) return 1 ;; esac
       ;;
     *) return 1 ;;
   esac
@@ -412,50 +412,50 @@ jg_remote_job_safe_child_dir() { # <canonical-parent> <single child basename>
 jg_remote_job_prepare_state() { # <account-home>
   local account_home=$1 root parent base firstmate
   jg_remote_job_validate_settings || {
-    FM_REMOTE_JOB_ERROR="remote job bounds or timeout are invalid"
+    JG_REMOTE_JOB_ERROR="remote job bounds or timeout are invalid"
     return 1
   }
   account_home=$(jg_remote_job_canonical_existing_dir "$account_home") || {
-    FM_REMOTE_JOB_ERROR="remote account home is unavailable or unsafe"
+    JG_REMOTE_JOB_ERROR="remote account home is unavailable or unsafe"
     return 1
   }
-  if [ -n "${FM_REMOTE_JOB_STATE_ROOT:-}" ]; then
-    root=$(jg_remote_job_normalize_absolute_path "$FM_REMOTE_JOB_STATE_ROOT") || {
-      FM_REMOTE_JOB_ERROR="remote job state root is not a safe absolute path"
+  if [ -n "${JG_REMOTE_JOB_STATE_ROOT:-}" ]; then
+    root=$(jg_remote_job_normalize_absolute_path "$JG_REMOTE_JOB_STATE_ROOT") || {
+      JG_REMOTE_JOB_ERROR="remote job state root is not a safe absolute path"
       return 1
     }
     parent=$(dirname "$root")
     base=$(basename "$root")
     parent=$(jg_remote_job_canonical_existing_dir "$parent") || {
-      FM_REMOTE_JOB_ERROR="remote job state parent is unavailable or unsafe"
+      JG_REMOTE_JOB_ERROR="remote job state parent is unavailable or unsafe"
       return 1
     }
     [ "$parent/$base" = "$root" ] || return 1
     root=$(jg_remote_job_safe_child_dir "$parent" "$base") || {
-      FM_REMOTE_JOB_ERROR="remote job state root is unsafe"
+      JG_REMOTE_JOB_ERROR="remote job state root is unsafe"
       return 1
     }
   else
     firstmate=$(jg_remote_job_safe_child_dir "$account_home" .firstmate) || {
-      FM_REMOTE_JOB_ERROR="cannot prepare $account_home/.firstmate for remote jobs"
+      JG_REMOTE_JOB_ERROR="cannot prepare $account_home/.firstmate for remote jobs"
       return 1
     }
     root=$(jg_remote_job_safe_child_dir "$firstmate" remote-job) || {
-      FM_REMOTE_JOB_ERROR="cannot prepare remote job state"
+      JG_REMOTE_JOB_ERROR="cannot prepare remote job state"
       return 1
     }
   fi
-  FM_REMOTE_JOB_STATE=$root
-  FM_REMOTE_JOB_JOBS=$(jg_remote_job_safe_child_dir "$FM_REMOTE_JOB_STATE" jobs) || {
-    FM_REMOTE_JOB_ERROR="remote job queue is unsafe"
+  JG_REMOTE_JOB_STATE=$root
+  JG_REMOTE_JOB_JOBS=$(jg_remote_job_safe_child_dir "$JG_REMOTE_JOB_STATE" jobs) || {
+    JG_REMOTE_JOB_ERROR="remote job queue is unsafe"
     return 1
   }
-  FM_REMOTE_JOB_SEQ_CLAIMS=$(jg_remote_job_safe_child_dir "$FM_REMOTE_JOB_STATE" .seq-claims) || {
-    FM_REMOTE_JOB_ERROR="remote job sequence claims are unsafe"
+  JG_REMOTE_JOB_SEQ_CLAIMS=$(jg_remote_job_safe_child_dir "$JG_REMOTE_JOB_STATE" .seq-claims) || {
+    JG_REMOTE_JOB_ERROR="remote job sequence claims are unsafe"
     return 1
   }
-  jg_remote_job_safe_child_dir "$FM_REMOTE_JOB_STATE" logs >/dev/null || {
-    FM_REMOTE_JOB_ERROR="remote job log directory is unsafe"
+  jg_remote_job_safe_child_dir "$JG_REMOTE_JOB_STATE" logs >/dev/null || {
+    JG_REMOTE_JOB_ERROR="remote job log directory is unsafe"
     return 1
   }
 }
@@ -463,8 +463,8 @@ jg_remote_job_prepare_state() { # <account-home>
 jg_remote_job_job_dir() { # <id>
   local id=$1 dir physical
   jg_remote_job_safe_id "$id" || return 1
-  [ -n "$FM_REMOTE_JOB_JOBS" ] || return 1
-  dir="$FM_REMOTE_JOB_JOBS/$id"
+  [ -n "$JG_REMOTE_JOB_JOBS" ] || return 1
+  dir="$JG_REMOTE_JOB_JOBS/$id"
   [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
   physical=$(CDPATH='' cd -- "$dir" 2>/dev/null && pwd -P) || return 1
   [ "$physical" = "$dir" ] || return 1
@@ -569,11 +569,11 @@ jg_remote_job_read_deadline() { # <job-dir>
 
 jg_remote_job_advance_seq_hint() { # <value>
   local value=$1 counter current tmp
-  counter="$FM_REMOTE_JOB_STATE/seq"
+  counter="$JG_REMOTE_JOB_STATE/seq"
   current=$(cat "$counter" 2>/dev/null || true)
   case "$current" in ''|*[!0-9]*) current=0 ;; esac
   [ "$value" -gt "$current" ] || return 0
-  tmp=$(umask 077; mktemp "$FM_REMOTE_JOB_STATE/.seqhint.XXXXXX") || return 1
+  tmp=$(umask 077; mktemp "$JG_REMOTE_JOB_STATE/.seqhint.XXXXXX") || return 1
   printf '%s\n' "$value" > "$tmp" || { rm -f -- "$tmp"; return 1; }
   chmod 600 "$tmp" || { rm -f -- "$tmp"; return 1; }
   current=$(cat "$counter" 2>/dev/null || true)
@@ -587,15 +587,15 @@ jg_remote_job_advance_seq_hint() { # <value>
 
 jg_remote_job_next_seq() { # [stage-dir destination]
   local stage=${1:-} destination=${2:-} counter value claim attempt=0 recovered=0 maximum entry
-  [ -n "$FM_REMOTE_JOB_STATE" ] && [ -n "$FM_REMOTE_JOB_SEQ_CLAIMS" ] || return 1
-  counter="$FM_REMOTE_JOB_STATE/seq"
+  [ -n "$JG_REMOTE_JOB_STATE" ] && [ -n "$JG_REMOTE_JOB_SEQ_CLAIMS" ] || return 1
+  counter="$JG_REMOTE_JOB_STATE/seq"
   value=$(cat "$counter" 2>/dev/null || true)
   case "$value" in ''|*[!0-9]*) value=0 ;; esac
   while :; do
     if [ "$attempt" -ge 100000 ]; then
       [ "$recovered" -eq 0 ] || return 1
       maximum=0
-      for entry in "$FM_REMOTE_JOB_SEQ_CLAIMS"/*; do
+      for entry in "$JG_REMOTE_JOB_SEQ_CLAIMS"/*; do
         [ -d "$entry" ] && [ ! -L "$entry" ] || continue
         entry=${entry##*/}
         case "$entry" in ''|*[!0-9]*|0) continue ;; esac
@@ -607,7 +607,7 @@ jg_remote_job_next_seq() { # [stage-dir destination]
     fi
     attempt=$((attempt + 1))
     value=$((value + 1))
-    claim="$FM_REMOTE_JOB_SEQ_CLAIMS/$value"
+    claim="$JG_REMOTE_JOB_SEQ_CLAIMS/$value"
     if (umask 077; mkdir "$claim") 2>/dev/null; then
       chmod 700 "$claim" || return 1
       jg_remote_job_advance_seq_hint "$value" || true
@@ -660,47 +660,47 @@ jg_remote_job_stage() { # <account-home> <root> <home> <command> [args...]; stdi
   shift 4
   jg_remote_job_prepare_state "$account_home" || return 1
   root=$(jg_remote_job_canonical_existing_dir "$root") || {
-    FM_REMOTE_JOB_ERROR="remote job root is unavailable or unsafe"
+    JG_REMOTE_JOB_ERROR="remote job root is unavailable or unsafe"
     return 1
   }
   home=$(jg_remote_job_canonical_home "$home") || {
-    FM_REMOTE_JOB_ERROR="remote job home is unavailable or unsafe"
+    JG_REMOTE_JOB_ERROR="remote job home is unavailable or unsafe"
     return 1
   }
-  case "$command" in jg-*.sh) ;; *) FM_REMOTE_JOB_ERROR="remote job command is outside the jg-*.sh namespace"; return 1 ;; esac
-  case "$command" in */*|*..*) FM_REMOTE_JOB_ERROR="remote job command contains a path or traversal"; return 1 ;; esac
+  case "$command" in jg-*.sh) ;; *) JG_REMOTE_JOB_ERROR="remote job command is outside the jg-*.sh namespace"; return 1 ;; esac
+  case "$command" in */*|*..*) JG_REMOTE_JOB_ERROR="remote job command contains a path or traversal"; return 1 ;; esac
   owner_start=$(jg_remote_job_process_start "$$") || {
-    FM_REMOTE_JOB_ERROR="cannot establish remote job staging ownership"
+    JG_REMOTE_JOB_ERROR="cannot establish remote job staging ownership"
     return 1
   }
-  stage=$(umask 077; mktemp -d "$FM_REMOTE_JOB_JOBS/.stage.XXXXXX") || {
-    FM_REMOTE_JOB_ERROR="cannot stage remote job"
+  stage=$(umask 077; mktemp -d "$JG_REMOTE_JOB_JOBS/.stage.XXXXXX") || {
+    JG_REMOTE_JOB_ERROR="cannot stage remote job"
     return 1
   }
   chmod 700 "$stage" || { rm -rf -- "$stage"; return 1; }
-  queue_deadline=$(( $(date +%s) + FM_REMOTE_JOB_QUEUE_TIMEOUT ))
+  queue_deadline=$(( $(date +%s) + JG_REMOTE_JOB_QUEUE_TIMEOUT ))
   if ! printf '%s\n' "$$" > "$stage/.owner-pid" ||
     ! printf '%s\n' "$owner_start" > "$stage/.owner-start" ||
     ! chmod 600 "$stage/.owner-pid" "$stage/.owner-start" ||
     ! printf '%s\n' "$root" > "$stage/root" ||
     ! printf '%s\n' "$home" > "$stage/home" ||
     ! printf '%s\n' "$queue_deadline" > "$stage/queue_deadline" ||
-    ! printf '%s\n' "$FM_REMOTE_JOB_TIMEOUT" > "$stage/timeout" ||
+    ! printf '%s\n' "$JG_REMOTE_JOB_TIMEOUT" > "$stage/timeout" ||
     ! printf '%s\0' "$command" "$@" > "$stage/argv" ||
-    ! head -c "$((FM_REMOTE_JOB_MAX_BYTES + 1))" > "$stage/stdin"; then
+    ! head -c "$((JG_REMOTE_JOB_MAX_BYTES + 1))" > "$stage/stdin"; then
     rm -rf -- "$stage"
-    FM_REMOTE_JOB_ERROR="cannot capture remote job input"
+    JG_REMOTE_JOB_ERROR="cannot capture remote job input"
     return 1
   fi
   for bytes in root home queue_deadline timeout argv stdin; do chmod 600 "$stage/$bytes" || { rm -rf -- "$stage"; return 1; }; done
-  jg_remote_job_regular_bounded "$stage/argv" "$FM_REMOTE_JOB_MAX_BYTES" || {
+  jg_remote_job_regular_bounded "$stage/argv" "$JG_REMOTE_JOB_MAX_BYTES" || {
     rm -rf -- "$stage"
-    FM_REMOTE_JOB_ERROR="remote job argv exceeds the ${FM_REMOTE_JOB_MAX_BYTES}-byte bound"
+    JG_REMOTE_JOB_ERROR="remote job argv exceeds the ${JG_REMOTE_JOB_MAX_BYTES}-byte bound"
     return 1
   }
-  jg_remote_job_regular_bounded "$stage/stdin" "$FM_REMOTE_JOB_MAX_BYTES" || {
+  jg_remote_job_regular_bounded "$stage/stdin" "$JG_REMOTE_JOB_MAX_BYTES" || {
     rm -rf -- "$stage"
-    FM_REMOTE_JOB_ERROR="remote job stdin exceeds the ${FM_REMOTE_JOB_MAX_BYTES}-byte bound"
+    JG_REMOTE_JOB_ERROR="remote job stdin exceeds the ${JG_REMOTE_JOB_MAX_BYTES}-byte bound"
     return 1
   }
   : > "$stage/stdout"
@@ -708,39 +708,39 @@ jg_remote_job_stage() { # <account-home> <root> <home> <command> [args...]; stdi
   chmod 600 "$stage/stdout" "$stage/stderr" || { rm -rf -- "$stage"; return 1; }
   id="job-${stage##*/.stage.}"
   jg_remote_job_safe_id "$id" || { rm -rf -- "$stage"; return 1; }
-  destination="$FM_REMOTE_JOB_JOBS/$id"
+  destination="$JG_REMOTE_JOB_JOBS/$id"
   [ ! -e "$destination" ] && [ ! -L "$destination" ] || { rm -rf -- "$stage"; return 1; }
   if ! jg_remote_job_next_seq "$stage" "$destination" >/dev/null; then
     rm -rf -- "$stage"
-    FM_REMOTE_JOB_ERROR="cannot allocate and publish a remote job staging sequence"
+    JG_REMOTE_JOB_ERROR="cannot allocate and publish a remote job staging sequence"
     return 1
   fi
   # shellcheck disable=SC2034 # Sourceable API consumed by callers that do not use command substitution.
-  FM_REMOTE_JOB_ID=$id
+  JG_REMOTE_JOB_ID=$id
   printf '%s\n' "$id"
 }
 
-jg_remote_job_wait() { # <account-home> <id>; honors FM_REMOTE_JOB_DISCONNECT_PROBE
+jg_remote_job_wait() { # <account-home> <id>; honors JG_REMOTE_JOB_DISCONNECT_PROBE
   local account_home=$1 id=$2 job state queue_deadline execution_timeout wait_deadline exit_value
   local deadline_ticks next_probe=0
   jg_remote_job_prepare_state "$account_home" || return 1
   job=$(jg_remote_job_job_dir "$id") || {
-    FM_REMOTE_JOB_ERROR="remote job record disappeared or became unsafe"
+    JG_REMOTE_JOB_ERROR="remote job record disappeared or became unsafe"
     return 1
   }
   queue_deadline=$(jg_remote_job_read_number "$job" queue_deadline) || {
-    FM_REMOTE_JOB_ERROR="remote job queue deadline is invalid"
+    JG_REMOTE_JOB_ERROR="remote job queue deadline is invalid"
     return 1
   }
   execution_timeout=$(jg_remote_job_read_number "$job" timeout) || {
-    FM_REMOTE_JOB_ERROR="remote job execution timeout is invalid"
+    JG_REMOTE_JOB_ERROR="remote job execution timeout is invalid"
     return 1
   }
   [ "$execution_timeout" -le 3600 ] || {
-    FM_REMOTE_JOB_ERROR="remote job execution timeout is invalid"
+    JG_REMOTE_JOB_ERROR="remote job execution timeout is invalid"
     return 1
   }
-  wait_deadline=$((queue_deadline + execution_timeout + FM_REMOTE_JOB_WAIT_GRACE))
+  wait_deadline=$((queue_deadline + execution_timeout + JG_REMOTE_JOB_WAIT_GRACE))
   # SECONDS is the loop's clock so no time child runs per sample: one date
   # read here converts the epoch deadline into the shell's own tick counter
   # with the same whole-second granularity.
@@ -749,39 +749,39 @@ jg_remote_job_wait() { # <account-home> <id>; honors FM_REMOTE_JOB_DISCONNECT_PR
     jg_remote_job_read_state "$job" state 2>/dev/null || state=
     case "$state" in
       'done')
-        if ! jg_remote_job_regular_bounded "$job/stdout" "$FM_REMOTE_JOB_MAX_BYTES" ||
-          ! jg_remote_job_regular_bounded "$job/stderr" "$FM_REMOTE_JOB_MAX_BYTES" ||
+        if ! jg_remote_job_regular_bounded "$job/stdout" "$JG_REMOTE_JOB_MAX_BYTES" ||
+          ! jg_remote_job_regular_bounded "$job/stderr" "$JG_REMOTE_JOB_MAX_BYTES" ||
           ! jg_remote_job_regular_bounded "$job/exit" 32; then
-          FM_REMOTE_JOB_ERROR="remote job result is unsafe or exceeds its byte bound"
+          JG_REMOTE_JOB_ERROR="remote job result is unsafe or exceeds its byte bound"
           return 1
         fi
         exit_value=$(tr -d '\n' < "$job/exit")
-        case "$exit_value" in ''|*[!0-9]*) FM_REMOTE_JOB_ERROR="remote job exit status is invalid"; return 1 ;; esac
-        [ "$exit_value" -le 255 ] || { FM_REMOTE_JOB_ERROR="remote job exit status is invalid"; return 1; }
+        case "$exit_value" in ''|*[!0-9]*) JG_REMOTE_JOB_ERROR="remote job exit status is invalid"; return 1 ;; esac
+        [ "$exit_value" -le 255 ] || { JG_REMOTE_JOB_ERROR="remote job exit status is invalid"; return 1; }
         # shellcheck disable=SC2034 # Sourceable API consumed by the entrypoint after this function returns.
-        FM_REMOTE_JOB_STDOUT="$job/stdout"
+        JG_REMOTE_JOB_STDOUT="$job/stdout"
         # shellcheck disable=SC2034 # Sourceable API consumed by the entrypoint after this function returns.
-        FM_REMOTE_JOB_STDERR="$job/stderr"
+        JG_REMOTE_JOB_STDERR="$job/stderr"
         # shellcheck disable=SC2034 # Sourceable API consumed by the entrypoint after this function returns.
-        FM_REMOTE_JOB_EXIT=$exit_value
+        JG_REMOTE_JOB_EXIT=$exit_value
         return 0
         ;;
       queued|running) ;;
-      *) FM_REMOTE_JOB_ERROR="remote job state is invalid"; return 1 ;;
+      *) JG_REMOTE_JOB_ERROR="remote job state is invalid"; return 1 ;;
     esac
     if [ "$SECONDS" -ge "$deadline_ticks" ]; then
-      FM_REMOTE_JOB_ERROR="remote job did not complete within its bounded wait"
+      JG_REMOTE_JOB_ERROR="remote job did not complete within its bounded wait"
       return 1
     fi
-    if [ -n "${FM_REMOTE_JOB_DISCONNECT_PROBE:-}" ] && [ "$SECONDS" -ge "$next_probe" ]; then
+    if [ -n "${JG_REMOTE_JOB_DISCONNECT_PROBE:-}" ] && [ "$SECONDS" -ge "$next_probe" ]; then
       next_probe=$((SECONDS + 1))
-      if ! "$FM_REMOTE_JOB_DISCONNECT_PROBE"; then
+      if ! "$JG_REMOTE_JOB_DISCONNECT_PROBE"; then
         jg_remote_job_cancel "$account_home" "$id" 2>/dev/null || true
-        FM_REMOTE_JOB_ERROR="remote job caller disconnected; the job was cancelled"
+        JG_REMOTE_JOB_ERROR="remote job caller disconnected; the job was cancelled"
         return 1
       fi
     fi
-    sleep "$FM_REMOTE_JOB_ACTIVE_POLL_SECONDS"
+    sleep "$JG_REMOTE_JOB_ACTIVE_POLL_SECONDS"
   done
 }
 
@@ -824,7 +824,7 @@ jg_remote_job_reap_stale() { # <account-home>
   local cutoff stamp ref
   jg_remote_job_prepare_state "$account_home" || return 1
   now=$(date +%s)
-  for job in "$FM_REMOTE_JOB_JOBS"/job-*; do
+  for job in "$JG_REMOTE_JOB_JOBS"/job-*; do
     [ -d "$job" ] && [ ! -L "$job" ] || continue
     id=${job##*/}
     jg_remote_job_safe_id "$id" || continue
@@ -832,23 +832,23 @@ jg_remote_job_reap_stale() { # <account-home>
     [ "$state" = 'done' ] || continue
     mtime=$(jg_remote_job_path_mtime "$job" 2>/dev/null || true)
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
-    [ $((now - mtime)) -ge "$FM_REMOTE_JOB_REAP_SECONDS" ] || continue
+    [ $((now - mtime)) -ge "$JG_REMOTE_JOB_REAP_SECONDS" ] || continue
     jg_remote_job_reap "$account_home" "$id" || true
   done
-  marker="$FM_REMOTE_JOB_STATE/.seq-claims-reaped"
+  marker="$JG_REMOTE_JOB_STATE/.seq-claims-reaped"
   mtime=$(jg_remote_job_path_mtime "$marker" 2>/dev/null || true)
   case "$mtime" in
     ''|*[!0-9]*) reap_claims=1 ;;
-    *) [ $((now - mtime)) -lt "$FM_REMOTE_JOB_SEQ_CLAIM_REAP_INTERVAL" ] || reap_claims=1 ;;
+    *) [ $((now - mtime)) -lt "$JG_REMOTE_JOB_SEQ_CLAIM_REAP_INTERVAL" ] || reap_claims=1 ;;
   esac
   if [ "$reap_claims" -eq 1 ]; then
     # Prepare the age beacon before advancing the marker so a touch/date failure
     # retries on the next sweep instead of skipping a whole interval.
     ref=
     stamp=
-    if [ -d "$FM_REMOTE_JOB_SEQ_CLAIMS" ] && [ ! -L "$FM_REMOTE_JOB_SEQ_CLAIMS" ]; then
-      cutoff=$((now - FM_REMOTE_JOB_SEQ_CLAIM_REAP_SECONDS))
-      ref=$(umask 077; mktemp "$FM_REMOTE_JOB_STATE/.seqreap-ref.XXXXXX") || ref=
+    if [ -d "$JG_REMOTE_JOB_SEQ_CLAIMS" ] && [ ! -L "$JG_REMOTE_JOB_SEQ_CLAIMS" ]; then
+      cutoff=$((now - JG_REMOTE_JOB_SEQ_CLAIM_REAP_SECONDS))
+      ref=$(umask 077; mktemp "$JG_REMOTE_JOB_STATE/.seqreap-ref.XXXXXX") || ref=
       if [ -n "$ref" ]; then
         # touch -d ISO-8601 is POSIX; date(1) needs a host-specific epoch
         # conversion. The beacon sits at the last instant of the cutoff second
@@ -862,13 +862,13 @@ jg_remote_job_reap_stale() { # <account-home>
       fi
     fi
     if [ -n "$stamp" ]; then
-      tmp=$(umask 077; mktemp "$FM_REMOTE_JOB_STATE/.seqreap.XXXXXX") || tmp=
+      tmp=$(umask 077; mktemp "$JG_REMOTE_JOB_STATE/.seqreap.XXXXXX") || tmp=
       if [ -n "$tmp" ] && printf '%s\n' "$now" > "$tmp" && chmod 600 "$tmp" \
         && mv -f -- "$tmp" "$marker"; then
         # One directory walk: ! -newer matches whole-second mtime <= cutoff
         # (the former >= age check). Batched rmdir tolerates concurrent mkdir/rmdir races
         # and non-empty dirs the same way the old per-claim rmdir || true did.
-        find "$FM_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 -type d \
+        find "$JG_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 -type d \
           -name '[0-9]*' ! -name '*[!0-9]*' ! -name 0 \
           ! -newer "$ref" -exec rmdir {} + 2>/dev/null || true
       else
@@ -879,22 +879,22 @@ jg_remote_job_reap_stale() { # <account-home>
   fi
   # Staging litter a killed caller left behind is reaped after its owner is no
   # longer the process that created it and the stage has exceeded the age bound.
-  for stage in "$FM_REMOTE_JOB_JOBS"/.stage.*; do
+  for stage in "$JG_REMOTE_JOB_JOBS"/.stage.*; do
     [ -d "$stage" ] && [ ! -L "$stage" ] || continue
     jg_remote_job_stage_owner_alive "$stage" && continue
     mtime=$(jg_remote_job_path_mtime "$stage" 2>/dev/null || true)
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
-    [ $((now - mtime)) -ge "$FM_REMOTE_JOB_STAGE_REAP_SECONDS" ] || continue
+    [ $((now - mtime)) -ge "$JG_REMOTE_JOB_STAGE_REAP_SECONDS" ] || continue
     rm -rf -- "$stage"
   done
 }
 
 jg_remote_job_launchagent_paths() { # <account-home>
   local account_home=$1
-  FM_REMOTE_JOB_LAUNCH_AGENT_DIR="$account_home/Library/LaunchAgents"
-  FM_REMOTE_JOB_LAUNCH_AGENT_PLIST="$FM_REMOTE_JOB_LAUNCH_AGENT_DIR/$FM_REMOTE_JOB_LABEL.plist"
-  FM_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR="$account_home/Library/Logs"
-  FM_REMOTE_JOB_LAUNCH_AGENT_LOG="$FM_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR/$FM_REMOTE_JOB_LABEL.log"
+  JG_REMOTE_JOB_LAUNCH_AGENT_DIR="$account_home/Library/LaunchAgents"
+  JG_REMOTE_JOB_LAUNCH_AGENT_PLIST="$JG_REMOTE_JOB_LAUNCH_AGENT_DIR/$JG_REMOTE_JOB_LABEL.plist"
+  JG_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR="$account_home/Library/Logs"
+  JG_REMOTE_JOB_LAUNCH_AGENT_LOG="$JG_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR/$JG_REMOTE_JOB_LABEL.log"
 }
 
 jg_remote_job_plist_safe_path() {
@@ -906,14 +906,14 @@ jg_remote_job_render_launchagent() { # <remote-root> <account-home>
   worker="$root/bin/jg-remote-job-worker.sh"
   jg_remote_job_launchagent_paths "$account_home"
   jg_remote_job_plist_safe_path "$worker" && jg_remote_job_plist_safe_path "$account_home" &&
-    jg_remote_job_plist_safe_path "$FM_REMOTE_JOB_LAUNCH_AGENT_LOG" || return 1
+    jg_remote_job_plist_safe_path "$JG_REMOTE_JOB_LAUNCH_AGENT_LOG" || return 1
   cat <<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>$FM_REMOTE_JOB_LABEL</string>
+	<string>$JG_REMOTE_JOB_LABEL</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>$worker</string>
@@ -922,7 +922,7 @@ jg_remote_job_render_launchagent() { # <remote-root> <account-home>
 	<dict>
 		<key>HOME</key>
 		<string>$account_home</string>
-		<key>FM_ROOT_OVERRIDE</key>
+		<key>JG_ROOT_OVERRIDE</key>
 		<string>$root</string>
 	</dict>
 	<key>LimitLoadToSessionType</key>
@@ -932,9 +932,9 @@ jg_remote_job_render_launchagent() { # <remote-root> <account-home>
 	<key>KeepAlive</key>
 	<true/>
 	<key>StandardOutPath</key>
-	<string>$FM_REMOTE_JOB_LAUNCH_AGENT_LOG</string>
+	<string>$JG_REMOTE_JOB_LAUNCH_AGENT_LOG</string>
 	<key>StandardErrorPath</key>
-	<string>$FM_REMOTE_JOB_LAUNCH_AGENT_LOG</string>
+	<string>$JG_REMOTE_JOB_LAUNCH_AGENT_LOG</string>
 </dict>
 </plist>
 XML
@@ -943,8 +943,8 @@ XML
 jg_remote_job_launchagent_contract_matches() { # <remote-root> <account-home>
   local root=$1 account_home=$2 actual expected
   jg_remote_job_launchagent_paths "$account_home"
-  [ -f "$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST" ] && [ ! -L "$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST" ] || return 1
-  actual=$(tr -d ' \t\r\n' < "$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST" 2>/dev/null) || return 1
+  [ -f "$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST" ] && [ ! -L "$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST" ] || return 1
+  actual=$(tr -d ' \t\r\n' < "$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST" 2>/dev/null) || return 1
   expected=$(jg_remote_job_render_launchagent "$root" "$account_home" | tr -d ' \t\r\n') || return 1
   [ "$actual" = "$expected" ]
 }
@@ -958,17 +958,17 @@ jg_remote_job_launchagent_loaded() { # <remote-root> <account-home> <uid>
   local root=$1 account_home=$2 uid=$3 worker loaded compact
   jg_remote_job_launchagent_paths "$account_home"
   worker="$root/bin/jg-remote-job-worker.sh"
-  loaded=$(launchctl print "gui/$uid/$FM_REMOTE_JOB_LABEL" 2>/dev/null) || return 1
+  loaded=$(launchctl print "gui/$uid/$JG_REMOTE_JOB_LABEL" 2>/dev/null) || return 1
   compact=$(printf '%s' "$loaded" | tr -d ' \t\r\n') || return 1
-  [[ "$compact" == *"$FM_REMOTE_JOB_LABEL"* ]] || return 1
+  [[ "$compact" == *"$JG_REMOTE_JOB_LABEL"* ]] || return 1
   [[ "$compact" == *"$worker"* ]] || return 1
-  [[ "$compact" == *"$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST"* ]] || return 1
+  [[ "$compact" == *"$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST"* ]] || return 1
 }
 
-jg_remote_job_worker_pid_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.pid"; }
-jg_remote_job_worker_ready_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.ready"; }
-jg_remote_job_worker_identity_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.identity"; }
-jg_remote_job_worker_lock_path() { printf '%s\n' "$FM_REMOTE_JOB_STATE/worker.lock"; }
+jg_remote_job_worker_pid_path() { printf '%s\n' "$JG_REMOTE_JOB_STATE/worker.pid"; }
+jg_remote_job_worker_ready_path() { printf '%s\n' "$JG_REMOTE_JOB_STATE/worker.ready"; }
+jg_remote_job_worker_identity_path() { printf '%s\n' "$JG_REMOTE_JOB_STATE/worker.identity"; }
+jg_remote_job_worker_lock_path() { printf '%s\n' "$JG_REMOTE_JOB_STATE/worker.lock"; }
 
 jg_remote_job_process_start() {
   local pid=$1 ps_bin value
@@ -1083,19 +1083,19 @@ jg_remote_job_recorded_owner_alive() { # <dir>
   recorded_command=$(jg_remote_job_read_single_line "$dir/command" 8192 2>/dev/null) || return 1
   actual_command=$(jg_remote_job_process_command "$pid") || return 1
   [ "$recorded_command" = "$actual_command" ] || return 1
-  FM_REMOTE_JOB_RECORDED_PID=$pid
+  JG_REMOTE_JOB_RECORDED_PID=$pid
 }
 
 jg_remote_job_lock_owner_matches_process() {
   local account_home=$1
   jg_remote_job_prepare_state "$account_home" || return 1
   jg_remote_job_recorded_owner_alive "$(jg_remote_job_worker_lock_path)" || return 1
-  FM_REMOTE_JOB_OWNER_PID=$FM_REMOTE_JOB_RECORDED_PID
+  JG_REMOTE_JOB_OWNER_PID=$JG_REMOTE_JOB_RECORDED_PID
 }
 
 jg_remote_job_worker_owned_alive() {
   local root=$1 account_home=$2 lock pid pid_file identity_file command ps_bin
-  [ "${FM_REMOTE_JOB_ACTIVE:-}" != 1 ] || return 0
+  [ "${JG_REMOTE_JOB_ACTIVE:-}" != 1 ] || return 0
   jg_remote_job_prepare_state "$account_home" || return 1
   lock=$(jg_remote_job_worker_lock_path)
   [ -d "$lock" ] && [ ! -L "$lock" ] || return 1
@@ -1107,7 +1107,7 @@ jg_remote_job_worker_owned_alive() {
   jg_remote_job_regular_bounded "$identity_file" 256 || return 1
   jg_remote_job_probe "$account_home" || return 1
   if jg_remote_job_lock_owner_matches_process "$account_home"; then
-    [ "$pid" = "$FM_REMOTE_JOB_OWNER_PID" ] || return 1
+    [ "$pid" = "$JG_REMOTE_JOB_OWNER_PID" ] || return 1
     return 0
   fi
   [ ! -e "$lock/pid" ] && [ ! -L "$lock/pid" ] &&
@@ -1115,7 +1115,7 @@ jg_remote_job_worker_owned_alive() {
     [ ! -e "$lock/command" ] && [ ! -L "$lock/command" ] || return 1
   if [ -x /bin/ps ]; then ps_bin=/bin/ps; elif [ -x /usr/bin/ps ]; then ps_bin=/usr/bin/ps; else return 1; fi
   command=$("$ps_bin" -p "$pid" -o command= 2>/dev/null) || return 1
-  case "$command" in *"$root/bin/jg-remote-job-worker.sh"*) FM_REMOTE_JOB_OWNER_PID=$pid; return 0 ;; esac
+  case "$command" in *"$root/bin/jg-remote-job-worker.sh"*) JG_REMOTE_JOB_OWNER_PID=$pid; return 0 ;; esac
   return 1
 }
 
@@ -1137,7 +1137,7 @@ jg_remote_job_code_identity() { # <remote-root> <account-home>
 
 jg_remote_job_worker_identity_matches() { # <remote-root> <account-home>
   local root=$1 account_home=$2 identity_file expected actual extra
-  [ "${FM_REMOTE_JOB_ACTIVE:-}" != 1 ] || return 0
+  [ "${JG_REMOTE_JOB_ACTIVE:-}" != 1 ] || return 0
   jg_remote_job_prepare_state "$account_home" || return 1
   identity_file=$(jg_remote_job_worker_identity_path)
   jg_remote_job_regular_bounded "$identity_file" 256 || return 1
@@ -1160,7 +1160,7 @@ jg_remote_job_worker_alive() { # <account-home>
 
 jg_remote_job_probe() { # <account-home>; require a fresh heartbeat outside an active job
   local account_home=$1 ready lock mtime now
-  [ "${FM_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
+  [ "${JG_REMOTE_JOB_ACTIVE:-}" = 1 ] && return 0
   jg_remote_job_prepare_state "$account_home" || return 1
   lock=$(jg_remote_job_worker_lock_path)
   [ ! -e "$lock/quarantine" ] && [ ! -L "$lock/quarantine" ] || return 1
@@ -1185,23 +1185,23 @@ jg_remote_job_wait_for_probe() { # <remote-root> <account-home>
 jg_remote_job_write_launchagent() { # <remote-root> <account-home>
   local root=$1 account_home=$2 tmp
   jg_remote_job_launchagent_paths "$account_home"
-  if ! mkdir -p "$FM_REMOTE_JOB_LAUNCH_AGENT_DIR" 2>/dev/null ||
-    ! mkdir -p "$FM_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" 2>/dev/null; then
-    FM_REMOTE_JOB_ERROR="cannot create the remote job LaunchAgent directories"
+  if ! mkdir -p "$JG_REMOTE_JOB_LAUNCH_AGENT_DIR" 2>/dev/null ||
+    ! mkdir -p "$JG_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" 2>/dev/null; then
+    JG_REMOTE_JOB_ERROR="cannot create the remote job LaunchAgent directories"
     return 1
   fi
-  [ -d "$FM_REMOTE_JOB_LAUNCH_AGENT_DIR" ] && [ ! -L "$FM_REMOTE_JOB_LAUNCH_AGENT_DIR" ] || return 1
-  [ -d "$FM_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" ] && [ ! -L "$FM_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" ] || return 1
-  tmp="$FM_REMOTE_JOB_LAUNCH_AGENT_DIR/.$FM_REMOTE_JOB_LABEL.plist.tmp.${BASHPID:-$$}"
+  [ -d "$JG_REMOTE_JOB_LAUNCH_AGENT_DIR" ] && [ ! -L "$JG_REMOTE_JOB_LAUNCH_AGENT_DIR" ] || return 1
+  [ -d "$JG_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" ] && [ ! -L "$JG_REMOTE_JOB_LAUNCH_AGENT_LOG_DIR" ] || return 1
+  tmp="$JG_REMOTE_JOB_LAUNCH_AGENT_DIR/.$JG_REMOTE_JOB_LABEL.plist.tmp.${BASHPID:-$$}"
   jg_remote_job_render_launchagent "$root" "$account_home" > "$tmp" || {
     rm -f -- "$tmp"
-    FM_REMOTE_JOB_ERROR="remote job paths cannot be embedded safely in a property list"
+    JG_REMOTE_JOB_ERROR="remote job paths cannot be embedded safely in a property list"
     return 1
   }
   chmod 0644 "$tmp" 2>/dev/null || true
-  mv -f -- "$tmp" "$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST" || {
+  mv -f -- "$tmp" "$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST" || {
     rm -f -- "$tmp"
-    FM_REMOTE_JOB_ERROR="cannot publish $FM_REMOTE_JOB_LAUNCH_AGENT_PLIST"
+    JG_REMOTE_JOB_ERROR="cannot publish $JG_REMOTE_JOB_LAUNCH_AGENT_PLIST"
     return 1
   }
 }
@@ -1228,7 +1228,7 @@ jg_remote_job_reload_lock_acquire() { # <lock-link>
   pid=${BASHPID:-$$}
   name="${lock##*/}.owner.$pid.$RANDOM$RANDOM"
   owner="$dir/$name"
-  FM_REMOTE_JOB_RELOAD_OWNER=
+  JG_REMOTE_JOB_RELOAD_OWNER=
   (umask 077; mkdir "$owner") 2>/dev/null || return 1
   if ! printf '%s\n' "$pid" > "$owner/pid" ||
     ! jg_remote_job_process_start "$pid" > "$owner/start" ||
@@ -1259,7 +1259,7 @@ jg_remote_job_reload_lock_acquire() { # <lock-link>
     sleep 0.1
   done
   if [ "$(readlink "$lock" 2>/dev/null)" = "$name" ]; then
-    FM_REMOTE_JOB_RELOAD_OWNER=$owner
+    JG_REMOTE_JOB_RELOAD_OWNER=$owner
     return 0
   fi
   rm -rf -- "$owner"
@@ -1267,7 +1267,7 @@ jg_remote_job_reload_lock_acquire() { # <lock-link>
 }
 
 jg_remote_job_reload_lock_release() { # <lock-link>
-  local lock=$1 owner=${FM_REMOTE_JOB_RELOAD_OWNER:-} status=0
+  local lock=$1 owner=${JG_REMOTE_JOB_RELOAD_OWNER:-} status=0
   [ -n "$owner" ] || return 1
   if [ "$(readlink "$lock" 2>/dev/null)" = "${owner##*/}" ]; then
     rm -f -- "$lock" || status=1
@@ -1275,7 +1275,7 @@ jg_remote_job_reload_lock_release() { # <lock-link>
     status=1
   fi
   rm -rf -- "$owner"
-  FM_REMOTE_JOB_RELOAD_OWNER=
+  JG_REMOTE_JOB_RELOAD_OWNER=
   return "$status"
 }
 
@@ -1284,7 +1284,7 @@ jg_remote_job_reload_lock_release() { # <lock-link>
 jg_remote_job_launchagent_pid() { # <remote-root> <account-home> <uid>
   local root=$1 account_home=$2 uid=$3 pid
   jg_remote_job_launchagent_loaded "$root" "$account_home" "$uid" || return 1
-  pid=$(launchctl print "gui/$uid/$FM_REMOTE_JOB_LABEL" 2>/dev/null | awk '
+  pid=$(launchctl print "gui/$uid/$JG_REMOTE_JOB_LABEL" 2>/dev/null | awk '
     $1 == "pid" && $2 == "=" { print $3; exit }
   ')
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
@@ -1303,7 +1303,7 @@ jg_remote_job_launchagent_tracks() { # <remote-root> <account-home> <uid> <pid>
 jg_remote_job_launchagent_owner_current() { # <remote-root> <account-home> <uid>
   local root=$1 account_home=$2 uid=$3 identity
   jg_remote_job_lock_owner_matches_process "$account_home" || return 1
-  jg_remote_job_launchagent_tracks "$root" "$account_home" "$uid" "$FM_REMOTE_JOB_OWNER_PID" || return 1
+  jg_remote_job_launchagent_tracks "$root" "$account_home" "$uid" "$JG_REMOTE_JOB_OWNER_PID" || return 1
   identity=$(jg_remote_job_worker_identity_path)
   if [ ! -e "$identity" ] && [ ! -L "$identity" ]; then return 0; fi
   jg_remote_job_worker_identity_matches "$root" "$account_home"
@@ -1312,21 +1312,21 @@ jg_remote_job_launchagent_owner_current() { # <remote-root> <account-home> <uid>
 jg_remote_job_reload_launchagent() { # <account-home> <uid>
   local account_home=$1 uid=$2 out i=0
   jg_remote_job_launchagent_paths "$account_home"
-  launchctl bootout "gui/$uid/$FM_REMOTE_JOB_LABEL" >/dev/null 2>&1 || true
-  while launchctl print "gui/$uid/$FM_REMOTE_JOB_LABEL" >/dev/null 2>&1; do
+  launchctl bootout "gui/$uid/$JG_REMOTE_JOB_LABEL" >/dev/null 2>&1 || true
+  while launchctl print "gui/$uid/$JG_REMOTE_JOB_LABEL" >/dev/null 2>&1; do
     if [ "$i" -ge 100 ]; then
-      FM_REMOTE_JOB_ERROR="timed out waiting for launchd to finish removing $FM_REMOTE_JOB_LABEL after bootout"
+      JG_REMOTE_JOB_ERROR="timed out waiting for launchd to finish removing $JG_REMOTE_JOB_LABEL after bootout"
       return 1
     fi
     i=$((i + 1))
     sleep 0.1
   done
-  if ! out=$(launchctl bootstrap "gui/$uid" "$FM_REMOTE_JOB_LAUNCH_AGENT_PLIST" 2>&1); then
-    FM_REMOTE_JOB_ERROR="launchctl bootstrap gui/$uid refused: ${out:-no diagnostic}"
+  if ! out=$(launchctl bootstrap "gui/$uid" "$JG_REMOTE_JOB_LAUNCH_AGENT_PLIST" 2>&1); then
+    JG_REMOTE_JOB_ERROR="launchctl bootstrap gui/$uid refused: ${out:-no diagnostic}"
     return 1
   fi
-  if ! out=$(launchctl kickstart -k "gui/$uid/$FM_REMOTE_JOB_LABEL" 2>&1); then
-    FM_REMOTE_JOB_ERROR="launchctl kickstart gui/$uid/$FM_REMOTE_JOB_LABEL refused: ${out:-no diagnostic}"
+  if ! out=$(launchctl kickstart -k "gui/$uid/$JG_REMOTE_JOB_LABEL" 2>&1); then
+    JG_REMOTE_JOB_ERROR="launchctl kickstart gui/$uid/$JG_REMOTE_JOB_LABEL refused: ${out:-no diagnostic}"
     return 1
   fi
 }
@@ -1334,7 +1334,7 @@ jg_remote_job_reload_launchagent() { # <account-home> <uid>
 jg_remote_job_stale_heartbeat_owner() { # <account-home>
   jg_remote_job_lock_owner_matches_process "$1" || return 1
   printf '%s\n' 'remote-job: ready heartbeat stale while verified worker lock owner is alive' >&2
-  FM_REMOTE_JOB_ERROR="remote job worker owns its lock but its ready heartbeat is stale"
+  JG_REMOTE_JOB_ERROR="remote job worker owns its lock but its ready heartbeat is stale"
 }
 
 # Hold the repair mutex across classification, replacement, and bounded startup
@@ -1347,36 +1347,36 @@ jg_remote_job_repair_launchagent() { # <remote-root> <account-home> <uid>
   local root=$1 account_home=$2 uid=$3
   if ! jg_remote_job_launchagent_contract_matches "$root" "$account_home"; then
     jg_remote_job_write_launchagent "$root" "$account_home" || return 1
-    FM_REMOTE_JOB_REPAIRED=1
+    JG_REMOTE_JOB_REPAIRED=1
   fi
-  if [ "$FM_REMOTE_JOB_REPAIRED" -eq 0 ] && jg_remote_job_launchagent_owner_current "$root" "$account_home" "$uid"; then
+  if [ "$JG_REMOTE_JOB_REPAIRED" -eq 0 ] && jg_remote_job_launchagent_owner_current "$root" "$account_home" "$uid"; then
     jg_remote_job_wait_for_probe "$root" "$account_home" && return 0
     jg_remote_job_stale_heartbeat_owner "$account_home" && return 1
   elif jg_remote_job_lock_owner_matches_process "$account_home"; then
     # Only stop the lock owner after the shared pid, start-time, and command
     # checks have all verified it as this worker.
-    jg_remote_job_stop_worker_tree "$FM_REMOTE_JOB_OWNER_PID" || {
-      FM_REMOTE_JOB_ERROR="stale or untracked remote job worker did not stop safely"
+    jg_remote_job_stop_worker_tree "$JG_REMOTE_JOB_OWNER_PID" || {
+      JG_REMOTE_JOB_ERROR="stale or untracked remote job worker did not stop safely"
       return 1
     }
-    FM_REMOTE_JOB_REPAIRED=1
-  elif [ "$FM_REMOTE_JOB_REPAIRED" -eq 0 ] && jg_remote_job_launchagent_pid "$root" "$account_home" "$uid" >/dev/null; then
+    JG_REMOTE_JOB_REPAIRED=1
+  elif [ "$JG_REMOTE_JOB_REPAIRED" -eq 0 ] && jg_remote_job_launchagent_pid "$root" "$account_home" "$uid" >/dev/null; then
     jg_remote_job_wait_for_probe "$root" "$account_home" && return 0
     jg_remote_job_stale_heartbeat_owner "$account_home" && return 1
   fi
-  if [ "$FM_REMOTE_JOB_REPAIRED" -eq 1 ] ||
+  if [ "$JG_REMOTE_JOB_REPAIRED" -eq 1 ] ||
     ! jg_remote_job_launchagent_loaded "$root" "$account_home" "$uid" ||
     ! jg_remote_job_worker_identity_matches "$root" "$account_home"; then
     jg_remote_job_reload_launchagent "$account_home" "$uid" || return 1
-    FM_REMOTE_JOB_REPAIRED=1
+    JG_REMOTE_JOB_REPAIRED=1
   fi
   jg_remote_job_wait_for_probe "$root" "$account_home" && return 0
   jg_remote_job_stale_heartbeat_owner "$account_home" && return 1
   jg_remote_job_reload_launchagent "$account_home" "$uid" || return 1
-  FM_REMOTE_JOB_REPAIRED=1
+  JG_REMOTE_JOB_REPAIRED=1
   jg_remote_job_wait_for_probe "$root" "$account_home" && return 0
   # shellcheck disable=SC2034 # Sourceable API consumed by the entrypoint and remote doctor.
-  FM_REMOTE_JOB_ERROR="remote job worker did not report ready after startup"
+  JG_REMOTE_JOB_ERROR="remote job worker did not report ready after startup"
   return 1
 }
 
@@ -1388,9 +1388,9 @@ jg_remote_job_ensure_launchagent() { # <remote-root> <account-home> <uid>
     jg_remote_job_probe "$account_home" && jg_remote_job_worker_identity_matches "$root" "$account_home"; then
     return 0
   fi
-  lock="$FM_REMOTE_JOB_STATE/launchagent.repair"
+  lock="$JG_REMOTE_JOB_STATE/launchagent.repair"
   jg_remote_job_reload_lock_acquire "$lock" || {
-    FM_REMOTE_JOB_ERROR="timed out waiting for the remote job LaunchAgent repair lock"
+    JG_REMOTE_JOB_ERROR="timed out waiting for the remote job LaunchAgent repair lock"
     return 1
   }
   jg_remote_job_repair_launchagent "$root" "$account_home" "$uid"
@@ -1403,7 +1403,7 @@ jg_remote_job_start_linux_worker() { # <remote-root> <account-home>
   local root=$1 account_home=$2 worker pid
   worker="$root/bin/jg-remote-job-worker.sh"
   [ -f "$worker" ] && [ ! -L "$worker" ] && [ -x "$worker" ] || {
-    FM_REMOTE_JOB_ERROR="remote job worker is not a genuine executable in the configured code root"
+    JG_REMOTE_JOB_ERROR="remote job worker is not a genuine executable in the configured code root"
     return 1
   }
   jg_remote_job_prepare_state "$account_home" || return 1
@@ -1412,13 +1412,13 @@ jg_remote_job_start_linux_worker() { # <remote-root> <account-home>
     # The owner pid is the serving child; its restart supervisor sits above it
     # and would immediately replace a lone process kill, so stop the whole
     # worker tree through its isolated group.
-    pid=$FM_REMOTE_JOB_OWNER_PID
+    pid=$JG_REMOTE_JOB_OWNER_PID
     jg_remote_job_stop_worker_tree "$pid" || {
-      FM_REMOTE_JOB_ERROR="stale remote job worker did not stop safely"
+      JG_REMOTE_JOB_ERROR="stale remote job worker did not stop safely"
       return 1
     }
     wait "$pid" 2>/dev/null || true
-    FM_REMOTE_JOB_REPAIRED=1
+    JG_REMOTE_JOB_REPAIRED=1
   fi
   # Job control puts the worker tree in its own process group, so a later stop
   # can signal every descendant at once without ever reaching the caller's own
@@ -1426,39 +1426,39 @@ jg_remote_job_start_linux_worker() { # <remote-root> <account-home>
   set -m
   nohup env \
     HOME="$account_home" \
-    FM_ROOT_OVERRIDE="$root" \
-    FM_REMOTE_JOB_STATE_ROOT="$FM_REMOTE_JOB_STATE" \
-    FM_REMOTE_JOB_PLATFORM_OVERRIDE="${FM_REMOTE_JOB_PLATFORM_OVERRIDE:-}" \
-    "$worker" >> "$FM_REMOTE_JOB_STATE/logs/$FM_REMOTE_JOB_LABEL.log" 2>&1 < /dev/null &
+    JG_ROOT_OVERRIDE="$root" \
+    JG_REMOTE_JOB_STATE_ROOT="$JG_REMOTE_JOB_STATE" \
+    JG_REMOTE_JOB_PLATFORM_OVERRIDE="${JG_REMOTE_JOB_PLATFORM_OVERRIDE:-}" \
+    "$worker" >> "$JG_REMOTE_JOB_STATE/logs/$JG_REMOTE_JOB_LABEL.log" 2>&1 < /dev/null &
   pid=$!
   set +m
-  case "$pid" in ''|*[!0-9]*) FM_REMOTE_JOB_ERROR="could not start the remote job worker"; return 1 ;; esac
-  FM_REMOTE_JOB_REPAIRED=1
+  case "$pid" in ''|*[!0-9]*) JG_REMOTE_JOB_ERROR="could not start the remote job worker"; return 1 ;; esac
+  JG_REMOTE_JOB_REPAIRED=1
 }
 
 jg_remote_job_ensure_worker() { # <remote-root> <account-home>
   local root=$1 account_home=$2 platform uid
-  FM_REMOTE_JOB_ERROR=
-  FM_REMOTE_JOB_REPAIRED=0
+  JG_REMOTE_JOB_ERROR=
+  JG_REMOTE_JOB_REPAIRED=0
   root=$(jg_remote_job_canonical_existing_dir "$root") || {
-    FM_REMOTE_JOB_ERROR="configured remote root is unavailable or unsafe"
+    JG_REMOTE_JOB_ERROR="configured remote root is unavailable or unsafe"
     return 1
   }
   account_home=$(jg_remote_job_canonical_existing_dir "$account_home") || {
-    FM_REMOTE_JOB_ERROR="remote account home is unavailable or unsafe"
+    JG_REMOTE_JOB_ERROR="remote account home is unavailable or unsafe"
     return 1
   }
   [ -f "$root/bin/jg-remote-job-worker.sh" ] && [ ! -L "$root/bin/jg-remote-job-worker.sh" ] &&
     [ -x "$root/bin/jg-remote-job-worker.sh" ] || {
-    FM_REMOTE_JOB_ERROR="configured remote root has no safe executable remote job worker"
+    JG_REMOTE_JOB_ERROR="configured remote root has no safe executable remote job worker"
     return 1
   }
   platform=$(jg_remote_job_platform)
   if [ "$platform" = darwin ]; then
     uid=$(id -u 2>/dev/null || true)
-    case "$uid" in ''|*[!0-9]*) FM_REMOTE_JOB_ERROR="remote account uid is unavailable; run jg-on.sh <route> jg-remote-doctor.sh --fix"; return 1 ;; esac
+    case "$uid" in ''|*[!0-9]*) JG_REMOTE_JOB_ERROR="remote account uid is unavailable; run jg-on.sh <route> jg-remote-doctor.sh --fix"; return 1 ;; esac
     if ! jg_remote_job_gui_available "$uid"; then
-      FM_REMOTE_JOB_ERROR="no Aqua login session exists for uid $uid; log that account in at the console, then run jg-on.sh <route> jg-remote-doctor.sh --fix"
+      JG_REMOTE_JOB_ERROR="no Aqua login session exists for uid $uid; log that account in at the console, then run jg-on.sh <route> jg-remote-doctor.sh --fix"
       return 1
     fi
     jg_remote_job_ensure_launchagent "$root" "$account_home" "$uid"
@@ -1470,9 +1470,9 @@ jg_remote_job_ensure_worker() { # <remote-root> <account-home>
   # prior supervisor finishes releasing the shared worker lock. Retry the
   # idempotent start once before reporting a startup failure.
   jg_remote_job_start_linux_worker "$root" "$account_home" || return 1
-  FM_REMOTE_JOB_REPAIRED=1
+  JG_REMOTE_JOB_REPAIRED=1
   jg_remote_job_wait_for_probe "$root" "$account_home" && return 0
   # shellcheck disable=SC2034 # Sourceable API consumed by the entrypoint and remote doctor.
-  FM_REMOTE_JOB_ERROR="remote job worker did not report ready after startup"
+  JG_REMOTE_JOB_ERROR="remote job worker did not report ready after startup"
   return 1
 }

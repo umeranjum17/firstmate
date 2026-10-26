@@ -60,13 +60,13 @@ printf 'fixture\n' > "$REMOTE_ROOT/AGENTS.md"
 cat > "$REMOTE_ROOT/bin/jg-probe-job.sh" <<'SH'
 #!/bin/bash
 set -u
-printf 'home=%s\nroot=%s\nactive=%s\npath=%s\n' "$FM_HOME" "$FM_ROOT_OVERRIDE" "${FM_REMOTE_JOB_ACTIVE:-}" "$PATH"
+printf 'home=%s\nroot=%s\nactive=%s\npath=%s\n' "$JG_HOME" "$JG_ROOT_OVERRIDE" "${JG_REMOTE_JOB_ACTIVE:-}" "$PATH"
 printf 'args:'
 printf ' <%s>' "$@"
 printf '\n'
 if [ -n "${TOP_SECRET:-}" ]; then printf 'secret=leaked\n'; else printf 'secret=absent\n'; fi
 while IFS= read -r line || [ -n "$line" ]; do printf 'stdin=%s\n' "$line"; done
-exit "${FM_PROBE_EXIT:-0}"
+exit "${JG_PROBE_EXIT:-0}"
 SH
 cat > "$REMOTE_ROOT/bin/jg-timeout-job.sh" <<'SH'
 #!/bin/bash
@@ -98,7 +98,7 @@ SH
 chmod +x "$REMOTE_ROOT/bin"/*.sh
 cat > "$RUNTIME_BIN/perl" <<'SH'
 #!/bin/bash
-printf 'invoked\n' >> "$FM_FAKE_PERL_LOG"
+printf 'invoked\n' >> "$JG_FAKE_PERL_LOG"
 exit 127
 SH
 chmod +x "$RUNTIME_BIN/perl"
@@ -118,67 +118,67 @@ poll_cadence_case() (
   mkdir -p "$poll_dir/bin"
   cat > "$poll_dir/bin/sleep" <<'SH'
 #!/bin/bash
-printf '%s\n' "$1" >> "$FM_POLL_SLEEP_LOG"
+printf '%s\n' "$1" >> "$JG_POLL_SLEEP_LOG"
 exec /bin/sleep "$@"
 SH
   chmod +x "$poll_dir/bin/sleep"
   trap '[ -z "$pid" ] || { kill -TERM "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }' EXIT
-  unset FM_REMOTE_JOB_POLL_SECONDS FM_REMOTE_JOB_ACTIVE_POLL_SECONDS
+  unset JG_REMOTE_JOB_POLL_SECONDS JG_REMOTE_JOB_ACTIVE_POLL_SECONDS
   # shellcheck disable=SC2030 # The legacy override is local to this cadence fixture.
-  [ -z "$legacy" ] || export FM_REMOTE_JOB_POLL_SECONDS="$legacy"
+  [ -z "$legacy" ] || export JG_REMOTE_JOB_POLL_SECONDS="$legacy"
   # shellcheck disable=SC2030 # The active override is local to this cadence fixture.
-  [ -z "$active" ] || export FM_REMOTE_JOB_ACTIVE_POLL_SECONDS="$active"
-  export FM_REMOTE_JOB_STATE_ROOT="$poll_dir/state" FM_ROOT_OVERRIDE="$REMOTE_ROOT"
+  [ -z "$active" ] || export JG_REMOTE_JOB_ACTIVE_POLL_SECONDS="$active"
+  export JG_REMOTE_JOB_STATE_ROOT="$poll_dir/state" JG_ROOT_OVERRIDE="$REMOTE_ROOT"
   # shellcheck disable=SC2030 # Each cadence fixture owns its subshell's bounds.
-  export FM_REMOTE_JOB_QUEUE_TIMEOUT=60 FM_REMOTE_JOB_TIMEOUT=30
+  export JG_REMOTE_JOB_QUEUE_TIMEOUT=60 JG_REMOTE_JOB_TIMEOUT=30
   # shellcheck disable=SC2030 # The recording executable is local to this fixture.
-  export PATH="$poll_dir/bin:$PATH" FM_POLL_SLEEP_LOG="$poll_dir/sleeps"
+  export PATH="$poll_dir/bin:$PATH" JG_POLL_SLEEP_LOG="$poll_dir/sleeps"
   # shellcheck source=bin/jg-remote-job-lib.sh
   . "$ROOT/bin/jg-remote-job-lib.sh"
   # shellcheck source=bin/jg-remote-job-lib.sh
   . "$ROOT/bin/jg-remote-job-lib.sh"
   jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
-    jg-delay-job.sh 0.8 "$poll_dir/ran" </dev/null >/dev/null || fail "$FM_REMOTE_JOB_ERROR"
+    jg-delay-job.sh 0.8 "$poll_dir/ran" </dev/null >/dev/null || fail "$JG_REMOTE_JOB_ERROR"
   # Publish a real bounded result after the caller has entered its wait, without
   # a lane's own samples contaminating this consumer-only executable log.
   (
     /bin/sleep 0.8
-    : > "$FM_REMOTE_JOB_JOBS/$FM_REMOTE_JOB_ID/stdout"
-    : > "$FM_REMOTE_JOB_JOBS/$FM_REMOTE_JOB_ID/stderr"
-    printf '0\n' > "$FM_REMOTE_JOB_JOBS/$FM_REMOTE_JOB_ID/exit"
-    jg_remote_job_write_state "$FM_REMOTE_JOB_JOBS/$FM_REMOTE_JOB_ID" 'done'
+    : > "$JG_REMOTE_JOB_JOBS/$JG_REMOTE_JOB_ID/stdout"
+    : > "$JG_REMOTE_JOB_JOBS/$JG_REMOTE_JOB_ID/stderr"
+    printf '0\n' > "$JG_REMOTE_JOB_JOBS/$JG_REMOTE_JOB_ID/exit"
+    jg_remote_job_write_state "$JG_REMOTE_JOB_JOBS/$JG_REMOTE_JOB_ID" 'done'
   ) &
   pid=$!
-  jg_remote_job_wait "$ACCOUNT_HOME" "$FM_REMOTE_JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
+  jg_remote_job_wait "$ACCOUNT_HOME" "$JG_REMOTE_JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
   wait "$pid" || fail "$label result producer failed"
   pid=''
-  [ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "$label result consumer lost the exit status"
-  grep -qx "$expected" "$FM_POLL_SLEEP_LOG" || fail "$label consumer never sampled at $expected seconds"
-  [ "$(sort -u "$FM_POLL_SLEEP_LOG")" = "$expected" ] || fail "$label consumer used another cadence"
+  [ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "$label result consumer lost the exit status"
+  grep -qx "$expected" "$JG_POLL_SLEEP_LOG" || fail "$label consumer never sampled at $expected seconds"
+  [ "$(sort -u "$JG_POLL_SLEEP_LOG")" = "$expected" ] || fail "$label consumer used another cadence"
 
-  : > "$FM_POLL_SLEEP_LOG"
+  : > "$JG_POLL_SLEEP_LOG"
   jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
-    jg-delay-job.sh 0.8 "$poll_dir/ran" </dev/null >/dev/null || fail "$FM_REMOTE_JOB_ERROR"
-  HOME="$ACCOUNT_HOME" "$BASH" "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --lane "$FM_REMOTE_JOB_ID" &
+    jg-delay-job.sh 0.8 "$poll_dir/ran" </dev/null >/dev/null || fail "$JG_REMOTE_JOB_ERROR"
+  HOME="$ACCOUNT_HOME" "$BASH" "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --lane "$JG_REMOTE_JOB_ID" &
   pid=$!
   wait "$pid" || fail "$label command lane failed"
   pid=''
   [ -e "$poll_dir/ran" ] || fail "$label lane did not execute its command"
-  [ "$(jg_remote_job_read_state "$FM_REMOTE_JOB_JOBS/$FM_REMOTE_JOB_ID")" = 'done' ] || fail "$label lane did not publish completion"
-  grep -qx "$expected" "$FM_POLL_SLEEP_LOG" || fail "$label lane never sampled at $expected seconds"
+  [ "$(jg_remote_job_read_state "$JG_REMOTE_JOB_JOBS/$JG_REMOTE_JOB_ID")" = 'done' ] || fail "$label lane did not publish completion"
+  grep -qx "$expected" "$JG_POLL_SLEEP_LOG" || fail "$label lane never sampled at $expected seconds"
   if [ "$expected" != 0.05 ]; then
-    ! grep -qx 0.05 "$FM_POLL_SLEEP_LOG" || fail "$label lane still sampled at the dispatcher default"
+    ! grep -qx 0.05 "$JG_POLL_SLEEP_LOG" || fail "$label lane still sampled at the dispatcher default"
   fi
 
-  : > "$FM_POLL_SLEEP_LOG"
+  : > "$JG_POLL_SLEEP_LOG"
   HOME="$ACCOUNT_HOME" "$BASH" "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" > "$poll_dir/worker.log" 2>&1 &
   pid=$!
   for ((i = 0; i < 200; i++)); do
-    grep -qx 1 "$FM_POLL_SLEEP_LOG" && break
+    grep -qx 1 "$JG_POLL_SLEEP_LOG" && break
     /bin/sleep 0.05
   done
-  grep -qx 1 "$FM_POLL_SLEEP_LOG" || fail "$label dispatcher never reached its one-second quiet wait"
-  [ "$(grep -cx "$dispatch" "$FM_POLL_SLEEP_LOG")" -eq 4 ] || fail "$label dispatcher did not limit its fast burst to four $dispatch-second waits"
+  grep -qx 1 "$JG_POLL_SLEEP_LOG" || fail "$label dispatcher never reached its one-second quiet wait"
+  [ "$(grep -cx "$dispatch" "$JG_POLL_SLEEP_LOG")" -eq 4 ] || fail "$label dispatcher did not limit its fast burst to four $dispatch-second waits"
   kill -TERM "$pid" || fail "$label dispatcher stopped unexpectedly"
   wait "$pid" 2>/dev/null || true
   pid=''
@@ -190,17 +190,17 @@ poll_cadence_case active 0.07 0.12 0.12 0.07 || exit 1
 
 DEFAULT_STATE="$TMP_ROOT/default-timeout-jobs"
 DEFAULT_BOUNDS=$(
-  unset FM_REMOTE_JOB_QUEUE_TIMEOUT
-  unset FM_REMOTE_JOB_TIMEOUT
+  unset JG_REMOTE_JOB_QUEUE_TIMEOUT
+  unset JG_REMOTE_JOB_TIMEOUT
   # shellcheck disable=SC2030 # This source intentionally initializes subshell-only defaults.
-  FM_REMOTE_JOB_STATE_ROOT="$DEFAULT_STATE"
-  export FM_REMOTE_JOB_STATE_ROOT
+  JG_REMOTE_JOB_STATE_ROOT="$DEFAULT_STATE"
+  export JG_REMOTE_JOB_STATE_ROOT
   # shellcheck source=bin/jg-remote-job-lib.sh
   . "$ROOT/bin/jg-remote-job-lib.sh"
   jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-probe-job.sh </dev/null >/dev/null
   printf '%s %s\n' \
-    "$(cat "$DEFAULT_STATE/jobs/$FM_REMOTE_JOB_ID/queue_deadline")" \
-    "$(cat "$DEFAULT_STATE/jobs/$FM_REMOTE_JOB_ID/timeout")"
+    "$(cat "$DEFAULT_STATE/jobs/$JG_REMOTE_JOB_ID/queue_deadline")" \
+    "$(cat "$DEFAULT_STATE/jobs/$JG_REMOTE_JOB_ID/timeout")"
 )
 read -r DEFAULT_QUEUE_DEADLINE DEFAULT_EXECUTION_TIMEOUT <<< "$DEFAULT_BOUNDS"
 DEFAULT_QUEUE_REMAINING=$((DEFAULT_QUEUE_DEADLINE - $(date +%s)))
@@ -209,12 +209,12 @@ DEFAULT_QUEUE_REMAINING=$((DEFAULT_QUEUE_DEADLINE - $(date +%s)))
 pass "default queue and execution bounds independently cover long polls"
 
 # shellcheck disable=SC2031 # The earlier assignment was confined to DEFAULT_BOUNDS.
-export FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
-export FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
+export JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
+export JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
 # shellcheck disable=SC2031 # The sourced defaults above were confined to DEFAULT_BOUNDS.
-export FM_REMOTE_JOB_QUEUE_TIMEOUT=5
+export JG_REMOTE_JOB_QUEUE_TIMEOUT=5
 # shellcheck disable=SC2031 # The sourced defaults above were confined to DEFAULT_BOUNDS.
-export FM_REMOTE_JOB_TIMEOUT=5
+export JG_REMOTE_JOB_TIMEOUT=5
 # shellcheck source=bin/jg-remote-job-lib.sh
 . "$ROOT/bin/jg-remote-job-lib.sh"
 
@@ -223,7 +223,7 @@ LOCAL_BIN_TARGET="$TMP_ROOT/local-bin-target"
 mkdir -p "$LOCAL_BIN_PARENT" "$LOCAL_BIN_TARGET"
 ln -s "$LOCAL_BIN_TARGET" "$LOCAL_BIN_PARENT/bin"
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-case ":$FM_REMOTE_JOB_OPERATOR_PATH:" in
+case ":$JG_REMOTE_JOB_OPERATOR_PATH:" in
   *":$LOCAL_BIN_PARENT/bin:"*|*":$LOCAL_BIN_TARGET:"*) fail "the composed PATH followed a symlinked local bin" ;;
 esac
 rm -f "$LOCAL_BIN_PARENT/bin"
@@ -239,15 +239,15 @@ printf '#!/bin/bash\nprintf "20\\n"\n' > "$NVM_V20/node"
 printf '#!/bin/bash\nprintf "24\\n"\n' > "$NVM_V24/node"
 chmod +x "$NVM_V20/node" "$NVM_V24/node"
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-NVM_SELECTED=$(PATH="$FM_REMOTE_JOB_OPERATOR_PATH" node)
+NVM_SELECTED=$(PATH="$JG_REMOTE_JOB_OPERATOR_PATH" node)
 [ "$NVM_SELECTED" = 20 ] || fail "the composed PATH ignored nvm's default alias"
 rm -f "$NVM_ROOT/alias/default"
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-NVM_SELECTED=$(PATH="$FM_REMOTE_JOB_OPERATOR_PATH" node)
+NVM_SELECTED=$(PATH="$JG_REMOTE_JOB_OPERATOR_PATH" node)
 [ "$NVM_SELECTED" = 24 ] || fail "the nvm fallback did not select the highest installed version"
 printf 'system\n' > "$NVM_ROOT/alias/default"
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-case ":$FM_REMOTE_JOB_OPERATOR_PATH:" in
+case ":$JG_REMOTE_JOB_OPERATOR_PATH:" in
   *":$NVM_V20:"*|*":$NVM_V24:"*) fail "the composed PATH ignored nvm's system default" ;;
 esac
 printf '20\n' > "$NVM_ROOT/alias/default"
@@ -258,7 +258,7 @@ NIX_BIN="$TMP_ROOT/nix-profile-bin"
 mkdir -p "$NIX_PROFILE" "$NIX_BIN"
 ln -s "$NIX_BIN" "$NIX_PROFILE/bin"
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-case ":$FM_REMOTE_JOB_OPERATOR_PATH:" in
+case ":$JG_REMOTE_JOB_OPERATOR_PATH:" in
   *":$NIX_BIN:"*) ;;
   *) fail "the composed PATH omitted a resolved Nix profile bin link" ;;
 esac
@@ -275,7 +275,7 @@ for TOOL_VERSION in node/26.7.0 node/8.1 node/26 bun/1.4 bun/1.3.14 python/3.12.
   mkdir -p "$MISE_INSTALLS/$TOOL_VERSION/bin"
 done
 jg_remote_job_compose_operator_path "$ACCOUNT_HOME" >/dev/null
-MISE_COMPOSED=$(printf '%s\n' "$FM_REMOTE_JOB_OPERATOR_PATH" | tr ':' '\n' | grep -F "$MISE_INSTALLS/" || true)
+MISE_COMPOSED=$(printf '%s\n' "$JG_REMOTE_JOB_OPERATOR_PATH" | tr ':' '\n' | grep -F "$MISE_INSTALLS/" || true)
 MISE_EXPECTED=$(printf '%s\n' "$MISE_INSTALLS"/*/*/bin)
 [ "$MISE_COMPOSED" = "$MISE_EXPECTED" ] \
   || fail "the composed operator PATH did not order tool installs like the shell's own expansion"$'\n'"expected: $MISE_EXPECTED"$'\n'"actual:   $MISE_COMPOSED"
@@ -283,9 +283,9 @@ MISE_EXPECTED=$(printf '%s\n' "$MISE_INSTALLS"/*/*/bin)
 rm -rf -- "$ACCOUNT_HOME/.local/share/mise"
 pass "operator PATH orders discovered tool installs deterministically"
 
-HOME="$ACCOUNT_HOME" PATH="$RUNTIME_BIN:/usr/bin:/bin:/usr/sbin:/sbin" FM_FAKE_PERL_LOG="$FAKE_PERL_LOG" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux FM_REMOTE_JOB_TIMEOUT=5 \
+HOME="$ACCOUNT_HOME" PATH="$RUNTIME_BIN:/usr/bin:/bin:/usr/sbin:/sbin" JG_FAKE_PERL_LOG="$FAKE_PERL_LOG" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux JG_REMOTE_JOB_TIMEOUT=5 \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" > "$TMP_ROOT/worker.out" 2> "$TMP_ROOT/worker.err" &
 for _ in $(seq 1 100); do
   [ -f "$STATE_ROOT/worker.ready" ] && break
@@ -313,14 +313,14 @@ printf 'first line\nsecond line\n' > "$TMP_ROOT/stdin"
 # shellcheck disable=SC2016 # Literal shell-looking argv is an injection probe.
 TOP_SECRET=must-not-cross jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-probe-job.sh 'two words' '$(not executed)' < "$TMP_ROOT/stdin" > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 [ "$(file_mode "$JOB_DIR")" = 700 ] \
   || fail "staged job directory is not mode 0700"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "the completed probe did not preserve exit status"
-OUT=$(<"$FM_REMOTE_JOB_STDOUT")
-assert_contains "$OUT" "home=$REMOTE_HOME" "the worker did not pass the staged FM_HOME"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "the completed probe did not preserve exit status"
+OUT=$(<"$JG_REMOTE_JOB_STDOUT")
+assert_contains "$OUT" "home=$REMOTE_HOME" "the worker did not pass the staged JG_HOME"
 assert_contains "$OUT" "root=$REMOTE_ROOT" "the worker did not pass the configured root"
 assert_contains "$OUT" 'active=1' "the target did not execute inside the worker environment"
 # shellcheck disable=SC2016 # Literal shell-looking expected output is an injection probe.
@@ -335,10 +335,10 @@ assert_absent "$FAKE_PERL_LOG" "the worker invoked an unavailable Perl runtime"
 pass "the worker preserves bounded argv and stdin in an empty environment"
 
 ACTIVE_SIDE_EFFECT="$TMP_ROOT/active-side-effect"
-FM_REMOTE_JOB_TIMEOUT=10
+JG_REMOTE_JOB_TIMEOUT=10
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-delay-job.sh 4 "$ACTIVE_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 for _ in $(seq 1 100); do
   [ "$(jg_remote_job_read_state "$JOB_DIR" 2>/dev/null || true)" = running ] && break
@@ -353,11 +353,11 @@ for _ in $(seq 1 40); do
   sleep 0.05
 done
 jg_remote_job_probe "$ACCOUNT_HOME" || fail "the active worker did not refresh its readiness heartbeat"
-jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$JG_REMOTE_JOB_ERROR"
 [ "$(cat "$STATE_ROOT/worker.pid")" = "$ACTIVE_WORKER_PID" ] \
   || fail "ensure replaced a healthy worker during an active job"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "the active job did not complete after the readiness probe"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "the active job did not complete after the readiness probe"
 assert_present "$ACTIVE_SIDE_EFFECT" "the active job was interrupted by the concurrent readiness check"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the active readiness job could not be reaped"
 pass "active jobs keep the worker ready for concurrent requests"
@@ -365,7 +365,7 @@ pass "active jobs keep the worker ready for concurrent requests"
 OLD_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 printf '\n' >> "$REMOTE_ROOT/bin/jg-remote-job-worker.sh"
 jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" \
-  || fail "$FM_REMOTE_JOB_ERROR"
+  || fail "$JG_REMOTE_JOB_ERROR"
 NEW_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 [ "$NEW_WORKER_PID" != "$OLD_WORKER_PID" ] || fail "ensure retained a worker running stale code"
 jg_remote_job_worker_identity_matches "$REMOTE_ROOT" "$ACCOUNT_HOME" \
@@ -378,17 +378,17 @@ OLD_WORKER_PID=$NEW_WORKER_PID
 OLD_WORKER_PGID=$(jg_remote_job_process_pgid "$OLD_WORKER_PID") \
   || fail "the worker replacement fixture could not resolve its process group"
 jg_remote_job_ensure_worker "$RELOCATED_ROOT" "$ACCOUNT_HOME" \
-  || fail "$FM_REMOTE_JOB_ERROR"
+  || fail "$JG_REMOTE_JOB_ERROR"
 NEW_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 [ "$NEW_WORKER_PID" != "$OLD_WORKER_PID" ] || fail "ensure retained a worker bound to a different code root"
 ! kill -0 -- "-$OLD_WORKER_PGID" 2>/dev/null \
   || fail "ensure left the replaced worker supervisor group alive"
 jg_remote_job_stage "$ACCOUNT_HOME" "$RELOCATED_ROOT" "$REMOTE_HOME" jg-probe-job.sh < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "the relocated worker rejected its configured code root"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "the relocated worker rejected its configured code root"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the relocated-root probe could not be reaped"
-jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$JG_REMOTE_JOB_ERROR"
 NEW_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 pass "worker identity binds the canonical configured code root"
 
@@ -402,7 +402,7 @@ printf '%s\n' "$OTHER_PID" > "$STATE_ROOT/worker.pid"
 printf '%s\n' "$OTHER_PID" > "$STATE_ROOT/worker.lock/pid"
 touch -t 200001010000 "$STATE_ROOT/worker.ready" "$STATE_ROOT/worker.lock"
 jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" \
-  || fail "$FM_REMOTE_JOB_ERROR"
+  || fail "$JG_REMOTE_JOB_ERROR"
 kill -0 "$OTHER_PID" 2>/dev/null || fail "stale worker state caused an unrelated process to be signaled"
 NEW_WORKER_PID=$(cat "$STATE_ROOT/worker.pid")
 [ "$NEW_WORKER_PID" != "$OTHER_PID" ] || fail "the replacement adopted an unrelated persisted pid"
@@ -413,17 +413,17 @@ wait "$OTHER_PID" 2>/dev/null || true
 OTHER_PID=
 pass "stale ownership is reclaimed without signaling a reused pid"
 
-FM_REMOTE_JOB_TIMEOUT=1
+JG_REMOTE_JOB_TIMEOUT=1
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-timeout-job.sh < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 124 ] || fail "the worker did not terminate an over-time job"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 124 ] || fail "the worker did not terminate an over-time job"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the timed-out job could not be reaped"
 pass "the worker enforces the job timeout and publishes its result"
 
 QUEUED_SIDE_EFFECT="$TMP_ROOT/queued-side-effect"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-timeout-job.sh < /dev/null > /dev/null
-FIRST_JOB_ID=$FM_REMOTE_JOB_ID
+FIRST_JOB_ID=$JG_REMOTE_JOB_ID
 FIRST_JOB_DIR="$STATE_ROOT/jobs/$FIRST_JOB_ID"
 for _ in $(seq 1 100); do
   [ "$(jg_remote_job_read_state "$FIRST_JOB_DIR" 2>/dev/null || true)" = running ] && break
@@ -432,11 +432,11 @@ done
 [ "$(jg_remote_job_read_state "$FIRST_JOB_DIR" 2>/dev/null || true)" = running ] \
   || fail "the blocking job did not begin running"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-touch-job.sh "$QUEUED_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 printf '%s\n' "$(jg_remote_job_read_deadline "$FIRST_JOB_DIR")" > "$STATE_ROOT/jobs/$JOB_ID/queue_deadline"
-jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 124 ] || fail "an expired queued job did not publish a timeout result"
+jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 124 ] || fail "an expired queued job did not publish a timeout result"
 assert_absent "$QUEUED_SIDE_EFFECT" "the worker executed a queued job after its durable deadline"
 jg_remote_job_reap "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "the blocking job could not be reaped"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the expired queued job could not be reaped"
@@ -444,11 +444,11 @@ pass "the worker expires queued jobs before they can mutate"
 
 FIRST_DELAYED_SIDE_EFFECT="$TMP_ROOT/first-delayed-side-effect"
 SECOND_DELAYED_SIDE_EFFECT="$TMP_ROOT/second-delayed-side-effect"
-FM_REMOTE_JOB_QUEUE_TIMEOUT=5
-FM_REMOTE_JOB_TIMEOUT=3
+JG_REMOTE_JOB_QUEUE_TIMEOUT=5
+JG_REMOTE_JOB_TIMEOUT=3
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-delay-job.sh 1.8 "$FIRST_DELAYED_SIDE_EFFECT" < /dev/null > /dev/null
-FIRST_JOB_ID=$FM_REMOTE_JOB_ID
+FIRST_JOB_ID=$JG_REMOTE_JOB_ID
 FIRST_JOB_DIR="$STATE_ROOT/jobs/$FIRST_JOB_ID"
 for _ in $(seq 1 100); do
   [ "$(jg_remote_job_read_state "$FIRST_JOB_DIR" 2>/dev/null || true)" = running ] && break
@@ -458,10 +458,10 @@ done
   || fail "the first delayed job did not begin running"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-delay-job.sh 1.8 "$SECOND_DELAYED_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "queue time consumed the second job's execution timeout"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "queue time consumed the second job's execution timeout"
 assert_present "$SECOND_DELAYED_SIDE_EFFECT" "the queued job did not receive its full execution timeout"
 jg_remote_job_reap "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "the first delayed job could not be reaped"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the second delayed job could not be reaped"
@@ -475,11 +475,11 @@ fi
 mkdir -p "$REMOTE_HOME/state"
 REPLY_LOG_REL=state/parent-replies.status
 PREEMPT_SIDE_EFFECT="$TMP_ROOT/preempt-side-effect"
-FM_REMOTE_JOB_QUEUE_TIMEOUT=60
-FM_REMOTE_JOB_TIMEOUT=40
+JG_REMOTE_JOB_QUEUE_TIMEOUT=60
+JG_REMOTE_JOB_TIMEOUT=40
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-remote-delta-read.sh "$REPLY_LOG_REL" 0 "$EMPTY_SHA" 30 < /dev/null > /dev/null
-POLL_JOB_ID=$FM_REMOTE_JOB_ID
+POLL_JOB_ID=$JG_REMOTE_JOB_ID
 POLL_JOB_DIR="$STATE_ROOT/jobs/$POLL_JOB_ID"
 for _ in $(seq 1 100); do
   [ "$(jg_remote_job_read_state "$POLL_JOB_DIR" 2>/dev/null || true)" = running ] && break
@@ -490,39 +490,39 @@ done
 PREEMPT_BEGAN=$(date +%s)
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-touch-job.sh "$PREEMPT_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
 PREEMPT_ELAPSED=$(( $(date +%s) - PREEMPT_BEGAN ))
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "the short command behind a long poll did not complete"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "the short command behind a long poll did not complete"
 assert_present "$PREEMPT_SIDE_EFFECT" "the short command behind a long poll did not run"
 [ "$PREEMPT_ELAPSED" -le 10 ] || fail "a queued short command waited a full poll window behind the long poll"
-jg_remote_job_wait "$ACCOUNT_HOME" "$POLL_JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq "$FM_REMOTE_JOB_PREEMPTED_EXIT" ] \
+jg_remote_job_wait "$ACCOUNT_HOME" "$POLL_JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq "$JG_REMOTE_JOB_PREEMPTED_EXIT" ] \
   || fail "a preempted long poll was not distinguished from an elapsed window"
-[ ! -s "$FM_REMOTE_JOB_STDOUT" ] || fail "a preempted long poll published partial stdout"
-[ ! -s "$FM_REMOTE_JOB_STDERR" ] || fail "a preempted long poll published partial stderr"
+[ ! -s "$JG_REMOTE_JOB_STDOUT" ] || fail "a preempted long poll published partial stdout"
+[ ! -s "$JG_REMOTE_JOB_STDERR" ] || fail "a preempted long poll published partial stderr"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the short command could not be reaped"
 jg_remote_job_reap "$ACCOUNT_HOME" "$POLL_JOB_ID" || fail "the preempted poll could not be reaped"
 pass "a queued short command preempts a running long poll instead of waiting its window"
 
 printf 'hello after preemption\n' > "$REMOTE_HOME/$REPLY_LOG_REL"
-FM_REMOTE_JOB_TIMEOUT=10
+JG_REMOTE_JOB_TIMEOUT=10
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-remote-delta-read.sh "$REPLY_LOG_REL" 0 "$EMPTY_SHA" 5 < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || fail "the re-armed poll after preemption did not complete"
-OUT=$(<"$FM_REMOTE_JOB_STDOUT")
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || fail "the re-armed poll after preemption did not complete"
+OUT=$(<"$JG_REMOTE_JOB_STDOUT")
 assert_contains "$OUT" 'status=delta' "the re-armed poll did not return a delta from the preserved cursor"
 assert_contains "$OUT" 'hello after preemption' "the re-armed poll lost data appended around the preemption"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the re-armed poll could not be reaped"
 rm -f -- "$REMOTE_HOME/$REPLY_LOG_REL"
 pass "a poll re-armed after preemption reads the same cursor with nothing lost"
 
-FM_REMOTE_JOB_TIMEOUT=15
+JG_REMOTE_JOB_TIMEOUT=15
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-remote-delta-read.sh "$REPLY_LOG_REL" 0 "$EMPTY_SHA" 6 < /dev/null > /dev/null
-FIRST_JOB_ID=$FM_REMOTE_JOB_ID
+FIRST_JOB_ID=$JG_REMOTE_JOB_ID
 FIRST_JOB_DIR="$STATE_ROOT/jobs/$FIRST_JOB_ID"
 for _ in $(seq 1 100); do
   [ "$(jg_remote_job_read_state "$FIRST_JOB_DIR" 2>/dev/null || true)" = running ] && break
@@ -533,24 +533,24 @@ done
 POLL_PAIR_BEGAN=$(date +%s)
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-remote-delta-read.sh "$REPLY_LOG_REL" 0 "$EMPTY_SHA" 1 < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
 POLL_PAIR_ELAPSED=$(( $(date +%s) - POLL_PAIR_BEGAN ))
-[ "$FM_REMOTE_JOB_EXIT" -eq 75 ] || fail "the first sibling poll did not close its own window"
+[ "$JG_REMOTE_JOB_EXIT" -eq 75 ] || fail "the first sibling poll did not close its own window"
 [ "$POLL_PAIR_ELAPSED" -ge 4 ] || fail "a queued sibling poll preempted a running poll"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 75 ] || fail "the queued sibling poll did not run after the first window"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 75 ] || fail "the queued sibling poll did not run after the first window"
 jg_remote_job_reap "$ACCOUNT_HOME" "$FIRST_JOB_ID" || fail "the first sibling poll could not be reaped"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the queued sibling poll could not be reaped"
-FM_REMOTE_JOB_QUEUE_TIMEOUT=5
+JG_REMOTE_JOB_QUEUE_TIMEOUT=5
 pass "sibling polls never preempt each other into a re-arm churn loop"
 
 STARTED="$TMP_ROOT/shutdown-started"
 SHUTDOWN_SIDE_EFFECT="$TMP_ROOT/shutdown-side-effect"
-FM_REMOTE_JOB_TIMEOUT=5
+JG_REMOTE_JOB_TIMEOUT=5
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-shutdown-job.sh "$STARTED" "$SHUTDOWN_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 for _ in $(seq 1 100); do
   [ -f "$STARTED" ] && break
   sleep 0.05
@@ -563,16 +563,16 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 kill -0 "$WORKER_PID" 2>/dev/null && fail "the worker did not finish its TERM shutdown"
-HOME="$ACCOUNT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux FM_REMOTE_JOB_TIMEOUT=1 \
+HOME="$ACCOUNT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux JG_REMOTE_JOB_TIMEOUT=1 \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" >> "$TMP_ROOT/worker.out" 2>> "$TMP_ROOT/worker.err" &
 for _ in $(seq 1 100); do
   [ -f "$STATE_ROOT/worker.ready" ] && break
   sleep 0.05
 done
 assert_present "$STATE_ROOT/worker.ready" "the replacement worker did not become ready"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 125 ] || fail "the interrupted job did not publish an unknown-completion result"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 125 ] || fail "the interrupted job did not publish an unknown-completion result"
 sleep 3
 assert_absent "$SHUTDOWN_SIDE_EFFECT" "the active command mutated after worker shutdown"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the interrupted job could not be reaped"
@@ -580,10 +580,10 @@ pass "worker shutdown terminates the active command tree before replacement"
 
 CRASH_STARTED="$TMP_ROOT/crash-started"
 CRASH_SIDE_EFFECT="$TMP_ROOT/crash-side-effect"
-FM_REMOTE_JOB_TIMEOUT=5
+JG_REMOTE_JOB_TIMEOUT=5
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-shutdown-job.sh "$CRASH_STARTED" "$CRASH_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 for _ in $(seq 1 100); do
   [ -f "$CRASH_STARTED" ] && break
   sleep 0.05
@@ -598,8 +598,8 @@ for _ in $(seq 1 200); do
 done
 [ -n "${RESTARTED_WORKER_PID:-}" ] && [ "$RESTARTED_WORKER_PID" != "$CRASHED_WORKER_PID" ] \
   || fail "the Linux supervisor did not restart a crashed worker"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 125 ] || fail "worker crash recovery did not publish unknown completion"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 125 ] || fail "worker crash recovery did not publish unknown completion"
 sleep 3
 assert_absent "$CRASH_SIDE_EFFECT" "an orphaned command mutated after worker crash recovery"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the crash-recovered job could not be reaped"
@@ -619,14 +619,14 @@ fi
 exec "$REAL_GIT" "\$@"
 SH
 chmod +x "$ACCOUNT_HOME/.local/bin/git"
-FM_REMOTE_JOB_TIMEOUT=3
+JG_REMOTE_JOB_TIMEOUT=3
 PREEXEC_BEGAN=$(date +%s)
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-probe-job.sh < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
 PREEXEC_ELAPSED=$(( $(date +%s) - PREEXEC_BEGAN ))
-[ "$FM_REMOTE_JOB_EXIT" -eq 124 ] || fail "the pre-execution deadline did not publish a timeout result"
+[ "$JG_REMOTE_JOB_EXIT" -eq 124 ] || fail "the pre-execution deadline did not publish a timeout result"
 assert_present "$PREEXEC_STARTED" "the pre-execution timeout fixture did not enter tracked-command validation"
 assert_absent "$PREEXEC_FINISHED" "tracked-command validation continued after the job timeout"
 [ "$PREEXEC_ELAPSED" -le 7 ] || fail "tracked-command validation exceeded the job timeout bound"
@@ -635,13 +635,13 @@ rm -f -- "$ACCOUNT_HOME/.local/bin/git"
 pass "pre-execution validation obeys the job timeout"
 
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-output-job.sh < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 23 ] || fail "bounded output changed the command exit status"
-OUTPUT_BYTES=$(LC_ALL=C wc -c < "$FM_REMOTE_JOB_STDOUT" | tr -d ' ')
-[ "$OUTPUT_BYTES" -le "$FM_REMOTE_JOB_MAX_BYTES" ] || fail "the worker retained output beyond its byte bound"
-ERROR_BYTES=$(LC_ALL=C wc -c < "$FM_REMOTE_JOB_STDERR" | tr -d ' ')
-[ "$ERROR_BYTES" -le "$FM_REMOTE_JOB_MAX_BYTES" ] || fail "the worker retained stderr beyond its byte bound"
+JOB_ID=$JG_REMOTE_JOB_ID
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 23 ] || fail "bounded output changed the command exit status"
+OUTPUT_BYTES=$(LC_ALL=C wc -c < "$JG_REMOTE_JOB_STDOUT" | tr -d ' ')
+[ "$OUTPUT_BYTES" -le "$JG_REMOTE_JOB_MAX_BYTES" ] || fail "the worker retained output beyond its byte bound"
+ERROR_BYTES=$(LC_ALL=C wc -c < "$JG_REMOTE_JOB_STDERR" | tr -d ' ')
+[ "$ERROR_BYTES" -le "$JG_REMOTE_JOB_MAX_BYTES" ] || fail "the worker retained stderr beyond its byte bound"
 jg_remote_job_reap "$ACCOUNT_HOME" "$JOB_ID" || fail "the bounded-output job could not be reaped"
 pass "the worker drains bounded output without changing command results"
 
@@ -651,22 +651,22 @@ jg_remote_job_stop_worker_tree "$WORKER_PID" \
   || fail "the worker tree did not stop before the staged-record tamper"
 assert_absent "$STATE_ROOT/worker.pid" "the worker did not clear its pid before the staged-record tamper"
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" jg-touch-job.sh "$SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 rm -f -- "$JOB_DIR/argv"
 ln -s "$TMP_ROOT/not-an-argv" "$JOB_DIR/argv"
-jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 126 ] || fail "the worker accepted a symlinked argv record"
+jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail "$JG_REMOTE_JOB_ERROR"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 126 ] || fail "the worker accepted a symlinked argv record"
 assert_absent "$SIDE_EFFECT" "the worker executed a job after its argv changed to a symlink"
 pass "the worker refuses symlinked job fields before command execution"
 
 QUARANTINE_STARTED="$TMP_ROOT/quarantine-started"
 QUARANTINE_SIDE_EFFECT="$TMP_ROOT/quarantine-side-effect"
-FM_REMOTE_JOB_TIMEOUT=5
+JG_REMOTE_JOB_TIMEOUT=5
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-shutdown-job.sh "$QUARANTINE_STARTED" "$QUARANTINE_SIDE_EFFECT" < /dev/null > /dev/null
-JOB_ID=$FM_REMOTE_JOB_ID
+JOB_ID=$JG_REMOTE_JOB_ID
 JOB_DIR="$STATE_ROOT/jobs/$JOB_ID"
 for _ in $(seq 1 100); do
   [ -f "$QUARANTINE_STARTED" ] && break
@@ -685,8 +685,8 @@ done
 assert_present "$STATE_ROOT/worker.lock/quarantine" "failed shutdown released worker ownership"
 jg_remote_job_probe "$ACCOUNT_HOME" && fail "quarantined worker ownership still reported ready"
 set +e
-HOME="$ACCOUNT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
+HOME="$ACCOUNT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
   >> "$TMP_ROOT/worker.out" 2>> "$TMP_ROOT/worker.err"
 REPLACEMENT_RC=$?
 set -e
@@ -722,8 +722,8 @@ chmod 600 "$RECOVERY_STATE/worker.lock"/* "$RECOVERY_JOB/state" "$RECOVERY_JOB/.
   "$RECOVERY_JOB/stdout" "$RECOVERY_JOB/stderr"
 touch -t 200001010000 "$RECOVERY_STATE/worker.lock"
 set +e
-HOME="$RECOVERY_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$RECOVERY_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
+HOME="$RECOVERY_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$RECOVERY_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
   > "$TMP_ROOT/recovery-refused.out" 2> "$TMP_ROOT/recovery-refused.err"
 RECOVERY_REFUSED_RC=$?
 set -e
@@ -734,8 +734,8 @@ printf 'stale owner identity\n' > "$RECOVERY_JOB/.claim/owner_start"
 printf 'stale supervisor identity\n' > "$RECOVERY_JOB/.claim/supervisor_start"
 chmod 600 "$RECOVERY_JOB/.claim/owner" "$RECOVERY_JOB/.claim/owner_start" \
   "$RECOVERY_JOB/.claim/supervisor_start"
-HOME="$RECOVERY_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$RECOVERY_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
+HOME="$RECOVERY_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$RECOVERY_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" \
   > "$TMP_ROOT/recovery-worker.out" 2> "$TMP_ROOT/recovery-worker.err" &
 RECOVERY_WORKER_PID=$!
 for _ in $(seq 1 300); do
@@ -775,8 +775,8 @@ REPEAT_HOME="$TMP_ROOT/repeat-signal-account"
 REPEAT_STATE="$TMP_ROOT/repeat-signal-jobs"
 mkdir -p "$REPEAT_HOME"
 chmod 700 "$REPEAT_HOME"
-HOME="$REPEAT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$REPEAT_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$REPEAT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$REPEAT_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/repeat-signal.out" 2> "$TMP_ROOT/repeat-signal.err" &
 REPEAT_WORKER_PID=$!
 for _ in $(seq 1 300); do
@@ -806,8 +806,8 @@ assert_absent "$REPEAT_STATE/worker.lock" \
   "a repeatedly signalled shutdown left its ownership lock behind"
 assert_absent "$REPEAT_STATE/worker.ready" \
   "a repeatedly signalled shutdown left its readiness heartbeat behind"
-HOME="$REPEAT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$REPEAT_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$REPEAT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$REPEAT_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   >> "$TMP_ROOT/repeat-signal.out" 2>> "$TMP_ROOT/repeat-signal.err" &
 REPEAT_WORKER_PID=$!
 for _ in $(seq 1 600); do
@@ -836,8 +836,8 @@ LOST_HOME="$TMP_ROOT/lost-term-account"
 LOST_STATE="$TMP_ROOT/lost-term-jobs"
 mkdir -p "$LOST_HOME"
 chmod 700 "$LOST_HOME"
-HOME="$LOST_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$LOST_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$LOST_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$LOST_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/lost-term.out" 2> "$TMP_ROOT/lost-term.err" &
 LOST_TERM_PID=$!
 for _ in $(seq 1 300); do
@@ -859,10 +859,10 @@ kill -CONT "$LOST_TERM_PID"
 # lock was removed. Let that in-flight refresh expire through the public
 # probe's 10-second freshness window instead of racing it with a backdated file.
 for _ in $(seq 1 80); do
-  ( FM_REMOTE_JOB_STATE_ROOT="$LOST_STATE"; jg_remote_job_probe "$LOST_HOME" ) || break
+  ( JG_REMOTE_JOB_STATE_ROOT="$LOST_STATE"; jg_remote_job_probe "$LOST_HOME" ) || break
   sleep 0.25
 done
-! ( FM_REMOTE_JOB_STATE_ROOT="$LOST_STATE"; jg_remote_job_probe "$LOST_HOME" ) \
+! ( JG_REMOTE_JOB_STATE_ROOT="$LOST_STATE"; jg_remote_job_probe "$LOST_HOME" ) \
   || fail "a worker without its ownership lock kept readiness fresh"
 assert_absent "$LOST_STATE/worker.lock" "the ownership lock reappeared before TERM"
 kill -TERM "$LOST_TERM_PID"
@@ -888,8 +888,8 @@ LOST_HOME="$TMP_ROOT/lost-cleanup-account"
 LOST_STATE="$TMP_ROOT/lost-cleanup-jobs"
 mkdir -p "$LOST_HOME"
 chmod 700 "$LOST_HOME"
-HOME="$LOST_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$LOST_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$LOST_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$LOST_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/lost-cleanup.out" 2> "$TMP_ROOT/lost-cleanup.err" &
 LOST_TERM_PID=$!
 for _ in $(seq 1 300); do
@@ -897,7 +897,7 @@ for _ in $(seq 1 300); do
   sleep 0.05
 done
 assert_present "$LOST_STATE/worker.ready" "the cleanup worker did not become ready"
-FM_REMOTE_JOB_STATE_ROOT="$LOST_STATE" FM_REMOTE_JOB_TIMEOUT=20 \
+JG_REMOTE_JOB_STATE_ROOT="$LOST_STATE" JG_REMOTE_JOB_TIMEOUT=20 \
   jg_remote_job_stage "$LOST_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-hold-job.sh "$HOLD_STARTED" "$HOLD_SIDE_EFFECT" < /dev/null > /dev/null
 for _ in $(seq 1 100); do
@@ -932,8 +932,8 @@ OWNER_STARTED="$TMP_ROOT/replacement-started"
 OWNER_SIDE_EFFECT="$TMP_ROOT/replacement-side-effect"
 mkdir -p "$OWNER_HOME"
 chmod 700 "$OWNER_HOME"
-HOME="$OWNER_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$OWNER_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/replacement-lost.out" 2> "$TMP_ROOT/replacement-lost.err" &
 LOST_TERM_PID=$!
 for _ in $(seq 1 300); do
@@ -947,8 +947,8 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 rm -rf -- "$OWNER_STATE/worker.lock"
-HOME="$OWNER_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$OWNER_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/replacement-owner.out" 2> "$TMP_ROOT/replacement-owner.err" &
 REPLACEMENT_OWNER_PID=$!
 for _ in $(seq 1 300); do
@@ -957,7 +957,7 @@ for _ in $(seq 1 300); do
 done
 [ "$(cat "$OWNER_STATE/worker.lock/pid" 2>/dev/null || true)" = "$REPLACEMENT_OWNER_PID" ] \
   || fail "the replacement worker did not take ownership"
-FM_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" FM_REMOTE_JOB_TIMEOUT=20 \
+JG_REMOTE_JOB_STATE_ROOT="$OWNER_STATE" JG_REMOTE_JOB_TIMEOUT=20 \
   jg_remote_job_stage "$OWNER_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-hold-job.sh "$OWNER_STARTED" "$OWNER_SIDE_EFFECT" < /dev/null > /dev/null
 for _ in $(seq 1 100); do
@@ -965,7 +965,7 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 assert_present "$OWNER_STARTED" "the replacement worker's command did not start"
-OWNER_JOB_SUPERVISOR=$(cat "$OWNER_STATE/jobs/$FM_REMOTE_JOB_ID/.claim/supervisor")
+OWNER_JOB_SUPERVISOR=$(cat "$OWNER_STATE/jobs/$JG_REMOTE_JOB_ID/.claim/supervisor")
 printf 'replacement guard\n' > "$OWNER_STATE/worker.lock/quarantine"
 OWNER_QUARANTINE_INODE=$(file_inode "$OWNER_STATE/worker.lock/quarantine")
 LATE_BURST=0
@@ -1040,8 +1040,8 @@ exec '$(command -v sleep)' "\$@"
 SH
 chmod +x "$STALL_BIN/sleep"
 # shellcheck disable=SC2031 # Cadence fixture PATH changes stayed in their subshells.
-HOME="$STALL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STALL_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux PATH="$STALL_BIN:$PATH" \
+HOME="$STALL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STALL_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux PATH="$STALL_BIN:$PATH" \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/stall-lost.out" 2> "$TMP_ROOT/stall-lost.err" &
 STALL_WORKER_PID=$!
@@ -1049,13 +1049,13 @@ printf '%s\n' "$STALL_WORKER_PID" > "$STALL_HOLD"
 STALL_DEADLINE=$((SECONDS + 30))
 until [ -f "$STALL_STATE/worker.ready" ] || [ "$SECONDS" -ge "$STALL_DEADLINE" ]; do sleep 0.05; done
 assert_present "$STALL_STATE/worker.ready" "the worker stalled in shutdown did not become ready"
-FM_REMOTE_JOB_STATE_ROOT="$STALL_STATE" FM_REMOTE_JOB_TIMEOUT=20 \
+JG_REMOTE_JOB_STATE_ROOT="$STALL_STATE" JG_REMOTE_JOB_TIMEOUT=20 \
   jg_remote_job_stage "$STALL_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-hold-job.sh "$STALL_STARTED" "$STALL_SIDE_EFFECT" < /dev/null > /dev/null
 STALL_DEADLINE=$((SECONDS + 30))
 until [ -f "$STALL_STARTED" ] || [ "$SECONDS" -ge "$STALL_DEADLINE" ]; do sleep 0.05; done
 assert_present "$STALL_STARTED" "the command that keeps shutdown in its stop loop did not start"
-STALL_JOB="$STALL_STATE/jobs/$FM_REMOTE_JOB_ID"
+STALL_JOB="$STALL_STATE/jobs/$JG_REMOTE_JOB_ID"
 # An unreadable start record keeps the worker from signalling the job's own
 # command group while it still counts that group as alive, so shutdown waits in
 # its stop loop until the test stops the group.
@@ -1068,8 +1068,8 @@ assert_present "$STALL_HELD" "shutdown did not reach its stop loop behind its ow
 assert_present "$STALL_STATE/worker.lock/quarantine" \
   "the worker held in its stop loop did not hold its own quarantine"
 rm -rf -- "$STALL_STATE/worker.lock"
-HOME="$STALL_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STALL_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
+HOME="$STALL_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STALL_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/stall-replacement.out" 2> "$TMP_ROOT/stall-replacement.err" &
 STALL_REPLACEMENT_PID=$!
 STALL_DEADLINE=$((SECONDS + 30))
@@ -1152,14 +1152,14 @@ for QUIET_TOOL in sleep chmod mktemp mv rm date stat uname dirname basename wc t
   QUIET_REAL=$(PATH=/usr/bin:/bin command -v "$QUIET_TOOL") || continue
   cat > "$QUIET_SHIM/$QUIET_TOOL" <<SH
 #!/bin/sh
-printf '%s\n' $QUIET_TOOL >> "\$FM_TEST_EXEC_LOG"
+printf '%s\n' $QUIET_TOOL >> "\$JG_TEST_EXEC_LOG"
 exec $QUIET_REAL "\$@"
 SH
   chmod +x "$QUIET_SHIM/$QUIET_TOOL"
 done
-HOME="$QUIET_HOME" PATH="$QUIET_SHIM:/usr/bin:/bin:/usr/sbin:/sbin" FM_TEST_EXEC_LOG="$QUIET_EXEC_LOG" \
-  FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$QUIET_STATE" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux FM_REMOTE_JOB_STAGE_REAP_SECONDS=2 \
+HOME="$QUIET_HOME" PATH="$QUIET_SHIM:/usr/bin:/bin:/usr/sbin:/sbin" JG_TEST_EXEC_LOG="$QUIET_EXEC_LOG" \
+  JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$QUIET_STATE" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux JG_REMOTE_JOB_STAGE_REAP_SECONDS=2 \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve > "$TMP_ROOT/quiet-worker.out" 2> "$TMP_ROOT/quiet-worker.err" &
 QUIET_WORKER_PID=$!
 quiet_wait_ready() { # <state> <label>
@@ -1198,7 +1198,7 @@ quiet_measure() { # <label> <max-sleeps>
 quiet_heartbeat_stays_fresh() { # <state> <account-home> <label>
   local deadline=$((SECONDS + 5)) mtime age
   while [ "$SECONDS" -lt "$deadline" ]; do
-    ( FM_REMOTE_JOB_STATE_ROOT="$1"; jg_remote_job_probe "$2" ) \
+    ( JG_REMOTE_JOB_STATE_ROOT="$1"; jg_remote_job_probe "$2" ) \
       || fail "the probe read the live $3 worker as unready"
     mtime=$(jg_remote_job_path_mtime "$1/worker.ready") || fail "the $3 worker heartbeat vanished"
     age=$(( $(date +%s) - mtime ))
@@ -1209,14 +1209,14 @@ quiet_heartbeat_stays_fresh() { # <state> <account-home> <label>
 quiet_stage_completes() { # <state> <account-home> <touched> <label>
   local began=$SECONDS elapsed
   (
-    FM_REMOTE_JOB_STATE_ROOT="$1"
-    FM_REMOTE_JOB_QUEUE_TIMEOUT=60
-    FM_REMOTE_JOB_TIMEOUT=30
+    JG_REMOTE_JOB_STATE_ROOT="$1"
+    JG_REMOTE_JOB_QUEUE_TIMEOUT=60
+    JG_REMOTE_JOB_TIMEOUT=30
     jg_remote_job_stage "$2" "$REMOTE_ROOT" "$REMOTE_HOME" jg-touch-job.sh "$3" \
       < /dev/null > /dev/null || exit 1
-    jg_remote_job_wait "$2" "$FM_REMOTE_JOB_ID" || exit 1
-    [ "$FM_REMOTE_JOB_EXIT" -eq 0 ] || exit 1
-    jg_remote_job_reap "$2" "$FM_REMOTE_JOB_ID"
+    jg_remote_job_wait "$2" "$JG_REMOTE_JOB_ID" || exit 1
+    [ "$JG_REMOTE_JOB_EXIT" -eq 0 ] || exit 1
+    jg_remote_job_reap "$2" "$JG_REMOTE_JOB_ID"
   ) || fail "a job staged to the $4 worker did not complete"
   elapsed=$((SECONDS - began))
   assert_present "$3" "the job staged to the $4 worker did not run"
@@ -1367,11 +1367,11 @@ scan_stage() { # <home> <command> [args...]; echoes the staged job id
   local home=$1
   shift
   (
-    FM_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" FM_REMOTE_JOB_QUEUE_TIMEOUT=60 \
-      FM_REMOTE_JOB_TIMEOUT=40 \
+    JG_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" JG_REMOTE_JOB_QUEUE_TIMEOUT=60 \
+      JG_REMOTE_JOB_TIMEOUT=40 \
       jg_remote_job_stage "$SCAN_ACCOUNT" "$REMOTE_ROOT" "$home" "$@" \
         </dev/null >/dev/null || exit 1
-    printf '%s\n' "$FM_REMOTE_JOB_ID"
+    printf '%s\n' "$JG_REMOTE_JOB_ID"
   )
 }
 SCAN_POLL_ID=$(scan_stage "$REMOTE_HOME" \
@@ -1390,8 +1390,8 @@ SCAN_OTHER_ID=$(scan_stage "$SCAN_HOME_B" jg-delay-job.sh 1 "$TMP_ROOT/other-ran
 # Direct exec, not "$BASH": the production shebang is /bin/bash, so this lane
 # runs on the stock macOS bash the same way the deployed worker does.
 HOME="$SCAN_ACCOUNT" PATH="$QUIET_SHIM:/usr/bin:/bin:/usr/sbin:/sbin" \
-  FM_TEST_EXEC_LOG="$SCAN_EXEC_LOG" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_TEST_EXEC_LOG="$SCAN_EXEC_LOG" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --lane "$SCAN_POLL_ID" \
   > "$TMP_ROOT/scan-lane.out" 2> "$TMP_ROOT/scan-lane.err" &
 SCAN_LANE_PID=$!
@@ -1425,7 +1425,7 @@ for _ in $(seq 1 200); do
 done
 [ "$(jg_remote_job_read_state "$SCAN_STATE/jobs/$SCAN_POLL_ID" 2>/dev/null || true)" = 'done' ] \
   || fail "a same-home queued command did not preempt the running poll"
-[ "$(cat "$SCAN_STATE/jobs/$SCAN_POLL_ID/exit")" -eq "$FM_REMOTE_JOB_PREEMPTED_EXIT" ] \
+[ "$(cat "$SCAN_STATE/jobs/$SCAN_POLL_ID/exit")" -eq "$JG_REMOTE_JOB_PREEMPTED_EXIT" ] \
   || fail "the preempted poll did not publish the preemption exit"
 wait "$SCAN_LANE_PID" 2>/dev/null || true
 SCAN_LANE_PID=
@@ -1436,7 +1436,7 @@ pass "a same-home queued command still preempts the poll through the builtin sca
 # characters, which the scan must not count in a UTF-8 locale. The earlier
 # fixture's queued same-home waiter is cancelled so only this record can
 # preempt.
-( FM_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" jg_remote_job_cancel "$SCAN_ACCOUNT" "$SCAN_WAITER_ID" ) \
+( JG_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" jg_remote_job_cancel "$SCAN_ACCOUNT" "$SCAN_WAITER_ID" ) \
   || fail "the earlier same-home waiter could not be cancelled"
 SCAN_BOUND_POLL_ID=$(scan_stage "$REMOTE_HOME" \
   jg-remote-delta-read.sh "$REPLY_LOG_REL" 0 "$EMPTY_SHA" 20)
@@ -1447,9 +1447,9 @@ SCAN_BOUND_SIBLING_ID=$(scan_stage "$REMOTE_HOME" \
 perl -e 'print "jg-remote-delta-read.sh\0", "\xc3\xa9" x 2100, "\0"' \
   > "$SCAN_STATE/jobs/$SCAN_BOUND_SIBLING_ID/argv"
 HOME="$SCAN_ACCOUNT" PATH="$QUIET_SHIM:/usr/bin:/bin:/usr/sbin:/sbin" \
-  FM_TEST_EXEC_LOG="$SCAN_EXEC_LOG" FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
-  FM_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_MAX_BYTES=4096 LC_ALL="$UTF8_LOCALE" \
+  JG_TEST_EXEC_LOG="$SCAN_EXEC_LOG" JG_ROOT_OVERRIDE="$REMOTE_ROOT" \
+  JG_REMOTE_JOB_STATE_ROOT="$SCAN_STATE" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_MAX_BYTES=4096 LC_ALL="$UTF8_LOCALE" \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --lane "$SCAN_BOUND_POLL_ID" \
   > "$TMP_ROOT/scan-bound-lane.out" 2> "$TMP_ROOT/scan-bound-lane.err" &
 SCAN_LANE_PID=$!
@@ -1459,13 +1459,13 @@ for _ in $(seq 1 200); do
 done
 [ "$(jg_remote_job_read_state "$SCAN_STATE/jobs/$SCAN_BOUND_POLL_ID" 2>/dev/null || true)" = 'done' ] \
   || fail "a queued poll with a multibyte argv past the byte bound did not preempt"
-[ "$(cat "$SCAN_STATE/jobs/$SCAN_BOUND_POLL_ID/exit")" -eq "$FM_REMOTE_JOB_PREEMPTED_EXIT" ] \
+[ "$(cat "$SCAN_STATE/jobs/$SCAN_BOUND_POLL_ID/exit")" -eq "$JG_REMOTE_JOB_PREEMPTED_EXIT" ] \
   || fail "the byte-bound preemption did not publish the preemption exit"
 wait "$SCAN_LANE_PID" 2>/dev/null || true
 SCAN_LANE_PID=
 pass "the lane scan bounds argv in bytes, not characters, in a UTF-8 locale"
 
-# A child that stays up for FM_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS clears the
+# A child that stays up for JG_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS clears the
 # consecutive-failure backoff, so a child that dies just past that threshold
 # used to reset the only guard the supervisor had and restart forever. The
 # fixture below is that worker: it exits non-zero after living just longer than
@@ -1482,16 +1482,16 @@ cat > "$RESTART_ROOT/bin/jg-remote-job-worker.sh" <<'SH'
 #!/bin/bash
 set -u
 [ "${1:-}" = --serve ] || exit 2
-printf '%s\n' "${BASHPID:-$$}" >> "$FM_TEST_SUPERVISOR_CHILD_LOG"
-sleep "$FM_TEST_SUPERVISOR_CHILD_SECONDS"
-exit "$FM_TEST_SUPERVISOR_CHILD_STATUS"
+printf '%s\n' "${BASHPID:-$$}" >> "$JG_TEST_SUPERVISOR_CHILD_LOG"
+sleep "$JG_TEST_SUPERVISOR_CHILD_SECONDS"
+exit "$JG_TEST_SUPERVISOR_CHILD_STATUS"
 SH
 chmod +x "$RESTART_ROOT/bin"/*.sh
-HOME="$RESTART_HOME" FM_ROOT_OVERRIDE="$RESTART_ROOT" \
-  FM_REMOTE_JOB_STATE_ROOT="$RESTART_STATE" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS=1 FM_REMOTE_JOB_SUPERVISOR_MAX_RESTARTS=3 \
-  FM_REMOTE_JOB_SUPERVISOR_MAX_BACKOFF_SECONDS=0 FM_TEST_SUPERVISOR_CHILD_LOG="$RESTART_CHILD_LOG" \
-  FM_TEST_SUPERVISOR_CHILD_SECONDS=1.1 FM_TEST_SUPERVISOR_CHILD_STATUS=1 \
+HOME="$RESTART_HOME" JG_ROOT_OVERRIDE="$RESTART_ROOT" \
+  JG_REMOTE_JOB_STATE_ROOT="$RESTART_STATE" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS=1 JG_REMOTE_JOB_SUPERVISOR_MAX_RESTARTS=3 \
+  JG_REMOTE_JOB_SUPERVISOR_MAX_BACKOFF_SECONDS=0 JG_TEST_SUPERVISOR_CHILD_LOG="$RESTART_CHILD_LOG" \
+  JG_TEST_SUPERVISOR_CHILD_SECONDS=1.1 JG_TEST_SUPERVISOR_CHILD_STATUS=1 \
   "$RESTART_ROOT/bin/jg-remote-job-supervisor-under-test.sh" \
   > "$TMP_ROOT/restart-supervisor.out" 2> "$TMP_ROOT/restart-supervisor.err" &
 RESTART_SUPERVISOR_PID=$!

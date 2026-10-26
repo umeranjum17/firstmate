@@ -9,8 +9,8 @@
 # three-tier timeout policy that docs/jg-test-portable-shards.md "Timeouts"
 # owns (fast, normal, heavy), so no job drifts back to a one-off number.
 #
-# They also hold the fork opt-out: the repository variables FM_CI_SKIP_PUSH and
-# FM_CI_SKIP_MACOS let a fork skip the push run and the macOS job through a
+# They also hold the fork opt-out: the repository variables JG_CI_SKIP_PUSH and
+# JG_CI_SKIP_MACOS let a fork skip the push run and the macOS job through a
 # job-level condition, while with neither set every job runs exactly as before.
 #
 # The workflow is parsed as YAML and its concurrency and job-level `if`
@@ -177,12 +177,12 @@ puts [interpolate.call(concurrency.fetch("group")),
 # Print, one per line in workflow order, the jobs whose job-level `if`
 # resolves true under one simulated event and fork variable setting; an unset
 # repository variable reads as the empty string, as GitHub documents.
-jobs_running_under() {  # <event> <FM_CI_SKIP_PUSH> <FM_CI_SKIP_MACOS>
+jobs_running_under() {  # <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS>
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[1],
-  "vars.FM_CI_SKIP_PUSH" => ARGV[2],
-  "vars.FM_CI_SKIP_MACOS" => ARGV[3],
+  "vars.JG_CI_SKIP_PUSH" => ARGV[2],
+  "vars.JG_CI_SKIP_MACOS" => ARGV[3],
 }
 YAML.load_file(ARGV[0]).fetch("jobs").each do |name, job|
   puts name if Expression.condition(job["if"], context)
@@ -346,7 +346,7 @@ puts steps[index].fetch("timeout-minutes", "none")
 }
 
 # The fork opt-out is opt-in: with neither variable set every job runs on both
-# events, FM_CI_SKIP_PUSH=1 empties only the push run, and FM_CI_SKIP_MACOS=1
+# events, JG_CI_SKIP_PUSH=1 empties only the push run, and JG_CI_SKIP_MACOS=1
 # removes only the macOS job. A "-" in the table means the variable is unset.
 test_fork_skip_variables_are_opt_in() {
   local all event skip_push skip_macos expected want actual
@@ -363,9 +363,9 @@ test_fork_skip_variables_are_opt_in() {
       *) fail "unknown expectation $expected" ;;
     esac
     actual=$(jobs_running_under "$event" "$skip_push" "$skip_macos") \
-      || fail "could not resolve the job conditions for $event FM_CI_SKIP_PUSH=$skip_push FM_CI_SKIP_MACOS=$skip_macos"
+      || fail "could not resolve the job conditions for $event JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos"
     [ "$actual" = "$want" ] \
-      || fail "$event with FM_CI_SKIP_PUSH=$skip_push FM_CI_SKIP_MACOS=$skip_macos must run $expected jobs"$'\n'"ran: $(printf '%s' "$actual" | tr '\n' ' ')"$'\n'"wanted: $(printf '%s' "$want" | tr '\n' ' ')"
+      || fail "$event with JG_CI_SKIP_PUSH=$skip_push JG_CI_SKIP_MACOS=$skip_macos must run $expected jobs"$'\n'"ran: $(printf '%s' "$actual" | tr '\n' ' ')"$'\n'"wanted: $(printf '%s' "$want" | tr '\n' ' ')"
   done <<'TABLE'
 push         - - all
 pull_request - - all
@@ -379,12 +379,12 @@ TABLE
 
 # Print true or false: whether one job's job-level `if` resolves true under
 # one simulated event, fork variable setting, and outcome of its needed jobs.
-job_runs_under() {  # <job> <event> <FM_CI_SKIP_PUSH> <FM_CI_SKIP_MACOS> <needs status>
+job_runs_under() {  # <job> <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <needs status>
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[2],
-  "vars.FM_CI_SKIP_PUSH" => ARGV[3],
-  "vars.FM_CI_SKIP_MACOS" => ARGV[4],
+  "vars.JG_CI_SKIP_PUSH" => ARGV[3],
+  "vars.JG_CI_SKIP_MACOS" => ARGV[4],
   "needs.status" => ARGV[5],
 }
 puts Expression.condition(YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1])["if"], context)
@@ -398,9 +398,9 @@ test_timing_aggregate_still_runs_after_a_failed_lane() {
   while read -r event skip_push expected; do
     [ "$skip_push" != - ] || skip_push=
     actual=$(job_runs_under tests-timing-aggregate "$event" "$skip_push" '' failure) \
-      || fail "could not resolve the aggregate condition for $event FM_CI_SKIP_PUSH=$skip_push"
+      || fail "could not resolve the aggregate condition for $event JG_CI_SKIP_PUSH=$skip_push"
     [ "$actual" = "$expected" ] \
-      || fail "after a failed lane, the aggregate on $event with FM_CI_SKIP_PUSH=$skip_push must resolve $expected, got $actual"
+      || fail "after a failed lane, the aggregate on $event with JG_CI_SKIP_PUSH=$skip_push must resolve $expected, got $actual"
   done <<'TABLE'
 pull_request - true
 push         - true

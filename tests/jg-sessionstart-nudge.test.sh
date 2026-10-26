@@ -12,11 +12,11 @@ set -u
 # lifecycle in which startup and later clear/compact hooks share one harness
 # ancestor. This also prevents a developer's ambient harness from making the
 # portable regression pass locally while failing on a harness-free CI runner.
-if [ "${FM_SESSIONSTART_TEST_HARNESS:-0}" != 1 ]; then
+if [ "${JG_SESSIONSTART_TEST_HARNESS:-0}" != 1 ]; then
   HARNESS_FIXTURE=$(mktemp -d "${TMPDIR:-/tmp}/jg-sessionstart-harness.XXXXXX") || exit 1
   ln -s /bin/bash "$HARNESS_FIXTURE/codex" || exit 1
   # shellcheck disable=SC2016 # Expand in the fixture shell, not this parent.
-  FM_SESSIONSTART_TEST_HARNESS=1 "$HARNESS_FIXTURE/codex" \
+  JG_SESSIONSTART_TEST_HARNESS=1 "$HARNESS_FIXTURE/codex" \
     -c '"$@"; rc=$?; :; exit "$rc"' _ "$0" "$@"
   HARNESS_STATUS=$?
   rm -rf "$HARNESS_FIXTURE"
@@ -48,7 +48,7 @@ make_primary() {
 
 run_nudge() {
   local root=$1
-  FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" "$NUDGE"
+  JG_GATE_REFUSE_BYPASS=0 JG_ROOT_OVERRIDE="$root" JG_HOME="$root" "$NUDGE"
 }
 
 expect_silent_zero() {
@@ -74,8 +74,8 @@ test_genuine_primary_nudges() {
 test_gate_env_is_silent() {
   local root="$TMP_ROOT/gate-env"
   make_primary "$root"
-  expect_silent_zero "gate env nudge" env NO_MISTAKES_GATE=1 FM_GATE_REFUSE_BYPASS=0 \
-    FM_ROOT_OVERRIDE="$root" FM_HOME="$root" "$NUDGE"
+  expect_silent_zero "gate env nudge" env NO_MISTAKES_GATE=1 JG_GATE_REFUSE_BYPASS=0 \
+    JG_ROOT_OVERRIDE="$root" JG_HOME="$root" "$NUDGE"
   pass "jg-sessionstart-nudge: NO_MISTAKES_GATE is silent"
 }
 
@@ -89,8 +89,8 @@ test_gate_common_dir_is_silent() {
   mkdir -p "$root/bin" "$root/state"
   : > "$root/AGENTS.md"
   printf 'gate-test\n' > "$root/.jg-secondmate-home"
-  expect_silent_zero "gate common-dir nudge" env FM_GATE_REFUSE_BYPASS=0 \
-    FM_ROOT_OVERRIDE="$root" FM_HOME="$root" "$NUDGE"
+  expect_silent_zero "gate common-dir nudge" env JG_GATE_REFUSE_BYPASS=0 \
+    JG_ROOT_OVERRIDE="$root" JG_HOME="$root" "$NUDGE"
   pass "jg-sessionstart-nudge: .no-mistakes gate common-dir is silent"
 }
 
@@ -150,7 +150,7 @@ test_namespace_pid1_lock_holder_is_silent() {
   # Non-vacuity: inside the same namespace, with no lock at all, the hook must
   # still produce its nudge, so silence below means the owner was recognized.
   out=$(unshare -rpf --mount-proc bash -c \
-    "FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE='$root' FM_HOME='$root' '$NUDGE'; exit \$?") || status=$?
+    "JG_GATE_REFUSE_BYPASS=0 JG_ROOT_OVERRIDE='$root' JG_HOME='$root' '$NUDGE'; exit \$?") || status=$?
   expect_code 0 "$status" "namespace nudge without a lock"
   [ "$out" = "$NUDGE_LINE" ] \
     || fail "the namespace fixture did not nudge without a lock, so its silence proves nothing: $out"
@@ -158,7 +158,7 @@ test_namespace_pid1_lock_holder_is_silent() {
   printf '1\n' > "$root/state/.lock"
   status=0
   out=$(unshare -rpf --mount-proc bash -c \
-    "FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE='$root' FM_HOME='$root' '$NUDGE'; exit \$?") || status=$?
+    "JG_GATE_REFUSE_BYPASS=0 JG_ROOT_OVERRIDE='$root' JG_HOME='$root' '$NUDGE'; exit \$?") || status=$?
   expect_code 0 "$status" "namespace pid 1 lock nudge"
   [ -z "$out" ] \
     || fail "a lock held by the harness at namespace pid 1 was not recognized, got: $out"
@@ -211,7 +211,7 @@ EOF
 # behaves, plus the home directories the digest reads. The deliberately bare
 # PATH keeps every bootstrap probe fast and hermetic - it reports missing tools
 # instead of reaching the host's real gh/tmux/tasks-axi.
-RUN_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+RUN_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 make_run_primary() {
   local dir=$1
@@ -224,15 +224,15 @@ make_run_primary() {
 run_hook() {  # <root> [args...]
   local root=$1
   shift
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-    FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
+  env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+    JG_GATE_REFUSE_BYPASS=0 JG_ROOT_OVERRIDE="$root" JG_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
 }
 
 run_hook_pi() {  # <root> [args...]
   local root=$1
   shift
-  env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true FM_PI_HARNESS=pi \
-    FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
+  env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true JG_PI_HARNESS=pi \
+    JG_GATE_REFUSE_BYPASS=0 JG_ROOT_OVERRIDE="$root" JG_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
 }
 
 # Every run-tier assertion keys off the digest banner, which jg-session-start.sh
@@ -375,7 +375,7 @@ while [ $# -gt 0 ]; do
     *) shift ;;
   esac
 done
-printf '%s\n' "$source_name" >> "${FM_HOME:?}/state/sources"
+printf '%s\n' "$source_name" >> "${JG_HOME:?}/state/sources"
 SH
   cat > "$fixture/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
@@ -384,7 +384,7 @@ SH
   chmod +x "$fixture/bin/"*.sh
 
   out=$(EXT="$fixture/.pi/extensions/jg-primary-turnend-guard.ts" \
-    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" \
+    JG_HOME="$fixture" JG_ROOT_OVERRIDE="$fixture" \
     node --input-type=module 2>&1 <<'JS'
 import { pathToFileURL } from "node:url";
 const handlers = new Map();
@@ -472,7 +472,7 @@ SH
   cat > "$fixture/bin/jg-sessionstart-run.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-state=${FM_HOME:?}/state
+state=${JG_HOME:?}/state
 source_name=
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -483,7 +483,7 @@ done
 count=$(( $(wc -l < "$state/launches" 2>/dev/null || printf '0') + 1 ))
 behavior=$(cat "$state/behavior-$count")
 printf 'launch:%s:%s:%s:%s:%s\n' \
-  "$count" "$behavior" "$source_name" "$$" "${FM_SESSIONSTART_SUPERVISOR_PID:-}" >> "$state/launches"
+  "$count" "$behavior" "$source_name" "$$" "${JG_SESSIONSTART_SUPERVISOR_PID:-}" >> "$state/launches"
 printf 'launch:%s\n' "$count" >> "$state/events"
 case "$behavior" in
   success)
@@ -547,7 +547,7 @@ SH
   : > "$fixture/state/events"
 
   out=$(EXT="$fixture/.pi/extensions/jg-primary-turnend-guard.ts" \
-    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" \
+    JG_HOME="$fixture" JG_ROOT_OVERRIDE="$fixture" \
     node --input-type=module 2>&1 <<'JS'
 import {
   existsSync,
@@ -557,8 +557,8 @@ import {
 } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const state = `${process.env.FM_HOME}/state`;
-const runner = `${process.env.FM_HOME}/bin/jg-sessionstart-run.sh`;
+const state = `${process.env.JG_HOME}/state`;
+const runner = `${process.env.JG_HOME}/bin/jg-sessionstart-run.sh`;
 const handlers = new Map();
 const sent = [];
 const pi = {
@@ -798,9 +798,9 @@ SH
   cat > "$fixture/bin/jg-sessionstart-run.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-state=${FM_HOME:?}/state
+state=${JG_HOME:?}/state
 index=$(( $(wc -l < "$state/launches" 2>/dev/null || printf '0') + 1 ))
-printf '%s:%s:%s\n' "$index" "$$" "${FM_SESSIONSTART_SUPERVISOR_PID:-}" >> "$state/launches"
+printf '%s:%s:%s\n' "$index" "$$" "${JG_SESSIONSTART_SUPERVISOR_PID:-}" >> "$state/launches"
 (
   trap '' TERM INT HUP
   while :; do sleep 30; done
@@ -818,13 +818,13 @@ SH
   : > "$fixture/state/launches"
 
   out=$(EXT="$fixture/.pi/extensions/jg-primary-turnend-guard.ts" \
-    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" \
+    JG_HOME="$fixture" JG_ROOT_OVERRIDE="$fixture" \
     node --input-type=module 2>&1 <<'JS'
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-const state = `${process.env.FM_HOME}/state`;
+const state = `${process.env.JG_HOME}/state`;
 const baselineListeners = process.listeners("exit");
 const baselineCount = baselineListeners.length;
 const assert = (condition, message) => {
@@ -941,7 +941,7 @@ SH
   chmod +x "$fixture/bin/"*.sh
 
   out=$(EXT="$fixture/.pi/extensions/jg-primary-turnend-guard.ts" \
-    FM_HOME="$fixture" FM_ROOT_OVERRIDE="$fixture" FM_GATE_REFUSE_BYPASS=1 \
+    JG_HOME="$fixture" JG_ROOT_OVERRIDE="$fixture" JG_GATE_REFUSE_BYPASS=1 \
     node --input-type=module 2>&1 <<'JS'
 import { pathToFileURL } from "node:url";
 const handlers = new Map();
@@ -1016,11 +1016,11 @@ test_run_gate_and_scope_are_silent() {
   local root="$TMP_ROOT/run-gate" base="$TMP_ROOT/run-linked-base" linked="$TMP_ROOT/run-linked"
   local out status=0
   make_run_primary "$root"
-  expect_silent_zero "gate env run" env NO_MISTAKES_GATE=1 FM_GATE_REFUSE_BYPASS=0 \
-    FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" "$RUN" --source startup
+  expect_silent_zero "gate env run" env NO_MISTAKES_GATE=1 JG_GATE_REFUSE_BYPASS=0 \
+    JG_ROOT_OVERRIDE="$root" JG_HOME="$root" PATH="$RUN_PATH" "$RUN" --source startup
   assert_absent "$root/state/.lock" "a gate agent's session open still took the fleet lock"
-  out=$(env NO_MISTAKES_GATE=1 FM_GATE_REFUSE_BYPASS=0 \
-    FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" \
+  out=$(env NO_MISTAKES_GATE=1 JG_GATE_REFUSE_BYPASS=0 \
+    JG_ROOT_OVERRIDE="$root" JG_HOME="$root" PATH="$RUN_PATH" \
     "$RUN" --source startup --pi-prerequisite 2>&1) || status=$?
   expect_code 3 "$status" "gate env Pi prerequisite stand-down"
   [ -z "$out" ] || fail "gate env Pi prerequisite stand-down must be silent, got: $out"

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-brief-inherit-lib.sh - shared worker-instruction inheritance for briefs. Source only.
 #
 # The fork's brief seam sources this when the add-on checkout is present and calls:
@@ -40,8 +49,8 @@ jg_brief_inherit_shared() {
 # Declare the shared include inheritable, so config-push, bootstrap convergence and the
 # remote push propagate its exact bytes (or its absence) to secondmate homes.
 jg_brief_inherit_config() {
-  case " ${FM_INHERITABLE_CONFIG:-} " in
+  case " ${JG_INHERITABLE_CONFIG:-} " in
     *" brief-include-shared.md "*) ;;
-    *) FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:+$FM_INHERITABLE_CONFIG }brief-include-shared.md" ;;
+    *) JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:+$JG_INHERITABLE_CONFIG }brief-include-shared.md" ;;
   esac
 }

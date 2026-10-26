@@ -57,7 +57,7 @@
 #   spend_max_concurrent_workers: <n>
 #   confirmed: <UTC ISO 8601>       when this mandate was recorded; /afk itself
 #   confirmed_epoch: <seconds>        is the go, so no later human step stamps it
-#   mode: quiet                    only on a quiet entry (FM_AFK_MODE=quiet); absent
+#   mode: quiet                    only on a quiet entry (JG_AFK_MODE=quiet); absent
 #                                  means away
 #   words: | or |-                 the captain's words, verbatim, never edited,
 #     <line>                       one record line per input line (or `words: -`
@@ -127,41 +127,41 @@
 # jg_afk_contract_lock_hold, jg_afk_contract_lock_release) without running main.
 set -u
 
-FM_AFK_CONTRACT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_AFK_CONTRACT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-FM_AFK_CONTRACT_STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_AFK_CONTRACT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$JG_AFK_CONTRACT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+JG_AFK_CONTRACT_STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-classify-lib.sh
-. "$FM_AFK_CONTRACT_DIR/jg-classify-lib.sh"
+. "$JG_AFK_CONTRACT_DIR/jg-classify-lib.sh"
 
-FM_AFK_CONTRACT_VERSION=2
+JG_AFK_CONTRACT_VERSION=2
 # Older record versions this script still reads (never writes).
-FM_AFK_CONTRACT_READABLE_VERSIONS="1 2"
-FM_AFK_CONTRACT_REACH_ANNOUNCED='No phone channel is configured; anything that needs you waits for your return.'
-FM_AFK_CONTRACT_SPEND_DEFAULT=4
-FM_AFK_CONTRACT_QUIET_HOLDS_NOTHING='you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.'
+JG_AFK_CONTRACT_READABLE_VERSIONS="1 2"
+JG_AFK_CONTRACT_REACH_ANNOUNCED='No phone channel is configured; anything that needs you waits for your return.'
+JG_AFK_CONTRACT_SPEND_DEFAULT=4
+JG_AFK_CONTRACT_QUIET_HOLDS_NOTHING='you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.'
 # Generous against the longest legitimate holder, a merge waiting on the forge,
 # so the bound only ever trips on something genuinely wedged.
-_FM_AFK_CONTRACT_LOCK_TIMEOUT=120
-FM_AFK_CONTRACT_LOCK_HELD=
+_JG_AFK_CONTRACT_LOCK_TIMEOUT=120
+JG_AFK_CONTRACT_LOCK_HELD=
 
 jg_afk_contract_path() {  # [state-dir]
-  printf '%s/.afk-contract' "${1:-$FM_AFK_CONTRACT_STATE}"
+  printf '%s/.afk-contract' "${1:-$JG_AFK_CONTRACT_STATE}"
 }
 
 # Where the retired two-step entry staged its proposal; kept only so `enter` can
 # remove one an older version left behind.
 jg_afk_contract_legacy_proposal_path() {  # [state-dir]
-  printf '%s/.afk-contract.proposed' "${1:-$FM_AFK_CONTRACT_STATE}"
+  printf '%s/.afk-contract.proposed' "${1:-$JG_AFK_CONTRACT_STATE}"
 }
 
 jg_afk_contract_archive_dir() {  # [state-dir]
-  printf '%s/afk-contracts' "${1:-$FM_AFK_CONTRACT_STATE}"
+  printf '%s/afk-contracts' "${1:-$JG_AFK_CONTRACT_STATE}"
 }
 
 jg_afk_contract_present() {  # [state-dir]
-  [ -f "$(jg_afk_contract_path "${1:-$FM_AFK_CONTRACT_STATE}")" ]
+  [ -f "$(jg_afk_contract_path "${1:-$JG_AFK_CONTRACT_STATE}")" ]
 }
 
 # The posture a record at <path> is (the header's AWAY OR QUIET): quiet only
@@ -177,7 +177,7 @@ jg_afk_contract_record_mode() {  # <path>
 # Print away or quiet for this home's record; 1 with no record.
 jg_afk_contract_mode() {  # [state-dir]
   local path
-  path=$(jg_afk_contract_path "${1:-$FM_AFK_CONTRACT_STATE}")
+  path=$(jg_afk_contract_path "${1:-$JG_AFK_CONTRACT_STATE}")
   [ -f "$path" ] || return 1
   jg_afk_contract_record_mode "$path"
 }
@@ -188,7 +188,7 @@ jg_afk_contract_away_present() {  # [state-dir]
 }
 
 jg_afk_contract_lock_path() {  # [state-dir]
-  printf '%s/.afk-contract.lock' "${1:-$FM_AFK_CONTRACT_STATE}"
+  printf '%s/.afk-contract.lock' "${1:-$JG_AFK_CONTRACT_STATE}"
 }
 
 # Lazily reach the lock primitive. bin/jg-wake-lib.sh is a canonical lint root
@@ -197,7 +197,7 @@ jg_afk_contract_lock_path() {  # [state-dir]
 jg_afk_contract_lock_helpers() {
   command -v jg_lock_acquire_wait_bounded >/dev/null 2>&1 && return 0
   # shellcheck source=/dev/null
-  . "$FM_AFK_CONTRACT_DIR/jg-wake-lib.sh"
+  . "$JG_AFK_CONTRACT_DIR/jg-wake-lib.sh"
 }
 
 # jg_afk_contract_lock_hold [state-dir]: take the cross-subsystem lock described
@@ -206,31 +206,31 @@ jg_afk_contract_lock_helpers() {
 # every caller refuses rather than proceeding unlocked.
 jg_afk_contract_lock_hold() {  # [state-dir]
   local lock rc=0 STATE timeout
-  STATE=${1:-$FM_AFK_CONTRACT_STATE}
+  STATE=${1:-$JG_AFK_CONTRACT_STATE}
   lock=$(jg_afk_contract_lock_path "$STATE")
-  timeout=${FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT:-$_FM_AFK_CONTRACT_LOCK_TIMEOUT}
+  timeout=${JG_TEST_AFK_CONTRACT_LOCK_TIMEOUT:-$_JG_AFK_CONTRACT_LOCK_TIMEOUT}
   jg_afk_contract_lock_helpers || {
     jg_afk_contract_log "could not load the lock primitive for $lock"
     return 1
   }
   jg_lock_acquire_wait_bounded "$lock" "$timeout" || rc=$?
   if [ "$rc" -ne 0 ]; then
-    if [ "$rc" -eq 124 ] && [ -n "${FM_LOCK_HELD_PID:-}" ]; then
-      jg_afk_contract_log "the away-posture record is locked by live process $FM_LOCK_HELD_PID (an in-flight merge, or another change to this record); nothing was changed"
+    if [ "$rc" -eq 124 ] && [ -n "${JG_LOCK_HELD_PID:-}" ]; then
+      jg_afk_contract_log "the away-posture record is locked by live process $JG_LOCK_HELD_PID (an in-flight merge, or another change to this record); nothing was changed"
     else
       jg_afk_contract_log "could not take the away-posture record lock at $lock; nothing was changed"
     fi
     return 1
   fi
-  FM_AFK_CONTRACT_LOCK_HELD=$lock
+  JG_AFK_CONTRACT_LOCK_HELD=$lock
 }
 
 # Release the lock taken by jg_afk_contract_lock_hold. Idempotent, so callers can
 # invoke it unconditionally from their own cleanup.
 jg_afk_contract_lock_release() {
-  local lock=$FM_AFK_CONTRACT_LOCK_HELD
+  local lock=$JG_AFK_CONTRACT_LOCK_HELD
   [ -n "$lock" ] || return 0
-  FM_AFK_CONTRACT_LOCK_HELD=
+  JG_AFK_CONTRACT_LOCK_HELD=
   jg_afk_contract_lock_helpers || return 1
   jg_lock_release "$lock"
 }
@@ -255,16 +255,16 @@ jg_afk_contract_validate_iso() {  # <ts>
 # Inputs: WORDS (verbatim), EXPECTED_RETURN, SPEND.
 jg_afk_contract_render_record() {  # <entered-iso> <entered-epoch> <confirmed-iso> <confirmed-epoch>
   local entered=$1 entered_epoch=$2 confirmed=$3 confirmed_epoch=$4
-  printf 'version: %s\n' "$FM_AFK_CONTRACT_VERSION"
+  printf 'version: %s\n' "$JG_AFK_CONTRACT_VERSION"
   printf 'entered: %s\n' "$entered"
   printf 'entered_epoch: %s\n' "$entered_epoch"
   printf 'expected_return: %s\n' "${EXPECTED_RETURN:--}"
   printf 'reach_channels: none\n'
-  printf 'reach_announced: %s\n' "$FM_AFK_CONTRACT_REACH_ANNOUNCED"
-  printf 'spend_max_concurrent_workers: %s\n' "${SPEND:-$FM_AFK_CONTRACT_SPEND_DEFAULT}"
+  printf 'reach_announced: %s\n' "$JG_AFK_CONTRACT_REACH_ANNOUNCED"
+  printf 'spend_max_concurrent_workers: %s\n' "${SPEND:-$JG_AFK_CONTRACT_SPEND_DEFAULT}"
   printf 'confirmed: %s\n' "$confirmed"
   printf 'confirmed_epoch: %s\n' "$confirmed_epoch"
-  [ "${FM_AFK_CONTRACT_ENTRY_MODE:-away}" != quiet ] || printf 'mode: quiet\n'
+  [ "${JG_AFK_CONTRACT_ENTRY_MODE:-away}" != quiet ] || printf 'mode: quiet\n'
   if [ -n "$WORDS" ]; then
     local words_body=$WORDS words_indicator='|-'
     case "$words_body" in
@@ -342,10 +342,10 @@ jg_afk_contract_validate() {  # <path>
   local path=$1 version entered entered_epoch expected reach announced spend words_header confirmed
   [ -f "$path" ] || return 1
   version=$(jg_afk_contract_read_field "$path" version)
-  case " $FM_AFK_CONTRACT_READABLE_VERSIONS " in
+  case " $JG_AFK_CONTRACT_READABLE_VERSIONS " in
     *" $version "*) ;;
     *)
-      jg_afk_contract_log "record $path carries version '${version:-none}', expected one of ${FM_AFK_CONTRACT_READABLE_VERSIONS// /, }; refusing to read it"
+      jg_afk_contract_log "record $path carries version '${version:-none}', expected one of ${JG_AFK_CONTRACT_READABLE_VERSIONS// /, }; refusing to read it"
       return 1 ;;
   esac
   entered=$(jg_afk_contract_read_field "$path" entered)
@@ -389,7 +389,7 @@ jg_afk_contract_render_readback() {  # <path>
   if [ "$(jg_afk_contract_record_mode "$path")" = quiet ]; then
     printf 'Quiet mode (recorded):\n'
     printf '  entered: %s\n' "$(jg_afk_contract_read_field "$path" entered)"
-    printf '  holds: none - %s\n' "$FM_AFK_CONTRACT_QUIET_HOLDS_NOTHING"
+    printf '  holds: none - %s\n' "$JG_AFK_CONTRACT_QUIET_HOLDS_NOTHING"
   else
     expected=$(jg_afk_contract_read_field "$path" expected_return)
     spend=$(jg_afk_contract_read_field "$path" spend_max_concurrent_workers)
@@ -414,7 +414,7 @@ jg_afk_contract_render_announcement() {  # <path>
   local path=$1 expected words mandate_text
   if [ "$(jg_afk_contract_record_mode "$path")" = quiet ]; then
     printf 'Quiet mode recorded at %s: %s Only an explicit /quiet off ends it.\n' \
-      "$(jg_afk_contract_read_field "$path" confirmed)" "$FM_AFK_CONTRACT_QUIET_HOLDS_NOTHING"
+      "$(jg_afk_contract_read_field "$path" confirmed)" "$JG_AFK_CONTRACT_QUIET_HOLDS_NOTHING"
     return 0
   fi
   expected=$(jg_afk_contract_read_field "$path" expected_return)
@@ -437,7 +437,7 @@ jg_afk_contract_render_announcement() {  # <path>
 
 jg_afk_contract_parse_inputs() {  # <args...>; sets WORDS, EXPECTED_RETURN, SPEND
   local words_file=''
-  WORDS=; EXPECTED_RETURN=-; SPEND=$FM_AFK_CONTRACT_SPEND_DEFAULT; FM_AFK_CONTRACT_SCALARS_GIVEN=0
+  WORDS=; EXPECTED_RETURN=-; SPEND=$JG_AFK_CONTRACT_SPEND_DEFAULT; JG_AFK_CONTRACT_SCALARS_GIVEN=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --words-file)
@@ -455,13 +455,13 @@ jg_afk_contract_parse_inputs() {  # <args...>; sets WORDS, EXPECTED_RETURN, SPEN
           return 2
         fi
         EXPECTED_RETURN=$2
-        FM_AFK_CONTRACT_SCALARS_GIVEN=1
+        JG_AFK_CONTRACT_SCALARS_GIVEN=1
         shift 2 ;;
       --spend)
         [ "$#" -gt 1 ] || { jg_afk_contract_log '--spend requires a positive integer'; return 2; }
         case "$2" in ''|*[!0-9]*|0) jg_afk_contract_log "--spend must be a positive integer, got '$2'"; return 2 ;; esac
         SPEND=$2
-        FM_AFK_CONTRACT_SCALARS_GIVEN=1
+        JG_AFK_CONTRACT_SCALARS_GIVEN=1
         shift 2 ;;
       --action|--object|--when|--stop|--grant|--grant=*)
         jg_afk_contract_log "$1 was retired: the captain's away words are the whole mandate, so pass them with --words or --words-file and nothing else"
@@ -498,26 +498,26 @@ jg_afk_contract_archive_target() {  # <record> [superseded-stamp]
 
 # /afk is the go: write the record in this same call, with no proposal and no
 # later confirmation step. Inputs were parsed before the lock (WORDS,
-# EXPECTED_RETURN, SPEND, FM_AFK_CONTRACT_SCALARS_GIVEN). The written mode
+# EXPECTED_RETURN, SPEND, JG_AFK_CONTRACT_SCALARS_GIVEN). The written mode
 # follows the header's AWAY OR QUIET rules.
 jg_afk_contract_cmd_enter() {
   local record legacy now now_epoch session_entered session_entered_epoch staged archived archived_tmp standing=''
   record=$(jg_afk_contract_path)
   legacy=$(jg_afk_contract_legacy_proposal_path)
-  FM_AFK_CONTRACT_ENTRY_MODE=away
-  [ "${FM_AFK_MODE:-}" != quiet ] || FM_AFK_CONTRACT_ENTRY_MODE=quiet
+  JG_AFK_CONTRACT_ENTRY_MODE=away
+  [ "${JG_AFK_MODE:-}" != quiet ] || JG_AFK_CONTRACT_ENTRY_MODE=quiet
   if [ -f "$record" ]; then
     jg_afk_contract_validate "$record" || return 1
     standing=$(jg_afk_contract_record_mode "$record")
-    [ "$standing" = quiet ] || FM_AFK_CONTRACT_ENTRY_MODE=away
+    [ "$standing" = quiet ] || JG_AFK_CONTRACT_ENTRY_MODE=away
   fi
-  if [ -f "$record" ] && [ -z "$WORDS" ] && [ "$standing" = "$FM_AFK_CONTRACT_ENTRY_MODE" ]; then
+  if [ -f "$record" ] && [ -z "$WORDS" ] && [ "$standing" = "$JG_AFK_CONTRACT_ENTRY_MODE" ]; then
     if [ "$standing" = quiet ]; then
       jg_afk_contract_log "quiet mode already recorded at $(jg_afk_contract_read_field "$record" entered); a refresh leaves it untouched"
     else
       jg_afk_contract_log "away posture already recorded at $(jg_afk_contract_read_field "$record" entered); a refresh leaves it untouched"
     fi
-    if [ "$FM_AFK_CONTRACT_SCALARS_GIVEN" -eq 1 ]; then
+    if [ "$JG_AFK_CONTRACT_SCALARS_GIVEN" -eq 1 ]; then
       jg_afk_contract_log "the expected return and spend cap given with this refresh were not applied; enter new words to replace the mandate"
     fi
     rm -f "$legacy"
@@ -534,7 +534,7 @@ jg_afk_contract_cmd_enter() {
   session_entered_epoch=$now_epoch
   # A replacement carries the session entry forward; quiet mode becoming the
   # away posture starts the away session now.
-  if [ -f "$record" ] && [ "$standing" = "$FM_AFK_CONTRACT_ENTRY_MODE" ]; then
+  if [ -f "$record" ] && [ "$standing" = "$JG_AFK_CONTRACT_ENTRY_MODE" ]; then
     session_entered=$(jg_afk_contract_read_field "$record" entered)
     session_entered_epoch=$(jg_afk_contract_read_field "$record" entered_epoch)
   fi
@@ -559,7 +559,7 @@ jg_afk_contract_cmd_enter() {
     return 1
   }
   if [ -n "${archived:-}" ]; then
-    if [ "$standing" = "$FM_AFK_CONTRACT_ENTRY_MODE" ]; then
+    if [ "$standing" = "$JG_AFK_CONTRACT_ENTRY_MODE" ]; then
       jg_afk_contract_log "replaced the earlier $( [ "$standing" = quiet ] && printf 'quiet mode' || printf 'away posture'); its record is archived at $archived"
     else
       jg_afk_contract_log "quiet mode became the away posture; the quiet record is archived at $archived"

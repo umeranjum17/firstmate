@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Route durable sign-off Go deeper asks to the matching Firstmate task inbox.
 set -euo pipefail
 
-FM_ROOT=${FM_ROOT_OVERRIDE:-${FM_HOME:?set FM_HOME}/}
-FM_ROOT=${FM_ROOT%/}
-STATE=${FM_STATE_OVERRIDE:-$FM_ROOT/state}
-CONFIG=${FM_CONFIG_OVERRIDE:-$FM_ROOT/config}
+JG_ROOT=${JG_ROOT_OVERRIDE:-${JG_HOME:?set JG_HOME}/}
+JG_ROOT=${JG_ROOT%/}
+STATE=${JG_STATE_OVERRIDE:-$JG_ROOT/state}
+CONFIG=${JG_CONFIG_OVERRIDE:-$JG_ROOT/config}
 SIGNOFF=${SIGN_OFF_CLI:-sign-off-axi}
 # shellcheck source=/dev/null
-. "$FM_ROOT/bin/jg-task-inbox-lib.sh"
+. "$JG_ROOT/bin/jg-task-inbox-lib.sh"
 usage() { echo 'usage: jg-engage-route.sh dispatch <board.json> | bind <filer> <task-id>' >&2; exit 2; }
 finished() { grep -Eq '^(done|failed|cancelled|finished) \[at=[0-9]+\]:' "$STATE/$1.status" 2>/dev/null; }
 [ "$#" -ge 1 ] || usage
@@ -71,7 +80,7 @@ case $cmd in
           printf '%s\towner-ack\t%s\n' "$id" "$task" >> "$STATE/engage-route.log"
         else
           if ! jg_task_inbox_ring "$backend" "$target" "$record" "jg-$task"; then
-            echo "request $id is in the owner inbox, but ringing $task failed: ${FM_TASK_INBOX_RING_REASON:-endpoint unavailable}" >&2
+            echo "request $id is in the owner inbox, but ringing $task failed: ${JG_TASK_INBOX_RING_REASON:-endpoint unavailable}" >&2
           fi
           printf '%s\tinbox-recorded\t%s\n' "$id" "$task" >> "$STATE/engage-route.log"
         fi

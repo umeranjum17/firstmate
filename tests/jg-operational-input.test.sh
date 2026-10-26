@@ -30,7 +30,7 @@ set_age_secs() {  # <file> <age-seconds>
 
 test_current_generic_matrix() {
   local kind body encoded parsed stripped prefix_hex
-  prefix_hex=$(printf '%s' "$FM_OPERATIONAL_PREFIX" | od -An -tx1 | tr -d ' \n')
+  prefix_hex=$(printf '%s' "$JG_OPERATIONAL_PREFIX" | od -An -tx1 | tr -d ' \n')
   [ "$prefix_hex" = e281a346495253544d4154455f4f503a20 ] \
     || fail "current operational prefix lost the landed U+2063 FIRSTMATE_OP bytes: $prefix_hex"
 
@@ -71,7 +71,7 @@ test_current_from_firstmate_carrier() {
 
 test_landed_untyped_prefix_is_explicitly_legacy() {
   local untyped parsed
-  untyped="${FM_OPERATIONAL_PREFIX}body whose historical subtype is unknowable"
+  untyped="${JG_OPERATIONAL_PREFIX}body whose historical subtype is unknowable"
   jg_legacy_operational_input_kind "$untyped" parsed \
     || fail "landed untyped FIRSTMATE_OP input was not retained"
   [ "$parsed" = legacy-operational ] \
@@ -85,12 +85,12 @@ test_landed_untyped_prefix_is_explicitly_legacy() {
 
 test_isolated_legacy_matrix() {
   local watcher turnend away parsed
-  watcher="${FM_LEGACY_WATCHER_PREFIX}signal: legacy${FM_LEGACY_WATCHER_SUFFIX}"
-  turnend="${FM_LEGACY_TURNEND_PREFIX}watcher: FAILED - legacy"
-  away="${FM_LEGACY_AWAY_PREFIX}1 event(s)): done: legacy"
+  watcher="${JG_LEGACY_WATCHER_PREFIX}signal: legacy${JG_LEGACY_WATCHER_SUFFIX}"
+  turnend="${JG_LEGACY_TURNEND_PREFIX}watcher: FAILED - legacy"
+  away="${JG_LEGACY_AWAY_PREFIX}1 event(s)): done: legacy"
 
   for fixture in \
-    "session-start|$FM_LEGACY_SESSIONSTART" \
+    "session-start|$JG_LEGACY_SESSIONSTART" \
     "watcher|$watcher" \
     "turn-end-guard|$turnend" \
     "away-supervisor|$away"
@@ -109,7 +109,7 @@ test_isolated_legacy_matrix() {
 
 test_genuine_near_misses_remain_unclassified() {
   local marker fixture parsed
-  marker=$FM_OPERATIONAL_MARK
+  marker=$JG_OPERATIONAL_MARK
   while IFS= read -r fixture || [ -n "$fixture" ]; do
     [ -n "$fixture" ] || continue
     ! jg_operational_input_classify "$fixture" parsed \
@@ -117,11 +117,11 @@ test_genuine_near_misses_remain_unclassified() {
     [ -z "$(classify_cli "$fixture" || true)" ] \
       || fail "CLI classified a genuine near miss: $fixture"
   done <<EOF
-Captain quote: ${FM_OPERATIONAL_PREFIX}v1 watcher
+Captain quote: ${JG_OPERATIONAL_PREFIX}v1 watcher
 FIRSTMATE_OP: v1 watcher
 $marker arbitrary captain text
-Captain quote: $FM_LEGACY_SESSIONSTART
-${FM_LEGACY_SESSIONSTART} Please explain this sentence.
+Captain quote: $JG_LEGACY_SESSIONSTART
+${JG_LEGACY_SESSIONSTART} Please explain this sentence.
 FIRSTMATE WATCHER WAKE: can you explain this phrase?
 TURN WOULD END BLIND - can you make this warning friendlier?
 Supervisor escalate (1 event(s)): is this wording clear?
@@ -132,11 +132,11 @@ EOF
 
 test_cross_language_adapter_uses_the_owner() {
   local encoded parsed
-  encoded=$(FM_TEST_ROOT="$ROOT" HELPER="$ROOT/.opencode/plugins/lib/jg-operational-input.js" \
+  encoded=$(JG_TEST_ROOT="$ROOT" HELPER="$ROOT/.opencode/plugins/lib/jg-operational-input.js" \
     node --input-type=module <<'JS'
 import { pathToFileURL } from "node:url";
 const { encodeFirstmateOperationalInput } = await import(pathToFileURL(process.env.HELPER).href);
-process.stdout.write(await encodeFirstmateOperationalInput(process.env.FM_TEST_ROOT, "watcher", "CROSS_LANGUAGE_BODY"));
+process.stdout.write(await encodeFirstmateOperationalInput(process.env.JG_TEST_ROOT, "watcher", "CROSS_LANGUAGE_BODY"));
 JS
   ) || fail "OpenCode cross-language adapter could not invoke the canonical owner"
   jg_operational_input_kind "$encoded" parsed \
@@ -170,25 +170,25 @@ test_record_backed_doorbell_carrier() {
       && fail "marker-preserving harness '$kind' was switched to the record-backed carrier"
   done
 
-  doorbell=$(printf 'digest body\nsecond line' | FM_STATE_OVERRIDE="$state" "$OWNER" record away-supervisor) \
+  doorbell=$(printf 'digest body\nsecond line' | JG_STATE_OVERRIDE="$state" "$OWNER" record away-supervisor) \
     || fail "the CLI could not publish an away-supervisor record"
   case "$doorbell" in
-    *"$FM_OPERATIONAL_MARK"*) fail "the doorbell carries the invisible marker it exists to avoid" ;;
+    *"$JG_OPERATIONAL_MARK"*) fail "the doorbell carries the invisible marker it exists to avoid" ;;
   esac
   printf '%s' "$doorbell" | LC_ALL=C grep -q '[^[:print:]]' \
     && fail "the doorbell is not one printable-ASCII line: $doorbell"
   jg_operational_doorbell_path "$doorbell" record || fail "the owner cannot parse its own doorbell"
-  [ "$(cat "$record")" = "${FM_OPERATIONAL_PREFIX}v1 away-supervisor: digest body"$'\n''second line' ] \
+  [ "$(cat "$record")" = "${JG_OPERATIONAL_PREFIX}v1 away-supervisor: digest body"$'\n''second line' ] \
     || fail "the record does not hold exactly the encoded envelope"
   [ "$(printf '%s' "$doorbell" | "$OWNER" doorbell-kind)" = away-supervisor ] \
     || fail "doorbell-kind lost the record's kind"
-  body=$(FM_STATE_OVERRIDE="$state" "$OWNER" open "$record") || fail "open refused this home's own record"
+  body=$(JG_STATE_OVERRIDE="$state" "$OWNER" open "$record") || fail "open refused this home's own record"
   [ "$body" = "digest body"$'\n''second line' ] || fail "open did not print the record body: $body"
   linked="$tmp/linked-state"
   ln -s "$state" "$linked"
-  FM_STATE_OVERRIDE="$linked" "$OWNER" open "$record" >/dev/null \
+  JG_STATE_OVERRIDE="$linked" "$OWNER" open "$record" >/dev/null \
     || fail "open refused this home's record when the home is reached through a symlink"
-  FM_STATE_OVERRIDE="$other" "$OWNER" open "$record" >/dev/null \
+  JG_STATE_OVERRIDE="$other" "$OWNER" open "$record" >/dev/null \
     && fail "open accepted another home's record"
   jg_operational_doorbell_kind "$doorbell" "$state" kind && [ "$kind" = away-supervisor ] \
     || fail "the home-bound check rejected this home's own doorbell"
@@ -198,13 +198,13 @@ test_record_backed_doorbell_carrier() {
   # A doorbell proves nothing without its record, and the classifier never reads one.
   [ -z "$(printf '%s' "$doorbell" | "$OWNER" classify)" ] \
     || fail "the pure text classifier recognized a doorbell"
-  prefix_len=${#FM_OPERATIONAL_DOORBELL_PREFIX}
+  prefix_len=${#JG_OPERATIONAL_DOORBELL_PREFIX}
   for stray in \
-    "${FM_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/0-missing.msg${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
-    "${FM_OPERATIONAL_DOORBELL_PREFIX}relative/operational-inbox/1-a.msg${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
-    "${FM_OPERATIONAL_DOORBELL_PREFIX}$state/other-dir/1-a.msg${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
-    "${FM_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/UPPER.msg${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
-    "${FM_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/1-a.txt${FM_OPERATIONAL_DOORBELL_SUFFIX}" \
+    "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/0-missing.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
+    "${JG_OPERATIONAL_DOORBELL_PREFIX}relative/operational-inbox/1-a.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
+    "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/other-dir/1-a.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
+    "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/UPPER.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
+    "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/1-a.txt${JG_OPERATIONAL_DOORBELL_SUFFIX}" \
     "$doorbell trailing" \
     " $doorbell" \
     "${doorbell:0:$prefix_len}" \
@@ -213,19 +213,19 @@ test_record_backed_doorbell_carrier() {
       || fail "a malformed or unbacked doorbell was recognized: $stray"
   done
   printf 'FIRSTMATE_OP: v1 away-supervisor: ascii only' >"$state/operational-inbox/2-ascii.msg"
-  [ -z "$(printf '%s' "${FM_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/2-ascii.msg${FM_OPERATIONAL_DOORBELL_SUFFIX}" | "$OWNER" doorbell-kind)" ] \
+  [ -z "$(printf '%s' "${JG_OPERATIONAL_DOORBELL_PREFIX}$state/operational-inbox/2-ascii.msg${JG_OPERATIONAL_DOORBELL_SUFFIX}" | "$OWNER" doorbell-kind)" ] \
     || fail "a record without the U+2063 envelope was recognized"
 
   old_record="$state/operational-inbox/1-old.msg"
-  printf '%s' "${FM_OPERATIONAL_PREFIX}v1 watcher: old" >"$old_record"
+  printf '%s' "${JG_OPERATIONAL_PREFIX}v1 watcher: old" >"$old_record"
   touch -t 200001010000 "$old_record"
   just_expired="$state/operational-inbox/1-just-expired.msg"
   just_kept="$state/operational-inbox/1-just-kept.msg"
-  printf '%s' "${FM_OPERATIONAL_PREFIX}v1 watcher: just expired" >"$just_expired"
-  printf '%s' "${FM_OPERATIONAL_PREFIX}v1 watcher: just kept" >"$just_kept"
+  printf '%s' "${JG_OPERATIONAL_PREFIX}v1 watcher: just expired" >"$just_expired"
+  printf '%s' "${JG_OPERATIONAL_PREFIX}v1 watcher: just kept" >"$just_kept"
   set_age_secs "$just_expired" $((7 * 86400 + 5))
   set_age_secs "$just_kept" $((7 * 86400 - 60))
-  printf 'x' | FM_STATE_OVERRIDE="$state" "$OWNER" record watcher >/dev/null || fail "second record write failed"
+  printf 'x' | JG_STATE_OVERRIDE="$state" "$OWNER" record watcher >/dev/null || fail "second record write failed"
   [ ! -e "$old_record" ] || fail "a record older than the retention window was not pruned"
   [ ! -e "$just_expired" ] || fail "a record seconds past seven days survived a write"
   [ -f "$just_kept" ] || fail "a record a minute short of seven days was pruned"
@@ -241,7 +241,7 @@ test_record_prune_outgrows_one_argument_list() {
   pad=$(printf '%0200d' 0)
   (cd "$state/operational-inbox" && seq 1 12000 | sed "s/\$/-$pad.msg/" | xargs touch -t 200001010000) \
     || fail "could not seed the expired record flood"
-  printf 'x' | FM_STATE_OVERRIDE="$state" "$OWNER" record watcher >/dev/null || fail "record write over a flood failed"
+  printf 'x' | JG_STATE_OVERRIDE="$state" "$OWNER" record watcher >/dev/null || fail "record write over a flood failed"
   left=$(find "$state/operational-inbox" -maxdepth 1 -type f -name '*.msg' | wc -l | tr -d ' ')
   [ "$left" = 1 ] || fail "a write left $left records when only its own fresh record was within retention"
   pass "record pruning: expired records past one argument list are all pruned on a write"

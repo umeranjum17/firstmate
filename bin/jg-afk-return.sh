@@ -59,13 +59,13 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 GATE="$STATE/.afk-return-catchup"
 LOCK="$STATE/.afk-return-catchup.lock"
-RETURN_GRACE=${FM_GUARD_GRACE:-300}
+RETURN_GRACE=${JG_GUARD_GRACE:-300}
 
 # The posture-record owner: path helpers only; every read goes through its
 # subcommands. It sources jg-classify-lib.sh, which has no side effects, so the
@@ -337,8 +337,8 @@ health_snapshot() {  # <evidence-file>
     # only an open downtime episode is a gap. A marker this read cannot
     # parse is treated as a gap, conservatively.
     if jg_recovery_marker_snapshot "$STATE/.watcher-down"; then
-      state=${FM_RECOVERY_MARKER_TOKEN%:*}
-      case "$FM_RECOVERY_MARKER_TOKEN" in
+      state=${JG_RECOVERY_MARKER_TOKEN%:*}
+      case "$JG_RECOVERY_MARKER_TOKEN" in
         acked:*) : ;;
         pending:handling:*|announced:handling:*) note="a wake was being handled at return (recovery marker $state); not a gap" ;;
         *) lines="GAP: watcher downtime was detected during the away window (recovery marker present)" ;;
@@ -385,7 +385,7 @@ engine_snapshot() {  # <evidence-file> <since-epoch>
   sidecar_start=$(jg_lock_path_mtime "$STATE/.lock-session" 2>/dev/null) || sidecar_start=0
   session_start=$lock_start
   [ "$sidecar_start" -le "$session_start" ] || session_start=$sidecar_start
-  summary=$(awk -F '\t' -v since="$since" -v session_start="$session_start" -v base="${FM_SUPERVISION_HOST_COOLDOWN}s" '
+  summary=$(awk -F '\t' -v since="$since" -v session_start="$session_start" -v base="${JG_SUPERVISION_HOST_COOLDOWN}s" '
     $1 !~ /^[0-9]+$/ || ($1 < since && $1 < session_start) { next }
     $1 >= since && $2 == "failed" && ($5 != "rc=0" || $8 !~ /^error=0/) { errors++ }
     $2 == "latch" {
@@ -407,7 +407,7 @@ engine_snapshot() {  # <evidence-file> <since-epoch>
   IFS='|' read -r errors trip last cooldown recovered episode_count <<EOF
 ${summary%%$'\n'*}
 EOF
-  if jg_supervision_host_config "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$(jg_supervision_host_primary)" \
+  if jg_supervision_host_config "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$(jg_supervision_host_primary)" \
     && retry=$(jg_supervision_host_paused_until "$STATE") \
     && { [ -z "$recovered" ] || [ "$retry" -gt "$recovered" ]; }; then
     paused=1
@@ -527,9 +527,9 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
     [ "$(grep '^kind=' "$meta" | tail -1 | cut -d= -f2- || true)" = secondmate ] && continue
     jg_pr_metadata_identity_parse "$meta" || continue
     jg_pr_poll_merge_already_notified "$STATE" "$task" \
-      "$FM_PR_META_PROVIDER" "$FM_PR_META_HOST" "$FM_PR_META_PATH" "$FM_PR_META_NUMBER" \
+      "$JG_PR_META_PROVIDER" "$JG_PR_META_HOST" "$JG_PR_META_PATH" "$JG_PR_META_NUMBER" \
       || continue
-    printf '%s\t%s\n' "$task" "$FM_PR_META_URL"
+    printf '%s\t%s\n' "$task" "$JG_PR_META_URL"
   done
 }
 
@@ -544,7 +544,7 @@ render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-
   # they await a successful drain when this return's drain failed.
   # shellcheck source=bin/jg-supervision-engine-lib.sh
   if . "$SCRIPT_DIR/jg-supervision-engine-lib.sh" \
-    && jg_supervision_host_outcomes_drained "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; then
+    && jg_supervision_host_outcomes_drained "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"; then
     drained=1
   fi
   if [ "$drain_ok" -eq 1 ]; then

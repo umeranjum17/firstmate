@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Opt-in credentialed live E2E for bin/jg-sentinel.sh against a real Herdr
 # restart. In one guarded named Herdr lab it runs a real Claude lab primary, a
 # real seeded Claude second mate (the lead), and the lead's real Claude worker
@@ -15,35 +24,35 @@
 #   - the primary and the lead each re-arm supervision (fresh watcher beacons);
 #   - the lead's reconcile relaunches the worker inside its recorded worktree.
 # Claude runs on a dedicated signed-in test HOME named by
-# FM_SENTINEL_E2E_CLAUDE_HOME (only its .claude/.credentials.json is referenced
+# JG_SENTINEL_E2E_CLAUDE_HOME (only its .claude/.credentials.json is referenced
 # in place, by symlink, never copied; the lab's Claude config is the lab's own
 # seeded store); the live default Herdr session, the operator's ~/.claude, and
 # ~/.treehouse are never touched.
-# Set FM_SENTINEL_E2E_EVIDENCE=<dir> to keep pane captures and logs.
+# Set JG_SENTINEL_E2E_EVIDENCE=<dir> to keep pane captures and logs.
 # shellcheck disable=SC2016 # inner bash -c scripts expand their own arguments
 set -u
 
-# The Firstmate checkout named by FM_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
+# The Firstmate checkout named by JG_UPSTREAM_ROOT supplies tests/lib.sh (fail, pass, ROOT) and the
 # upstream bin/ scripts; the sentinel under test is this add-on's copy.
-[ -n "${FM_UPSTREAM_ROOT:-}" ] || { echo "skip: set FM_UPSTREAM_ROOT to a Firstmate checkout"; exit 0; }
+[ -n "${JG_UPSTREAM_ROOT:-}" ] || { echo "skip: set JG_UPSTREAM_ROOT to a Firstmate checkout"; exit 0; }
 SENTINEL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/jg-sentinel.sh"
 # shellcheck source=/dev/null
-. "$FM_UPSTREAM_ROOT/tests/lib.sh"
+. "$JG_UPSTREAM_ROOT/tests/lib.sh"
 
-jg_live_gate opt-in FM_SENTINEL_LIVE_E2E herdr jq claude treehouse node git python3
+jg_live_gate opt-in JG_SENTINEL_LIVE_E2E herdr jq claude treehouse node git python3
 
 HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
-CRED_HOME=${FM_SENTINEL_E2E_CLAUDE_HOME:-}
-EVID=${FM_SENTINEL_E2E_EVIDENCE:-}
-MODEL=${FM_SENTINEL_E2E_MODEL:-sonnet}
+CRED_HOME=${JG_SENTINEL_E2E_CLAUDE_HOME:-}
+EVID=${JG_SENTINEL_E2E_EVIDENCE:-}
+MODEL=${JG_SENTINEL_E2E_MODEL:-sonnet}
 
 [ -n "$CRED_HOME" ] && [ -d "$CRED_HOME/.claude" ] && [ -f "$CRED_HOME/.claude.json" ] \
-  || fail "FM_SENTINEL_E2E_CLAUDE_HOME must name a signed-in test Claude HOME (holding .claude/ and .claude.json)"
+  || fail "JG_SENTINEL_E2E_CLAUDE_HOME must name a signed-in test Claude HOME (holding .claude/ and .claude.json)"
 # Take the test credential's run lock when it has one, so live runs sharing it
 # take turns.
 if [ -f "$CRED_HOME/../run.lock" ] && command -v flock >/dev/null 2>&1; then
   exec 9<"$CRED_HOME/../run.lock"
-  flock -w "${FM_SENTINEL_E2E_LOCK_WAIT:-1800}" 9 || fail "the test credential stayed busy past the lock wait"
+  flock -w "${JG_SENTINEL_E2E_LOCK_WAIT:-1800}" 9 || fail "the test credential stayed busy past the lock wait"
 fi
 
 REAL_HERDR=$(command -v herdr)
@@ -189,7 +198,7 @@ printf '. ~/.bashrc\n' > "$LABHOME/.bash_profile"
 lab_env() {
   env -i HOME="$LABHOME" USER="${USER:-}" LOGNAME="${LOGNAME:-}" LANG="${LANG:-C.UTF-8}" \
     TERM=xterm-256color SHELL=/bin/bash PATH="$HERDR_ORIGINAL_PATH" \
-    FM_HERDR_LAB_FLEET_HOME="$HOME" DISABLE_AUTOUPDATER=1 "$@"
+    JG_HERDR_LAB_FLEET_HOME="$HOME" DISABLE_AUTOUPDATER=1 "$@"
 }
 lab() { lab_env "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"; }
 # Production entrypoints the test itself drives, routed like a lab pane.
@@ -199,7 +208,7 @@ fm() {  # <home> <command...>
   lab_env PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" HERDR_SESSION="$HERDR_LAB_SESSION" \
     HERDR_LAB_SESSION="$HERDR_LAB_SESSION" HERDR_LAB_HELPER="$HERDR_LAB_HELPER" \
     REAL_HERDR="$REAL_HERDR" HERDR_ORIGINAL_PATH="$HERDR_ORIGINAL_PATH" \
-    FM_GATE_REFUSE_BYPASS=1 FM_HOME="$home" "$@"
+    JG_GATE_REFUSE_BYPASS=1 JG_HOME="$home" "$@"
 }
 wait_for() {  # <seconds> <what> <command...>
   local deadline=$(( $(date +%s) + $1 )) what=$2
@@ -271,8 +280,8 @@ printf 'auto\n' > "$MAIN/config/claude-permission-mode"
 lab_settings "$MAIN"
 
 # The lead: a real seeded second mate home with its own project and worker.
-fm "$MAIN" env FM_SECONDMATE_CHARTER='Lab second mate for a Herdr restart test. Act only on orders from your parent; never spawn, merge, or edit project files yourself.' \
-  FM_SECONDMATE_SCOPE='lab restart recovery test' \
+fm "$MAIN" env JG_SECONDMATE_CHARTER='Lab second mate for a Herdr restart test. Act only on orders from your parent; never spawn, merge, or edit project files yourself.' \
+  JG_SECONDMATE_SCOPE='lab restart recovery test' \
   "$MAIN/bin/jg-home-seed.sh" "$LEAD_ID" "$LEAD" --no-projects >"$LABROOT/seed.out" 2>&1 \
   || fail "cannot seed the lead home: $(tail -5 "$LABROOT/seed.out")"
 cp "$MAIN/config/backend" "$MAIN/config/crew-harness" "$MAIN/config/claude-permission-mode" "$LEAD/config/"
@@ -289,7 +298,7 @@ wire_treehouse_root "$NOTES"
 printf '# Projects\n\n- notes [local-only +yolo] - lab notes fixture\n' > "$LEAD/data/projects.md"
 
 write_brief() {  # <id>
-  fm "$LEAD" bash -c 'cd "$FM_HOME" && bin/jg-brief.sh "$1" notes --mode local-only' _ "$1" >/dev/null || fail "cannot scaffold brief $1"
+  fm "$LEAD" bash -c 'cd "$JG_HOME" && bin/jg-brief.sh "$1" notes --mode local-only' _ "$1" >/dev/null || fail "cannot scaffold brief $1"
   TASK_TEXT='Lab worker for a Herdr restart test. Change no file.' \
   SPEC_TEXT='Right after setup, append one paused status line saying you wait for a resume message, and end your turn. Whenever a later message arrives, append that same paused line again and end your turn. Nothing else is in scope.' \
     python3 - "$LEAD/data/$1/brief.md" <<'PY'
@@ -299,7 +308,7 @@ t = open(p, encoding="utf-8").read()
 t = t.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
 open(p, "w", encoding="utf-8").write(t)
 PY
-  fm "$LEAD" bash -c 'cd "$FM_HOME" && bin/jg-tasks-axi.sh add "$1" "lab worker" --kind ship --repo notes' _ "$1" >/dev/null \
+  fm "$LEAD" bash -c 'cd "$JG_HOME" && bin/jg-tasks-axi.sh add "$1" "lab worker" --kind ship --repo notes' _ "$1" >/dev/null \
     || fail "cannot file backlog item $1"
 }
 # Claude sessions sharing one .claude.json can lose each other's writes, such as

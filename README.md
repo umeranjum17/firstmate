@@ -66,7 +66,7 @@ An agent distro is a portable directory of instructions, skills, tooling, polici
 
 ### Scale and reach
 
-- **Optional secondmates** — opt in to persistent second mates in isolated Juggernaut homes with their own `FM_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
+- **Optional secondmates** — opt in to persistent second mates in isolated Juggernaut homes with their own `JG_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
 - **Optional Relay** — opt in with one local `.env` pairing token so Juggernaut can answer public X and Discord mentions through the same lifecycle as chat, acknowledge spawned work, and post up to three public-safe follow-ups within seven days; dry-run previews would-be replies locally.
 
 Full detail on every feature lives in [docs/architecture.md](docs/architecture.md).
@@ -116,8 +116,8 @@ Then launch one of the co-primary harnesses; `AGENTS.md` takes over from there:
 |---|---|
 | **Claude Code** | `claude` |
 | **Grok** | `grok --trust` |
-| **Pi** | `pi` — or `FM_PI_HARNESS=pi-signed pi-signed` when the signed wrapper is installed |
-| **Oh My Pi** | `omp` — or `FM_OMP_HARNESS=omp omp` from inside a Claude Code pane |
+| **Pi** | `pi` — or `JG_PI_HARNESS=pi-signed pi-signed` when the signed wrapper is installed |
+| **Oh My Pi** | `omp` — or `JG_OMP_HARNESS=omp omp` from inside a Claude Code pane |
 
 Codex, OpenCode, and Cursor Agent CLI are also verified primaries. See the harness notes below.
 
@@ -215,8 +215,8 @@ Three companion tools fit Juggernaut without changing it, and each also works wi
 # done-done
 npx skills add umeranjum17/done-done-axi --skill done-done -g -a claude-code -y
 npm install -g --allow-git=all github:umeranjum17/done-done-axi
-cat "$(npm root -g)/done-done-axi/integrations/firstmate/brief-include.md" >> "$FM_HOME/config/brief-include.md"
-cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$FM_HOME/config/merge-gate"
+cat "$(npm root -g)/done-done-axi/integrations/firstmate/brief-include.md" >> "$JG_HOME/config/brief-include.md"
+cp "$(npm root -g)/done-done-axi/integrations/firstmate/merge-gate" "$JG_HOME/config/merge-gate"
 
 # sign-off
 npx skills add umeranjum17/sign-off --skill sign-off-axi
@@ -243,7 +243,7 @@ Run the `cat >>` line once: each run appends the brief include again, duplicatin
 ### Architecture and configuration
 
 - [docs/architecture.md](docs/architecture.md) — maintainer architecture for the squad, supervision, worktrees, secondmates, and project modes.
-- [docs/configuration.md](docs/configuration.md) — environment variables, `FM_HOME`, runtime backend selection, optional Relay and its X and Discord setup steps, trusted external process-event adapter setup, the files you set, and harness support.
+- [docs/configuration.md](docs/configuration.md) — environment variables, `JG_HOME`, runtime backend selection, optional Relay and its X and Discord setup steps, trusted external process-event adapter setup, the files you set, and harness support.
 - [docs/extension-bindings.md](docs/extension-bindings.md) — maintainer architecture for the narrow trusted external `process-event-adapter/1` package, binding, handshake, and evidence boundary.
 - [docs/remote-secondmates.md](docs/remote-secondmates.md) — current setup, routing, transfer, recovery, and safety behavior for whole-home remote second mates.
 - [docs/calm.md](docs/calm.md) — current `/calm` behavior on Pi and Claude Code and its supported presentation limits.

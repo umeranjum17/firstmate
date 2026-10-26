@@ -83,8 +83,8 @@ EOF
 
 cat > "$FAKEBIN/fake-ssh" <<'SH'
 #!/usr/bin/env bash
-count=$(cat "$FM_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
-printf '%s\n' "$((count + 1))" > "$FM_FAKE_SSH_COUNT"
+count=$(cat "$JG_FAKE_SSH_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((count + 1))" > "$JG_FAKE_SSH_COUNT"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) shift 2 ;;
@@ -99,46 +99,46 @@ shift 2
 [ "$entry" = jg-remote-entrypoint.sh ] || exit 92
 argv_b64=$4
 command_name=$(perl -MMIME::Base64=decode_base64 -e '$d=decode_base64($ARGV[0]); ($c)=split(/\0/, $d); print $c' "$argv_b64")
-case "${FM_FAKE_SSH_MODE:-normal}:$command_name" in
+case "${JG_FAKE_SSH_MODE:-normal}:$command_name" in
   *:jg-remote-secondmate-control.sh)
-    printf '%s\n' "$command_name" >> "$FM_FAKE_REMOTE_WAKE_LOG"
-    [ "${FM_FAKE_REMOTE_WAKE_RC:-0}" -eq 0 ] || printf 'remote receiver wake failed\n' >&2
-    exit "${FM_FAKE_REMOTE_WAKE_RC:-0}"
+    printf '%s\n' "$command_name" >> "$JG_FAKE_REMOTE_WAKE_LOG"
+    [ "${JG_FAKE_REMOTE_WAKE_RC:-0}" -eq 0 ] || printf 'remote receiver wake failed\n' >&2
+    exit "${JG_FAKE_REMOTE_WAKE_RC:-0}"
     ;;
   unreachable:*) exit 255 ;;
   serialize:jg-backlog-receive.sh)
-    if mkdir "$FM_FAKE_SERIALIZE_ONCE" 2>/dev/null; then
-      touch "$FM_FAKE_SERIALIZE_ENTERED"
-      while [ ! -f "$FM_FAKE_SERIALIZE_RELEASE" ]; do sleep 0.02; done
+    if mkdir "$JG_FAKE_SERIALIZE_ONCE" 2>/dev/null; then
+      touch "$JG_FAKE_SERIALIZE_ENTERED"
+      while [ ! -f "$JG_FAKE_SERIALIZE_RELEASE" ]; do sleep 0.02; done
     fi
-    exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+    exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
     ;;
   after-put:jg-remote-file.sh)
-    "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+    "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
     exit 255
     ;;
   after-receive:jg-backlog-receive.sh)
-    "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
+    "$JG_FAKE_REMOTE_ENTRYPOINT" "$@"
     exit 255
     ;;
-  *) exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
+  *) exec "$JG_FAKE_REMOTE_ENTRYPOINT" "$@" ;;
 esac
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
 handoff_env() {
-  FM_HOME="$PARENT" \
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_SSH_BIN="$FAKEBIN/fake-ssh" \
-  FM_FAKE_SSH_COUNT="$SSH_COUNT" \
-  FM_FAKE_REMOTE_WAKE_LOG="$WAKE_LOG" \
-  FM_FAKE_REMOTE_WAKE_RC="${FM_FAKE_REMOTE_WAKE_RC:-0}" \
-  FM_FAKE_SERIALIZE_ONCE="$TMP_ROOT/serialize.once" \
-  FM_FAKE_SERIALIZE_ENTERED="$TMP_ROOT/serialize.entered" \
-  FM_FAKE_SERIALIZE_RELEASE="$TMP_ROOT/serialize.release" \
-  FM_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
-  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
+  JG_HOME="$PARENT" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_SSH_BIN="$FAKEBIN/fake-ssh" \
+  JG_FAKE_SSH_COUNT="$SSH_COUNT" \
+  JG_FAKE_REMOTE_WAKE_LOG="$WAKE_LOG" \
+  JG_FAKE_REMOTE_WAKE_RC="${JG_FAKE_REMOTE_WAKE_RC:-0}" \
+  JG_FAKE_SERIALIZE_ONCE="$TMP_ROOT/serialize.once" \
+  JG_FAKE_SERIALIZE_ENTERED="$TMP_ROOT/serialize.entered" \
+  JG_FAKE_SERIALIZE_RELEASE="$TMP_ROOT/serialize.release" \
+  JG_FAKE_REMOTE_ENTRYPOINT="$REMOTE_ROOT/bin/jg-remote-entrypoint.sh" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  JG_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/remote-jobs" \
   "$@"
 }
 
@@ -149,18 +149,18 @@ sha256_file() {
 printf 'complete handoff payload\n' > "$TMP_ROOT/complete-payload"
 complete_bytes=$(LC_ALL=C wc -c < "$TMP_ROOT/complete-payload" | tr -d ' ')
 complete_hash=$(sha256_file "$TMP_ROOT/complete-payload")
-if printf 'complete' | FM_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
+if printf 'complete' | JG_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
   put state/handoff/integrity.outbox.md 1024 "$complete_bytes" "$complete_hash" 1 >/dev/null 2>&1; then
   fail "confined put published a truncated payload"
 fi
 assert_absent "$REMOTE/state/handoff/integrity.outbox.md" "truncated confined put published a destination"
-FM_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
+JG_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
   put state/handoff/integrity.outbox.md 1024 "$complete_bytes" "$complete_hash" 2 \
   < "$TMP_ROOT/complete-payload" >/dev/null
 printf 'stale handoff payload\n' > "$TMP_ROOT/stale-payload"
 stale_bytes=$(LC_ALL=C wc -c < "$TMP_ROOT/stale-payload" | tr -d ' ')
 stale_hash=$(sha256_file "$TMP_ROOT/stale-payload")
-if FM_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
+if JG_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
   put state/handoff/integrity.outbox.md 1024 "$stale_bytes" "$stale_hash" 1 \
   < "$TMP_ROOT/stale-payload" >/dev/null 2>&1; then
   fail "confined put accepted a superseded payload generation"
@@ -179,7 +179,7 @@ race_hash=$(sha256_file "$TMP_ROOT/race-payload")
   (
     while [ ! -f "$TMP_ROOT/put.release" ]; do sleep 0.02; done
     cat "$TMP_ROOT/race-payload"
-  ) | FM_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
+  ) | JG_HOME="$REMOTE" "$REMOTE_ROOT/bin/jg-remote-file.sh" \
     put state/handoff/race.outbox.md 1024 "$race_bytes" "$race_hash" 1
 ) > "$TMP_ROOT/put-race.out" 2>&1 &
 put_race_pid=$!
@@ -221,7 +221,7 @@ EOF
 write_backlog $'- [ ] ios-a - first iOS task (repo: alpha)\n- [ ] ios-b - dependent iOS task (repo: alpha) blocked-by: ios-a - waits'
 : > "$SSH_COUNT"
 set +e
-FM_FAKE_SSH_MODE=after-receive handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios ios-a ios-b \
+JG_FAKE_SSH_MODE=after-receive handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios ios-a ios-b \
   > "$TMP_ROOT/ambiguous.out" 2>&1
 rc=$?
 set -e
@@ -259,7 +259,7 @@ rm -f "$REMOTE/data/backlog.md"
 write_backlog '- [ ] transfer-cut - survives a dropped transfer (repo: alpha)'
 : > "$SSH_COUNT"
 set +e
-FM_FAKE_SSH_MODE=after-put handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios transfer-cut \
+JG_FAKE_SSH_MODE=after-put handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios transfer-cut \
   > "$TMP_ROOT/transfer-cut.out" 2>&1
 rc=$?
 set -e
@@ -277,7 +277,7 @@ pass "dropped transfer recovery overwrites scratch and delivers exactly once"
 rm -f "$REMOTE/data/backlog.md" "$TMP_ROOT/serialize.entered" "$TMP_ROOT/serialize.release"
 rm -rf "$TMP_ROOT/serialize.once"
 write_backlog '- [ ] serialized-a - first concurrent handoff (repo: alpha)'
-FM_FAKE_SSH_MODE=serialize handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios serialized-a \
+JG_FAKE_SSH_MODE=serialize handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios serialized-a \
   > "$TMP_ROOT/serialized-a.out" 2>&1 &
 handoff_a=$!
 wait_for_serialization=0
@@ -288,7 +288,7 @@ while [ ! -f "$TMP_ROOT/serialize.entered" ]; do
   sleep 0.02
 done
 write_backlog '- [ ] serialized-b - second concurrent handoff (repo: alpha)'
-FM_FAKE_SSH_MODE=serialize handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios serialized-b \
+JG_FAKE_SSH_MODE=serialize handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios serialized-b \
   > "$TMP_ROOT/serialized-b.out" 2>&1 &
 handoff_b=$!
 sleep 0.2
@@ -321,13 +321,13 @@ pass "receiver removes one proven dead stale lock and retries once"
 # Unreachable delivery keeps the backlog-format outbox visible to bootstrap.
 write_backlog '- [ ] pending-offline - waits for the remote Mac (repo: alpha)'
 set +e
-FM_FAKE_SSH_MODE=unreachable handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios pending-offline \
+JG_FAKE_SSH_MODE=unreachable handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios pending-offline \
   > "$TMP_ROOT/offline.out" 2>&1
 rc=$?
 set -e
 [ "$rc" -ne 0 ] || fail "offline handoff claimed success"
-bootstrap_out=$(FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" FM_BACKEND=tmux \
-  FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
+bootstrap_out=$(JG_HOME="$PARENT" JG_ROOT_OVERRIDE="$ROOT" JG_BACKEND=tmux \
+  JG_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
 assert_contains "$bootstrap_out" 'SECONDMATE_HANDOFF: secondmate ios: pending delivery: 1 item(s)' \
   "bootstrap did not surface the pending outbox count"
 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending >/dev/null \
@@ -335,7 +335,7 @@ handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending >/dev/null \
 pass "bootstrap detects pending outbox handoffs without a journal"
 
 write_backlog '- [ ] remote-wake-fail - receiver failure stays recoverable (repo: alpha)'
-FM_FAKE_REMOTE_WAKE_RC=1 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios remote-wake-fail \
+JG_FAKE_REMOTE_WAKE_RC=1 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios remote-wake-fail \
   > "$TMP_ROOT/remote-wake-fail.out" 2>&1 \
   || fail "durably received remote handoff failed only because its best-effort wake failed"
 assert_contains "$(cat "$TMP_ROOT/remote-wake-fail.out")" 'receiver wake failed' \
@@ -358,7 +358,7 @@ pass "remote handoff releases durable work and separately retries its receiver w
 # behind a correlation the resume refuses to resend forever.
 write_backlog '- [ ] wake-escalated - escalated undelivered wake stays retryable (repo: alpha)'
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
-FM_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-escalated \
+JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-escalated \
   > "$TMP_ROOT/wake-escalated.out" 2>&1 \
   || fail "durably received handoff failed only because its wake transport was lost"
 assert_grep 'wake-escalated' "$REMOTE/data/backlog.md" "lost wake transport did not leave the backlog durably received"
@@ -410,7 +410,7 @@ pass "an escalated undelivered receiver wake stays retryable instead of jamming 
 
 write_backlog '- [ ] wake-permanent-a - first handoff with permanently lost wake (repo: alpha)'
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
-FM_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-a \
+JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-a \
   > "$TMP_ROOT/wake-permanent-a.out" 2>&1 \
   || fail "first durably received handoff was held hostage to a permanently lost wake"
 assert_absent "$PARENT/data/handoff/ios.outbox.md" "permanently lost wake retained the first durable outbox"
@@ -424,7 +424,7 @@ esac
 wakes_after_first=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
 [ "$wakes_after_first" -gt "$wakes_before" ] || fail "first permanently lost wake was not attempted"
 set +e
-FM_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending \
+JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending \
   > "$TMP_ROOT/wake-permanent-resume.out" 2>&1
 rc=$?
 set -e
@@ -434,7 +434,7 @@ set -e
 wakes_after_resume=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
 [ "$wakes_after_resume" -gt "$wakes_after_first" ] || fail "resume did not retry the separately pending wake"
 write_backlog '- [ ] wake-permanent-b - second handoff despite permanently lost wake (repo: alpha)'
-FM_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-b \
+JG_FAKE_REMOTE_WAKE_RC=255 handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-permanent-b \
   > "$TMP_ROOT/wake-permanent-b.out" 2>&1 \
   || fail "second durable handoff was blocked by the permanently lost wake"
 assert_absent "$PARENT/data/handoff/ios.outbox.md" "permanently lost wake retained the second durable outbox"
@@ -454,17 +454,17 @@ REAL_RM=$(command -v rm)
 cat > "$RM_FAKEBIN/rm" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-if [ "$last" = "$FM_FAIL_RM_PATH" ]; then
+if [ "$last" = "$JG_FAIL_RM_PATH" ]; then
   exit 1
 fi
-exec "$FM_REAL_RM" "$@"
+exec "$JG_REAL_RM" "$@"
 SH
 chmod +x "$RM_FAKEBIN/rm"
 write_backlog '- [ ] cleanup-retry - confirmed wake survives cleanup retry (repo: alpha)'
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
 set +e
-PATH="$RM_FAKEBIN:$PATH" FM_REAL_RM="$REAL_RM" \
-  FM_FAIL_RM_PATH="$PARENT/data/handoff/ios.outbox.md" \
+PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" \
+  JG_FAIL_RM_PATH="$PARENT/data/handoff/ios.outbox.md" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios cleanup-retry \
   > "$TMP_ROOT/cleanup-retry.out" 2>&1
 rc=$?
@@ -496,8 +496,8 @@ pass "fresh remote work gets a new wake after confirmed cleanup recovery"
 
 write_backlog '- [ ] confirmed-marker-stale - completed handoff ignores marker cleanup failure (repo: alpha)'
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
-PATH="$RM_FAKEBIN:$PATH" FM_REAL_RM="$REAL_RM" \
-  FM_FAIL_RM_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
+PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" \
+  JG_FAIL_RM_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios confirmed-marker-stale \
   > "$TMP_ROOT/confirmed-marker-stale.out" 2>&1 \
   || fail "confirmed marker cleanup failure falsely failed a completed handoff"
@@ -523,20 +523,20 @@ REAL_MV=$(command -v mv)
 cat > "$CONFIRM_MV_FAKEBIN/mv" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-if [ "$last" = "$FM_CONFIRM_MV_PATH" ]; then
-  count=$(cat "$FM_CONFIRM_MV_COUNT" 2>/dev/null || echo 0)
+if [ "$last" = "$JG_CONFIRM_MV_PATH" ]; then
+  count=$(cat "$JG_CONFIRM_MV_COUNT" 2>/dev/null || echo 0)
   count=$((count + 1))
-  printf '%s\n' "$count" > "$FM_CONFIRM_MV_COUNT"
+  printf '%s\n' "$count" > "$JG_CONFIRM_MV_COUNT"
   [ "$count" -ne 2 ] || exit 1
 fi
-exec "$FM_REAL_MV" "$@"
+exec "$JG_REAL_MV" "$@"
 SH
 chmod +x "$CONFIRM_MV_FAKEBIN/mv"
 write_backlog '- [ ] delivered-pending-old - wake confirms before state promotion fails (repo: alpha)'
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
-PATH="$CONFIRM_MV_FAKEBIN:$PATH" FM_REAL_MV="$REAL_MV" \
-  FM_CONFIRM_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
-  FM_CONFIRM_MV_COUNT="$TMP_ROOT/confirm-mv.count" \
+PATH="$CONFIRM_MV_FAKEBIN:$PATH" JG_REAL_MV="$REAL_MV" \
+  JG_CONFIRM_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
+  JG_CONFIRM_MV_COUNT="$TMP_ROOT/confirm-mv.count" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios delivered-pending-old \
   > "$TMP_ROOT/delivered-pending-old.out" 2>&1 \
   || fail "confirmed wake state promotion failure failed durable work"
@@ -571,17 +571,17 @@ REAL_MV=$(command -v mv)
 cat > "$MV_FAKEBIN/mv" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-if [ "$last" = "$FM_FAIL_MV_PATH" ]; then
+if [ "$last" = "$JG_FAIL_MV_PATH" ]; then
   exit 1
 fi
-exec "$FM_REAL_MV" "$@"
+exec "$JG_REAL_MV" "$@"
 SH
 chmod +x "$MV_FAKEBIN/mv"
 write_backlog '- [ ] wake-state-drop - durable work survives lost wake state (repo: alpha)'
 pending_records_before=$(find "$PARENT/state/pending-replies" -maxdepth 1 -type f | wc -l | tr -d ' ')
 wakes_before=$(grep -cF jg-remote-secondmate-control.sh "$WAKE_LOG")
-PATH="$MV_FAKEBIN:$PATH" FM_REAL_MV="$REAL_MV" \
-  FM_FAIL_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
+PATH="$MV_FAKEBIN:$PATH" JG_REAL_MV="$REAL_MV" \
+  JG_FAIL_MV_PATH="$PARENT/state/.backlog-handoff-ios.wake-pending" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios wake-state-drop \
   > "$TMP_ROOT/wake-state-drop.out" 2>&1 \
   || fail "wake-state write failure held the durable outbox hostage"
@@ -615,7 +615,7 @@ pass "unrecordable best-effort wake state drops without blocking later handoffs"
 
 stale_wake_marker="$PARENT/state/.backlog-handoff-ios.wake-pending"
 printf 'invalid wake state\n' > "$stale_wake_marker"
-PATH="$RM_FAKEBIN:$PATH" FM_REAL_RM="$REAL_RM" FM_FAIL_RM_PATH="$stale_wake_marker" \
+PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" JG_FAIL_RM_PATH="$stale_wake_marker" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" --resume-pending \
   > "$TMP_ROOT/stale-wake-resume.out" 2>&1 \
   || fail "resume was blocked by an undeletable invalid wake marker"
@@ -625,7 +625,7 @@ assert_contains "$(cat "$TMP_ROOT/stale-wake-resume.out")" 'receiver wake state:
 assert_contains "$(cat "$TMP_ROOT/stale-wake-resume.out")" "stale wake marker remains at $stale_wake_marker" \
   "resume did not name the surviving stale wake marker"
 write_backlog '- [ ] after-stale-wake - later handoff ignores stale wake state (repo: alpha)'
-PATH="$RM_FAKEBIN:$PATH" FM_REAL_RM="$REAL_RM" FM_FAIL_RM_PATH="$stale_wake_marker" \
+PATH="$RM_FAKEBIN:$PATH" JG_REAL_RM="$REAL_RM" JG_FAIL_RM_PATH="$stale_wake_marker" \
   handoff_env "$ROOT/bin/jg-backlog-handoff.sh" ios after-stale-wake \
   > "$TMP_ROOT/after-stale-wake.out" 2>&1 \
   || fail "later handoff was blocked by an undeletable invalid wake marker"
@@ -644,7 +644,7 @@ pass "undeletable invalid wake state cannot block remote handoffs"
 write_backlog '- [ ] route-race - remains dispatchable through retirement (repo: alpha)'
 registry_lock="$PARENT/state/.secondmate-registry.lock"
 handoff_lock="$PARENT/state/.backlog-handoff-ios.lock"
-FM_HOME="$PARENT" /bin/bash -c '
+JG_HOME="$PARENT" /bin/bash -c '
   . "$1"
   jg_lock_acquire_wait "$2"
   jg_lock_acquire_wait "$3"
@@ -684,8 +684,8 @@ pass "route classification serializes with retirement before staging"
 FRESH="$TMP_ROOT/fresh"
 mkdir -p "$FRESH/data" "$FRESH/state"
 : > "$SSH_COUNT"
-fresh_out=$(FM_HOME="$FRESH" FM_ROOT_OVERRIDE="$ROOT" FM_BACKEND=tmux \
-  FM_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
+fresh_out=$(JG_HOME="$FRESH" JG_ROOT_OVERRIDE="$ROOT" JG_BACKEND=tmux \
+  JG_BOOTSTRAP_DETECT_ONLY=1 "$ROOT/bin/jg-bootstrap.sh" 2>&1)
 assert_not_contains "$fresh_out" 'SECONDMATE_HANDOFF:' "unconfigured bootstrap emitted a remote handoff diagnostic"
 [ ! -s "$SSH_COUNT" ] || fail "unconfigured bootstrap touched SSH"
 pass "unconfigured bootstrap has no remote handoff behavior"
@@ -704,7 +704,7 @@ recv_bytes=$(LC_ALL=C wc -c < "$RECV_HOME/state/handoff/ios.outbox.md" | tr -d '
 recv_hash=$(sha256_file "$RECV_HOME/state/handoff/ios.outbox.md")
 printf '1\n%s\n%s\n' "$recv_bytes" "$recv_hash" > "$RECV_HOME/state/handoff/.ios.upload-generation"
 printf 'backend = "beads"\n\n[beads]\ndb = "%s/missing/beads.db"\n' "$RECV_DECOY" > "$RECV_DECOY/.tasks.toml"
-recv_out=$(cd "$RECV_DECOY" && FM_HOME="$RECV_HOME" "$ROOT/bin/jg-backlog-receive.sh" \
+recv_out=$(cd "$RECV_DECOY" && JG_HOME="$RECV_HOME" "$ROOT/bin/jg-backlog-receive.sh" \
   state/handoff/ios.outbox.md "$recv_bytes" "$recv_hash" 1 2>&1) \
   || fail "receipt from a cwd with a beads .tasks.toml failed: $recv_out"
 assert_contains "$recv_out" 'received: ios moved=1 already=0' "decoy-cwd receipt did not move the item"

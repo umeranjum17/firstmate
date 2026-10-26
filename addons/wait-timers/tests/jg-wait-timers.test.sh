@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Real watcher/drain/parent-channel journey; only the terminal API is a fixture.
 set -eu
 # shellcheck source=tests/wake-helpers.sh
@@ -10,20 +19,20 @@ DRAIN="$ROOT/bin/jg-wake-drain.sh"
 cycle() {
   local rc=0 seq gen
   env HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/config" TMPDIR="$dir/tmp" \
-    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" \
-    FM_CONFIG_OVERRIDE="$dir/config" FM_POLL=1 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_HOME_SUMMARY_INTERVAL=999999 \
-    FM_SECONDMATE_LIVENESS_SECS=99999999 FM_BUSY_TURN_MAX_SECS=999999 \
-    FM_STALE_ESCALATE_SECS=999999 FM_WAIT_ALERT_SECS=2 FM_WAIT_ESCALATE_SECS=4 \
+    PATH="$dir/fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" \
+    JG_CONFIG_OVERRIDE="$dir/config" JG_POLL=1 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
+    JG_SECONDMATE_LIVENESS_SECS=99999999 JG_BUSY_TURN_MAX_SECS=999999 \
+    JG_STALE_ESCALATE_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 \
     "$WATCH" > "$dir/out" 2> "$dir/err" &
   pid=$!
   wait_for_exit "$pid" 70 || rc=$?
   case "$rc" in 0|124) ;; *) fail "watcher failed: $(cat "$dir/err")" ;; esac
   cat "$dir/out" >> "$dir/events"
-  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" > "$dir/drain" 2> "$dir/ack"
+  JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" "$DRAIN" > "$dir/drain" 2> "$dir/ack"
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9]*\) --recovery-generation .*/\1/p' "$dir/ack")
   gen=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([^ ]*\)$/\1/p' "$dir/ack")
-  [ -z "$seq" ] || FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
+  [ -z "$seq" ] || JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
 }
 
 # Arms the lane's episode and ends that arming cycle on a real signal from a second
@@ -47,7 +56,7 @@ arm_episode() {  # <dir>
   wait
 }
 
-if [ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ]; then
+if [ "${JG_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ]; then
 for verb in blocked needs-decision; do
   dir=$(make_case "$verb")
   mkdir -p "$dir/home/config" "$dir/tmp" "$dir/config" "$dir/parent/state"
@@ -160,7 +169,7 @@ case "$key3" in
 esac
 case "$key3" in *"$$"*) fail "unkeyed identity carries a process id: $key3" ;; esac
 pass 'waits carry home/task/generation/key identity, name the unresolved source, and keep unrelated decisions open'
-[ "${FM_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ] || exit 0
+[ "${JG_WAIT_TIMERS_MAIN_ESCALATION_ONLY:-0}" != 1 ] || exit 0
 
 # Native blocked wins over a working log and survives unrelated status churn.
 dir=$(make_case herdr)
@@ -170,16 +179,16 @@ printf 'working: running\n' > "$dir/state/lane.status"
 printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_HOME/native-calls"
+printf '%s\n' "$*" >> "$JG_HOME/native-calls"
 if [ "$1 $2" = 'agent list' ]; then
-  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"},{"pane_id":"foreign:pane","agent_status":"blocked"}]}}\n' "$(cat "$FM_HOME/native")"
+  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"},{"pane_id":"foreign:pane","agent_status":"blocked"}]}}\n' "$(cat "$JG_HOME/native")"
 elif [ "$1" = status ]; then
   printf '{"server":{"running":true}}\n'
 elif [ "$1 $2" = 'session list' ]; then
   printf '{"sessions":[{"name":"fixture","socket_path":"fixture-socket"}]}\n'
 elif [ "$1 $2" = 'agent get' ]; then
-  printf 'agent-get\n' >> "$FM_HOME/native-reads"
-  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$FM_HOME/native")"
+  printf 'agent-get\n' >> "$JG_HOME/native-reads"
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$JG_HOME/native")"
 else
   exit 1
 fi
@@ -218,7 +227,7 @@ printf '@subscribed\n'
 sleep "$2"
 SH
 chmod +x "$dir/fakebin/reader"
-export FM_BACKEND_HERDR_EVENTS_FORCE=1 FM_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
+export JG_BACKEND_HERDR_EVENTS_FORCE=1 JG_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
 : > "$dir/events"
 : > "$dir/native-reads"
 printf 'blocked\n' > "$dir/native"
@@ -235,7 +244,7 @@ cycle
 cycle
 grep -q 'waiting-state lane (blocked' "$dir/events" || fail 'Cursor declaration not monitored'
 pass 'Cursor ship ignores native polling and push blockers but retains declaration monitoring'
-unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
+unset JG_BACKEND_HERDR_EVENTS_FORCE JG_BACKEND_HERDR_EVENT_READER
 printf 'kind=secondmate\nharness=cursor\nbackend=herdr\nwindow=fixture:w1:p1\n' > "$dir/state/lane.meta"
 
 cat > "$dir/fakebin/herdr" <<'SH'
@@ -246,8 +255,8 @@ elif [ "$1 $2" = 'session list' ]; then printf '{"sessions":[{"name":"fixture","
 else exit 1; fi
 SH
 for tool in timeout gtimeout; do
-  # shellcheck disable=SC2016 # The generated script expands FM_HOME at runtime.
-  printf '#!/usr/bin/env bash\nprintf "coreutils-called\\n" >> "$FM_HOME/coreutils-calls"\nexit 125\n' > "$dir/fakebin/$tool"
+  # shellcheck disable=SC2016 # The generated script expands JG_HOME at runtime.
+  printf '#!/usr/bin/env bash\nprintf "coreutils-called\\n" >> "$JG_HOME/coreutils-calls"\nexit 125\n' > "$dir/fakebin/$tool"
   chmod +x "$dir/fakebin/$tool"
 done
 rm -f "$dir/state/lane.meta" "$dir/state/lane.status"
@@ -258,9 +267,9 @@ printf 'blocked [key=tmux-wait]: external dependency\n' > "$dir/state/tmux-lane.
 prime_status_seen "$dir/state" "$dir/state/herdr-lane.status"
 prime_status_seen "$dir/state" "$dir/state/tmux-lane.status"
 : > "$dir/events"
-export FM_BACKEND_HERDR_READ_TIMEOUT=1 FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+export JG_BACKEND_HERDR_READ_TIMEOUT=1 JG_TIMEOUT_MECHANISM_OVERRIDE=bash
 cycle
-unset FM_BACKEND_HERDR_READ_TIMEOUT FM_TIMEOUT_MECHANISM_OVERRIDE
+unset JG_BACKEND_HERDR_READ_TIMEOUT JG_TIMEOUT_MECHANISM_OVERRIDE
 grep -q 'check: waiting-state tmux-lane .*level=owner' "$dir/events" || fail 'stalled native lookup stopped monitoring the healthy tmux lane'
 ! grep -q 'herdr-lane' "$dir/events" || fail 'lane on a stalled native session raised an alert'
 grep -q 'agent list for fixture failed (code 124, deadline 1s); its lanes are unknown this poll' "$dir/err" || fail 'native failure diagnostic missing'
@@ -275,7 +284,7 @@ printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 if [ "$1 $2" = 'agent list' ]; then
-  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$FM_HOME/native")"
+  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$JG_HOME/native")"
 else
   exit 1
 fi
@@ -305,13 +314,13 @@ printf 'blocked\n' > "$dir/native"
 cat > "$dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 if [ "$1 $2" = 'agent list' ]; then
-  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$FM_HOME/native")"
+  printf '{"result":{"agents":[{"pane_id":"w1:p1","agent_status":"%s"}]}}\n' "$(cat "$JG_HOME/native")"
 elif [ "$1" = status ]; then
   printf '{"server":{"running":true}}\n'
 elif [ "$1 $2" = 'session list' ]; then
   printf '{"sessions":[{"name":"fixture","socket_path":"fixture-socket"}]}\n'
 elif [ "$1 $2" = 'agent get' ]; then
-  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$FM_HOME/native")"
+  printf '{"result":{"agent":{"agent_status":"%s"}}}\n' "$(cat "$JG_HOME/native")"
 else
   exit 1
 fi
@@ -322,7 +331,7 @@ printf '@subscribed\n'
 sleep "$2"
 SH
 chmod +x "$dir/fakebin/herdr" "$dir/fakebin/reader"
-export FM_BACKEND_HERDR_EVENTS_FORCE=1 FM_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
+export JG_BACKEND_HERDR_EVENTS_FORCE=1 JG_BACKEND_HERDR_EVENT_READER="$dir/fakebin/reader"
 prime_status_seen "$dir/state" "$dir/state/lane.status"
 : > "$dir/events"
 cycle
@@ -331,7 +340,7 @@ IFS=$'\t' read -r _sig _since owner _parent _key _misses < "$dir/state/.waiting-
 [ "$owner" -gt 1 ] || fail 'native push wake did not record owner delivery'
 cycle
 [ "$(grep -c 'level=owner' "$dir/events")" -eq 0 ] || fail 'native push wake was followed by a duplicate owner recheck'
-unset FM_BACKEND_HERDR_EVENTS_FORCE FM_BACKEND_HERDR_EVENT_READER
+unset JG_BACKEND_HERDR_EVENTS_FORCE JG_BACKEND_HERDR_EVENT_READER
 pass 'an immediate native push wake is the episode owner delivery, with no duplicate recheck'
 
 # A due wait alert defers to a same-cycle signal: the signal scan runs first,
@@ -385,4 +394,4 @@ cycle
 cycle
 IFS=$'\t' read -r _sig since _owner _parent _key _misses < "$dir/state/.waiting-timers/lane"
 [ "$since" -gt "$start" ] || fail 'a pause with a new phase key did not re-arm the episode'
-pass 'a paused wait rechecks at FM_PAUSE_RESURFACE_SECS, survives prose churn, and re-arms on a new key'
+pass 'a paused wait rechecks at JG_PAUSE_RESURFACE_SECS, survives prose churn, and re-arms on a new key'

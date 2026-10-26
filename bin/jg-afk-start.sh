@@ -6,7 +6,7 @@
 #
 # Usage: jg-afk-start.sh
 #   Sets state/.afk (mode preserved on refresh, see jg_afk_flag_write) unless
-#   FM_AFK_STATE_PREPARED=1, checks state/.supervise-daemon.lock, and:
+#   JG_AFK_STATE_PREPARED=1, checks state/.supervise-daemon.lock, and:
 #     - prints "afk: daemon already running pid=<pid>" then exits 0 when that
 #       lock is held by a live daemon (a REFRESH: no stale-artifact clear);
 #     - otherwise clears any prior away session's stale escalation artifacts
@@ -27,22 +27,22 @@
 #   - Harnesses with NO native background mechanism (e.g. pi) run this THROUGH
 #     bin/jg-afk-launch.sh, which creates a non-visible tracked terminal per
 #     backend (herdr tab/workspace, tmux detached session) and passes the
-#     captain pane in as FM_SUPERVISOR_TARGET so injection targets it, not the
+#     captain pane in as JG_SUPERVISOR_TARGET so injection targets it, not the
 #     daemon's own new pane.
 # Do not wrap this in `nohup ... &`: Codex/herdr can reap fire-and-forget shell
 # children after the tool call returns, while a tracked background terminal stays
 # attached and has a real lifecycle.
 set -eu
 
-FM_AFK_START_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$FM_AFK_START_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-FM_AFK_STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-FM_AFK_LOCK="$FM_AFK_STATE/.supervise-daemon.lock"
-FM_AFK_DAEMON="$FM_AFK_START_DIR/jg-supervise-daemon.sh"
+JG_AFK_START_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$JG_AFK_START_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+JG_AFK_STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+JG_AFK_LOCK="$JG_AFK_STATE/.supervise-daemon.lock"
+JG_AFK_DAEMON="$JG_AFK_START_DIR/jg-supervise-daemon.sh"
 
 # shellcheck source=bin/jg-wake-lib.sh
-. "$FM_AFK_START_DIR/jg-wake-lib.sh"
+. "$JG_AFK_START_DIR/jg-wake-lib.sh"
 
 jg_afk_start_usage() {
   sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -71,17 +71,17 @@ jg_afk_clear_stale_artifacts() {  # <state-dir>
 
 daemon_lock_owner() {
   local owner
-  if [ -L "$FM_AFK_LOCK" ]; then
-    owner=$(readlink "$FM_AFK_LOCK" 2>/dev/null) || return 1
+  if [ -L "$JG_AFK_LOCK" ]; then
+    owner=$(readlink "$JG_AFK_LOCK" 2>/dev/null) || return 1
     [ -n "$owner" ] || return 1
     case "$owner" in
       /*) printf '%s\n' "$owner" ;;
-      *) printf '%s/%s\n' "$(dirname "$FM_AFK_LOCK")" "$owner" ;;
+      *) printf '%s/%s\n' "$(dirname "$JG_AFK_LOCK")" "$owner" ;;
     esac
     return 0
   fi
-  [ -d "$FM_AFK_LOCK" ] || return 1
-  printf '%s\n' "$FM_AFK_LOCK"
+  [ -d "$JG_AFK_LOCK" ] || return 1
+  printf '%s\n' "$JG_AFK_LOCK"
 }
 
 daemon_pid_matches() {
@@ -94,7 +94,7 @@ daemon_pid_matches() {
   fi
   command=$(ps -p "$pid" -o command= 2>/dev/null || true)
   case "$command" in
-    *"$FM_AFK_DAEMON"*|*"jg-supervise-daemon.sh"*) return 0 ;;
+    *"$JG_AFK_DAEMON"*|*"jg-supervise-daemon.sh"*) return 0 ;;
   esac
   return 1
 }
@@ -152,11 +152,11 @@ jg_afk_start_main() {
     * ) echo "usage: $(basename "${BASH_SOURCE[1]:-jg-afk-start.sh}")" >&2; return 2 ;;
   esac
 
-  mkdir -p "$FM_AFK_STATE"
-  if [ "${FM_AFK_STATE_PREPARED:-0}" = 1 ]; then
-    [ -f "$FM_AFK_STATE/.afk" ] || { echo "afk: launcher-prepared state is missing" >&2; return 1; }
+  mkdir -p "$JG_AFK_STATE"
+  if [ "${JG_AFK_STATE_PREPARED:-0}" = 1 ]; then
+    [ -f "$JG_AFK_STATE/.afk" ] || { echo "afk: launcher-prepared state is missing" >&2; return 1; }
   else
-    jg_afk_flag_write "$FM_AFK_STATE" || { echo "afk: failed to write away-mode flag" >&2; return 1; }
+    jg_afk_flag_write "$JG_AFK_STATE" || { echo "afk: failed to write away-mode flag" >&2; return 1; }
   fi
 
   local pid
@@ -167,17 +167,17 @@ jg_afk_start_main() {
   fi
 
   if jg_pid_alive "$pid" && [ -n "$pid" ]; then
-    jg_lock_remove_path "$FM_AFK_LOCK" 2>/dev/null || true
+    jg_lock_remove_path "$JG_AFK_LOCK" 2>/dev/null || true
   fi
 
   # Fresh start: clear the previous away session's stale delivery artifacts
   # before the new daemon can surface them (fix for the leaked-artifact defect).
-  if [ "${FM_AFK_STATE_PREPARED:-0}" != 1 ]; then
-    jg_afk_clear_stale_artifacts "$FM_AFK_STATE"
+  if [ "${JG_AFK_STATE_PREPARED:-0}" != 1 ]; then
+    jg_afk_clear_stale_artifacts "$JG_AFK_STATE"
   fi
 
   echo "afk: starting supervise daemon in foreground; keep this command as a tracked background session"
-  exec "$FM_AFK_DAEMON"
+  exec "$JG_AFK_DAEMON"
 }
 
 # Run only when executed, not when sourced (tests source jg_afk_clear_stale_artifacts

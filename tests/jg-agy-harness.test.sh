@@ -41,8 +41,8 @@ set -u
 # from inside another harness inherits those markers, which outrank the fake
 # ancestry the detection cases set up. Drop the ambient markers so the asserted
 # verdict does not depend on which harness launched the suite.
-unset CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
-  ATLASSIAN_AGENT_TYPE ROVODEV_CLI GEMINI_CLI AGENT FM_OMP_HARNESS
+unset CLAUDECODE PI_CODING_AGENT JG_PI_HARNESS GROK_AGENT CURSOR_AGENT CURSOR_INVOKED_AS \
+  ATLASSIAN_AGENT_TYPE ROVODEV_CLI GEMINI_CLI AGENT JG_OMP_HARNESS
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-control-lib.sh"
@@ -171,7 +171,7 @@ test_agy_busy_tail_needs_the_pinned_status_row() {
     && fail "an idle footer must not read busy" || true
   printf 'Generating report...\ndone\n? for shortcuts\n>\n' | jg_busy_lines_match agy \
     && fail "the delivery guard must not acknowledge on echoed Generating output" || true
-  FM_BUSY_AGY_REGEX='idle' bash -c '. "$0/bin/jg-busy-lib.sh"; printf "idle\n" | jg_busy_agy_tail_busy' "$ROOT" \
+  JG_BUSY_AGY_REGEX='idle' bash -c '. "$0/bin/jg-busy-lib.sh"; printf "idle\n" | jg_busy_agy_tail_busy' "$ROOT" \
     && fail "an environment override must not change the agy busy signature" || true
   pass "jg-busy-lib: only the pinned esc-to-cancel row carries the agy busy verdict"
 }
@@ -440,12 +440,12 @@ test_agy_trust_refuses_out_of_scope_paths() {
 # the readiness gate are exercised through their real code paths. Whether the
 # dialog renders is decided the way agy decides it: the pane path is looked up
 # in the trustedWorkspaces array of the store the spawn just wrote.
-# FM_FAKE_AGY_IGNORE_TRUST=1 models a vendor that stopped honouring the store;
-# FM_FAKE_AGY_ASSUME_TRUSTED=1 models a pane that never shows the dialog even
+# JG_FAKE_AGY_IGNORE_TRUST=1 models a vendor that stopped honouring the store;
+# JG_FAKE_AGY_ASSUME_TRUSTED=1 models a pane that never shows the dialog even
 # though firstmate could not register the path (a busy verdict with no proof
 # of where the turn runs);
-# FM_FAKE_AGY_RACE=1 models Herdr's native busy verdict rendering one capture
-# before the dialog paints; FM_FAKE_AGY_ANSWER=stuck models a dialog whose
+# JG_FAKE_AGY_RACE=1 models Herdr's native busy verdict rendering one capture
+# before the dialog paints; JG_FAKE_AGY_ANSWER=stuck models a dialog whose
 # answer never turns into a busy turn.
 make_agy_fakebin() {
   local dir=$1 fakebin
@@ -453,19 +453,19 @@ make_agy_fakebin() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "$FM_FAKE_TMUX_CALL_LOG"
-state=$(cat "$FM_FAKE_AGY_STATE" 2>/dev/null || true)
+printf '%s\n' "$*" >> "$JG_FAKE_TMUX_CALL_LOG"
+state=$(cat "$JG_FAKE_AGY_STATE" 2>/dev/null || true)
 fake_screen() {
   case "$state" in
     dialog)
-      printf 'Accessing workspace:\n\n%s\n\nDo you trust the contents of this project?\n\nAntigravity CLI requires permission to read, edit, and execute files here.\n\n> Yes, I trust this folder\n  No, exit\n' "$FM_FAKE_PANE_PATH"
+      printf 'Accessing workspace:\n\n%s\n\nDo you trust the contents of this project?\n\nAntigravity CLI requires permission to read, edit, and execute files here.\n\n> Yes, I trust this folder\n  No, exit\n' "$JG_FAKE_PANE_PATH"
       ;;
     busy)
       printf 'Generating...\n└ Tip: press f to see the full diff.\n\nesc to cancel                                Gemini 3.8 Flash · low\n'
       ;;
     racing)
       printf 'esc to cancel                                Gemini 3.8 Flash · low\n'
-      printf 'dialog\n' > "$FM_FAKE_AGY_STATE"
+      printf 'dialog\n' > "$JG_FAKE_AGY_STATE"
       ;;
     *)
       printf 'shell starting\n$ \n'
@@ -473,13 +473,13 @@ fake_screen() {
   esac
 }
 fake_path_trusted() {
-  [ "${FM_FAKE_AGY_ASSUME_TRUSTED:-0}" = 1 ] && return 0
-  [ "${FM_FAKE_AGY_IGNORE_TRUST:-0}" = 1 ] && return 1
+  [ "${JG_FAKE_AGY_ASSUME_TRUSTED:-0}" = 1 ] && return 0
+  [ "${JG_FAKE_AGY_IGNORE_TRUST:-0}" = 1 ] && return 1
   node -e 'const fs=require("node:fs");let j={};try{j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));}catch(e){process.exit(1);}process.exit(Array.isArray(j.trustedWorkspaces)&&j.trustedWorkspaces.includes(process.argv[2])?0:1);' \
-    "$FM_FAKE_AGY_SETTINGS" "$FM_FAKE_PANE_PATH"
+    "$JG_FAKE_AGY_SETTINGS" "$JG_FAKE_PANE_PATH"
 }
 case "$*" in
-  *"#{pane_current_path}"*) printf '%s\n' "$FM_FAKE_PANE_PATH"; exit 0 ;;
+  *"#{pane_current_path}"*) printf '%s\n' "$JG_FAKE_PANE_PATH"; exit 0 ;;
   *"#{cursor_y}"*) printf '1\n'; exit 0 ;;
 esac
 case "${1:-}" in
@@ -499,8 +499,8 @@ case "${1:-}" in
       esac
       case "$literal" in
         *--prompt-interactive*)
-          printf '%s\n' "$literal" >> "$FM_FAKE_LAUNCH_LOG"
-          printf 'launched\n' > "$FM_FAKE_AGY_STATE"
+          printf '%s\n' "$literal" >> "$JG_FAKE_LAUNCH_LOG"
+          printf 'launched\n' > "$JG_FAKE_AGY_STATE"
           ;;
       esac
       exit 0
@@ -510,16 +510,16 @@ case "${1:-}" in
         case "$state" in
           launched)
             if fake_path_trusted; then
-              printf 'busy\n' > "$FM_FAKE_AGY_STATE"
-            elif [ "${FM_FAKE_AGY_RACE:-0}" = 1 ]; then
-              printf 'racing\n' > "$FM_FAKE_AGY_STATE"
+              printf 'busy\n' > "$JG_FAKE_AGY_STATE"
+            elif [ "${JG_FAKE_AGY_RACE:-0}" = 1 ]; then
+              printf 'racing\n' > "$JG_FAKE_AGY_STATE"
             else
-              printf 'dialog\n' > "$FM_FAKE_AGY_STATE"
+              printf 'dialog\n' > "$JG_FAKE_AGY_STATE"
             fi
             ;;
           dialog)
-            if [ "${FM_FAKE_AGY_ANSWER:-works}" = works ]; then
-              printf 'busy\n' > "$FM_FAKE_AGY_STATE"
+            if [ "${JG_FAKE_AGY_ANSWER:-works}" = works ]; then
+              printf 'busy\n' > "$JG_FAKE_AGY_STATE"
             fi
             ;;
         esac
@@ -536,8 +536,8 @@ SH
 #!/usr/bin/env bash
 set -u
 if [ "${1:-}" = models ]; then
-  if [ "${FM_FAKE_AGY_MODELS_FAIL:-0}" = 1 ]; then exit 3; fi
-  if [ "${FM_FAKE_AGY_MODELS_HANG:-0}" = 1 ]; then cat > /dev/null; sleep 30; exit 0; fi
+  if [ "${JG_FAKE_AGY_MODELS_FAIL:-0}" = 1 ]; then exit 3; fi
+  if [ "${JG_FAKE_AGY_MODELS_HANG:-0}" = 1 ]; then cat > /dev/null; sleep 30; exit 0; fi
   printf 'gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n'
   printf 'gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n'
   printf 'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\n'
@@ -591,26 +591,26 @@ EOF
 # invoking environment resolves node from, the jg-kimi-harness shape.
 NODE_BIN=$(command -v node) || fail "test needs node"
 NODE_BIN_DIR=$(dirname "$NODE_BIN")
-BASE_PATH=${FM_TEST_BASE_PATH:-$NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-$NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin}
 
 run_agy_spawn() {
   local case_dir=$1 home=$2 proj=$3 wt=$4 fakebin=$5 id=$6
   shift 6
-  HOME="$home" FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
-    FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
-    FM_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
-    FM_FAKE_AGY_STATE="$case_dir/agy.state" \
-    FM_FAKE_AGY_SETTINGS="$home/.gemini/antigravity-cli/settings.json" \
-    FM_FAKE_AGY_MODELS_FAIL="${FM_FAKE_AGY_MODELS_FAIL:-0}" \
-    FM_FAKE_AGY_MODELS_HANG="${FM_FAKE_AGY_MODELS_HANG:-0}" \
-    FM_FAKE_AGY_IGNORE_TRUST="${FM_FAKE_AGY_IGNORE_TRUST:-0}" \
-    FM_FAKE_AGY_ASSUME_TRUSTED="${FM_FAKE_AGY_ASSUME_TRUSTED:-0}" \
-    FM_FAKE_AGY_RACE="${FM_FAKE_AGY_RACE:-0}" \
-    FM_FAKE_AGY_ANSWER="${FM_FAKE_AGY_ANSWER:-works}" \
-    FM_AGY_READY_POLLS=4 FM_AGY_POLL_INTERVAL=0 FM_AGY_MODELS_TIMEOUT=${FM_AGY_MODELS_TIMEOUT:-1} \
+  HOME="$home" JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
+    JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+    JG_FAKE_TMUX_CALL_LOG="$case_dir/tmux-calls.log" \
+    JG_FAKE_AGY_STATE="$case_dir/agy.state" \
+    JG_FAKE_AGY_SETTINGS="$home/.gemini/antigravity-cli/settings.json" \
+    JG_FAKE_AGY_MODELS_FAIL="${JG_FAKE_AGY_MODELS_FAIL:-0}" \
+    JG_FAKE_AGY_MODELS_HANG="${JG_FAKE_AGY_MODELS_HANG:-0}" \
+    JG_FAKE_AGY_IGNORE_TRUST="${JG_FAKE_AGY_IGNORE_TRUST:-0}" \
+    JG_FAKE_AGY_ASSUME_TRUSTED="${JG_FAKE_AGY_ASSUME_TRUSTED:-0}" \
+    JG_FAKE_AGY_RACE="${JG_FAKE_AGY_RACE:-0}" \
+    JG_FAKE_AGY_ANSWER="${JG_FAKE_AGY_ANSWER:-works}" \
+    JG_AGY_READY_POLLS=4 JG_AGY_POLL_INTERVAL=0 JG_AGY_MODELS_TIMEOUT=${JG_AGY_MODELS_TIMEOUT:-1} \
     PATH="$fakebin:$BASE_PATH" \
     "$SPAWN" "$id" "$proj" --harness agy --mode no-mistakes --yolo off "$@" 2>&1
 }
@@ -677,7 +677,7 @@ test_agy_unreachable_listing_launches_unvalidated() {
   rec=$(make_agy_spawn_case nolisting "$id")
   read_agy_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_AGY_MODELS_FAIL=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_MODELS_FAIL=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low) || rc=$?
   expect_code 0 "$rc" "an unreachable model listing must not block the spawn"
   [ -s "$CASE_DIR/launch.log" ] || fail "an unreachable listing produced no launch command"
@@ -692,7 +692,7 @@ test_agy_hung_listing_is_cut_off_and_launches() {
   read_agy_spawn_record "$rec"
   rc=0
   started=$(date +%s)
-  out=$(FM_FAKE_AGY_MODELS_HANG=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_MODELS_HANG=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low) || rc=$?
   elapsed=$(( $(date +%s) - started ))
   expect_code 0 "$rc" "a hung model listing must not block the spawn"
@@ -711,7 +711,7 @@ test_agy_zero_model_timeout_is_clamped_to_the_default_bound() {
   read_agy_spawn_record "$rec"
   rc=0
   started=$(date +%s)
-  out=$(FM_FAKE_AGY_MODELS_HANG=1 FM_AGY_MODELS_TIMEOUT=0 \
+  out=$(JG_FAKE_AGY_MODELS_HANG=1 JG_AGY_MODELS_TIMEOUT=0 \
     run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low) || rc=$?
   elapsed=$(( $(date +%s) - started ))
@@ -720,7 +720,7 @@ test_agy_zero_model_timeout_is_clamped_to_the_default_bound() {
   assert_contains "$out" "did not answer within 15s" \
     "a zero model bound was not clamped to the documented default"
   [ -s "$CASE_DIR/launch.log" ] || fail "a zero model bound produced no launch command"
-  pass "jg-spawn: a zero FM_AGY_MODELS_TIMEOUT is clamped to the default bound"
+  pass "jg-spawn: a zero JG_AGY_MODELS_TIMEOUT is clamped to the default bound"
 }
 
 # Bare Enter key presses only: shell setup rides its Enter on the typed text
@@ -761,7 +761,7 @@ test_agy_dialog_despite_registration_is_answered_once() {
   id="agy-vendor-z10-$$"
   rec=$(make_agy_spawn_case vendor-dialog "$id")
   read_agy_spawn_record "$rec"
-  out=$(FM_FAKE_AGY_IGNORE_TRUST=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_IGNORE_TRUST=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low)
   rc=$?
   expect_code 0 "$rc" "an agy spawn whose dialog renders despite registration should succeed"
@@ -781,7 +781,7 @@ test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered() {
   store="$HOME_DIR/.gemini/antigravity-cli/settings.json"
   printf '%s\n' '{not json' > "$store"
   before=$(cat "$store")
-  out=$(FM_FAKE_AGY_RACE=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_RACE=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low)
   rc=$?
   expect_code 0 "$rc" "an agy spawn that meets the dialog after a premature busy verdict should still succeed"
@@ -805,7 +805,7 @@ test_agy_unregistered_path_without_a_dialog_fails_the_spawn() {
   store="$HOME_DIR/.gemini/antigravity-cli/settings.json"
   printf '%s\n' '{not json' > "$store"
   rc=0
-  out=$(FM_FAKE_AGY_ASSUME_TRUSTED=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_ASSUME_TRUSTED=1 run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low) || rc=$?
   [ "$rc" -ne 0 ] || fail "a busy verdict on an unregistered path with no dialog must not pass the gate"
   assert_contains "$out" "never showed its folder-trust dialog on an unregistered worktree" \
@@ -826,7 +826,7 @@ test_agy_pre_trusted_path_that_never_turns_busy_fails_the_spawn() {
   rec=$(make_agy_spawn_case idle "$id")
   read_agy_spawn_record "$rec"
   rc=0
-  out=$(FM_FAKE_AGY_IGNORE_TRUST=1 FM_FAKE_AGY_ANSWER=stuck run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
+  out=$(JG_FAKE_AGY_IGNORE_TRUST=1 JG_FAKE_AGY_ANSWER=stuck run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$WT_DIR" \
     "$FAKEBIN_DIR" "$id" --model gemini-3.8-flash-low) || rc=$?
   [ "$rc" -ne 0 ] || fail "a dialog that never turns into a busy turn must fail the spawn"
   assert_contains "$out" "did not start processing its brief after the folder-trust dialog was answered" \
@@ -858,10 +858,10 @@ test_agy_secondmate_is_refused() {
   rec=$(make_agy_spawn_case secondmate-refuse "$id")
   read_agy_spawn_record "$rec"
   rc=0
-  out=$(HOME="$HOME_DIR" FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
-    FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
-    FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
+  out=$(HOME="$HOME_DIR" JG_ROOT_OVERRIDE='' JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_PROJECTS_OVERRIDE="$HOME_DIR/projects" JG_CONFIG_OVERRIDE="$HOME_DIR/config" \
+    JG_SPAWN_NO_GUARD=1 PATH="$FAKEBIN_DIR:$BASE_PATH" \
     "$SPAWN" "$id" --secondmate agy 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an agy secondmate spawn should be refused"
   assert_contains "$out" "agy is a verified crewmate/scout adapter only" \

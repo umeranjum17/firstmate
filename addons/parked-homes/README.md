@@ -60,8 +60,8 @@ One log line per skip is all a parked home ever produces.
 The live producers live in the firstmate fork, so the gates are one source
 line plus one predicate call per producer (fork PR carries the full list; see
 `FORK-EXIT.md`). The fork's `bin/jg-parked-homes-lib.sh` is a thin shim: it
-sources this directory's reader from `FM_ADDONS_DIR` (default
-`$FM_HOME/projects/firstmate-addons`). When the add-on checkout is absent the
+sources this directory's reader from `JG_ADDONS_DIR` (default
+`$JG_HOME/projects/firstmate-addons`). When the add-on checkout is absent the
 shim defines no-op predicates — every gate is a no-op and behavior is exactly
 as before, so the fork hook is safe to merge before any home installs the
 add-on checkout.

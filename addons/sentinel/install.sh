@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update the sentinel for one firstmate home: copy bin/jg-sentinel.sh to the data dir and point the jg-sentinel user unit at that copy, restarting the service in the same step.
 # Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
 set -euo pipefail
@@ -23,7 +32,7 @@ show() {
 }
 
 # The unit is the copy's own `unit` output, re-pointed at the installed copy and this home.
-FM_HOME="$FMH" "$SRC/bin/jg-sentinel.sh" unit | sed "s|$SRC/bin/jg-sentinel.sh|$DEST/bin/jg-sentinel.sh|" > "$TMP/unit"
+JG_HOME="$FMH" "$SRC/bin/jg-sentinel.sh" unit | sed "s|$SRC/bin/jg-sentinel.sh|$DEST/bin/jg-sentinel.sh|" > "$TMP/unit"
 
 copy_changed=0 unit_changed=0
 show "$DEST/bin/jg-sentinel.sh" "$SRC/bin/jg-sentinel.sh" && copy_changed=1 || true

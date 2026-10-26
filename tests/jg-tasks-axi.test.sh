@@ -7,14 +7,14 @@
 # the caller's working directory, and tasks-axi writes by renaming a temp file
 # over its target, so a bare tasks-axi run from the code root turns a code-root
 # symlink into the home's backlog into a private regular copy. The suite proves
-# that every write through bin/jg-tasks-axi.sh lands in $FM_HOME/data from the
+# that every write through bin/jg-tasks-axi.sh lands in $JG_HOME/data from the
 # code root (including archiving and relative --body-file arguments),
 # that the command refuses addressing it cannot keep correct, and that bootstrap
 # reports any code-root copy that is not this home's own file while staying
 # silent for a link into the home, an absent copy, and the single-home layout.
 set -u
 # An installed task-priority add-on must not change unrelated cases.
-export FM_TASK_PRIORITY_CHECK=/nonexistent
+export JG_TASK_PRIORITY_CHECK=/nonexistent
 
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -22,11 +22,11 @@ export FM_TASK_PRIORITY_CHECK=/nonexistent
 WRAPPER="$ROOT/bin/jg-tasks-axi.sh"
 BOOTSTRAP="$ROOT/bin/jg-bootstrap.sh"
 TMP_ROOT=$(jg_test_tmproot jg-tasks-axi)
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 
 # The developer shell may pin any of these; each case states its own layout.
-unset TASKS_AXI_FILE TASKS_AXI_BACKEND FM_HOME FM_ROOT_OVERRIDE \
-  FM_DATA_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+unset TASKS_AXI_FILE TASKS_AXI_BACKEND JG_HOME JG_ROOT_OVERRIDE \
+  JG_DATA_OVERRIDE JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE JG_PROJECTS_OVERRIDE
 
 HAVE_TASKS_AXI=0
 command -v tasks-axi >/dev/null 2>&1 && HAVE_TASKS_AXI=1
@@ -51,7 +51,7 @@ make_split() {  # <name>; prints the case directory
 wrapper_from_code() {  # <case-dir> <tasks-axi args...>
   local dir=$1
   shift
-  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$WRAPPER" "$@")
+  (cd "$dir/code" && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$WRAPPER" "$@")
 }
 
 # Only the shadow-backlog lines matter here; the rest of a detect-only local
@@ -60,11 +60,11 @@ wrapper_from_code() {  # <case-dir> <tasks-axi args...>
 bootstrap_backlog_lines() {  # <code-root> [<home>]
   local code=$1 home=${2:-}
   if [ -n "$home" ]; then
-    PATH="$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$code" FM_BOOTSTRAP_DETECT_ONLY=1 \
-      FM_BOOTSTRAP_NETWORK=skip "$BOOTSTRAP" 2>&1 | grep '^BACKLOG_RECONCILE: code-root' || true
+    PATH="$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$code" JG_BOOTSTRAP_DETECT_ONLY=1 \
+      JG_BOOTSTRAP_NETWORK=skip "$BOOTSTRAP" 2>&1 | grep '^BACKLOG_RECONCILE: code-root' || true
   else
-    PATH="$BASE_PATH" FM_ROOT_OVERRIDE="$code" FM_BOOTSTRAP_DETECT_ONLY=1 \
-      FM_BOOTSTRAP_NETWORK=skip "$BOOTSTRAP" 2>&1 | grep '^BACKLOG_RECONCILE: code-root' || true
+    PATH="$BASE_PATH" JG_ROOT_OVERRIDE="$code" JG_BOOTSTRAP_DETECT_ONLY=1 \
+      JG_BOOTSTRAP_NETWORK=skip "$BOOTSTRAP" 2>&1 | grep '^BACKLOG_RECONCILE: code-root' || true
   fi
 }
 
@@ -112,7 +112,7 @@ test_guard_silent_for_single_home() {
   out=$(bootstrap_backlog_lines "$dir")
   assert_equals "" "$out" "the single-home layout's own backlog was reported as a fork"
   out=$(bootstrap_backlog_lines "$dir" "$dir")
-  assert_equals "" "$out" "FM_HOME naming the code root was reported as a fork"
+  assert_equals "" "$out" "JG_HOME naming the code root was reported as a fork"
   pass "bootstrap stays silent when the code root is the home"
 }
 
@@ -171,7 +171,7 @@ test_wrapper_overrides_ambient_file() {
   local dir
   dir=$(make_split wrapper-ambient)
   empty_backlog "$dir/decoy.md"
-  (cd "$dir/code" && TASKS_AXI_FILE="$dir/decoy.md" FM_HOME="$dir/home" "$WRAPPER" add amb-1 "ambient" >/dev/null) \
+  (cd "$dir/code" && TASKS_AXI_FILE="$dir/decoy.md" JG_HOME="$dir/home" "$WRAPPER" add amb-1 "ambient" >/dev/null) \
     || fail "add under an ambient TASKS_AXI_FILE failed"
   assert_grep "amb-1" "$dir/home/data/backlog.md" "an ambient TASKS_AXI_FILE diverted the write from the home"
   assert_no_grep "amb-1" "$dir/decoy.md" "an ambient TASKS_AXI_FILE received the write"
@@ -200,7 +200,7 @@ test_wrapper_refusals() {
   [ -L "$dir/home/data/backlog.md" ] || fail "a refused call still replaced the home link"
   assert_equals "$before" "$(cat "$dir/home/real-backlog.md")" "a refused call changed the backlog"
 
-  out=$(cd "$dir/code" && FM_HOME="$dir/missing-home" "$WRAPPER" list 2>&1)
+  out=$(cd "$dir/code" && JG_HOME="$dir/missing-home" "$WRAPPER" list 2>&1)
   rc=$?
   expect_code 2 "$rc" "missing data directory"
   pass "jg-tasks-axi.sh refuses caller --file, a symlinked home backlog, and an unresolvable home"
@@ -235,7 +235,7 @@ test_wrapper_single_home() {
   mkdir -p "$dir/data"
   jg_test_tasks_toml "$dir/.tasks.toml"
   empty_backlog "$dir/data/backlog.md"
-  (cd "$dir" && FM_ROOT_OVERRIDE="$dir" "$WRAPPER" add solo-1 "single home" >/dev/null) \
+  (cd "$dir" && JG_ROOT_OVERRIDE="$dir" "$WRAPPER" add solo-1 "single home" >/dev/null) \
     || fail "add in the single-home layout failed"
   assert_grep "solo-1" "$dir/data/backlog.md" "the single-home layout lost its own backlog write"
   pass "jg-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog"
@@ -289,8 +289,8 @@ EOF
   PATH="$dir/unreadable:$PATH" expect_captain_refusal "$dir" ca-3 rm ca-3
   assert_grep "ca-1" "$dir/home/data/backlog.md" "the refused item left the backlog"
   assert_grep "ca-3" "$dir/home/data/backlog.md" "a refused item left the backlog"
-  (cd "$dir/code" && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
-    && FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
+  (cd "$dir/code" && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
+    && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
     || fail "could not record a captain answer"
   wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
   wrapper_from_code "$dir" update ca-4 --pr https://github.com/o/r/pull/2 >/dev/null
@@ -308,23 +308,23 @@ test_captain_ask_guard_gaps() {
   home="$dir/home"
   printf 'Ship the first choice.\n' > "$dir/answer.txt"
   wrapper_from_code "$dir" add reheld "[captain-ask] choose again" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold reheld --reason choose >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer reheld --release --decision-file "$dir/answer.txt" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold reheld --reason "choose again" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold reheld --reason choose >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer reheld --release --decision-file "$dir/answer.txt" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold reheld --reason "choose again" >/dev/null
   expect_captain_refusal "$dir" reheld "done" reheld
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" bind board >/dev/null
-  printf 'reheld\n' | FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" bind board >/dev/null
+  printf 'reheld\n' | JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
   printf 'The original choice is moot.\n' > "$dir/evidence.txt"
   rc=0
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile close reheld --evidence-file "$dir/evidence.txt" 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile close reheld --evidence-file "$dir/evidence.txt" 2>&1) || rc=$?
   [ "$rc" != 0 ] || fail "reconcile closed an unanswered ask"
   assert_contains "$out" "reheld" "reconcile refusal did not name the ask"
   out=$(wrapper_from_code "$dir" show reheld --full)
   assert_contains "$out" 'held: yes' "reconcile released the ask"
   assert_not_contains "$out" 'Resolution mode: reconciled' "refused reconcile changed the history"
 
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer reheld --release --decision-file "$dir/evidence.txt" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answered reheld || fail "newest answer was not recognized"
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer reheld --release --decision-file "$dir/evidence.txt" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answered reheld || fail "newest answer was not recognized"
   wrapper_from_code "$dir" "done" reheld >/dev/null || fail "a newly answered ask could not close"
 
   (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null)
@@ -343,8 +343,8 @@ test_raw_rehold_of_a_released_ask_is_refused() {
   home="$dir/home"
   printf 'Ship the first choice.\n' > "$dir/answer.txt"
   wrapper_from_code "$dir" add raw-rehold "[captain-ask] choose once" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold raw-rehold --reason choose >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer raw-rehold --release --decision-file "$dir/answer.txt" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold raw-rehold --reason choose >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer raw-rehold --release --decision-file "$dir/answer.txt" >/dev/null
   expect_captain_refusal "$dir" raw-rehold hold raw-rehold --reason "choose again" --kind captain
   expect_captain_refusal "$dir" raw-rehold hold raw-rehold --reason "choose again"
   expect_captain_refusal "$dir" raw-rehold hold --kind=external raw-rehold --reason "choose again"
@@ -360,14 +360,14 @@ test_captain_hold_preflights_archive_candidates_only() {
   (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null) \
     || fail "could not seed the legacy unanswered ask"
   for id in call-held call-reconciled ordinary; do wrapper_from_code "$dir" add "$id" "$id call" >/dev/null; done
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-held --reason decide >/dev/null || fail "could not hold call-held"
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer call-held --decision-file "$dir/answer.txt" >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-held --reason decide >/dev/null || fail "could not hold call-held"
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer call-held --decision-file "$dir/answer.txt" >/dev/null \
     || fail "a legacy ask within keep blocked a fresh captain answer"
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-reconciled --reason decide >/dev/null || fail "could not hold call-reconciled"
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" bind board >/dev/null
-  printf 'call-reconciled\n' | FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-reconciled --reason decide >/dev/null || fail "could not hold call-reconciled"
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" bind board >/dev/null
+  printf 'call-reconciled\n' | JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile-requests --source-id board --source test >/dev/null
   printf 'The original choice is moot.\n' > "$dir/evidence.txt"
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile close call-reconciled --evidence-file "$dir/evidence.txt" >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" reconcile close call-reconciled --evidence-file "$dir/evidence.txt" >/dev/null \
     || fail "a legacy ask within keep blocked reconciling unrelated work"
   wrapper_from_code "$dir" "done" ordinary >/dev/null || fail "a legacy ask within keep blocked an ordinary done"
   out=$(wrapper_from_code "$dir" public-followup record-delivery nobody 2>&1) || true
@@ -375,9 +375,9 @@ test_captain_hold_preflights_archive_candidates_only() {
 
   printf 'backend = "markdown"\r\n\r\n[markdown] # backlog\r\npath = "data/backlog.md"\r\narchive = "data/done-archive.md"\r\n  done_keep = 0 # surplus\r\n' > "$home/.tasks.toml"
   wrapper_from_code "$dir" add call-surplus "captain call past keep" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-surplus --reason decide >/dev/null || fail "could not hold call-surplus"
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold call-surplus --reason decide >/dev/null || fail "could not hold call-surplus"
   rc=0
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer call-surplus --decision-file "$dir/answer.txt" >/dev/null 2>&1 || rc=$?
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer call-surplus --decision-file "$dir/answer.txt" >/dev/null 2>&1 || rc=$?
   [ "$rc" != 0 ] || fail "answer closed a call while the legacy unanswered ask would be archived"
   out=$(wrapper_from_code "$dir" show call-surplus --full)
   assert_not_contains "$out" "Resolution mode:" "a refused answer left a resolution record"
@@ -395,10 +395,10 @@ test_rehold_answer_closes_as_the_new_hold() {
   home="$dir/home"
   printf 'Ship the first choice.\n' > "$dir/answer.txt"
   wrapper_from_code "$dir" add rehold "[captain-ask] choose again" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold rehold --reason choose >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer rehold --release --decision-file "$dir/answer.txt" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold rehold --reason "choose again" >/dev/null
-  FM_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer rehold --decision-file "$dir/answer.txt" >/dev/null \
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold rehold --reason choose >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer rehold --release --decision-file "$dir/answer.txt" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" hold rehold --reason "choose again" >/dev/null
+  JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer rehold --decision-file "$dir/answer.txt" >/dev/null \
     || fail "the new hold's answer was refused as a replay of the released answer"
   out=$(wrapper_from_code "$dir" show rehold --full)
   assert_contains "$out" "state: done" "the new hold's answer did not close the call"
@@ -419,17 +419,17 @@ exit 1
 SH
   chmod +x "$stub"
   rc=0
-  FM_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" add pri-1 "no priority" >"$dir/out" 2>&1 || rc=$?
+  JG_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" add pri-1 "no priority" >"$dir/out" 2>&1 || rc=$?
   assert_equals 1 "$rc" "a refusing check must return its exit status"
   assert_grep "task-priority: this task has no priority" "$dir/out" "the check's message was not shown"
   assert_no_grep "pri-1" "$dir/home/data/backlog.md" "a refused add still reached the backlog"
-  FM_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" add pri-2 "has priority" --priority 1 >/dev/null 2>&1 \
+  JG_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" add pri-2 "has priority" --priority 1 >/dev/null 2>&1 \
     || fail "an add with a priority was refused"
   assert_grep "pri-2" "$dir/home/data/backlog.md" "a passing add did not reach the backlog"
-  FM_TASK_PRIORITY_CHECK="$dir/not-installed" wrapper_from_code "$dir" add pri-3 "check absent" >/dev/null 2>&1 \
+  JG_TASK_PRIORITY_CHECK="$dir/not-installed" wrapper_from_code "$dir" add pri-3 "check absent" >/dev/null 2>&1 \
     || fail "an add failed with the check absent"
   assert_grep "pri-3" "$dir/home/data/backlog.md" "an absent check blocked the add"
-  FM_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" list >/dev/null 2>&1 || fail "a non-add command was checked"
+  JG_TASK_PRIORITY_CHECK="$stub" wrapper_from_code "$dir" list >/dev/null 2>&1 || fail "a non-add command was checked"
   pass "jg-tasks-axi.sh add honors the installed task-priority check and ignores its absence"
 }
 

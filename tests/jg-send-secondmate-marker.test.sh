@@ -29,7 +29,7 @@ SEND="$ROOT/bin/jg-send.sh"
 TMP_ROOT=$(jg_test_tmproot jg-send-marker)
 
 # A fake tmux that (a) records the literal text of every `send-keys -l` to
-# FM_SEND_LOG and (b) lets jg-send's submit path reach a clean "empty" verdict.
+# JG_SEND_LOG and (b) lets jg-send's submit path reach a clean "empty" verdict.
 # display-message yields a numeric cursor_y; capture-pane returns an empty
 # bordered composer so jg_tmux_composer_state reads "empty" (submit landed) on the
 # first Enter. Only the literal (-l) text is logged; Enter retries and --key sends
@@ -52,7 +52,7 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "${1:-}" >> "$FM_SEND_LOG"
+      printf '%s' "${1:-}" >> "$JG_SEND_LOG"
     fi
     exit 0 ;;
   display-message)
@@ -74,15 +74,15 @@ SH
 
 # run_send <fakebin> <home> <send-log> -- <jg-send args...>
 # Runs jg-send.sh with the stubs on PATH against the given home (which holds
-# state/<id>.meta). FM_ROOT_OVERRIDE points at the same non-repo home so
+# state/<id>.meta). JG_ROOT_OVERRIDE points at the same non-repo home so
 # jg-guard's tangle check stays silent; guard noise goes to stderr (discarded).
-# FM_SEND_SETTLE=0 keeps the run fast. Truncates the log first; returns jg-send's
+# JG_SEND_SETTLE=0 keeps the run fast. Truncates the log first; returns jg-send's
 # exit code.
 run_send() {
   local fb=$1 home=$2 log=$3; shift 3
   : > "$log"
   env PATH="$fb:$PATH" \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$log" JG_SEND_SETTLE=0 \
     "$SEND" "$@" 2>/dev/null
 }
 
@@ -110,7 +110,7 @@ test_secondmate_target_is_marked() {
   expect_code 0 "$rc" "send to a secondmate target should succeed"
   got=$(record_body "$home/state/domain.inbox/001.msg")
   case "$got" in
-    "$FM_FROMFIRST_MARK"corr=[a-f0-9][a-f0-9]*) : ;;
+    "$JG_FROMFIRST_MARK"corr=[a-f0-9][a-f0-9]*) : ;;
     *) fail "secondmate send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   case "$got" in
@@ -118,7 +118,7 @@ test_secondmate_target_is_marked() {
     *) fail "secondmate send lost the request body"$'\n'"$got" ;;
   esac
   case "$(cat "$log")" in
-    *"$FM_FROMFIRST_MARK"*) fail "the marker must ride the record, never the typed doorbell" ;;
+    *"$JG_FROMFIRST_MARK"*) fail "the marker must ride the record, never the typed doorbell" ;;
   esac
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-pending-reply-lib.sh"
@@ -138,19 +138,19 @@ test_exact_secondmate_task_id_is_marked() {
   expect_code 0 "$rc" "send to an exact secondmate task id should succeed"
   got=$(record_body "$home/state/domain.inbox/001.msg")
   case "$got" in
-    "$FM_FROMFIRST_MARK"corr=[a-f0-9]*) : ;;
+    "$JG_FROMFIRST_MARK"corr=[a-f0-9]*) : ;;
     *) fail "exact secondmate send: the recorded steer should be marker+corr+text"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -c)" ;;
   esac
   # shellcheck source=/dev/null
   . "$ROOT/bin/jg-pending-reply-lib.sh"
   corr=$(jg_pending_reply_extract_corr "$got")
   # Resend with the same corr already present: embed is idempotent for that corr.
-  already_marked="${FM_FROMFIRST_MARK}corr=${corr} already routed"
+  already_marked="${JG_FROMFIRST_MARK}corr=${corr} already routed"
   run_send "$fb" "$home" "$log" "domain" "$already_marked"; rc=$?
   expect_code 0 "$rc" "send of already-marked exact-id content should succeed"
   got=$(record_body "$home/state/domain.inbox/002.msg")
   case "$got" in
-    "${FM_FROMFIRST_MARK}corr=${corr} already routed") : ;;
+    "${JG_FROMFIRST_MARK}corr=${corr} already routed") : ;;
     *) fail "exact secondmate send altered already-correlated content"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$got" | od -An -tx1)" ;;
   esac
   pass "jg-send: an exact kind=secondmate task id is marked with corr exactly once"
@@ -218,14 +218,14 @@ test_key_path_is_not_marked() {
 test_marker_is_label_plus_invisible_separator() {
   local separator hex
   separator=$(printf '\342\201\243')
-  [ "$FM_FROMFIRST_MARK" = "[jg-from-firstmate]$separator" ] \
-    || fail "marker is not the expected label + U+2063 sequence"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$FM_FROMFIRST_MARK" | od -An -tx1)"
-  hex=$(printf '%s' "$FM_FROMFIRST_MARK" | od -An -tx1 | tr -d ' \n')
+  [ "$JG_FROMFIRST_MARK" = "[jg-from-firstmate]$separator" ] \
+    || fail "marker is not the expected label + U+2063 sequence"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$JG_FROMFIRST_MARK" | od -An -tx1)"
+  hex=$(printf '%s' "$JG_FROMFIRST_MARK" | od -An -tx1 | tr -d ' \n')
   case "$hex" in
     *e281a3) : ;;
     *) fail "marker does not end in UTF-8 U+2063 bytes e2 81 a3; bytes were: $hex" ;;
   esac
-  jg_message_from_firstmate "${FM_FROMFIRST_MARK}do the work" \
+  jg_message_from_firstmate "${JG_FROMFIRST_MARK}do the work" \
     || fail "detector should recognize a marked message"
   jg_message_from_firstmate "do the work" \
     && fail "direct captain input must remain unmarked"
@@ -240,7 +240,7 @@ test_marker_transformation_is_idempotent() {
   jg_message_mark_from_firstmate "$once" twice
   [ "$once" = "$twice" ] \
     || fail "already-marked content was double-prefixed"$'\n'"--- once ---"$'\n'"$(printf '%s' "$once" | od -An -tx1)"$'\n'"--- twice ---"$'\n'"$(printf '%s' "$twice" | od -An -tx1)"
-  [ "$once" = "${FM_FROMFIRST_MARK}do the work" ] \
+  [ "$once" = "${JG_FROMFIRST_MARK}do the work" ] \
     || fail "marker transformation did not prefix bare content exactly once"
   pass "jg-marker: from-firstmate transformation is idempotent"
 }

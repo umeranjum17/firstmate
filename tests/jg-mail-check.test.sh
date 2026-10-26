@@ -29,10 +29,10 @@ run_check() {
   local home=$1 out=$2 check=$3
   shift 3
   local status=0
-  env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST \
-    -u FM_MAIL_CHECK_BUDGET \
-    FM_CHECK_TIMEOUT=30 \
-    "$@" FM_HOME="$home" PATH="$FAKEBIN:$PATH" \
+  env -u JG_MAIL_USER -u JG_MAIL_PASS -u JG_IMAP_HOST -u JG_SMTP_HOST \
+    -u JG_MAIL_CHECK_BUDGET \
+    JG_CHECK_TIMEOUT=30 \
+    "$@" JG_HOME="$home" PATH="$FAKEBIN:$PATH" \
     "$check" check >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "check exit"
 }
@@ -45,14 +45,14 @@ make_home() {
   printf '%s\n' "$home"
 }
 
-# write_env <home>: the four FM_MAIL_* values the poll requires.
+# write_env <home>: the four JG_MAIL_* values the poll requires.
 write_env() {
   local home=$1
   printf '%s\n' \
-    'FM_MAIL_USER=test@example.invalid' \
-    'FM_MAIL_PASS=test-pass' \
-    'FM_IMAP_HOST=imap.test.invalid' \
-    'FM_SMTP_HOST=smtp.test.invalid' > "$home/.env"
+    'JG_MAIL_USER=test@example.invalid' \
+    'JG_MAIL_PASS=test-pass' \
+    'JG_IMAP_HOST=imap.test.invalid' \
+    'JG_SMTP_HOST=smtp.test.invalid' > "$home/.env"
 }
 
 # enter_mailbox <home> <mailbox-generator-command...>: wires the scratch home's
@@ -87,17 +87,17 @@ test_arm_writes_and_binds_the_check_and_disarm_removes_it() {
   local home out
   home=$(make_home arm)
   write_env "$home"
-  out=$(FM_HOME="$home" "$CHECK" arm 2>&1) || fail "arm must succeed: $out"
+  out=$(JG_HOME="$home" "$CHECK" arm 2>&1) || fail "arm must succeed: $out"
   assert_contains "$out" "armed: state/mail.check.sh" "arm names the shim it wrote"
   assert_present "$home/state/mail.check.sh" "arm writes the check shim"
   assert_present "$home/state/mail.check-trust" "arm binds the shim for the watcher"
   assert_contains "$(cat "$home/state/mail.check.sh")" "jg-mail-check.sh check" "shim dispatches the check action"
-  assert_contains "$(cat "$home/state/mail.check.sh")" "FM_HOME=$home" "shim pins the absolute home"
+  assert_contains "$(cat "$home/state/mail.check.sh")" "JG_HOME=$home" "shim pins the absolute home"
 
-  out=$(FM_HOME="$home" "$CHECK" arm 2>&1) || fail "re-arm must succeed: $out"
+  out=$(JG_HOME="$home" "$CHECK" arm 2>&1) || fail "re-arm must succeed: $out"
   assert_contains "$out" "armed" "re-arm stays armed"
 
-  out=$(FM_HOME="$home" "$CHECK" disarm 2>&1) || fail "disarm must succeed: $out"
+  out=$(JG_HOME="$home" "$CHECK" disarm 2>&1) || fail "disarm must succeed: $out"
   assert_absent "$home/state/mail.check.sh" "disarm removes the check shim"
   assert_absent "$home/state/mail.check-trust" "disarm removes the trust binding"
   assert_absent "$home/state/.mail-check" "disarm removes the report record"
@@ -109,8 +109,8 @@ test_arm_resolves_a_relative_home_into_the_shim() {
   home=$(make_home relative)
   write_env "$home"
   rel="$(basename "$home")"
-  out=$(cd "$TMP_ROOT" && env FM_HOME="$rel" "$CHECK" arm 2>&1) || fail "arm with a relative FM_HOME must succeed: $out"
-  assert_contains "$(cat "$home/state/mail.check.sh")" "export FM_HOME=$home" "the shim pins the resolved absolute home, not the relative spelling"
+  out=$(cd "$TMP_ROOT" && env JG_HOME="$rel" "$CHECK" arm 2>&1) || fail "arm with a relative JG_HOME must succeed: $out"
+  assert_contains "$(cat "$home/state/mail.check.sh")" "export JG_HOME=$home" "the shim pins the resolved absolute home, not the relative spelling"
   pass "jg-mail-check: arm resolves a relative home into the shim"
 }
 
@@ -122,7 +122,7 @@ test_arm_refuses_a_symlink_at_the_shim_path() {
   mkdir -p "$target"
   printf '#!/usr/bin/env bash\n' > "$target/mail.check.sh"
   ln -s "$target/mail.check.sh" "$home/state/mail.check.sh"
-  out=$(FM_HOME="$home" "$CHECK" arm 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$CHECK" arm 2>&1) || rc=$?
   expect_code 1 "$rc" "arm must refuse a symlink at the shim path"
   assert_contains "$out" "could not write" "arm reports the shim write failure"
   assert_absent "$home/state/mail.check-trust" "no trust binding is left behind by a refused arm"
@@ -140,7 +140,7 @@ test_arm_refuses_without_the_mail_plane() {
   for lib in jg-timeout-lib.sh jg-pr-lib.sh jg-line-cap-lib.sh jg-check-lib.sh; do
     [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
-  out=$(FM_HOME="$home" "$tmpbin/jg-mail-check.sh" arm 2>&1) || rc=$?
+  out=$(JG_HOME="$home" "$tmpbin/jg-mail-check.sh" arm 2>&1) || rc=$?
   expect_code 1 "$rc" "arm must refuse when the mail plane is missing"
   assert_contains "$out" "mail plane is missing" "arm names the missing plane"
   assert_absent "$home/state/mail.check.sh" "a refused arm writes no shim"
@@ -209,7 +209,7 @@ test_unconfigured_home_is_reported_once() {
   out="$home/out.txt"
   run_check "$home" "$out" "$CHECK"
   assert_contains "$(cat "$out")" "mail: missing required" "an unconfigured home reports the missing setup"
-  assert_contains "$(cat "$out")" "FM_MAIL_USER" "the report names the missing variable"
+  assert_contains "$(cat "$out")" "JG_MAIL_USER" "the report names the missing variable"
   out="$home/out2.txt"
   run_check "$home" "$out" "$CHECK"
   [ ! -s "$out" ] || fail "the unconfigured state must not repeat: $(cat "$out")"
@@ -223,7 +223,7 @@ test_slow_poll_times_out_and_is_reported() {
   enter_mailbox "$home" \
     'sleep 6'
   out="$home/out.txt"
-  run_check "$home" "$out" "$CHECK" FM_MAIL_CHECK_BUDGET=5
+  run_check "$home" "$out" "$CHECK" JG_MAIL_CHECK_BUDGET=5
   assert_contains "$(cat "$out")" "mail: poll did not finish within the 5s budget" "a poll past its budget is reported, not ignored"
   [ "$(wc -l < "$out" | tr -d '[:space:]')" = 1 ] || fail "a poll timeout reports exactly one line: $(cat "$out")"
   pass "jg-mail-check: a slow poll times out into a one-line report"
@@ -272,7 +272,7 @@ test_large_poll_output_is_drained() {
   cat > "$tmpbin/jg-mail.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'jg-mail: woke for 42\n'
-case "$FM_TEST_POLL_SHAPE" in
+case "$JG_TEST_POLL_SHAPE" in
   success)
     awk 'BEGIN { for (i=0; i<20000; i++) print "poll diagnostic padding padding padding" }'
     printf 'jg-mail: woke for 43\n'
@@ -299,7 +299,7 @@ SH
     esac
     for attempt in 1 2; do
       out="$home/out-$attempt.txt"
-      (trap '' PIPE; run_check "$home" "$out" "$tmpbin/jg-mail-check.sh" FM_TEST_POLL_SHAPE="$shape")
+      (trap '' PIPE; run_check "$home" "$out" "$tmpbin/jg-mail-check.sh" JG_TEST_POLL_SHAPE="$shape")
       [ "$(cat "$out")" = "$expected" ] || fail "large $shape poll $attempt must emit only its summary: $(cat "$out")"
       [ "$(wc -l < "$out" | tr -d '[:space:]')" = 1 ] || fail "large $shape poll must be exactly one line"
     done
@@ -399,7 +399,7 @@ test_repeated_status2_stays_queued_still_wakes() {
   done
   cat > "$tmpbin/jg-mail.sh" <<EOF
 #!/usr/bin/env bash
-printf '1\t1\tcheck\tmail:9\tcheck: mail 9 - stays queued\\n' >> "\$FM_HOME/state/.wake-queue"
+printf '1\t1\tcheck\tmail:9\tcheck: mail 9 - stays queued\\n' >> "\$JG_HOME/state/.wake-queue"
 echo "jg-mail: wake for 9 could not be rolled back or durably recorded; the wake stays queued and the next poll heals it - a possible duplicate, never a lost mail" >&2
 exit 1
 EOF

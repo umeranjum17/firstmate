@@ -88,23 +88,23 @@
 #   -h, --help      print this header
 #
 # Per-script machine-parseable markers (stdout):
-#   FM_TEST_BEGIN <iso8601> <script> family=<family> expected_gate_skip=<class>
-#   FM_TEST_END <iso8601> <script> exit=<code> duration_ms=<n> gate_skip=<true|false>
+#   JG_TEST_BEGIN <iso8601> <script> family=<family> expected_gate_skip=<class>
+#   JG_TEST_END <iso8601> <script> exit=<code> duration_ms=<n> gate_skip=<true|false>
 #
 # After all scripts (stdout):
-#   FM_TEST_SUMMARY total=<n> failed=<n> skipped_gate=<n> duration_ms=<n>
-#   FM_TEST_SUMMARY_FAMILY family=<name> count=<n> duration_ms=<n> failed=<n>
-#   FM_TEST_SLOWEST rank=<k> script=<path> duration_ms=<n>
-#   FM_TEST_BUDGET max_wall_ms=<n> duration_ms=<n>   (only with --max-wall-ms)
+#   JG_TEST_SUMMARY total=<n> failed=<n> skipped_gate=<n> duration_ms=<n>
+#   JG_TEST_SUMMARY_FAMILY family=<name> count=<n> duration_ms=<n> failed=<n>
+#   JG_TEST_SLOWEST rank=<k> script=<path> duration_ms=<n>
+#   JG_TEST_BUDGET max_wall_ms=<n> duration_ms=<n>   (only with --max-wall-ms)
 #
 # Placement refusal:
 #   A task worker is assigned an isolated worktree, and that placement is
-#   checked only when its task starts. When FM_TASK_ID marks such a worker and
+#   checked only when its task starts. When JG_TASK_ID marks such a worker and
 #   this runner resolves to the repository's PRIMARY checkout, every executing
 #   mode refuses before selecting a suite: the suite creates and switches
 #   branches, and the primary is the checkout every linked worktree resolves
 #   against. Inspection modes execute nothing and stay available, and a run with
-#   no FM_TASK_ID set is unchanged.
+#   no JG_TASK_ID set is unchanged.
 #
 # Exit status is non-zero if any selected script exits non-zero, a configured
 # --fail-on-gate-skip token appears, the measured duration exceeds
@@ -252,7 +252,7 @@ now_iso() {
 # so the run proceeds.
 refuse_primary_checkout_for_task() {
   local task_id git_dir common_dir top
-  task_id=${FM_TASK_ID:-}
+  task_id=${JG_TASK_ID:-}
   [ -n "$task_id" ] || return 0
   git_dir=$(git -C "$ROOT" rev-parse --absolute-git-dir 2>/dev/null) \
     && git_dir=$(cd "$git_dir" 2>/dev/null && pwd -P) || git_dir=
@@ -261,7 +261,7 @@ refuse_primary_checkout_for_task() {
   [ -n "$git_dir" ] && [ -n "$common_dir" ] || return 0
   [ "$git_dir" = "$common_dir" ] || return 0
   top=$(cd "$ROOT" && pwd -P)
-  die "refusing to run in the repository primary checkout $top while FM_TASK_ID=$task_id is set; run from the assigned task worktree instead"
+  die "refusing to run in the repository primary checkout $top while JG_TASK_ID=$task_id is set; run from the assigned task worktree instead"
 }
 
 cpu_count() {
@@ -1206,7 +1206,7 @@ run_coverage_guard() {
   parallel_imbalance_ms=$((p1_ms - p2_ms))
   [ "$parallel_imbalance_ms" -ge 0 ] || parallel_imbalance_ms=$((-parallel_imbalance_ms))
 
-  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s herdr=%s\n' \
+  printf 'JG_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s herdr=%s\n' \
     "$(wc -l <"$tmp/all" | tr -d ' ')" \
     "$(wc -l <"$tmp/shards_union" | tr -d ' ')" \
     "$parallel_max_ms" \
@@ -1277,7 +1277,7 @@ agg = {
 }
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(agg, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-print(f"FM_TEST_AGGREGATE lanes={len(lanes)} total={total} failed={failed} skipped_gate={skipped} critical_path_duration_ms={wall_ms}")
+print(f"JG_TEST_AGGREGATE lanes={len(lanes)} total={total} failed={failed} skipped_gate={skipped} critical_path_duration_ms={wall_ms}")
 PY
 }
 
@@ -2232,11 +2232,11 @@ if [ "${#SCRIPTS[@]}" -eq 0 ]; then
   empty_duration=$((empty_finished_ms - RUN_STARTED_MS))
   [ "$empty_duration" -ge 0 ] || empty_duration=0
   empty_rc=0
-  printf 'FM_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=%s\n' "$empty_duration"
+  printf 'JG_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=%s\n' "$empty_duration"
   # The budget covers the whole invocation, so a selection phase that outran it
   # still fails - reporting zero work is not the same as reporting no time.
   if [ -n "$MAX_WALL_MS" ]; then
-    printf 'FM_TEST_BUDGET max_wall_ms=%s duration_ms=%s\n' "$MAX_WALL_MS" "$empty_duration"
+    printf 'JG_TEST_BUDGET max_wall_ms=%s duration_ms=%s\n' "$MAX_WALL_MS" "$empty_duration"
     if [ "$empty_duration" -gt "$MAX_WALL_MS" ]; then
       log "wall-clock budget exceeded: ${empty_duration}ms > ${MAX_WALL_MS}ms for $SELECTION_DESC"
       empty_rc=1
@@ -2438,7 +2438,7 @@ record_script_result() {
     log "gate skip: $script: ${gate_reason:-<no reason given>}"
   fi
 
-  printf 'FM_TEST_END %s %s exit=%s duration_ms=%s gate_skip=%s\n' \
+  printf 'JG_TEST_END %s %s exit=%s duration_ms=%s gate_skip=%s\n' \
     "$end_iso" "$script" "$rc" "$duration" "$gate_skip"
 
   fail_delta=0
@@ -2506,7 +2506,7 @@ run_one_serial() {
   begin_iso=$(now_iso)
   begin_ms=$(now_ms)
 
-  printf 'FM_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
+  printf 'JG_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
     "$begin_iso" "$script" "$family" "$expected"
 
   set +e
@@ -2622,15 +2622,15 @@ else
     base=$(basename "$script")
     family=$(family_for_basename "$base")
     expected=$(expected_gate_skip_for_family "$family")
-    printf 'FM_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
+    printf 'JG_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
       "$(now_iso)" "$script" "$family" "$expected"
     (
       trap - EXIT HUP INT TERM
       set +e
       export TMPDIR="$work/tmp"
       export TMP="$work/tmp"
-      unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
-        FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+      unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
+        JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
       begin_ms=$(now_ms)
       set +e
@@ -2668,13 +2668,13 @@ if [ "$RUN_DURATION" -lt 0 ]; then
   RUN_DURATION=0
 fi
 
-printf 'FM_TEST_SUMMARY total=%s failed=%s skipped_gate=%s duration_ms=%s\n' \
+printf 'JG_TEST_SUMMARY total=%s failed=%s skipped_gate=%s duration_ms=%s\n' \
   "$TOTAL" "$FAILED" "$SKIPPED_GATE" "$RUN_DURATION"
 
 if [ -s "$FAMILIES_TSV" ]; then
   # Stable family summary order by name.
   sort -t$'\t' -k1,1 "$FAMILIES_TSV" | while IFS=$'\t' read -r name count duration failed_count; do
-    printf 'FM_TEST_SUMMARY_FAMILY family=%s count=%s duration_ms=%s failed=%s\n' \
+    printf 'JG_TEST_SUMMARY_FAMILY family=%s count=%s duration_ms=%s failed=%s\n' \
       "$name" "$count" "$duration" "$failed_count"
   done
 fi
@@ -2683,7 +2683,7 @@ fi
 if [ -s "$RECORDS" ]; then
   rank=1
   sort -t$'\t' -k5,5nr "$RECORDS" | head -n 15 | while IFS=$'\t' read -r path _family _expected _rc duration _gate; do
-    printf 'FM_TEST_SLOWEST rank=%s script=%s duration_ms=%s\n' \
+    printf 'JG_TEST_SLOWEST rank=%s script=%s duration_ms=%s\n' \
       "$rank" "$path" "$duration"
     rank=$((rank + 1))
   done
@@ -2713,7 +2713,7 @@ if [ -n "$JSON_PATH" ]; then
 fi
 
 if [ -n "$MAX_WALL_MS" ]; then
-  printf 'FM_TEST_BUDGET max_wall_ms=%s duration_ms=%s\n' "$MAX_WALL_MS" "$RUN_DURATION"
+  printf 'JG_TEST_BUDGET max_wall_ms=%s duration_ms=%s\n' "$MAX_WALL_MS" "$RUN_DURATION"
   if [ "$RUN_DURATION" -gt "$MAX_WALL_MS" ]; then
     log "wall-clock budget exceeded: ${RUN_DURATION}ms > ${MAX_WALL_MS}ms for $SELECTION_DESC"
     AGG_RC=1

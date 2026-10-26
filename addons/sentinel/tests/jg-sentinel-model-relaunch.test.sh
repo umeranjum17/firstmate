@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 d=$(mktemp -d)
@@ -32,7 +41,7 @@ SH
 for cmd in jg-control.sh jg-secondmate-restart.sh; do
   cat >"$d/home/bin/$cmd" <<'SH'
 #!/usr/bin/env bash
-printf '%s %s %s\n' "$FM_HOME" "$(basename "$0")" "$*" >> "$RELAUNCH_LOG"
+printf '%s %s %s\n' "$JG_HOME" "$(basename "$0")" "$*" >> "$RELAUNCH_LOG"
 [ "${1:-}" != bad ]
 SH
   chmod +x "$d/home/bin/$cmd"
@@ -50,13 +59,13 @@ EOF
   [ "$id" != unmodeled ] || sed -i '/^model=/d' "$d/home/state/$id.meta"
 done
 : > "$d/relaunch.log"
-OUT=$(PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
+OUT=$(PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" JG_HOME="$d/home" JG_SENTINEL_MODEL_EVENT=fixture-event \
   "$ROOT/sentinel/bin/jg-sentinel.sh" model-reconcile 2>&1) || :
 printf '%s\n' "$OUT" | grep -q '^unmodeled: stored model missing; model restore refused$'
 [ "$(wc -l < "$d/relaunch.log")" -eq 1 ]
 rm "$d/home/state/unmodeled.meta"
 grep -q "$d/home jg-control.sh mismatch relaunch --model claude-sonnet-5-5" "$d/relaunch.log"
-PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=fixture-event \
+PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" JG_HOME="$d/home" JG_SENTINEL_MODEL_EVENT=fixture-event \
   "$ROOT/sentinel/bin/jg-sentinel.sh" model-reconcile
 [ "$(wc -l < "$d/relaunch.log")" -eq 1 ]
 printf 'PASS: main-home mismatch relaunches once per event\n'
@@ -81,7 +90,7 @@ printf -- '- lead-a - Lead (home: %s; scope: work)\n- lead-b - Lead (home: %s; s
 mkdir -p "$d/home/data" "$d/home/config"
 mv "$d/home/data-secondmates.md" "$d/home/data/secondmates.md"
 printf 'parked\n' >"$d/home/config/parked-homes"
-if PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=lead-event \
+if PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" JG_HOME="$d/home" JG_SENTINEL_MODEL_EVENT=lead-event \
   "$ROOT/sentinel/bin/jg-sentinel.sh" lead-model-reconcile; then
   echo 'expected failing lead relaunch to report failure' >&2; exit 1
 fi
@@ -91,7 +100,7 @@ grep -q "$d/lead-b jg-control.sh good relaunch --model claude-sonnet-5-5" "$d/re
 if grep -q "$d/parked jg-control.sh" "$d/relaunch.log"; then exit 1; fi
 if grep -q "$d/missing jg-control.sh" "$d/relaunch.log"; then exit 1; fi
 [ "$(wc -l < "$d/relaunch.log")" -eq 3 ]
-PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" FM_HOME="$d/home" FM_SENTINEL_MODEL_EVENT=lead-event \
+PATH="$PATH" RELAUNCH_LOG="$d/relaunch.log" JG_HOME="$d/home" JG_SENTINEL_MODEL_EVENT=lead-event \
   "$ROOT/sentinel/bin/jg-sentinel.sh" lead-model-reconcile
 [ "$(wc -l < "$d/relaunch.log")" -eq 3 ]
-printf 'PASS: lead homes use their own FM_HOME; failures continue; markers deduplicate\n'
+printf 'PASS: lead homes use their own JG_HOME; failures continue; markers deduplicate\n'

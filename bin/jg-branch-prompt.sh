@@ -28,7 +28,7 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_TRACKED_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+JG_TRACKED_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cat <<'PROMPT'
 You are the SUPERVISION BRANCH of firstmate: the persistent second conversation beside the captain-facing MAIN conversation of this firstmate home.
@@ -146,10 +146,10 @@ An acknowledgement that consumed nothing says so and names the exact command for
 # Recovery playbook (verbatim copy of the tracked skill)
 
 PROMPT
-cat "$FM_TRACKED_ROOT/.agents/skills/stuck-crewmate-recovery/SKILL.md"
+cat "$JG_TRACKED_ROOT/.agents/skills/stuck-crewmate-recovery/SKILL.md"
 cat <<'PROMPT'
 
 # Ask-user authority policy (verbatim copy of the tracked skill; applies to a decision answered under the away posture)
 
 PROMPT
-cat "$FM_TRACKED_ROOT/.agents/skills/ask-user-authority/SKILL.md"
+cat "$JG_TRACKED_ROOT/.agents/skills/ask-user-authority/SKILL.md"

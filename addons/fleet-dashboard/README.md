@@ -19,7 +19,7 @@ fork described under Provenance.
 
 ## Tests
 
-Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`: it copies a Firstmate checkout (the argument, `FM_FIRSTMATE_DIR`, or a fresh clone when neither is set) to a scratch tree, swaps in this directory's `jg-dashboard.sh` and `jg-dashboard/`, and runs the suite there.
+Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`: it copies a Firstmate checkout (the argument, `JG_FIRSTMATE_DIR`, or a fresh clone when neither is set) to a scratch tree, swaps in this directory's `jg-dashboard.sh` and `jg-dashboard/`, and runs the suite there.
 `fleet-dashboard/tests/jg-dashboard-partial-backlog.test.sh` runs on its own and checks the lower-bound counts when a single home's backlog cannot be read.
 
 ## Frozen contract (unchanged)
@@ -27,7 +27,7 @@ Run the behavior suite with `fleet-dashboard/tests/run-fork-suite.sh [checkout]`
 - CLI: `jg-dashboard.sh [build]` and `jg-dashboard.sh serve [--bind ADDR]
   [--port N]` (plus `-h`); every other invocation prints the usage line and
   exits 2.
-- Output: `$FM_HOME/state/dashboard/` — `board.json`, `data.json`, the static
+- Output: `$JG_HOME/state/dashboard/` — `board.json`, `data.json`, the static
   pages `index.html`, `backlog.html` (+ its `backlog.home.html` variant) and
   `measure.html`, plus the retained `filed.json` and `history.tsv`.
 - Data keys: `board.json` carries the flow reader's `jg-flow.v1` observation
@@ -51,7 +51,7 @@ and queue numbers when a single home's backlog cannot be read: it counts the
 homes that were read, marks a partial count as a lower bound (`≥`), names each
 unread home with its reason, and reports the partial metric with status
 `partial` in `data.json`. Only when no home could be read does the tile show
-the unknown dash as before. It also adds one environment input, `FM_BIN` (see
+the unknown dash as before. It also adds one environment input, `JG_BIN` (see
 For the fork shim lane), defaulting to the script's own directory so a fork
 copy behaves exactly as before. The third changes the ask list: it lists
 newest first by default with an oldest-first toggle, and each ask carries a
@@ -68,16 +68,16 @@ metric's `source` in `data.json`) on hover and under its card, and the ticket co
 It takes the owner's sign-off board token: `config/owner-board` names the board's `board.json`, and its `<board>.token` is read on each comment.
 A device that opened the board's access link carries the board's `sign-off-<port>` cookie, and the browser sends it to the dashboard too when both are opened at the same address, so nothing is pasted (with no such config, comments are off).
 The comment goes to the owning lead with `jg-send.sh` (or to Main with `jg-inbox.sh note`) and asks for the answer in the thread:
-the lead runs `"$FM_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer>`, Main `jg-inbox.sh reply <note id> <answer>`.
+the lead runs `"$JG_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer>`, Main `jg-inbox.sh reply <note id> <answer>`.
 The build shows each comment with its pickup (the steer or note moved to `handled/`) and answer (the lead's `corr=<comment id>` line on its channel, or Main's inbox reply).
-The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page. Every memory pressure figure (the Metrics Memory card, the generated pages, `data.json` and Insights) is the memory gate's own sustained reading, the lower of the 10 s and 60 s averages. Metrics shows Time in stage: each open lane at its time in its current stage, the median per stage, and the bottleneck (most lane-hours, lanes on hold left out); a row opens the stage-filtered Board. A ticket's name and description are whole even when `tasks-axi list` cuts them (filled from `show --full`, cached in `state/dashboard/full-text.json`), its ask names the Main message that carried it, and its page shows the lane's proof (completion receipt and done-done verdict). Metrics' Flow card shows GitHub's merges in the repositories the fleet recorded merges in beside the recorded ones, by local day, with the records' coverage (one read-only `gh pr list` per repository at most every 30 minutes, kept in `state/dashboard/forge.json`; `FM_DASHBOARD_FORGE=off` skips it).
+The Ship tab is removed, with its `ship/` files and the vendored three.js it alone used. The app takes the approved Tickets prototype's look: neutral greys and one accent in both themes (Insights included), Tickets as the landing view, Overview labelled Metrics, a phone dock that names each view, flat neutral Metrics cards, and Board cards whose names drop leading tags and Main refs as tickets do. Tickets filters by release as well as project and lays open items in release lanes (Next release, After, Later; `#/tickets?by=release`); each Metrics lifecycle stage and To land open the Board filtered to that stage (`#/board?stage=ci`, a removable Stage chip); a phone's column switcher scrolls sideways only, never the page. Every memory pressure figure (the Metrics Memory card, the generated pages, `data.json` and Insights) is the memory gate's own sustained reading, the lower of the 10 s and 60 s averages. Metrics shows Time in stage: each open lane at its time in its current stage, the median per stage, and the bottleneck (most lane-hours, lanes on hold left out); a row opens the stage-filtered Board. A ticket's name and description are whole even when `tasks-axi list` cuts them (filled from `show --full`, cached in `state/dashboard/full-text.json`), its ask names the Main message that carried it, and its page shows the lane's proof (completion receipt and done-done verdict). Metrics' Flow card shows GitHub's merges in the repositories the fleet recorded merges in beside the recorded ones, by local day, with the records' coverage (one read-only `gh pr list` per repository at most every 30 minutes, kept in `state/dashboard/forge.json`; `JG_DASHBOARD_FORGE=off` skips it).
 The fifth adds the stale-ticket count: `jg-dashboard.sh` derives `tickets_stale` from the backlog it already reads — open tickets (`state != done`) whose `updated` is more than a day old, the one-day rule counted once on the server — and `tickets.js` names it in the Tickets hero at both widths, so a board that has drifted says how far on the view the captain opens first.
 Every other moved file remains byte-identical to the fork.
 
 ## Side-by-side proof (re-run before the served path swaps)
 
 The acceptance proof builds the fork copy and this copy in two throwaway
-`FM_HOME` dirs over one identical fixture and diffs the two
+`JG_HOME` dirs over one identical fixture and diffs the two
 `state/dashboard/` outputs byte for byte. Its fixture reads every home's
 backlog, so the two copies still agree there; the deliberate differences
 above are the cases where they are now expected to diverge.
@@ -100,19 +100,19 @@ Manual recipe if the harness is gone:
    (`jg-flow.sh` exiting non-zero for pass 1, a fixed `jg-flow.v1` JSON for
    pass 2; fixed `jg-model-stats.sh` / `jg-skill-stats.sh`; a fixed TOON
    `jg-tasks-axi.sh` + addressing lib), and PATH stubs for `herdr`, `adb`,
-   `pgrep`, `systemctl`, a fake `/proc` (`FM_DASHBOARD_PROC`) and an empty
-   `FM_DEVICE_LOCK_DIR`.
-3. Copy one synthesized fixture into two throwaway `FM_HOME` dirs: the most
+   `pgrep`, `systemctl`, a fake `/proc` (`JG_DASHBOARD_PROC`) and an empty
+   `JG_DEVICE_LOCK_DIR`.
+3. Copy one synthesized fixture into two throwaway `JG_HOME` dirs: the most
    tasks, the longest titles, a lane in every state plus a held lane, asks,
    recorded merges, quota and machine samples, and a home whose flow reader is
    broken so `flow_error` is exercised; pin `TZ=UTC LC_ALL=C` and freeze the
    clock (`PYTHONPATH=sitecustomize.py` stubbing `datetime.now`/`time`) so
    both builds run at one instant.
 4. Run `jg-dashboard.sh build` with each home, capture
-   `$FM_HOME/state/dashboard/`, and `diff -r` the captures: identical
+   `$JG_HOME/state/dashboard/`, and `diff -r` the captures: identical
    `board.json` and `data.json`, page HTML identical outside the deliberate
    differences above. The only path a build prints is
-   its index page path, which names its own `FM_HOME` — normalize that line
+   its index page path, which names its own `JG_HOME` — normalize that line
    and the stdout must match too.
 5. Check the CLI contract (`-h`, bad subcommand, bad port, extra build
    argument → usage line and exit 2) and smoke `serve --bind 127.0.0.1
@@ -121,12 +121,12 @@ Manual recipe if the harness is gone:
 
 ## For the fork shim lane
 
-`FM_BIN` names the directory holding the Firstmate helper scripts a build runs (`jg-tasks-axi.sh`, `jg-flow.sh`, ...); unset, it defaults to this script's own directory, so a fork copy is unaffected.
-Run from this repository it must point at the Firstmate `bin/`, which makes the later shim `FM_BIN=<firstmate>/bin exec <addons>/fleet-dashboard/jg-dashboard.sh "$@"`: a set `FM_BIN` without `jg-tasks-axi.sh` is refused.
+`JG_BIN` names the directory holding the Firstmate helper scripts a build runs (`jg-tasks-axi.sh`, `jg-flow.sh`, ...); unset, it defaults to this script's own directory, so a fork copy is unaffected.
+Run from this repository it must point at the Firstmate `bin/`, which makes the later shim `JG_BIN=<firstmate>/bin exec <addons>/fleet-dashboard/jg-dashboard.sh "$@"`: a set `JG_BIN` without `jg-tasks-axi.sh` is refused.
 
 The shipped `jg-dashboard.service` runs
 `<jg-home>/bin/jg-dashboard.sh serve --bind "$(tailscale ip -4 |
-head -1)" --port 4390` with `FM_HOME=<jg-home>`; the later shim
+head -1)" --port 4390` with `JG_HOME=<jg-home>`; the later shim
 must keep that exact path and argv (it will exec
 `fleet-dashboard/jg-dashboard.sh`). Re-run the side-by-side proof above
 immediately before the served path swaps, and keep this README's proof

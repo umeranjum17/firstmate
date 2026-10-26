@@ -57,16 +57,16 @@
 #
 # Sourced by the publishers above and by tests. No side effects on source.
 
-_FM_PARENT_CHANNEL_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+_JG_PARENT_CHANNEL_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 # shellcheck source=bin/jg-secondmate-parent-lib.sh
-. "$_FM_PARENT_CHANNEL_LIB_DIR/jg-secondmate-parent-lib.sh"
+. "$_JG_PARENT_CHANNEL_LIB_DIR/jg-secondmate-parent-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
-. "$_FM_PARENT_CHANNEL_LIB_DIR/jg-classify-lib.sh"
+. "$_JG_PARENT_CHANNEL_LIB_DIR/jg-classify-lib.sh"
 
 # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-FM_PARENT_CHANNEL_ID=
+JG_PARENT_CHANNEL_ID=
 # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-FM_PARENT_CHANNEL_ROUTE=
+JG_PARENT_CHANNEL_ROUTE=
 
 # A mate id is used as a file-name component in the parent home, so it is
 # accepted only when it is path-safe: no empty value, leading dot, slash, or
@@ -95,30 +95,30 @@ jg_parent_channel_home_id() {  # <home>
 }
 
 # Resolve the channel destination for <home> whose state dir is <state>.
-# Prints the destination path and sets FM_PARENT_CHANNEL_ID and
-# FM_PARENT_CHANNEL_ROUTE. Returns 1 for a main home, 2 for an unusable
+# Prints the destination path and sets JG_PARENT_CHANNEL_ID and
+# JG_PARENT_CHANNEL_ROUTE. Returns 1 for a main home, 2 for an unusable
 # marker, 3 for a missing or unreadable parent binding.
 jg_parent_channel_destination() {  # <home> <state>
   local home=$1 state=$2 id rc=0
-  FM_PARENT_CHANNEL_ID=
-  FM_PARENT_CHANNEL_ROUTE=
+  JG_PARENT_CHANNEL_ID=
+  JG_PARENT_CHANNEL_ROUTE=
   id=$(jg_parent_channel_home_id "$home") || rc=$?
   [ "$rc" -eq 0 ] || return "$rc"
   jg_secondmate_parent_record_parse "$home/.jg-secondmate-parent" || return 3
-  case "$FM_SECONDMATE_PARENT_ROUTE" in
+  case "$JG_SECONDMATE_PARENT_ROUTE" in
     local)
-      [ -n "$FM_SECONDMATE_PARENT_HOME" ] || return 3
+      [ -n "$JG_SECONDMATE_PARENT_HOME" ] || return 3
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-      FM_PARENT_CHANNEL_ID=$id
+      JG_PARENT_CHANNEL_ID=$id
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-      FM_PARENT_CHANNEL_ROUTE=local
-      printf '%s/state/%s.status\n' "$FM_SECONDMATE_PARENT_HOME" "$id"
+      JG_PARENT_CHANNEL_ROUTE=local
+      printf '%s/state/%s.status\n' "$JG_SECONDMATE_PARENT_HOME" "$id"
       ;;
     remote)
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-      FM_PARENT_CHANNEL_ID=$id
+      JG_PARENT_CHANNEL_ID=$id
       # shellcheck disable=SC2034 # Output globals read by sourcing callers.
-      FM_PARENT_CHANNEL_ROUTE=remote
+      JG_PARENT_CHANNEL_ROUTE=remote
       printf '%s/parent-replies.status\n' "$state"
       ;;
     *) return 3 ;;
@@ -143,7 +143,7 @@ jg_parent_channel_outbound_status() {  # <home> <state>
   # shape jg-pending-reply-lib.sh's wrong-home detection uses) so the route
   # check reads the resolver's own verdict rather than re-deriving it.
   jg_parent_channel_destination "$home" "$state" >/dev/null || return 1
-  [ "$FM_PARENT_CHANNEL_ROUTE" = remote ] || return 1
+  [ "$JG_PARENT_CHANNEL_ROUTE" = remote ] || return 1
   printf '%s\n' "$destination"
 }
 

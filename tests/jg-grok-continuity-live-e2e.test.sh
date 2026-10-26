@@ -6,7 +6,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_GROK_LIVE_E2E grok tmux
+jg_live_gate opt-in JG_GROK_LIVE_E2E grok tmux
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -70,7 +70,7 @@ mkdir -p "$HOME_DIR/state" "$HOME_DIR/config"
 printf 'project=fixture\n' > "$HOME_DIR/state/grok-e2e.meta"
 
 "$TMUX" -L "$SOCKET" new-session -d -s "$SESSION" -c "$PROJECT" \
-  "env FM_HOME='$HOME_DIR' FM_ROOT_OVERRIDE='$PROJECT' FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 bash -lc 'printf \"%s\\n\" \"\$\$\" > \"\$FM_HOME/state/.lock\"; grok --trust --always-approve --reasoning-effort low; rc=\$?; printf \"GROK_EXIT=%s\\n\" \"\$rc\"; sleep 300'"
+  "env JG_HOME='$HOME_DIR' JG_ROOT_OVERRIDE='$PROJECT' JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HEARTBEAT=600 bash -lc 'printf \"%s\\n\" \"\$\$\" > \"\$JG_HOME/state/.lock\"; grok --trust --always-approve --reasoning-effort low; rc=\$?; printf \"GROK_EXIT=%s\\n\" \"\$rc\"; sleep 300'"
 
 wait_for_text "Grok Build" 180 || fail "Grok did not reach its ready composer"
 sleep 1

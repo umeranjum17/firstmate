@@ -30,7 +30,7 @@ pass() {
   printf 'ok - %s\n' "$1"
 }
 
-jg_live_gate opt-in FM_AGY_SIGNALS_LIVE agy tmux
+jg_live_gate opt-in JG_AGY_SIGNALS_LIVE agy tmux
 [ -n "$AGY_BIN" ] || fail "agy is not installed"
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-agy-signals.XXXXXX") || fail "could not create the isolated agy lab"

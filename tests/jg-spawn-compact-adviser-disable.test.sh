@@ -52,7 +52,7 @@ EOF
 run_case_spawn() {
   : > "$LAUNCH_LOG"
   : > "$PANE_LOG"
-  FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_PANE_LOG="$PANE_LOG" \
+  JG_FAKE_LAUNCH_LOG="$LAUNCH_LOG" JG_FAKE_PANE_LOG="$PANE_LOG" \
     jg_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$@"
 }
 
@@ -190,7 +190,7 @@ test_secondmate_launch() {
   pass "a secondmate launch carries the compact-adviser switch in both allowlist postures"
 }
 
-# The steering doorbell names "$FM_TASK_INBOX" rather than a path, so every
+# The steering doorbell names "$JG_TASK_INBOX" rather than a path, so every
 # launch must hand its agent the absolute path of the task's own inbox. For a
 # secondmate that inbox lives in the launching home's state, not its own. The
 # cleared allowlist environment is where an ambient forward would be lost.
@@ -215,14 +215,14 @@ test_launch_exports_task_inbox() {
     fi
     status=$?
     expect_code 0 "$status" "$kind spawn should succeed: $out"
-    install_env_probe "$FAKEBIN_DIR" codex FM_TASK_INBOX
+    install_env_probe "$FAKEBIN_DIR" codex JG_TASK_INBOX
     seen=$(emitted_launch_env "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG") \
       || fail "$kind: the emitted launch failed to run"
     want="$(cd "$HOME_DIR/state" && pwd -P)/$id.inbox"
     assert_equals "$want" "$seen" \
-      "a $kind agent must start with FM_TASK_INBOX set to its absolute steering inbox"
+      "a $kind agent must start with JG_TASK_INBOX set to its absolute steering inbox"
   done
-  pass "ship and secondmate launches export their absolute steering inbox as FM_TASK_INBOX"
+  pass "ship and secondmate launches export their absolute steering inbox as JG_TASK_INBOX"
 }
 
 # --- relaunch ---------------------------------------------------------------
@@ -238,7 +238,7 @@ make_relaunch_stub() {  # <case-dir>
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=$JG_FAKE_DIR
 case "${1:-}" in
   send-keys)
     shift
@@ -324,9 +324,9 @@ test_relaunch_rebuilds_the_switch() {
     } > "$home/state/$id.meta"
 
     mkdir -p "$dir/user-home"
-    out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$home" FM_FAKE_DIR="$dir/fake" \
-      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
-      FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
+    out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$home" JG_FAKE_DIR="$dir/fake" \
+      HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' JG_SPAWN_NO_GUARD=1 \
+      JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
       "$CONTROL" "$id" relaunch --note 'replacement continues the same task' 2>&1)
     status=$?
     expect_code 0 "$status" "relaunch with allowlist=$setting should succeed: $out"
@@ -393,9 +393,9 @@ SH
     echo "model=default"
     echo "effort=default"
   } > "$home/state/$id.meta"
-  out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$home" FM_FAKE_DIR="$dir/fake" \
-    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 FM_ADDONS_DIR="$dir/addons" \
-    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
+  out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$home" JG_FAKE_DIR="$dir/fake" \
+    HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' JG_SPAWN_NO_GUARD=1 JG_ADDONS_DIR="$dir/addons" \
+    JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
     "$CONTROL" "$id" relaunch --note 'replacement continues the same task' 2>&1)
   status=$?
   expect_code 0 "$status" "receipt relaunch should succeed: $out"

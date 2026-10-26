@@ -42,9 +42,9 @@ SEND="$ROOT/bin/jg-send.sh"
 TMP_ROOT=$(jg_test_tmproot jg-send-inbox)
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
 
-# Stub tmux: logs literal typed text to FM_SEND_LOG and lets the submit and
-# composer paths reach clean verdicts. FM_FAKE_TMUX_COMPOSER=pending renders a
-# composer visibly holding text; FM_FAKE_TMUX_SEND_FAIL=1 fails send-keys.
+# Stub tmux: logs literal typed text to JG_SEND_LOG and lets the submit and
+# composer paths reach clean verdicts. JG_FAKE_TMUX_COMPOSER=pending renders a
+# composer visibly holding text; JG_FAKE_TMUX_SEND_FAIL=1 fails send-keys.
 make_stubs() { # <dir> -> echoes fakebin dir
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
@@ -53,7 +53,7 @@ make_stubs() { # <dir> -> echoes fakebin dir
 set -u
 case "${1:-}" in
   send-keys)
-    [ "${FM_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
+    [ "${JG_FAKE_TMUX_SEND_FAIL:-0}" = 1 ] && exit 1
     shift
     literal=0
     while [ $# -gt 0 ]; do
@@ -64,14 +64,14 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s\n' "${1:-}" >> "$FM_SEND_LOG"
+      printf '%s\n' "${1:-}" >> "$JG_SEND_LOG"
     fi
     exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
-    if [ "${FM_FAKE_TMUX_COMPOSER:-}" = pending ]; then
+    if [ "${JG_FAKE_TMUX_COMPOSER:-}" = pending ]; then
       printf '╭──────────────╮\n│ leftover txt │\n╰──────────────╯\n'
     else
       printf '╭────╮\n│    │\n╰────╯\n'
@@ -110,8 +110,8 @@ run_send() { # <case-dir> <err-file> [env...] -- <jg-send args...>
   shift
   : >"$dir/send.log"
   env PATH="$dir/fakebin:$PATH" \
-    FM_ROOT_OVERRIDE="$dir/home" FM_HOME="$dir/home" FM_SEND_LOG="$dir/send.log" \
-    FM_SEND_SETTLE=0 ${envs[@]+"${envs[@]}"} \
+    JG_ROOT_OVERRIDE="$dir/home" JG_HOME="$dir/home" JG_SEND_LOG="$dir/send.log" \
+    JG_SEND_SETTLE=0 ${envs[@]+"${envs[@]}"} \
     "$SEND" "$@" >/dev/null 2>"$err"
 }
 
@@ -131,7 +131,7 @@ test_text_steer_rides_inbox() {
   body=$(record_body _ "$rec")
   [ "$body" = "please rebase onto main" ] || fail "the recorded body differs: $body"
   typed=$(cat "$dir/send.log")
-  assert_contains "$typed" "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
+  assert_contains "$typed" "Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
     "the doorbell should direct the worker to drain the inbox"
   case "$typed" in
   *"please rebase onto main"*) fail "the payload must never be typed:"$'\n'"$typed" ;;
@@ -154,8 +154,8 @@ test_deep_home_doorbell_stays_short() {
   jg_write_meta "$home/state/t1.meta" "window=sess:jg-t1" "kind=ship" "harness=claude"
   err="$deep/send.err"
   env PATH="$deep/fakebin:$PATH" \
-    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$deep/send.log" \
-    FM_SEND_SETTLE=0 "$SEND" t1 "please continue" >/dev/null 2>"$err" ||
+    JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_SEND_LOG="$deep/send.log" \
+    JG_SEND_SETTLE=0 "$SEND" t1 "please continue" >/dev/null 2>"$err" ||
     fail "the deep-home send failed: $(cat "$err")"
   [ -f "$home/state/t1.inbox/001.msg" ] || fail "the deep-home steer was not durably recorded"
   typed=$(cat "$deep/send.log")
@@ -170,12 +170,12 @@ test_deep_home_doorbell_stays_short() {
   case "$rest" in
   *t1.inbox*) fail "the doorbell should name the inbox once: $typed" ;;
   esac
-  found=$(cd / && FM_TASK_INBOX="$home/state/t1.inbox" bash -c 'ls "$FM_TASK_INBOX"/*.msg') ||
-    fail "a shell with FM_TASK_INBOX exported could not list the deep inbox"
+  found=$(cd / && JG_TASK_INBOX="$home/state/t1.inbox" bash -c 'ls "$JG_TASK_INBOX"/*.msg') ||
+    fail "a shell with JG_TASK_INBOX exported could not list the deep inbox"
   [ "$found" = "$home/state/t1.inbox/001.msg" ] ||
     fail "the doorbell's list instruction did not resolve the deep inbox from an unrelated cwd: $found"
-  (cd / && FM_TASK_INBOX="$home/state/t1.inbox" bash -c 'mv "$FM_TASK_INBOX"/001.msg "$FM_TASK_INBOX"/handled/') ||
-    fail "the doorbell's mv instruction did not acknowledge through FM_TASK_INBOX"
+  (cd / && JG_TASK_INBOX="$home/state/t1.inbox" bash -c 'mv "$JG_TASK_INBOX"/001.msg "$JG_TASK_INBOX"/handled/') ||
+    fail "the doorbell's mv instruction did not acknowledge through JG_TASK_INBOX"
   [ -f "$home/state/t1.inbox/handled/001.msg" ] || fail "the acknowledged record did not land in handled/"
   pass "jg-send inbox: a deep home rings the same short doorbell naming the inbox once"
 }
@@ -219,7 +219,7 @@ test_pending_composer_skips_ring_advisorily() {
   local dir err rc
   dir=$(setup_case pendingskip)
   err="$dir/send.err"
-  run_send "$dir" "$err" FM_FAKE_TMUX_COMPOSER=pending -- t1 "steer past a stuck composer"
+  run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- t1 "steer past a stuck composer"
   rc=$?
   expect_code 0 "$rc" "a skipped ring is still a sent steer"
   [ -f "$dir/home/state/t1.inbox/001.msg" ] || fail "the steer was not recorded"
@@ -235,7 +235,7 @@ test_failed_ring_is_still_sent() {
   local dir err rc
   dir=$(setup_case ringfail)
   err="$dir/send.err"
-  run_send "$dir" "$err" FM_FAKE_TMUX_SEND_FAIL=1 -- t1 "steer into a dead pane"
+  run_send "$dir" "$err" JG_FAKE_TMUX_SEND_FAIL=1 -- t1 "steer into a dead pane"
   rc=$?
   expect_code 0 "$rc" "a failed doorbell must not fail the send"
   [ -f "$dir/home/state/t1.inbox/001.msg" ] || fail "the steer was not recorded"
@@ -255,7 +255,7 @@ test_fire_and_forget_unlanded_ring_owes_one_retry() {
   # The stub lists only window jg-t1, so the secondmate takes it over.
   rm -f "$dir/home/state/t1.meta"
   jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
-  run_send "$dir" "$err" FM_FAKE_TMUX_COMPOSER=pending -- \
+  run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- \
     jg-domain --fire-and-forget 0123456789abcdef "reconcile your books"; rc=$?
   expect_code 0 "$rc" "a skipped fire-and-forget ring is still a sent steer"
   [ "$(cat "$dir/home/state/domain.inbox/.retry-ring" 2>/dev/null)" = 001.msg ] \
@@ -270,7 +270,7 @@ test_fire_and_forget_unlanded_ring_owes_one_retry() {
 
   dir=$(setup_case ordinary-no-retry)
   err="$dir/send.err"
-  run_send "$dir" "$err" FM_FAKE_TMUX_COMPOSER=pending -- t1 "ordinary steer"
+  run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- t1 "ordinary steer"
   [ ! -e "$dir/home/state/t1.inbox/.retry-ring" ] \
     || fail "an ordinary record rides the ladder and must not owe a separate retry"
   pass "jg-send inbox: a fire-and-forget ring that did not land owes one retry ring"
@@ -284,7 +284,7 @@ test_fire_and_forget_retry_stays_off_without_the_flag() {
   [ ! -e "$dir/home/config/wait-no-turns" ]
   rm -f "$dir/home/state/t1.meta"
   jg_write_secondmate_meta "$dir/home/state/domain.meta" "$dir/home" "sess:jg-t1" alpha claude
-  run_send "$dir" "$err" FM_FAKE_TMUX_COMPOSER=pending -- \
+  run_send "$dir" "$err" JG_FAKE_TMUX_COMPOSER=pending -- \
     jg-domain --fire-and-forget 0123456789abcdef "reconcile your books"; rc=$?
   expect_code 0 "$rc" "a skipped fire-and-forget ring is still a sent steer"
   [ ! -e "$dir/home/state/domain.inbox/.retry-ring" ] \
@@ -350,7 +350,7 @@ test_secondmate_marker_and_enqueue_delivery() {
     fail "a secondmate steer should succeed"
   body=$(record_body _ "$dir/home/state/domain.inbox/001.msg")
   case "$body" in
-  "$FM_FROMFIRST_MARK"corr=*) : ;;
+  "$JG_FROMFIRST_MARK"corr=*) : ;;
   *) fail "the recorded body lost the from-firstmate marker/corr framing:"$'\n'"$body" ;;
   esac
   corr=$(printf '%s' "$body" | grep -oE 'corr=[a-f0-9]{16}' | head -1 | cut -d= -f2)
@@ -375,7 +375,7 @@ test_post_enqueue_bookkeeping_failure_is_not_retryable() {
 set -u
 source_arg=${@: -2:1}
 target_arg=${@: -1}
-if [ "${FM_FAIL_DELIVERY_CONFIRM:-0}" = 1 ] \
+if [ "${JG_FAIL_DELIVERY_CONFIRM:-0}" = 1 ] \
   && grep -q '^confirmed=' "$source_arg" 2>/dev/null; then
   # Simulate losing both the delivery commit and its prepared recovery marker.
   rm -f "$target_arg"
@@ -385,7 +385,7 @@ exec /bin/mv "$@"
 SH
   chmod +x "$dir/fakebin/mv"
 
-  run_send "$dir" "$err" FM_FAIL_DELIVERY_CONFIRM=1 -- domain "durable once"
+  run_send "$dir" "$err" JG_FAIL_DELIVERY_CONFIRM=1 -- domain "durable once"
   rc=$?
   # The durable record IS the delivery: even with the commit AND its recovery
   # marker both lost, the steer was delivered, so jg-send must not signal a
@@ -399,7 +399,7 @@ SH
     fail "the delivered steer was duplicated:"$'\n'"$(ls "$dir/home/state/domain.inbox")"
   body=$(record_body _ "$rec")
   case "$body" in
-  "$FM_FROMFIRST_MARK"corr=*) : ;;
+  "$JG_FROMFIRST_MARK"corr=*) : ;;
   *) fail "bookkeeping failure test lost the secondmate marker: $body" ;;
   esac
   assert_contains "$(cat "$err")" "reply-tracking-degraded" \
@@ -433,7 +433,7 @@ test_meta_lock_contention_fails_bounded() {
     kill "$holder" 2>/dev/null
     fail "the metadata lock holder did not start"
   }
-  run_send "$dir" "$err" FM_TASK_INBOX_LOCK_WAIT_SECS=0 -- t1 "must not hang"
+  run_send "$dir" "$err" JG_TASK_INBOX_LOCK_WAIT_SECS=0 -- t1 "must not hang"
   rc=$?
   kill "$holder" 2>/dev/null
   wait "$holder" 2>/dev/null

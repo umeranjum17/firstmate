@@ -22,14 +22,14 @@
 #      supervision session, and hands to its successor as handling, but that
 #      turns main-only (a decision lands) before its turn starts, is handed
 #      back to main and delivered the same way, with no engine turn.
-# With FM_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF=<git ref>, the scenario
+# With JG_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF=<git ref>, the scenario
 # first runs on that ref's host as a negative control and must show the idle
 # primary NOT woken by the first event, so the scenario is proven able to catch
 # a dropped hand-back. Evidence lines start with "# ".
 #
-#   FM_SUPERVISION_HOST_ATTENDED_LIVE_E2E=1 tests/jg-supervision-host-attended-live-e2e.test.sh
+#   JG_SUPERVISION_HOST_ATTENDED_LIVE_E2E=1 tests/jg-supervision-host-attended-live-e2e.test.sh
 #
-# FM_SUPERVISION_HOST_ATTENDED_LIVE_MODEL (default haiku) picks the primary's
+# JG_SUPERVISION_HOST_ATTENDED_LIVE_MODEL (default haiku) picks the primary's
 # model. Claude keeps its existing managed authentication; the lab path gets a
 # workspace-trust entry and a project transcript directory in Claude's own store.
 # shellcheck disable=SC2016 # single-quoted scripts expand inside their own shells
@@ -40,18 +40,18 @@ set -u
 # shellcheck source=bin/jg-tmux-lib.sh
 . "$ROOT/bin/jg-tmux-lib.sh"
 
-jg_live_gate opt-in FM_SUPERVISION_HOST_ATTENDED_LIVE_E2E claude tmux jq node perl git
+jg_live_gate opt-in JG_SUPERVISION_HOST_ATTENDED_LIVE_E2E claude tmux jq node perl git
 
 CLAUDE_VERSION=$(claude --version 2>/dev/null | head -n 1)
-MODEL=${FM_SUPERVISION_HOST_ATTENDED_LIVE_MODEL:-haiku}
-CONTROL_REF=${FM_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF:-}
+MODEL=${JG_SUPERVISION_HOST_ATTENDED_LIVE_MODEL:-haiku}
+CONTROL_REF=${JG_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF:-}
 LAB=$(jg_test_tmproot jg-sh-attended-live)
 LAB=$(cd -P "$LAB" && pwd -P)
 SOCKET="fmshal-$$"
 PROJECTS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
-TURN_POLLS=${FM_SUPERVISION_HOST_ATTENDED_LIVE_POLLS:-1800}
-CONTROL_QUIET_SECONDS=${FM_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_SECONDS:-90}
-unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE TMUX TMUX_PANE PI_CODING_AGENT NO_MISTAKES_GATE
+TURN_POLLS=${JG_SUPERVISION_HOST_ATTENDED_LIVE_POLLS:-1800}
+CONTROL_QUIET_SECONDS=${JG_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_SECONDS:-90}
+unset JG_HOME JG_ROOT_OVERRIDE JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE JG_DATA_OVERRIDE TMUX TMUX_PANE PI_CODING_AGENT NO_MISTAKES_GATE
 # Claude Code keeps no transcript for a session that inherits another session's
 # markers, so the lab primary starts without the invoking session's.
 while IFS= read -r name; do
@@ -70,7 +70,7 @@ stop_lab() {  # <lab>
   fi
   pid=$(cat "$fm/state/.watch.lock/pid" 2>/dev/null || true)
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
-  FM_HOME="$fm" FM_PROCEVENT_CLAIM_ROOT="$lab/claims" "$fm/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
+  JG_HOME="$fm" JG_PROCEVENT_CLAIM_ROOT="$lab/claims" "$fm/bin/jg-procevent.sh" sweep-home >/dev/null 2>&1 || true
   rm -rf "${PROJECTS:?}/$(printf '%s' "$fm" | sed 's/[^A-Za-z0-9]/-/g')"
 }
 cleanup() {
@@ -139,12 +139,12 @@ exec "$fm/bin/jg-remote-entrypoint.sh" "\$@"
 SH
   chmod +x "$lab/bin/tmux" "$lab/bin/ssh"
   cat > "$lab/env" <<ENV
-export FM_HOME='$fm'
-export FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
-export FM_PROCEVENT_CLAIM_ROOT='$lab/claims'
-export FM_SSH_BIN='$lab/bin/ssh'
-export FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux FM_REMOTE_JOB_STATE_ROOT='$lab/remote-jobs'
-export FM_REMOTE_REPLY_WAIT_SECONDS=10
+export JG_HOME='$fm'
+export JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999
+export JG_PROCEVENT_CLAIM_ROOT='$lab/claims'
+export JG_SSH_BIN='$lab/bin/ssh'
+export JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux JG_REMOTE_JOB_STATE_ROOT='$lab/remote-jobs'
+export JG_REMOTE_REPLY_WAIT_SECONDS=10
 export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0
 export PATH='$lab/bin':"\$PATH"
 ENV
@@ -453,6 +453,6 @@ run_control() {
 if [ -n "$CONTROL_REF" ]; then
   run_control
 else
-  printf 'skip: control: set FM_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF to a pre-fix ref to run the negative control\n'
+  printf 'skip: control: set JG_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF to a pre-fix ref to run the negative control\n'
 fi
 run_positive

@@ -19,9 +19,9 @@ new_home() {
 }
 
 bearings() {
-  PATH="$1/fakebin:$PATH" FM_HOME="$1" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$1/state" FM_DATA_OVERRIDE="$1/data" FM_CONFIG_OVERRIDE="$1/config" \
-    FM_BEARINGS_NOW="$NOW" "$ROOT/bin/jg-bearings-snapshot.sh" --json
+  PATH="$1/fakebin:$PATH" JG_HOME="$1" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_STATE_OVERRIDE="$1/state" JG_DATA_OVERRIDE="$1/data" JG_CONFIG_OVERRIDE="$1/config" \
+    JG_BEARINGS_NOW="$NOW" "$ROOT/bin/jg-bearings-snapshot.sh" --json
 }
 
 record() { # home id number forge-state mergeability [hold]
@@ -147,9 +147,9 @@ SH
 with_home() {
   local home=$1; shift
   PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$home/root" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_CONTRIBUTIONS_NOW="$NOW" "$@"
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$home/root" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_CONTRIBUTIONS_NOW="$NOW" "$@"
 }
 
 registered_checks() {
@@ -391,7 +391,7 @@ test_away_yolo_cross_home_is_fleet_work() {
   with_home "$child" "$ROOT/bin/jg-afk-contract.sh" enter --words 'merge the delivery PR when green' >/dev/null \
     || fail 'could not enter child away posture'
   mutate_record "$child" delivery '.records[0].observation.can_merge=true'
-  FM_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
     || fail 'could not collect child contribution summary'
   printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/secondmates.md"
   bearings "$home" | jq -e '.contributions.checked == 1 and .contributions.counts.captain == 0
@@ -579,7 +579,7 @@ test_watcher_keeps_diagnostics_separate_from_contribution_wakes() {
     updated_at:"2026-09-16T08:01:00Z",submitted_at:"2026-09-16T08:01:00Z"}]' > "$home/forge/comments.json"
   out="$home/watcher-diagnostics.out"
   rc=0
-  with_home "$home" env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
+  with_home "$home" env JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds 15 > "$out" 2> "$home/watcher-diagnostics.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "watcher did not surface contribution diagnostics: $(cat "$home/watcher-diagnostics.err")"
   diagnostic=$(awk -F '\t' -v key="$home/state/contributions.check.sh" '$3 == "check" && $4 == key { print $5 }' "$home/state/.wake-queue")
@@ -598,7 +598,7 @@ test_expired_child_unsupported_forge_stays_unmeasured() {
   printf '# Fixture\n' > "$child/AGENTS.md"
   printf 'child\n' > "$child/.jg-secondmate-home"
   printf -- '- [ ] unsupported - Filed https://gitlab.com/o/r/-/merge_requests/2 (repo: sample) (kind: ship)\n' >> "$child/data/backlog.md"
-  FM_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
     || fail 'could not collect child unsupported-forge coverage'
   jq '.contributions.valid_until=0' "$child/state/home-summary.json" > "$child/update.json"
   mv "$child/update.json" "$child/state/home-summary.json"
@@ -623,7 +623,7 @@ test_watcher_surfaces_new_contribution_once() {
     updated_at:"2026-09-16T08:01:00Z",submitted_at:"2026-09-16T08:01:00Z"}]' > "$home/forge/comments.json"
   out="$home/watcher.out"
   rc=0
-  with_home "$home" env FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
+  with_home "$home" env JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds 5 > "$out" 2> "$home/watcher.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "watcher did not surface the new contribution signal: $(cat "$home/watcher.err")"
   grep -E '^check: contributions delivery [0-9a-f]{64}$' "$out" >/dev/null \
@@ -631,7 +631,7 @@ test_watcher_surfaces_new_contribution_once() {
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
   [ "$rows" = 1 ] || fail "one contribution signal created $rows durable check wakes"
   rc=0
-  with_home "$home" env FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
+  with_home "$home" env JG_WATCH_HANDLING_SUCCESSOR=1 JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds 2 > "$home/watcher-repeat.out" 2> "$home/watcher-repeat.err" || rc=$?
   [ "$rc" -eq 124 ] || fail "an already durable contribution signal re-rang the watcher: $(cat "$home/watcher-repeat.out")"
   rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
@@ -647,7 +647,7 @@ test_home_summary_coverage() {
   printf '# Fixture\n' > "$child/AGENTS.md"
   printf 'child\n' > "$child/.jg-secondmate-home"
   record "$child" child-work 15 open mergeable
-  FM_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
+  JG_SNAPSHOT_NOW="$NOW" with_home "$child" "$ROOT/bin/jg-fleet-snapshot.sh" --secondmate-home-summary > "$child/state/home-summary.json" \
     || fail 'child summary failed'
   printf -- '- child - fixture (home: %s; scope: fixture; projects: sample; added 2026-09-16)\n' "$child" > "$home/data/secondmates.md"
   bearings "$home" | jq -e '.contributions.known == 1 and .contributions.checked == 1
@@ -689,7 +689,7 @@ test_record_task_identity_matches_dirname_basename() {
       tasks+=("$want")
     done
     expected=$(printf '%s\0' "${tasks[@]}" | jq -Rs 'split("\u0000")[:-1] | sort')
-    actual=$(with_home "$home" env FM_DATA_OVERRIDE="$data" "$ROOT/bin/jg-contributions.sh" pending | jq '[.[].task] | sort') \
+    actual=$(with_home "$home" env JG_DATA_OVERRIDE="$data" "$ROOT/bin/jg-contributions.sh" pending | jq '[.[].task] | sort') \
       || fail "records under data root '$data' were refused"
     [ "$actual" = "$expected" ] || fail "data root '$data' named tasks $actual, expected $expected"
     rm -rf "${home:?}/data/"*/
@@ -777,7 +777,7 @@ test_budget_exhaustion_keeps_prior_record() { # exhaust|hang
   # budget before the first forge call, so nothing is ever observed.
   /bin/date +%s > "$home/forge/clock"
   printf '%s\n' "$mode" > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=1 "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_BUDGET=1 "$ROOT/bin/jg-contributions.sh" poll) \
     || fail "poll failed when its budget ran out ($mode)"
   [ -z "$out" ] || fail "budget exhaustion ($mode) printed a wake line: $out"
   grep -F 'api repos/o/r/pulls/8' "$home/forge/calls" >/dev/null \
@@ -850,7 +850,7 @@ test_terminal_contribution_settles() {
     cp "$home/data/delivery/contributions.json" "$home/prior.json"
     : > "$home/forge/calls"
     printf 'down\n' > "$home/forge/fault"
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
+    out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
       || fail "poll after a $mode observation failed"
     [ -z "$out" ] || fail "a $mode contribution woke again when a later read would fail: $out"
     [ ! -s "$home/forge/calls" ] || fail "a $mode contribution was re-read: $(cat "$home/forge/calls")"
@@ -866,7 +866,7 @@ test_terminal_contribution_settles() {
   wrap_forge "$home"
   mutate_record "$home" delivery '.records[0].observation.state="merged" | .records[0].error="forge observation unavailable or changed during read"'
   printf 'down\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'poll of an error-stamped merged record failed'
   [ -z "$out" ] || fail "an error-stamped merged record woke again: $out"
   [ ! -s "$home/forge/calls" ] || fail 'an error-stamped merged record was re-read'
@@ -886,7 +886,7 @@ test_late_owner_inherits_terminal_observation() {
   printf -- '- [ ] duplicate - Filed https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
   : > "$home/forge/calls"
   printf 'down\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'late-owner terminal poll failed'
   [ -z "$out" ] || fail "a late owner reactivated a terminal contribution: $out"
   [ ! -s "$home/forge/calls" ] || fail 'a late owner triggered a terminal forge read'
@@ -910,7 +910,7 @@ test_interrupted_multi_owner_poll_settles_every_owner() {
     | .records[0].checked_at="2026-09-15T08:00:00Z"'
   mutate_record "$home" delivery ".records[0].observation.state=\"merged\" | .records[0].observation.head=\"$HEAD_B\""
   printf 'down\n' > "$home/forge/fault"
-  with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
+  with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
     || fail 'interrupted multi-owner poll failed'
   [ ! -s "$home/forge/calls" ] || fail 'a known terminal URL triggered a forge read'
   jq -e --slurpfile terminal "$home/data/delivery/contributions.json" '.records[0] | .observation.state == "merged"
@@ -927,7 +927,7 @@ test_interrupted_multi_owner_poll_settles_every_owner() {
   mutate_record "$home" duplicate '.records[0].error="forge observation unavailable or changed during read"'
   mutate_record "$home" delivery ".records[0].observation.state=\"merged\" | .records[0].observation.head=\"$HEAD_B\""
   printf 'down\n' > "$home/forge/fault"
-  with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
+  with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
     || fail 'interrupted multi-owner poll (errored owner) failed'
   [ ! -s "$home/forge/calls" ] || fail 'a known terminal URL triggered a forge read (errored owner)'
   jq -e --slurpfile terminal "$home/data/delivery/contributions.json" '.records[0] | .observation.state == "merged"
@@ -947,7 +947,7 @@ test_done_task_open_pr_still_observed() {
     > "$home/data/backlog.md"
   with_home "$home" "$ROOT/bin/jg-contributions.sh" poll >/dev/null || fail 'poll of a done task failed'
   printf '%s\n' "$HEAD_B" > "$home/forge/head"
-  with_home "$home" env FM_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
+  with_home "$home" env JG_CONTRIBUTIONS_NOW="$later" "$ROOT/bin/jg-contributions.sh" poll >/dev/null \
     || fail 'second poll of a done task failed'
   [ "$(grep -cFx 'api repos/o/r/pulls/8' "$home/forge/calls")" = 2 ] \
     || fail 'an open PR linked from a done task was not observed on every poll'
@@ -966,7 +966,7 @@ test_reservation_defers_later_url_when_fifteen_seconds_do_not_remain() {
   mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
   /bin/date +%s > "$home/forge/clock"
   printf 'reserve\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'reservation poll failed'
   [ -z "$out" ] || fail "reservation poll printed an unavailable wake: $out"
   jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
@@ -986,7 +986,7 @@ test_three_second_pr_reads_complete_fresh_in_one_cycle() { # 3-second reads: 8 s
   wrap_forge "$home"
   mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z" | .records[0].error="forge observation unavailable or changed during read"'
   printf 'latency\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=3 "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=3 "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'a 3-second-read PR observation failed'
   [ -z "$out" ] || fail "a fresh 3-second-read PR observation woke: $out"
   jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
@@ -1004,7 +1004,7 @@ test_slow_read_deadline_kill_is_budget_refusal() {
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   /bin/date +%s > "$home/forge/clock"
   printf 'latency\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=6 "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=6 "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'poll failed on a deadline-killed slow read'
   [ -z "$out" ] || fail "a deadline-killed slow read printed an unavailable wake: $out"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
@@ -1026,7 +1026,7 @@ test_unmeasured_url_does_not_starve_the_tail() {
   for cycle in 0 1 2; do
     at=$(jq -nr --arg now "$NOW" --argjson cycle "$cycle" '(($now | fromdateiso8601) + ($cycle + 1) * 300) | todateiso8601')
     started=$(/bin/date +%s)
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" FM_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/jg-contributions.sh" poll) \
+    out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$at" JG_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/jg-contributions.sh" poll) \
       || fail 'poll failed after an unmeasured first URL'
     elapsed=$(( $(/bin/date +%s) - started ))
     [ -z "$out" ] || fail "a poll after an unmeasured URL printed a wake: $out"
@@ -1065,7 +1065,7 @@ test_unmeasured_url_does_not_starve_the_tail() {
   for cycle in 0 1 2 3 4 5; do
     at=$(jq -nr --arg now "$NOW" --argjson cycle "$cycle" '(($now | fromdateiso8601) + $cycle * 300) | todateiso8601')
     started=$(/bin/date +%s)
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" FM_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=3 "$ROOT/bin/jg-contributions.sh" poll) \
+    out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$at" JG_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=3 "$ROOT/bin/jg-contributions.sh" poll) \
       || fail 'sustained slow-read poll failed'
     elapsed=$(( $(/bin/date +%s) - started ))
     [ "$elapsed" -ge 9 ] && [ "$elapsed" -le 23 ] \
@@ -1103,7 +1103,7 @@ test_budget_is_cut_down_to_the_watcher_check_bound() {
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   /bin/date +%s > "$home/forge/clock"
   printf 'hang\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CHECK_TIMEOUT=6 "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CHECK_TIMEOUT=6 "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'poll failed under a small watcher check bound'
   [ -z "$out" ] || fail "a check-bound-capped poll printed a wake: $out"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
@@ -1128,14 +1128,14 @@ test_arm_plumbs_a_configured_budget_into_the_check_shim() {
     # first forge call, so the generated check never writes forge/calls.
     /bin/date +%s > "$home/forge/clock"
     if [ "$mode" = configured ]; then
-      with_home "$home" env FM_CONTRIBUTIONS_BUDGET=1 "$ROOT/bin/jg-contributions.sh" arm >/dev/null \
+      with_home "$home" env JG_CONTRIBUTIONS_BUDGET=1 "$ROOT/bin/jg-contributions.sh" arm >/dev/null \
         || fail 'arm with a configured budget failed'
-      out=$(with_home "$home" env -u FM_CONTRIBUTIONS_BUDGET bash "$home/state/contributions.check.sh") \
+      out=$(with_home "$home" env -u JG_CONTRIBUTIONS_BUDGET bash "$home/state/contributions.check.sh") \
         || fail 'configured check shim failed'
     else
-      with_home "$home" env -u FM_CONTRIBUTIONS_BUDGET "$ROOT/bin/jg-contributions.sh" arm >/dev/null \
+      with_home "$home" env -u JG_CONTRIBUTIONS_BUDGET "$ROOT/bin/jg-contributions.sh" arm >/dev/null \
         || fail 'arm without a configured budget failed'
-      out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=1 bash "$home/state/contributions.check.sh") \
+      out=$(with_home "$home" env JG_CONTRIBUTIONS_BUDGET=1 bash "$home/state/contributions.check.sh") \
         || fail 'inherited-budget check shim failed'
     fi
     [ -z "$out" ] || fail "generated check printed an unavailable wake: $out"
@@ -1153,7 +1153,7 @@ test_unavailable_forge_records_error_and_wakes_once_per_episode() { # genuine ou
   forge_home "$home"
   wrap_forge "$home"
   printf 'down\n' > "$home/forge/fault"
-  poll_at() { with_home "$home" env FM_CONTRIBUTIONS_NOW="$1" "$ROOT/bin/jg-contributions.sh" poll || fail "poll at $1 failed"; }
+  poll_at() { with_home "$home" env JG_CONTRIBUTIONS_NOW="$1" "$ROOT/bin/jg-contributions.sh" poll || fail "poll at $1 failed"; }
   out=$(poll_at 2026-09-16T09:00:00Z)
   [ "$out" = "$line" ] || fail "the first failure of an episode did not wake: $out"
   out=$(poll_at 2026-09-16T10:00:00Z)
@@ -1182,11 +1182,11 @@ test_late_owner_keeps_failure_episode_suppressed() {
   forge_home "$home"
   wrap_forge "$home"
   printf 'down\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'initial failing poll failed'
   [ "$out" = "$line" ] || fail "the initial failure did not wake: $out"
   printf -- '- [ ] duplicate - Filed https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T10:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T10:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'late-owner failing poll failed'
   [ -z "$out" ] || fail "a late owner restarted an unchanged failure episode: $out"
   for task in delivery duplicate; do
@@ -1194,7 +1194,7 @@ test_late_owner_keeps_failure_episode_suppressed() {
       || fail "owner $task did not retain the shared failure evidence"
   done
   : > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T11:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T11:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'successful shared poll failed'
   [ -z "$out" ] || fail "a successful shared poll printed: $out"
   for task in delivery duplicate; do
@@ -1202,7 +1202,7 @@ test_late_owner_keeps_failure_episode_suppressed() {
       || fail "owner $task did not end the shared failure episode"
   done
   printf 'down\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T12:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T12:00:00Z "$ROOT/bin/jg-contributions.sh" poll) \
     || fail 'new shared failing poll failed'
   [ "$out" = "$line" ] || fail "a failure after shared recovery did not wake: $out"
   pass 'a late owner does not restart a shared forge failure episode'
@@ -1241,18 +1241,18 @@ test_retire_ends_observation_of_a_gone_contribution() {
   forge_home "$home"
   wrap_forge "$home"
   printf 'not-found\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z "$ROOT/bin/jg-contributions.sh" poll) || fail 'failing poll failed'
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z "$ROOT/bin/jg-contributions.sh" poll) || fail 'failing poll failed'
   [ "$out" = "$line" ] || fail "a gone repository did not raise the unavailable check: $out"
   bearings "$home" | jq -e '.contributions.known == 1 and .contributions.checked == 0
     and .contributions.complete == false and .contributions.proven_clear == false' >/dev/null \
     || fail 'an unreadable contribution did not hold coverage incomplete before retirement'
-  with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T09:30:00Z "$ROOT/bin/jg-contributions.sh" retire delivery "$url" captain 'repository deleted' \
+  with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-16T09:30:00Z "$ROOT/bin/jg-contributions.sh" retire delivery "$url" captain 'repository deleted' \
     || fail 'retire of an owned unreadable contribution failed'
   jq -e '.records[0].retired == {actor:"captain",reason:"repository deleted",at:"2026-09-16T09:30:00Z"}' \
     "$home/data/delivery/contributions.json" >/dev/null || fail 'retire did not record its provenance'
   : > "$home/forge/calls"
   for at in 2026-09-16T10:00:00Z 2026-09-16T10:05:00Z; do
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" "$ROOT/bin/jg-contributions.sh" poll) || fail "poll after retire failed at $at"
+    out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW="$at" "$ROOT/bin/jg-contributions.sh" poll) || fail "poll after retire failed at $at"
     [ -z "$out" ] || fail "a retired contribution still raised a check: $out"
   done
   [ ! -s "$home/forge/calls" ] || fail "a retired contribution stayed in rotation: $(cat "$home/forge/calls")"
@@ -1272,7 +1272,7 @@ test_late_owner_of_a_retired_final_contribution_is_not_retired() {
   record "$home" duplicate 8 merged mergeable
   mutate_record "$home" duplicate '.records[0].error="forge observation unavailable or changed during read"'
   printf -- '- [ ] late - Filed https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-17T08:00:00Z "$ROOT/bin/jg-contributions.sh" poll) || fail 'late-owner poll failed'
+  out=$(with_home "$home" env JG_CONTRIBUTIONS_NOW=2026-09-17T08:00:00Z "$ROOT/bin/jg-contributions.sh" poll) || fail 'late-owner poll failed'
   [ -z "$out" ] || fail "a late owner of a retired final contribution printed: $out"
   [ ! -s "$home/forge/calls" ] || fail 'a known final contribution triggered a forge read'
   jq -e '.records[0] | .retired == null and .observation.state == "merged" and .error == null' \

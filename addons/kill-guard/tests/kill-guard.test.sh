@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End to end: install into a throwaway HOME, then drive the hooks and adapters. Only this test's sleeps and fakes are signalled.
 # shellcheck disable=SC2016 # the cases are literal commands
-set -euo pipefail; unset FM_TASK_ID FM_TASK_INBOX FM_HOME
+set -euo pipefail; unset JG_TASK_ID JG_TASK_INBOX JG_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 T=$(mktemp -d); PIDS=()
 cleanup() { for p in "${PIDS[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; rm -rf -- "$T"; }

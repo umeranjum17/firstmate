@@ -35,7 +35,7 @@
 # A takeover closes every pane in that session; the parent firstmate's
 # secondmate liveness sweep relaunches its mates into the Aqua-born server.
 # bin/jg-remote-herdr-owner-lib.sh owns the owner discovery and the birth
-# markers; FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
+# markers; JG_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
 # release wait in tenths of a second. Every decision prints one line to
 # stdout, which launchd routes to the agent's log.
 set -u
@@ -54,7 +54,7 @@ SESSION=$2
 [ -n "$HERDR_BIN" ] && [ -x "$HERDR_BIN" ] || { printf 'jg-remote-herdr-guard: herdr is not executable: %s\n' "$HERDR_BIN" >&2; exit 1; }
 [ -n "$SESSION" ] || usage
 command -v jq >/dev/null 2>&1 || { printf 'jg-remote-herdr-guard: jq does not resolve on the launch agent PATH\n' >&2; exit 1; }
-STOP_WAIT_TENTHS=${FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS:-50}
+STOP_WAIT_TENTHS=${JG_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS:-50}
 
 log() { printf 'jg-remote-herdr-guard: %s\n' "$*"; }
 

@@ -50,9 +50,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 COMPLETION_FILE="$STATE/.session-start-complete"
 
 # shellcheck source=bin/jg-gate-refuse-lib.sh
@@ -91,15 +91,15 @@ stand_down() {
 # agent and an unmarked task worktree can never run a session start for a home
 # they do not own. Pi's preflight-only status preserves that intentional silence
 # without mistaking it for a failed eligible attempt that needs the manual nudge.
-jg_is_gate_agent "$FM_ROOT" && stand_down
-if [ ! -d "$STATE" ] && jg_primary_root_matches "$FM_ROOT"; then
+jg_is_gate_agent "$JG_ROOT" && stand_down
+if [ ! -d "$STATE" ] && jg_primary_root_matches "$JG_ROOT"; then
   if ! MKDIR_ERR=$(mkdir -p "$STATE" 2>&1); then
     printf 'jg-sessionstart-run: startup could not create the state directory %s: %s\n' \
       "$STATE" "${MKDIR_ERR##*: }" >&2
     stand_down
   fi
 fi
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || stand_down
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || stand_down
 
 session_start_completed() {
   local lock_pid completion_pid

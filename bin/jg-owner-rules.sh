@@ -45,10 +45,10 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 SURFACE="$DATA/owner-rules.md"
 
 usage() {
@@ -133,7 +133,7 @@ require_repo_paths() {  # <enforcement point> -> refuse a named path that does n
     path=$token
     case "$path" in
       /*) ;;
-      *) path="$FM_ROOT/$path" ;;
+      *) path="$JG_ROOT/$path" ;;
     esac
     [ -e "$path" ] || die "the enforcement point names $token, which does not exist in this checkout (fix --enforce)"
   done
@@ -247,11 +247,11 @@ cmd_audit() {
   audit_files "$tmp/sources" > "$tmp/files" || true
 
   {
-    for f in "$SURFACE" "$DATA/captain.md" "$DATA/captain-shared.md" "$FM_ROOT/AGENTS.md"; do
+    for f in "$SURFACE" "$DATA/captain.md" "$DATA/captain-shared.md" "$JG_ROOT/AGENTS.md"; do
       [ -f "$f" ] && cat "$f"
     done
-    find "$FM_ROOT/bin" "$FM_ROOT/docs" "$FM_ROOT/.agents/skills" -type f 2>/dev/null \
-      | grep -v '^'"$FM_ROOT"'/bin/jg-owner-rules.sh$' | while IFS= read -r f; do cat "$f" 2>/dev/null; done
+    find "$JG_ROOT/bin" "$JG_ROOT/docs" "$JG_ROOT/.agents/skills" -type f 2>/dev/null \
+      | grep -v '^'"$JG_ROOT"'/bin/jg-owner-rules.sh$' | while IFS= read -r f; do cat "$f" 2>/dev/null; done
   } | normalize > "$tmp/surface" 2>/dev/null || true
 
   local f

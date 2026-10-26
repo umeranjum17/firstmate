@@ -23,7 +23,7 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-jg_live_gate default-on FM_CODEX_HOOK_LAYER_LIVE codex
+jg_live_gate default-on JG_CODEX_HOOK_LAYER_LIVE codex
 
 CODEX_VERSION=$(codex --version 2>&1)
 TMP_ROOT=$(jg_test_tmproot jg-codex-hook-layer-live)
@@ -45,7 +45,7 @@ capture_codex_launch() {
   jg_test_spawn_brief "$home" "$id"
   jg_git_worktree "$proj" "$wt" "wt-$name"
   : > "$launchlog"
-  FM_FAKE_LAUNCH_LOG="$launchlog" \
+  JG_FAKE_LAUNCH_LOG="$launchlog" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" "$@" >/dev/null 2>&1 ||
     fail "codex $CODEX_VERSION: jg-spawn could not build a crewmate launch"
   cat "$launchlog"

@@ -25,7 +25,7 @@
 #   - The sweep converges: once a secondmate reads alive, a later run never
 #     re-touches it (idempotent by construction, not by remembering what it
 #     already did).
-#   - The sweep is skipped entirely under FM_BOOTSTRAP_DETECT_ONLY=1 (the
+#   - The sweep is skipped entirely under JG_BOOTSTRAP_DETECT_ONLY=1 (the
 #     read-only session path), matching the other mutating sweeps.
 #   - The sweep is naturally scoped to the primary: with no kind=secondmate
 #     meta present (a secondmate's own state/ never holds one, since
@@ -35,7 +35,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 jg_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(jg_test_tmproot jg-secondmate-liveness)
@@ -142,13 +142,13 @@ test_tmux_agent_state_rejects_malformed_targets_before_probe() {
   marker="$TMP_ROOT/tmux-malformed-called"
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-printf 'called\n' > "$FM_TEST_TMUX_MARKER"
+printf 'called\n' > "$JG_TEST_TMUX_MARKER"
 printf 'bash\n'
 SH
   chmod +x "$fakebin/tmux"
 
   for target in sess sess: :win sess:win:extra; do
-    out=$(PATH="$fakebin:$BASE_PATH" FM_TEST_TMUX_MARKER="$marker" \
+    out=$(PATH="$fakebin:$BASE_PATH" JG_TEST_TMUX_MARKER="$marker" \
       bash -c '. "$0/bin/jg-backend.sh"; jg_backend_agent_state tmux "$1"' "$ROOT" "$target")
     [ "$out" = unreadable ] || fail "malformed tmux target '$target' should classify as unreadable, got '$out'"
     [ ! -e "$marker" ] || fail "malformed tmux target '$target' invoked tmux"
@@ -167,7 +167,7 @@ test_herdr_agent_state_preserves_husk_classifier() {
   for row in 'dead missing' 'no-agent dead' 'live alive' 'unknown unreadable'; do
     pane_state=${row%% *}
     expected=${row#* }
-    out=$(FM_TEST_PANE_STATE="$pane_state" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_pane_agent_state() { printf "%s" "$FM_TEST_PANE_STATE"; }; jg_backend_herdr_server_running_state() { printf running; }; jg_backend_herdr_agent_state "sess:p1"' "$ROOT")
+    out=$(JG_TEST_PANE_STATE="$pane_state" bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_pane_agent_state() { printf "%s" "$JG_TEST_PANE_STATE"; }; jg_backend_herdr_server_running_state() { printf running; }; jg_backend_herdr_agent_state "sess:p1"' "$ROOT")
     [ "$out" = "$expected" ] || fail "Herdr pane state $pane_state should map to $expected, got '$out'"
   done
 
@@ -209,7 +209,7 @@ make_toolchain() {
   local dir=$1 fakebin
   fakebin=$(jg_fakebin "$dir")
   jg_fake_exit0 "$fakebin" node chrome-devtools-axi pi-signed
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -263,7 +263,7 @@ SH
   printf '%s\n' "$fakebin"
 }
 
-# make_liveness_tmux <dir>: a controllable tmux stub. FM_TEST_PANE_CMD may be
+# make_liveness_tmux <dir>: a controllable tmux stub. JG_TEST_PANE_CMD may be
 # a foreground command, `missing` (readable inventory omits the window), or
 # `unreadable` (both pane and inventory reads fail).
 make_liveness_tmux() {
@@ -272,7 +272,7 @@ make_liveness_tmux() {
   cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-mode=${FM_TEST_PANE_CMD:-zsh}
+mode=${JG_TEST_PANE_CMD:-zsh}
 case "${1:-}" in
   display-message)
     for a in "$@"; do
@@ -292,17 +292,17 @@ case "${1:-}" in
     case "$mode" in
       missing) printf '%s\n' main; exit 0 ;;
       unreadable) exit 1 ;;
-      *) [ -e "${FM_TMUX_CALL_LOG:?}.killed" ] || printf '%s\n' jg-sm1; exit 0 ;;
+      *) [ -e "${JG_TMUX_CALL_LOG:?}.killed" ] || printf '%s\n' jg-sm1; exit 0 ;;
     esac
     ;;
   new-window|kill-window)
-    printf '%s\n' "$*" >> "${FM_TMUX_CALL_LOG:?}"
-    if [ "${1:-}" = new-window ] && [ -n "${FM_TEST_NEW_WINDOW_PAUSE:-}" ]; then
-      sleep "$FM_TEST_NEW_WINDOW_PAUSE"
+    printf '%s\n' "$*" >> "${JG_TMUX_CALL_LOG:?}"
+    if [ "${1:-}" = new-window ] && [ -n "${JG_TEST_NEW_WINDOW_PAUSE:-}" ]; then
+      sleep "$JG_TEST_NEW_WINDOW_PAUSE"
     fi
-    [ "${1:-}" = kill-window ] && : > "${FM_TMUX_CALL_LOG}.killed"
-    [ "${FM_TEST_FAIL_NEW_WINDOW:-0}" = 1 ] && [ "${1:-}" = new-window ] && exit 1
-    [ "${1:-}" = new-window ] && rm -f "${FM_TMUX_CALL_LOG}.killed"
+    [ "${1:-}" = kill-window ] && : > "${JG_TMUX_CALL_LOG}.killed"
+    [ "${JG_TEST_FAIL_NEW_WINDOW:-0}" = 1 ] && [ "${1:-}" = new-window ] && exit 1
+    [ "${1:-}" = new-window ] && rm -f "${JG_TMUX_CALL_LOG}.killed"
     exit 0
     ;;
   has-session) exit 0 ;;
@@ -314,10 +314,10 @@ SH
 }
 
 # new_world <name>: a scratch firstmate HOME (state/, watcher beacon, pinned
-# harness) with no kind=secondmate meta yet. FM_ROOT is left to resolve
+# harness) with no kind=secondmate meta yet. JG_ROOT is left to resolve
 # naturally to the real checkout under test ($ROOT), exactly as production
 # always has it - this sweep's own jg-spawn.sh invocation resolves the
-# secondmate harness through $FM_ROOT/bin/jg-harness.sh, which only exists in
+# secondmate harness through $JG_ROOT/bin/jg-harness.sh, which only exists in
 # the real tree. The harness is pinned because ambient own-harness detection is
 # environment-dependent: interactive harness sessions expose markers or parent
 # process names, while a plain pipeline shell can fall through to "unknown",
@@ -354,9 +354,9 @@ add_sm_home() {
 
 # make_parked_addon <w> <parked-id>...: a synthetic parked-homes add-on
 # checkout at the in-repo shim's documented resolution path
-# ($FM_HOME/projects/firstmate-addons/parked-homes/bin). It implements the
+# ($JG_HOME/projects/firstmate-addons/parked-homes/bin). It implements the
 # hook contract the shim sources - the refuse and skip predicates answered from
-# $FM_HOME/config/parked-homes - so the sweep's parked guard is exercised
+# $JG_HOME/config/parked-homes - so the sweep's parked guard is exercised
 # through the real sourcing boundary, not a stubbed function.
 make_parked_addon() {
   local w=$1 id
@@ -368,7 +368,7 @@ make_parked_addon() {
   done
   cat > "$dir/jg-parked-homes-lib.sh" <<'SH'
 jg_parked_home() {
-  [ -f "${FM_HOME:?}/config/parked-homes" ] && grep -Fxq "${1:?}" "$FM_HOME/config/parked-homes"
+  [ -f "${JG_HOME:?}/config/parked-homes" ] && grep -Fxq "${1:?}" "$JG_HOME/config/parked-homes"
 }
 jg_parked_refuse_meta() {
   if jg_parked_home "${2:?}"; then
@@ -385,8 +385,8 @@ SH
 
 run_bootstrap() {  # <fakebin> <home> <pane-cmd> <call-log> [extra env...] -> stdout
   local fb=$1 home=$2 cmd=$3 log=$4; shift 4
-  PATH="$fb:$BASE_PATH" TMUX='' FM_BACKEND=tmux FM_HOME="$home" \
-    FM_TEST_PANE_CMD="$cmd" FM_TMUX_CALL_LOG="$log" \
+  PATH="$fb:$BASE_PATH" TMUX='' JG_BACKEND=tmux JG_HOME="$home" \
+    JG_TEST_PANE_CMD="$cmd" JG_TMUX_CALL_LOG="$log" \
     env "$@" "$ROOT/bin/jg-bootstrap.sh" 2>&1
 }
 
@@ -444,7 +444,7 @@ test_sweep_serializes_distinct_secondmate_relaunches() {
 
   # Keep the first fresh spawn inside new-window with its task-set lock held.
   # A parallel sweep races the second spawn into that lock and loses it.
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" FM_TEST_NEW_WINDOW_PAUSE=2)
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" JG_TEST_NEW_WINDOW_PAUSE=2)
 
   assert_not_contains "$out" 'SECONDMATE_LIVENESS: secondmate sm' \
     "both distinct mates should relaunch without task-set contention"
@@ -504,14 +504,14 @@ test_relaunch_waits_for_other_mates_relaunch_lock() {
   done
   [ -e "$lock" ] || fail "the fixture never acquired the per-home relaunch lock"
 
-  out=$(PATH="$tmuxfb:$fb:$BASE_PATH" FM_HOME="$w/home" FM_BACKEND=tmux \
-    FM_ROOT="$ROOT" FM_TEST_PANE_CMD=zsh FM_TMUX_CALL_LOG="$log" \
+  out=$(PATH="$tmuxfb:$fb:$BASE_PATH" JG_HOME="$w/home" JG_BACKEND=tmux \
+    JG_ROOT="$ROOT" JG_TEST_PANE_CMD=zsh JG_TMUX_CALL_LOG="$log" \
     STATE="$w/home/state" bash -c '
       . "$1/bin/jg-secondmate-liveness-lib.sh"
       jg_secondmate_liveness_probe "$2" sm1 poll
       rc=0
       jg_secondmate_liveness_relaunch "$2" sm1 1 || rc=$?
-      printf "rc=%s status=%s reason=%s\n" "$rc" "$FM_SM_LIVE_STATUS" "$FM_SM_LIVE_REASON"
+      printf "rc=%s status=%s reason=%s\n" "$rc" "$JG_SM_LIVE_STATUS" "$JG_SM_LIVE_REASON"
     ' _ "$ROOT" "$w/home/state/sm1.meta")
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
@@ -566,7 +566,7 @@ test_sweep_leaves_alive_secondmate_untouched() {
     "an already-live secondmate should be handled silently"
   [ ! -s "$log" ] || fail "an already-live secondmate must never be killed or respawned: $(cat "$log")"
 
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" claude "$log" FM_BOOTSTRAP_VERBOSE_FACTS=1)
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" claude "$log" JG_BOOTSTRAP_VERBOSE_FACTS=1)
   assert_contains "$out" "BOOTSTRAP_INFO: secondmate sm1 already live (backend=tmux)" \
     "verbose diagnostics should identify the already-live outcome"
   [ ! -s "$log" ] || fail "verbose reporting must not touch an already-live secondmate: $(cat "$log")"
@@ -648,7 +648,7 @@ test_sweep_reports_missing_endpoint_relaunch_failure() {
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" FM_TEST_FAIL_NEW_WINDOW=1)
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" missing "$log" JG_TEST_FAIL_NEW_WINDOW=1)
 
   assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: respawn failed after recorded endpoint confidently missing" \
     "a failed missing-endpoint relaunch should retain its authorizing cause"
@@ -700,14 +700,14 @@ test_sweep_skipped_under_detect_only() {
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
   log="$w/calls.log"; : > "$log"
 
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_BOOTSTRAP_DETECT_ONLY=1)
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_BOOTSTRAP_DETECT_ONLY=1)
 
   assert_not_contains "$out" "CREW_HARNESS_OVERRIDE:" \
     "detect-only should keep routine harness facts silent"
   assert_not_contains "$out" "SECONDMATE_LIVENESS:" \
     "the read-only detect-only path must never run the mutating liveness sweep"
   [ ! -s "$log" ] || fail "detect-only must never touch any endpoint: $(cat "$log")"
-  pass "sweep: skipped entirely under FM_BOOTSTRAP_DETECT_ONLY=1, exactly like the other mutating sweeps"
+  pass "sweep: skipped entirely under JG_BOOTSTRAP_DETECT_ONLY=1, exactly like the other mutating sweeps"
 }
 
 test_sweep_noop_with_no_secondmate_meta() {
@@ -737,7 +737,7 @@ test_sweep_noop_with_no_secondmate_meta() {
 
 # make_remote_probe_world <name>: a parent home carrying one remote-route
 # secondmate meta plus a fake ssh that logs every call and answers with
-# FM_FAKE_REMOTE_REPLY on FM_FAKE_REMOTE_RC.
+# JG_FAKE_REMOTE_REPLY on JG_FAKE_REMOTE_RC.
 make_remote_probe_world() {
   local name=$1 w fakebin
   w="$TMP_ROOT/$name"
@@ -758,9 +758,9 @@ EOF
 EOF
   cat > "$fakebin/ssh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_SSH_LOG:?}"
-[ -z "${FM_FAKE_REMOTE_REPLY:-}" ] || printf '%s\n' "$FM_FAKE_REMOTE_REPLY"
-exit "${FM_FAKE_REMOTE_RC:-0}"
+printf '%s\n' "$*" >> "${JG_FAKE_SSH_LOG:?}"
+[ -z "${JG_FAKE_REMOTE_REPLY:-}" ] || printf '%s\n' "$JG_FAKE_REMOTE_REPLY"
+exit "${JG_FAKE_REMOTE_RC:-0}"
 SH
   chmod +x "$fakebin/ssh"
   printf '%s\n' "$w"
@@ -770,14 +770,14 @@ SH
 probe_remote() {
   local w=$1 mode=$2; shift 2
   # shellcheck disable=SC2016 # positional params expand in the child shell.
-  env STATE="$w/home/state" FM_HOME="$w/home" FM_DATA_OVERRIDE="$w/home/data" \
-    FM_SSH_BIN="$w/fakebin/ssh" FM_FAKE_SSH_LOG="$w/ssh.log" "$@" \
+  env STATE="$w/home/state" JG_HOME="$w/home" JG_DATA_OVERRIDE="$w/home/data" \
+    JG_SSH_BIN="$w/fakebin/ssh" JG_FAKE_SSH_LOG="$w/ssh.log" "$@" \
     bash -c '
       . "$0/bin/jg-secondmate-liveness-lib.sh"
       jg_secondmate_liveness_probe "$1" rsm1 "$2"
       printf "%s|%s|%s|%s|%s|%s\n" \
-        "$FM_SM_LIVE_STATUS" "$FM_SM_LIVE_STATE" "$FM_SM_LIVE_KILL" \
-        "$FM_SM_LIVE_CAUSE" "$FM_SM_LIVE_WHERE" "$FM_SM_LIVE_REASON"
+        "$JG_SM_LIVE_STATUS" "$JG_SM_LIVE_STATE" "$JG_SM_LIVE_KILL" \
+        "$JG_SM_LIVE_CAUSE" "$JG_SM_LIVE_WHERE" "$JG_SM_LIVE_REASON"
     ' "$ROOT" "$w/home/state/rsm1.meta" "$mode"
 }
 
@@ -785,26 +785,26 @@ test_remote_poll_probe_maps_states() {
   local w out
   w=$(make_remote_probe_world probe-states)
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=dead)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=dead)
   [ "$out" = 'relaunchable|dead|0|remote endpoint dead on its configured host|host=lab-host|' ] \
     || fail "a dead remote reply should authorize relaunch on its own host, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=missing)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=missing)
   [ "$out" = 'relaunchable|missing|0|remote endpoint missing on its configured host|host=lab-host|' ] \
     || fail "a missing remote reply should authorize relaunch on its own host, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=alive)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=alive)
   [ "$out" = 'alive|alive|0|||' ] || fail "an alive remote reply should be a quiet no-op, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=ambiguous)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=ambiguous)
   [ "$out" = 'skipped|ambiguous|0|||remote endpoint state is ambiguous on lab-host' ] \
     || fail "an ambiguous remote reply must preserve the endpoint, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=unverified)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=unverified)
   [ "$out" = 'skipped|unverified|0|||remote endpoint state is unverified on lab-host' ] \
     || fail "an unverified remote reply must preserve the endpoint, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_REPLY=bogus)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_REPLY=bogus)
   [ "$out" = 'skipped|bogus|0|||remote endpoint returned an invalid state' ] \
     || fail "an invalid remote reply must preserve the endpoint, got: $out"
 
@@ -817,11 +817,11 @@ test_remote_poll_probe_unreachable_preserves_route() {
   local w out
   w=$(make_remote_probe_world probe-unreachable)
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_RC=255)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_RC=255)
   [ "$out" = 'skipped|unknown|0|||remote host unavailable or endpoint state unknown; route preserved on lab-host' ] \
     || fail "ssh exit 255 must never read as a dead endpoint, got: $out"
 
-  out=$(probe_remote "$w" poll FM_FAKE_REMOTE_RC=1)
+  out=$(probe_remote "$w" poll JG_FAKE_REMOTE_RC=1)
   [ "$out" = 'skipped|unknown|0|||remote endpoint probe unreadable on lab-host' ] \
     || fail "a non-transport remote probe failure must stay inconclusive, got: $out"
   pass "poll probe: unreachable or inconclusive remote reads preserve the route"
@@ -846,26 +846,26 @@ test_memory_admission_defers_recovery() {
   mkdir -p "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   printf 'some avg10=25 avg60=25 avg300=0 total=1\n' > "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   for i in 1 2 3 4; do
-    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
     assert_contains "$out" 'memory admission deferred:' "memory pressure defers liveness recovery"
     [ ! -s "$log" ] || fail "memory deferral removed the endpoint: $(cat "$log")"
     [ ! -e "$w/home/state/.secondmate-relaunch-sm1" ] || fail "memory deferral consumed retry budget"
   done
   printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/proc/pressure/memory"
   printf 'some avg10=2 avg60=0 avg300=0 total=1\n' > "$w/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
-  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
   assert_contains "$(cat "$log")" new-window "recovery resumes once memory eases: $out"
   assert_grep relaunched "$w/home/state/.secondmate-relaunch-sm1" "successful recovery is ledgered"
   [ "$(grep -c $'\tattempt$' "$w/home/state/.secondmate-relaunch-sm1")" -eq 1 ] || fail "only the actual launch should consume an attempt"
   printf 'wait_pressure=nan\n' > "$w/home/config/host-memory"
   for i in 1 2 3; do
-    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" FM_ROOT_OVERRIDE="$w/code" FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
+    out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log" JG_ROOT_OVERRIDE="$w/code" JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup")
     assert_contains "$out" 'respawn failed' "invalid configuration is a genuine recovery failure"
   done
-  out=$(PATH="$tmuxfb:$fb:$BASE_PATH" FM_HOME="$w/home" FM_ROOT_OVERRIDE="$w/code" \
-    FM_TEST_PANE_CMD=zsh FM_TMUX_CALL_LOG="$log" TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$w/proc" FM_HOST_MEMORY_CGROUP_ROOT="$w/cgroup" \
-    FM_SECONDMATE_LIVENESS_SECS=1 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=4 FM_POLL=1 FM_SIGNAL_GRACE=0 \
+  out=$(PATH="$tmuxfb:$fb:$BASE_PATH" JG_HOME="$w/home" JG_ROOT_OVERRIDE="$w/code" \
+    JG_TEST_PANE_CMD=zsh JG_TMUX_CALL_LOG="$log" TMUX='' JG_BACKEND=tmux \
+    JG_HOST_MEMORY_PROC="$w/proc" JG_HOST_MEMORY_CGROUP_ROOT="$w/cgroup" \
+    JG_SECONDMATE_LIVENESS_SECS=1 JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS=4 JG_POLL=1 JG_SIGNAL_GRACE=0 \
     "$ROOT/bin/jg-watch.sh" 2>&1)
   assert_contains "$out" 'auto-relaunch paused after 4 attempts' "non-memory failures still consume the retry budget"
   pass "memory deferrals preserve the endpoint and liveness retry budget"

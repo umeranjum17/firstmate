@@ -21,7 +21,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_AFK_PI_HERDR_E2E herdr jq pi python3
+jg_live_gate opt-in JG_AFK_PI_HERDR_E2E herdr jq pi python3
 
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-supervise-daemon.sh"
@@ -47,7 +47,7 @@ cleanup() {
   local rc=$?
   trap - EXIT
   if [ -f "$STATE/.afk-contract" ] || [ -e "$STATE/.afk" ]; then
-    PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+    PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
       PI_CODING_AGENT=true "$ROOT/bin/jg-afk-launch.sh" stop >/dev/null 2>&1 || true
   fi
   if ! "$LAB_HELPER" teardown "$SESSION"; then
@@ -72,7 +72,7 @@ CAPTURE_EXT="$TMP_ROOT/capture-extension.ts"
 cat > "$CAPTURE_EXT" <<'EOF'
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { appendFileSync } from "node:fs";
-const capturePath = process.env.FM_PI_CAPTURE_PATH!;
+const capturePath = process.env.JG_PI_CAPTURE_PATH!;
 export default function (pi: ExtensionAPI) {
   pi.on("project_trust", () => ({ trusted: "yes", remember: false }));
   pi.on("input", (event) => {
@@ -112,7 +112,7 @@ WORKSPACE=$(printf '%s' "$PRIMARY_OUT" | jq -r '.result.workspace.workspace_id')
 PRIMARY_PANE=$(printf '%s' "$PRIMARY_OUT" | jq -r '.result.root_pane.pane_id')
 PRIMARY_TARGET="$SESSION:$PRIMARY_PANE"
 EXT="$CAPTURE_EXT"
-PI_CMD=$(printf 'exec env PI_CODING_AGENT_DIR=%q FM_HOME=%q FM_PI_CAPTURE_PATH=%q pi -e %q --no-context-files --no-session' "$PI_DIR" "$HOME_DIR" "$CAPTURE" "$EXT")
+PI_CMD=$(printf 'exec env PI_CODING_AGENT_DIR=%q JG_HOME=%q JG_PI_CAPTURE_PATH=%q pi -e %q --no-context-files --no-session' "$PI_DIR" "$HOME_DIR" "$CAPTURE" "$EXT")
 "$LAB_HELPER" run "$SESSION" pane run "$PRIMARY_PANE" "$PI_CMD" >/dev/null
 
 wait_for_idle() {
@@ -174,14 +174,14 @@ EOF
 # harness from its own ancestry in production; this test process is not under
 # Pi, so it supplies Pi's verified PI_CODING_AGENT environment marker.
 set +e
-START_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
-  PI_CODING_AGENT=true FM_SUPERVISOR_BACKEND=herdr FM_SUPERVISOR_TARGET="$PRIMARY_TARGET" \
+START_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
+  PI_CODING_AGENT=true JG_SUPERVISOR_BACKEND=herdr JG_SUPERVISOR_TARGET="$PRIMARY_TARGET" \
   "$ROOT/bin/jg-afk-launch.sh" start 2>&1)
 START_RC=$?
 set -e
 [ "$START_RC" -ne 0 ] || fail "the away daemon launched on a Pi primary"
 assert_contains "$START_OUT" 'the away daemon is no longer launched on pi' "the Pi refusal did not name its reason"
-ENTER_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+ENTER_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   PI_CODING_AGENT=true "$ROOT/bin/jg-afk-launch.sh" enter 2>&1) || fail "the away posture could not be recorded on Pi: $ENTER_OUT"
 assert_contains "$ENTER_OUT" 'hold-for-return only' "the entry announcement did not say hold-for-return"
 [ -f "$STATE/.afk-contract" ] || fail "enter did not write the away-posture record"
@@ -242,7 +242,7 @@ assert_blocker_open 'before return catch-up'
 [ -f "$STATE/repair-task.meta" ] || fail "live blocker metadata disappeared before return catch-up"
 
 set +e
-RETURN_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_ROOT_OVERRIDE="$PROJECT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+RETURN_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   PI_CODING_AGENT=true "$ROOT/bin/jg-afk-return.sh" begin 2>&1)
 RETURN_RC=$?
 set -e
@@ -251,7 +251,7 @@ assert_contains "$RETURN_OUT" 'firstmate-actionable blocker: repair-task [key=sy
 assert_contains "$RETURN_OUT" '=== Return brief (away ' "the return did not render the brief"
 assert_contains "$RETURN_OUT" 'Supervisor health:' "the brief did not lead with supervisor health"
 [ ! -f "$STATE/.afk-contract" ] || fail "the return did not archive the away-posture record"
-BEARINGS_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_ROOT_OVERRIDE="$PROJECT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+BEARINGS_OUT=$(PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   "$ROOT/bin/jg-bearings-snapshot.sh" --json 2>&1) \
   || fail "Bearings refused behind the return gate instead of reporting it: $BEARINGS_OUT"
 printf '%s' "$BEARINGS_OUT" | jq -e '
@@ -262,18 +262,18 @@ printf '%s' "$BEARINGS_OUT" | jq -e '
 pass "real unmarked Pi return renders the brief, opens catch-up, and reports that posture through Bearings while the blocker stays Firstmate's to remediate"
 
 printf 'resolved [key=synthetic-dependency]: refreshed the synthetic token and resumed the task\n' >> "$STATE/repair-task.status"
-PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_ROOT_OVERRIDE="$PROJECT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   "$ROOT/bin/jg-afk-return.sh" check >/dev/null || fail "remediated blocker did not clear return catch-up"
-PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_ROOT_OVERRIDE="$PROJECT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   "$ROOT/bin/jg-bearings-snapshot.sh" --json \
   | jq -e '[.gates[].id] | index("(return-catchup)") | not' >/dev/null \
   || fail "Bearings kept the catch-up posture row after the gate cleared"
 
 # A clean re-entry records a fresh posture, and an immediate return is
 # idempotently clear because the keyed blocker is resolved.
-PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   PI_CODING_AGENT=true "$ROOT/bin/jg-afk-launch.sh" enter >/dev/null || fail "clean away re-entry failed"
-PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" FM_ROOT_OVERRIDE="$PROJECT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" HERDR_SESSION="$SESSION" JG_ROOT_OVERRIDE="$PROJECT" JG_HOME="$HOME_DIR" JG_STATE_OVERRIDE="$STATE" \
   PI_CODING_AGENT=true "$ROOT/bin/jg-afk-return.sh" begin >/dev/null \
   || fail "clean away re-entry/return was not idempotent"
 [ "$(find "$STATE/afk-contracts" -name '*.afk-contract' | wc -l | tr -d ' ')" -eq 2 ] || fail "each away window did not leave exactly one archived record"

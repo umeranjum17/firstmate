@@ -15,7 +15,7 @@
 #   throwaway, NEVER-default HERDR_SESSION and asserts the default session is
 #   byte-identical via the jg-herdr-lab.sh fleet-state tripwire; the tmux path
 #   uses uniquely-named throwaway sessions killed by exact name. A harmless
-#   sleeper replaces the real daemon (FM_AFK_LAUNCH_ENTRY) so the test observes
+#   sleeper replaces the real daemon (JG_AFK_LAUNCH_ENTRY) so the test observes
 #   only the terminal lifecycle.
 set -u
 
@@ -25,19 +25,19 @@ START="$ROOT/bin/jg-afk-start.sh"
 CONTRACT="$ROOT/bin/jg-afk-contract.sh"
 # The daemon paths refuse on a Pi primary, so pin a daemon-running harness for
 # every unit below; the Pi refusal has its own units (unit_pi_never_launches_the_daemon).
-# FM_TEST_HARNESS is the launch path's test-only seam (bin/jg-afk-launch.sh
+# JG_TEST_HARNESS is the launch path's test-only seam (bin/jg-afk-launch.sh
 # jg_afk_launch_primary_harness): the suite calls the entrypoints directly, so a
 # real harness ancestor - a no-mistakes gate agent run under Pi - would outrank
 # the CLAUDECODE=1 marker below and refuse the daemon paths under test.
-unset PI_CODING_AGENT FM_PI_HARNESS CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI ATLASSIAN_AGENT_TYPE ROVODEV_CLI
-export CLAUDECODE=1 FM_TEST_HARNESS=claude FM_TEST_SEAM=1
+unset PI_CODING_AGENT JG_PI_HARNESS CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI ATLASSIAN_AGENT_TYPE ROVODEV_CLI
+export CLAUDECODE=1 JG_TEST_HARNESS=claude JG_TEST_SEAM=1
 # A Claude home runs the supervision host unless config/supervision-host-off
 # opts it out (docs/configuration.md "Supervision host"), and the host is that home's
 # away session, so the daemon units run on a Claude home that opted out; the
-# supervision-host units point FM_CONFIG_OVERRIDE at their own home's config.
+# supervision-host units point JG_CONFIG_OVERRIDE at their own home's config.
 OFF_CONFIG=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-off-config.XXXXXX")
 : > "$OFF_CONFIG/supervision-host-off"
-export FM_CONFIG_OVERRIDE="$OFF_CONFIG"
+export JG_CONFIG_OVERRIDE="$OFF_CONFIG"
 
 FAILED=0
 fail() { printf 'not ok - %s\n' "$1" >&2; FAILED=1; }
@@ -58,7 +58,7 @@ GLOBAL_CLEANUP() {
 trap GLOBAL_CLEANUP EXIT
 
 enter_posture() {  # <home>
-  FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" "$CONTRACT" enter >/dev/null 2>&1
+  JG_HOME="$1" JG_STATE_OVERRIDE="$1/state" "$CONTRACT" enter >/dev/null 2>&1
 }
 
 # ---------------------------------------------------------------------------
@@ -71,13 +71,13 @@ unit_enter_records_the_posture_in_one_step_without_a_daemon() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-enter.XXXXXX")
   mkdir -p "$st/state"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter \
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter \
     --words 'merge the windows fix when green' --expected-return 2026-09-08T08:00Z --spend 2 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] && [ -f "$st/state/.afk-contract" ] && [ ! -e "$st/state/.afk-contract.proposed" ] \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ] \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" field expected_return)" = 2026-09-08T08:00Z ] \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" field spend_max_concurrent_workers)" = 2 ] \
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ] \
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" field expected_return)" = 2026-09-08T08:00Z ] \
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" field spend_max_concurrent_workers)" = 2 ] \
     && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ] \
     && printf '%s' "$out" | grep -F 'hold-for-return only. No phone channel is configured; anything that needs you waits for your return.' >/dev/null \
     && printf '%s' "$out" | grep -F '    merge the windows fix when green' >/dev/null \
@@ -86,18 +86,18 @@ unit_enter_records_the_posture_in_one_step_without_a_daemon() {
   else
     fail "enter: record, read-back, or daemon state wrong (rc=$rc): $out"
   fi
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge it' --grant fix-windows 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge it' --grant fix-windows 2>&1)
   rc=$?
   if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -F -- '--grant was retired' >/dev/null \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ]; then
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ]; then
     pass "enter: the retired --grant flag is refused by name and leaves the standing record alone"
   else
     fail "enter: --grant was not refused by name (rc=$rc): $out"
   fi
   printf 'schema\tjg-afk-return.v1\nphase\tblocked\n' > "$st/state/.afk-return-catchup"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge task a PR when green' >/dev/null 2>&1; then
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge task a PR when green' >/dev/null 2>&1; then
     fail "enter: accepted a new mandate while the prior return catch-up was pending"
-  elif [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ]; then
+  elif [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" words)" = 'merge the windows fix when green' ]; then
     pass "enter: refuses while the prior return catch-up is pending"
   else
     fail "enter: a refused entry changed the standing record"
@@ -113,7 +113,7 @@ unit_retired_two_step_entry_is_refused() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-retired.XXXXXX")
   mkdir -p "$st/state"
   for cmd in propose confirm; do
-    out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" "$cmd" --words 'merge it when green' 2>&1)
+    out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" "$cmd" --words 'merge it when green' 2>&1)
     rc=$?
     if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -F "'$cmd' was retired" >/dev/null \
       && [ ! -e "$st/state/.afk-contract" ] && [ ! -e "$st/state/.afk-contract.proposed" ] \
@@ -131,9 +131,9 @@ unit_pi_never_launches_the_daemon() {
   for harness in pi pi-signed; do
     st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-pi.XXXXXX")
     mkdir -p "$st/state"
-    out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_TEST_HARNESS="$harness" \
-      FM_SUPERVISOR_TARGET=unused FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
-      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$FM_TEST_HARNESS"; }; jg_afk_launch_main start' _ "$LAUNCH" 2>&1)
+    out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_TEST_HARNESS="$harness" \
+      JG_SUPERVISOR_TARGET=unused JG_SUPERVISOR_BACKEND=tmux JG_AFK_LAUNCH_ENTRY="$SLEEPER" \
+      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$JG_TEST_HARNESS"; }; jg_afk_launch_main start' _ "$LAUNCH" 2>&1)
     rc=$?
     if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -F "the away daemon is no longer launched on $harness" >/dev/null \
       && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ] && [ ! -e "$st/state/.afk-contract" ]; then
@@ -141,8 +141,8 @@ unit_pi_never_launches_the_daemon() {
     else
       fail "$harness: start did not refuse cleanly (rc=$rc): $out"
     fi
-    out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_TEST_HARNESS="$harness" \
-      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$FM_TEST_HARNESS"; }; jg_afk_launch_main start-native' _ "$LAUNCH" 2>&1)
+    out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_TEST_HARNESS="$harness" \
+      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$JG_TEST_HARNESS"; }; jg_afk_launch_main start-native' _ "$LAUNCH" 2>&1)
     rc=$?
     if [ "$rc" -ne 0 ] && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ]; then
       pass "$harness: start-native refuses to prepare a daemon"
@@ -153,29 +153,29 @@ unit_pi_never_launches_the_daemon() {
   done
 }
 
-# A leaked FM_TEST_HARNESS in a real primary's environment must stay inert: the
-# seam fires only alongside the FM_TEST_SEAM marker that test suites set.
+# A leaked JG_TEST_HARNESS in a real primary's environment must stay inert: the
+# seam fires only alongside the JG_TEST_SEAM marker that test suites set.
 unit_test_harness_seam_requires_the_marker() {
   local ref stray pinned
   # shellcheck disable=SC2016 # positional params expand in the child shell.
-  ref=$(env -u FM_TEST_SEAM -u FM_TEST_HARNESS CLAUDECODE=1 \
+  ref=$(env -u JG_TEST_SEAM -u JG_TEST_HARNESS CLAUDECODE=1 \
     bash -c '. "$1"; jg_afk_launch_primary_harness' _ "$LAUNCH")
   # shellcheck disable=SC2016 # positional params expand in the child shell.
-  stray=$(env -u FM_TEST_SEAM CLAUDECODE=1 FM_TEST_HARNESS=omp \
-    bash -c '. "$1"; jg_afk_launch_primary_harness' _ "$LAUNCH")
-  [ "$stray" = "$ref" ] \
-    || fail "FM_TEST_HARNESS without FM_TEST_SEAM changed harness detection ($stray != $ref)"
-  # shellcheck disable=SC2016 # positional params expand in the child shell.
-  stray=$(env -u FM_TEST_SEAM CLAUDECODE=1 FM_TEST_HARNESS='1 omp' \
+  stray=$(env -u JG_TEST_SEAM CLAUDECODE=1 JG_TEST_HARNESS=omp \
     bash -c '. "$1"; jg_afk_launch_primary_harness' _ "$LAUNCH")
   [ "$stray" = "$ref" ] \
-    || fail "a marker-shaped FM_TEST_HARNESS without FM_TEST_SEAM changed harness detection ($stray != $ref)"
+    || fail "JG_TEST_HARNESS without JG_TEST_SEAM changed harness detection ($stray != $ref)"
   # shellcheck disable=SC2016 # positional params expand in the child shell.
-  pinned=$(FM_TEST_SEAM=1 CLAUDECODE=1 FM_TEST_HARNESS=omp \
+  stray=$(env -u JG_TEST_SEAM CLAUDECODE=1 JG_TEST_HARNESS='1 omp' \
+    bash -c '. "$1"; jg_afk_launch_primary_harness' _ "$LAUNCH")
+  [ "$stray" = "$ref" ] \
+    || fail "a marker-shaped JG_TEST_HARNESS without JG_TEST_SEAM changed harness detection ($stray != $ref)"
+  # shellcheck disable=SC2016 # positional params expand in the child shell.
+  pinned=$(JG_TEST_SEAM=1 CLAUDECODE=1 JG_TEST_HARNESS=omp \
     bash -c '. "$1"; jg_afk_launch_primary_harness' _ "$LAUNCH")
   [ "$pinned" = omp ] \
-    || fail "FM_TEST_SEAM-armed FM_TEST_HARNESS did not pin the harness ($pinned)"
-  pass "FM_TEST_HARNESS seam is inert without the test marker"
+    || fail "JG_TEST_SEAM-armed JG_TEST_HARNESS did not pin the harness ($pinned)"
+  pass "JG_TEST_HARNESS seam is inert without the test marker"
 }
 
 unit_pi_enter_stop_does_not_claim_a_daemon_terminal() {
@@ -186,7 +186,7 @@ unit_pi_enter_stop_does_not_claim_a_daemon_terminal() {
   [ ! -e "$st/state/.afk" ] || fail "pi stop: fixture error: enter wrote the away flag"
   [ ! -e "$st/state/.afk-daemon-terminal" ] || fail "pi stop: fixture error: enter recorded a daemon terminal"
   [ ! -e "$st/state/.supervise-daemon.log" ] || fail "pi stop: fixture error: a daemon log already existed"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] \
     && printf '%s' "$out" | grep -F 'no daemon terminal was running' >/dev/null \
@@ -203,7 +203,7 @@ unit_daemon_entry_requires_the_record() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-entry-record.XXXXXX")
   mkdir -p "$st/state"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native 2>&1)
   rc=$?
   if [ "$rc" -ne 0 ] && [ ! -e "$st/state/.afk-contract" ] && [ ! -e "$st/state/.afk" ] \
     && printf '%s' "$out" | grep -F 'an away-posture record is required; run enter' >/dev/null; then
@@ -211,14 +211,14 @@ unit_daemon_entry_requires_the_record() {
   else
     fail "daemon entry: started without a record or the refusal was unclear (rc=$rc): $out"
   fi
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge task a PR when green' >/dev/null 2>&1 \
-    && FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter --words 'merge task a PR when green' >/dev/null 2>&1 \
+    && JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
     && [ -e "$st/state/.afk" ]; then
     pass "daemon entry: enter then start-native run back to back with no confirmation between them"
   else
     fail "daemon entry: the record enter wrote did not permit lifecycle preparation"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
   rm -rf "$st"
 }
 
@@ -227,8 +227,8 @@ unit_failed_daemon_launch_preserves_the_record() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-failed-record.XXXXXX")
   mkdir -p "$st/state"
   enter_posture "$st" || fail "failed start: could not enter fixture posture"
-  if ! FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-    FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1 \
+  if ! JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET=unused \
+    JG_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1 \
     && [ -f "$st/state/.afk-contract" ] && [ ! -e "$st/state/afk-contracts" ]; then
     pass "failed start: preserves the posture record enter wrote"
   else
@@ -242,9 +242,9 @@ unit_stop_archives_the_record_last() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-stop-archive.XXXXXX")
   mkdir -p "$st/state"
   enter_posture "$st" || fail "stop archive: could not enter fixture posture"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 || fail "stop archive: native entry failed"
-  epoch=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" field entered_epoch)
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 \
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 || fail "stop archive: native entry failed"
+  epoch=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" field entered_epoch)
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 \
     && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-contract" ] \
     && [ -f "$st/state/afk-contracts/$epoch.afk-contract" ]; then
     pass "stop: clears the away flag and archives the posture record under its entry time"
@@ -268,7 +268,7 @@ unit_clear_stale() {
   : > "$st/state/.wake-queue"          # durable queue must be untouched
   # Source jg-afk-start.sh inside a child bash (it sets `set -eu` and would
   # otherwise leak that into this test shell) and call the clear helper.
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" \
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" \
     bash -c '. "$1"; jg_afk_clear_stale_artifacts "$2"' _ "$START" "$st/state"
   if [ ! -e "$st/state/.subsuper-escalations" ] \
      && [ ! -e "$st/state/.subsuper-escalations.since" ] \
@@ -294,8 +294,8 @@ unit_relative_paths_are_absolute_before_daemon_launch() {
   state="$home/state"
   out=$(
     cd "$root" || exit 1
-    CDPATH="$root/cdpath" FM_HOME=home FM_STATE_OVERRIDE=home/state \
-      bash -c '. "$1"; printf "%s\n%s\n" "$FM_HOME" "$FM_AFK_LAUNCH_STATE"' _ "$LAUNCH"
+    CDPATH="$root/cdpath" JG_HOME=home JG_STATE_OVERRIDE=home/state \
+      bash -c '. "$1"; printf "%s\n%s\n" "$JG_HOME" "$JG_AFK_LAUNCH_STATE"' _ "$LAUNCH"
   )
   if [ "$out" = "$home"$'\n'"$state" ]; then
     pass "launcher paths: relative home and state ignore CDPATH before daemon command construction"
@@ -304,8 +304,8 @@ unit_relative_paths_are_absolute_before_daemon_launch() {
   fi
   linked_home="$root/home-link"
   ln -s "$root/home" "$linked_home"
-  out=$(FM_HOME="$linked_home" FM_STATE_OVERRIDE="$linked_home/state" \
-    bash -c '. "$1"; printf "%s\n%s\n" "$FM_HOME" "$FM_AFK_LAUNCH_STATE"' _ "$LAUNCH")
+  out=$(JG_HOME="$linked_home" JG_STATE_OVERRIDE="$linked_home/state" \
+    bash -c '. "$1"; printf "%s\n%s\n" "$JG_HOME" "$JG_AFK_LAUNCH_STATE"' _ "$LAUNCH")
   if [ "$out" = "$linked_home"$'\n'"$linked_home/state" ]; then
     pass "launcher paths: absolute symlink spellings are preserved"
   else
@@ -313,23 +313,23 @@ unit_relative_paths_are_absolute_before_daemon_launch() {
   fi
   out=$(
     cd "$root" || exit 1
-    FM_HOME=missing-home "$LAUNCH" help 2>&1
+    JG_HOME=missing-home "$LAUNCH" help 2>&1
   )
   status=$?
-  if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "FM_HOME directory cannot be resolved: missing-home" >/dev/null; then
-    pass "launcher paths: unresolved relative FM_HOME fails loudly"
+  if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "JG_HOME directory cannot be resolved: missing-home" >/dev/null; then
+    pass "launcher paths: unresolved relative JG_HOME fails loudly"
   else
-    fail "launcher paths: unresolved relative FM_HOME did not name the bad input ($out)"
+    fail "launcher paths: unresolved relative JG_HOME did not name the bad input ($out)"
   fi
   out=$(
     cd "$root" || exit 1
-    FM_HOME=home FM_STATE_OVERRIDE=missing-state "$LAUNCH" help 2>&1
+    JG_HOME=home JG_STATE_OVERRIDE=missing-state "$LAUNCH" help 2>&1
   )
   status=$?
-  if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "FM_STATE_OVERRIDE directory cannot be resolved: missing-state" >/dev/null; then
-    pass "launcher paths: unresolved relative FM_STATE_OVERRIDE fails loudly"
+  if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "JG_STATE_OVERRIDE directory cannot be resolved: missing-state" >/dev/null; then
+    pass "launcher paths: unresolved relative JG_STATE_OVERRIDE fails loudly"
   else
-    fail "launcher paths: unresolved relative FM_STATE_OVERRIDE did not name the bad input ($out)"
+    fail "launcher paths: unresolved relative JG_STATE_OVERRIDE did not name the bad input ($out)"
   fi
   rm -rf "$root"
 }
@@ -354,7 +354,7 @@ unit_fresh_vs_refresh() {
   printf '%s' "$sleep_pid" > "$lock/pid"
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$sleep_pid" > "$lock/pid-identity" 2>/dev/null ) || true
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$START" >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$START" >/dev/null 2>&1
   if [ -e "$st/state/.subsuper-escalations" ] && [ -e "$st/state/.subsuper-inject-wedged" ] \
      && [ -e "$st/state/.subsuper-unknown-acked" ]; then
     pass "refresh: daemon already alive - stale artifacts preserved (current session's buffer kept)"
@@ -382,13 +382,13 @@ unit_mode_explicit_write() {
   local st out
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-mode-explicit.XXXXXX")
   mkdir -p "$st/state"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_MODE=quiet \
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_MODE=quiet \
     bash -c '. "$1"; jg_afk_launch_flag_write' _ "$LAUNCH"
   out=$(read_mode "$st/state")
   if [ "$out" = quiet ]; then
-    pass "mode: a fresh entry with FM_AFK_MODE=quiet writes quiet"
+    pass "mode: a fresh entry with JG_AFK_MODE=quiet writes quiet"
   else
-    fail "mode: explicit FM_AFK_MODE=quiet fresh entry wrote '$out' instead of quiet"
+    fail "mode: explicit JG_AFK_MODE=quiet fresh entry wrote '$out' instead of quiet"
   fi
   rm -rf "$st"
 }
@@ -397,11 +397,11 @@ unit_mode_fresh_defaults_away() {
   local st out
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-mode-default.XXXXXX")
   mkdir -p "$st/state"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" \
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" \
     bash -c '. "$1"; jg_afk_launch_flag_write' _ "$LAUNCH"
   out=$(read_mode "$st/state")
   if [ "$out" = away ]; then
-    pass "mode: a fresh entry with FM_AFK_MODE unset defaults to away"
+    pass "mode: a fresh entry with JG_AFK_MODE unset defaults to away"
   else
     fail "mode: fresh unset-mode entry wrote '$out' instead of away"
   fi
@@ -422,10 +422,10 @@ unit_mode_refresh_preserves_quiet() {
   # The exact real-entry shape: a bare direct re-write with no explicit mode,
   # simulating the terminal-side jg-afk-start.sh redundant write that would
   # silently clobber quiet back to away if it were not preserve-on-refresh.
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$START" >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$START" >/dev/null 2>&1
   out=$(read_mode "$st/state")
   if [ "$out" = quiet ]; then
-    pass "mode: a bare refresh (FM_AFK_MODE unset) of an already-running quiet daemon preserves quiet, never resets to away"
+    pass "mode: a bare refresh (JG_AFK_MODE unset) of an already-running quiet daemon preserves quiet, never resets to away"
   else
     fail "mode: refresh incorrectly changed quiet mode to '$out'"
   fi
@@ -441,7 +441,7 @@ unit_mode_quiet_daemon_to_away() {
   for command in start start-native; do
     st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-quiet-to-away.XXXXXX")
     mkdir -p "$st/state"
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_MODE=quiet "$LAUNCH" enter >/dev/null 2>&1 \
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_MODE=quiet "$LAUNCH" enter >/dev/null 2>&1 \
       || fail "$command: could not enter quiet mode"
     printf 'quiet\n%s\n' "$(date '+%s')" > "$st/state/.afk"
     sleep 600 &
@@ -452,27 +452,27 @@ unit_mode_quiet_daemon_to_away() {
     printf '%s' "$sleep_pid" > "$lock/pid"
     ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$sleep_pid" > "$lock/pid-identity" 2>/dev/null ) || true
 
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-      FM_SUPERVISOR_BACKEND=tmux "$LAUNCH" "$command" >/dev/null 2>&1
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET=unused \
+      JG_SUPERVISOR_BACKEND=tmux "$LAUNCH" "$command" >/dev/null 2>&1
     rc=$?
-    mode=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)
+    mode=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)
     if [ "$rc" -eq 0 ] && [ "$mode" = quiet ] && [ "$(head -n 1 "$st/state/.afk")" = quiet ]; then
       pass "$command: an unset-mode quiet refresh preserves the quiet record and flag"
     else
       fail "$command: quiet refresh changed the record or flag (rc=$rc, record=$mode)"
     fi
 
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter >/dev/null 2>&1
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter >/dev/null 2>&1
     rc=$?
-    mode=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)
+    mode=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)
     if [ "$rc" -ne 0 ] || [ "$mode" != away ]; then
       fail "$command: /afk did not convert the live quiet record to away (rc=$rc, record=$mode)"
     fi
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-      FM_SUPERVISOR_BACKEND=tmux "$LAUNCH" "$command" >/dev/null 2>&1
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET=unused \
+      JG_SUPERVISOR_BACKEND=tmux "$LAUNCH" "$command" >/dev/null 2>&1
     rc=$?
     if [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk")" = away ] \
-      && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ]; then
+      && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ]; then
       pass "$command: /afk over a running quiet daemon refreshes the flag to away"
     else
       fail "$command: /afk record and daemon flag disagree after refresh (rc=$rc)"
@@ -544,7 +544,7 @@ unit_stop_ordering() {
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$daemon_pid" > "$lock/pid-identity" 2>/dev/null ) || true
   printf 'none\t-\tnative\n' > "$st/state/.afk-daemon-terminal"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
   # shellcheck disable=SC2031 # The background daemon writes this shared file; no shell variable is reassigned.
   if [ "$(cat "$marker" 2>/dev/null || echo missing)" = present ]; then
     pass "stop-ordering: daemon SIGTERM'd while .afk still present (flush is not a no-op)"
@@ -578,7 +578,7 @@ unit_stop_rejects_reused_pid() {
   mkdir -p "$lock"
   printf '%s' "$sleeper_pid" > "$lock/pid"
   printf 'different-process-identity' > "$lock/pid-identity"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
   if kill -0 "$sleeper_pid" 2>/dev/null; then
     pass "stop identity: stale lock cannot signal an unrelated live process"
   else
@@ -596,8 +596,8 @@ unit_failed_start_rolls_back_state() {
   printf 'pending\n' > "$st/state/.subsuper-escalations"
   printf 'wedged\n' > "$st/state/.subsuper-inject-wedged"
   enter_posture "$st" || fail "failed start: could not enter fixture posture"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-    FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1; then
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET=unused \
+    JG_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1; then
     fail "failed start: unsupported backend unexpectedly succeeded"
   elif [ ! -e "$st/state/.afk" ] \
     && [ "$(cat "$st/state/.subsuper-escalations")" = pending ] \
@@ -618,12 +618,12 @@ unit_concurrent_start_serialized() {
   TRACK_TMUX_SESSIONS="$TRACK_TMUX_SESSIONS $cap_session"
   cap_pane=$(tmux display-message -p -t "$cap_session" '#{pane_id}')
   enter_posture "$st" || fail "concurrent start: could not enter fixture posture"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET="$cap_pane" \
-    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET="$cap_pane" \
+    JG_SUPERVISOR_BACKEND=tmux JG_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   first=$!
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET="$cap_pane" \
-    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET="$cap_pane" \
+    JG_SUPERVISOR_BACKEND=tmux JG_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   second=$!
   wait "$first"; wait "$second"
@@ -635,7 +635,7 @@ unit_concurrent_start_serialized() {
   else
     fail "concurrent start: leaked or lost daemon terminal (count $count, record $rec)"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
   tmux kill-session -t "$cap_session" 2>/dev/null || true
   rm -rf "$st"
 }
@@ -660,7 +660,7 @@ unit_lock_initialization_grace() {
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   initializer=$!
   # shellcheck disable=SC2031 # The initializer communicates through this shared file path.
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_lock_acquire
     jg_afk_launch_lock_release
@@ -677,7 +677,7 @@ unit_signal_exits_with_lock_cleanup() {
   local st marker child
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-signal.XXXXXX")
   marker="$st/resumed"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_start() { sleep 30; }
     jg_afk_launch_main start
@@ -714,8 +714,8 @@ unit_herdr_partial_create_recovery() {
   local st recorded
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-herdr-partial.XXXXXX")
   recorded="$st/recorded"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_LAUNCH_ENTRY=/bin/true \
-    FM_AFK_LAUNCH_LABEL=afk-exact-label RECORDED="$recorded" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_LAUNCH_ENTRY=/bin/true \
+    JG_AFK_LAUNCH_LABEL=afk-exact-label RECORDED="$recorded" bash -c '
     . "$1"
     jg_backend_source() { return 0; }
     jg_backend_herdr_server_ensure() { return 0; }
@@ -743,7 +743,7 @@ unit_herdr_partial_create_recovery() {
 unit_herdr_error_with_exact_ids_closes_exact() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-herdr-error-exact.XXXXXX")
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_backend_source() { return 0; }
     jg_backend_herdr_server_ensure() { return 0; }
@@ -770,7 +770,7 @@ unit_herdr_error_with_exact_ids_closes_exact() {
 unit_herdr_run_failure_preserves_unconfirmed_record() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-herdr-run-fail.XXXXXX")
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_backend_source() { return 0; }
     jg_backend_herdr_server_ensure() { return 0; }
@@ -803,13 +803,13 @@ unit_daemon_terminal_receives_the_primary_harness() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-daemon-harness.XXXXXX")
   entry="$st/entry"
   # shellcheck disable=SC2016 # expands in the entry script.
-  printf '#!/usr/bin/env bash\nprintf "%%s" "${FM_DAEMON_PRIMARY_HARNESS-unset}" > "$FM_HOME/daemon-harness"\n' > "$entry"
+  printf '#!/usr/bin/env bash\nprintf "%%s" "${JG_DAEMON_PRIMARY_HARNESS-unset}" > "$JG_HOME/daemon-harness"\n' > "$entry"
   chmod +x "$entry"
   # shellcheck disable=SC2016 # positional params expand in the child shell.
   for backend in herdr tmux; do
     rm -f "$st/daemon-harness"
-    env -u FM_DAEMON_PRIMARY_HARNESS FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_LAUNCH_ENTRY="$entry" \
-      FM_TEST_HARNESS=claude bash -c '
+    env -u JG_DAEMON_PRIMARY_HARNESS JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_LAUNCH_ENTRY="$entry" \
+      JG_TEST_HARNESS=claude bash -c '
       . "$1"
       jg_backend_source() { return 0; }
       jg_backend_herdr_server_ensure() { return 0; }
@@ -839,7 +839,7 @@ unit_record_failure_closes_terminal() {
   local st closed
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-record-fail.XXXXXX")
   closed="$st/closed"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" CLOSED="$closed" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" CLOSED="$closed" bash -c '
     . "$1"
     jg_afk_launch_record_write() { return 1; }
     jg_afk_launch_close_terminal() { printf "%s:%s" "$1" "$2" > "$CLOSED"; }
@@ -857,7 +857,7 @@ unit_readiness_failure_rolls_back_terminal() {
   local st closed
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-not-ready.XXXXXX")
   closed="$st/closed"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" CLOSED="$closed" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" CLOSED="$closed" bash -c '
     . "$1"
     jg_afk_launch_wait_ready() { return 1; }
     jg_afk_launch_close_terminal() { printf "%s:%s" "$1" "$2" > "$CLOSED"; }
@@ -876,7 +876,7 @@ unit_readiness_failure_rolls_back_terminal() {
 unit_readiness_failure_preserves_unconfirmed_record() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-not-ready-unconfirmed.XXXXXX")
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_wait_ready() { return 1; }
     jg_afk_launch_close_terminal() { return 1; }
@@ -894,7 +894,7 @@ unit_readiness_failure_preserves_unconfirmed_record() {
 unit_tmux_absence_distinguishes_probe_failure() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-tmux-probe.XXXXXX")
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     tmux() { printf "%s" "can'\''t find session: exact-session" >&2; return 1; }
     jg_afk_launch_terminal_absent tmux exact-session
@@ -914,7 +914,7 @@ unit_native_lifecycle() {
   mkdir -p "$st/state"
   : > "$st/state/.subsuper-escalations"
   enter_posture "$st" || fail "native lifecycle: could not enter fixture posture"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
     && [ "$(cut -f1 "$st/state/.afk-daemon-terminal")" = none ] \
     && [ -e "$st/state/.afk" ] \
     && [ ! -e "$st/state/.subsuper-escalations" ]; then
@@ -922,7 +922,7 @@ unit_native_lifecycle() {
   else
     fail "native lifecycle: state preparation or no-terminal record failed"
   fi
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop 2>&1)
   if [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ] \
     && printf '%s' "$out" | grep -F 'no daemon terminal was running' >/dev/null \
     && ! printf '%s' "$out" | grep -F 'daemon terminal torn down' >/dev/null; then
@@ -944,8 +944,8 @@ unit_supervision_host_claude_home_runs_no_away_daemon() {
   for line in - ''; do
     rm -f "$st/config/supervision-host" "$st/state/.afk-contract"
     [ "$line" = - ] || printf '%s\n' "$line" > "$st/config/supervision-host"
-    FM_CONFIG_OVERRIDE="$st/config" enter_posture "$st" || fail "supervision host: could not enter fixture posture"
-    out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native 2>&1)
+    JG_CONFIG_OVERRIDE="$st/config" enter_posture "$st" || fail "supervision host: could not enter fixture posture"
+    out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native 2>&1)
     rc=$?
     if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -F 'runs the supervision host (docs/supervision-host.md)' >/dev/null \
       && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ] && [ -f "$st/state/.afk-contract" ]; then
@@ -955,27 +955,27 @@ unit_supervision_host_claude_home_runs_no_away_daemon() {
     fi
   done
   rm -f "$st/state/.afk-contract"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_MODE=quiet "$CONTRACT" enter >/dev/null 2>&1 \
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_MODE=quiet "$CONTRACT" enter >/dev/null 2>&1 \
     || fail "supervision host: could not enter quiet fixture posture"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" FM_AFK_MODE=quiet "$LAUNCH" start-native >/dev/null 2>&1 \
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" JG_AFK_MODE=quiet "$LAUNCH" start-native >/dev/null 2>&1 \
     && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
-    && FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native >/dev/null 2>&1 \
+    && JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native >/dev/null 2>&1 \
     && [ "$(head -n 1 "$st/state/.afk")" = quiet ]; then
     pass "supervision host: quiet start-native and a plain refresh of the quiet daemon still prepare the daemon"
   else
     fail "supervision host: quiet mode was refused or lost its mode on a claude host home"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" "$LAUNCH" stop >/dev/null 2>&1 || true
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" "$LAUNCH" stop >/dev/null 2>&1 || true
   : > "$st/config/supervision-host-off"
-  FM_CONFIG_OVERRIDE="$st/config" enter_posture "$st" || fail "supervision host: could not enter the off fixture posture"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native 2>&1)
+  JG_CONFIG_OVERRIDE="$st/config" enter_posture "$st" || fail "supervision host: could not enter the off fixture posture"
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" "$LAUNCH" start-native 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk" 2>/dev/null)" = away ]; then
     pass "supervision host: config/supervision-host-off keeps the away daemon on a claude home"
   else
     fail "supervision host: config/supervision-host-off did not keep the away daemon (rc=$rc): $out"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" "$LAUNCH" stop >/dev/null 2>&1 || true
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" "$LAUNCH" stop >/dev/null 2>&1 || true
   rm -rf "$st"
 }
 
@@ -988,8 +988,8 @@ unit_supervision_host_other_harnesses_run_no_away_daemon() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-host-harness.XXXXXX")
   mkdir -p "$st/state" "$st/config"
   daemon_allowed() {  # <harness> [mode]
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" FM_TEST_HARNESS="$1" FM_AFK_MODE="${2:-}" \
-      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$FM_TEST_HARNESS"; }; jg_afk_launch_daemon_allowed' _ "$LAUNCH" 2>&1
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" JG_TEST_HARNESS="$1" JG_AFK_MODE="${2:-}" \
+      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$JG_TEST_HARNESS"; }; jg_afk_launch_daemon_allowed' _ "$LAUNCH" 2>&1
   }
   for harness in cursor opencode omp grok codex; do
     daemon_allowed "$harness" >/dev/null || fail "$harness: a home without config/supervision-host must keep the away daemon"
@@ -1018,8 +1018,8 @@ unit_supervision_host_other_harnesses_run_no_away_daemon() {
       off) : > "$st/config/supervision-host-off" ;;
       *) printf '%s\n' "$2" > "$st/config/supervision-host" ;;
     esac
-    FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_CONFIG_OVERRIDE="$st/config" FM_TEST_HARNESS="$1" \
-      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$FM_TEST_HARNESS"; }; jg_afk_launch_main enter --words "watch the fleet"' _ "$LAUNCH" 2>&1
+    JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_CONFIG_OVERRIDE="$st/config" JG_TEST_HARNESS="$1" \
+      bash -c '. "$1"; jg_afk_launch_primary_harness() { printf "%s" "$JG_TEST_HARNESS"; }; jg_afk_launch_main enter --words "watch the fleet"' _ "$LAUNCH" 2>&1
   }
   out=$(enter_with cursor ''); rc=$?
   [ "$rc" -eq 0 ] && [ -f "$st/state/.afk-contract" ] || fail "enter on an opted-in cursor home failed (rc=$rc): $out"
@@ -1060,8 +1060,8 @@ quiet_expect() {  # <status> <fragment> <failure>
 quiet_in() {  # <home> <command...>
   local home=$1
   shift
-  FM_SUPERVISION_ENGINE_CLAUDE_BIN="${QUIET_ENGINE-$home/claude-engine}" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" "$@" 2>&1
+  JG_SUPERVISION_ENGINE_CLAUDE_BIN="${QUIET_ENGINE-$home/claude-engine}" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_CONFIG_OVERRIDE="$home/config" "$@" 2>&1
 }
 
 # Daemon-backed quiet mode (no supervision host) writes the record through the
@@ -1072,10 +1072,10 @@ unit_daemon_quiet_entry_holds_nothing_for_a_return() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-quiet-entry.XXXXXX")
   mkdir -p "$st/state"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_MODE=quiet "$LAUNCH" enter 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_MODE=quiet "$LAUNCH" enter 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = quiet ] \
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = quiet ] \
     && printf '%s' "$out" | grep -F 'Quiet mode recorded at ' >/dev/null \
     && printf '%s' "$out" | grep -F 'nothing waits for your return' >/dev/null \
     && ! printf '%s' "$out" | grep -F 'hold-for-return' >/dev/null \
@@ -1084,10 +1084,10 @@ unit_daemon_quiet_entry_holds_nothing_for_a_return() {
   else
     fail "quiet entry: the quiet record read as away or hold-for-return (rc=$rc): $out"
   fi
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" enter 2>&1)
+  out=$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" enter 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] \
-    && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ] \
+    && [ "$(JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ] \
     && printf '%s' "$out" | grep -F 'hold-for-return only' >/dev/null; then
     pass "quiet entry: a later /afk entry turns the quiet record into the away posture, which holds for the return"
   else
@@ -1108,19 +1108,19 @@ unit_supervision_host_quiet_statement() {
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check on a claude home opted out by config/supervision-host-off must exit 1 silently (rc=$rc): $out"
   rm -f "$st/config/supervision-host" "$st/config/supervision-host-off"
-  out=$(FM_TEST_HARNESS=cursor quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
+  out=$(JG_TEST_HARNESS=cursor quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check on a cursor home without config/supervision-host must exit 1 silently (rc=$rc): $out"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   quiet_expect 0 'Quiet mode needs nothing on this home' "quiet-check on a claude home without config/supervision-host must say quiet mode needs nothing"
   printf 'claude\n' > "$st/config/supervision-host"
-  out=$(FM_TEST_HARNESS=pi quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
+  out=$(JG_TEST_HARNESS=pi quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check on a pi home must exit 1 silently (rc=$rc): $out"
 
   for harness in claude cursor; do
-    out=$(FM_TEST_HARNESS=$harness quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
+    out=$(JG_TEST_HARNESS=$harness quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
     quiet_expect 0 'Quiet mode needs nothing on this home' "$harness: quiet-check must say quiet mode needs nothing where the attended host runs"
   done
-  out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
+  out=$(quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
   if [ "$rc" -ne 3 ] || [ -e "$st/state/.afk-contract" ] || [ -e "$st/state/.afk" ] \
     || ! printf '%s' "$out" | grep -F 'quiet mode writes no away-posture record on this home' >/dev/null; then
     fail "a quiet enter where the attended host runs must write no record that would park a present captain (rc=$rc): $out"
@@ -1135,7 +1135,7 @@ unit_supervision_host_quiet_statement() {
   printf 'key=%s\nerrors=2\ncooldown=300\nretry_after=%s\n' "$key" "$(( $(date +%s) + 300 ))" > "$st/state/.supervision-host-health"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   quiet_expect 0 'paused after repeated engine errors: routine wakes reach this conversation until it recovers, and its next retry is due at' "quiet-check during the latch's cooldown must say the session is paused"
-  out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
+  out=$(quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
   [ "$rc" -eq 3 ] && [ ! -e "$st/state/.afk-contract" ] || fail "a quiet enter while the latch holds must write nothing (rc=$rc): $out"
   printf 'key=%s\nerrors=2\ncooldown=300\nretry_after=%s\n' "$key" "$(( $(date +%s) - 10 ))" > "$st/state/.supervision-host-health"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check)
@@ -1152,14 +1152,14 @@ unit_supervision_host_quiet_statement() {
 
 # Where the home opted in but the attended host lacks a part, quiet-check names
 # it and quiet mode enters through the daemon. The quiet enter records its
-# mode, so the daemon start needs no FM_AFK_MODE, while an explicit away start
+# mode, so the daemon start needs no JG_AFK_MODE, while an explicit away start
 # is refused in away wording; a later /quiet refreshes the running quiet daemon.
 unit_supervision_host_quiet_fallback() {
   local st out rc bad
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-quiet-fallback.XXXXXX")
   quiet_home "$st"
   unready() {  # <reason fragment> [<harness>]
-    out=$(FM_TEST_HARNESS="${2:-claude}" quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
+    out=$(JG_TEST_HARNESS="${2:-claude}" quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
     quiet_expect 1 "Quiet mode is not already the ordinary posture on this home, because $1" "quiet-check must name '$1' and exit 1"
   }
   QUIET_ENGINE="$st/no-claude" unready 'the claude engine executable is missing'
@@ -1190,10 +1190,10 @@ unit_supervision_host_quiet_fallback() {
   [ ! -e "$st/state/.host-mirror-cursor.next" ] || fail "quiet-check must stage no mirror cursor"
   pass "supervision host: quiet-check names what the attended host lacks"
 
-  out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
+  out=$(quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
   [ "$rc" -eq 0 ] && [ "$(quiet_in "$st" "$CONTRACT" field mode)" = quiet ] \
     || fail "a quiet enter where the attended host is unready must record quiet mode for the daemon (rc=$rc): $out"
-  out=$(quiet_in "$st" env FM_AFK_MODE=away "$LAUNCH" start-native); rc=$?
+  out=$(quiet_in "$st" env JG_AFK_MODE=away "$LAUNCH" start-native); rc=$?
   if [ "$rc" -eq 0 ] || [ -e "$st/state/.afk" ] \
     || ! printf '%s' "$out" | grep -F 'the away daemon is not launched on this claude home' >/dev/null; then
     fail "an explicit away start must still refuse the away daemon in away wording (rc=$rc): $out"
@@ -1201,10 +1201,10 @@ unit_supervision_host_quiet_fallback() {
   printf 'away\n' > "$st/state/.afk"
   out=$(quiet_in "$st" "$LAUNCH" start-native); rc=$?
   [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
-    || fail "a start with no FM_AFK_MODE must take quiet from the entry's record, over a stale flag (rc=$rc): $out"
+    || fail "a start with no JG_AFK_MODE must take quiet from the entry's record, over a stale flag (rc=$rc): $out"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check while the quiet daemon runs must send a later /quiet to its refresh silently (rc=$rc): $out"
-  out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter); rc=$?
+  out=$(quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter); rc=$?
   [ "$rc" -eq 0 ] && [ "$(quiet_in "$st" "$CONTRACT" field mode)" = quiet ] \
     || fail "a quiet refresh must keep the quiet daemon's record (rc=$rc): $out"
   pass "supervision host: an unready host's quiet entry records its mode, which carries the daemon start"
@@ -1224,7 +1224,7 @@ unit_supervision_host_quiet_after_afk() {
     cp "$st/state/.afk-contract" "$st/away-record"
     out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
     quiet_expect 2 'away record (state/.afk-contract) is live' "$1: quiet-check under a live away record must refuse and name it"
-    out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
+    out=$(quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet"); rc=$?
     quiet_expect 3 'away record (state/.afk-contract) is live' "$1: a quiet enter under a live away record must refuse and name it"
     cmp -s "$st/state/.afk-contract" "$st/away-record" || fail "$1: a refused quiet enter must leave the away record untouched"
   }
@@ -1239,7 +1239,7 @@ unit_supervision_host_quiet_after_afk() {
   pass "supervision host: /quiet under a live away record refuses and names it until the return"
 
   rm -f "$st/state/.host-mirror.jsonl"
-  quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
+  quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
     && quiet_in "$st" "$LAUNCH" start-native >/dev/null && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
     || fail "a quiet entry without the dialog mirror must prepare the quiet daemon"
   out=$(quiet_in "$st" "$LAUNCH" enter --words "back after lunch"); rc=$?
@@ -1262,9 +1262,9 @@ unit_supervision_host_quiet_failed_start() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-quiet-failed.XXXXXX")
   quiet_home "$st"
   rm -f "$st/state/.host-mirror.jsonl"
-  quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
+  quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
     || fail "a quiet entry without the dialog mirror must record quiet mode"
-  out=$(quiet_in "$st" env FM_SUPERVISOR_TARGET=unused FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start); rc=$?
+  out=$(quiet_in "$st" env JG_SUPERVISOR_TARGET=unused JG_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start); rc=$?
   if [ "$rc" -eq 0 ] || [ -e "$st/state/.afk-contract" ] || [ -e "$st/state/.afk" ] \
     || [ -z "$(ls "$st/state/afk-contracts" 2>/dev/null)" ]; then
     fail "a failed quiet start must archive the quiet record and leave no flag (rc=$rc): $out"
@@ -1272,12 +1272,12 @@ unit_supervision_host_quiet_failed_start() {
   printf '%s\n' "$QUIET_MIRROR" > "$st/state/.host-mirror.jsonl"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   quiet_expect 0 'Quiet mode needs nothing on this home' "once the mirror returns after a failed quiet start, the attended host must treat the captain as present"
-  quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null; rc=$?
+  quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null; rc=$?
   [ "$rc" -eq 3 ] && [ ! -e "$st/state/.afk-contract" ] || fail "a quiet enter after a failed quiet start must again write nothing (rc=$rc)"
   rm -f "$st/state/.host-mirror.jsonl"
-  quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
+  quiet_in "$st" env JG_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
     || fail "a second quiet entry without the dialog mirror must record quiet mode"
-  out=$(quiet_in "$st" env FM_SUPERVISOR_TARGET=unused "$LAUNCH" start-native); rc=$?
+  out=$(quiet_in "$st" env JG_SUPERVISOR_TARGET=unused "$LAUNCH" start-native); rc=$?
   [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
     || fail "a successful quiet start must keep the quiet record and flag (rc=$rc): $out"
   quiet_in "$st" "$LAUNCH" stop >/dev/null || true
@@ -1286,7 +1286,7 @@ unit_supervision_host_quiet_failed_start() {
   : > "$st/config/supervision-host-off"
   quiet_in "$st" "$LAUNCH" enter --words "back after lunch" >/dev/null || fail "an away entry must record the away words"
   cp "$st/state/.afk-contract" "$st/away-record"
-  out=$(quiet_in "$st" env FM_SUPERVISOR_TARGET=unused FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start); rc=$?
+  out=$(quiet_in "$st" env JG_SUPERVISOR_TARGET=unused JG_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start); rc=$?
   [ "$rc" -ne 0 ] && cmp -s "$st/state/.afk-contract" "$st/away-record" && [ ! -e "$st/state/.afk" ] \
     || fail "a failed away start must keep its away record (rc=$rc): $out"
   pass "supervision host: a failed away start keeps its away record"
@@ -1299,9 +1299,9 @@ unit_native_entry_preserves_prepared_state() {
   mkdir -p "$st/state"
   : > "$st/state/.afk"
   : > "$st/state/.subsuper-escalations"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_AFK_STATE_PREPARED=1 bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_AFK_STATE_PREPARED=1 bash -c '
     . "$1"
-    FM_AFK_DAEMON=/bin/true
+    JG_AFK_DAEMON=/bin/true
     jg_afk_start_main
   ' _ "$START" >/dev/null 2>&1
   if [ -e "$st/state/.afk" ] && [ -e "$st/state/.subsuper-escalations" ]; then
@@ -1317,7 +1317,7 @@ unit_close_failure_preserves_record() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-close-fail.XXXXXX")
   mkdir -p "$st/state"
   printf 'tmux\texact-session\towned\n' > "$st/state/.afk-daemon-terminal"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_close_terminal() { return 1; }
     jg_afk_launch_terminal_absent() { return 1; }
@@ -1336,7 +1336,7 @@ unit_record_publication_atomic() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-record-atomic.XXXXXX")
   mkdir -p "$st/state"
   printf 'tmux\told-session\towned\n' > "$st/state/.afk-daemon-terminal"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     mv() { return 1; }
     ! jg_afk_launch_record_write tmux new-session owned
@@ -1356,7 +1356,7 @@ unit_malformed_record_fails_closed() {
   mkdir -p "$st/state"
   printf 'tmux\tonly-two-fields\n' > "$st/state/.afk-daemon-terminal"
   acted="$st/acted"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" ACTED="$acted" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" ACTED="$acted" bash -c '
     . "$1"
     jg_afk_launch_close_terminal() { : > "$ACTED"; }
     ! jg_afk_launch_reconcile
@@ -1375,7 +1375,7 @@ unit_stop_malformed_record_fails_closed() {
   mkdir -p "$st/state"
   : > "$st/state/.afk"
   printf 'tmux\tonly-two-fields\n' > "$st/state/.afk-daemon-terminal"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     ! jg_afk_launch_stop
   ' _ "$LAUNCH" && [ -e "$st/state/.afk" ] && [ -e "$st/state/.afk-daemon-terminal" ]; then
@@ -1390,15 +1390,15 @@ unit_tmux_planned_record_and_collision() {
   local st first second
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-tmux-plan.XXXXXX")
   mkdir -p "$st/state"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     tmux() {
       if [ "$1" = new-session ]; then
-        [ -s "$FM_AFK_LAUNCH_RECORD" ] || return 9
-        printf "%s" "$4" > "$FM_HOME/created-name"
+        [ -s "$JG_AFK_LAUNCH_RECORD" ] || return 9
+        printf "%s" "$4" > "$JG_HOME/created-name"
         return 1
       fi
-      [ "$1" != kill-session ] || : > "$FM_HOME/killed"
+      [ "$1" != kill-session ] || : > "$JG_HOME/killed"
       return 1
     }
     ! jg_afk_launch_create_tmux captain:0 tmux
@@ -1412,11 +1412,11 @@ unit_tmux_planned_record_and_collision() {
 
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-tmux-unique.XXXXXX")
   mkdir -p "$st/state"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     tmux() {
-      [ "$1" != new-session ] || { printf "%s" "$4" > "$FM_HOME/created-name"; return 1; }
-      [ "$1" != kill-session ] || : > "$FM_HOME/killed"
+      [ "$1" != new-session ] || { printf "%s" "$4" > "$JG_HOME/created-name"; return 1; }
+      [ "$1" != kill-session ] || : > "$JG_HOME/killed"
       return 1
     }
     ! jg_afk_launch_create_tmux captain:0 tmux
@@ -1446,7 +1446,7 @@ unit_stop_validates_before_signal() {
   printf '%s' "$sleeper_pid" > "$st/state/.supervise-daemon.lock/pid"
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$sleeper_pid" > "$st/state/.supervise-daemon.lock/pid-identity" )
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 || true
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 || true
   if kill -0 "$sleeper_pid" 2>/dev/null && [ -e "$st/state/.afk" ]; then
     pass "stop validation: malformed record causes no daemon or state side effects"
   else
@@ -1461,7 +1461,7 @@ unit_lock_requires_complete_metadata() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-lock-metadata.XXXXXX")
   mkdir -p "$st/state"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_pid_identity() { return 1; }
     ! jg_afk_launch_lock_acquire
@@ -1478,9 +1478,9 @@ unit_stop_surfaces_afk_removal_failure() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-stop-remove.XXXXXX")
   mkdir -p "$st/state"
   : > "$st/state/.afk"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
-    rm() { local last=${!#}; [ "$last" != "$FM_AFK_LAUNCH_STATE/.afk" ]; }
+    rm() { local last=${!#}; [ "$last" != "$JG_AFK_LAUNCH_STATE/.afk" ]; }
     ! jg_afk_launch_stop
   ' _ "$LAUNCH"; then
     pass "stop state: away-flag removal failure is surfaced"
@@ -1502,14 +1502,14 @@ unit_stop_confirms_daemon_exit() {
   printf '%s' "$daemon_pid" > "$st/state/.supervise-daemon.lock/pid"
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$daemon_pid" > "$st/state/.supervise-daemon.lock/pid-identity" )
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     seq() { printf "1\n"; }
     sleep() { :; }
     kill() {
       command kill "$@"
       if [ "$1" = -TERM ]; then
-        rm -rf "$FM_AFK_LAUNCH_STATE/.supervise-daemon.lock"
+        rm -rf "$JG_AFK_LAUNCH_STATE/.supervise-daemon.lock"
       fi
     }
     ! jg_afk_launch_stop
@@ -1536,8 +1536,8 @@ unit_refresh_validates_record() {
   printf '%s' "$daemon_pid" > "$st/state/.supervise-daemon.lock/pid"
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/jg-wake-lib.sh"; jg_pid_identity "$daemon_pid" > "$st/state/.supervise-daemon.lock/pid-identity" )
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-    FM_SUPERVISOR_BACKEND=tmux bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" JG_SUPERVISOR_TARGET=unused \
+    JG_SUPERVISOR_BACKEND=tmux bash -c '
       . "$1"
       ! jg_afk_launch_start && ! jg_afk_launch_start_native
     ' _ "$LAUNCH" && [ ! -e "$st/state/.afk" ]; then
@@ -1555,7 +1555,7 @@ unit_clear_failure_aborts_entry() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-clear-fail.XXXXXX")
   mkdir -p "$st/state"
   : > "$st/state/.subsuper-escalations"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_reconcile() { return 0; }
     jg_afk_clear_stale_artifacts() { return 1; }
@@ -1573,7 +1573,7 @@ unit_confirmed_absence_succeeds() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-confirmed-absent.XXXXXX")
   mkdir -p "$st/state"
   printf 'tmux\texact-session\towned\n' > "$st/state/.afk-daemon-terminal"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_close_terminal() { return 1; }
     jg_afk_launch_terminal_absent() { return 0; }
@@ -1592,7 +1592,7 @@ unit_incomplete_restore_retains_backup() {
   mkdir -p "$st/state"
   backup=$(mktemp -d "$st/state/.afk-launch-backup.XXXXXX")
   printf 'prior\n' > "$backup/.afk"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  if JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     cp() { return 1; }
     ! jg_afk_launch_restore_backup "$2" 1
@@ -1608,7 +1608,7 @@ unit_flag_write_failure_aborts() {
   local st
   st=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-flag-fail.XXXXXX")
   mkdir -p "$st/state"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" bash -c '
+  JG_HOME="$st" JG_STATE_OVERRIDE="$st/state" bash -c '
     . "$1"
     jg_afk_launch_flag_write() { return 1; }
     ! jg_afk_launch_start_native
@@ -1639,8 +1639,8 @@ e2e_herdr() (
   home_tmp=$(mktemp -d "${TMPDIR:-/tmp}/jg-afk-e2e-home.XXXXXX")
   E2E_HERDR_CLEANUP() {
     # shellcheck disable=SC2031 # Cleanup reads the caller's resolved target; it does not reassign it.
-    FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-      FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1 || true
+    JG_HOME="$home_tmp" JG_STATE_OVERRIDE="$home_tmp/state" \
+      JG_SUPERVISOR_TARGET="$target" JG_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1 || true
     herdr_safe_stop_and_delete "$SESSION" >/dev/null 2>&1 || true
     rm -rf "$home_tmp" 2>/dev/null || true
   }
@@ -1658,8 +1658,8 @@ e2e_herdr() (
   before=$(jg_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
   ws_before=$(jg_backend_herdr_cli "$SESSION" workspace list 2>/dev/null | jq '[.result.workspaces[]?]|length')
 
-  FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
+  JG_HOME="$home_tmp" JG_STATE_OVERRIDE="$home_tmp/state" \
+    JG_SUPERVISOR_TARGET="$target" JG_SUPERVISOR_BACKEND=herdr JG_AFK_LAUNCH_ENTRY="$SLEEPER" \
     "$LAUNCH" start >/dev/null 2>&1
 
   during=$(jg_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
@@ -1672,8 +1672,8 @@ e2e_herdr() (
   if [ -n "$dtab" ] && [ "$dtab" != "$cap_tab" ]; then pass "herdr e2e: daemon pane is NOT in the captain's tab"; else fail "herdr e2e: daemon pane shares the captain tab ($dtab)"; fi
   case "$dtgt" in "$SESSION":*) pass "herdr e2e: daemon terminal scoped to the lab session" ;; *) fail "herdr e2e: daemon terminal not in the lab session ($dtgt)" ;; esac
 
-  FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$home_tmp" JG_STATE_OVERRIDE="$home_tmp/state" \
+    JG_SUPERVISOR_TARGET="$target" JG_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1
 
   after=$(jg_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
   ws_after=$(jg_backend_herdr_cli "$SESSION" workspace list 2>/dev/null | jq '[.result.workspaces[]?]|length')
@@ -1700,8 +1700,8 @@ e2e_tmux() {
   enter_posture "$home_tmp" || fail "tmux e2e: could not enter fixture posture"
   before=$(tmux list-panes -t "$cap_session" | wc -l | tr -d ' ')
 
-  FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
+  JG_HOME="$home_tmp" JG_STATE_OVERRIDE="$home_tmp/state" \
+    JG_SUPERVISOR_TARGET="$cap_pane" JG_SUPERVISOR_BACKEND=tmux JG_AFK_LAUNCH_ENTRY="$SLEEPER" \
     "$LAUNCH" start >/dev/null 2>&1
 
   during=$(tmux list-panes -t "$cap_session" | wc -l | tr -d ' ')
@@ -1710,8 +1710,8 @@ e2e_tmux() {
   if [ "$before" = "$during" ]; then pass "tmux e2e: captain window pane count unchanged after start (no split-window)"; else fail "tmux e2e: captain window pane count changed ($before -> $during)"; fi
   if [ -n "$rec" ] && tmux has-session -t "$rec" 2>/dev/null && [ "$rec" != "$cap_session" ]; then pass "tmux e2e: daemon launched in a separate detached session"; else fail "tmux e2e: no separate daemon session ($rec)"; fi
 
-  FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux "$LAUNCH" stop >/dev/null 2>&1
+  JG_HOME="$home_tmp" JG_STATE_OVERRIDE="$home_tmp/state" \
+    JG_SUPERVISOR_TARGET="$cap_pane" JG_SUPERVISOR_BACKEND=tmux "$LAUNCH" stop >/dev/null 2>&1
 
   after=$(tmux list-panes -t "$cap_session" | wc -l | tr -d ' ')
   if [ "$after" = "$before" ]; then pass "tmux e2e: captain window pane count unchanged after stop"; else fail "tmux e2e: captain window changed ($before -> $after)"; fi

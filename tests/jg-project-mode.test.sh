@@ -30,10 +30,10 @@ cat > "$DATA/projects.md" <<'EOF'
 EOF
 
 run_mode() {
-  FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" "$1" 2>/dev/null
+  JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" "$1" 2>/dev/null
 }
 run_forge() {
-  FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" --forge "$1" 2>/dev/null
+  JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" --forge "$1" 2>/dev/null
 }
 
 [ "$(run_mode legacy)" = "no-mistakes off" ] || fail "legacy entry's default output changed: $(run_mode legacy)"
@@ -44,19 +44,19 @@ pass "jg-project-mode: an entry with no forge token reports forge none and keeps
 
 [ "$(run_mode lab)" = "no-mistakes off" ] || fail "lab entry's mode output changed: $(run_mode lab)"
 [ "$(run_forge lab)" = "forgejo" ] || fail "forge=forgejo after the mode token did not resolve: $(run_forge lab)"
-err=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" lab 2>&1 >/dev/null)
+err=$(JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" lab 2>&1 >/dev/null)
 [ -z "$err" ] || fail "a registered forge=forgejo warned: $err"
 pass "jg-project-mode: forge=forgejo placed after the mode token binds forgejo without a warning"
 
 [ "$(run_mode lead)" = "direct-PR on" ] || fail "forge=forgejo must keep +yolo, which only gerrit deactivates: $(run_mode lead)"
 [ "$(run_forge lead)" = "forgejo" ] || fail "forge=forgejo placed before the mode token did not resolve: $(run_forge lead)"
-err=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" lead 2>&1 >/dev/null)
+err=$(JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" lead 2>&1 >/dev/null)
 [ -z "$err" ] || fail "+yolo on a forge=forgejo project was refused or warned: $err"
 pass "jg-project-mode: forge=forgejo binds in any token order and keeps +yolo"
 
 for flag in "" --forge; do
   # shellcheck disable=SC2086 # An empty flag must expand to nothing.
-  out=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" $flag kept 2>/dev/null)
+  out=$(JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" $flag kept 2>/dev/null)
   status=$?
   [ "$status" -eq 3 ] || fail "local-only with forge=forgejo did not refuse${flag:+ under $flag} (status $status, got '$out')"
   [ -z "$out" ] || fail "a refused local-only forge still handed the caller a posture: '$out'"
@@ -69,17 +69,17 @@ pass "jg-project-mode: the colon spelling forge:forgejo is not a forge binding"
 
 for flag in "" --forge; do
   # shellcheck disable=SC2086 # An empty flag must expand to nothing.
-  out=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" $flag glabbed 2>/dev/null)
+  out=$(JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" $flag glabbed 2>/dev/null)
   status=$?
   [ "$status" -eq 3 ] || fail "forge=gitlab did not refuse${flag:+ under $flag} (status $status, got '$out')"
   [ -z "$out" ] || fail "a refused forge=gitlab still handed the caller a posture: '$out'"
 done
-err=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" glabbed 2>&1 >/dev/null) || true
+err=$(JG_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" glabbed 2>&1 >/dev/null) || true
 assert_contains "$err" 'forge=forgejo' "the unknown-forge refusal did not name forge=forgejo as an accepted value"
 pass "jg-project-mode: a value outside none|gerrit|forgejo is refused and the refusal names forge=forgejo"
 
 [ "$(run_forge missing-project)" = "none" ] || fail "a missing project must default --forge to none: $(run_forge missing-project)"
-[ "$(FM_DATA_OVERRIDE="$TMP_ROOT/no-such-dir" "$PROJECT_MODE" --forge legacy 2>/dev/null)" = "none" ] \
+[ "$(JG_DATA_OVERRIDE="$TMP_ROOT/no-such-dir" "$PROJECT_MODE" --forge legacy 2>/dev/null)" = "none" ] \
   || fail "an absent registry file must default --forge to none"
 pass "jg-project-mode: a missing project or absent registry defaults --forge to none"
 

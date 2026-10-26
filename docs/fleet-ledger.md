@@ -76,10 +76,10 @@ Example:
 
 ## Reading lifecycle metrics
 
-The firstmate-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `FM_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
+The firstmate-addons fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `JG_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
 The dashboard's Insights view consumes its output: the firstmate-addons fleet-dashboard add-on (reached through the `jg-dashboard.sh` shim) runs the reader at each build and embeds the result as the `flow` key of `board.json`.
 The add-on's header owns that embedding and its scrubbing.
-The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.test.sh`, run with `FM_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/jg-flow-shim.test.sh`](../tests/jg-flow-shim.test.sh).
+The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.test.sh`, run with `JG_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/jg-flow-shim.test.sh`](../tests/jg-flow-shim.test.sh).
 
 ## Per-model statistics
 

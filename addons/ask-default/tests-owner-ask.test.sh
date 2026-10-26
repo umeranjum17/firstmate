@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Real authoring and sign-off commands in an isolated home and board; no live state.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d /var/tmp/owner-ask.XXXXXX)
 trap 'rm -rf -- "$work"' EXIT
-export HOME="$work/home" FM_HOME="$work/home" SIGN_OFF_HOME="$work/board"
+export HOME="$work/home" JG_HOME="$work/home" SIGN_OFF_HOME="$work/board"
 export XDG_DATA_HOME="$work/xdg" XDG_CONFIG_HOME="$work/config" TMPDIR="$work/tmp"
 mkdir -p "$HOME/config" "$SIGN_OFF_HOME" "$TMPDIR"
 ask() { python3 "$root/ask-default/bin/jg-captain-ask.py" "$@"; }
@@ -26,7 +35,7 @@ refused author --owner-must scheduling
 refused author --already ''
 refused author --option 'Later=The release waits for a phone test.'
 [ "$(ask list)" = "$before" ] || { echo 'refused asks changed the list'; exit 1; }
-python3 - "$FM_HOME/data/captain-ask-cards/device-check.json" <<'PYCODE'
+python3 - "$JG_HOME/data/captain-ask-cards/device-check.json" <<'PYCODE'
 import json, sys
 p = sys.argv[1]
 card = json.load(open(p))
@@ -47,7 +56,7 @@ assert len({o['outcome'] for o in card['options']}) == 2
 print('PASS: real board has the authored owner question, three context lines and distinct outcomes')
 PY
 ask install "$HOME"
-FM_HOME="$HOME" "$HOME/config/jg-captain-ask.sh" list > "$work/installed-list"
+JG_HOME="$HOME" "$HOME/config/jg-captain-ask.sh" list > "$work/installed-list"
 [ "$(cat "$work/installed-list")" = "$before" ]
 ask "done" device-check
 [ -z "$(ask list)" ]

@@ -40,7 +40,7 @@
 #   home/            the lab main home: bin/jg-lab-home.sh create, then the
 #                    committed tree <ref> of <source> (default: HEAD of the
 #                    checkout this script runs from) checked out as a genuine
-#                    primary checkout, with FM_HOME at its root.
+#                    primary checkout, with JG_HOME at its root.
 #   config/          backend tmux, Claude crews and second mates, and
 #                    supervision-host <line> (default claude claude-haiku-5-5
 #                    on Claude, absent on Pi; none leaves the file absent;
@@ -185,7 +185,7 @@ lab_tmux() {
 lab_env_base() {
   printf '%s\n' "HOME=$HOME" "USER=${USER:-$(id -un)}" "LOGNAME=${USER:-$(id -un)}" \
     "PATH=$PATH" "SHELL=${SHELL:-/bin/zsh}" "TERM=xterm-256color" "LANG=${LANG:-en_US.UTF-8}" \
-    "TMUX_TMPDIR=$TMUX_DIR" "TREEHOUSE_ROOT=$ROOT/treehouse" "FM_BACKEND=tmux" "DISABLE_AUTOUPDATER=1"
+    "TMUX_TMPDIR=$TMUX_DIR" "TREEHOUSE_ROOT=$ROOT/treehouse" "JG_BACKEND=tmux" "DISABLE_AUTOUPDATER=1"
   [ -z "${CLAUDE_DIR:-}" ] || printf '%s\n' "CLAUDE_CONFIG_DIR=$CLAUDE_DIR"
 }
 
@@ -276,10 +276,10 @@ check_trust() {
 
 check_mirror() {
   local out rc entries
-  out=$(cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-host-mirror.sh" verified claude 2>&1)
+  out=$(cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-host-mirror.sh" verified claude 2>&1)
   rc=$?
   [ "$rc" -eq 0 ] || { echo "fail mirror: jg-host-mirror.sh verified claude exited $rc ${out:+($out)}"; return 1; }
-  out=$(cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-host-mirror.sh" check 2>&1)
+  out=$(cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-host-mirror.sh" check 2>&1)
   rc=$?
   [ "$rc" -eq 0 ] || { echo "fail mirror: jg-host-mirror.sh check exited $rc ${out:+($(printf '%s' "$out" | head -n 1))}"; return 1; }
   entries=$(jq -rs '[.[].tag] | "captain=\(map(select(.=="captain"))|length) main=\(map(select(.=="main"))|length)"' \
@@ -296,9 +296,9 @@ check_extensions() {
     source=${pair%%:*}; marker=${pair#*:}; phase=${marker#*:}; marker=${marker%%:*}
     [ "$phase" != "$marker" ] || phase=
     # shellcheck disable=SC2016 # Expanded by the inner shell.
-    version=$(FM_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_pi_extension_version "$1/.pi/extensions/$2"' _ "$LAB" "$source" 2>/dev/null)
+    version=$(JG_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_pi_extension_version "$1/.pi/extensions/$2"' _ "$LAB" "$source" 2>/dev/null)
     # shellcheck disable=SC2016 # Expanded by the inner shell.
-    FM_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_pi_extension_loaded "$1/state/$2" "$3" "$1/state/.lock" "$4"' \
+    JG_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_pi_extension_loaded "$1/state/$2" "$3" "$1/state/.lock" "$4"' \
       _ "$LAB" "$marker" "$version" "$phase" 2>/dev/null \
       || { echo "fail extensions: $source is not loaded at its current build by the lock holder"; return 1; }
     out="$out ${source%.ts}"
@@ -324,7 +324,7 @@ check_host() {
 check_watcher() {
   fleet_nonempty || { echo "ok watcher: skipped (empty fleet)"; return 0; }
   # shellcheck disable=SC2016 # Expanded by the inner shell.
-  if FM_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_watcher_healthy "$1/state" "$1/bin/jg-watch.sh" 300 "$1"' _ "$LAB" 2>/dev/null; then
+  if JG_HOME="$LAB" bash -c '. "$1/bin/jg-wake-lib.sh" && jg_watcher_healthy "$1/state" "$1/bin/jg-watch.sh" 300 "$1"' _ "$LAB" 2>/dev/null; then
     echo "ok watcher: live watcher with a fresh beacon"
   else
     echo "fail watcher: no live watcher with a fresh beacon holds the lab home"
@@ -350,7 +350,7 @@ check_mate() {
 check_worker() {
   local state
   window_alive worker || { echo "fail worker: the $WORKER_ID window is not running"; return 1; }
-  state=$(cd "$LAB" && lab_run FM_HOME="$LAB" FM_CREW_STATE_NO_FORGE=1 "$LAB/bin/jg-crew-state.sh" "$WORKER_ID" 2>/dev/null)
+  state=$(cd "$LAB" && lab_run JG_HOME="$LAB" JG_CREW_STATE_NO_FORGE=1 "$LAB/bin/jg-crew-state.sh" "$WORKER_ID" 2>/dev/null)
   case "$state" in
     "state: paused · "*"$GATE"*) ;;
     *) echo "fail worker: the worker is not currently parked on $GATE (${state:-no state})"; return 1 ;;
@@ -457,7 +457,7 @@ MD
 spawn_worker() {
   local brief="$LAB/data/$WORKER_ID/brief.md" gate="$GATE"
   make_notes_project || return 1
-  (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-brief.sh" "$WORKER_ID" notes --mode local-only) >/dev/null || return 1
+  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-brief.sh" "$WORKER_ID" notes --mode local-only) >/dev/null || return 1
   TASK_TEXT="Lab gated worker for a live supervision lab. Add count_notes(), which returns how many notes are stored, to notes/__init__.py with a unit test, but only after the gate file $gate exists and you receive a message to resume." \
   SPEC_TEXT="Right after setup, append one paused status line naming the gate file $gate and end your turn. Do not poll or sleep in a foreground command. When a later message resumes you, check that $gate exists before implementing count_notes() in notes/__init__.py and a test in tests/test_notes.py; if it is absent, remain paused and end your turn again. Once the gate exists, run python3 -m unittest discover -s tests, commit, and report done. Nothing else is in scope." \
     python3 - "$brief" <<'PY' || return 1
@@ -467,17 +467,17 @@ text = open(path, encoding="utf-8").read()
 text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
 open(path, "w", encoding="utf-8").write(text)
 PY
-  (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-tasks-axi.sh" add "$WORKER_ID" "lab gated worker" --kind ship --repo notes --priority 2) >/dev/null || return 1
-  (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$WORKER_ID" "$LAB/projects/notes" \
+  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-tasks-axi.sh" add "$WORKER_ID" "lab gated worker" --kind ship --repo notes --priority 2) >/dev/null || return 1
+  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$WORKER_ID" "$LAB/projects/notes" \
     --mode local-only --yolo on --harness claude --model claude-haiku-5-5 --effort low)
 }
 
 spawn_mate() {
   local charter='Provide an idle live-validation lab second mate. When explicitly steered for a synthetic test, report only honest local lab outcomes; do not claim external PR activity, merge, or retire yourself.'
-  (cd "$LAB" && lab_run FM_HOME="$LAB" FM_SECONDMATE_CHARTER="$charter" \
-    FM_SECONDMATE_SCOPE='second-mate live validation synthetic status relay' \
+  (cd "$LAB" && lab_run JG_HOME="$LAB" JG_SECONDMATE_CHARTER="$charter" \
+    JG_SECONDMATE_SCOPE='second-mate live validation synthetic status relay' \
     "$LAB/bin/jg-home-seed.sh" "$MATE_ID" "$ROOT/mate" --no-projects) || return 1
-  (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$MATE_ID" --secondmate)
+  (cd "$LAB" && lab_run JG_HOME="$LAB" "$LAB/bin/jg-spawn.sh" "$MATE_ID" --secondmate)
 }
 
 cmd_up() {
@@ -600,7 +600,7 @@ cmd_up() {
     primary=(pi --approve --session-dir "$ROOT/pi-sessions" --model "$model" --thinking "$effort")
   fi
   lab_tmux new-window -d -t firstmate: -n main -c "$LAB" \
-    env FM_HOME="$LAB" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "${primary[@]}" \
+    env JG_HOME="$LAB" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "${primary[@]}" \
     || die "cannot launch the lab primary"
   lab_tmux set-option -w -t "$(window_id main)" remain-on-exit on >/dev/null
   record_launch_pid "$(window_field main '#{pane_pid}')"

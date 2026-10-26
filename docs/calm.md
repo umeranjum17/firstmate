@@ -169,7 +169,7 @@ tests/jg-calm-pi-extension.test.sh
 tests/jg-pi-branch-extension.test.sh
 tests/jg-pi-primary-types.test.sh
 tests/jg-calm-pi-queue-retention-live-e2e.test.sh
-FM_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
+JG_PI_LIVE_E2E=1 tests/jg-pi-primary-live-e2e.test.sh
 ```
 
 ## Claude Code
@@ -306,5 +306,5 @@ Evidence for 2.1.280 and the record-backed doorbell is also in its [2026-09-25 r
 ```sh
 tests/jg-calm-claude-mod.test.sh
 tests/jg-calm-claude-mod-plugin.test.sh
-FM_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
+JG_CLAUDE_CALM_LIVE_E2E=1 tests/jg-calm-claude-mod-live-e2e.test.sh
 ```

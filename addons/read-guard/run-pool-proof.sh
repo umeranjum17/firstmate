@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Live proof on the real product: for every Claude account in the pool registry plus the ambient ~/.claude, a fresh
 # Haiku worker on that account must load the guard hooks and be refused a read of a planted fake login file.
 # This checkout's delete, kill and read guards are installed into a temporary data folder; their hooks go into each pool
@@ -8,12 +17,12 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 OUT=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}/guards-pool-accounts; T=$(mktemp -d)
 mkdir -p "$OUT" "$T/home" "$T/fm/state" "$T/fm/bin" "$T/work/.codex"
-REG=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+REG=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
 jq --arg h "$HOME/.claude" '{accounts: [.accounts[] | select(.provider == "claude" and .folder != $h)]}' "$REG" > "$T/registry.json"
 printf '#!/bin/sh\nexit 0\n' > "$T/fm/bin/jg-check-register.sh"; cp "$T/fm/bin/jg-check-register.sh" "$T/fm/bin/jg-check-unregister.sh"
 chmod +x "$T/fm/bin/"*.sh
 echo FIXTURE-NOT-A-SECRET > "$T/work/.codex/auth.json"
-E=(env HOME="$T/home" XDG_DATA_HOME="$T/data" FM_CLAUDE_ACCOUNTS_REGISTRY="$T/registry.json")
+E=(env HOME="$T/home" XDG_DATA_HOME="$T/data" JG_CLAUDE_ACCOUNTS_REGISTRY="$T/registry.json")
 remove() { "${E[@]}" "$ROOT/delete-guard/uninstall.sh" "$T/fm" && "${E[@]}" "$ROOT/kill-guard/uninstall.sh" && "${E[@]}" "$ROOT/read-guard/uninstall.sh"; }
 trap 'remove >/dev/null 2>&1; rm -rf -- "$T"' EXIT
 n=0; while read -r f; do n=$((n + 1)); cp "$f/settings.json" "$T/before-$n.json"; done < <(jq -r '.accounts[].folder' "$T/registry.json")

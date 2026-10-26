@@ -5,19 +5,19 @@
 # Usage: jg-remote-inherit-push.sh <secondmate-id> <generation>
 #
 # The item set is derived from the ONE declared owner
-# (FM_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh), the same declaration
+# (JG_INHERITABLE_CONFIG in bin/jg-config-inherit-lib.sh), the same declaration
 # the receiving bin/jg-remote-inherit.sh enforces, so the two implementations in
 # one code revision cannot drift silently. Different local and remote revisions
-# fail closed as documented by that owner. FM_CONFIG_INHERIT_LIVE=1 marks a live
+# fail closed as documented by that owner. JG_CONFIG_INHERIT_LIVE=1 marks a live
 # convergence push into an already-running home and skips session-scoped items,
 # exactly as the local propagation path does.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/jg-secondmate-registry-lib.sh"
@@ -48,7 +48,7 @@ EMPTY_HASH=$(sha256_file "$EMPTY") || die "cannot hash empty inheritance payload
 ITEMS=$(jg_config_inherit_items)
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
-  if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ]; then
+  if [ "${JG_CONFIG_INHERIT_LIVE:-0}" = 1 ]; then
     case "$rel" in
       config/*)
         if jg_config_inherit_item_session_scoped "${rel#config/}"; then
@@ -61,7 +61,7 @@ while IFS= read -r rel; do
   case "$rel" in
     config/firstmate-role)
       source="$TMP/firstmate-role.resolved"
-      jg_role_inherit_payload "$FM_HOME" "$CONFIG" "$source" || die "cannot resolve the primary role"
+      jg_role_inherit_payload "$JG_HOME" "$CONFIG" "$source" || die "cannot resolve the primary role"
       ;;
     config/*) source="$CONFIG/${rel#config/}" ;;
     data/*) source="$DATA/${rel#data/}" ;;

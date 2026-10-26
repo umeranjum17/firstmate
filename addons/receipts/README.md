@@ -2,14 +2,14 @@
 
 The completion-receipt publisher and acceptance helpers run from this add-on;
 the fork optionally sources them from `bin/jg-dod-lib.sh`.
-The publisher reads fork libraries from `$FM_FORK_BIN`, else `$FM_HOME/bin`.
+The publisher reads fork libraries from `$JG_FORK_BIN`, else `$JG_HOME/bin`.
 
 The fork's done-acceptance hook delegates to `jg_receipts_accept_done`.
 Its local merge and both PR merge paths delegate to `jg_dod_receipt_accept`.
 The add-on owns brief rendering, receipt inheritance, promotion, publishing, and receipt validation.
 `jg_receipts_pr_candidate` is the receipt-candidate hook `bin/jg-pr-check.sh` calls: for a pull request outside the worktree's origin repository it prints the verified PR head, otherwise nothing, so the worker HEAD stands. It prints nothing when the head is unverified and always exits 0.
 
-`tests/receipts-hook-e2e.sh` (set `FM_TEST_FORK`) copies the real fork scripts,
+`tests/receipts-hook-e2e.sh` (set `JG_TEST_FORK`) copies the real fork scripts,
 runs its done-acceptance, local-delivery, and PR-merge integration journeys with
 the add-on loaded, then checks the helpers, the PR candidate hook through the real `jg-pr-check.sh`, and absent-add-on behavior.
 `run-proof.sh` runs that journey under done-done (`receipts-pr-candidate`).
@@ -26,9 +26,9 @@ the add-on loaded, then checks the helpers, the PR candidate hook through the re
 
 ## Frozen contract (identical to the fork)
 
-- CLI: `FM_HOME=<supervising-home> jg-run-receipt.sh <task-id> PASS|FAIL
+- CLI: `JG_HOME=<supervising-home> jg-run-receipt.sh <task-id> PASS|FAIL
   <evidence-file> [candidate-repo]`; the candidate repo defaults to the
-  current directory and `FM_HOME` must be set explicitly. `--help` prints
+  current directory and `JG_HOME` must be set explicitly. `--help` prints
   usage and exits 0.
 - Receipt: `state/<id>.run-receipt.json` with schema 1 fields
   `{schema:1, task, mode, spawn_gen, head, verdict, at, evidence}`, where

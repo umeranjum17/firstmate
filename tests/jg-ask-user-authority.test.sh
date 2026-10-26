@@ -13,7 +13,7 @@ test_primary_and_secondmate_instruction_generation() {
   home="$TMP_ROOT/home"
   mkdir -p "$home/data"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$BRIEF" authority-worker sample --mode no-mistakes >/dev/null 2>&1
   ship="$home/data/authority-worker/brief.md"
   assert_grep 'ask-user findings are never yours to answer' "$ship" \
@@ -28,7 +28,7 @@ test_primary_and_secondmate_instruction_generation() {
   assert_no_grep 'the captain, not you, owns the ask-user decisions' "$ship" \
     "generated implementation brief retained conflicting captain-only wording"
 
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_SECONDMATE_CHARTER='Handle sample work.' \
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" JG_SECONDMATE_CHARTER='Handle sample work.' \
     "$BRIEF" authority-mate --secondmate --no-projects >/dev/null 2>&1
   charter="$home/data/authority-mate/brief.md"
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.

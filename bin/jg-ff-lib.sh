@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Shared fast-forward machinery for firstmate self-sync.
-# Usage: . bin/jg-ff-lib.sh   (after FM_ROOT and FM_HOME are set)
+# Usage: . bin/jg-ff-lib.sh   (after JG_ROOT and JG_HOME are set)
 #
 # This is the one implementation of "advance a firstmate checkout to a base by a
 # clean fast-forward, never forcing, merging, or stashing" used by every sync
@@ -149,11 +149,11 @@ validate_secondmate_home() {
     VALIDATION_ERROR="not a directory"
     return 1
   }
-  abs_active_home=$(resolved_existing_dir "$FM_HOME") || {
+  abs_active_home=$(resolved_existing_dir "$JG_HOME") || {
     VALIDATION_ERROR="active firstmate home is not a directory"
     return 1
   }
-  abs_root=$(resolved_existing_dir "$FM_ROOT") || {
+  abs_root=$(resolved_existing_dir "$JG_ROOT") || {
     VALIDATION_ERROR="firstmate repo is not a directory"
     return 1
   }
@@ -373,7 +373,7 @@ live_secondmate_meta_records() {
 # Read at call time - this is a sourced library serving many sweeps in one shell -
 # and an invalid or missing value falls back to 30s.
 ff_stale_index_lock_age_secs() {
-  local age=${FM_FF_STALE_INDEX_LOCK_AGE_SECS:-30}
+  local age=${JG_FF_STALE_INDEX_LOCK_AGE_SECS:-30}
   case "$age" in ''|*[!0-9]*) age=30 ;; esac
   printf '%s\n' "$age"
 }
@@ -598,7 +598,7 @@ FF_SEEN_HOMES=""
 # live window. With nudge_requires_instr=yes the advance must also have changed
 # the instruction surface (FF_INSTR non-empty): an already-current home, or one
 # whose only change was non-instruction tracked files, is left undisturbed. The
-# firstmate repo itself (FM_ROOT) is never processed as its own secondmate, and
+# firstmate repo itself (JG_ROOT) is never processed as its own secondmate, and
 # each resolved home is processed at most once.
 #
 # Two optional caller hooks fire from here, each at most once per resolved home:
@@ -618,7 +618,7 @@ process_secondmate() {
   local id=$1 home=$2 window=${3:-} base_mode=$4 nudge_requires_instr=${5:-no} home_real jg_root_real
   [ -n "$id" ] || return 0
   [ -n "$home" ] || return 0
-  jg_root_real=$(resolve_path "$FM_ROOT")
+  jg_root_real=$(resolve_path "$JG_ROOT")
   home_real=$(resolve_path "$home")
   [ "$home_real" != "$jg_root_real" ] || return 0
   if ! validate_secondmate_home "$id" "$home"; then
@@ -631,7 +631,7 @@ process_secondmate() {
   esac
   FF_SEEN_HOMES="$FF_SEEN_HOMES $home_real"
 
-  ff_target "$home_real" "secondmate $id" "$base_mode" yes yes "$id" "${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+  ff_target "$home_real" "secondmate $id" "$base_mode" yes yes "$id" "${JG_STATE_OVERRIDE:-$JG_HOME/state}"
   if [ -n "$window" ] && { [ "$FF_STATUS" = "updated" ] || [ "$FF_STATUS" = "current" ]; } \
     && type jg_ff_after_secondmate_settled >/dev/null 2>&1; then
     jg_ff_after_secondmate_settled "$id" "$home_real" "$window" "$FF_STATUS" "$FF_INSTR"
@@ -654,7 +654,7 @@ process_secondmate() {
 # FF_NUDGE_WINDOWS / FF_SEEN_HOMES, which the caller resets before and reads after.
 # The registry argument is only for home= fallback on older or incomplete meta records.
 sweep_live_secondmate_metas() {
-  local state=$1 base_mode=$2 nudge_requires_instr=${3:-no} registry=${4:-$FM_HOME/data/secondmates.md} id home window meta
+  local state=$1 base_mode=$2 nudge_requires_instr=${3:-no} registry=${4:-$JG_HOME/data/secondmates.md} id home window meta
   [ -d "$state" ] || return 0
   while IFS='|' read -r id home window meta; do
     if grep -q '^remote_host=.' "$meta" 2>/dev/null; then continue; fi

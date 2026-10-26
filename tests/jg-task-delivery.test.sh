@@ -63,10 +63,10 @@ fill_brief_subsections() {  # <file> <intent> <spec>
 run_spawn() {  # <home> <fakebin> <spawn-args...>
   local home=$1 fakebin=$2
   shift 2
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/projects-unused" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux PATH="$fakebin:$PATH" \
+  JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/projects-unused" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 JG_BACKEND=tmux PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
 }
 
@@ -223,25 +223,25 @@ test_promote_requires_and_records_the_delivery_contract() {
   }
 
   write_scout_meta
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion without --mode should exit non-zero"
   assert_contains "$out" "promotion requires --mode" "promote refusal did not name the missing mode"
   assert_grep 'kind=scout' "$meta" "refused promotion still changed the task record"
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode direct-PR 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode direct-PR 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion without --yolo should exit non-zero"
   assert_contains "$out" "promotion requires --yolo" "promote refusal did not name the missing merge posture"
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode no-mistakes-prod-only --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode no-mistakes-prod-only --yolo off 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion on a conditional policy should exit non-zero"
   assert_contains "$out" "classify this task's surface" "promote did not refuse the conditional policy as a task mode"
 
   blocked_data="$home/data-blocked"
   printf 'not a directory\n' > "$blocked_data"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$blocked_data" \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$blocked_data" \
     "$PROMOTE" promote-d1 --mode direct-PR --yolo on 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion without writable instruction storage should exit non-zero"
@@ -251,7 +251,7 @@ test_promote_requires_and_records_the_delivery_contract() {
 
   instructions_path="$home/data/promote-d1/ship-instructions.md"
   mkdir -p "$instructions_path"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     "$PROMOTE" promote-d1 --mode direct-PR --yolo on 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion over an instruction directory should exit non-zero"
@@ -262,7 +262,7 @@ test_promote_requires_and_records_the_delivery_contract() {
   assert_no_grep '^yolo=' "$meta" "invalid instruction destination recorded a merge posture"
   rmdir "$instructions_path"
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode direct-PR --yolo on 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" promote-d1 --mode direct-PR --yolo on 2>&1)
   status=$?
   expect_code 0 "$status" "a promotion carrying both flags should succeed"
   assert_grep 'kind=ship' "$meta" "promotion did not restore ship teardown protection"
@@ -286,7 +286,7 @@ test_promote_refuses_a_symlinked_task_record() {
   cp "$target" "$original"
   ln -s "$target" "$meta"
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     "$PROMOTE" promote-sym --mode direct-PR --yolo on 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion through a symlink record should refuse"
@@ -315,7 +315,7 @@ test_promotion_delivers_the_real_definition_of_done() {
   cat > "$sendroot/bin/jg-send.sh" <<'STUB'
 #!/usr/bin/env bash
 # Capture the message a promoted worker would receive, instead of steering one.
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+printf '%s' "$2" > "$JG_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/jg-send.sh"
 
@@ -323,18 +323,18 @@ STUB
     id="promote-dod-$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')"
     meta="$home/state/$id.meta"
     printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-    FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+    JG_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
       || fail "$mode: scout brief generation should succeed"
     fill_brief_subsections "$home/data/$id/brief.md" \
       "Ship the delivery-contract change." "Preserve the selected delivery mode."
-    out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode "$mode" --yolo off 2>&1) \
+    out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode "$mode" --yolo off 2>&1) \
       || fail "$mode: promotion should succeed"
 
     payload="$TMP_ROOT/promote-dod/payload-$id"
     # Run the delivery command promotion printed, so the assertions below are made
     # against the message the worker receives rather than the script's own text.
     ( cd "$sendroot" \
-      && FM_TEST_CAPTURE="$payload" \
+      && JG_TEST_CAPTURE="$payload" \
          eval "$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'jg-send\.sh')" ) \
       || fail "$mode: promotion's delivery command did not run"
     assert_present "$payload" "$mode: promotion delivered no message to the worker"
@@ -372,7 +372,7 @@ STUB
     # payload ends at its Definition of done, as does an ordinary generated
     # brief, so identical suffixes prove both workers receive the same contract.
     rm "$home/data/$id/brief.md"
-    FM_HOME="$home" "$BRIEF" "$id" fixture-project --mode "$mode" >/dev/null 2>&1 \
+    JG_HOME="$home" "$BRIEF" "$id" fixture-project --mode "$mode" >/dev/null 2>&1 \
       || fail "$mode: ordinary ship brief generation should succeed"
     brief_dod="$TMP_ROOT/promote-dod/brief-dod-$id"
     delivered_dod="$TMP_ROOT/promote-dod/delivered-dod-$id"
@@ -419,11 +419,11 @@ test_promotion_persists_the_selected_ship_branch() {
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
     || fail "branch-prefix promotion scout brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Promote the branch-prefix fixture." "Use the configured branch exactly."
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" \
     --mode local-only --yolo off --branch-prefix fix/) \
     || fail "branch-prefix promotion should succeed"
   instructions="$home/data/$id/ship-instructions.md"
@@ -449,11 +449,11 @@ test_promotion_branch_command_is_shell_safe() {
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
     || fail "shell-safe promotion scout brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Promote the shell-safe fixture." "Use the configured branch exactly."
-  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" \
     --mode local-only --yolo off --branch-prefix "$prefix" >/dev/null 2>&1 \
     || fail "a ref-format-valid metacharacter prefix should promote safely"
   instructions="$home/data/$id/ship-instructions.md"
@@ -493,7 +493,7 @@ test_local_merge_uses_the_recorded_ship_branch() {
 - $(basename "$proj") [local-only branch=contrib/] - changed after task intake (added 2026-01-01)
 EOF
   printf 'project=%s\nmode=local-only\nbranch=fix/%s\n' "$proj" "$id" > "$home/state/$id.meta"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$MERGE_LOCAL" "$id") \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$MERGE_LOCAL" "$id") \
     || fail "local merge did not use the branch recorded at task intake: $out"
   [ "$(git -C "$proj" rev-parse HEAD)" = "$fix" ] \
     || fail "local merge did not fast-forward the default branch to the recorded ship branch"
@@ -516,20 +516,20 @@ test_project_mode_matches_whole_multiword_names() {
 - foo [direct-PR] - fixture (added 2026-01-01)
 - controlproj [direct-PR] - fixture (added 2026-01-01)
 EOF
-  out=$(FM_HOME="$home" "$PROJECT_MODE" "048. Blast- Lease summary drafter" 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" "048. Blast- Lease summary drafter" 2>/dev/null)
   [ "$out" = "local-only off" ] || fail "a multi-word registered name did not resolve to its own row (got '$out')"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" "048. Blast- Lease summary drafter" 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" "048. Blast- Lease summary drafter" 2>&1 >/dev/null)
   [ -z "$err" ] || fail "a multi-word registered name still warned as not in the registry: $err"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" foo 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" foo 2>/dev/null)
   [ "$out" = "direct-PR off" ] || fail "a single-word name matched a longer name it prefixes (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" "foo bar" 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" "foo bar" 2>/dev/null)
   [ "$out" = "local-only on" ] || fail "a longer multi-word name did not resolve to its own row (got '$out')"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix "foo bar" 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix "foo bar" 2>/dev/null)
   [ "$out" = "x/" ] || fail "a multi-word name's registered branch prefix did not resolve (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" controlproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" controlproj 2>/dev/null)
   [ "$out" = "direct-PR off" ] || fail "a single-word control name regressed (got '$out')"
   pass "jg-project-mode: the registry lookup matches a whole multi-word name, not just its first token"
 }
@@ -547,23 +547,23 @@ test_project_mode_maps_the_conditional_policy() {
 - flatproj [direct-PR] - fixture (added 2026-01-01)
 - typoproj [no-mistakez] - fixture (added 2026-01-01)
 EOF
-  out=$(FM_HOME="$home" "$PROJECT_MODE" prodproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" prodproj 2>/dev/null)
   [ "$out" = "no-mistakes off" ] || fail "conditional policy did not map to its most rigorous leg (got '$out')"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" prodproj 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" prodproj 2>&1 >/dev/null)
   [ -z "$err" ] || fail "a registered conditional policy still warned as unknown: $err"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" yoloproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" yoloproj 2>/dev/null)
   [ "$out" = "no-mistakes on" ] || fail "conditional policy dropped its +yolo posture (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --raw prodproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --raw prodproj 2>/dev/null)
   [ "$out" = "no-mistakes-prod-only off" ] || fail "--raw did not expose the registered annotation (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --raw flatproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --raw flatproj 2>/dev/null)
   [ "$out" = "direct-PR off" ] || fail "--raw altered a flat registered mode (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" typoproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" typoproj 2>/dev/null)
   [ "$out" = "no-mistakes off" ] || fail "a typo'd mode no longer falls back to the most rigorous default"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" typoproj 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" typoproj 2>&1 >/dev/null)
   assert_contains "$err" "unknown mode" "a typo'd registry mode stopped warning"
   pass "jg-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw"
 }
@@ -579,7 +579,7 @@ $rec
 EOF
 
   id=delivery-unfilled-ship
-  FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 \
     || fail "unfilled ship brief should still scaffold"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   status=$?
@@ -591,7 +591,7 @@ EOF
   assert_absent "$home/state/$id.meta" "unfilled ship spawn wrote task metadata"
 
   id=delivery-filled-ship
-  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
     || fail "filled-ship brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Fix replacement of \`{TASK}\` in Herdr briefs." \
@@ -713,7 +713,7 @@ EOF
   assert_absent "$home/state/$id.meta" "unmarked legacy no-mistakes spawn wrote task metadata"
 
   id=delivery-unfilled-scout
-  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
     || fail "unfilled scout brief should still scaffold"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
   status=$?
@@ -723,7 +723,7 @@ EOF
   assert_absent "$home/state/$id.meta" "unfilled scout spawn wrote task metadata"
 
   id=delivery-empty-ship
-  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
     || fail "empty-ship brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" "" ""
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
@@ -737,9 +737,9 @@ EOF
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
     || fail "unfilled promote scout brief should scaffold"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion of an unfilled scout brief should exit non-zero"
   assert_contains "$out" "preserve the original ask in ## Captain's intent" \
@@ -751,7 +751,7 @@ EOF
   id=promote-missing-brief
   meta="$home/state/$id.meta"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion without a scout brief should exit non-zero"
   assert_contains "$out" "must contain nonempty" \
@@ -775,7 +775,7 @@ Unrelated notes are not the original ask.
 ## Firstmate spec
 Unrelated notes are not the task specification.
 EOF
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion without provenance-marked captain intent should fail"
   assert_contains "$out" "has no provenance-marked Captain's intent" \
@@ -787,12 +787,12 @@ EOF
   id=promote-filled-e2
   meta="$home/state/$id.meta"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
     || fail "filled promote scout brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Investigate why the identity check is failing." \
     "Ship the identity-check fix without adding a classifier."
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1)
   status=$?
   expect_code 0 "$status" "promotion of a filled scout brief should succeed"
   assert_grep 'kind=ship' "$meta" "filled promotion did not restore ship teardown protection"
@@ -833,7 +833,7 @@ Keep this closing requirement.
 # Setup
 This scout-only setup must not become the spec.
 EOF
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1)
   status=$?
   expect_code 0 "$status" "promotion with nested and fenced spec content should succeed"
   brief="$home/data/$id/ship-instructions.md"
@@ -865,7 +865,7 @@ Ship the narrow session-floor fix with a regression test.
 # Setup
 This is a SCOUT task: the deliverable is a written report, not a PR.
 EOF
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1)
   status=$?
   expect_code 0 "$status" "promotion of a pre-subsection scout brief should succeed"
   brief="$home/data/$id/ship-instructions.md"
@@ -900,7 +900,7 @@ $rec
 EOF
   id='intent-plain'
   words=$(printf '%s\n' 'Keep the original request intact.' '' "Preserve its provenance, punctuation, and \`literal code\`.")
-  FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 \
     || fail "intent brief should scaffold"
   fill_brief_subsections "$home/data/$id/brief.md" "$words" 'This build constraint must not become intent.'
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
@@ -942,7 +942,7 @@ EOF
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
   write_brief "$home" "$id"
   printf '# Task\n## Captain'"'"'s intent\nCaptain: investigate the refusal.\n\n## Firstmate spec\nReproduce it first.\n' > "$home/data/$id/brief.md"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "promotion of addressed intent should be refused"
   assert_contains "$out" "operator-address line: Captain: investigate the refusal." \
@@ -1029,9 +1029,9 @@ test_project_mode_binds_the_forge_orthogonally() {
   while IFS='|' read -r label registry expect forge; do
     [ -n "$label" ] || continue
     printf '%s\n' "$registry" > "$home/data/projects.md"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null)
+    out=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null)
     [ "$out" = "$expect" ] || fail "$label: expected default output '$expect', got '$out'"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null)
+    out=$(JG_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null)
     [ "$out" = "$forge" ] || fail "$label: expected --forge '$forge', got '$out'"
   done <<'ROWS'
 no annotation at all|- fp - fixture (added 2026-01-01)|no-mistakes off|none
@@ -1046,10 +1046,10 @@ an unregistered project|- other [direct-PR] - fixture (added 2026-01-01)|no-mist
 ROWS
 
   printf '%s\n' '- fp [no-mistakes-prod-only forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --raw fp 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --raw fp 2>/dev/null)
   [ "$out" = "no-mistakes-prod-only off" ] \
     || fail "--raw on a bound project did not keep the two-word annotation (got '$out')"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
   [ -z "$err" ] || fail "a registered forge warned as unknown: $err"
 
   # A forge describes what a mode publishes, and local-only publishes nothing, so
@@ -1058,12 +1058,12 @@ ROWS
   printf '%s\n' '- fp [local-only forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   for flag in "" --forge; do
     # shellcheck disable=SC2086 # An empty flag must expand to nothing.
-    out=$(FM_HOME="$home" "$PROJECT_MODE" $flag fp 2>/dev/null)
+    out=$(JG_HOME="$home" "$PROJECT_MODE" $flag fp 2>/dev/null)
     status=$?
     [ "$status" -eq 3 ] || fail "local-only with a forge did not refuse${flag:+ under $flag} (status $status, got '$out')"
     [ -z "$out" ] || fail "a refused local-only forge still handed the caller a posture: '$out'"
   done
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null) || true
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null) || true
   assert_contains "$err" 'local-only publishes nothing' "the refusal did not say why local-only takes no forge"
   pass "jg-project-mode: the forge binds from its own token and is reported only through --forge"
 }
@@ -1084,12 +1084,12 @@ test_project_mode_refuses_only_a_malformed_forge_binding() {
     printf '%s\n' "$registry" > "$home/data/projects.md"
     for flag in "" --forge; do
       # shellcheck disable=SC2086 # An empty flag must expand to nothing.
-      out=$(FM_HOME="$home" "$PROJECT_MODE" $flag fp 2>/dev/null)
+      out=$(JG_HOME="$home" "$PROJECT_MODE" $flag fp 2>/dev/null)
       status=$?
       [ "$status" -eq 3 ] || fail "$label: did not refuse${flag:+ under $flag} (status $status, got '$out')"
       [ -z "$out" ] || fail "$label: a refused binding still handed the caller a posture: '$out'"
     done
-    err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null) || true
+    err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null) || true
     assert_contains "$err" "\"$token\"" "$label: the refusal did not name the token it could not read"
     assert_contains "$err" 'forge=gerrit' "$label: the refusal did not name the accepted binding"
   done <<'ROWS'
@@ -1101,10 +1101,10 @@ ROWS
   while IFS='|' read -r label registry; do
     [ -n "$label" ] || continue
     printf '%s\n' "$registry" > "$home/data/projects.md"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null) \
+    out=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null) \
       || fail "$label: a token the parser never read became a refusal"
     [ "$out" = "no-mistakes off" ] || fail "$label: expected the old tolerant 'no-mistakes off', got '$out'"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null) \
+    out=$(JG_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null) \
       || fail "$label: --forge refused a token the parser never read"
     [ "$out" = none ] || fail "$label: an ignored token bound a forge ('$out')"
   done <<'ROWS'
@@ -1115,13 +1115,13 @@ a keyed token in the mode slot|- fp [owner=me] - fixture (added 2026-01-01)
 an annotation the line never closes|- fp [no-mistakes - fixture (added 2026-01-01)
 ROWS
   printf '%s\n' '- fp [gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
   assert_contains "$err" "unknown mode" "a forge value in the mode slot stopped warning as an unknown mode"
   printf '%s\n' '- fp [owner=me] - fixture (added 2026-01-01)' > "$home/data/projects.md"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
   assert_contains "$err" 'unknown mode "owner=me"' "a keyed token in the mode slot stopped warning as an unknown mode"
   printf '%s\n' '- fp [direct-PR owner=me] - fixture (added 2026-01-01)' > "$home/data/projects.md"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
   [ -z "$err" ] || fail "a keyed token that is not near the forge key warned: $err"
 
   # A near miss of the forge key keeps the old stdout and exit status; only
@@ -1129,13 +1129,13 @@ ROWS
   while IFS='|' read -r label registry token expect; do
     [ -n "$label" ] || continue
     printf '%s\n' "$registry" > "$home/data/projects.md"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null) \
+    out=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null) \
       || fail "$label: a near-miss key became a refusal"
     [ "$out" = "$expect" ] || fail "$label: expected '$expect', got '$out'"
-    out=$(FM_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null) \
+    out=$(JG_HOME="$home" "$PROJECT_MODE" --forge fp 2>/dev/null) \
       || fail "$label: --forge refused a near-miss key"
     [ "$out" = none ] || fail "$label: a near-miss key bound a forge ('$out')"
-    err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+    err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
     [ "$(printf '%s\n' "$err" | grep -c .)" -eq 1 ] || fail "$label: expected one warning line, got: $err"
     assert_contains "$err" "\"$token\"" "$label: the warning did not name the token"
     assert_contains "$err" 'forge=gerrit' "$label: the warning did not name the forge=gerrit spelling"
@@ -1158,10 +1158,10 @@ test_forge_gerrit_refuses_yolo() {
   home="$TMP_ROOT/forge-yolo/home"
   mkdir -p "$home/data"
   printf '%s\n' '- fp [no-mistakes +yolo forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>/dev/null)
   [ "$out" = "no-mistakes off" ] \
     || fail "a registered +yolo survived the gerrit forge (got '$out')"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" fp 2>&1 >/dev/null)
   assert_contains "$err" "refused" "the dropped yolo posture was a silent no-op"
   assert_contains "$err" "attributed claim that a named human approved" \
     "the refusal did not carry the reason yolo is inactive for this forge"
@@ -1170,7 +1170,7 @@ test_forge_gerrit_refuses_yolo() {
   IFS='|' read -r home proj fakebin <<EOF
 $rec
 EOF
-  FM_HOME="$home" "$BRIEF" forge-yolo-s1 proj --mode no-mistakes --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-yolo-s1 proj --mode no-mistakes --forge gerrit >/dev/null \
     || fail "a gerrit ship brief should scaffold"
   fill_brief_subsections "$home/data/forge-yolo-s1/brief.md" \
     "Run the review loop on the Gerrit project." "Ship the review pass."
@@ -1184,7 +1184,7 @@ EOF
 
   meta="$home/state/forge-yolo-p1.meta"
   printf 'window=jg-forge-yolo-p1\nkind=scout\nworktree=/tmp/wt\nproject=%s\n' "$proj" > "$meta"
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" forge-yolo-p1 --mode no-mistakes --yolo on 2>&1)
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" forge-yolo-p1 --mode no-mistakes --yolo on 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "a promotion with --yolo on was accepted for the gerrit-forge project"
   assert_contains "$out" "--yolo on is refused" "the promotion refusal did not name the refused flag"
@@ -1201,7 +1201,7 @@ test_forge_gerrit_changes_what_no_mistakes_means() {
   local home brief plain
   home="$TMP_ROOT/forge-dod/home"
   mkdir -p "$home/data" "$home/state"
-  FM_HOME="$home" "$BRIEF" forge-dod-g1 review-server-project --mode no-mistakes --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-dod-g1 review-server-project --mode no-mistakes --forge gerrit >/dev/null \
     || fail "a gerrit no-mistakes brief should scaffold"
   brief="$home/data/forge-dod-g1/brief.md"
   grep -qx "Delivery contract: mode=no-mistakes forge=gerrit shape=squash" "$brief" \
@@ -1247,7 +1247,7 @@ test_forge_gerrit_changes_what_no_mistakes_means() {
     "the gerrit worker lost the ask-user escalation rule"
   # shellcheck disable=SC2016 # Backticks are literal generated Markdown.
   assert_grep 'NEVER pass `--yes` (or `-y`)' "$brief" "the gerrit worker lost the --yes ban"
-  FM_HOME="$home" "$BRIEF" forge-dod-n1 other-project --mode no-mistakes >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-dod-n1 other-project --mode no-mistakes >/dev/null \
     || fail "a default-forge no-mistakes brief should scaffold"
   plain="$home/data/forge-dod-n1/brief.md"
   awk '/^You drive no-mistakes by responding to its gates/ { emit = 1 }
@@ -1299,14 +1299,14 @@ EOF
     "the refusal did not say to preserve the filled subsections the re-scaffold discards"
   assert_absent "$home/state/forge-agree-a1.meta" "the refused spawn still recorded a task"
 
-  FM_HOME="$home" "$BRIEF" forge-agree-a2 proj --mode direct-PR --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-agree-a2 proj --mode direct-PR --forge gerrit >/dev/null \
     || fail "a gerrit direct-PR brief should scaffold"
   fill_brief_subsections "$home/data/forge-agree-a2/brief.md" "Publish the change." "Ship it."
   out=$(run_spawn "$home" "$fakebin" forge-agree-a2 "$proj" claude --mode direct-PR --yolo off 2>&1)
   assert_not_contains "$out" "forge mismatch" "a gerrit direct-PR brief was reported as drift"
   assert_not_contains "$out" "cannot ship" "direct-PR was refused on the forge it publishes to"
 
-  FM_HOME="$home" "$BRIEF" forge-agree-a3 proj --mode no-mistakes --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-agree-a3 proj --mode no-mistakes --forge gerrit >/dev/null \
     || fail "a gerrit ship brief should scaffold"
   fill_brief_subsections "$home/data/forge-agree-a3/brief.md" "Run the review loop." "Ship it."
   out=$(run_spawn "$home" "$fakebin" forge-agree-a3 "$proj" claude --mode no-mistakes --yolo off 2>&1)
@@ -1315,7 +1315,7 @@ EOF
   # local-only publishes nothing and cannot carry the forge, so a bound project
   # has no local-only brief that agrees with its registry: landing one would
   # fast-forward local main with content the review server never saw.
-  FM_HOME="$home" "$BRIEF" forge-agree-a4 proj --mode local-only >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-agree-a4 proj --mode local-only >/dev/null \
     || fail "a local-only ship brief should scaffold without a forge"
   fill_brief_subsections "$home/data/forge-agree-a4/brief.md" "Land it locally." "Stop at a ready branch."
   out=$(run_spawn "$home" "$fakebin" forge-agree-a4 "$proj" claude --mode local-only --yolo off 2>&1)
@@ -1330,7 +1330,7 @@ EOF
   IFS='|' read -r home proj fakebin <<EOF
 $rec
 EOF
-  FM_HOME="$home" "$BRIEF" forge-agree-a5 proj --mode no-mistakes --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-agree-a5 proj --mode no-mistakes --forge gerrit >/dev/null \
     || fail "a gerrit ship brief should scaffold"
   fill_brief_subsections "$home/data/forge-agree-a5/brief.md" "Run the review loop." "Ship it."
   out=$(run_spawn "$home" "$fakebin" forge-agree-a5 "$proj" claude --mode no-mistakes --yolo off 2>&1)
@@ -1358,7 +1358,7 @@ test_spawn_requires_the_brief_to_carry_the_selected_branch() {
 $rec
 EOF
 
-  FM_HOME="$home" "$BRIEF" branch-agree-a1 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
+  JG_HOME="$home" "$BRIEF" branch-agree-a1 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
     || fail "a fix/-prefixed brief should scaffold"
   fill_brief_subsections "$home/data/branch-agree-a1/brief.md" "Run the review loop." "Ship it."
   out=$(run_spawn "$home" "$fakebin" branch-agree-a1 "$proj" claude --mode no-mistakes --yolo off --branch-prefix contrib/)
@@ -1383,7 +1383,7 @@ EOF
     "the legacy default did not warn about the brief's missing ship branch"
   assert_not_contains "$out" "branch mismatch" "the legacy default was refused as drift"
 
-  FM_HOME="$home" "$BRIEF" branch-agree-a4 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
+  JG_HOME="$home" "$BRIEF" branch-agree-a4 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
     || fail "a second fix/-prefixed brief should scaffold"
   fill_brief_subsections "$home/data/branch-agree-a4/brief.md" "Run the review loop." "Ship it."
   out=$(run_spawn "$home" "$fakebin" branch-agree-a4 "$proj" claude --mode no-mistakes --yolo off --branch-prefix fix/)
@@ -1432,7 +1432,7 @@ EOF
   assert_contains "$out" "will read as firstmate-authored" \
     "the deviation notice did not name the cost of the drift"
 
-  FM_HOME="$home" "$BRIEF" prefix-dev-a2 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
+  JG_HOME="$home" "$BRIEF" prefix-dev-a2 proj --mode no-mistakes --branch-prefix fix/ >/dev/null \
     || fail "a fix/-prefixed brief should scaffold"
   fill_brief_subsections "$home/data/prefix-dev-a2/brief.md" "Run the review loop." "Ship it."
   out=$(run_spawn "$home" "$fakebin" prefix-dev-a2 "$proj" claude --mode no-mistakes --yolo off --branch-prefix fix/)
@@ -1479,23 +1479,23 @@ test_promotion_carries_the_forge_binding() {
   printf '%s\n' '- proj [no-mistakes forge=gerrit] - fixture (added 2026-01-01)' > "$home/data/projects.md"
   cat > "$sendroot/bin/jg-send.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+printf '%s' "$2" > "$JG_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/jg-send.sh"
 
   id="forge-promote-g1"
   meta="$home/state/$id.meta"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\nproject=%s\n' "$id" "$home/projects/proj" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
     || fail "scout brief generation should succeed"
   fill_brief_subsections "$home/data/$id/brief.md" \
     "Fix what the investigation found on the Gerrit project." "Carry over only the fix."
 
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1) \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off 2>&1) \
     || fail "promotion should take the registered forge with no flag to remember"
   payload="$TMP_ROOT/forge-promote/payload"
   ( cd "$sendroot" \
-    && FM_TEST_CAPTURE="$payload" \
+    && JG_TEST_CAPTURE="$payload" \
        eval "$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'jg-send\.sh')" ) \
     || fail "promotion's delivery command did not run"
   assert_present "$payload" "promotion delivered no message to the worker"
@@ -1512,7 +1512,7 @@ STUB
   # Both real generation paths must end in the same contract, as they do for every
   # mode: a promoted worker is never handed a weaker one than a briefed worker.
   rm "$home/data/$id/brief.md"
-  FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes --forge gerrit >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes --forge gerrit >/dev/null 2>&1 \
     || fail "ordinary gerrit ship brief generation should succeed"
   awk '/^# Definition of done$/ { emit=1 } emit' "$home/data/$id/brief.md" > "$TMP_ROOT/forge-promote/brief-dod"
   awk '/^# Definition of done$/ { emit=1 } emit' "$payload" > "$TMP_ROOT/forge-promote/delivered-dod"
@@ -1540,7 +1540,7 @@ EOF
     "the refusal did not print the forgejo re-scaffold command"
   assert_absent "$home/state/forge-forgejo-s1.meta" "the refused spawn still recorded a task"
 
-  FM_HOME="$home" "$BRIEF" forge-forgejo-s2 proj --mode direct-PR --forge forgejo >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-forgejo-s2 proj --mode direct-PR --forge forgejo >/dev/null \
     || fail "a forgejo direct-PR brief should scaffold"
   fill_brief_subsections "$home/data/forge-forgejo-s2/brief.md" "Open the pull request." "Ship it."
   out=$(run_spawn "$home" "$fakebin" forge-forgejo-s2 "$proj" claude --mode direct-PR --yolo on 2>&1)
@@ -1551,20 +1551,20 @@ EOF
   mkdir -p "$sendroot/bin"
   cat > "$sendroot/bin/jg-send.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s' "$2" > "$FM_TEST_CAPTURE"
+printf '%s' "$2" > "$JG_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/jg-send.sh"
   id="forge-forgejo-p1"
   meta="$home/state/$id.meta"
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\nproject=%s\n' "$id" "$proj" > "$meta"
-  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
+  JG_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 \
     || fail "scout brief generation should succeed"
   fill_brief_subsections "$home/data/$id/brief.md" "Fix what the investigation found." "Carry over only the fix."
-  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1) \
+  out=$(JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode direct-PR --yolo on 2>&1) \
     || fail "promotion should take the forgejo binding and keep yolo: $out"
   payload="$TMP_ROOT/forge-forgejo/payload"
   ( cd "$sendroot" \
-    && FM_TEST_CAPTURE="$payload" \
+    && JG_TEST_CAPTURE="$payload" \
        eval "$(printf '%s\n' "$out" | sed -n 's/^next: //p' | grep 'jg-send\.sh')" ) \
     || fail "promotion's delivery command did not run"
   grep -qx "Delivery contract: mode=direct-PR forge=forgejo" "$payload" \
@@ -1582,7 +1582,7 @@ test_forge_gerrit_direct_pr_publishes_one_change() {
   local home brief out status
   home="$TMP_ROOT/forge-direct/home"
   mkdir -p "$home/data" "$home/state"
-  FM_HOME="$home" "$BRIEF" forge-direct-g1 review-server-project --mode direct-PR --forge gerrit >/dev/null \
+  JG_HOME="$home" "$BRIEF" forge-direct-g1 review-server-project --mode direct-PR --forge gerrit >/dev/null \
     || fail "a gerrit direct-PR brief should scaffold"
   brief="$home/data/forge-direct-g1/brief.md"
   grep -qx "Delivery contract: mode=direct-PR forge=gerrit shape=squash" "$brief" \
@@ -1606,16 +1606,16 @@ test_forge_gerrit_direct_pr_publishes_one_change() {
 
   # A stack is several changes and the merge watch follows one, so the shape is
   # refused with that reason until pinned-membership watching exists.
-  out=$(FM_HOME="$home" "$BRIEF" forge-direct-g2 review-server-project --mode direct-PR --forge gerrit --shape stack 2>&1)
+  out=$(JG_HOME="$home" "$BRIEF" forge-direct-g2 review-server-project --mode direct-PR --forge gerrit --shape stack 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "a stack-shaped gerrit brief scaffolded"
   assert_contains "$out" "--shape stack is refused" "the stack refusal did not name the refused shape"
   assert_contains "$out" "pinned when its watch is armed" "the stack refusal did not carry its reason"
   assert_absent "$home/data/forge-direct-g2/brief.md" "the refused stack brief was still written"
-  out=$(FM_HOME="$home" "$BRIEF" forge-direct-g3 review-server-project --mode direct-PR --shape squash 2>&1)
+  out=$(JG_HOME="$home" "$BRIEF" forge-direct-g3 review-server-project --mode direct-PR --shape squash 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "a shape was accepted without a forge that publishes changes"
-  out=$(FM_HOME="$home" "$BRIEF" forge-direct-g4 review-server-project --mode local-only --forge gerrit 2>&1)
+  out=$(JG_HOME="$home" "$BRIEF" forge-direct-g4 review-server-project --mode local-only --forge gerrit 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "a local-only brief accepted a forge"
   assert_contains "$out" "cannot ship mode=local-only" "the local-only refusal did not name the mode"
@@ -1641,39 +1641,39 @@ test_project_mode_resolves_branch_prefix() {
 - typomodeproj [no-mistake branch=fix/] - fixture with a typo'd mode (added 2026-01-01)
 
 EOF
-  out=$(FM_HOME="$home" "$PROJECT_MODE" plainproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" plainproj 2>/dev/null)
   [ "$out" = "no-mistakes off" ] || fail "an unrelated branch=<prefix> query must not change the default mode/yolo output (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix plainproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix plainproj 2>/dev/null)
   [ "$out" = "fm/" ] || fail "a project with no branch= annotation must resolve to the legacy fm/ prefix (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix modeonlyproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix modeonlyproj 2>/dev/null)
   [ "$out" = "fm/" ] || fail "a project registering only a mode must still default to fm/ (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" overrideproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" overrideproj 2>/dev/null)
   [ "$out" = "direct-PR off" ] || fail "a branch= token must not leak into the mode/yolo output (got '$out')"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix overrideproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix overrideproj 2>/dev/null)
   [ "$out" = "fix/" ] || fail "a registered branch= override after the mode was not resolved (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" reorderedproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" reorderedproj 2>/dev/null)
   [ "$out" = "direct-PR on" ] || fail "a branch= token before the mode must not be mistaken for the mode (got '$out')"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix reorderedproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix reorderedproj 2>/dev/null)
   [ "$out" = "contrib/" ] || fail "a registered branch= override before the mode was not resolved (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix bareproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix bareproj 2>/dev/null)
   [ "$out" = "" ] || fail "an empty branch= override must resolve to an empty prefix, not fm/ (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" typomodeproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" typomodeproj 2>/dev/null)
   [ "$out" = "no-mistakes off" ] || fail "a typo'd mode's registered branch leaked into the mode/yolo output (got '$out')"
-  err=$(FM_HOME="$home" "$PROJECT_MODE" typomodeproj 2>&1 >/dev/null)
+  err=$(JG_HOME="$home" "$PROJECT_MODE" typomodeproj 2>&1 >/dev/null)
   assert_contains "$err" "unknown mode" "a typo'd mode with a branch override stopped warning"
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix typomodeproj 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix typomodeproj 2>/dev/null)
   [ "$out" = "fm/" ] || fail "an unknown mode must fall back to the legacy fm/ prefix, not trust the malformed entry's branch (got '$out')"
 
-  out=$(FM_HOME="$home" "$PROJECT_MODE" --branch-prefix never-registered 2>/dev/null)
+  out=$(JG_HOME="$home" "$PROJECT_MODE" --branch-prefix never-registered 2>/dev/null)
   [ "$out" = "fm/" ] || fail "an unregistered project must default its branch prefix to fm/ (got '$out')"
 
-  out=$(FM_HOME="$TMP_ROOT/project-mode-branch/no-registry-home" "$PROJECT_MODE" --branch-prefix anyproj 2>/dev/null)
+  out=$(JG_HOME="$TMP_ROOT/project-mode-branch/no-registry-home" "$PROJECT_MODE" --branch-prefix anyproj 2>/dev/null)
   [ "$out" = "fm/" ] || fail "an absent registry must default the branch prefix to fm/ (got '$out')"
   pass "jg-project-mode: --branch-prefix resolves order-independently and defaults to the legacy fm/ prefix"
 }
@@ -1682,7 +1682,7 @@ EOF
 # one completion requirement and a ship brief must carry the receipt instruction.
 test_receipt_hooks_run_with_the_addon() {
   local addons home id meta out
-  addons=${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}
+  addons=${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/firstmate-addons}
   if [ ! -r "$addons/receipts/bin/jg-receipts-lib.sh" ]; then
     echo "skip: receipts add-on absent, receipt hook sites not run"
     return 0
@@ -1691,17 +1691,17 @@ test_receipt_hooks_run_with_the_addon() {
   id=receipt-hooks-a1
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
-  FM_ADDONS_DIR="$addons" FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
+  JG_ADDONS_DIR="$addons" JG_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null 2>&1 \
     || fail "scout brief generation should succeed"
   fill_brief_subsections "$home/data/$id/brief.md" "Ship the receipt change." "Keep the receipt hook."
   printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
-  out=$(FM_ADDONS_DIR="$addons" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  out=$(JG_ADDONS_DIR="$addons" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1) \
     || fail "promotion with the receipts add-on should succeed: $out"
   assert_equals 1 "$(grep -c '^receipt_required=1$' "$meta")" \
     "promotion must record exactly one completion requirement"
 
-  FM_ADDONS_DIR="$addons" FM_HOME="$home" "$BRIEF" "$id-ship" fixture-project --mode direct-PR >/dev/null 2>&1 \
+  JG_ADDONS_DIR="$addons" JG_HOME="$home" "$BRIEF" "$id-ship" fixture-project --mode direct-PR >/dev/null 2>&1 \
     || fail "ship brief generation with the receipts add-on should succeed"
   assert_grep 'Completion receipt: required' "$home/data/$id-ship/brief.md" \
     "ship brief omitted the completion receipt requirement"
@@ -1715,15 +1715,15 @@ test_fresh_and_promoted_ships_register_disposable_scratch() {
   for route in fresh promoted; do
     id="scratch-$route"
     if [ "$route" = fresh ]; then
-      FM_HOME="$home" "$BRIEF" "$id" fixture-project --mode local-only >/dev/null \
+      JG_HOME="$home" "$BRIEF" "$id" fixture-project --mode local-only >/dev/null \
         || fail "fresh scratch brief failed"
       prompt="$home/data/$id/brief.md"
     else
       printf 'window=jg-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
-      FM_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null \
+      JG_HOME="$home" "$BRIEF" "$id" fixture-project --scout >/dev/null \
         || fail "scratch scout brief failed"
       fill_brief_subsections "$home/data/$id/brief.md" "Implement the fix." "Preserve task evidence."
-      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode local-only --yolo off 2>&1) \
+      out=$(JG_HOME="$home" "$PROMOTE" "$id" --mode local-only --yolo off 2>&1) \
         || fail "scratch promotion failed: $out"
       prompt="$home/data/$id/ship-instructions.md"
     fi
@@ -1739,7 +1739,7 @@ print(commands[0].replace('<dir>', '"$1"'))
 PYCODE
     ) || fail "$route: generated instructions omitted the registration command"
     bash -c "$command" _ "$scratch" >/dev/null || fail "$route: emitted registration command failed"
-    assert_equals "$scratch" "$(FM_HOME="$home" "$ROOT/bin/jg-scratch.sh" list "$id")" \
+    assert_equals "$scratch" "$(JG_HOME="$home" "$ROOT/bin/jg-scratch.sh" list "$id")" \
       "$route: emitted command registered scratch in the wrong home"
     if bash -c "$command" _ "$home/data/$id" >/dev/null 2>&1; then
       fail "$route: emitted command accepted retained evidence"

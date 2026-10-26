@@ -27,7 +27,7 @@ Rovo CLI: 202609.1.2
 
 ## Launch: bare launch-then-send, the kimi shape
 
-`jg-spawn.sh` builds `env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS <rovo-bin> run --yolo <model/effort flags>` - BARE, with no positional brief - wrapped by the shared `env -u CURSOR_AGENT -u CURSOR_INVOKED_AS` prefix every non-cursor harness gets.
+`jg-spawn.sh` builds `env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS <rovo-bin> run --yolo <model/effort flags>` - BARE, with no positional brief - wrapped by the shared `env -u CURSOR_AGENT -u CURSOR_INVOKED_AS` prefix every non-cursor harness gets.
 The brief is then typed in after the TUI comes up, the same launch-then-send shape kimi uses, through the same shared readers (`jg_backend_capture`, `jg_backend_composer_state`, `jg_backend_send_text_submit`):
 
 1. `rovo_wait_for_ready` polls for the `Welcome to Rovo!` banner (primary) or a composer-empty verdict (weaker fallback, see the composer-ghost-text gap below).
@@ -77,7 +77,7 @@ row 12  ╰───────────────────────
 ```
 
 Real typed text in the same row, captured separately, renders at `38;2;206;207;210` (luminance ~207).
-Both values sit above `bin/jg-composer-lib.sh`'s default `FM_COMPOSER_GHOST_LUMA_MAX` of 128, so `jg_composer_strip_ghost` leaves the placeholder unstripped and a fresh rovo composer can misclassify as `pending` rather than `empty`.
+Both values sit above `bin/jg-composer-lib.sh`'s default `JG_COMPOSER_GHOST_LUMA_MAX` of 128, so `jg_composer_strip_ghost` leaves the placeholder unstripped and a fresh rovo composer can misclassify as `pending` rather than `empty`.
 Raising the shared default was considered and rejected: muse's own real, must-not-be-stripped prompt glyph measures luminance ~149.9 (`muse.md`), below rovo's ghost luminance of ~163, so no single global threshold can keep muse's glyph real while dropping rovo's ghost chip.
 This is recorded as a known gap rather than patched, because the safe fix needs a harness-scoped signal the shared composer classifier does not carry today, and a threshold change risks regressing muse's already-credentialed behavior for a rovo-scoped fix.
 The blast radius is bounded to composer-emptiness consumers such as steering delivery, which already retries through the doorbell ladder on a non-`empty` read.
@@ -231,7 +231,7 @@ Run the portable suite and the live guard after any rovo upgrade, because the pr
 
 ```
 bin/jg-test-run.sh tests/jg-rovo-harness.test.sh
-FM_ROVO_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-rovo-signals-live-e2e.test.sh
+JG_ROVO_SIGNALS_LIVE=1 bin/jg-test-run.sh tests/jg-rovo-signals-live-e2e.test.sh
 ```
 
 The live guard requires a real, authenticated `rovo` binary but drives it through a raw PTY rather than tmux, so it runs on hosts without tmux installed; tmux and herdr pane placement and liveness were both verified separately in live isolated sessions (see the backend-liveness section above), where the herdr agent-state classifier's rovo blind spot is recorded as a Herdr-side integration gap to track, not a live-guard coverage gap this refresh command needs to close.

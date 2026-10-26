@@ -51,13 +51,13 @@
 # on .seq.lock; the worst racing outcome is ordering, never loss.
 #
 # Re-ring ladder (jg_task_inbox_due_action): an unhandled message older than
-# FM_TASK_INBOX_GRACE_SECS is due one delivery attempt per grace period; an
+# JG_TASK_INBOX_GRACE_SECS is due one delivery attempt per grace period; an
 # attempt may ring or be skipped to protect another draft in a proven pending
 # composer; an unsubmitted copy of this doorbell is retried. After
-# FM_TASK_INBOX_RING_MAX attempts without an acknowledgement it escalates. The
+# JG_TASK_INBOX_RING_MAX attempts without an acknowledgement it escalates. The
 # caller owns the busy and recovery-grade endpoint checks: due actions deferred
 # by a busy pane consume a separate durable consecutive-poll budget,
-# FM_TASK_INBOX_BUSY_MAX. At that bound the same escalation path surfaces a
+# JG_TASK_INBOX_BUSY_MAX. At that bound the same escalation path surfaces a
 # stuck-busy reason without typing. A non-busy due check or acknowledgement resets
 # this budget. Fire-and-forget retries remain outside escalation. A positively
 # dead or missing endpoint skips delivery and the ladder and escalates directly.
@@ -90,43 +90,43 @@
 # and tests. No side effects on source beyond its sourced libraries.
 #
 # Tunables (env):
-#   FM_TASK_INBOX_GRACE_SECS   default 90; delivery-attempt grace and spacing
-#   FM_TASK_INBOX_RING_MAX     default 3; delivery attempts before escalation
-#   FM_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
+#   JG_TASK_INBOX_GRACE_SECS   default 90; delivery-attempt grace and spacing
+#   JG_TASK_INBOX_RING_MAX     default 3; delivery attempts before escalation
+#   JG_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
 
-_FM_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Both dependencies are canonical lint roots in their own right. Keep them as
 # analysis boundaries here so ShellCheck's external-source traversal does not
 # recursively duplicate the full backend graph for every inbox consumer.
 # shellcheck source=/dev/null
-. "$_FM_TASK_INBOX_LIB_DIR/jg-wake-lib.sh"
+. "$_JG_TASK_INBOX_LIB_DIR/jg-wake-lib.sh"
 # shellcheck source=/dev/null
-. "$_FM_TASK_INBOX_LIB_DIR/jg-backend.sh"
+. "$_JG_TASK_INBOX_LIB_DIR/jg-backend.sh"
 
-FM_TASK_INBOX_SCHEMA='jg-task-inbox.v1'
-FM_TASK_INBOX_GRACE_DEFAULT=90
-FM_TASK_INBOX_RING_MAX_DEFAULT=3
-FM_TASK_INBOX_BUSY_MAX_DEFAULT=2
-FM_TASK_INBOX_LOCK_WAIT_DEFAULT=5
+JG_TASK_INBOX_SCHEMA='jg-task-inbox.v1'
+JG_TASK_INBOX_GRACE_DEFAULT=90
+JG_TASK_INBOX_RING_MAX_DEFAULT=3
+JG_TASK_INBOX_BUSY_MAX_DEFAULT=2
+JG_TASK_INBOX_LOCK_WAIT_DEFAULT=5
 
 jg_task_inbox_grace_secs() {
-  local g=${FM_TASK_INBOX_GRACE_SECS:-$FM_TASK_INBOX_GRACE_DEFAULT}
-  case "$g" in ''|*[!0-9]*) g=$FM_TASK_INBOX_GRACE_DEFAULT ;; esac
+  local g=${JG_TASK_INBOX_GRACE_SECS:-$JG_TASK_INBOX_GRACE_DEFAULT}
+  case "$g" in ''|*[!0-9]*) g=$JG_TASK_INBOX_GRACE_DEFAULT ;; esac
   printf '%s' "$g"
 }
 
 jg_task_inbox_ring_max() {
-  local m=${FM_TASK_INBOX_RING_MAX:-$FM_TASK_INBOX_RING_MAX_DEFAULT}
-  case "$m" in ''|*[!0-9]*) m=$FM_TASK_INBOX_RING_MAX_DEFAULT ;; esac
+  local m=${JG_TASK_INBOX_RING_MAX:-$JG_TASK_INBOX_RING_MAX_DEFAULT}
+  case "$m" in ''|*[!0-9]*) m=$JG_TASK_INBOX_RING_MAX_DEFAULT ;; esac
   printf '%s' "$m"
 }
 
 jg_task_inbox_busy_max() {
-  local m=${FM_TASK_INBOX_BUSY_MAX:-$FM_TASK_INBOX_BUSY_MAX_DEFAULT}
-  case "$m" in ''|*[!0-9]*) m=$FM_TASK_INBOX_BUSY_MAX_DEFAULT ;; esac
+  local m=${JG_TASK_INBOX_BUSY_MAX:-$JG_TASK_INBOX_BUSY_MAX_DEFAULT}
+  case "$m" in ''|*[!0-9]*) m=$JG_TASK_INBOX_BUSY_MAX_DEFAULT ;; esac
   # Check the length before numeric comparison so oversized input cannot overflow.
   if [ "${#m}" -gt 9 ] || [ "$m" -eq 0 ]; then
-    m=$FM_TASK_INBOX_BUSY_MAX_DEFAULT
+    m=$JG_TASK_INBOX_BUSY_MAX_DEFAULT
   fi
   printf '%s' "$m"
 }
@@ -186,9 +186,9 @@ jg_task_inbox_next_seq() {  # <inbox-dir>
 }
 
 jg_task_inbox_lock_acquire() {  # <lock-path>
-  local lock=$1 wait=${FM_TASK_INBOX_LOCK_WAIT_SECS:-$FM_TASK_INBOX_LOCK_WAIT_DEFAULT}
+  local lock=$1 wait=${JG_TASK_INBOX_LOCK_WAIT_SECS:-$JG_TASK_INBOX_LOCK_WAIT_DEFAULT}
   local deadline probe
-  case "$wait" in ''|*[!0-9]*) wait=$FM_TASK_INBOX_LOCK_WAIT_DEFAULT ;; esac
+  case "$wait" in ''|*[!0-9]*) wait=$JG_TASK_INBOX_LOCK_WAIT_DEFAULT ;; esac
   probe=$(mktemp "${lock%/*}/.lock-probe.XXXXXX") || return 1
   rm -f "$probe" || return 1
   if [ ! -e "$lock" ] && [ ! -L "$lock" ]; then
@@ -209,7 +209,7 @@ _jg_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
   rec="$dir/$seq.msg"
   tmp=$(mktemp "$dir/.staging.XXXXXX") || return 1
   {
-    printf 'schema=%s\n' "$FM_TASK_INBOX_SCHEMA"
+    printf 'schema=%s\n' "$JG_TASK_INBOX_SCHEMA"
     printf 'at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     [ "$delivery_mode" != fire-and-forget ] || printf 'delivery=fire-and-forget\n'
     printf -- '--\n'
@@ -311,7 +311,7 @@ jg_task_inbox_body() {  # <record-path>
 }
 
 # The constant self-describing doorbell line for the inbox containing a record.
-# It names the inbox by the literal "$FM_TASK_INBOX", which bin/jg-spawn.sh
+# It names the inbox by the literal "$JG_TASK_INBOX", which bin/jg-spawn.sh
 # exports into every launch as the inbox's absolute path, so the worker can
 # resolve it from its own environment even after losing its brief context.
 # The short `<task>.inbox` name follows as the fallback for a worker launched
@@ -333,7 +333,7 @@ jg_task_inbox_doorbell_line() {  # <record-path>
     ''|*[![:print:]]*) return 1 ;;
   esac
   quoted=$(printf '%s' "$name" | sed "s/'/'\\\\''/g")
-  printf ": Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your '%s' steering inbox, read and act on each in numeric order, then mv each into its handled/." \
+  printf ": Firstmate instruction waiting: list \"\$JG_TASK_INBOX\"/*.msg in your '%s' steering inbox, read and act on each in numeric order, then mv each into its handled/." \
     "$quoted"
 }
 
@@ -355,16 +355,16 @@ jg_task_inbox_doorbell_line() {  # <record-path>
 # whose Enter never landed, so on an agent not reported busy it is submitted
 # rather than skipped; skipping it would block every later ring. On both paths
 # a lost first Enter gets one confirmed retry.
-# On return 2, FM_TASK_INBOX_RING_REASON holds the backend's refusal
+# On return 2, JG_TASK_INBOX_RING_REASON holds the backend's refusal
 # diagnostics on one line, for callers to log; it is empty otherwise.
 jg_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   local backend=$1 target=$2 rec=$3 label=${4:-} line cstate verdict errf
-  FM_TASK_INBOX_RING_REASON=
+  JG_TASK_INBOX_RING_REASON=
   case "$(jg_backend_agent_state "$backend" "$target" 2>/dev/null || true)" in
     dead|missing) return 3 ;;
   esac
   if ! line=$(jg_task_inbox_doorbell_line "$rec"); then
-    FM_TASK_INBOX_RING_REASON="inbox name is not printable"
+    JG_TASK_INBOX_RING_REASON="inbox name is not printable"
     return 2
   fi
   cstate=$(jg_backend_composer_state "$backend" "$target" "$label" 2>/dev/null) || cstate=unknown
@@ -387,16 +387,16 @@ jg_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   errf=$(mktemp "${TMPDIR:-/tmp}/jg-ring-err.XXXXXX" 2>/dev/null) || errf=/dev/null
   verdict=$(jg_backend_send_text_submit "$backend" "$target" "$line" 2 0.4 0.3 "$label" 2>"$errf") || verdict=send-failed
   if [ "$errf" != /dev/null ]; then
-    FM_TASK_INBOX_RING_REASON=$(LC_ALL=C tr -c '[:print:]\n' ' ' < "$errf" | sed '/^ *$/d' | paste -sd ';' - | cut -c1-300)
+    JG_TASK_INBOX_RING_REASON=$(LC_ALL=C tr -c '[:print:]\n' ' ' < "$errf" | sed '/^ *$/d' | paste -sd ';' - | cut -c1-300)
     rm -f "$errf"
   fi
   # The verdict is read only to report a failed keystroke; every other value
   # (empty, pending, unknown, ...) is deliberately ignored, never proof.
   if [ "$verdict" = send-failed ]; then
-    FM_TASK_INBOX_RING_REASON=${FM_TASK_INBOX_RING_REASON:-the backend reported send-failed without a reason}
+    JG_TASK_INBOX_RING_REASON=${JG_TASK_INBOX_RING_REASON:-the backend reported send-failed without a reason}
     return 2
   fi
-  FM_TASK_INBOX_RING_REASON=
+  JG_TASK_INBOX_RING_REASON=
   return 0
 }
 
@@ -404,7 +404,7 @@ jg_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
 jg_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
   local cap held
   jg_backend_source "$1" || return 1
-  cap=$(jg_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
+  cap=$(jg_backend_capture "$1" "$2" "$JG_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
   held=$(jg_composer_extract_selected_content styled=0 "$cap") || return 1
   [ -n "$held" ] && [ "$(printf '%s' "$held" | tr -d '[:space:]')" = "$(printf '%s' "$3" | tr -d '[:space:]')" ]
 }
@@ -472,7 +472,7 @@ jg_task_inbox_due_action() {  # <state-dir> <task-id>
     rm -f "$dir/.ring-state" "$dir/.escalated" "$dir/.busy-state" 2>/dev/null || true
     # The one retry ring exists only while config/wait-no-turns is present.
     # Absent, a mark is left untouched and the inbox stays quiet, as before.
-    if [ -e "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/wait-no-turns" ]; then
+    if [ -e "${JG_CONFIG_OVERRIDE:-${JG_HOME:-}/config}/wait-no-turns" ]; then
       base=$(cat "$dir/.retry-ring" 2>/dev/null || true)
       if ! jg_task_inbox_seq_of "$base" >/dev/null || [ ! -f "$dir/$base" ]; then
         rm -f "$dir/.retry-ring" 2>/dev/null || true

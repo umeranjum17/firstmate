@@ -128,21 +128,21 @@ case "${1:-} ${2:-}" in
 esac
 exit 0
 SH
-  # Default hermetic no-mistakes stub: `axi status` answers FM_FAKE_AXI_STATUS
+  # Default hermetic no-mistakes stub: `axi status` answers JG_FAKE_AXI_STATUS
   # verbatim (empty by default, i.e. no active run - the pre-teardown run-abort
   # step is then a no-op), `axi abort` appends one line to
-  # FM_FAKE_NM_ABORT_LOG when set, the top-level `runs` listing answers
-  # FM_FAKE_NM_RUNS_LIST verbatim (the real `no-mistakes runs --limit N` is
+  # JG_FAKE_NM_ABORT_LOG when set, the top-level `runs` listing answers
+  # JG_FAKE_NM_RUNS_LIST verbatim (the real `no-mistakes runs --limit N` is
   # plain text with no run id and no quoting - see the ledger fixtures below),
-  # and `runs` appends its own invocation to FM_FAKE_NM_RUNS_LOG when set, so
+  # and `runs` appends its own invocation to JG_FAKE_NM_RUNS_LOG when set, so
   # a test can prove whether the ledger fallback ever engaged.
-  # The bare `axi` overview answers FM_FAKE_AXI_OVERVIEW verbatim (empty by
+  # The bare `axi` overview answers JG_FAKE_AXI_OVERVIEW verbatim (empty by
   # default, so no repository resolves and the pipeline-spend record is
   # written as unavailable).
   # This keeps every case hermetic - without it, `command -v no-mistakes`
   # would fall through to whatever real binary happens to be on the test
   # runner's own PATH. Tests exercising the run-abort path override
-  # FM_FAKE_AXI_STATUS/FM_FAKE_NM_ABORT_LOG/FM_FAKE_NM_RUNS_LIST before
+  # JG_FAKE_AXI_STATUS/JG_FAKE_NM_ABORT_LOG/JG_FAKE_NM_RUNS_LIST before
   # run_teardown.
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
@@ -151,37 +151,37 @@ case "${1:-}" in
     shift
     case "${1:-}" in
       '')
-        printf '%s\n' "${FM_FAKE_AXI_OVERVIEW:-}" ;;
+        printf '%s\n' "${JG_FAKE_AXI_OVERVIEW:-}" ;;
       status)
         shift
         run_id=""
         if [ "${1:-}" = --run ]; then run_id=${2:-}; fi
-        if [ -n "${FM_FAKE_NM_ABORT_LOG:-}" ] \
-           && grep -Fxq "abort --run $run_id" "$FM_FAKE_NM_ABORT_LOG" 2>/dev/null \
-           && [ "${FM_FAKE_NM_ABORT_NOOP:-0}" != 1 ]; then
-          if [ "${FM_FAKE_NM_NOT_FOUND_AFTER_ABORT:-0}" = 1 ]; then
+        if [ -n "${JG_FAKE_NM_ABORT_LOG:-}" ] \
+           && grep -Fxq "abort --run $run_id" "$JG_FAKE_NM_ABORT_LOG" 2>/dev/null \
+           && [ "${JG_FAKE_NM_ABORT_NOOP:-0}" != 1 ]; then
+          if [ "${JG_FAKE_NM_NOT_FOUND_AFTER_ABORT:-0}" = 1 ]; then
             printf 'error: "run \\"%s\\" not found"\n' "$run_id" >&2
             exit 1
-          elif [ "${FM_FAKE_NM_EMPTY_AFTER_ABORT:-0}" = 1 ]; then
+          elif [ "${JG_FAKE_NM_EMPTY_AFTER_ABORT:-0}" = 1 ]; then
             exit 0
-          elif [ -n "${FM_FAKE_AXI_STATUS_AFTER_ABORT:-}" ]; then
-            printf '%s\n' "$FM_FAKE_AXI_STATUS_AFTER_ABORT"
+          elif [ -n "${JG_FAKE_AXI_STATUS_AFTER_ABORT:-}" ]; then
+            printf '%s\n' "$JG_FAKE_AXI_STATUS_AFTER_ABORT"
           else
             printf 'run:\n  id: "%s"\n  outcome: cancelled\n' "$run_id"
           fi
         else
-          printf '%s\n' "${FM_FAKE_AXI_STATUS:-}"
+          printf '%s\n' "${JG_FAKE_AXI_STATUS:-}"
         fi
         ;;
       abort)
         shift
-        [ -z "${FM_FAKE_NM_ABORT_LOG:-}" ] || printf 'abort %s\n' "$*" >> "$FM_FAKE_NM_ABORT_LOG"
+        [ -z "${JG_FAKE_NM_ABORT_LOG:-}" ] || printf 'abort %s\n' "$*" >> "$JG_FAKE_NM_ABORT_LOG"
         exit 0 ;;
     esac
     ;;
   runs)
-    [ -z "${FM_FAKE_NM_RUNS_LOG:-}" ] || printf 'runs %s\n' "$*" >> "$FM_FAKE_NM_RUNS_LOG"
-    printf '%s\n' "${FM_FAKE_NM_RUNS_LIST:-}" ;;
+    [ -z "${JG_FAKE_NM_RUNS_LOG:-}" ] || printf 'runs %s\n' "$*" >> "$JG_FAKE_NM_RUNS_LOG"
+    printf '%s\n' "${JG_FAKE_NM_RUNS_LIST:-}" ;;
 esac
 exit 0
 SH
@@ -644,14 +644,14 @@ SH
 # Run teardown with PATH mocking. Args: case_dir [extra args...]
 run_teardown() {
   local case_dir=$1; shift
-  # FM_DATA_OVERRIDE is pinned to the case dir because teardown closes this
+  # JG_DATA_OVERRIDE is pinned to the case dir because teardown closes this
   # home's backlog item itself; without it $DATA would resolve to the real
   # repo's own home and a test could mutate live records.
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
-  FM_DATA_OVERRIDE="$case_dir/data" \
-  FM_CONFIG_OVERRIDE="$case_dir/config" \
-  PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
+  JG_DATA_OVERRIDE="$case_dir/data" \
+  JG_CONFIG_OVERRIDE="$case_dir/config" \
+  PATH="$case_dir/fakebin:${JG_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
 }
 
@@ -709,7 +709,7 @@ test_local_only_fork_remote_allows() {
   # The supervision branch reports the teardown it just performed AFTER the
   # task's records are gone (bin/jg-branch-prompt.sh); that report must be
   # stored, must publish its ready sequence, and must not recreate the index.
-  post_seq=$(FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-branch-outcome.sh" append \
+  post_seq=$(JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-branch-outcome.sh" append \
     --task task-x1 --verdict captain --summary 'PR merged and cleaned up') \
     || fail "fork-allow: post-teardown branch report was refused"
   [ "$post_seq" = 1 ] || fail "fork-allow: post-teardown branch report got seq $post_seq, expected 1"
@@ -1251,16 +1251,16 @@ test_pr_check_does_not_refresh_stale_pr_head() {
   pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
   PATH="$case_dir/fakebin:$PATH" \
     "$PR_CHECK" task-x1 https://github.com/example/repo/pull/7 >/dev/null
 
   wt_commit_file "$case_dir" later.txt local-only "local follow-up"
   new_head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
   PATH="$case_dir/fakebin:$PATH" \
     "$PR_CHECK" task-x1 https://github.com/example/repo/pull/7 >/dev/null
 
@@ -1288,8 +1288,8 @@ test_pr_check_records_remote_head_when_local_lags() {
   pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes follow-up")
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
   PATH="$case_dir/fakebin:$PATH" \
     "$PR_CHECK" task-x1 https://github.com/example/repo/pull/7 >/dev/null
 
@@ -1311,13 +1311,13 @@ test_content_in_default_fallback_allows() {
   land_on_origin_main "$case_dir" feature.txt hello
   cat > "$case_dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" > "${FM_TEST_TREEHOUSE_LOG:?}"
+printf '%s\n' "$*" > "${JG_TEST_TREEHOUSE_LOG:?}"
 exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 
   set +e
-  FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+  JG_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -1635,7 +1635,7 @@ test_dirty_return_warns_which_slot_was_lost() {
   add_treehouse_that_leaves_residue "$case_dir"
 
   set +e
-  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  JG_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
@@ -1669,7 +1669,7 @@ SH
   chmod +x "$case_dir/fakebin/tmux"
 
   set +e
-  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  JG_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
@@ -1777,7 +1777,7 @@ test_return_that_removes_copy_warns_cannot_verify() {
   add_treehouse_that_removes_copy "$case_dir"
 
   rc=0
-  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  JG_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 4 "$rc" "return-removes-copy: an unverified slot should exit 4 after cleanup"
   assert_grep "lost this slot" "$case_dir/stderr" "return-removes-copy: no lost-slot warning"
@@ -2286,7 +2286,7 @@ test_stale_index_lock_cleared_and_teardown_succeeds() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2316,7 +2316,7 @@ test_live_index_lock_is_never_removed_and_teardown_refuses() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2347,7 +2347,7 @@ test_lsof_error_never_clears_index_lock() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2380,7 +2380,7 @@ test_stale_index_lock_cleanup_rechecks_dirty_worktree() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2415,7 +2415,7 @@ test_non_linked_index_lock_path_is_checked_from_worktree() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2452,7 +2452,7 @@ test_index_lock_mtime_read_failure_refuses() {
   touch -t 200001010000 "$lock"
 
   set +e
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 JG_STALE_WORKTREE_LOCK_AGE_SECS=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2490,9 +2490,9 @@ test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds() {
 
   set +e
   TREEHOUSE_ATTEMPT_FILE="$attempt_file" \
-  FM_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
-  FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
-  FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+  JG_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2526,9 +2526,9 @@ test_persistent_index_lock_exhausts_retries_and_refuses_loudly() {
   touch "$lock"
 
   set +e
-  FM_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
-  FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
-  FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+  JG_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2566,10 +2566,10 @@ test_empty_retry_wait_uses_default_without_aborting() {
 
   set +e
   TREEHOUSE_ATTEMPT_FILE="$attempt_file" \
-  FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
-  FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS='' \
-  FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS='' \
+  JG_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2598,10 +2598,10 @@ test_fractional_legacy_retry_wait_refuses_without_arithmetic_error() {
   : > "$lock"
 
   set +e
-  FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
-  FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
-  FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0.1 \
-  FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
+  JG_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
+  JG_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0.1 \
+  JG_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
@@ -2631,7 +2631,7 @@ test_local_only_force_overrides_unpushed() {
 }
 
 # Mark the case's home as a secondmate home bound to a parent: teardown and
-# jg-pr-check run with FM_HOME="$case_dir/home" so the parent-channel
+# jg-pr-check run with JG_HOME="$case_dir/home" so the parent-channel
 # publishers resolve that binding while the task state stays in $case_dir/state.
 configure_secondmate_home() {  # <case-dir> <local|remote> [<parent-home>]
   local case_dir=$1 route=$2 parent=${3:-} home="$1/home"
@@ -2665,7 +2665,7 @@ test_secondmate_pr_registration_publishes_ready_line() {
   pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
     PATH="$case_dir/fakebin:$PATH" "$PR_CHECK" task-x1 "$url" > "$case_dir/pr-check.out" 2> "$case_dir/pr-check.err" \
     || fail "mate-pr-ready: jg-pr-check failed: $(cat "$case_dir/pr-check.err")"
   grep -q '^armed:' "$case_dir/pr-check.out" || fail "mate-pr-ready: poll was not armed"
@@ -2673,7 +2673,7 @@ test_secondmate_pr_registration_publishes_ready_line() {
     "mate-pr-ready: the ready line did not reach the parent channel"
   ! grep -q '^actionable:' "$case_dir/pr-check.err" \
     || fail "mate-pr-ready: registration reported a channel problem: $(cat "$case_dir/pr-check.err")"
-  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
     PATH="$case_dir/fakebin:$PATH" "$PR_CHECK" task-x1 "$url" >/dev/null 2>&1 \
     || fail "mate-pr-ready: re-registration failed"
   [ "$(grep -c 'child-pr-task-x1' "$channel")" -eq 1 ] \
@@ -2683,7 +2683,7 @@ test_secondmate_pr_registration_publishes_ready_line() {
   write_meta "$case_dir" no-mistakes ship
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
     PATH="$case_dir/fakebin:$PATH" "$PR_CHECK" task-x1 "$url" >/dev/null 2> "$case_dir/pr-check.err" \
     || fail "main-pr-ready: jg-pr-check failed"
   ! grep -q '^actionable:' "$case_dir/pr-check.err" \
@@ -2710,7 +2710,7 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   printf 'working: shipping\ndone: PR https://github.com/example/repo/pull/9 checks green\n' \
     > "$case_dir/state/task-x1.status"
   set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  JG_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
   expect_code 0 "$rc" "mate-teardown-delivers: teardown should succeed: $(cat "$case_dir/stderr")"
@@ -2733,7 +2733,7 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
   printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
   set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  JG_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "mate-teardown-refuses: teardown proceeded with an undelivered final line"
@@ -2746,14 +2746,14 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
     && [ -d "$case_dir/tasktmp" ] \
     || fail "mate-teardown-refuses: refusal removed endpoint records before parent delivery"
   rmdir "$channel"
-  err=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+  err=$(JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-wake-drain.sh" 2>&1 >/dev/null)
   seq=$(printf '%s\n' "$err" | sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation .*/\1/p')
   generation=$(printf '%s\n' "$err" | sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p')
-  [ -z "$seq" ] || FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+  [ -z "$seq" ] || JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-wake-drain.sh" --ack-through "$seq" --recovery-generation "$generation" >/dev/null
   set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2"
+  JG_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2"
   rc=$?
   set -e
   expect_code 0 "$rc" "mate-teardown-refuses: rerun after repair should succeed: $(cat "$case_dir/stderr2")"
@@ -2833,7 +2833,7 @@ configure_flat_herdr_teardown_case() {  # <case-dir>
   cat > "$case_dir/fakebin/herdr" <<SH
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "\$*" >> "\${FM_FAKE_HERDR_LOG:?}"
+printf '%s\n' "\$*" >> "\${JG_FAKE_HERDR_LOG:?}"
 case "\${1:-} \${2:-}" in
   "workspace list")
     printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"wH","active_tab_id":"wH:t1","focused":true},{"workspace_id":"wG","active_tab_id":"wG:tQ","focused":false}]}}'
@@ -2852,21 +2852,21 @@ case "\${1:-} \${2:-}" in
     printf '%s\n' '{"server":{"running":true}}'
     ;;
   "session list")
-    if [ "\${FM_FAKE_HERDR_SESSION_LIST_GARBAGE:-0}" = 1 ]; then
+    if [ "\${JG_FAKE_HERDR_SESSION_LIST_GARBAGE:-0}" = 1 ]; then
       printf '%s\n' 'not-json'
     else
       printf '%s\n' '{"sessions":[{"name":"default","running":true,"socket_path":"$case_dir/herdr.sock"}]}'
     fi
     ;;
   "pane close")
-    : > "\${FM_FAKE_HERDR_CLOSED:?}"
+    : > "\${JG_FAKE_HERDR_CLOSED:?}"
     ;;
   "pane get")
-    if [ "\${FM_FAKE_HERDR_PANE_GET_GARBAGE:-0}" = 1 ]; then
+    if [ "\${JG_FAKE_HERDR_PANE_GET_GARBAGE:-0}" = 1 ]; then
       printf '%s\n' 'not-json'
       exit 0
     fi
-    if [ -e "\${FM_FAKE_HERDR_CLOSED:?}" ]; then
+    if [ -e "\${JG_FAKE_HERDR_CLOSED:?}" ]; then
       printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
       exit 1
     fi
@@ -2900,7 +2900,7 @@ exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 
-  lock=$(FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" PATH="$case_dir/fakebin:$PATH" \
+  lock=$(JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" PATH="$case_dir/fakebin:$PATH" \
     bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_presentation_session_lock_path default' "$ROOT") \
     || fail "herdr-orphan-refusal: could not resolve the fixture presentation lock path"
   ready="$case_dir/lock-ready"; release="$case_dir/lock-release"
@@ -2917,7 +2917,7 @@ SH
   [ -e "$ready" ] || fail "herdr-orphan-refusal: the contending lock holder never started"
 
   rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   if [ "$rc" -eq 0 ]; then
     : > "$release"; wait "$holder_pid" 2>/dev/null || true
@@ -2944,7 +2944,7 @@ SH
 
   : > "$release"
   wait "$holder_pid" 2>/dev/null || true
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout2" 2> "$case_dir/stderr2" \
     || fail "herdr-orphan-refusal: the retry after lock release failed: $(cat "$case_dir/stderr2")"
   [ -e "$closed" ] || fail "herdr-orphan-refusal: the retry never closed the pane under the lock"
@@ -2965,8 +2965,8 @@ test_herdr_flat_teardown_refuses_records_on_unparseable_presence() {
   closed="$case_dir/closed"
   : > "$case_dir/state/task-x1.status"
   rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_PANE_GET_GARBAGE=1 \
-    FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_PANE_GET_GARBAGE=1 \
+    JG_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-garbage-presence: teardown erased records on an unparseable pane presence"
@@ -3016,9 +3016,9 @@ SH
       ;;
   esac
   rc=0
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
-    FM_CONFIG_OVERRIDE="$case_dir/config" FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
-    FM_FAKE_HERDR_SESSION_LIST_GARBAGE="$([ "$mode" = unresolvable-lock ] && printf 1 || printf 0)" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" JG_DATA_OVERRIDE="$case_dir/data" \
+    JG_CONFIG_OVERRIDE="$case_dir/config" JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
+    JG_FAKE_HERDR_SESSION_LIST_GARBAGE="$([ "$mode" = unresolvable-lock ] && printf 1 || printf 0)" \
     PATH="$case_dir/fakebin:$PATH" \
     "$teardown_bin" task-x1 --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-preflight-$mode: teardown continued without its required preflight"
@@ -3050,7 +3050,7 @@ test_herdr_flat_teardown_preflight_refuses_before_changes() {
 # real account's namespace or the old shared /tmp/firstmate-herdr-presentation,
 # and every directory the fixture account resolves is really owned by the
 # running account, i.e. by another uid from the fixture account's view.
-# FM_FAKE_NS_STAT names one path whose owner and mode the `stat` shim reports
+# JG_FAKE_NS_STAT names one path whose owner and mode the `stat` shim reports
 # instead; the adapter reads ownership through a PATH `stat` only on its non-
 # Darwin branch, so the arms that need it run only there.
 herdr_lock_ns_fake_uid() {
@@ -3062,17 +3062,17 @@ configure_herdr_lock_ns_shims() {  # <case-dir>
   real_id=$(command -v id); real_stat=$(command -v stat)
   cat > "$case_dir/fakebin/id" <<SH
 #!/usr/bin/env bash
-if [ "\${1:-}" = -u ] && [ "\$#" -eq 1 ] && [ -n "\${FM_FAKE_ACCOUNT_UID:-}" ]; then
-  printf '%s\n' "\$FM_FAKE_ACCOUNT_UID"
+if [ "\${1:-}" = -u ] && [ "\$#" -eq 1 ] && [ -n "\${JG_FAKE_ACCOUNT_UID:-}" ]; then
+  printf '%s\n' "\$JG_FAKE_ACCOUNT_UID"
   exit 0
 fi
 exec "$real_id" "\$@"
 SH
   cat > "$case_dir/fakebin/stat" <<SH
 #!/usr/bin/env bash
-if [ "\$#" -eq 3 ] && [ "\$1" = -c ] && [ -n "\${FM_FAKE_NS_STAT:-}" ] \\
-  && [ "\$3" = "\${FM_FAKE_NS_STAT%%:*}" ]; then
-  rest=\${FM_FAKE_NS_STAT#*:}
+if [ "\$#" -eq 3 ] && [ "\$1" = -c ] && [ -n "\${JG_FAKE_NS_STAT:-}" ] \\
+  && [ "\$3" = "\${JG_FAKE_NS_STAT%%:*}" ]; then
+  rest=\${JG_FAKE_NS_STAT#*:}
   case "\$2" in
     %u) printf '%s\n' "\${rest%%:*}"; exit 0 ;;
     %a) printf '%s\n' "\${rest#*:}"; exit 0 ;;
@@ -3095,9 +3095,9 @@ herdr_lock_ns_path_state() {  # <path>
 
 run_herdr_lock_ns_teardown() {  # <case-dir> <fake-uid> [stat-spec]
   local case_dir=$1 fake_uid=$2 stat_spec=${3:-} rc=0
-  FM_FAKE_ACCOUNT_UID="$fake_uid" FM_FAKE_NS_STAT="$stat_spec" \
-    FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
-    FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+  JG_FAKE_ACCOUNT_UID="$fake_uid" JG_FAKE_NS_STAT="$stat_spec" \
+    JG_FAKE_HERDR_LOG="$case_dir/herdr.log" JG_FAKE_HERDR_CLOSED="$case_dir/closed" \
+    JG_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   return "$rc"
 }
@@ -3130,7 +3130,7 @@ test_herdr_teardown_presentation_lock_namespace_is_per_account() {
   legacy=/tmp/firstmate-herdr-presentation
   [ ! -e "$own_ns" ] && [ ! -L "$own_ns" ] \
     || fail "herdr-lock-ns: fixture namespace $own_ns already exists; refusing to reuse it"
-  printf '%s\n' "$own_ns" >> "$FM_TEST_CLEANUP_REGISTRY"
+  printf '%s\n' "$own_ns" >> "$JG_TEST_CLEANUP_REGISTRY"
   mkdir -m 700 "$own_ns" || fail "herdr-lock-ns: could not stage $own_ns"
   legacy_before=$(herdr_lock_ns_path_state "$legacy")
 
@@ -3156,8 +3156,8 @@ test_herdr_teardown_presentation_lock_namespace_is_per_account() {
     [ ! -e "$case_dir/state/task-x1.meta" ] || fail "herdr-lock-ns-other-account: teardown left the metadata behind"
     grep -q "teardown task-x1 complete" "$case_dir/stdout" \
       || fail "herdr-lock-ns-other-account: teardown did not report completion"
-    lock=$(FM_FAKE_ACCOUNT_UID="$fake_uid" FM_FAKE_NS_STAT="$own_ns:$fake_uid:700" \
-      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+    lock=$(JG_FAKE_ACCOUNT_UID="$fake_uid" JG_FAKE_NS_STAT="$own_ns:$fake_uid:700" \
+      JG_FAKE_HERDR_LOG="$case_dir/herdr.log" JG_FAKE_HERDR_CLOSED="$case_dir/closed" \
       PATH="$case_dir/fakebin:$PATH" \
       bash -c '. "$0/bin/backends/herdr.sh"; jg_backend_herdr_presentation_session_lock_path default' "$ROOT") \
       || fail "herdr-lock-ns-other-account: could not resolve the fixture account's lock path"
@@ -3207,10 +3207,10 @@ configure_secondmate_with_herdr_child() {  # <case-dir>
   cat > "$case_dir/fakebin/herdr" <<SH
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "\$*" >> "\${FM_FAKE_HERDR_LOG:?}"
+printf '%s\n' "\$*" >> "\${JG_FAKE_HERDR_LOG:?}"
 case "\${1:-} \${2:-}" in
   "session list")
-    if [ "\${FM_FAKE_HERDR_SESSION_LIST_GARBAGE:-0}" = 1 ]; then
+    if [ "\${JG_FAKE_HERDR_SESSION_LIST_GARBAGE:-0}" = 1 ]; then
       printf '%s\n' 'not-json'
     else
       printf '%s\n' '{"sessions":[{"name":"childsession","running":true,"socket_path":"$case_dir/child.sock"}]}'
@@ -3218,8 +3218,8 @@ case "\${1:-} \${2:-}" in
     ;;
   "workspace list") exit 1 ;;
   "pane get")
-    if [ -e "\${FM_FAKE_HERDR_CLOSED:?}" ]; then
-      if [ "\${FM_FAKE_HERDR_PRESENCE_UNKNOWN:-0}" = 1 ]; then
+    if [ -e "\${JG_FAKE_HERDR_CLOSED:?}" ]; then
+      if [ "\${JG_FAKE_HERDR_PRESENCE_UNKNOWN:-0}" = 1 ]; then
         printf '%s\n' 'not-json'
       else
         printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
@@ -3229,7 +3229,7 @@ case "\${1:-} \${2:-}" in
       printf '%s\n' '{"result":{"pane":{"pane_id":"wC:p1","tab_id":"wC:t1","workspace_id":"wC"}}}'
     fi
     ;;
-  "pane close") : > "\${FM_FAKE_HERDR_CLOSED:?}" ;;
+  "pane close") : > "\${JG_FAKE_HERDR_CLOSED:?}" ;;
 esac
 SH
   chmod +x "$case_dir/fakebin/herdr"
@@ -3250,8 +3250,8 @@ exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
   rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
-    FM_FAKE_HERDR_SESSION_LIST_GARBAGE=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
+    JG_FAKE_HERDR_SESSION_LIST_GARBAGE=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-child-preflight: teardown continued through an unresolvable child lock"
   [ -e "$case_dir/state/task-x1.meta" ] || fail "herdr-child-preflight: refusal erased the parent record"
@@ -3309,7 +3309,7 @@ SH
   release="$case_dir/lock-release"
   ROOT="$ROOT" LOCK="$lock" READY="$ready" RELEASE="$release" \
     HOME_STATE="$home/state" OWNER_PID="$$" bash -c '
-    export FM_STATE_OVERRIDE="$HOME_STATE"
+    export JG_STATE_OVERRIDE="$HOME_STATE"
     . "$ROOT/bin/jg-wake-lib.sh"
     jg_lock_try_acquire "$LOCK" || exit 1
     : > "$READY"
@@ -3366,7 +3366,7 @@ test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
   home="$case_dir/secondmate-home"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "herdr-child-unconfirmed-close: teardown erased records after an ambiguous close"
   [ -e "$closed" ] || fail "herdr-child-unconfirmed-close: fixture did not attempt the child close"
@@ -3411,20 +3411,20 @@ configure_nested_secondmate_with_herdr_grandchild() {  # <case-dir>
   cat > "$case_dir/fakebin/herdr" <<SH
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "\$*" >> "\${FM_FAKE_HERDR_LOG:?}"
+printf '%s\n' "\$*" >> "\${JG_FAKE_HERDR_LOG:?}"
 case "\${1:-} \${2:-}" in
   "session list")
     printf '%s\n' '{"sessions":[{"name":"grandchildsession","running":true,"socket_path":"$case_dir/grandchild.sock"}]}'
     ;;
   "workspace list") exit 1 ;;
   "pane get")
-    if [ -e "\${FM_FAKE_HERDR_CLOSED:?}" ]; then
+    if [ -e "\${JG_FAKE_HERDR_CLOSED:?}" ]; then
       printf '%s\n' 'not-json'
     else
       printf '%s\n' '{"result":{"pane":{"pane_id":"wG:p1","tab_id":"wG:t1","workspace_id":"wG"}}}'
     fi
     ;;
-  "pane close") : > "\${FM_FAKE_HERDR_CLOSED:?}" ;;
+  "pane close") : > "\${JG_FAKE_HERDR_CLOSED:?}" ;;
 esac
 SH
   chmod +x "$case_dir/fakebin/herdr"
@@ -3438,7 +3438,7 @@ test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconf
   home="$case_dir/secondmate-home"; nested_home="$home/nested-home"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
   rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-grandchild-unconfirmed-close: teardown erased records after an ambiguous grandchild close"
@@ -3474,12 +3474,12 @@ configure_herdr_projection_teardown_case() {  # <case-dir>
   cat > "$case_dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
+printf '%s\n' "$*" >> "${JG_FAKE_HERDR_LOG:?}"
 case "${1:-} ${2:-}" in
   "workspace list")
-    if [ -e "${FM_FAKE_HERDR_RESTORED:?}" ]; then
+    if [ -e "${JG_FAKE_HERDR_RESTORED:?}" ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
-    elif [ -e "${FM_FAKE_HERDR_CLOSED:?}" ]; then
+    elif [ -e "${JG_FAKE_HERDR_CLOSED:?}" ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":false},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":true}]}}'
     else
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
@@ -3499,14 +3499,14 @@ case "${1:-} ${2:-}" in
     printf '%s\n' '{"sessions":[{"name":"fmtest","running":true,"socket_path":"/tmp/fmtest.sock"}]}'
     ;;
   "pane close")
-    if [ "${FM_FAKE_HERDR_CLOSE_FAIL:-0}" = 1 ]; then
+    if [ "${JG_FAKE_HERDR_CLOSE_FAIL:-0}" = 1 ]; then
       exit 1
     fi
-    : > "${FM_FAKE_HERDR_CLOSED:?}"
+    : > "${JG_FAKE_HERDR_CLOSED:?}"
     ;;
   "pane get")
-    if [ -e "${FM_FAKE_HERDR_CLOSED:?}" ]; then
-      if [ "${FM_FAKE_HERDR_PRESENCE_UNKNOWN:-0}" = 1 ]; then
+    if [ -e "${JG_FAKE_HERDR_CLOSED:?}" ]; then
+      if [ "${JG_FAKE_HERDR_PRESENCE_UNKNOWN:-0}" = 1 ]; then
         printf '%s\n' '{"error":{"code":"internal"}}' >&2
         exit 1
       fi
@@ -3519,10 +3519,10 @@ case "${1:-} ${2:-}" in
     printf '%s\n' '{"result":{"tab":{"tab_id":"w2:t2","workspace_id":"w2"}}}'
     ;;
   "tab focus")
-    if [ "${FM_FAKE_HERDR_RESTORE_FAIL:-0}" = 1 ]; then
+    if [ "${JG_FAKE_HERDR_RESTORE_FAIL:-0}" = 1 ]; then
       exit 1
     fi
-    : > "${FM_FAKE_HERDR_RESTORED:?}"
+    : > "${JG_FAKE_HERDR_RESTORED:?}"
     printf '%s\n' '{"result":{"tab":{"tab_id":"w2:t2","workspace_id":"w2","focused":true}}}'
     ;;
   "agent get")
@@ -3544,12 +3544,12 @@ test_herdr_projection_teardown_retires_journal_only_after_confirmed_close() {
   # that pane before the adapter gets a chance to preserve the original focus.
   cat > "$case_dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
-[ "${1:-}" != return ] || : > "${FM_FAKE_HERDR_CLOSED:?}"
+[ "${1:-}" != return ] || : > "${JG_FAKE_HERDR_CLOSED:?}"
 exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_RESTORED="$restored" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "herdr-projection-confirmed-close: forced teardown failed"
   [ ! -e "$case_dir/state/task-x1.herdr-presentation" ] \
@@ -3568,12 +3568,12 @@ test_herdr_projection_teardown_retains_journal_when_close_unconfirmed() {
   configure_herdr_projection_teardown_case "$case_dir"
   seed_backlog_in_flight "$case_dir"
   mkdir -p "$case_dir/scratch/proof"
-  FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$case_dir/scratch/proof" >/dev/null \
+  JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$case_dir/scratch/proof" >/dev/null \
     || fail "scratch registration failed"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
 
   local rc=0
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" FM_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_RESTORED="$restored" JG_FAKE_HERDR_PRESENCE_UNKNOWN=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "herdr-projection-unconfirmed-close: teardown reported success after an unknown post-close presence read"
@@ -3601,8 +3601,8 @@ test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
   configure_herdr_projection_teardown_case "$case_dir"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
-    FM_FAKE_HERDR_RESTORE_FAIL=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_RESTORED="$restored" \
+    JG_FAKE_HERDR_RESTORE_FAIL=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "herdr-projection-restore-failure: a confirmed close with a failed focus restore blocked teardown"
   [ -e "$closed" ] \
@@ -3640,7 +3640,7 @@ test_teardown_retires_task_watcher_markers_and_orphan_journal() {
   printf '%s\n' 'version=1' 'task_id=task-y2' 'projection_id=ZyXwVuTsRqPoNmLkJiHgFe' \
     > "$case_dir/state/task-y2.herdr-presentation"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_RESTORED="$restored" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retire-watcher-markers: teardown failed: $(cat "$case_dir/stderr")"
   for marker in .seen-task-x1_status .seen-task-x1_turn-ended .hb-surfaced-task-x1 task-x1.herdr-presentation; do
@@ -3668,7 +3668,7 @@ test_teardown_retains_journal_bound_to_another_pane() {
     'workspace_label=└ task-x1 · p:AbCdEfGhIjKlMnOpQrStUv' 'task_label=jg-task-x1' \
     > "$case_dir/state/task-x1.herdr-presentation"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_RESTORED="$restored" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-drifted-journal: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
@@ -3702,14 +3702,14 @@ configure_herdr_v1_orphan_workspace_case() {  # <case-dir>
   cat > "$case_dir/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf '%s\n' "$*" >> "${FM_FAKE_HERDR_LOG:?}"
+printf '%s\n' "$*" >> "${JG_FAKE_HERDR_LOG:?}"
 case "${1:-} ${2:-}" in
   "workspace list")
-    if [ "${FM_FAKE_HERDR_WS_MALFORMED:-0}" = 1 ]; then
+    if [ "${JG_FAKE_HERDR_WS_MALFORMED:-0}" = 1 ]; then
       # A non-object entry before a live token-bearing workspace: the token query
       # is ambiguous, so teardown must treat it as unknown and keep the journal.
       printf '%s\n' '{"result":{"workspaces":[42,{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false}]}}'
-    elif [ "${FM_FAKE_HERDR_WS_COLLAPSED:-0}" = 1 ]; then
+    elif [ "${JG_FAKE_HERDR_WS_COLLAPSED:-0}" = 1 ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true}]}}'
     else
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true}]}}'
@@ -3722,7 +3722,7 @@ case "${1:-} ${2:-}" in
     printf '%s\n' '{"sessions":[{"name":"fmtest","running":true,"socket_path":"/tmp/fmtest.sock"}]}'
     ;;
   "pane close")
-    : > "${FM_FAKE_HERDR_CLOSED:?}"
+    : > "${JG_FAKE_HERDR_CLOSED:?}"
     ;;
   "pane get")
     printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
@@ -3744,7 +3744,7 @@ test_teardown_retires_v1_journal_when_projected_workspace_gone() {
   configure_herdr_v1_orphan_workspace_case "$case_dir"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_WS_COLLAPSED=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_WS_COLLAPSED=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retire-v1-journal-workspace-gone: teardown failed: $(cat "$case_dir/stderr")"
   assert_absent "$case_dir/state/task-x1.herdr-presentation" \
@@ -3763,7 +3763,7 @@ test_teardown_retains_v1_journal_when_projected_workspace_present() {
   configure_herdr_v1_orphan_workspace_case "$case_dir"
   log="$case_dir/herdr.log"; closed="$case_dir/closed"; : > "$log"
 
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-v1-journal-workspace-present: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
@@ -3786,7 +3786,7 @@ test_teardown_retains_v1_journal_when_workspace_query_ambiguous() {
 
   # A malformed workspace-list entry makes the token query ambiguous: teardown
   # cannot prove the token workspace gone, so it must keep the journal.
-  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_WS_MALFORMED=1 \
+  JG_FAKE_HERDR_LOG="$log" JG_FAKE_HERDR_CLOSED="$closed" JG_FAKE_HERDR_WS_MALFORMED=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retain-v1-journal-workspace-ambiguous: teardown failed: $(cat "$case_dir/stderr")"
   assert_present "$case_dir/state/task-x1.herdr-presentation" \
@@ -3892,7 +3892,7 @@ test_registered_scratch_is_reaped_after_launching_session_is_gone() {
   printf 'keep\n' > "$sibling/file"
   printf 'evidence\n' > "$case_dir/data/task-x1/report.md"
 
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-scratch.sh" register task-x1 "$scratch" > /dev/null \
     || fail "registered-scratch-reap: register refused a plain scratch directory"
   # The launching session is gone: a detached proof process outlives the
@@ -3939,11 +3939,11 @@ test_registered_scratch_cleanup_paths() {
       case "$failure" in
         list-*)
           mkdir -p "$case_dir/another-proof"
-          FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
+          JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" \
             "$ROOT/bin/jg-scratch.sh" register "$task" "$case_dir/another-proof" >/dev/null || fail "sibling registration failed"
           ;;
       esac
-      FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
+      JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" \
         "$ROOT/bin/jg-scratch.sh" register "$task" "$scratch" >/dev/null \
         || fail "scratch-$route-$failure: registration failed"
       pid=
@@ -3958,9 +3958,9 @@ test_registered_scratch_cleanup_paths() {
         cat > "$case_dir/fakebin/rm" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
-  [ "$arg" != "$FM_BLOCKED_SCRATCH" ] || exit 1
+  [ "$arg" != "$JG_BLOCKED_SCRATCH" ] || exit 1
 done
-exec "$FM_REAL_RM" "$@"
+exec "$JG_REAL_RM" "$@"
 SH
         chmod +x "$case_dir/fakebin/rm"
       fi
@@ -3968,10 +3968,10 @@ SH
         cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 count=0
-[ ! -f "$FM_SCRATCH_SCAN_COUNT" ] || count=$(cat "$FM_SCRATCH_SCAN_COUNT")
+[ ! -f "$JG_SCRATCH_SCAN_COUNT" ] || count=$(cat "$JG_SCRATCH_SCAN_COUNT")
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_SCRATCH_SCAN_COUNT"
-[ "$count" -lt "$FM_SCRATCH_SCAN_LIMIT" ]
+printf '%s\n' "$count" > "$JG_SCRATCH_SCAN_COUNT"
+[ "$count" -lt "$JG_SCRATCH_SCAN_LIMIT" ]
 SH
         chmod +x "$case_dir/fakebin/lsof"
       fi
@@ -3985,9 +3985,9 @@ SH
       test_path=$PATH
       [ "$failure" != no-lsof ] || test_path=$(make_path_without_lsof "$case_dir")
       rc=0
-      FM_BLOCKED_SCRATCH="$scratch" FM_REAL_RM="$(command -v rm)" \
-        FM_SCRATCH_SCAN_COUNT="$case_dir/scan-count" FM_SCRATCH_SCAN_LIMIT="$scan_limit" \
-        FM_TEARDOWN_TEST_PATH="$test_path" \
+      JG_BLOCKED_SCRATCH="$scratch" JG_REAL_RM="$(command -v rm)" \
+        JG_SCRATCH_SCAN_COUNT="$case_dir/scan-count" JG_SCRATCH_SCAN_LIMIT="$scan_limit" \
+        JG_TEARDOWN_TEST_PATH="$test_path" \
         run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
       case "$failure" in
         list-search) chmod 700 "$scratch" ;;
@@ -4069,7 +4069,7 @@ test_retained_task_data_processes_are_reaped() {
       test_path=$PATH
       [ "$failure" != no-lsof ] || test_path=$(make_path_without_lsof "$case_dir")
       rc=0
-      FM_TEARDOWN_TEST_PATH="$test_path" run_teardown "$case_dir" --force \
+      JG_TEARDOWN_TEST_PATH="$test_path" run_teardown "$case_dir" --force \
         > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
       if [ "$failure" = no-lsof ]; then
         kill -0 "$pid" 2>/dev/null || fail "retained-data: unverified process was killed"
@@ -4106,7 +4106,7 @@ test_hard_interruption_preserves_scratch_ownership_on_replay() {
   [ "$location" != data ] || scratch="$case_dir/data/task-x1/proof"
   mkdir -p "$scratch"
   if [ "$location" = scratch ]; then
-    FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$scratch" >/dev/null \
+    JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$scratch" >/dev/null \
       || fail "hard-interruption: scratch registration failed"
   fi
   setsid bash -c "cd \"\$1\"; exec sleep 309" _ "$scratch" &
@@ -4114,14 +4114,14 @@ test_hard_interruption_preserves_scratch_ownership_on_replay() {
   sleep 0.5
   cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
-kill -KILL "$FM_TEARDOWN_KILL_PID"
+kill -KILL "$JG_TEARDOWN_KILL_PID"
 exit 1
 SH
   chmod +x "$case_dir/fakebin/lsof"
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
-    FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
+    JG_DATA_OVERRIDE="$case_dir/data" JG_CONFIG_OVERRIDE="$case_dir/config" \
     PATH="$case_dir/fakebin:$PATH" \
-    bash -c 'export FM_TEARDOWN_KILL_PID=$$; exec "$@"' _ "$TEARDOWN" task-x1 --force \
+    bash -c 'export JG_TEARDOWN_KILL_PID=$$; exec "$@"' _ "$TEARDOWN" task-x1 --force \
     > "$case_dir/stdout" 2> "$case_dir/stderr" &
   cleanup_pid=$!
   rc=0
@@ -4179,7 +4179,7 @@ test_scratch_registration_excludes_retained_material() {
   ln -s "$data" "$case_dir/evidence-alias"
   for dir in "$home" "$home/sub" "$state" "$data" "$data/task-x1/proof" \
       "$case_dir" "$ROOT" "$ROOT/bin" "$case_dir/evidence-alias/task-x1/proof"; do
-    if FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
+    if JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" \
         "$ROOT/bin/jg-scratch.sh" register task-x1 "$dir" >/dev/null 2>&1; then
       fail "protected-material: registered $dir"
     fi
@@ -4187,7 +4187,7 @@ test_scratch_registration_excludes_retained_material() {
   assert_absent "$state/task-x1.scratch" "protected-material: refusals created registry"
   printf '%s\n' "$data/task-x1/proof" "$case_dir/scratch/proof" > "$state/task-x1.scratch"
   rc=0
-  FM_HOME="$home" FM_DATA_OVERRIDE="$data" \
+  JG_HOME="$home" JG_DATA_OVERRIDE="$data" \
     run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "protected-material: legacy registry blocked cleanup: $(cat "$case_dir/stderr")"
   assert_present "$data/task-x1/proof/file" "protected-material: retained evidence was reaped"
@@ -4202,7 +4202,7 @@ test_registered_scratch_survives_a_refused_teardown() {
   wt_commit "$case_dir" "unpushed work"
   scratch="$case_dir/scratch/proof-run"
   mkdir -p "$scratch"
-  FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/jg-scratch.sh" register task-x1 "$scratch" > /dev/null \
     || fail "registered-scratch-refused: register refused a plain scratch directory"
 
@@ -4223,7 +4223,7 @@ test_scratch_register_and_reap_refuse_unsafe_paths() {
   mkdir -p "$case_dir/scratch/real" "$case_dir/home-like"
   ln -s "$case_dir/scratch/real" "$case_dir/scratch/link"
   for bad in "relative/dir" "$case_dir/scratch/*" "$case_dir/scratch/link" "$case_dir/scratch/real/../real" "$HOME" "/" "/tmp/does-not-exist-$$"; do
-    if FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$case_dir/state" \
+    if JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="$case_dir/state" \
         "$ROOT/bin/jg-scratch.sh" register task-x1 "$bad" > /dev/null 2>&1; then
       fail "scratch-unsafe-paths: register accepted $bad"
     fi
@@ -4276,7 +4276,7 @@ db.execute("INSERT INTO agent_invocations VALUES ('i2', '01RUN', 'review', 'cold
 db.commit()
 PY
   (
-    export NM_HOME="$case_dir/nm" FM_FAKE_AXI_OVERVIEW="repo: $case_dir/project"
+    export NM_HOME="$case_dir/nm" JG_FAKE_AXI_OVERVIEW="repo: $case_dir/project"
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   ) || rc=$?
 
@@ -4337,8 +4337,8 @@ test_parked_own_run_is_aborted_before_teardown() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   local rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-abort: teardown should still succeed"
@@ -4363,9 +4363,9 @@ test_parked_own_run_concludes_on_passed_with_override_after_abort() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   local rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
-  FM_FAKE_AXI_STATUS_AFTER_ABORT='run:
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS_AFTER_ABORT='run:
   id: "01RUN"
   outcome: passed-with-override
 ci_override_reason: "live checks not all passed: Lint (fail)"' \
@@ -4388,9 +4388,9 @@ test_parked_own_run_concludes_on_passed_with_skips_after_abort() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   local rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
-  FM_FAKE_AXI_STATUS_AFTER_ABORT='run:
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS_AFTER_ABORT='run:
   id: "01RUN"
   outcome: passed-with-skips
 automatic_skips: "publication skipped: no-mistakes.yaml pr.enabled=false"' \
@@ -4421,15 +4421,15 @@ test_parked_run_advanced_past_unfetched_head_is_still_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-pipeline-advanced-unfetched"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/other-task aaaaaaa 2026-09-03 22:10)
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 $(ledger_row completed fm/third-task bbbbbbb 2026-09-01 11:00)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-pipeline-advanced-unfetched: teardown should still succeed"
@@ -4450,13 +4450,13 @@ test_parked_run_with_mismatched_ledger_head_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-mismatched-ledger-head"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 deadbee 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-mismatched-ledger-head: teardown should still succeed"
@@ -4475,13 +4475,13 @@ test_parked_run_with_malformed_ledger_row_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-malformed-ledger-row"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 running fm/task-x1 $advanced_short
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-malformed-ledger-row: teardown should still succeed"
@@ -4500,14 +4500,14 @@ test_parked_run_with_impossible_ledger_date_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-impossible-ledger-date"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-02-31 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-02-28 06:36)
 EOF
 )" \
-  FM_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-impossible-ledger-date: teardown should still succeed"
@@ -4530,14 +4530,14 @@ test_terminal_status_with_gate_never_queries_or_aborts_ledger_fallback() {
   terminal_status=${terminal_status/status: awaiting_approval/status: completed}
 
   rc=0
-  FM_FAKE_AXI_STATUS="$terminal_status" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$terminal_status" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-terminal-status-gate: teardown should still succeed"
@@ -4569,10 +4569,10 @@ test_parked_run_advanced_head_locally_fetched_is_still_aborted() {
     || fail "parked-run-advanced-fetched: fixture broke - the pipeline head never reached the task copy"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="" \
-  FM_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="" \
+  JG_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-advanced-fetched: teardown should still succeed"
@@ -4595,14 +4595,14 @@ test_parked_advanced_run_without_anchor_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-advanced-no-anchor"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/other-task aaaaaaa 2026-09-03 22:10)
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 $(ledger_row completed fm/third-task bbbbbbb 2026-09-01 11:00)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-advanced-no-anchor: teardown should still succeed"
@@ -4624,13 +4624,13 @@ test_parked_advanced_run_ancestor_anchor_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-advanced-ancestor-anchor"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$parent_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-advanced-ancestor-anchor: teardown should still succeed"
@@ -4653,13 +4653,13 @@ test_parked_terminal_unfetched_row_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-terminal-unfetched"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row failed fm/task-x1 "$advanced_short" 2026-09-03 08:20)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-terminal-unfetched: teardown should still succeed"
@@ -4686,14 +4686,14 @@ test_parked_run_terminal_newest_row_at_own_head_is_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-terminal-newest-at-head"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/other-task aaaaaaa 2026-09-03 22:10)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-03 06:36)
 EOF
 )" \
-  FM_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_RUNS_LOG="$case_dir/nm-runs.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-terminal-newest-at-head: teardown should still succeed"
@@ -4733,13 +4733,13 @@ test_parked_run_behind_diverged_newer_row_is_never_aborted() {
     && fail "parked-run-behind-newer-row: fixture broke - the newer row is a descendant, not diverged"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$diverged_short" 2026-09-03 09:00)
 $(ledger_row failed fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-behind-newer-row: teardown should still succeed"
@@ -4761,15 +4761,15 @@ test_parked_advanced_run_ambiguous_rows_are_never_aborted() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-advanced-ambiguous"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 08:30)
 $(ledger_row failed fm/other-task ccccccc 2026-09-03 08:10)
 $(ledger_row running fm/task-x1 ddddddd 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-advanced-ambiguous: teardown should still succeed"
@@ -4791,13 +4791,13 @@ test_ledger_proven_continuation_never_aborts_active_run() {
   assert_head_absent_from_worktree "$case_dir/wt" "$advanced_short" "parked-run-ledger-active"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(running_axi_status_toon fm/task-x1 "$advanced_short")" \
-  FM_FAKE_NM_RUNS_LIST="$(cat <<EOF
+  JG_FAKE_AXI_STATUS="$(running_axi_status_toon fm/task-x1 "$advanced_short")" \
+  JG_FAKE_NM_RUNS_LIST="$(cat <<EOF
 $(ledger_row running fm/task-x1 "$advanced_short" 2026-09-03 07:55)
 $(ledger_row failed fm/task-x1 "$anchor_short" 2026-09-02 06:36)
 EOF
 )" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-ledger-active: teardown should still succeed"
@@ -4814,9 +4814,9 @@ test_mismatched_run_after_abort_refuses_unconfirmed() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head" 01RUN)" \
-  FM_FAKE_AXI_STATUS_AFTER_ABORT="$(parked_axi_status_toon fm/task-x1 "$head" 02RUN)" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head" 01RUN)" \
+  JG_FAKE_AXI_STATUS_AFTER_ABORT="$(parked_axi_status_toon fm/task-x1 "$head" 02RUN)" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "parked-run-replaced: a different run does not confirm the targeted abort"
@@ -4834,9 +4834,9 @@ test_empty_status_after_abort_refuses_unconfirmed() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
-  FM_FAKE_NM_EMPTY_AFTER_ABORT=1 \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_EMPTY_AFTER_ABORT=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "parked-run-empty-confirmation: empty status should refuse"
@@ -4852,9 +4852,9 @@ test_not_found_status_after_abort_confirms_completion() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
-  FM_FAKE_NM_NOT_FOUND_AFTER_ABORT=1 \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_NOT_FOUND_AFTER_ABORT=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-not-found-confirmation: explicit not-found should confirm completion"
@@ -4869,7 +4869,7 @@ test_parked_own_run_refuses_when_abort_is_unconfirmed() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
   seed_backlog_in_flight "$case_dir"
   mkdir -p "$case_dir/scratch/proof"
-  FM_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$case_dir/scratch/proof" >/dev/null \
+  JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-scratch.sh" register task-x1 "$case_dir/scratch/proof" >/dev/null \
     || fail "scratch registration failed"
   ( cd "$case_dir/wt" && exec sleep 300 ) &
   pid=$!
@@ -4882,9 +4882,9 @@ EOF
   chmod +x "$case_dir/fakebin/treehouse"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
-  FM_FAKE_NM_ABORT_NOOP=1 \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_NM_ABORT_NOOP=1 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "parked-run-abort-unconfirmed: teardown should refuse"
@@ -4913,8 +4913,8 @@ test_another_branchs_parked_run_is_never_touched() {
   # A parked run reported for a DIFFERENT branch - e.g. another crew's task
   # still validating on the shared gate - must never be aborted by this task's
   # teardown.
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/some-other-task deadbeef)" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/some-other-task deadbeef)" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-not-ours: teardown should still succeed"
@@ -4933,8 +4933,8 @@ test_own_autonomous_run_is_left_alone() {
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(running_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  JG_FAKE_AXI_STATUS="$(running_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "autonomous-run-left-alone: teardown should still succeed"
@@ -5025,7 +5025,7 @@ EOF
   chmod +x "$case_dir/fakebin/tmux"
 
   rc=0
-  FM_TEARDOWN_TEST_PATH="$path_without_lsof" \
+  JG_TEARDOWN_TEST_PATH="$path_without_lsof" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "lsof-absent-process-group-reap: teardown should succeed"
@@ -5085,12 +5085,12 @@ if [ "\$count" -le 3 ]; then printf 'p%s\nfcwd\nn%s\n' '$pid' '$case_dir/wt'; fi
 EOF
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_REUSED_PID:-}" ] \
+if [ "${1:-}" = -p ] && [ "${2:-}" = "${JG_FAKE_REUSED_PID:-}" ] \
    && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
   count=0
-  [ ! -f "$FM_FAKE_PS_COUNT" ] || count=$(cat "$FM_FAKE_PS_COUNT")
+  [ ! -f "$JG_FAKE_PS_COUNT" ] || count=$(cat "$JG_FAKE_PS_COUNT")
   count=$((count + 1))
-  printf '%s\n' "$count" > "$FM_FAKE_PS_COUNT"
+  printf '%s\n' "$count" > "$JG_FAKE_PS_COUNT"
   if [ "$count" -le 2 ]; then printf 'Tue Aug  4 10:00:00 2026\n'
   else printf 'Tue Aug  4 10:00:01 2026\n'; fi
   exit 0
@@ -5100,8 +5100,8 @@ SH
   chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
 
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
-  FM_FAKE_REUSED_PID="$pid" FM_FAKE_PS_COUNT="$case_dir/ps-count" \
+  JG_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
+  JG_FAKE_REUSED_PID="$pid" JG_FAKE_PS_COUNT="$case_dir/ps-count" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "reused-pid-identity: teardown should skip the replacement process"
@@ -5132,10 +5132,10 @@ test_exec_changed_process_is_still_reaped() {
   sleep 0.2
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_EXEC_PID:-}" ] \
+if [ "${1:-}" = -p ] && [ "${2:-}" = "${JG_FAKE_EXEC_PID:-}" ] \
    && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
   out=$("$REAL_PS_FOR_TEST" "$@") || exit $?
-  [ -e "$FM_FAKE_EXEC_MARKER" ] || : > "$FM_FAKE_EXEC_MARKER"
+  [ -e "$JG_FAKE_EXEC_MARKER" ] || : > "$JG_FAKE_EXEC_MARKER"
   printf '%s\n' "$out"
   exit 0
 fi
@@ -5144,13 +5144,13 @@ SH
   cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 count=0
-[ ! -f "$FM_FAKE_LSOF_COUNT" ] || count=$(cat "$FM_FAKE_LSOF_COUNT")
+[ ! -f "$JG_FAKE_LSOF_COUNT" ] || count=$(cat "$JG_FAKE_LSOF_COUNT")
 count=$((count + 1))
-printf '%s\n' "$count" > "$FM_FAKE_LSOF_COUNT"
+printf '%s\n' "$count" > "$JG_FAKE_LSOF_COUNT"
 if [ "$count" -eq 2 ]; then
   i=0
   while [ "$i" -lt 100 ]; do
-    [ ! -e "$FM_FAKE_EXEC_DONE" ] || break
+    [ ! -e "$JG_FAKE_EXEC_DONE" ] || break
     sleep 0.01
     i=$((i + 1))
   done
@@ -5160,9 +5160,9 @@ SH
   chmod +x "$case_dir/fakebin/ps" "$case_dir/fakebin/lsof"
 
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
-  FM_FAKE_EXEC_PID="$pid" FM_FAKE_EXEC_MARKER="$marker" \
-  FM_FAKE_EXEC_DONE="$done_flag" FM_FAKE_LSOF_COUNT="$case_dir/lsof-count" \
+  JG_PROC_ROOT_OVERRIDE="$case_dir/no-proc" \
+  JG_FAKE_EXEC_PID="$pid" JG_FAKE_EXEC_MARKER="$marker" \
+  JG_FAKE_EXEC_DONE="$done_flag" JG_FAKE_LSOF_COUNT="$case_dir/lsof-count" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   if kill -0 "$pid" 2>/dev/null; then
@@ -5229,7 +5229,7 @@ printf 'p%s\nfcwd\nn%s\n' '$fake_pid' '$wt_path'
 EOF
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_PERSISTENT_PID:-}" ] \
+if [ "${1:-}" = -p ] && [ "${2:-}" = "${JG_FAKE_PERSISTENT_PID:-}" ] \
    && [ "${3:-}" = -o ] && [ "${4:-}" = lstart= ]; then
   printf 'Tue Aug  4 10:00:00 2026\n'
   exit 0
@@ -5239,7 +5239,7 @@ SH
   chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps"
 
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_PERSISTENT_PID="$fake_pid" \
+  JG_PROC_ROOT_OVERRIDE="$case_dir/no-proc" JG_FAKE_PERSISTENT_PID="$fake_pid" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "persistent-reap-refusal: teardown should refuse"
@@ -5268,7 +5268,7 @@ fi
 EOF
   cat > "$case_dir/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = -p ] && [ "${2:-}" = "${FM_FAKE_EXITED_PID:-}" ]; then
+if [ "${1:-}" = -p ] && [ "${2:-}" = "${JG_FAKE_EXITED_PID:-}" ]; then
   exit 1
 fi
 exec "$REAL_PS_FOR_TEST" "$@"
@@ -5280,7 +5280,7 @@ EOF
   chmod +x "$case_dir/fakebin/lsof" "$case_dir/fakebin/ps" "$case_dir/fakebin/treehouse"
 
   rc=0
-  FM_PROC_ROOT_OVERRIDE="$case_dir/no-proc" FM_FAKE_EXITED_PID="$fake_pid" \
+  JG_PROC_ROOT_OVERRIDE="$case_dir/no-proc" JG_FAKE_EXITED_PID="$fake_pid" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "identity-exit-convergence: teardown should succeed"
@@ -5318,8 +5318,8 @@ EOF
   chmod +x "$case_dir/fakebin/treehouse"
 
   rc=0
-  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
-  FM_FAKE_NM_ABORT_LOG="$abort_log" \
+  JG_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  JG_FAKE_NM_ABORT_LOG="$abort_log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "abort-then-reap-then-remove-order: teardown should still succeed"
   kill -0 "$pid" 2>/dev/null && { kill -KILL "$pid" 2>/dev/null || true; }
@@ -5364,10 +5364,10 @@ SH
 run_copied_teardown() {  # <case-dir> [args...]
   local case_dir=$1
   shift
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
-  FM_DATA_OVERRIDE="$case_dir/data" \
-  FM_CONFIG_OVERRIDE="$case_dir/config" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
+  JG_DATA_OVERRIDE="$case_dir/data" \
+  JG_CONFIG_OVERRIDE="$case_dir/config" \
   PATH="$case_dir/fakebin:$PATH" \
     "$case_dir/test-root/bin/jg-teardown.sh" task-x1 "$@"
 }
@@ -5495,10 +5495,10 @@ test_retained_sources_still_reach_the_ordinary_refusal() {
   case_dir=$(make_case retained-sources)
   prepare_teardown_source_copy "$case_dir"
   rc=0
-  FM_ROOT_OVERRIDE="$ROOT" \
-  FM_STATE_OVERRIDE="$case_dir/state" \
-  FM_DATA_OVERRIDE="$case_dir/data" \
-  FM_CONFIG_OVERRIDE="$case_dir/config" \
+  JG_ROOT_OVERRIDE="$ROOT" \
+  JG_STATE_OVERRIDE="$case_dir/state" \
+  JG_DATA_OVERRIDE="$case_dir/data" \
+  JG_CONFIG_OVERRIDE="$case_dir/config" \
   PATH="$case_dir/fakebin:$PATH" \
     "$case_dir/test-root/bin/jg-teardown.sh" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -eq 2 ] || fail "retained-sources: a present source tree should still reject a request with no task id (rc=$rc)"

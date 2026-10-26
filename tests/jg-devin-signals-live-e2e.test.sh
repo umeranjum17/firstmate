@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Credentialed Devin worker guard. Opt in with FM_DEVIN_SIGNALS_LIVE=1.
-# FM_DEVIN_MODEL chooses an account-listed model (default swe-2-medium).
+# Credentialed Devin worker guard. Opt in with JG_DEVIN_SIGNALS_LIVE=1.
+# JG_DEVIN_MODEL chooses an account-listed model (default swe-2-medium).
 # Runs the real jg-spawn launch command in a private tmux server; only worktree
 # allocation and initial endpoint delivery use fixtures. All later steering,
 # interrupt and exit operations use the real Firstmate control plane.
@@ -9,7 +9,7 @@
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
-jg_live_gate opt-in FM_DEVIN_SIGNALS_LIVE devin tmux jq
+jg_live_gate opt-in JG_DEVIN_SIGNALS_LIVE devin tmux jq
 DEVIN_BIN=$(command -v devin)
 REAL_TMUX=$(command -v tmux)
 VERSION=$(devin --version)
@@ -64,14 +64,14 @@ jq -n --arg cmd "cat >> '$LAB/events.jsonl'; printf '\n' >> '$LAB/events.jsonl'"
 jg_test_spawn_brief "$H" "$ID" "Runtime verification only: compute 12345 plus 67890 using your shell tool and write only the result into answer.txt, then commit answer.txt with git using a commit message you write yourself. Also run '$ROOT/bin/jg-harness.sh' and write its output to harness.txt. Do no other work and do not delegate. Later read and acknowledge Firstmate's instruction inbox when the doorbell arrives."
 fakebin=$(make_spawn_fakebin "$LAB/fake" claude)
 ln -s "$DEVIN_BIN" "$fakebin/devin"
-FM_FAKE_LAUNCH_LOG="$LAB/launch.sh" jg_test_run_spawn "$H" "$WT" "$fakebin" "$ID" "$PROJ" \
-  --scout --harness devin --model "${FM_DEVIN_MODEL:-swe-2-medium}" --effort high > "$LAB/spawn.log" 2>&1 \
+JG_FAKE_LAUNCH_LOG="$LAB/launch.sh" jg_test_run_spawn "$H" "$WT" "$fakebin" "$ID" "$PROJ" \
+  --scout --harness devin --model "${JG_DEVIN_MODEL:-swe-2-medium}" --effort high > "$LAB/spawn.log" 2>&1 \
   || fail "jg-spawn failed: $(cat "$LAB/spawn.log")"
 # Route every backend read/write to this guard's own socket only.
 printf '#!/bin/sh\nexec "%s" -S "%s" "$@"\n' "$REAL_TMUX" "$SOCKET" > "$LAB/bin/tmux"
 chmod +x "$LAB/bin/tmux"
-export PATH="$LAB/bin:$PATH" FM_HOME="$H"
-unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE
+export PATH="$LAB/bin:$PATH" JG_HOME="$H"
+unset JG_ROOT_OVERRIDE JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_CONFIG_OVERRIDE JG_PROJECTS_OVERRIDE
 TARGET="firstmate:jg-$ID"
 "$REAL_TMUX" -S "$SOCKET" new-session -d -s firstmate -n "jg-$ID" -x 120 -y 40 -c "$WT" \
   "HOME='$H/user-home' /bin/sh '$LAB/launch.sh'; exec /bin/bash --noprofile --norc" || fail 'could not start pane'

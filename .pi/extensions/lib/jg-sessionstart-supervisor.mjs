@@ -1,4 +1,8 @@
 import { spawn } from "node:child_process";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
 const [runner, ...args] = process.argv.slice(2);
 let runnerCode;
@@ -22,7 +26,7 @@ process.on("disconnect", () => {
 });
 
 const child = spawn(runner, args, {
-  env: { ...process.env, FM_SESSIONSTART_SUPERVISOR_PID: String(process.pid) },
+  env: { ...process.env, JG_SESSIONSTART_SUPERVISOR_PID: String(process.pid) },
   stdio: ["ignore", "pipe", "ignore"],
 });
 child.stdout.on("data", (chunk) => {

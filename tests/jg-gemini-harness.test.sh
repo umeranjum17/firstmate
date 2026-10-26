@@ -32,7 +32,7 @@ TMP_ROOT=$(jg_test_tmproot jg-gemini-harness)
 
 test_gemini_marker_outranks_inherited_claudecode() {
   local out fakebin base_path
-  base_path=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+  base_path=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
   fakebin=$(jg_fakebin "$TMP_ROOT/marker-ordering")
   jg_fake_blind_ancestry "$fakebin"
   # This is the exact hazard: gemini does not clear an inherited CLAUDECODE, so
@@ -137,10 +137,10 @@ const { spawnSync } = require('child_process');
 const env = { ...process.env };
 for (const k of ['GEMINI_CLI', 'CLAUDECODE', 'CURSOR_AGENT', 'CURSOR_INVOKED_AS',
                  'PI_CODING_AGENT', 'GROK_AGENT']) delete env[k];
-const r = spawnSync(process.env.FM_HARNESS_BIN, { env, encoding: 'utf8' });
+const r = spawnSync(process.env.JG_HARNESS_BIN, { env, encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 JS
-    out=$(FM_HARNESS_BIN="$HARNESS" node "$dir/gemini" 2>/dev/null | tr -d '\n')
+    out=$(JG_HARNESS_BIN="$HARNESS" node "$dir/gemini" 2>/dev/null | tr -d '\n')
     [ "$out" = gemini ] \
       || fail "where node reports comm=$comm, a gemini script path must detect gemini, got '$out'"
     pass "jg-harness.sh: this platform's node reports comm=$comm and ancestry reaches gemini"
@@ -154,16 +154,16 @@ const { spawnSync } = require('child_process');
 const env = { ...process.env };
 for (const k of ['GEMINI_CLI', 'CLAUDECODE', 'CURSOR_AGENT', 'CURSOR_INVOKED_AS',
                  'PI_CODING_AGENT', 'GROK_AGENT']) delete env[k];
-const r = spawnSync(process.env.FM_HARNESS_BIN, { env, encoding: 'utf8' });
+const r = spawnSync(process.env.JG_HARNESS_BIN, { env, encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 JS
-  out=$(FM_HARNESS_BIN="$HARNESS" node "$dir/gemini" 2>/dev/null | tr -d '\n')
+  out=$(JG_HARNESS_BIN="$HARNESS" node "$dir/gemini" 2>/dev/null | tr -d '\n')
   [ "$out" != gemini ] \
     || fail "node reports comm=$comm here, so ancestry must not be claiming gemini; got '$out'"
   # And the marker closes exactly that gap on the same process shape.
-  out=$(FM_HARNESS_BIN="$HARNESS" GEMINI_CLI=1 node -e '
+  out=$(JG_HARNESS_BIN="$HARNESS" GEMINI_CLI=1 node -e '
 const { spawnSync } = require("child_process");
-const r = spawnSync(process.env.FM_HARNESS_BIN, { encoding: "utf8" });
+const r = spawnSync(process.env.JG_HARNESS_BIN, { encoding: "utf8" });
 process.stdout.write(r.stdout || "");' 2>/dev/null | tr -d '\n')
   [ "$out" = gemini ] \
     || fail "GEMINI_CLI must identify a node-bundle gemini worker, got '$out'"

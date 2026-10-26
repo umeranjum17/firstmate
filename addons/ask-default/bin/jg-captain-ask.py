@@ -14,6 +14,10 @@ import re
 import subprocess
 import sys
 import time
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 
 def require(ok, message):
@@ -72,8 +76,8 @@ def main():
         target.write_text('#!/bin/sh\nexec python3 ' + shlex.quote(str(Path(__file__).resolve())) + ' "$@"\n')
         target.chmod(0o755)
         return
-    require(bool(os.environ.get('FM_HOME')), 'set FM_HOME to the home that owns the ask')
-    path = Path(os.environ['FM_HOME']) / 'data/captain-asks.tsv'
+    require(bool(os.environ.get('JG_HOME')), 'set JG_HOME to the home that owns the ask')
+    path = Path(os.environ['JG_HOME']) / 'data/captain-asks.tsv'
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(str(path) + '.lock', 'a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

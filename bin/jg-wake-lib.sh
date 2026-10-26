@@ -4,20 +4,20 @@
 # Shared durable wake queue and portable lock helpers.
 # docs/watcher-continuity.md owns the recovery-episode state contract.
 
-FM_WAKE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-FM_WAKE_DEFAULT_ROOT="$(cd "$FM_WAKE_LIB_DIR/.." && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_WAKE_DEFAULT_ROOT}}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-${STATE:-$FM_HOME/state}}"
-FM_WAKE_QUEUE="${FM_WAKE_QUEUE:-$STATE/.wake-queue}"
-FM_WAKE_QUEUE_LOCK="${FM_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
-FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
+JG_WAKE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+JG_WAKE_DEFAULT_ROOT="$(cd "$JG_WAKE_LIB_DIR/.." && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-${JG_ROOT:-$JG_WAKE_DEFAULT_ROOT}}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-${STATE:-$JG_HOME/state}}"
+JG_WAKE_QUEUE="${JG_WAKE_QUEUE:-$STATE/.wake-queue}"
+JG_WAKE_QUEUE_LOCK="${JG_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
+JG_LOCK_STALE_AFTER="${JG_LOCK_STALE_AFTER:-2}"
 # shellcheck source=bin/jg-path-lib.sh
-. "$FM_WAKE_LIB_DIR/jg-path-lib.sh"
+. "$JG_WAKE_LIB_DIR/jg-path-lib.sh"
 # Resolved once at source time: jg_pid_identity and jg_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
-_FM_UNAME=$(uname 2>/dev/null || echo unknown)
+_JG_UNAME=$(uname 2>/dev/null || echo unknown)
 mkdir -p "$STATE"
 
 hash_pane() {
@@ -30,7 +30,7 @@ hash_pane() {
 _jg_wake_require_classify() {
   command -v status_observed_signature >/dev/null 2>&1 && return 0
   # shellcheck source=bin/jg-classify-lib.sh
-  . "$FM_WAKE_LIB_DIR/jg-classify-lib.sh"
+  . "$JG_WAKE_LIB_DIR/jg-classify-lib.sh"
 }
 
 # Load the bounded-execution owner only for callers that use the presentation
@@ -38,7 +38,7 @@ _jg_wake_require_classify() {
 _jg_wake_require_timeout() {
   command -v jg_run_timed >/dev/null 2>&1 && return 0
   # shellcheck source=bin/jg-timeout-lib.sh
-  . "$FM_WAKE_LIB_DIR/jg-timeout-lib.sh"
+  . "$JG_WAKE_LIB_DIR/jg-timeout-lib.sh"
 }
 
 # Pass a variable name to capture this frame's pid without forking it in $().
@@ -77,7 +77,7 @@ jg_pid_identity() {
   case "$pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc}
   # Prefer a Linux-compatible /proc when present: stat field 22 (starttime, clock ticks since boot) is
   # immune to the wall-clock steps that re-render the ps lstart fallback's date
   # (observed as WSL2 btime drift) and would evict a live watcher; combining the
@@ -96,7 +96,7 @@ jg_pid_identity() {
     cmdline_hex=$(od -An -v -tx1 "$proc_root/$pid/cmdline" 2>/dev/null | tr -d '[:space:]') || return 1
     [ -n "$cmdline_hex" ] || return 1
     identity_key=proc-starttime
-    [ "$_FM_UNAME" != Linux ] || identity_key=linux-starttime
+    [ "$_JG_UNAME" != Linux ] || identity_key=linux-starttime
     printf '%s=%s cmdline-hex=%s\n' "$identity_key" "$starttime" "$cmdline_hex"
     return 0
   fi
@@ -114,7 +114,7 @@ jg_pid_identity() {
 }
 
 jg_path_mtime() {
-  if [ "$_FM_UNAME" = Darwin ]; then
+  if [ "$_JG_UNAME" = Darwin ]; then
     /usr/bin/stat -f %m "$1" 2>/dev/null
   else
     stat -c %Y "$1" 2>/dev/null
@@ -129,7 +129,7 @@ jg_path_age() {
 }
 
 jg_watcher_child_identity() {
-  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line identity
+  local pid=$1 proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc} stat_line identity
   local -a fields
   if [ -r "$proc_root/$pid/stat" ]; then
     read -r stat_line < "$proc_root/$pid/stat" 2>/dev/null || return 1
@@ -144,7 +144,7 @@ jg_watcher_child_identity() {
 }
 
 jg_watcher_process_zombie() {
-  local pid=$1 proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_line
+  local pid=$1 proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc} stat_line
   if [ -r "$proc_root/$pid/stat" ]; then
     stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
     case "${stat_line##*)}" in ' Z '*) return 0 ;; esac
@@ -197,8 +197,8 @@ jg_watcher_retire_child_identities() {
 jg_watcher_retire_recorded_children() {
   local lockdir=$1 records
   [ -s "$lockdir/children" ] || return 0
-  [ "$(cat "$lockdir/jg-home" 2>/dev/null)" = "$FM_HOME" ] || return 1
-  [ "$(cat "$lockdir/watcher-path" 2>/dev/null)" = "$FM_WAKE_LIB_DIR/jg-watch.sh" ] || return 1
+  [ "$(cat "$lockdir/jg-home" 2>/dev/null)" = "$JG_HOME" ] || return 1
+  [ "$(cat "$lockdir/watcher-path" 2>/dev/null)" = "$JG_WAKE_LIB_DIR/jg-watch.sh" ] || return 1
   [ -s "$lockdir/pid-identity" ] || return 1
   records=$(cat "$lockdir/children") || return 1
   jg_watcher_retire_child_identities "$records"
@@ -219,13 +219,13 @@ jg_watcher_progress_age() {
 # bounding staleness once the poll cadence reaches or exceeds it; growing the
 # default with the cadence while keeping the historical 300s floor for the
 # common short-poll case fixes that without a caller-specific constant.
-# Defaults to $FM_POLL (jg-watch.sh's own poll env var) when no argument is
+# Defaults to $JG_POLL (jg-watch.sh's own poll env var) when no argument is
 # given, so a caller with no independent notion of the poll cadence still
 # derives the same default jg-watch.sh itself would use.
 # docs/turnend-guard.md "Guard grace and the poll cadence" is the single owner
-# of the rationale; every FM_GUARD_GRACE default should derive from this.
+# of the rationale; every JG_GUARD_GRACE default should derive from this.
 jg_poll_derived_grace() {
-  local poll=${1:-${FM_POLL:-15}} margin=60 derived
+  local poll=${1:-${JG_POLL:-15}} margin=60 derived
   case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
   derived=$((poll + margin))
   [ "$derived" -ge 300 ] || derived=300
@@ -233,20 +233,20 @@ jg_poll_derived_grace() {
 }
 
 # jg_watcher_stall_bound [poll-seconds]
-# Hard bound on a live watcher holder's beacon age: FM_WATCHER_STALL_BOUND,
-# defaulting to 3x the watcher's stale grace (FM_WATCHER_STALE_GRACE, else
-# FM_GUARD_GRACE, else jg_poll_derived_grace). Under it a live holder with a
+# Hard bound on a live watcher holder's beacon age: JG_WATCHER_STALL_BOUND,
+# defaulting to 3x the watcher's stale grace (JG_WATCHER_STALE_GRACE, else
+# JG_GUARD_GRACE, else jg_poll_derived_grace). Under it a live holder with a
 # stale beacon is a slow cycle; at or past it bin/jg-watch.sh evicts that holder
 # and bin/jg-watch-arm.sh stops following it, so both read this one definition.
 jg_watcher_stall_bound() {
-  local poll=${1:-${FM_POLL:-15}} grace
-  grace=${FM_WATCHER_STALE_GRACE:-${FM_GUARD_GRACE:-$(jg_poll_derived_grace "$poll")}}
-  printf '%s\n' "${FM_WATCHER_STALL_BOUND:-$((grace * 3))}"
+  local poll=${1:-${JG_POLL:-15}} grace
+  grace=${JG_WATCHER_STALE_GRACE:-${JG_GUARD_GRACE:-$(jg_poll_derived_grace "$poll")}}
+  printf '%s\n' "${JG_WATCHER_STALL_BOUND:-$((grace * 3))}"
 }
 
 # Shared startup budget in seconds: platform startup allowance (10, or 30 on
 # MSYS) plus signal grace and one timeout plus rounding second per check file.
-# FM_ARM_CONFIRM_TIMEOUT replaces that scan allowance; a verified stalled live
+# JG_ARM_CONFIRM_TIMEOUT replaces that scan allowance; a verified stalled live
 # holder adds 15 seconds even with the override, so eviction can finish before
 # a caller declares failure. Adapter callers add their own transport margin.
 jg_watcher_confirmation_budget() {
@@ -255,13 +255,13 @@ jg_watcher_confirmation_budget() {
     msys*|mingw*|cygwin*) budget=30 ;;
     *) budget=10 ;;
   esac
-  if [ -n "${FM_ARM_CONFIRM_TIMEOUT:-}" ]; then
-    budget=$FM_ARM_CONFIRM_TIMEOUT
+  if [ -n "${JG_ARM_CONFIRM_TIMEOUT:-}" ]; then
+    budget=$JG_ARM_CONFIRM_TIMEOUT
   else
-    budget=$((budget + ${FM_SIGNAL_GRACE:-30}))
+    budget=$((budget + ${JG_SIGNAL_GRACE:-30}))
     for check in "$state"/*.check.sh; do
       [ -e "$check" ] || continue
-      budget=$((budget + ${FM_CHECK_TIMEOUT:-30} + 1))
+      budget=$((budget + ${JG_CHECK_TIMEOUT:-30} + 1))
     done
   fi
   pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
@@ -285,10 +285,10 @@ jg_watcher_lock_unheld() {
   [ -z "$pid" ]
 }
 
-FM_WATCHER_MATCHED_IDENTITY=
+JG_WATCHER_MATCHED_IDENTITY=
 jg_watcher_lock_matches_pid() {
-  local state=$1 watch_path=$2 pid=$3 home=${4:-$FM_HOME} lockdir lock_home lock_path lock_identity current_identity
-  FM_WATCHER_MATCHED_IDENTITY=
+  local state=$1 watch_path=$2 pid=$3 home=${4:-$JG_HOME} lockdir lock_home lock_path lock_identity current_identity
+  JG_WATCHER_MATCHED_IDENTITY=
   lockdir="$state/.watch.lock"
   lock_home=$(cat "$lockdir/jg-home" 2>/dev/null || true)
   lock_path=$(cat "$lockdir/watcher-path" 2>/dev/null || true)
@@ -298,27 +298,27 @@ jg_watcher_lock_matches_pid() {
   [ -n "$lock_identity" ] || return 1
   current_identity=$(jg_pid_identity "$pid") || return 1
   [ "$current_identity" = "$lock_identity" ] || return 1
-  FM_WATCHER_MATCHED_IDENTITY=$lock_identity
+  JG_WATCHER_MATCHED_IDENTITY=$lock_identity
 }
 
-FM_WATCHER_HEALTHY_PID=
-FM_WATCHER_HEALTHY_IDENTITY=
+JG_WATCHER_HEALTHY_PID=
+JG_WATCHER_HEALTHY_IDENTITY=
 jg_watcher_healthy() {
-  local state=$1 watch_path=$2 grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-$FM_HOME} lockdir beat pid identity age
-  FM_WATCHER_HEALTHY_PID=
-  FM_WATCHER_HEALTHY_IDENTITY=
+  local state=$1 watch_path=$2 grace=${3:-${JG_GUARD_GRACE:-300}} home=${4:-$JG_HOME} lockdir beat pid identity age
+  JG_WATCHER_HEALTHY_PID=
+  JG_WATCHER_HEALTHY_IDENTITY=
   lockdir="$state/.watch.lock"
   beat="$state/.last-watcher-beat"
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   jg_pid_alive "$pid" || return 1
   jg_watcher_lock_matches_pid "$state" "$watch_path" "$pid" "$home" || return 1
-  identity=$FM_WATCHER_MATCHED_IDENTITY
+  identity=$JG_WATCHER_MATCHED_IDENTITY
   age=$(jg_path_age "$beat")
   [ "$age" -lt "$grace" ] || return 1
   # shellcheck disable=SC2034 # Read by callers after jg_watcher_healthy returns.
-  FM_WATCHER_HEALTHY_PID=$pid
+  JG_WATCHER_HEALTHY_PID=$pid
   # shellcheck disable=SC2034 # Read by callers after jg_watcher_healthy returns.
-  FM_WATCHER_HEALTHY_IDENTITY=$identity
+  JG_WATCHER_HEALTHY_IDENTITY=$identity
   return 0
 }
 
@@ -348,15 +348,15 @@ jg_watcher_healthy() {
 #   persistent  every other harness (codex foreground checkpoint, opencode/grok
 #               background arm, tmux, unknown): the watcher runs as a tracked live
 #               process, so a live identity-matched pid is the real liveness signal.
-# FM_SUPERVISION_MODEL overrides detection (tests, and callers that already know
+# JG_SUPERVISION_MODEL overrides detection (tests, and callers that already know
 # the harness). Otherwise bin/jg-harness.sh is the single detection owner, so this
 # stays consistent with the harness-specific repair line the guards already emit.
 jg_supervision_model() {
   local harness
-  case "${FM_SUPERVISION_MODEL:-}" in
-    autoarm|extension|persistent) printf '%s\n' "$FM_SUPERVISION_MODEL"; return 0 ;;
+  case "${JG_SUPERVISION_MODEL:-}" in
+    autoarm|extension|persistent) printf '%s\n' "$JG_SUPERVISION_MODEL"; return 0 ;;
   esac
-  harness=$("$FM_WAKE_LIB_DIR/jg-harness.sh" 2>/dev/null || printf unknown)
+  harness=$("$JG_WAKE_LIB_DIR/jg-harness.sh" 2>/dev/null || printf unknown)
   case "$harness" in
     claude|cursor) printf 'autoarm\n' ;;
     pi|pi-signed|omp) printf 'extension\n' ;;
@@ -519,8 +519,8 @@ jg_afk_mode() {
 # jg_watcher_supervision_verdict <state> <watch-path> [grace] [home] [root]
 # Model-aware "is supervision healthy right now" verdict for the pull warning
 # guard (bin/jg-guard.sh), NOT the arm layer or the turn-end guard. Sets:
-#   FM_WATCHER_VERDICT_OK      true when supervision is healthy for this model
-#   FM_WATCHER_VERDICT_REASON  when not ok, the true failing condition:
+#   JG_WATCHER_VERDICT_OK      true when supervision is healthy for this model
+#   JG_WATCHER_VERDICT_REASON  when not ok, the true failing condition:
 #                              no-watcher   - a live watcher process is the real
 #                                             signal for this model but none holds
 #                                             the lock (the beacon is still fresh)
@@ -544,15 +544,15 @@ jg_afk_mode() {
 # persistent: require a live identity-matched watcher with a fresh beacon
 # (jg_watcher_healthy); a fresh leftover beacon with no live watcher is still down.
 # shellcheck disable=SC2034 # Read by callers after the function returns.
-FM_WATCHER_VERDICT_OK=false
+JG_WATCHER_VERDICT_OK=false
 # shellcheck disable=SC2034 # Read by callers after the function returns.
-FM_WATCHER_VERDICT_REASON=stale-beacon
+JG_WATCHER_VERDICT_REASON=stale-beacon
 jg_watcher_supervision_verdict() {
-  local state=$1 watch=$2 grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-$FM_HOME}
-  local root=${5:-$FM_ROOT}
+  local state=$1 watch=$2 grace=${3:-${JG_GUARD_GRACE:-300}} home=${4:-$JG_HOME}
+  local root=${5:-$JG_ROOT}
   local beat age fresh=false model
-  FM_WATCHER_VERDICT_OK=false
-  FM_WATCHER_VERDICT_REASON=stale-beacon
+  JG_WATCHER_VERDICT_OK=false
+  JG_WATCHER_VERDICT_REASON=stale-beacon
   beat="$state/.last-watcher-beat"
   age=$(jg_path_age "$beat")
   case "$age" in
@@ -562,21 +562,21 @@ jg_watcher_supervision_verdict() {
   model=$(jg_supervision_model)
   if [ "$model" = autoarm ]; then
     if [ "$fresh" = true ] || jg_autoarm_midturn_healthy "$state" "$grace"; then
-      FM_WATCHER_VERDICT_OK=true
+      JG_WATCHER_VERDICT_OK=true
     fi
     return 0
   fi
   if jg_watcher_healthy "$state" "$watch" "$grace" "$home"; then
     # shellcheck disable=SC2034 # Read by callers after the function returns.
-    FM_WATCHER_VERDICT_OK=true
+    JG_WATCHER_VERDICT_OK=true
   elif [ "$fresh" = true ]; then
     if [ "$model" = extension ] && jg_watcher_lock_unheld "$state" \
       && jg_extension_owns_supervision "$state" "$root"; then
       # shellcheck disable=SC2034 # Read by callers after the function returns.
-      FM_WATCHER_VERDICT_OK=true
+      JG_WATCHER_VERDICT_OK=true
     else
       # shellcheck disable=SC2034 # Read by callers after the function returns.
-      FM_WATCHER_VERDICT_REASON=no-watcher
+      JG_WATCHER_VERDICT_REASON=no-watcher
     fi
   fi
   return 0
@@ -704,7 +704,7 @@ jg_lock_claim() {
 
 jg_lock_try_create() {
   local lockdir=$1 allowed_steal_owner=${2:-} ownerdir
-  FM_LOCK_OWNER_DIR=
+  JG_LOCK_OWNER_DIR=
   ownerdir=$(jg_lock_owner_dir "$lockdir") || return 1
   if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
     jg_lock_discard_owner "$ownerdir"
@@ -716,7 +716,7 @@ jg_lock_try_create() {
   fi
   if ln -s "$ownerdir" "$lockdir" 2>/dev/null && jg_lock_points_to_owner "$lockdir" "$ownerdir"; then
     if jg_lock_claim "$lockdir" "$ownerdir" "$allowed_steal_owner"; then
-      FM_LOCK_OWNER_DIR=$ownerdir
+      JG_LOCK_OWNER_DIR=$ownerdir
       return 0
     fi
     if jg_lock_points_to_owner "$lockdir" "$ownerdir"; then
@@ -752,7 +752,7 @@ jg_lock_mid_acquire_is_fresh() {
   local lockdir=$1 pid=$2 mid_acquire_stale
   case "$pid" in
     ''|*[!0-9]*)
-      mid_acquire_stale=$FM_LOCK_STALE_AFTER
+      mid_acquire_stale=$JG_LOCK_STALE_AFTER
       [ "$mid_acquire_stale" -lt 2 ] && mid_acquire_stale=2
       [ "$(jg_path_age "$lockdir")" -lt "$mid_acquire_stale" ]
       return
@@ -779,18 +779,18 @@ jg_lock_recheck_stale_owner() {
   return 0
 }
 
-FM_RECOVERY_MARKER_TOKEN=
-FM_RECOVERY_MARKER_ACTION='none'
-FM_RECOVERY_MARKER_WRITTEN_TOKEN=
-FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
-FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+JG_RECOVERY_MARKER_TOKEN=
+JG_RECOVERY_MARKER_ACTION='none'
+JG_RECOVERY_MARKER_WRITTEN_TOKEN=
+JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
 
 # Token grammar (one owner): <pending|announced|acked>:<handling|downtime>:<generation>
 # docs/watcher-continuity.md owns the recovery-episode contract, including the
 # once-per-generation announcement rule for unacknowledged downtime.
 jg_recovery_marker_read() {
   local marker=$1 line extra
-  FM_RECOVERY_MARKER_TOKEN=
+  JG_RECOVERY_MARKER_TOKEN=
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
   # Exactly one newline byte: the first line is terminated and no second is.
   { IFS= read -r line && ! IFS= read -r extra; } < "$marker" || return 1
@@ -801,7 +801,7 @@ jg_recovery_marker_read() {
   case "${line##*:}" in
     ''|*[!A-Za-z0-9._-]*) return 1 ;;
   esac
-  FM_RECOVERY_MARKER_TOKEN=$line
+  JG_RECOVERY_MARKER_TOKEN=$line
 }
 
 _jg_atomic_replace() {
@@ -816,7 +816,7 @@ _jg_recovery_marker_write_locked() {
   # Pid/date failures stay unchecked like the pre-fix sibling assignment so a
   # grammar-valid token is still minted and the durable wake row still appends.
   local marker=$1 kind=$2 generation=${3:-} status=${4:-pending} tmp pid epoch token
-  FM_RECOVERY_MARKER_WRITTEN_TOKEN=
+  JG_RECOVERY_MARKER_WRITTEN_TOKEN=
   case "$kind" in handling|downtime) ;; *) return 1 ;; esac
   case "$status" in pending|announced|acked) ;; *) return 1 ;; esac
   tmp=$(mktemp "${marker}.tmp.XXXXXX") || return 1
@@ -833,7 +833,7 @@ _jg_recovery_marker_write_locked() {
     rm -f -- "$tmp"
     return 1
   fi
-  FM_RECOVERY_MARKER_WRITTEN_TOKEN=$token
+  JG_RECOVERY_MARKER_WRITTEN_TOKEN=$token
 }
 
 # Apply the downtime republication states owned by docs/watcher-continuity.md
@@ -844,8 +844,8 @@ _jg_recovery_marker_publish() {
   case "$kind" in handling|downtime) ;; *) return 1 ;; esac
   case "$source" in watcher|append) ;; *) return 1 ;; esac
   if [ "$source" = append ]; then
-    FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
-    FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+    JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+    JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
   fi
   lock="${marker}.lock"
   if [ -n "$bound" ]; then
@@ -861,38 +861,38 @@ _jg_recovery_marker_publish() {
     # Read inline rather than in a command substitution: this runs inside the
     # marker-lock critical section, so it must not add a subshell fork there.
     # The token is restored because publishing owns no snapshot of its own.
-    saved_token=$FM_RECOVERY_MARKER_TOKEN
+    saved_token=$JG_RECOVERY_MARKER_TOKEN
     if jg_recovery_marker_read "$marker"; then
       if [ "$source" = append ]; then
-        previous_append_token=$FM_RECOVERY_MARKER_TOKEN
+        previous_append_token=$JG_RECOVERY_MARKER_TOKEN
       fi
-      case "$FM_RECOVERY_MARKER_TOKEN" in
+      case "$JG_RECOVERY_MARKER_TOKEN" in
         pending:handling:*|pending:downtime:*)
-          generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+          generation=${JG_RECOVERY_MARKER_TOKEN##*:}
           status=pending
           ;;
         announced:handling:*)
-          generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+          generation=${JG_RECOVERY_MARKER_TOKEN##*:}
           status=pending
           ;;
         announced:downtime:*)
           if [ "$source" = watcher ]; then
-            generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+            generation=${JG_RECOVERY_MARKER_TOKEN##*:}
             status=announced
           fi
           ;;
       esac
     fi
-    FM_RECOVERY_MARKER_TOKEN=$saved_token
+    JG_RECOVERY_MARKER_TOKEN=$saved_token
   fi
   if ! _jg_recovery_marker_write_locked "$marker" "$kind" "$generation" "$status"; then
     jg_lock_release "$lock"
     return 1
   fi
   if [ -n "$previous_append_token" ] \
-    && [ "$previous_append_token" != "$FM_RECOVERY_MARKER_WRITTEN_TOKEN" ]; then
-    FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=$previous_append_token
-    FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=$FM_RECOVERY_MARKER_WRITTEN_TOKEN
+    && [ "$previous_append_token" != "$JG_RECOVERY_MARKER_WRITTEN_TOKEN" ]; then
+    JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=$previous_append_token
+    JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=$JG_RECOVERY_MARKER_WRITTEN_TOKEN
   fi
   jg_lock_release "$lock"
 }
@@ -907,12 +907,12 @@ _jg_recovery_marker_restore_token_locked() {
 }
 
 _jg_wake_append_recovery_restore_locked() {
-  local marker="$STATE/.watcher-down" lock previous=$FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN
+  local marker="$STATE/.watcher-down" lock previous=$JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN
   [ -n "$previous" ] || return 0
   lock="${marker}.lock"
   jg_lock_acquire_wait "$lock" || return 1
   if ! jg_recovery_marker_read "$marker" \
-    || [ "$FM_RECOVERY_MARKER_TOKEN" != "$FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN" ]; then
+    || [ "$JG_RECOVERY_MARKER_TOKEN" != "$JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN" ]; then
     jg_lock_release "$lock"
     return 1
   fi
@@ -920,8 +920,8 @@ _jg_wake_append_recovery_restore_locked() {
     jg_lock_release "$lock"
     return 1
   fi
-  FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
-  FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+  JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+  JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
   jg_lock_release "$lock"
 }
 
@@ -933,7 +933,7 @@ _jg_recovery_marker_begin_handling() {
     jg_lock_release "$lock"
     return 1
   fi
-  line=$FM_RECOVERY_MARKER_TOKEN
+  line=$JG_RECOVERY_MARKER_TOKEN
   generation=${line##*:}
   if [ -n "$expected_generation" ] && [ "$generation" != "$expected_generation" ]; then
     jg_lock_release "$lock"
@@ -957,14 +957,14 @@ _jg_recovery_marker_begin_handling() {
         jg_lock_release "$lock"
         return 1
       fi
-      FM_RECOVERY_MARKER_TOKEN="pending:handling:$generation"
+      JG_RECOVERY_MARKER_TOKEN="pending:handling:$generation"
       ;;
     announced:downtime:*)
       if ! _jg_recovery_marker_write_locked "$marker" handling "$generation" announced; then
         jg_lock_release "$lock"
         return 1
       fi
-      FM_RECOVERY_MARKER_TOKEN="announced:handling:$generation"
+      JG_RECOVERY_MARKER_TOKEN="announced:handling:$generation"
       ;;
     *) jg_lock_release "$lock"; return 1 ;;
   esac
@@ -973,7 +973,7 @@ _jg_recovery_marker_begin_handling() {
 
 jg_recovery_marker_snapshot() {
   local marker=$1 lock
-  FM_RECOVERY_MARKER_TOKEN=
+  JG_RECOVERY_MARKER_TOKEN=
   lock="${marker}.lock"
   jg_lock_acquire_wait "$lock" || return 1
   jg_recovery_marker_read "$marker" || true
@@ -986,11 +986,11 @@ _jg_recovery_marker_ack() {
   lock="${marker}.lock"
   jg_lock_acquire_wait "$lock" || return 1
   if ! jg_recovery_marker_read "$marker" \
-    || [ "${FM_RECOVERY_MARKER_TOKEN##*:}" != "$expected_generation" ]; then
+    || [ "${JG_RECOVERY_MARKER_TOKEN##*:}" != "$expected_generation" ]; then
     jg_lock_release "$lock"
     return 3
   fi
-  line=$FM_RECOVERY_MARKER_TOKEN
+  line=$JG_RECOVERY_MARKER_TOKEN
   case "$line" in
     pending:*|announced:*) line="acked:${line#*:}" ;;
     acked:*) jg_lock_release "$lock"; return 0 ;;
@@ -1009,76 +1009,76 @@ _jg_recovery_marker_ack() {
 
 _jg_recovery_marker_arm_check() {
   local marker=$1 lock line quarantine
-  FM_RECOVERY_MARKER_ACTION='none'
+  JG_RECOVERY_MARKER_ACTION='none'
   lock="${marker}.lock"
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
   if ! jg_lock_acquire_wait "$lock"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 1
   fi
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
-    if [ -s "$FM_WAKE_QUEUE" ]; then
+    if [ -s "$JG_WAKE_QUEUE" ]; then
       if ! _jg_recovery_marker_write_locked "$marker" downtime "" announced; then
         jg_lock_release "$lock"
-        jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+        jg_lock_release "$JG_WAKE_QUEUE_LOCK"
         return 1
       fi
-      FM_RECOVERY_MARKER_ACTION='recover'
+      JG_RECOVERY_MARKER_ACTION='recover'
     fi
     jg_lock_release "$lock"
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   if ! jg_recovery_marker_read "$marker"; then
     quarantine=$(mktemp -d "${marker}.invalid.XXXXXX") \
       || {
         jg_lock_release "$lock"
-        jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+        jg_lock_release "$JG_WAKE_QUEUE_LOCK"
         return 1
       }
     if ! mv -- "$marker" "$quarantine/marker" \
       || ! _jg_recovery_marker_write_locked "$marker" downtime "" announced; then
       rmdir "$quarantine" 2>/dev/null || true
       jg_lock_release "$lock"
-      jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+      jg_lock_release "$JG_WAKE_QUEUE_LOCK"
       return 1
     fi
-    FM_RECOVERY_MARKER_ACTION='recover'
+    JG_RECOVERY_MARKER_ACTION='recover'
     jg_lock_release "$lock"
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
-  line=$FM_RECOVERY_MARKER_TOKEN
+  line=$JG_RECOVERY_MARKER_TOKEN
   case "$line" in
     pending:handling:*|announced:handling:*|announced:downtime:*)
-      FM_RECOVERY_MARKER_ACTION='wait'
+      JG_RECOVERY_MARKER_ACTION='wait'
       jg_lock_release "$lock"
-      jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+      jg_lock_release "$JG_WAKE_QUEUE_LOCK"
       return 0
       ;;
     pending:downtime:*)
       if ! _jg_recovery_marker_write_locked "$marker" downtime "${line##*:}" announced; then
         jg_lock_release "$lock"
-        jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+        jg_lock_release "$JG_WAKE_QUEUE_LOCK"
         return 1
       fi
-      FM_RECOVERY_MARKER_TOKEN="announced:downtime:${line##*:}"
-      FM_RECOVERY_MARKER_ACTION='recover'
+      JG_RECOVERY_MARKER_TOKEN="announced:downtime:${line##*:}"
+      JG_RECOVERY_MARKER_ACTION='recover'
       ;;
     acked:*)
-      if [ -s "$FM_WAKE_QUEUE" ]; then
+      if [ -s "$JG_WAKE_QUEUE" ]; then
         if ! _jg_recovery_marker_write_locked "$marker" downtime "" announced; then
           jg_lock_release "$lock"
-          jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+          jg_lock_release "$JG_WAKE_QUEUE_LOCK"
           return 1
         fi
         # shellcheck disable=SC2034 # Output read by callers after this function returns.
-        FM_RECOVERY_MARKER_ACTION='recover'
+        JG_RECOVERY_MARKER_ACTION='recover'
       fi
       ;;
   esac
   jg_lock_release "$lock"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 }
 
 # Apply the owner-documented announced-episode arm transition atomically with
@@ -1087,28 +1087,28 @@ _jg_recovery_marker_arm_check() {
 _jg_recovery_marker_reopen_announced() {
   local marker=$1 lock
   lock="${marker}.lock"
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
   if ! jg_lock_acquire_wait "$lock"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 1
   fi
   if ! jg_recovery_marker_read "$marker"; then
     jg_lock_release "$lock"
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
-  case "$FM_RECOVERY_MARKER_TOKEN" in
+  case "$JG_RECOVERY_MARKER_TOKEN" in
     announced:*)
-      if [ -s "$FM_WAKE_QUEUE" ] \
+      if [ -s "$JG_WAKE_QUEUE" ] \
         && ! _jg_recovery_marker_write_locked "$marker" downtime ""; then
         jg_lock_release "$lock"
-        jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+        jg_lock_release "$JG_WAKE_QUEUE_LOCK"
         return 1
       fi
       ;;
   esac
   jg_lock_release "$lock"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 }
 
 # The handover rule for a watcher stopped by bin/jg-watch-arm.sh --take-over
@@ -1117,49 +1117,49 @@ _jg_recovery_marker_reopen_announced() {
 # stop; handover-restore puts an acknowledged token back only while that
 # sequence is unchanged and the marker reads the fresh pending downtime the
 # stopped watcher's own close published.
-FM_RECOVERY_HANDOVER_TOKEN=
-FM_RECOVERY_HANDOVER_SEQ=
+JG_RECOVERY_HANDOVER_TOKEN=
+JG_RECOVERY_HANDOVER_SEQ=
 jg_recovery_marker_handover_snapshot() {  # <marker>
   local marker=$1 lock
-  FM_RECOVERY_HANDOVER_TOKEN=
-  FM_RECOVERY_HANDOVER_SEQ=
+  JG_RECOVERY_HANDOVER_TOKEN=
+  JG_RECOVERY_HANDOVER_SEQ=
   lock="${marker}.lock"
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
   if ! jg_lock_acquire_wait "$lock"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 1
   fi
   if jg_recovery_marker_read "$marker"; then
     # shellcheck disable=SC2034 # Read by callers after this function returns.
-    FM_RECOVERY_HANDOVER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+    JG_RECOVERY_HANDOVER_TOKEN=$JG_RECOVERY_MARKER_TOKEN
   fi
   # shellcheck disable=SC2034 # Read by callers after this function returns.
-  FM_RECOVERY_HANDOVER_SEQ=$(cat "$STATE/.wake-queue.seq" 2>/dev/null || true)
+  JG_RECOVERY_HANDOVER_SEQ=$(cat "$STATE/.wake-queue.seq" 2>/dev/null || true)
   jg_lock_release "$lock"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 }
 
 _jg_recovery_marker_handover_restore() {
   local marker=$1 token=$2 seq=$3 lock status=0
   case "$token" in acked:*) ;; *) return 0 ;; esac
   lock="${marker}.lock"
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
   if ! jg_lock_acquire_wait "$lock"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 1
   fi
   if [ "$(cat "$STATE/.wake-queue.seq" 2>/dev/null || true)" = "$seq" ] \
     && jg_recovery_marker_read "$marker"; then
-    case "$FM_RECOVERY_MARKER_TOKEN" in
+    case "$JG_RECOVERY_MARKER_TOKEN" in
       pending:downtime:*)
-        if [ "${FM_RECOVERY_MARKER_TOKEN##*:}" != "${token##*:}" ]; then
+        if [ "${JG_RECOVERY_MARKER_TOKEN##*:}" != "${token##*:}" ]; then
           _jg_recovery_marker_restore_token_locked "$marker" "$token" || status=1
         fi
         ;;
     esac
   fi
   jg_lock_release "$lock"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
@@ -1278,7 +1278,7 @@ jg_lock_reap_dead_link() {
 # is reclaimed like jg_lock_try_acquire's self-held branch.
 jg_lock_try_acquire_steal_mutex() {  # <steal-lock>
   local lockdir=$1 current
-  FM_LOCK_OWNER_DIR=
+  JG_LOCK_OWNER_DIR=
   jg_lock_try_create "$lockdir" && return 0
   jg_current_pid current || return 1
   jg_lock_reap_dead_link "$lockdir.steal" || true
@@ -1292,9 +1292,9 @@ jg_lock_try_acquire_steal_mutex() {  # <steal-lock>
 
 jg_lock_try_acquire() {
   local lockdir=$1 pid steal cur rc steal_owner primary_owner current
-  FM_LOCK_HELD_PID=
-  FM_LOCK_OWNER_DIR=
-  FM_LOCK_RECOVERED_PID=
+  JG_LOCK_HELD_PID=
+  JG_LOCK_OWNER_DIR=
+  JG_LOCK_RECOVERED_PID=
 
   if jg_lock_try_create "$lockdir"; then
     return 0
@@ -1315,43 +1315,43 @@ jg_lock_try_acquire() {
     if jg_lock_try_create "$lockdir"; then
       return 0
     fi
-    FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     return 1
   fi
   if jg_pid_alive "$pid"; then
-    FM_LOCK_HELD_PID=$pid
+    JG_LOCK_HELD_PID=$pid
     return 1
   fi
   if jg_lock_mid_acquire_is_fresh "$lockdir" "$pid"; then
-    FM_LOCK_HELD_PID=$pid
+    JG_LOCK_HELD_PID=$pid
     return 1
   fi
 
   steal="$lockdir.steal"
   if ! jg_lock_try_acquire_steal_mutex "$steal"; then
-    FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
-  steal_owner=${FM_LOCK_OWNER_DIR:-}
+  steal_owner=${JG_LOCK_OWNER_DIR:-}
 
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
   if jg_pid_alive "$cur"; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$cur
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$cur
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
   if jg_lock_mid_acquire_is_fresh "$lockdir" "$cur"; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$cur
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$cur
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
   if ! jg_lock_points_to_owner "$steal" "$steal_owner"; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
 
@@ -1362,24 +1362,24 @@ jg_lock_try_acquire() {
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
   if ! jg_lock_recheck_stale_owner "$lockdir" "$primary_owner" "$cur"; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
 
   if [ "$lockdir" = "$STATE/.watch.lock" ] \
     && ! jg_watcher_retire_recorded_children "$lockdir"; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$cur
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$cur
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
 
   if [ "$lockdir" = "$STATE/.watch.lock" ] \
     && ! _jg_recovery_marker_publish "$STATE/.watcher-down" downtime; then
     jg_lock_release "$steal"
-    FM_LOCK_HELD_PID=$cur
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$cur
+    JG_LOCK_OWNER_DIR=
     return 1
   fi
   jg_lock_remove_path "$lockdir" || true
@@ -1387,12 +1387,12 @@ jg_lock_try_acquire() {
   if jg_lock_try_create "$lockdir" "$steal_owner"; then
     rc=0
     # shellcheck disable=SC2034 # Read by sourcing callers after lock acquisition.
-    FM_LOCK_RECOVERED_PID=$cur
+    JG_LOCK_RECOVERED_PID=$cur
   fi
   if [ "$rc" -ne 0 ]; then
     # shellcheck disable=SC2034 # Read by callers after jg_lock_try_acquire returns.
-    FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
-    FM_LOCK_OWNER_DIR=
+    JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    JG_LOCK_OWNER_DIR=
   fi
   jg_lock_release "$steal"
   return "$rc"
@@ -1451,7 +1451,7 @@ _jg_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
 #
 # Bounded acquire variant. It preserves the ordinary wait/reclaim behavior
 # until jg-timeout-lib.sh's hard deadline, returns 124 when a live holder still
-# owns the lock, and leaves FM_LOCK_HELD_PID naming that holder.
+# owns the lock, and leaves JG_LOCK_HELD_PID naming that holder.
 # Use it where a caller must refuse rather than block: wake presentation, and
 # the guarded remote link clear, whose whole contract is to return a
 # reconciliation refusal instead of wedging an unattended close.
@@ -1467,11 +1467,11 @@ jg_lock_acquire_wait_bounded() {
   jg_current_pid caller_pid || return 1
   # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
   if jg_run_timed "$seconds" env \
-    "FM_STATE_OVERRIDE=$STATE" \
-    "FM_ROOT_OVERRIDE=$FM_ROOT" \
-    "FM_LOCK_STALE_AFTER=$FM_LOCK_STALE_AFTER" \
+    "JG_STATE_OVERRIDE=$STATE" \
+    "JG_ROOT_OVERRIDE=$JG_ROOT" \
+    "JG_LOCK_STALE_AFTER=$JG_LOCK_STALE_AFTER" \
     bash -c '. "$1"; _jg_lock_acquire_wait_handoff "$2" "$3"' \
-      _ "$FM_WAKE_LIB_DIR/jg-wake-lib.sh" "$lockdir" "$caller_pid" \
+      _ "$JG_WAKE_LIB_DIR/jg-wake-lib.sh" "$lockdir" "$caller_pid" \
       </dev/null >/dev/null 2>&1; then
     rc=0
   else
@@ -1495,13 +1495,13 @@ jg_lock_acquire_wait_bounded() {
       ''|*[!0-9]*|0) ;;
       *)
         if [ "$owner_pid" -gt 0 ] 2>/dev/null && jg_pid_alive "$owner_pid"; then
-          FM_LOCK_HELD_PID=$owner_pid
+          JG_LOCK_HELD_PID=$owner_pid
           return 124
         fi
         ;;
     esac
     # shellcheck disable=SC2034 # Output read by callers after bounded acquisition.
-    FM_LOCK_HELD_PID=
+    JG_LOCK_HELD_PID=
     return 1
   fi
   return "$rc"
@@ -1581,21 +1581,21 @@ jg_task_set_lock_path() {  # <state-dir>
 # Everything else still fails closed: an unreadable or malformed binding, an
 # unreachable local parent, a cycle, and a chain deeper than the bound.
 jg_firstmate_root_home() {
-  local home=${1:-$FM_HOME} marker parent seen="|" depth=0
+  local home=${1:-$JG_HOME} marker parent seen="|" depth=0
   home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
   while [ -e "$home/.jg-secondmate-parent" ] || [ -L "$home/.jg-secondmate-parent" ]; do
     marker="$home/.jg-secondmate-parent"
     if ! command -v jg_secondmate_parent_record_parse >/dev/null 2>&1; then
       # shellcheck source=bin/jg-secondmate-parent-lib.sh
-      . "$FM_WAKE_LIB_DIR/jg-secondmate-parent-lib.sh"
+      . "$JG_WAKE_LIB_DIR/jg-secondmate-parent-lib.sh"
     fi
     jg_secondmate_parent_record_parse "$marker" || return 1
-    case "$FM_SECONDMATE_PARENT_ROUTE" in
+    case "$JG_SECONDMATE_PARENT_ROUTE" in
       local) ;;
       remote) break ;;
       *) return 1 ;;
     esac
-    parent=$(CDPATH='' cd -- "$FM_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
+    parent=$(CDPATH='' cd -- "$JG_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
     case "$seen" in *"|$parent|"*) return 1 ;; esac
     seen="$seen$home|"
     home=$parent
@@ -1611,24 +1611,24 @@ jg_firstmate_root_home() {
 # every data/secondmates.md breadth-first. Remote registry entries are skipped,
 # because their workers run on another machine.
 #
-# Sets FM_LOCAL_FIRSTMATE_STATES to that list, <first-state> first and without
+# Sets JG_LOCAL_FIRSTMATE_STATES to that list, <first-state> first and without
 # duplicates however each directory is spelled. Returns 1 with
-# FM_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
+# JG_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
 # root, an unsafe or malformed registry, or an unavailable registered local
 # home - so a caller refuses rather than treating an unreadable home as one
 # with no tasks. Requires bin/jg-secondmate-registry-lib.sh to be sourced first.
-# shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR is read by callers.
+# shellcheck disable=SC2034 # JG_LOCAL_FIRSTMATE_ERROR is read by callers.
 jg_local_firstmate_state_dirs() {  # <first-state>
   local first=$1 root home reg line child known existing i=0
   local -a homes
-  FM_LOCAL_FIRSTMATE_STATES=("$first")
-  FM_LOCAL_FIRSTMATE_ERROR=
+  JG_LOCAL_FIRSTMATE_STATES=("$first")
+  JG_LOCAL_FIRSTMATE_ERROR=
   if ! command -v secondmate_registry_parse_line >/dev/null 2>&1; then
     # shellcheck source=bin/jg-secondmate-registry-lib.sh
-    . "$FM_WAKE_LIB_DIR/jg-secondmate-registry-lib.sh"
+    . "$JG_WAKE_LIB_DIR/jg-secondmate-registry-lib.sh"
   fi
-  root=$(jg_firstmate_root_home "$FM_HOME") || {
-    FM_LOCAL_FIRSTMATE_ERROR="cannot resolve the root Firstmate home"
+  root=$(jg_firstmate_root_home "$JG_HOME") || {
+    JG_LOCAL_FIRSTMATE_ERROR="cannot resolve the root Firstmate home"
     return 1
   }
   homes=("$root")
@@ -1636,29 +1636,29 @@ jg_local_firstmate_state_dirs() {  # <first-state>
     home=${homes[$i]}
     i=$((i + 1))
     known=0
-    for existing in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for existing in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
       if [ "$existing" = "$home/state" ] || [ "$existing" -ef "$home/state" ]; then
         known=1
       fi
     done
-    [ "$known" = 1 ] || FM_LOCAL_FIRSTMATE_STATES+=("$home/state")
+    [ "$known" = 1 ] || JG_LOCAL_FIRSTMATE_STATES+=("$home/state")
     reg="$home/data/secondmates.md"
     [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
     [ -f "$reg" ] && [ ! -L "$reg" ] || {
-      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
+      JG_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
       return 1
     }
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)
           secondmate_registry_parse_line "$line" || {
-            FM_LOCAL_FIRSTMATE_ERROR="malformed local Firstmate registry entry in $reg"
+            JG_LOCAL_FIRSTMATE_ERROR="malformed local Firstmate registry entry in $reg"
             return 1
           }
           [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
           child=$([ -d "$SECONDMATE_REGISTRY_HOME" ] &&
             CDPATH='' cd -- "$SECONDMATE_REGISTRY_HOME" 2>/dev/null && pwd -P) || {
-            FM_LOCAL_FIRSTMATE_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
+            JG_LOCAL_FIRSTMATE_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
             return 1
           }
           known=0
@@ -1685,7 +1685,7 @@ jg_local_firstmate_state_dirs() {  # <first-state>
 jg_treehouse_project_lock_path() {  # <project-dir>
   local project=$1 root origin identity hash top
   [ -d "$project" ] || return 1
-  root=$(jg_firstmate_root_home "$FM_HOME") || return 1
+  root=$(jg_firstmate_root_home "$JG_HOME") || return 1
   origin=$(git -C "$project" remote get-url origin 2>/dev/null || true)
   if [ -n "$origin" ]; then
     case "$origin" in
@@ -1771,22 +1771,22 @@ jg_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home>
 }
 
 # Read the claim on a pool slot and compare it with a task id.
-# Sets FM_TREEHOUSE_SLOT_OWNER to one of:
+# Sets JG_TREEHOUSE_SLOT_OWNER to one of:
 #   mine   - the claim names this task
 #   other  - the claim names a different task, so the slot was reassigned
 #   absent - no claim: the slot was taken before claims existed, or returned since
 #   unsafe - a claim file exists but cannot be read as a claim
-# FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME carry the recorded
+# JG_TREEHOUSE_SLOT_OWNER_ID and JG_TREEHOUSE_SLOT_OWNER_HOME carry the recorded
 # claimant as evidence. The home is reported, never matched: a home that moved
 # must not turn a task's own slot into a refusal.
 jg_treehouse_slot_owner_state() {  # <worktree> <task-id>
   local worktree=$1 id=$2 marker line owner_id='' owner_home=''
-  FM_TREEHOUSE_SLOT_OWNER=unsafe
-  FM_TREEHOUSE_SLOT_OWNER_ID=
-  FM_TREEHOUSE_SLOT_OWNER_HOME=
+  JG_TREEHOUSE_SLOT_OWNER=unsafe
+  JG_TREEHOUSE_SLOT_OWNER_ID=
+  JG_TREEHOUSE_SLOT_OWNER_HOME=
   marker=$(jg_treehouse_slot_owner_marker "$worktree") || return 0
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
-    FM_TREEHOUSE_SLOT_OWNER=absent
+    JG_TREEHOUSE_SLOT_OWNER=absent
     return 0
   fi
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
@@ -1798,13 +1798,13 @@ jg_treehouse_slot_owner_state() {  # <worktree> <task-id>
   done < "$marker" || return 0
   [ -n "$owner_id" ] || return 0
   # shellcheck disable=SC2034 # Output globals, read by the sourcing caller.
-  FM_TREEHOUSE_SLOT_OWNER_ID=$owner_id
+  JG_TREEHOUSE_SLOT_OWNER_ID=$owner_id
   # shellcheck disable=SC2034 # Output globals, read by the sourcing caller.
-  FM_TREEHOUSE_SLOT_OWNER_HOME=$owner_home
+  JG_TREEHOUSE_SLOT_OWNER_HOME=$owner_home
   if [ "$owner_id" = "$id" ]; then
-    FM_TREEHOUSE_SLOT_OWNER=mine
+    JG_TREEHOUSE_SLOT_OWNER=mine
   else
-    FM_TREEHOUSE_SLOT_OWNER=other
+    JG_TREEHOUSE_SLOT_OWNER=other
   fi
 }
 
@@ -1814,7 +1814,7 @@ jg_treehouse_slot_owner_state() {  # <worktree> <task-id>
 jg_treehouse_slot_owner_release() {  # <worktree> <task-id>
   local worktree=$1 id=$2 marker
   jg_treehouse_slot_owner_state "$worktree" "$id"
-  [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
+  [ "$JG_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
   marker=$(jg_treehouse_slot_owner_marker "$worktree") || return 0
   rm -f "$marker" 2>/dev/null || true
 }
@@ -1825,28 +1825,28 @@ jg_canonical_existing_dir() {  # <path>
 }
 
 # Which other task record, in any local Firstmate home, still names <slot> as
-# its worktree= or home=. Returns 0 with FM_SLOT_RECORD_OWNER_ID and
-# FM_SLOT_RECORD_OWNER_FIELD set when one does, 1 when none does, and 2 when the
-# local homes cannot be enumerated (reason in FM_LOCAL_FIRSTMATE_ERROR). <self-meta> is skipped by
+# its worktree= or home=. Returns 0 with JG_SLOT_RECORD_OWNER_ID and
+# JG_SLOT_RECORD_OWNER_FIELD set when one does, 1 when none does, and 2 when the
+# local homes cannot be enumerated (reason in JG_LOCAL_FIRSTMATE_ERROR). <self-meta> is skipped by
 # identity and name, so the same record reached through a differently resolved
 # state dir is still itself while a differently named hardlink is another task.
 # Callers source bin/jg-backend.sh for jg_meta_get.
-# shellcheck disable=SC2034 # FM_SLOT_RECORD_OWNER_* are read by callers.
+# shellcheck disable=SC2034 # JG_SLOT_RECORD_OWNER_* are read by callers.
 jg_slot_record_owner() {  # <slot> <first-state> [self-meta]
   local slot=$1 self=${3:-} state_dir other field other_slot
-  FM_SLOT_RECORD_OWNER_ID=
-  FM_SLOT_RECORD_OWNER_FIELD=
+  JG_SLOT_RECORD_OWNER_ID=
+  JG_SLOT_RECORD_OWNER_FIELD=
   slot=$(jg_canonical_existing_dir "$slot") || return 1
   jg_local_firstmate_state_dirs "$2" || return 2
-  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for state_dir in "${JG_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
       [ -f "$other" ] && [ ! -L "$other" ] || continue
       [ -n "$self" ] && [ "${other##*/}" = "${self##*/}" ] && [ "$other" -ef "$self" ] && continue
       for field in worktree home; do
         other_slot=$(jg_canonical_existing_dir "$(jg_meta_get "$other" "$field")") || continue
         [ "$other_slot" = "$slot" ] || continue
-        FM_SLOT_RECORD_OWNER_ID=$(basename "$other" .meta)
-        FM_SLOT_RECORD_OWNER_FIELD=$field
+        JG_SLOT_RECORD_OWNER_ID=$(basename "$other" .meta)
+        JG_SLOT_RECORD_OWNER_FIELD=$field
         return 0
       done
     done
@@ -1981,29 +1981,29 @@ _jg_autoarm_epoch_field() {  # <epoch-file> <field>
   return 1
 }
 
-# Parse the current ledger claim. Sets FM_AUTOARM_GEN, FM_AUTOARM_OWNER,
-# FM_AUTOARM_OUTCOME, FM_AUTOARM_SESSION, FM_AUTOARM_RECOVERY, and
-# FM_AUTOARM_IDENTITY (line 2 of the entry, and ONLY
+# Parse the current ledger claim. Sets JG_AUTOARM_GEN, JG_AUTOARM_OWNER,
+# JG_AUTOARM_OUTCOME, JG_AUTOARM_SESSION, JG_AUTOARM_RECOVERY, and
+# JG_AUTOARM_IDENTITY (line 2 of the entry, and ONLY
 # line 2 - identity is never substituted from a lock, so a transient
 # micro-mutex hold or a reused pid can never authenticate a stale entry).
 jg_autoarm_ledger_read() {  # <state-dir>
   local state=$1 epoch
   epoch="$state/.claude-autoarm-epoch"
-  FM_AUTOARM_GEN=
-  FM_AUTOARM_OWNER=
-  FM_AUTOARM_OUTCOME=
-  FM_AUTOARM_SESSION=
-  FM_AUTOARM_RECOVERY=
-  FM_AUTOARM_IDENTITY=
-  FM_AUTOARM_GEN=$(_jg_autoarm_epoch_field "$epoch" epoch) || return 1
-  FM_AUTOARM_OWNER=$(_jg_autoarm_epoch_field "$epoch" owner_pid) || return 1
-  FM_AUTOARM_OUTCOME=$(_jg_autoarm_epoch_field "$epoch" outcome) || return 1
-  FM_AUTOARM_SESSION=$(_jg_autoarm_epoch_field "$epoch" session_pid 2>/dev/null || true)
-  FM_AUTOARM_RECOVERY=$(_jg_autoarm_epoch_field "$epoch" recovery_generation 2>/dev/null || true)
-  case "$FM_AUTOARM_GEN" in
+  JG_AUTOARM_GEN=
+  JG_AUTOARM_OWNER=
+  JG_AUTOARM_OUTCOME=
+  JG_AUTOARM_SESSION=
+  JG_AUTOARM_RECOVERY=
+  JG_AUTOARM_IDENTITY=
+  JG_AUTOARM_GEN=$(_jg_autoarm_epoch_field "$epoch" epoch) || return 1
+  JG_AUTOARM_OWNER=$(_jg_autoarm_epoch_field "$epoch" owner_pid) || return 1
+  JG_AUTOARM_OUTCOME=$(_jg_autoarm_epoch_field "$epoch" outcome) || return 1
+  JG_AUTOARM_SESSION=$(_jg_autoarm_epoch_field "$epoch" session_pid 2>/dev/null || true)
+  JG_AUTOARM_RECOVERY=$(_jg_autoarm_epoch_field "$epoch" recovery_generation 2>/dev/null || true)
+  case "$JG_AUTOARM_GEN" in
     ''|*[!0-9]*) return 1 ;;
   esac
-  FM_AUTOARM_IDENTITY=$(sed -n '2p' "$epoch" 2>/dev/null || true)
+  JG_AUTOARM_IDENTITY=$(sed -n '2p' "$epoch" 2>/dev/null || true)
   return 0
 }
 
@@ -2017,18 +2017,18 @@ jg_autoarm_ledger_read() {  # <state-dir>
 # build's entry gets its deference from its held role-carrying lock through
 # the legacy shim, and anything else must not defer.
 jg_autoarm_claim_open() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} epoch current
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} epoch current
   epoch="$state/.claude-autoarm-epoch"
   case "$grace" in
     ''|*[!0-9]*|0) grace=300 ;;
   esac
   jg_autoarm_ledger_read "$state" || return 1
-  [ "$FM_AUTOARM_OUTCOME" = arming ] || return 1
-  jg_pid_alive "$FM_AUTOARM_OWNER" || return 1
-  [ -n "$FM_AUTOARM_IDENTITY" ] || return 1
-  current=$(jg_pid_identity "$FM_AUTOARM_OWNER" 2>/dev/null) || return 1
+  [ "$JG_AUTOARM_OUTCOME" = arming ] || return 1
+  jg_pid_alive "$JG_AUTOARM_OWNER" || return 1
+  [ -n "$JG_AUTOARM_IDENTITY" ] || return 1
+  current=$(jg_pid_identity "$JG_AUTOARM_OWNER" 2>/dev/null) || return 1
   [ -n "$current" ] || return 1
-  [ "$current" = "$FM_AUTOARM_IDENTITY" ] || return 1
+  [ "$current" = "$JG_AUTOARM_IDENTITY" ] || return 1
   if [ "$(jg_path_age "$epoch")" -ge "$grace" ] \
     && [ "$(jg_path_age "$state/.last-watcher-beat")" -ge "$grace" ]; then
     return 1
@@ -2058,28 +2058,28 @@ jg_autoarm_midturn_healthy() {  # <state-dir> [grace]
   [ -e "$state/.claude-autoarm-failure-notified" ] && return 1
   [ -e "$state/.claude-autoarm-failure-alarmed" ] && return 1
   jg_autoarm_ledger_read "$state" || return 1
-  [ "$FM_AUTOARM_OUTCOME" = rewake ] || return 1
+  [ "$JG_AUTOARM_OUTCOME" = rewake ] || return 1
   lock_pid=$(sed -n '1p' "$state/.lock" 2>/dev/null || true)
-  [ -n "$FM_AUTOARM_SESSION" ] && [ "$FM_AUTOARM_SESSION" = "$lock_pid" ] || return 1
+  [ -n "$JG_AUTOARM_SESSION" ] && [ "$JG_AUTOARM_SESSION" = "$lock_pid" ] || return 1
   jg_pid_alive "$lock_pid" || return 1
   jg_recovery_marker_read "$state/.watcher-down" || return 1
-  recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
-  [ -n "$FM_AUTOARM_RECOVERY" ] && [ "$FM_AUTOARM_RECOVERY" = "$recovery" ] || return 1
+  recovery=${JG_RECOVERY_MARKER_TOKEN##*:}
+  [ -n "$JG_AUTOARM_RECOVERY" ] && [ "$JG_AUTOARM_RECOVERY" = "$recovery" ] || return 1
   epoch_mtime=$(jg_path_mtime "$state/.claude-autoarm-epoch") || return 1
   beacon_mtime=$(jg_path_mtime "$state/.last-watcher-beat") || return 1
   [ "$epoch_mtime" -ge "$beacon_mtime" ]
 }
 
 # Atomically publish this process as the owner of generation N+1, under one
-# short micro-mutex hold. Returns 0 with FM_AUTOARM_MY_GEN set on success, 2
+# short micro-mutex hold. Returns 0 with JG_AUTOARM_MY_GEN set on success, 2
 # when a competing claimant won the race (the ledger holds an open claim), and
 # 1 when the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
 jg_autoarm_claim_next() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock epoch pid gen identity tmp
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} lock epoch pid gen identity tmp
   lock="$state/.claude-autoarm.lock"
   epoch="$state/.claude-autoarm-epoch"
-  FM_AUTOARM_MY_GEN=
+  JG_AUTOARM_MY_GEN=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
   # identity of a process that exits immediately.
@@ -2106,7 +2106,7 @@ jg_autoarm_claim_next() {  # <state-dir> [grace]
   fi
   jg_lock_release "$lock"
   # shellcheck disable=SC2034 # Read by callers after the claim succeeds.
-  FM_AUTOARM_MY_GEN=$gen
+  JG_AUTOARM_MY_GEN=$gen
   return 0
 }
 
@@ -2130,11 +2130,11 @@ jg_autoarm_write_owned() {  # <state-dir> <gen> <outcome> [marker-file] [session
     i=$((i + 1))
   done
   if ! jg_autoarm_ledger_read "$state" \
-    || [ "$FM_AUTOARM_GEN" != "$gen" ] || [ "$FM_AUTOARM_OWNER" != "$pid" ]; then
+    || [ "$JG_AUTOARM_GEN" != "$gen" ] || [ "$JG_AUTOARM_OWNER" != "$pid" ]; then
     jg_lock_release "$lock"
     return 2
   fi
-  identity=$FM_AUTOARM_IDENTITY
+  identity=$JG_AUTOARM_IDENTITY
   tmp="$epoch.tmp.$pid"
   if ! {
       printf 'epoch=%s owner_pid=%s outcome=%s updated_at=%s' \
@@ -2163,7 +2163,7 @@ jg_autoarm_still_owner() {  # <state-dir> <gen>
   local state=$1 gen=$2 pid
   pid=${BASHPID:-$$}
   jg_autoarm_ledger_read "$state" || return 1
-  [ "$FM_AUTOARM_GEN" = "$gen" ] && [ "$FM_AUTOARM_OWNER" = "$pid" ]
+  [ "$JG_AUTOARM_GEN" = "$gen" ] && [ "$JG_AUTOARM_OWNER" = "$pid" ]
 }
 
 jg_autoarm_reset_owned() {  # <state-dir> <gen>
@@ -2172,7 +2172,7 @@ jg_autoarm_reset_owned() {  # <state-dir> <gen>
   pid=${BASHPID:-$$}
   jg_lock_try_acquire "$lock" || return 2
   if ! jg_autoarm_ledger_read "$state" \
-    || [ "$FM_AUTOARM_GEN" != "$gen" ] || [ "$FM_AUTOARM_OWNER" != "$pid" ]; then
+    || [ "$JG_AUTOARM_GEN" != "$gen" ] || [ "$JG_AUTOARM_OWNER" != "$pid" ]; then
     jg_lock_release "$lock"
     return 2
   fi
@@ -2199,7 +2199,7 @@ jg_autoarm_reset_owned() {  # <state-dir> <gen>
 #      and the watcher beacon are older than the guard grace (the same stuck
 #      proof as jg_autoarm_claim_open).
 jg_autoarm_claim_abandoned() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} epoch lock role pid owner outcome recorded current
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} epoch lock role pid owner outcome recorded current
   lock="$state/.claude-autoarm.lock"
   epoch="$state/.claude-autoarm-epoch"
   case "$grace" in
@@ -2250,7 +2250,7 @@ jg_autoarm_claim_abandoned() {  # <state-dir> [grace]
 # TERM and the ledger graft below, keeping the documented bounded
 # upgrade-window residual instead of the deadlock.
 jg_autoarm_release_abandoned() {  # <state-dir> [grace]
-  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock steal epoch lock_pid recorded current owner line1 tmp i
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} lock steal epoch lock_pid recorded current owner line1 tmp i
   lock="$state/.claude-autoarm.lock"
   steal="$lock.steal"
   epoch="$state/.claude-autoarm-epoch"
@@ -2311,15 +2311,15 @@ jg_wake_clean_field() {
 
 jg_wake_append() {
   local status=0
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   jg_wake_append_locked "$@" || status=$?
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
 # jg_wake_append_locked <kind> <key> <payload>
 # Locked core of jg_wake_append: appends the wake row under an already-held
-# FM_WAKE_QUEUE_LOCK. Callers that must commit another durable record atomically
+# JG_WAKE_QUEUE_LOCK. Callers that must commit another durable record atomically
 # with the append (holding this lock excludes the drain's acknowledgement, which
 # deletes consumed rows under the same lock) acquire the lock once, run this and
 # their own write, then release.
@@ -2348,13 +2348,13 @@ jg_wake_append_locked() {
     printf '%s\n' "$seq" > "$seq_file" || status=$?
   fi
   if [ "$status" -eq 0 ]; then
-    printf '%s\t%s\t%s\t%s\t%s\n' "$epoch" "$seq" "$kind" "$clean_key" "$clean_payload" >> "$FM_WAKE_QUEUE" || status=$?
+    printf '%s\t%s\t%s\t%s\t%s\n' "$epoch" "$seq" "$kind" "$clean_key" "$clean_payload" >> "$JG_WAKE_QUEUE" || status=$?
   fi
   if [ "$status" -ne 0 ]; then
     _jg_wake_append_recovery_restore_locked || true
   else
-    FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
-    FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+    JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+    JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
   fi
   return "$status"
 }
@@ -2371,15 +2371,15 @@ jg_wake_queued_keys() {
     signal|stale|check|heartbeat) ;;
     *) printf 'jg_wake_queued_keys: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
   esac
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   jg_wake_queued_keys_locked "$kind"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 }
 
 jg_wake_queued_keys_locked() {
   local kind=$1
   awk -F '\t' -v kind="$kind" 'NF >= 5 && $3 == kind && !seen[$4]++ { print $4 }' \
-    "$FM_WAKE_QUEUE" 2>/dev/null || true
+    "$JG_WAKE_QUEUE" 2>/dev/null || true
 }
 
 # jg_wake_withdraw <kind> <key>
@@ -2398,23 +2398,23 @@ jg_wake_withdraw() {
     *) printf 'jg_wake_withdraw: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
   esac
   clean_key=$(printf '%s' "$key" | jg_wake_clean_field)
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
-  if [ ! -f "$FM_WAKE_QUEUE" ]; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
+  if [ ! -f "$JG_WAKE_QUEUE" ]; then
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   # Nothing to do without a matching row, so an idle producer never rewrites the
   # queue on a cadence.
   if ! awk -F '\t' -v kind="$kind" -v key="$clean_key" \
     'NF >= 5 && $3 == kind && $4 == key { found = 1 } END { exit(found ? 0 : 1) }' \
-    "$FM_WAKE_QUEUE"; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    "$JG_WAKE_QUEUE"; then
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   if tmp=$(mktemp "$STATE/.wake-queue.withdraw.XXXXXX") && chmod 0600 "$tmp"; then
     if awk -F '\t' -v kind="$kind" -v key="$clean_key" \
-      '!(NF >= 5 && $3 == kind && $4 == key) { print }' "$FM_WAKE_QUEUE" > "$tmp" \
-      && _jg_atomic_replace "$tmp" "$FM_WAKE_QUEUE"; then
+      '!(NF >= 5 && $3 == kind && $4 == key) { print }' "$JG_WAKE_QUEUE" > "$tmp" \
+      && _jg_atomic_replace "$tmp" "$JG_WAKE_QUEUE"; then
       tmp=
     else
       status=1
@@ -2423,7 +2423,7 @@ jg_wake_withdraw() {
     status=1
   fi
   [ -z "$tmp" ] || rm -f -- "$tmp"
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
@@ -2522,16 +2522,16 @@ jg_wake_commit_secondmate_stall_receipts_through() { # <cutoff> [<rows-file>]
     NF >= 5 && $2 ~ /^[0-9]+$/ && $2 <= cutoff \
       && (rows == "" || ($2 in owned)) && $3 == "check" \
       && $4 ~ /^secondmate-wake-loop-[A-Za-z0-9._-]+-[0-9]+-[0-9]+$/ { print $4 }
-  ' "$FM_WAKE_QUEUE" 2>/dev/null)
+  ' "$JG_WAKE_QUEUE" 2>/dev/null)
 }
 
 jg_wake_restore_queue() {
   local drained=$1 restore
   restore="$STATE/.wake-queue.restore.$(jg_current_pid)"
-  if [ -e "$FM_WAKE_QUEUE" ]; then
-    cat "$drained" "$FM_WAKE_QUEUE" > "$restore" && mv "$restore" "$FM_WAKE_QUEUE"
+  if [ -e "$JG_WAKE_QUEUE" ]; then
+    cat "$drained" "$JG_WAKE_QUEUE" > "$restore" && mv "$restore" "$JG_WAKE_QUEUE"
   else
-    mv "$drained" "$FM_WAKE_QUEUE"
+    mv "$drained" "$JG_WAKE_QUEUE"
   fi
 }
 
@@ -2637,7 +2637,7 @@ jg_wake_branch_grant_live() {  # <rows-file> <owner-file>
 jg_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   local actor=${1:-main} rows=${2:-$STATE/.branch-eligible-rows}
   local owner=${3:-$STATE/.branch-eligible-owner} grant='' count=''
-  [ -f "$FM_WAKE_QUEUE" ] || { printf '0\n'; return 0; }
+  [ -f "$JG_WAKE_QUEUE" ] || { printf '0\n'; return 0; }
   if jg_wake_branch_grant_live "$rows" "$owner"; then
     grant=$rows
   fi
@@ -2647,14 +2647,14 @@ jg_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
       BEGIN { while ((getline line < seqs) > 0) keep[line] = 1 }
       NF >= 5 && $2 ~ /^[0-9]+$/ && ($2 in keep) { n++ }
       END { print n + 0 }
-    ' "$FM_WAKE_QUEUE") || count=''
+    ' "$JG_WAKE_QUEUE") || count=''
   else
     count=$(awk -F '\t' -v seqs="$grant" '
       BEGIN { if (seqs != "") while ((getline line < seqs) > 0) reserved[line] = 1 }
       NF < 5 || $2 !~ /^[0-9]+$/ { n++; next }
       !($2 in reserved) { n++ }
       END { print n + 0 }
-    ' "$FM_WAKE_QUEUE") || count=''
+    ' "$JG_WAKE_QUEUE") || count=''
   fi
   # A queue that exists but cannot be counted (unreadable file, unreadable
   # state/) is not evidence of an empty queue: report a pending row so callers
@@ -2670,11 +2670,11 @@ jg_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 # caller that asks only after the actor that could consume those rows is done.
 # Fails when the queue exists but cannot be read.
 jg_wake_rows_queued() {  # <seq>...
-  [ -f "$FM_WAKE_QUEUE" ] || return 0
+  [ -f "$JG_WAKE_QUEUE" ] || return 0
   awk -F '\t' -v seqs="$*" '
     BEGIN { n = split(seqs, list, " "); for (i = 1; i <= n; i++) want[list[i]] = 1 }
     NF >= 5 && $2 ~ /^[0-9]+$/ && ($2 in want) { print $2 }
-  ' "$FM_WAKE_QUEUE"
+  ' "$JG_WAKE_QUEUE"
 }
 
 # --- signal announcement signatures -----------------------------------------
@@ -2694,7 +2694,7 @@ jg_wake_signal_sig() {  # <file> -> reported-state signature
       status_observed_signature "$1"
       ;;
     *)
-      if [ "$_FM_UNAME" = Darwin ]; then /usr/bin/stat -f '%z:%Fm' "$1" 2>/dev/null; else stat -c '%s:%Y' "$1" 2>/dev/null; fi
+      if [ "$_JG_UNAME" = Darwin ]; then /usr/bin/stat -f '%z:%Fm' "$1" 2>/dev/null; else stat -c '%s:%Y' "$1" 2>/dev/null; fi
       ;;
   esac
 }
@@ -2879,19 +2879,19 @@ EOF
 # Queue payload text is intentionally ignored: it is display data, not a path
 # authority. The caller still verifies the resulting regular file immediately
 # before its bounded read.
-FM_WAKE_STATUS_KEY=
-FM_WAKE_STATUS_HISTORICAL=false
+JG_WAKE_STATUS_KEY=
+JG_WAKE_STATUS_HISTORICAL=false
 jg_wake_status_key_map() {  # <queue-key>
   local key=$1 id
-  FM_WAKE_STATUS_KEY=
-  FM_WAKE_STATUS_HISTORICAL=false
+  JG_WAKE_STATUS_KEY=
+  JG_WAKE_STATUS_HISTORICAL=false
   case "$key" in
     *.status)
       id=${key%.status}
       ;;
     *.turn-ended)
       id=${key%.turn-ended}
-      FM_WAKE_STATUS_HISTORICAL=true
+      JG_WAKE_STATUS_HISTORICAL=true
       ;;
     *)
       return 1
@@ -2901,7 +2901,7 @@ jg_wake_status_key_map() {  # <queue-key>
     ''|.*|*[!A-Za-z0-9._-]*) return 1 ;;
   esac
   [ "${#id}" -le 64 ] || return 1
-  FM_WAKE_STATUS_KEY="$id.status"
+  JG_WAKE_STATUS_KEY="$id.status"
 }
 
 jg_wake_annotation_manifest() {  # <deduped-raw-rows>
@@ -2909,18 +2909,18 @@ jg_wake_annotation_manifest() {  # <deduped-raw-rows>
   while IFS=$(printf '\t') read -r epoch seq kind key payload; do
     [ "$kind" = signal ] || continue
     jg_wake_status_key_map "$key" || continue
-    if [ "$FM_WAKE_STATUS_HISTORICAL" = true ]; then
-      printf '%s\thistorical\n' "$FM_WAKE_STATUS_KEY"
+    if [ "$JG_WAKE_STATUS_HISTORICAL" = true ]; then
+      printf '%s\thistorical\n' "$JG_WAKE_STATUS_KEY"
     else
-      printf '%s\tdirect\n' "$FM_WAKE_STATUS_KEY"
+      printf '%s\tdirect\n' "$JG_WAKE_STATUS_KEY"
     fi
   done <<EOF
 $rows
 EOF
 }
 
-FM_WAKE_EVENT_LINE=
-FM_WAKE_UNREAD_LINES=
+JG_WAKE_EVENT_LINE=
+JG_WAKE_UNREAD_LINES=
 jg_wake_status_cursor_offset() {  # <validated-status-path> -> already-presented byte offset
   local path=$1 offset
   command -v status_presentation_cursor_offset >/dev/null 2>&1 || return 1
@@ -2936,8 +2936,8 @@ jg_wake_status_cursor_offset() {  # <validated-status-path> -> already-presented
 jg_wake_unread_events() {  # <validated-status-path> <unused-tail-byte-cap> <min-offset> [<end-offset>]
   local path=$1 min_offset=$3 end_offset=${4:-} result size chunk chunk_start
   local LC_ALL=C
-  FM_WAKE_EVENT_LINE=
-  FM_WAKE_UNREAD_LINES=
+  JG_WAKE_EVENT_LINE=
+  JG_WAKE_UNREAD_LINES=
   case "$min_offset" in ''|*[!0-9]*) min_offset=0 ;; esac
   result=$(perl -MFcntl=:DEFAULT -e '
     my ($path, $start, $end) = @ARGV;
@@ -2965,7 +2965,7 @@ jg_wake_unread_events() {  # <validated-status-path> <unused-tail-byte-cap> <min
   [ -n "$chunk" ] || return 1
   [ "$min_offset" -lt "$size" ] || return 1
   chunk_start=$min_offset
-  FM_WAKE_UNREAD_LINES=$(printf '%s' "$chunk" | LC_ALL=C awk -v start="$chunk_start" -v min="$min_offset" '
+  JG_WAKE_UNREAD_LINES=$(printf '%s' "$chunk" | LC_ALL=C awk -v start="$chunk_start" -v min="$min_offset" '
     BEGIN { pos = start + 0 }
     {
       line_start = pos
@@ -2973,9 +2973,9 @@ jg_wake_unread_events() {  # <validated-status-path> <unused-tail-byte-cap> <min
       if ($0 ~ /[^[:space:]]/ && line_start >= min) print $0
     }
   ') || return 1
-  [ -n "$FM_WAKE_UNREAD_LINES" ] || return 1
-  FM_WAKE_EVENT_LINE=$(printf '%s\n' "$FM_WAKE_UNREAD_LINES" | tail -1)
-  FM_WAKE_EVENT_LINE=$(printf '%s' "$FM_WAKE_EVENT_LINE" | LC_ALL=C tr '\t\r' '  ')
+  [ -n "$JG_WAKE_UNREAD_LINES" ] || return 1
+  JG_WAKE_EVENT_LINE=$(printf '%s\n' "$JG_WAKE_UNREAD_LINES" | tail -1)
+  JG_WAKE_EVENT_LINE=$(printf '%s' "$JG_WAKE_EVENT_LINE" | LC_ALL=C tr '\t\r' '  ')
 }
 
 jg_wake_latest_event() {  # <validated-status-path> <tail-byte-cap>
@@ -3007,10 +3007,10 @@ jg_wake_print_annotations() {  # <deduped-raw-rows> [<presentation-snapshot>]
 
   # Test-only latency seam for proving that queue appends remain independent of
   # a slow best-effort annotation phase.
-  case "${FM_WAKE_ENRICH_TEST_DELAY:-0}" in
+  case "${JG_WAKE_ENRICH_TEST_DELAY:-0}" in
     0) ;;
     ''|*[!0-9]*) ;;
-    *) sleep "$FM_WAKE_ENRICH_TEST_DELAY" ;;
+    *) sleep "$JG_WAKE_ENRICH_TEST_DELAY" ;;
   esac
 
   while IFS=$(printf '\t') read -r status_key mode; do
@@ -3048,7 +3048,7 @@ EOF
       # presentation commit will reject a changed snapshot identity.
       continue
     fi
-    last_event=$FM_WAKE_EVENT_LINE
+    last_event=$JG_WAKE_EVENT_LINE
     while IFS= read -r event_line || [ -n "$event_line" ]; do
       [ -n "$event_line" ] || continue
       event_line=$(printf '%s' "$event_line" | LC_ALL=C tr '\t\r' '  ')
@@ -3062,7 +3062,7 @@ EOF
       line="$prefix: $status_key: $event_line"
       printf '%s\n' "$line" || return 1
     done <<EOF
-$FM_WAKE_UNREAD_LINES
+$JG_WAKE_UNREAD_LINES
 EOF
   done <<EOF
 $manifest

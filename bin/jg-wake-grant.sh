@@ -17,7 +17,7 @@ LOCK_HELD=false
 cleanup() {
   local status=$?
   [ -z "$TMP" ] || rm -f -- "$TMP" 2>/dev/null || true
-  [ "$LOCK_HELD" = false ] || jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ "$LOCK_HELD" = false ] || jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   exit "$status"
 }
 trap cleanup EXIT
@@ -43,7 +43,7 @@ case "${1:-}" in
     TMP=$(mktemp "$STATE/.branch-eligible-owner.tmp.XXXXXX") || exit 1
     printf '%s\n%s\n%s\n%s\n' jg-branch-eligible-owner-v1 "$pid" "$identity" "$generation" > "$TMP" || exit 1
     chmod 0600 "$TMP" || exit 1
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
     LOCK_HELD=true
     [ "$(jg_pid_identity "$pid" 2>/dev/null || true)" = "$identity" ] || exit 1
     rm -f -- "$BRANCH_ROWS" || exit 1
@@ -59,7 +59,7 @@ case "${1:-}" in
     printf '%s\n' "$@" > "$TMP" || exit 1
     chmod 0600 "$TMP" || exit 1
     rows_valid "$TMP" || exit 2
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
     LOCK_HELD=true
     owner_matches '' "$generation" || exit 1
     replace=1
@@ -77,7 +77,7 @@ case "${1:-}" in
         for (seq in wanted) if (seq in owned) exit 3
         for (seq in wanted) if (!(seq in present)) exit 1
       }
-    ' "$FM_WAKE_QUEUE"
+    ' "$JG_WAKE_QUEUE"
     rc=$?
     [ "$rc" -eq 0 ] || exit "$rc"
     if [ "$replace" -eq 1 ]; then
@@ -88,7 +88,7 @@ case "${1:-}" in
   release)
     generation=${2:-}
     [ "$#" -eq 2 ] || exit 2
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
     LOCK_HELD=true
     owner_matches '' "$generation" || exit 1
     rm -f -- "$BRANCH_ROWS" || exit 1
@@ -97,7 +97,7 @@ case "${1:-}" in
     pid=${2:-}
     generation=${3:-}
     [ "$#" -eq 3 ] || exit 2
-    jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
     LOCK_HELD=true
     owner_matches "$pid" "$generation" || exit 1
     rm -f -- "$BRANCH_ROWS" "$BRANCH_OWNER" || exit 1
@@ -108,6 +108,6 @@ case "${1:-}" in
     ;;
 esac
 
-jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+jg_lock_release "$JG_WAKE_QUEUE_LOCK"
 LOCK_HELD=false
 exit 0

@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # The supervisor-work guard end to end: install into a throwaway HOME, run the
 # installed hook against fixture homes, a linked worktree and a worker session,
-# then uninstall. Needs a Firstmate checkout (FM_CODE_ROOT) for the scope predicate
+# then uninstall. Needs a Firstmate checkout (JG_CODE_ROOT) for the scope predicate
 # and the shell lexer, and fails (not skips) without jq or node.
 # shellcheck disable=SC2016 # single-quoted commands are literal payloads for the guard.
 set -u
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-CK=${FM_CODE_ROOT:-}
+CK=${JG_CODE_ROOT:-}
 [ -n "$CK" ] && [ -f "$CK/bin/jg-primary-scope-lib.sh" ] \
-  || { echo "FAIL: set FM_CODE_ROOT to a Firstmate checkout"; exit 1; }
+  || { echo "FAIL: set JG_CODE_ROOT to a Firstmate checkout"; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "FAIL: jq is required"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "FAIL: node is required"; exit 1; }
 

@@ -34,7 +34,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate default-on FM_HARNESS_LIVENESS_DRIFT tmux
+jg_live_gate default-on JG_HARNESS_LIVENESS_DRIFT tmux
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

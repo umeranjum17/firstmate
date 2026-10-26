@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: drive nm-drain.sh and install.sh against a throwaway firstmate home, HOME and state DB, with a fake
 # no-mistakes first on PATH that records every call and fails on --force. Usage: nm-drain/tests/nm-drain.test.sh
 set -euo pipefail
@@ -79,21 +88,21 @@ for s in jg-check-register.sh jg-check-unregister.sh; do printf '#!/bin/sh\necho
 for old in nm-quiet nm-update nm-upgrade; do : > "$FM/state/$old.check.sh"; done
 before=$(find "$d" | sort)
 out=$("$SRC/install.sh" --dry-run "$FM" 2>&1)
-has "e: register" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/jg-check-register.sh 0-nm-drain"
-for old in nm-quiet nm-update nm-upgrade; do has "e: unregister $old" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/jg-check-unregister.sh $old"; done
+has "e: register" "$out" "would run: env -u JG_STATE_OVERRIDE JG_HOME=$FM $FM/bin/jg-check-register.sh 0-nm-drain"
+for old in nm-quiet nm-update nm-upgrade; do has "e: unregister $old" "$out" "would run: env -u JG_STATE_OVERRIDE JG_HOME=$FM $FM/bin/jg-check-unregister.sh $old"; done
 check "e: nothing written" "$(find "$d" | sort)" "$before"
 
-# (f) real install with FM_STATE_OVERRIDE exported empty: the stubs fail if it reaches them, so register and all
+# (f) real install with JG_STATE_OVERRIDE exported empty: the stubs fail if it reaches them, so register and all
 #     three unregisters must run without it.
 for s in jg-check-register.sh jg-check-unregister.sh; do
   cat > "$FM/bin/$s" <<'EOF'
 #!/bin/sh
-if [ "${FM_STATE_OVERRIDE+set}" ]; then echo "override leaked" >&2; exit 1; fi
-echo "${0##*/} $1" >> "$FM_HOME/calls"
+if [ "${JG_STATE_OVERRIDE+set}" ]; then echo "override leaked" >&2; exit 1; fi
+echo "${0##*/} $1" >> "$JG_HOME/calls"
 EOF
 done
-out=$(FM_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
-check "f: install exits 0 with FM_STATE_OVERRIDE=''" "$rc" 0
+out=$(JG_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
+check "f: install exits 0 with JG_STATE_OVERRIDE=''" "$rc" 0
 check "f: register and unregisters ran" "$(cat "$FM/calls" 2>/dev/null)" "$(printf 'jg-check-register.sh 0-nm-drain\njg-check-unregister.sh nm-quiet\njg-check-unregister.sh nm-update\njg-check-unregister.sh nm-upgrade')"
 check "f: shim written" "$(sed -n 2p "$FM/state/0-nm-drain.check.sh")" "exec $XDG_DATA_HOME/jg-nm-drain/nm-drain.sh check $FM"
 

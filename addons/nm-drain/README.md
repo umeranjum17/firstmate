@@ -40,5 +40,5 @@ The `0-` id sorts the check first, because a check that wakes ends the watcher's
 
 ## Test
 
-`nm-drain/tests/nm-drain.test.sh` drives the CLI, the check and `install.sh` end to end, both as `--dry-run` and as a real install that must register and retire the old checks even with `FM_STATE_OVERRIDE` exported empty.
+`nm-drain/tests/nm-drain.test.sh` drives the CLI, the check and `install.sh` end to end, both as `--dry-run` and as a real install that must register and retire the old checks even with `JG_STATE_OVERRIDE` exported empty.
 It uses a throwaway home, HOME and state database, with a fake `no-mistakes` first on `PATH` that records every call and fails on `--force`.

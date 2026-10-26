@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # run-proof-codex-rest.sh: prove a stale Codex rest clears when the reading has null
-# five_hour and seven_day.left >= FM_ACCOUNT_POOL_REST_FLOOR (default 15). Copies the
+# five_hour and seven_day.left >= JG_ACCOUNT_POOL_REST_FLOOR (default 15). Copies the
 # live pool Codex reading and rested list into a temp --state dir (never edits the live
 # rest file), then runs pick. Requires a pool state with codex-accounts.json and
-# codex-accounts-rested/<id> (set POOL_STATE, or FM_HOME with config/account-pool
+# codex-accounts-rested/<id> (set POOL_STATE, or JG_HOME with config/account-pool
 # state=). Screen: none.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -15,15 +24,15 @@ resolve_pool_state() {
     printf '%s\n' "$POOL_STATE"
     return
   fi
-  [ -n "${FM_HOME:-}" ] || return 1
-  local cfg=$FM_HOME/config/account-pool line=
+  [ -n "${JG_HOME:-}" ] || return 1
+  local cfg=$JG_HOME/config/account-pool line=
   [ -r "$cfg" ] || return 1
   line=$(grep -E '^state=' "$cfg" | head -n1) || return 1
   printf '%s\n' "${line#state=}"
 }
 
 pool_state=$(resolve_pool_state) || {
-  echo "error: set POOL_STATE or FM_HOME with config/account-pool state=" >&2
+  echo "error: set POOL_STATE or JG_HOME with config/account-pool state=" >&2
   exit 1
 }
 [ -r "$pool_state/codex-accounts.json" ] || {
@@ -69,7 +78,7 @@ bash "$repo/claude-accounts/tests/claude-accounts-pick.test.sh" >"$evidence/pick
 
 rc=0
 out=$(env -i PATH="$PATH" HOME="$work" TMPDIR="$work" \
-  FM_CLAUDE_ACCOUNTS_REGISTRY="$work/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=999999 \
+  JG_CLAUDE_ACCOUNTS_REGISTRY="$work/registry.json" JG_CLAUDE_ACCOUNTS_FRESH=999999 \
   "$pick" pick codex --json --state "$work/state" 2>"$work/stderr") || rc=$?
 printf '%s\n' "$out" >"$evidence/codex-pick.json"
 {
@@ -85,7 +94,7 @@ printf '%s\n' "$out" >"$evidence/codex-pick.json"
 
 ok=$(jq -r '.ok // false' <<<"$out" 2>/dev/null || echo false)
 id=$(jq -r '.id // empty' <<<"$out" 2>/dev/null || true)
-floor=${FM_ACCOUNT_POOL_REST_FLOOR:-15}
+floor=${JG_ACCOUNT_POOL_REST_FLOOR:-15}
 recovered=$(jq -r --argjson floor "$floor" '.accounts[]? | select(.problem == null and (
   if .five_hour == null and .seven_day != null then .seven_day.left >= $floor
   else ([.five_hour, .seven_day] | map(select(. != null)) | length > 0 and all(.left == 100))

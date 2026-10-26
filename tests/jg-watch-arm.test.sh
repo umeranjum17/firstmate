@@ -50,8 +50,8 @@ ARM_PID=
 # Start the real watcher as the singleton holder.
 start_seed_watcher() {  # <state> <fakebin> <watch-out> [poll-seconds]
   local state=$1 fakebin=$2 out=$3 poll=${4:-5} i
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL="$poll" FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL="$poll" JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   SEED_PID=$!
   i=0
   # Initial supervision can include a large pending-reply scan. A lock alone
@@ -71,8 +71,8 @@ start_seed_watcher() {  # <state> <fakebin> <watch-out> [poll-seconds]
 # Attach a real arm to the live cycle.
 start_attached_arm() {  # <state> <fakebin> <arm-out> <confirm-timeout>
   local state=$1 fakebin=$2 armout=$3 confirm=$4 i
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 \
-    FM_ARM_CONFIRM_TIMEOUT="$confirm" "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 \
+    JG_ARM_CONFIRM_TIMEOUT="$confirm" "$WATCH_ARM" > "$armout" &
   ARM_PID=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -140,7 +140,7 @@ wait_for_file_text() {  # <file> <fixed-text>
 ack_wakes() {  # <state>
   local state=$1 sequence generation err
   err="$state/.test-ack.err"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
+  JG_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
@@ -149,7 +149,7 @@ ack_wakes() {  # <state>
     case "$(cat "$state/.watcher-down" 2>/dev/null || true)" in pending:*|announced:*) return 1 ;; esac
     return 0
   fi
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
 
@@ -165,10 +165,10 @@ drain_ack_pair() {  # <drain-stderr>
 
 start_rearm_arm() {  # <home> <state> <fakebin> <arm-out> [predecessor-arm-pid]
   local home=$1 state=$2 fakebin=$3 armout=$4 predecessor=${5:-} i
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" \
-    FM_WATCH_PREDECESSOR_ARM_PID="$predecessor" \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" \
+    JG_WATCH_PREDECESSOR_ARM_PID="$predecessor" \
     "$WATCH_ARM" --restart > "$armout" &
   ARM_PID=$!
   # Wait for the arm to confirm its watcher or exit, within a ceiling that
@@ -232,7 +232,7 @@ test_attached_arm_reports_the_delivered_wake_after_drain() {
   # The handling turn consumes the records before the attached arm closes: the
   # queue is empty again, while the watcher's identity-bound terminal record
   # still proves which cycle delivered the reason.
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 || fail "drain failed"
+  JG_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 || fail "drain failed"
   ack_wakes "$state" || fail "handling acknowledgement failed"
   [ ! -s "$state/.wake-queue" ] || fail "acknowledgement left records behind"
 
@@ -324,8 +324,8 @@ test_attached_arm_follows_a_slow_live_holder() {
   out="$dir/watch.out"
   armout="$dir/arm.out"
   start_seed_watcher "$state" "$fakebin" "$out" 1
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 \
-    FM_ARM_CONFIRM_TIMEOUT=1 FM_GUARD_GRACE=4 FM_WATCHER_STALL_BOUND=600 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 \
+    JG_ARM_CONFIRM_TIMEOUT=1 JG_GUARD_GRACE=4 JG_WATCHER_STALL_BOUND=600 "$WATCH_ARM" > "$armout" &
   ARM_PID=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -341,7 +341,7 @@ test_attached_arm_follows_a_slow_live_holder() {
   # the old arm gave up; hold the holder well past that. Observe while frozen,
   # but resume before asserting so a failure never strands a stopped watcher.
   i=0
-  while [ "$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_path_age "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$state/.last-watcher-beat")" -lt 10 ] \
+  while [ "$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_path_age "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$state/.last-watcher-beat")" -lt 10 ] \
     && [ "$i" -lt 300 ]; do
     sleep 0.1
     i=$((i + 1))
@@ -387,7 +387,7 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   # the shape of a watcher wedged mid-cycle that still answers TERM.
   sleep 300 &
   holder=$!
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
     || fail "could not identify the fake holder"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
@@ -396,8 +396,8 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   : > "$state/.last-watcher-beat"
 
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 \
-    FM_ARM_CONFIRM_TIMEOUT=1 FM_GUARD_GRACE=5 FM_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 \
+    JG_ARM_CONFIRM_TIMEOUT=1 JG_GUARD_GRACE=5 JG_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" &
   ARM_PID=$!
   wait_for_exit "$ARM_PID" 300
   status=$?
@@ -416,9 +416,9 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   # The owner's retry: a fresh arm reaches the watcher's eviction path, and the
   # replacement surfaces an ordinary wake instead of the refusal that used to
   # end in the auto-arm FAILED notice.
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT=10 FM_GUARD_GRACE=5 FM_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$rearmout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT=10 JG_GUARD_GRACE=5 JG_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$rearmout" 2>&1 &
   ARM_PID=$!
   wait_for_exit "$ARM_PID" 300
   status=$?
@@ -439,10 +439,10 @@ test_concurrent_rearm_waits_for_recorded_child_retirement() (
   dir=$(make_case "concurrent-child-retirement-$mode")
   state="$dir/state"
   fakebin="$dir/fakebin"
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=0
-  export FM_GUARD_GRACE=300 FM_WATCHER_STALE_GRACE=1 FM_WATCHER_STALL_BOUND=3
-  export FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=30
-  trap 'FM_HOME="$dir" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop >/dev/null 2>&1 || true
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_POLL=1 JG_SIGNAL_GRACE=0
+  export JG_GUARD_GRACE=300 JG_WATCHER_STALE_GRACE=1 JG_WATCHER_STALL_BOUND=3
+  export JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 JG_ARM_CONFIRM_TIMEOUT=30
+  trap 'JG_HOME="$dir" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop >/dev/null 2>&1 || true
     for id in "$holder" "$child" "$first" "$second" "$evictor" "$unrelated"; do
       [ -z "$id" ] || kill -KILL "$id" 2>/dev/null || true
     done
@@ -451,7 +451,7 @@ test_concurrent_rearm_waits_for_recorded_child_retirement() (
   unrelated=$!
   cat > "$state/hung.check.sh" <<'SH'
 #!/usr/bin/env bash
-python3 - "$FM_HOME/child.pid" <<'PYTHON'
+python3 - "$JG_HOME/child.pid" <<'PYTHON'
 import subprocess, sys
 child = subprocess.Popen([sys.executable, "-c", """
 import os, signal, sys, time
@@ -484,7 +484,7 @@ SH
     sleep 0.1
   done
   "$ROOT/bin/jg-check-unregister.sh" hung >/dev/null || fail "retire concurrent-rearm check"
-  PATH="$fakebin:$PATH" FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/first.out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/first.out" 2>&1 &
   first=$!
   for ((i=0; i<100; i++)); do
     [ -n "$evictor" ] || evictor=$(cat "$state/.watch.lock.steal/pid" 2>/dev/null || true)
@@ -495,7 +495,7 @@ SH
   is_live_non_zombie "$child" || fail "the child did not survive into the TERM grace"
   [ "$mode" != interrupted ] || { [ -n "$evictor" ] && kill -KILL "$evictor"; } \
     || fail "could not interrupt the partial eviction"
-  PATH="$fakebin:$PATH" FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/second.out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/second.out" 2>&1 &
   second=$!
   for ((i=0; i<150; i++)); do
     is_live_non_zombie "$child" || break
@@ -541,7 +541,7 @@ test_rearm_evicts_a_stalled_holder_that_inherited_ignored_term() (
     i=$((i + 1))
   done
   [ -e "$dir/ready" ] || fail "TERM-ignoring holder did not start"
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
     || fail "could not identify the TERM-ignoring holder"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
@@ -550,10 +550,10 @@ test_rearm_evicts_a_stalled_holder_that_inherited_ignored_term() (
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   touch -t 200001010000 "$state/.last-watcher-beat"
 
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" FM_GUARD_GRACE=5 \
-    FM_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" JG_GUARD_GRACE=5 \
+    JG_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" 2>&1 &
   armpid=$!
   wait_for_exit "$armpid" "$REARM_EXIT_POLLS"
   status=$?
@@ -595,7 +595,7 @@ test_rearm_does_not_kill_a_holder_that_changed_during_term_grace() (
     i=$((i + 1))
   done
   [ -e "$dir/ready" ] || fail "changing holder did not start"
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$holder") \
     || fail "could not identify changing holder"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
@@ -604,10 +604,10 @@ test_rearm_does_not_kill_a_holder_that_changed_during_term_grace() (
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   touch -t 200001010000 "$state/.last-watcher-beat"
 
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" FM_GUARD_GRACE=5 \
-    FM_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" JG_GUARD_GRACE=5 \
+    JG_WATCHER_STALL_BOUND=12 "$WATCH_ARM" > "$armout" 2>&1 &
   armpid=$!
   wait_for_exit "$armpid" "$REARM_EXIT_POLLS"
   status=$?
@@ -638,14 +638,14 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   # secondmate's decision onto the parent status surface the shared fold owns.
   write_remote_delta "$result" \
     'needs-decision [key=remote-signoff]: remote secondmate is held for captain sign-off'
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$home/data" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$home/data" \
     "$ROOT/bin/jg-procevent-remote-reply.sh" ingest ios "$result" >/dev/null \
     || fail "remote parent-reply ingest failed"
 
   # Drain once before the outage to establish the incremental cursor and the
   # signal suppressor that a watcher had already observed. The decision remains
   # intentionally open across the watcher-down interval.
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/baseline-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/baseline-drain.out" \
     || fail "baseline drain failed"
   ack_wakes "$state" || fail "baseline handling acknowledgement failed"
   grep -F 'remote secondmate is held for captain sign-off' "$dir/baseline-drain.out" >/dev/null \
@@ -679,7 +679,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   # The normal wake-handling drain is the one owner of both queue consumption
   # and the cursor-backed fold. It must expose every queued record and the
   # already-open remote decision without relying on another user message.
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drainout" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drainout" \
     || fail "drain after re-arm recovery failed"
   grep "$(printf '\tcheck\tremote-reply-ios\t')" "$drainout" >/dev/null \
     || fail "remote-reply wake queued during downtime was not drained"
@@ -706,7 +706,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   start_rearm_arm "$home" "$state" "$fakebin" "$dir/decision-handling-successor.out" "$decision_recovery_arm"
   is_live_non_zombie "$ARM_PID" || fail "decision handling successor re-triggered before the drain"
   decision_successor=$ARM_PID
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/decision-only-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/decision-only-drain.out" \
     2> "$dir/decision-only-drain.err" || fail "decision-only drain after re-arm recovery failed"
   grep -F 'ios [key=remote-signoff] needs-decision: remote secondmate is held for captain sign-off' \
     "$dir/decision-only-drain.out" >/dev/null \
@@ -726,7 +726,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS" || fail "interrupted decision handling was not recovered on successor re-arm"
   grep -F 'check: rearm-resurface' "$dir/interrupted-decision-arm.out" >/dev/null \
     || fail "successor did not re-surface the unacknowledged decision recovery"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/replayed-decision-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/replayed-decision-drain.out" \
     2> "$dir/replayed-decision-drain.err" || fail "replayed decision recovery drain failed"
   grep -F 'ios [key=remote-signoff] needs-decision: remote secondmate is held for captain sign-off' \
     "$dir/replayed-decision-drain.out" >/dev/null \
@@ -735,7 +735,7 @@ test_rearm_resurfaces_durable_queue_and_remote_open_decision() {
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$dir/replayed-decision-drain.err")
   [ "$sequence" = 0 ] && [ -n "$generation" ] \
     || fail "replayed decision recovery omitted its current acknowledgement generation"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" --recovery-generation "$generation" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" --recovery-generation "$generation" \
     || fail "completed decision handling could not acknowledge current recovery"
   start_rearm_arm "$home" "$state" "$fakebin" "$dir/decision-successor-arm.out"
   is_live_non_zombie "$ARM_PID" || fail "acknowledged decision recovery did not leave a live successor"
@@ -796,7 +796,7 @@ SH
   # while no longer testing a slow cycle at all.
   [ $(( $(date +%s) - started )) -ge 12 ] \
     || fail "the delayed tools did not hold the re-arm past the old fixed wait"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
     || fail "slow re-arm recovery drain failed"
   grep "$(printf '\tcheck\tstartup-network\t')" "$dir/drain.out" >/dev/null \
     || fail "wake queued before the slow re-arm was not drained"
@@ -850,7 +850,7 @@ test_delivery_gap_wake_is_recovered_once() {
   grep -q '^signal:' "$dir/first-arm.out" \
     || fail "first watcher did not report its delivered wake"
 
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/first-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/first-drain.out" \
     || fail "first handling drain failed"
   ack_wakes "$state" || fail "first handling acknowledgement failed"
   append_wake "$state" check startup-network 'check: startup-network during handling gap'
@@ -860,7 +860,7 @@ test_delivery_gap_wake_is_recovered_once() {
   grep -F 'check: rearm-resurface' "$dir/gap-arm.out" >/dev/null \
     || fail "delivery-gap successor did not emit one recovery wake: $(cat "$dir/gap-arm.out")"
 
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/gap-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/gap-drain.out" \
     || fail "delivery-gap recovery drain failed"
   grep "$(printf '\tcheck\tstartup-network\t')" "$dir/gap-drain.out" >/dev/null \
     || fail "wake queued in the delivery gap was not drained"
@@ -923,7 +923,7 @@ test_interrupted_handling_is_redrained_on_rearm() {
   esac
   handling_generation=$(recovery_marker_generation "$state/.watcher-down")
   handling_watcher_pid=$(sed -n 's/^watcher: started pid=\([0-9][0-9]*\).* recovery-generation=.*$/\1/p' "$dir/handling-successor-arm.out")
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$handling_generation" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$handling_generation" \
     --watcher-pid "$handling_watcher_pid" \
     || fail "confirmed prompt delivery did not begin handling"
   case "$(cat "$state/.watcher-down" 2>/dev/null || true)" in
@@ -932,7 +932,7 @@ test_interrupted_handling_is_redrained_on_rearm() {
   esac
   ! grep -F 'check: rearm-resurface' "$dir/handling-successor-arm.out" >/dev/null \
     || fail "expected handling successor emitted a recursive recovery wake"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/interrupted-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/interrupted-drain.out" \
     2> "$dir/interrupted-drain.err" || fail "handling drain did not expose the durable wake"
   grep "$(printf '\tsignal\tinterrupted.status\t')" "$dir/interrupted-drain.out" >/dev/null \
     || fail "handling drain did not present the durable wake"
@@ -951,7 +951,7 @@ test_interrupted_handling_is_redrained_on_rearm() {
   wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS" || fail "successor after interruption did not re-surface the pending wake"
   grep -F 'check: rearm-resurface' "$dir/recovery-arm.out" >/dev/null \
     || fail "successor after interruption did not emit durable recovery"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/replay-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/replay-drain.out" \
     2> "$dir/replay-drain.err" || fail "successor could not re-drain the interrupted wake"
   grep "$(printf '\tsignal\tinterrupted.status\t')" "$dir/replay-drain.out" >/dev/null \
     || fail "successor did not re-drain the still-durable wake"
@@ -959,7 +959,7 @@ test_interrupted_handling_is_redrained_on_rearm() {
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$dir/replay-drain.err")
   [ -n "$sequence" ] && [ -n "$generation" ] \
     || fail "re-drain did not emit a generation-bound post-handling acknowledgement command"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation" \
     || fail "completed replay could not acknowledge the handled wake"
   [ ! -s "$state/.wake-queue" ] || fail "acknowledged replay remained in the durable queue"
@@ -982,7 +982,7 @@ test_malformed_marker_is_quarantined_once() {
   invalid_count=$(find "$state" -maxdepth 1 -type d -name '.watcher-down.invalid.*' | wc -l | tr -d '[:space:]')
   [ "$invalid_count" -eq 1 ] || fail "malformed marker was not quarantined exactly once"
 
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/recovery-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/recovery-drain.out" \
     || fail "malformed-marker recovery drain failed"
   ack_wakes "$state" || fail "malformed-marker handling acknowledgement failed"
   start_rearm_arm "$home" "$state" "$fakebin" "$dir/stable-successor.out"
@@ -1011,7 +1011,7 @@ test_recovery_consumption_serializes_queue_publication() {
     || fail "publisher did not restore recovery evidence"
   grep "$(printf '\tcheck\tstartup-network\t')" "$state/.wake-queue" >/dev/null \
     || fail "publisher did not durably append its wake"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
     || fail "publisher recovery drain failed"
   grep "$(printf '\tcheck\tstartup-network\t')" "$dir/drain.out" >/dev/null \
     || fail "publisher wake was not surfaced and drained"
@@ -1065,7 +1065,7 @@ test_markerless_legacy_queue_is_recovered_on_arm() {
     pending:downtime:*|announced:downtime:*) ;;
     *) fail "markerless legacy queue was not adopted into downtime recovery" ;;
   esac
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" \
     || fail "adopted legacy queue could not be drained"
   grep -F "$row" "$dir/drain.out" >/dev/null \
     || fail "adopted legacy wake was not presented"
@@ -1104,23 +1104,23 @@ RESULT
 SH
   chmod +x "$source"
 
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
     "$ROOT/bin/jg-procevent.sh" register lavish idle-lavish -- "$source" "$trigger" \
     >/dev/null || fail "could not register the Lavish fixture source"
-  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+  JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
     "$ROOT/bin/jg-procevent.sh" reconcile >/dev/null \
     || fail "could not start the Lavish fixture source"
   printf 'pending:downtime:idle-lavish.1.fixture\n' > "$state/.watcher-down"
 
-  FM_ROOT_OVERRIDE="$ROOT" start_rearm_arm "$home" "$state" "$fakebin" "$first_out"
+  JG_ROOT_OVERRIDE="$ROOT" start_rearm_arm "$home" "$state" "$fakebin" "$first_out"
   wait_for_exit "$ARM_PID" 80 || fail "the first recovery arm did not surface"
   grep -F 'check: rearm-resurface' "$first_out" >/dev/null \
     || fail "the pending recovery generation did not get its first announcement"
   [ ! -s "$state/.wake-queue" ] \
     || fail "the idle Lavish source produced a wake before any result"
 
-  FM_ROOT_OVERRIDE="$ROOT" start_rearm_arm "$home" "$state" "$fakebin" "$idle_out"
+  JG_ROOT_OVERRIDE="$ROOT" start_rearm_arm "$home" "$state" "$fakebin" "$idle_out"
   i=0
   while [ "$i" -lt 30 ] && is_live_non_zombie "$ARM_PID"; do
     sleep 0.1
@@ -1129,7 +1129,7 @@ SH
   if ! is_live_non_zombie "$ARM_PID"; then
     : > "$trigger"
     wait "$ARM_PID" 2>/dev/null || true
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
       "$ROOT/bin/jg-procevent.sh" retire idle-lavish >/dev/null 2>&1 || true
     fail "an idle live Lavish source re-fired recovery with an empty queue: $(cat "$idle_out")"
   fi
@@ -1195,7 +1195,7 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
   grep "$(printf '\tsignal\thandled.status\t')" "$state/.wake-queue" >/dev/null \
     || fail "delivered wake was not durable before handling"
 
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" \
     || fail "handling drain did not present the durable wake"
   pair=$(drain_ack_pair "$dir/drain.err") \
     || fail "drain did not print a generation-bound acknowledgement command"
@@ -1212,7 +1212,7 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
 
   [ "$(cat "$state/.watcher-down" 2>/dev/null || true)" = "pending:downtime:$generation" ] \
     || fail "repeated publications during handling replaced the outstanding recovery generation"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation" 2> "$dir/ack.err" \
     || fail "the printed acknowledgement was rejected after repeated publications: $(cat "$dir/ack.err")"
   ! grep "$(printf '\tsignal\thandled.status\t')" "$state/.wake-queue" >/dev/null \
@@ -1220,11 +1220,11 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
   grep "$(printf '\tsignal\tduring-handling.status\t')" "$state/.wake-queue" >/dev/null \
     || fail "the newer handling-window wake was over-consumed"
 
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/remaining-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/remaining-drain.out" \
     2> "$dir/remaining-drain.err" || fail "remaining wake could not be re-drained"
   pair=$(drain_ack_pair "$dir/remaining-drain.err") \
     || fail "remaining drain did not print an acknowledgement command"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "${pair%%$'\t'*}" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "${pair%%$'\t'*}" \
     --recovery-generation "${pair##*$'\t'}" \
     || fail "remaining handling-window wake could not be acknowledged"
   [ ! -s "$state/.wake-queue" ] || fail "remaining wake was not consumed"
@@ -1260,13 +1260,13 @@ test_moved_generation_acknowledgement_is_self_healing() {
   is_live_non_zombie "$ARM_PID" || fail "moved-generation fixture watcher did not stay live"
   printf 'done: first handled wake\n' > "$state/first.status"
   wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS" || fail "fixture watcher did not deliver its first wake"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/first-drain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/first-drain.out" \
     2> "$dir/first-drain.err" || fail "first drain did not present the durable wake"
   pair=$(drain_ack_pair "$dir/first-drain.err") \
     || fail "first drain did not print a generation-bound acknowledgement command"
   first_sequence=${pair%%$'\t'*}
   first_generation=${pair##*$'\t'}
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$first_sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$first_sequence" \
     --recovery-generation "$first_generation" \
     || fail "the first handled wake could not be acknowledged"
 
@@ -1282,7 +1282,7 @@ test_moved_generation_acknowledgement_is_self_healing() {
 
   # Replaying the stale pair must not fail, must not over-consume, and must not
   # retire the newer episode.
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$first_sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$first_sequence" \
     --recovery-generation "$first_generation" 2> "$dir/stale-ack.err" \
     || fail "a replayed stale acknowledgement was rejected instead of degrading safely"
   if ! grep -F 'WAKE_ACK_REQUIRED' "$dir/stale-ack.err" >/dev/null \
@@ -1296,7 +1296,7 @@ test_moved_generation_acknowledgement_is_self_healing() {
 
   # The sequence alone owns consumption, so the handled rows go even while the
   # generation is stale, and only the episode stays pending.
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through 999 \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through 999 \
     --recovery-generation "$first_generation" 2> "$dir/stale-consume.err" \
     || fail "a stale acknowledgement refused to consume the rows it was given"
   [ ! -s "$state/.wake-queue" ] \
@@ -1305,11 +1305,11 @@ test_moved_generation_acknowledgement_is_self_healing() {
     || fail "row consumption under a stale generation retired the pending episode"
 
   # Following the printed remedy closes the episode, so the loop is self-healing.
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/redrain.out" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/redrain.out" \
     2> "$dir/redrain.err" || fail "the remedy re-drain did not run"
   pair=$(drain_ack_pair "$dir/redrain.err") \
     || fail "the remedy re-drain did not print the newer acknowledgement command"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "${pair%%$'\t'*}" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "${pair%%$'\t'*}" \
     --recovery-generation "${pair##*$'\t'}" \
     || fail "the newer recovery episode could not be acknowledged"
   case "$(cat "$state/.watcher-down" 2>/dev/null || true)" in
@@ -1329,8 +1329,8 @@ test_stop_ends_the_home_watcher_and_publishes_downtime() {
   state="$home/state"
   fakebin=$(make_case stop-home-watcher-bin)/fakebin
   mkdir -p "$state"
-  FM_HOME="$home" start_seed_watcher "$state" "$fakebin" "$dir/watch.out"
-  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop 2>&1); status=$?
+  JG_HOME="$home" start_seed_watcher "$state" "$fakebin" "$dir/watch.out"
+  out=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop 2>&1); status=$?
   expect_code 0 "$status" "--stop of a live home watcher must succeed"
   assert_contains "$out" "watcher: stopped pid=$SEED_PID" "--stop must name the watcher it stopped"
   wait_for_exit "$SEED_PID" 50 >/dev/null 2>&1 || true
@@ -1339,7 +1339,7 @@ test_stop_ends_the_home_watcher_and_publishes_downtime() {
     pending:downtime:*|announced:downtime:*) ;;
     *) fail "--stop did not leave downtime published: $(cat "$state/.watcher-down" 2>/dev/null)" ;;
   esac
-  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop 2>&1); status=$?
+  out=$(PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --stop 2>&1); status=$?
   expect_code 0 "$status" "--stop with no watcher must succeed"
   assert_contains "$out" "watcher: none running" "--stop with no watcher must say so"
   pass "watch-arm: --stop ends only this home's watcher, publishes downtime, and reports when none runs"
@@ -1354,13 +1354,13 @@ test_take_over_attaches_to_a_cycle_the_named_arm_does_not_own() {
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  FM_HOME="$dir" start_seed_watcher "$state" "$fakebin" "$dir/watch.out"
+  JG_HOME="$dir" start_seed_watcher "$state" "$fakebin" "$dir/watch.out"
   sleep 60 &
   other=$!
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --take-over 2>/dev/null
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --take-over 2>/dev/null
   status=$?
   expect_code 2 "$status" "--take-over without an arm pid must be refused"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 \
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 \
     "$WATCH_ARM" --take-over "$other" > "$armout" &
   ARM_PID=$!
   wait_for_file_text "$armout" "watcher: attached pid=$SEED_PID" \
@@ -1392,8 +1392,8 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   append_wake "$state" signal take-over "signal: fixture handled by main"
   ack_wakes "$state" >/dev/null || fail "fixture: main could not acknowledge the handled wake"
   case "$(cat "$state/.watcher-down" 2>/dev/null)" in acked:*) ;; *) fail "fixture: the episode was not acknowledged" ;; esac
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH_ARM" --take-over "$owner" > "$armout" &
   ARM_PID=$!
   wait_for_file_text "$armout" 'watcher: started pid=' \
@@ -1417,9 +1417,9 @@ test_take_over_owns_a_fresh_cycle_and_keeps_queued_work_surfacing() {
   owner=$ARM_PID
   SEED_PID=$(cat "$state/.watch.lock/pid")
   append_wake "$state" signal take-over "signal: fixture still queued for main"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" "$WATCH_ARM" --take-over "$owner" > "$armout" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" "$WATCH_ARM" --take-over "$owner" > "$armout" &
   ARM_PID=$!
   wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS"
   status=$?
@@ -1445,7 +1445,7 @@ test_take_over_preserves_downtime_from_watcher_self_exit() {
   printf '#!/usr/bin/env bash\nif [ "$*" = "%s/.secondmate-liveness-tick" ] && [ -e "%s/fail-tick" ]; then exit 1; fi\nexec "%s" "$@"\n' \
     "$state" "$dir" "$real_touch" > "$fakebin/touch"
   chmod +x "$fakebin/touch"
-  FM_SECONDMATE_LIVENESS_SECS=1 start_rearm_arm "$home" "$state" "$fakebin" "$dir/owner.out" "$$"
+  JG_SECONDMATE_LIVENESS_SECS=1 start_rearm_arm "$home" "$state" "$fakebin" "$dir/owner.out" "$$"
   owner=$ARM_PID
   watcher=$(cat "$state/.watch.lock/pid")
   append_wake "$state" signal take-over "signal: fixture handled by main"
@@ -1459,9 +1459,9 @@ test_take_over_preserves_downtime_from_watcher_self_exit() {
   printf 'if [ "$*" = "-f %s/.wake-queue.lock" ]; then\n' "$state" >> "$dir/barrier-bin/rm"
   printf '  touch "%s/snapshot-read"\n  for ((i=0; i<700; i++)); do\n    [ -e "%s/release" ] && break\n    sleep 0.05\n  done\nfi\n' "$dir" "$dir" >> "$dir/barrier-bin/rm"
   chmod +x "$dir/barrier-bin/rm"
-  PATH="$dir/barrier-bin:$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" \
+  PATH="$dir/barrier-bin:$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT="$REARM_CONFIRM_SECONDS" \
     "$WATCH_ARM" --take-over "$owner" > "$armout" &
   ARM_PID=$!
   i=0
@@ -1523,7 +1523,7 @@ test_downtime_marker_does_not_follow_symlink() {
   pass "watch-arm: downtime marker publication does not follow symlinks"
 }
 
-# The watcher validates FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS when it arms and
+# The watcher validates JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS when it arms and
 # refuses to arm on an unusable value. Under a running watcher that value would
 # make every per-cycle reconcile refuse by name into a discarded stdout, so no
 # source would ever start and the home would sit disarmed while presenting as
@@ -1540,9 +1540,9 @@ test_arm_refuses_an_unusable_launch_confirm_window() {
   armout="$dir/arm.out"
   mkdir -p "$home/data"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT=5 FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=5s \
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT=5 JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS=5s \
     "$WATCH_ARM" > "$armout" 2>&1 &
   ARM_PID=$!
   wait_for_exit "$ARM_PID" 200
@@ -1551,7 +1551,7 @@ test_arm_refuses_an_unusable_launch_confirm_window() {
   [ "$status" -ne 0 ] || fail "arm reported success with an unusable confirm window: $(cat "$armout")"
   grep -q '^watcher: FAILED' "$armout" \
     || fail "arm did not report the typed failure line: $(cat "$armout")"
-  grep -qF 'FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS' "$armout" \
+  grep -qF 'JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS' "$armout" \
     || fail "the refusal did not name the variable: $(cat "$armout")"
   grep -qF "must be whole seconds from 1 to 600" "$armout" \
     || fail "the refusal did not name the accepted range: $(cat "$armout")"
@@ -1582,9 +1582,9 @@ test_arm_refuses_a_disposable_validation_checkout() {
   mkdir -p "$home/data" "$(dirname "$link")"
   ln -s "$ROOT" "$link"
 
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_GATE_REFUSE_BYPASS='' \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT=5 "$link/bin/jg-watch-arm.sh" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" JG_GATE_REFUSE_BYPASS='' \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT=5 "$link/bin/jg-watch-arm.sh" > "$armout" 2>&1 &
   ARM_PID=$!
   wait_for_exit "$ARM_PID" 200
   status=$?
@@ -1609,9 +1609,9 @@ test_arm_refuses_a_disposable_validation_checkout() {
 WATCH_PID=
 start_owned_watcher() {  # <home> <state> <fakebin> <arm-out>
   local home=$1 state=$2 fakebin=$3 armout=$4 i
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_ARM_CONFIRM_TIMEOUT=2 "$WATCH_ARM" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$state" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
+    JG_ARM_CONFIRM_TIMEOUT=2 "$WATCH_ARM" > "$armout" 2>&1 &
   ARM_PID=$!
   i=0
   while [ "$i" -lt 100 ]; do
@@ -1638,7 +1638,7 @@ wait_for_pid_gone() {  # <pid> <polls>
 # A running watcher whose state directory is deleted (a torn-down temporary
 # home) must exit after noticing the deletion with a logged reason, not run on
 # as an orphan (upstream #4760). Allow for a slow CI runner finishing the cycle
-# already in progress before its next FM_POLL=1 tick. A busy poll may spend
+# already in progress before its next JG_POLL=1 tick. A busy poll may spend
 # longer than ten seconds in subprocesses on a contended CI runner.
 test_watcher_exits_when_its_state_directory_is_removed() {
   local dir home state fakebin armout
@@ -1696,7 +1696,7 @@ test_reaper_stops_a_tracked_watcher() {
   out="$dir/watch.out"
   start_seed_watcher "$state" "$fakebin" "$out"
   printf '%s\n' "$state" > "$dir/registry"
-  ( FM_TEST_WATCHER_REGISTRY="$dir/registry"; jg_test_reap_watchers )
+  ( JG_TEST_WATCHER_REGISTRY="$dir/registry"; jg_test_reap_watchers )
   wait_for_exit "$SEED_PID" 100 >/dev/null 2>&1 || true
   ! is_live_non_zombie "$SEED_PID" \
     || { kill -TERM "$SEED_PID" 2>/dev/null; fail "reaper left the tracked watcher pid $SEED_PID running"; }
@@ -1721,34 +1721,34 @@ test_handling_delivered_accepts_already_acked_generation() {
   printf '%s' "$home" > "$state/.watch.lock/jg-home"
   printf '%s' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s' "$identity" > "$state/.watch.lock/pid-identity"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_publish "$2" downtime' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_publish "$2" downtime' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" \
     || fail "could not publish the fixture downtime episode"
   generation=$(recovery_marker_generation "$state/.watcher-down")
   [ -n "$generation" ] || fail "published episode left no recovery generation"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
     --watcher-pid "$pid" || fail "confirmed prompt delivery did not begin handling"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_ack "$2" "$3"' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_ack "$2" "$3"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" "$generation" \
     || fail "could not acknowledge the fixture handling episode"
   case "$(cat "$state/.watcher-down")" in
     acked:handling:"$generation") ;;
     *) fail "acknowledged episode did not retire: $(cat "$state/.watcher-down")" ;;
   esac
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
     --watcher-pid "$pid"
   expect_code 0 "$?" "an already-acknowledged confirmation must succeed as a no-op"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "superseded.0.deadbeef" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "superseded.0.deadbeef" \
     --watcher-pid "$pid" 2>/dev/null
   expect_code 3 "$?" "a superseded generation must stay rejected"
   sleep 0 &
   dead=$!
   wait "$dead" 2>/dev/null || true
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
     --watcher-pid "$dead" 2>/dev/null
   expect_code 1 "$?" "a dead watcher pid must stay rejected"
   printf 'foreign-identity\n' > "$state/.watch.lock/pid-identity"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$generation" \
     --watcher-pid "$pid" 2>/dev/null
   status=$?
   printf '%s' "$identity" > "$state/.watch.lock/pid-identity"
@@ -1776,7 +1776,7 @@ test_handling_delivered_rejects_a_superseded_generation() {
   printf '%s' "$home" > "$state/.watch.lock/jg-home"
   printf '%s' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s' "$identity" > "$state/.watch.lock/pid-identity"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_publish "$2" downtime && jg_recovery_marker_arm_check "$2"' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_publish "$2" downtime && jg_recovery_marker_arm_check "$2"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" \
     || fail "could not announce the fixture downtime episode"
   first=$(recovery_marker_generation "$state/.watcher-down")
@@ -1790,7 +1790,7 @@ test_handling_delivered_rejects_a_superseded_generation() {
   # by design (no idle churn) and the fresh-generation assertion below fails.
   append_wake "$state" check inbox:fixture 'check: manual-restart churn fixture' \
     || fail "could not queue the fixture wake for the manual restart"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_arm_check "$2"' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_arm_check "$2"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" \
     || fail "could not re-announce the queued fixture episode"
   first=$(recovery_marker_generation "$state/.watcher-down")
@@ -1798,16 +1798,16 @@ test_handling_delivered_rejects_a_superseded_generation() {
     announced:downtime:"$first") ;;
     *) fail "queued episode has the wrong shape: $(cat "$state/.watcher-down")" ;;
   esac
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_reopen_announced "$2"' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_reopen_announced "$2"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" \
     || fail "a manual arm start could not reopen the announced episode"
   second=$(recovery_marker_generation "$state/.watcher-down")
   [ -n "$second" ] && [ "$second" != "$first" ] \
     || fail "a non-successor arm start did not mint a fresh generation: $(cat "$state/.watcher-down")"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$first" \
+  JG_HOME="$home" JG_STATE_OVERRIDE="$state" "$WATCH_ARM" --handling-delivered "$first" \
     --watcher-pid "$pid" 2>/dev/null
   expect_code 3 "$?" "a confirmation for the churned generation must report a mismatch"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_arm_check "$2"' \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_recovery_marker_arm_check "$2"' \
     _ "$ROOT/bin/jg-wake-lib.sh" "$state/.watcher-down" \
     || fail "the arm check after the reopen could not run"
   status=$(recovery_marker_generation "$state/.watcher-down")
@@ -1837,7 +1837,7 @@ make_arm_decision_fixture() {  # <name>
   cp "$ROOT/bin/jg-supervision-lib.sh" "$repo/bin/jg-supervision-lib.sh"
   cat > "$repo/bin/jg-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm\n' >> "${FM_ARM_LOG:?}"
+printf 'arm\n' >> "${JG_ARM_LOG:?}"
 printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   chmod +x "$repo/bin/jg-watch-arm.sh"
@@ -1853,9 +1853,9 @@ import { existsSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-const state = `${process.env.FM_HOME}/state`;
-const config = `${process.env.FM_HOME}/config`;
-const armLog = process.env.FM_ARM_LOG;
+const state = `${process.env.JG_HOME}/state`;
+const config = `${process.env.JG_HOME}/config`;
+const armLog = process.env.JG_ARM_LOG;
 
 // The shared predicate verdict over the same state directory and the same lib
 // copy the delegation in the plugin sources.
@@ -1865,7 +1865,7 @@ const probe = spawnSync(
     "-c",
     '. "$1/bin/jg-supervision-lib.sh"; if jg_supervision_needed "$2"; then printf arm; else printf no-arm; fi',
     "predicate-probe",
-    process.env.FM_ROOT_OVERRIDE,
+    process.env.JG_ROOT_OVERRIDE,
     state,
   ],
   { encoding: "utf8" },
@@ -1938,8 +1938,8 @@ EOF
       task-meta) : > "$state/fixture.meta" ;;
       x-mode) : > "$config/x-mode.env" ;;
     esac
-    out=$(FM_ROOT_OVERRIDE="$dir/repo" WORKTREE="$dir/repo" FM_HOME="$dir/home" \
-      FM_ARM_LOG="$dir/arm.log" NODE_NO_WARNINGS=1 \
+    out=$(JG_ROOT_OVERRIDE="$dir/repo" WORKTREE="$dir/repo" JG_HOME="$dir/home" \
+      JG_ARM_LOG="$dir/arm.log" NODE_NO_WARNINGS=1 \
       PLUGIN="$ROOT/.opencode/plugins/jg-primary-watch-arm.js" node "$driver" 2>&1)
     status=$?
     expect_code 0 "$status" "OpenCode arm plugin must decide with the shared predicate ($case_name): $out"

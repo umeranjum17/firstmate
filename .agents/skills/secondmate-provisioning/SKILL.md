@@ -50,8 +50,8 @@ bin/jg-brief.sh <id> --secondmate {<project>...|--no-projects}
 ```
 
 The scaffold writes a charter brief instead of a task brief.
-Set `FM_SECONDMATE_CHARTER='<charter>'` to fill the charter text and `FM_SECONDMATE_SCOPE='<scope>'` when the routing scope differs.
-If you scaffold without `FM_SECONDMATE_CHARTER`, replace the `{TASK}` placeholder before seeding.
+Set `JG_SECONDMATE_CHARTER='<charter>'` to fill the charter text and `JG_SECONDMATE_SCOPE='<scope>'` when the routing scope differs.
+If you scaffold without `JG_SECONDMATE_CHARTER`, replace the `{TASK}` placeholder before seeding.
 Pass `--no-projects` instead of a project list to scaffold a project-less charter for a domain whose subject is the Juggernaut repo itself, whose home is a Juggernaut worktree and whose crews take pooled worktrees of the same repo.
 `--no-projects` is mutually exclusive with a project list, and omitting both still fails loudly, so an accidental omission is never mistaken for a deliberate project-less seed.
 Re-seeding a populated home as project-less is refused non-destructively when the home contains project clones or `data/projects.md` entries.
@@ -111,7 +111,7 @@ For inherited config files, local propagation and the remote sender preserve the
 Inheritance copies the literal `config/crew-harness` file, so a secondmate's own operators use the primary's operator harness only when it names a concrete adapter such as `codex`; an unset or `default` value has nothing concrete to inherit, and the secondmate's own operators fall back to the secondmate's own or detected harness instead.
 Inherited `config/backend` becomes that secondmate home's local runtime-backend default for future spawns only; it never retargets, rewrites, migrates, stops, or restarts an already-live worker endpoint.
 A present primary value always converges byte-exact into validated secondmate homes, and primary absence removes the destination so those homes keep runtime auto-detection.
-Explicit per-spawn `--backend` and `FM_BACKEND` remain stronger than every home's local `config/backend`, including an inherited default.
+Explicit per-spawn `--backend` and `JG_BACKEND` remain stronger than every home's local `config/backend`, including an inherited default.
 The declared `config/supervision-host-off` opt-out follows the same primary-authoritative propagation: its presence opts secondmate homes out even if they have their own engine setting, and its absence removes their copy at convergence.
 `config/supervision-host` itself is not inherited; each home selects its own engine.
 `config/secondmate-harness` and `config/secondmates/<id>/harness` pins are not inherited because they are only the primary's knobs for launching secondmate agents.
@@ -151,7 +151,7 @@ For already-live secondmates, use `bin/jg-config-push.sh` to push a mid-session 
 It uses the same live-home discovery and propagation helper as bootstrap, reports each item as `pushed`, `unchanged`, `skipped`, or `error`, and follows the config-reread contract above for changed or pending generations.
 `bin/jg-home-seed.sh` refuses to copy a missing or placeholder charter.
 
-Direct seed without a preexisting brief requires `FM_SECONDMATE_CHARTER`.
+Direct seed without a preexisting brief requires `JG_SECONDMATE_CHARTER`.
 Run `bin/jg-home-seed.sh validate` when checking registry integrity; its header owns the complete validation and refusal mechanics.
 
 Seeding is transactional.

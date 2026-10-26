@@ -7,7 +7,7 @@ PID 1, the systemd user manager, herdr server, no-mistakes daemon, sshd, tailsca
 All `pkill` and `killall` commands are refused; use a literal PID.
 
 Main approval requires the guard's actual process ancestry to reach the supplied caller and the live harness PID recorded in `~/firstmate/state/.lock`.
-The account home comes from the OS account record, ignoring `HOME`, `FM_HOME` and other environment overrides.
+The account home comes from the OS account record, ignoring `HOME`, `JG_HOME` and other environment overrides.
 The lock holder's resolved working directory must be under `~/firstmate`; a different harness in that ancestry outside the primary home disqualifies the allowance.
 A missing, malformed, symlinked, dead or uncertain lock never grants it.
 Environment variables and `--caller` alone cannot select Main.
@@ -21,7 +21,7 @@ There remains a PID-reuse window between hook approval and the shell's subsequen
 
 Each approved Main target appends a JSON line to `<guard directory>/state/main-kills.jsonl` (normally `~/.local/share/jg-kill-guard/state/main-kills.jsonl`) for Lookout Incidents.
 Fields are `pid`, `starttime`, `cmdline` (argument array), `cwd`, `caller` (PID), and `reason`.
-The hook CLI accepts `--reason <text>`; otherwise `FM_KILL_REASON`, then command text supplies the reason.
+The hook CLI accepts `--reason <text>`; otherwise `JG_KILL_REASON`, then command text supplies the reason.
 Only fleet paths, numeric PIDs, option names and a small set of operational words survive in command/reason fields; arbitrary values, prompts, URLs and credentials become `[redacted]`.
 A failure to record the approval refuses the Main kill; commands rejected by policy create no approval rows.
 Rows record approvals, not confirmation that the shell later delivered a signal.

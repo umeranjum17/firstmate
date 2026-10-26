@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Install or update the backlog-lock-reclaim check for this user and point one firstmate home's
 # state/backlog-lock-reclaim.check.sh at it through an exec shim, backing up a replaced check first, then register it.
 # Idempotent. Usage: install.sh [--dry-run] <jg-home>
@@ -28,6 +37,6 @@ install -m 755 "$SRC/backlog-lock-reclaim.check.sh" "$DEST/backlog-lock-reclaim.
 [ -z "$BAK" ] || { cp -p "$CHECK" "$BAK"; echo "backed up: $BAK"; }
 printf '%s\n' "$SHIM" > "$CHECK"
 chmod 700 "$CHECK"
-# An FM_STATE_OVERRIDE in the caller env, even empty, would register away from FMH/state.
-env -u FM_STATE_OVERRIDE FM_HOME="$FMH" "$FMH/bin/jg-check-register.sh" backlog-lock-reclaim
+# An JG_STATE_OVERRIDE in the caller env, even empty, would register away from FMH/state.
+env -u JG_STATE_OVERRIDE JG_HOME="$FMH" "$FMH/bin/jg-check-register.sh" backlog-lock-reclaim
 echo "installed: $CHECK -> $DEST/backlog-lock-reclaim.check.sh"

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # parked-homes install.sh - verify the parked-homes wiring for one firstmate
 # home. It changes nothing: the add-on works through the fork's shim sourcing
 # this checkout, so the only install state is (1) this checkout reachable from
@@ -9,10 +18,10 @@ set -u
 
 die() { echo "parked-homes install: $*" >&2; exit 1; }
 
-home=${1:-${FM_HOME:-}}
+home=${1:-${JG_HOME:-}}
 [ -n "$home" ] && [ -d "$home" ] || die "usage: install.sh <jg-home>"
 home=$(cd "$home" && pwd) || die "cannot read $home"
-FM_HOME=$home
+JG_HOME=$home
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
 lib="$here/parked-homes/bin/jg-parked-homes-lib.sh"
@@ -22,13 +31,13 @@ status=0
 say() { printf '%s\n' "$*"; }
 bad() { printf 'MISSING: %s\n' "$*"; status=1; }
 
-addons="${FM_ADDONS_DIR:-$home/projects/firstmate-addons}"
+addons="${JG_ADDONS_DIR:-$home/projects/firstmate-addons}"
 if [ -f "$addons/parked-homes/bin/jg-parked-homes-lib.sh" ]; then
   same=0
   [ "$(cat "$addons/parked-homes/bin/jg-parked-homes-lib.sh" 2>/dev/null)" = "$(cat "$lib")" ] && same=1
   say "add-on checkout: $addons (lib $([ "$same" = 1 ] && echo matches || echo DIFFERS-FROM-this-checkout))"
 else
-  bad "add-on checkout reachable at $addons/parked-homes (set FM_ADDONS_DIR or update projects/firstmate-addons)"
+  bad "add-on checkout reachable at $addons/parked-homes (set JG_ADDONS_DIR or update projects/firstmate-addons)"
 fi
 
 if [ -f "$home/bin/jg-parked-homes-lib.sh" ] &&

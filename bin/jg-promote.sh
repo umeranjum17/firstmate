@@ -48,11 +48,11 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 # shellcheck source=bin/jg-dod-lib.sh
 . "$SCRIPT_DIR/jg-dod-lib.sh"
@@ -199,14 +199,14 @@ jg_lock_try_acquire "$CONTROL_LOCK" || {
   exit 1
 }
 CONTROL_LOCK_HELD=1
-"$FM_ROOT/bin/jg-guard.sh" || true
+"$JG_ROOT/bin/jg-guard.sh" || true
 META="$STATE/$ID.meta"
 [ -d "$STATE" ] || { echo "error: state dir not found: $STATE" >&2; exit 1; }
 META_LOCK=$(jg_meta_lock_path "$META") || exit 1
 jg_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
 if ! jg_backlog_record_present "$META" "task record" "$STATE"; then
-  echo "error: task record for $ID is unsafe or missing ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+  echo "error: task record for $ID is unsafe or missing ($JG_BACKLOG_TRANSITION_ERROR)" >&2
   exit 1
 fi
 grep -qx 'kind=scout' "$META" || { echo "error: task $ID is not a scout task (kind=scout not in meta)" >&2; exit 1; }
@@ -217,7 +217,7 @@ grep -qx 'kind=scout' "$META" || { echo "error: task $ID is not a scout task (ki
 PROMOTE_PROJECT=$(sed -n 's/^project=//p' "$META" | head -n 1)
 if [ -n "$PROMOTE_PROJECT" ]; then
   PROMOTE_PROJECT_NAME=$(basename "$PROMOTE_PROJECT")
-  if ! PROMOTE_STANDING_FORGE=$("$FM_ROOT/bin/jg-project-mode.sh" --forge "$PROMOTE_PROJECT_NAME"); then
+  if ! PROMOTE_STANDING_FORGE=$("$JG_ROOT/bin/jg-project-mode.sh" --forge "$PROMOTE_PROJECT_NAME"); then
     echo "error: $ID cannot promote: the registry entry for $PROMOTE_PROJECT_NAME does not resolve to a delivery posture (see the refusal above); correct data/projects.md and promote again" >&2
     exit 1
   fi
@@ -231,12 +231,12 @@ jg_base_branch_valid "$BASE_BRANCH" "$MODE" "$FORGE" "jg-promote.sh $ID" || exit
 # greater upstream authority than the spawn path would grant.
 if [ "$MODE" != local-only ] && [ -n "$PROMOTE_PROJECT" ]; then
   gate_rc=0
-  jg_role_gate_self_publish "$FM_HOME" "$CONFIG" "$PROMOTE_PROJECT" "$FM_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
+  jg_role_gate_self_publish "$JG_HOME" "$CONFIG" "$PROMOTE_PROJECT" "$JG_ROOT" "$UPSTREAM_CONSENT" || gate_rc=$?
   case $gate_rc in
   0 | 2) ;;
   *)
-    echo "error: promotion refused for $ID: $FM_ROLE_PUB_DENIAL" >&2
-    echo "error: to let this home publish to ${FM_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${FM_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
+    echo "error: promotion refused for $ID: $JG_ROLE_PUB_DENIAL" >&2
+    echo "error: to let this home publish to ${JG_ROLE_PUB_TARGET:-that repository}, write 'maintainer ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>}' into $CONFIG/firstmate-role (docs/configuration.md \"Firstmate role\"), or pass --upstream-consent ${JG_ROLE_PUB_TARGET:-<host>/<owner>/<repo>} for this one task with the captain's explicit approval" >&2
       exit 1
       ;;
   esac
@@ -303,7 +303,7 @@ Any earlier "Never push" or scout-only delivery language in this file is superse
 This replaces the scout rule limiting outside-worktree writes to the report and status file.
 Keep project edits inside this worktree; keep proof and scratch output outside it, under \`$DATA/$ID/\` or a temporary directory.
 Outside the worktree, write only that task material and the status and steering-inbox records authorized below.
-Register disposable temporary directories outside the Firstmate home, repository, state and data directories with \`FM_HOME='$FM_HOME' FM_STATE_OVERRIDE='$STATE' FM_DATA_OVERRIDE='$DATA' '$FM_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
+Register disposable temporary directories outside the Firstmate home, repository, state and data directories with \`JG_HOME='$JG_HOME' JG_STATE_OVERRIDE='$STATE' JG_DATA_OVERRIDE='$DATA' '$JG_ROOT/bin/jg-scratch.sh' register $ID <dir>\` so cleanup reaps them; keep retained evidence under \`$DATA/$ID/\` unregistered.
 Leave the worktree clean before reporting done.
 The mode-specific Definition of done below is the current delivery contract.
 
@@ -385,7 +385,7 @@ fi
 if ! jg_backlog_atomic_transition publish "$TMP" "$META" "task record" "$STATE"; then
   rm -f -- "$TMP"
   TMP=
-  echo "error: task record for $ID could not be published ($FM_BACKLOG_TRANSITION_ERROR)" >&2
+  echo "error: task record for $ID could not be published ($JG_BACKLOG_TRANSITION_ERROR)" >&2
   exit 1
 fi
 TMP=
@@ -394,16 +394,16 @@ BRIEF_ORIGINAL=
 jg_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 
-HOME_Q=$(printf '%q' "$FM_HOME")
+HOME_Q=$(printf '%q' "$JG_HOME")
 INSTRUCTIONS_Q=$(printf '%q' "$INSTRUCTIONS")
 echo "promoted $ID to ship mode=$MODE yolo=$YOLO$PROMOTE_FORGE_WORDS (teardown protection restored)"
 echo "wrote ship instructions for mode=$MODE$PROMOTE_FORGE_WORDS: $INSTRUCTIONS"
-echo "next: FM_HOME=$HOME_Q bin/jg-send.sh jg-$ID \"\$(cat $INSTRUCTIONS_Q)\""
+echo "next: JG_HOME=$HOME_Q bin/jg-send.sh jg-$ID \"\$(cat $INSTRUCTIONS_Q)\""
 
 promote_print_rechain_hint() {
   local consent_home=$1 work_home=$2 task_id=$3 id prefix
   prefix=
-  [ "$consent_home" = "$FM_HOME" ] || prefix="FM_HOME=$(printf '%q' "$consent_home") "
+  [ "$consent_home" = "$JG_HOME" ] || prefix="JG_HOME=$(printf '%q' "$consent_home") "
   while IFS= read -r id; do
     [ -n "$id" ] || continue
     [ "$(jg_pf_registry_get "$consent_home/state" "$id" state)" = delivered ] || continue
@@ -441,26 +441,26 @@ promote_warn_parent_unresolved() {
   echo "warning: could not resolve the consent-holding parent home for secondmate $1; promotion succeeded, but any open public loop must be inspected and rechained from the parent." >&2
 }
 
-if [ -f "$FM_HOME/.jg-secondmate-home" ]; then
-  PROMOTE_MATE_ID=$(sed -n '1p' "$FM_HOME/.jg-secondmate-home" 2>/dev/null || true)
+if [ -f "$JG_HOME/.jg-secondmate-home" ]; then
+  PROMOTE_MATE_ID=$(sed -n '1p' "$JG_HOME/.jg-secondmate-home" 2>/dev/null || true)
   PROMOTE_PARENT_RECORD=absent
   PROMOTE_PARENT_ROUTE=
   PROMOTE_DURABLE_PARENT=
-  if [ -e "$FM_HOME/.jg-secondmate-parent" ] || [ -L "$FM_HOME/.jg-secondmate-parent" ]; then
+  if [ -e "$JG_HOME/.jg-secondmate-parent" ] || [ -L "$JG_HOME/.jg-secondmate-parent" ]; then
     PROMOTE_PARENT_RECORD=invalid
-    if jg_secondmate_parent_record_parse "$FM_HOME/.jg-secondmate-parent"; then
+    if jg_secondmate_parent_record_parse "$JG_HOME/.jg-secondmate-parent"; then
       PROMOTE_PARENT_RECORD=valid
-      PROMOTE_PARENT_ROUTE=$FM_SECONDMATE_PARENT_ROUTE
-      PROMOTE_DURABLE_PARENT=$FM_SECONDMATE_PARENT_HOME
+      PROMOTE_PARENT_ROUTE=$JG_SECONDMATE_PARENT_ROUTE
+      PROMOTE_DURABLE_PARENT=$JG_SECONDMATE_PARENT_HOME
     fi
   fi
   if [ "$PROMOTE_PARENT_RECORD" = invalid ]; then
     promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
   elif [ "$PROMOTE_PARENT_ROUTE" = local ]; then
-    PROMOTE_PARENT_CANDIDATE=${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-$PROMOTE_DURABLE_PARENT}
+    PROMOTE_PARENT_CANDIDATE=${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-$PROMOTE_DURABLE_PARENT}
     PROMOTE_PARENT_BINDINGS_MATCH=1
-    if [ -n "${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
-      PROMOTE_LIVE_PARENT=$(promote_canonical_home "$FM_PUBLIC_FOLLOWUP_PRIMARY_HOME") \
+    if [ -n "${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
+      PROMOTE_LIVE_PARENT=$(promote_canonical_home "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME") \
         || PROMOTE_PARENT_BINDINGS_MATCH=0
       PROMOTE_RECORDED_PARENT=$(promote_canonical_home "$PROMOTE_DURABLE_PARENT") \
         || PROMOTE_PARENT_BINDINGS_MATCH=0
@@ -471,7 +471,7 @@ if [ -f "$FM_HOME/.jg-secondmate-home" ]; then
     fi
     if [ "$PROMOTE_PARENT_BINDINGS_MATCH" = 1 ] \
         && PROMOTE_PARENT=$(promote_resolve_primary_home \
-          "$PROMOTE_PARENT_CANDIDATE" "$FM_HOME" "$PROMOTE_MATE_ID"); then
+          "$PROMOTE_PARENT_CANDIDATE" "$JG_HOME" "$PROMOTE_MATE_ID"); then
       if jg_pf_relay_active "$PROMOTE_PARENT"; then
         promote_print_rechain_hint "$PROMOTE_PARENT" "secondmate:$PROMOTE_MATE_ID" "$ID"
       fi
@@ -480,24 +480,24 @@ if [ -f "$FM_HOME/.jg-secondmate-home" ]; then
     fi
   elif [ "$PROMOTE_PARENT_ROUTE" = remote ]; then
     PROMOTE_HOME_ENV_TOKEN=
-    if [ -f "$FM_HOME/.env" ]; then
-      PROMOTE_HOME_ENV_TOKEN=$(fmx_env_get FMX_PAIRING_TOKEN "$FM_HOME/.env")
+    if [ -f "$JG_HOME/.env" ]; then
+      PROMOTE_HOME_ENV_TOKEN=$(fmx_env_get FMX_PAIRING_TOKEN "$JG_HOME/.env")
     fi
     if [ -n "$PROMOTE_HOME_ENV_TOKEN" ]; then
       promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
     fi
-  elif [ -n "${FM_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
-    if jg_pf_relay_active "$FM_PUBLIC_FOLLOWUP_PRIMARY_HOME"; then
+  elif [ -n "${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" ]; then
+    if jg_pf_relay_active "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME"; then
       if PROMOTE_PARENT=$(promote_resolve_primary_home \
-          "$FM_PUBLIC_FOLLOWUP_PRIMARY_HOME" "$FM_HOME" "$PROMOTE_MATE_ID"); then
+          "$JG_PUBLIC_FOLLOWUP_PRIMARY_HOME" "$JG_HOME" "$PROMOTE_MATE_ID"); then
         promote_print_rechain_hint "$PROMOTE_PARENT" "secondmate:$PROMOTE_MATE_ID" "$ID"
       else
         promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
       fi
     fi
-  elif jg_pf_relay_active "$FM_HOME"; then
+  elif jg_pf_relay_active "$JG_HOME"; then
     promote_warn_parent_unresolved "$PROMOTE_MATE_ID"
   fi
-elif jg_pf_relay_active "$FM_HOME"; then
-  promote_print_rechain_hint "$FM_HOME" main "$ID"
+elif jg_pf_relay_active "$JG_HOME"; then
+  promote_print_rechain_hint "$JG_HOME" main "$ID"
 fi

@@ -34,7 +34,7 @@ test_git_config_isolation() (
 set -eu
 while [ "$#" -gt 0 ]; do
   if [ "$1" = -c ]; then
-    git -C "$2" log -1 --format=%s > "${FM_TEST_STANDALONE_COMMIT:?}"
+    git -C "$2" log -1 --format=%s > "${JG_TEST_STANDALONE_COMMIT:?}"
     exit 1
   fi
   shift
@@ -52,7 +52,7 @@ git -C "$repo" config user.email runner@example.invalid
 git -C "$repo" commit -q --allow-empty -m initial
 [ "$(git -C "$repo" log -1 --format='%s:%an:%ae')" = 'initial:Runner Fixture:runner@example.invalid' ]
 [ "$(git -C "$repo" config --get fixture.input)" = preserved ]
-[ "$(GIT_CONFIG_GLOBAL="$FM_TEST_GIT_CONFIG" git config --global --get commit.gpgsign)" = true ]
+[ "$(GIT_CONFIG_GLOBAL="$JG_TEST_GIT_CONFIG" git config --global --get commit.gpgsign)" = true ]
 SH
   chmod +x "$dir/runner/tests/jg-test-run.test.sh"
   export GIT_CONFIG_GLOBAL="$dir/global" GIT_CONFIG_SYSTEM="$dir/system"
@@ -121,18 +121,18 @@ SH
   for jobs in 1 2; do
     for timeout in 0 30; do
       GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=fixture.input GIT_CONFIG_VALUE_0=preserved \
-        FM_TEST_GIT_CONFIG="$dir/global" \
+        JG_TEST_GIT_CONFIG="$dir/global" \
         "$dir/runner/bin/jg-test-run.sh" --jobs "$jobs" --per-script-timeout-secs "$timeout" \
         tests/jg-test-run.test.sh > "$dir/runner.log" 2>&1 \
         || fail "runner inherited global config (jobs=$jobs, timeout=$timeout): $(cat "$dir/runner.log")"
-      assert_grep 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0' "$dir/runner.log" \
+      assert_grep 'JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0' "$dir/runner.log" \
         "runner did not execute the Git fixture"
     done
   done
   rc=0
-  FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 FM_SESSIONSTART_INSTRUCTION_REFRESH_REF=HEAD \
-    FM_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=updated \
-    FM_TEST_STANDALONE_COMMIT="$dir/global-standalone-commit" PATH="$fakebin:$PATH" \
+  JG_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 JG_SESSIONSTART_INSTRUCTION_REFRESH_REF=HEAD \
+    JG_SESSIONSTART_INSTRUCTION_REFRESH_EXPECT=updated \
+    JG_TEST_STANDALONE_COMMIT="$dir/global-standalone-commit" PATH="$fakebin:$PATH" \
     bash "$ROOT/tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh" \
     > "$dir/standalone.log" 2>&1 || rc=$?
   [ "$rc" = 1 ] || fail "standalone fixture did not stop at the tmux launch"
@@ -173,20 +173,20 @@ test_no_mistakes_version_constant() {
   fakebin=$(jg_fakebin "$TMP_ROOT/nm")
   jg_test_fake_no_mistakes "$fakebin"
   out=$("$fakebin/no-mistakes" --version)
-  [ "$out" = "$FM_TEST_NO_MISTAKES_FAKE_VERSION" ] || \
+  [ "$out" = "$JG_TEST_NO_MISTAKES_FAKE_VERSION" ] || \
     fail "fake no-mistakes --version should be the shared constant, got '$out'"
-  out=$(FM_FAKE_NO_MISTAKES_VERSION="$FM_TEST_NO_MISTAKES_FAKE_VERSION_TS" \
+  out=$(JG_FAKE_NO_MISTAKES_VERSION="$JG_TEST_NO_MISTAKES_FAKE_VERSION_TS" \
     "$fakebin/no-mistakes" --version)
-  [ "$out" = "$FM_TEST_NO_MISTAKES_FAKE_VERSION_TS" ] || \
+  [ "$out" = "$JG_TEST_NO_MISTAKES_FAKE_VERSION_TS" ] || \
     fail "timestamped banner override should round-trip, got '$out'"
   case "$out" in
-    "$FM_TEST_NO_MISTAKES_FAKE_VERSION "*) ;;
+    "$JG_TEST_NO_MISTAKES_FAKE_VERSION "*) ;;
     *) fail "timestamped banner '$out' is not the shared constant plus a suffix" ;;
   esac
-  out=$(FM_FAKE_NO_MISTAKES_VERSION='no-mistakes version v9.9.9 (fake)' \
+  out=$(JG_FAKE_NO_MISTAKES_VERSION='no-mistakes version v9.9.9 (fake)' \
     "$fakebin/no-mistakes" --version)
   [ "$out" = 'no-mistakes version v9.9.9 (fake)' ] || \
-    fail "FM_FAKE_NO_MISTAKES_VERSION should override the default banner, got '$out'"
+    fail "JG_FAKE_NO_MISTAKES_VERSION should override the default banner, got '$out'"
   "$fakebin/no-mistakes" doctor
   expect_code 0 $? "fake no-mistakes non-version verbs should exit 0"
   pass "fake no-mistakes --version is the shared constant and overridable"
@@ -218,10 +218,10 @@ test_fake_gh_and_gh_axi() {
   "$fakebin/gh" pr list
   expect_code 0 $? "fake gh other verbs should exit 0"
   out=$("$fakebin/gh-axi" --version)
-  [ "$out" = "$FM_TEST_GH_AXI_VERSION" ] || \
-    fail "fake gh-axi --version should be $FM_TEST_GH_AXI_VERSION, got '$out'"
-  out=$(FM_FAKE_GH_AXI_VERSION=0.9.9 "$fakebin/gh-axi" --version)
-  [ "$out" = 0.9.9 ] || fail "FM_FAKE_GH_AXI_VERSION should override, got '$out'"
+  [ "$out" = "$JG_TEST_GH_AXI_VERSION" ] || \
+    fail "fake gh-axi --version should be $JG_TEST_GH_AXI_VERSION, got '$out'"
+  out=$(JG_FAKE_GH_AXI_VERSION=0.9.9 "$fakebin/gh-axi" --version)
+  [ "$out" = 0.9.9 ] || fail "JG_FAKE_GH_AXI_VERSION should override, got '$out'"
   pass "fake gh authenticates and fake gh-axi reports the shared version"
 }
 
@@ -230,13 +230,13 @@ test_spawn_tmux_and_fakebin() {
   fakebin=$(make_spawn_fakebin "$TMP_ROOT/spawn" gh-axi)
   log="$TMP_ROOT/spawn/launch.log"
   : > "$log"
-  out=$(FM_FAKE_PANE_PATH=/tmp/wt "$fakebin/tmux" display-message -p '#{pane_current_path}')
-  [ "$out" = /tmp/wt ] || fail "spawn tmux pane path should be FM_FAKE_PANE_PATH, got '$out'"
-  out=$(unset FM_FAKE_PANE_PATH; "$fakebin/tmux" display-message -p '#{pane_current_path}')
+  out=$(JG_FAKE_PANE_PATH=/tmp/wt "$fakebin/tmux" display-message -p '#{pane_current_path}')
+  [ "$out" = /tmp/wt ] || fail "spawn tmux pane path should be JG_FAKE_PANE_PATH, got '$out'"
+  out=$(unset JG_FAKE_PANE_PATH; "$fakebin/tmux" display-message -p '#{pane_current_path}')
   [ -z "$out" ] || fail "spawn tmux pane path should default to empty, got '$out'"
   out=$("$fakebin/tmux" display-message -p '#S')
   [ "$out" = firstmate ] || fail "spawn tmux session name should be firstmate, got '$out'"
-  FM_FAKE_LAUNCH_LOG="$log" "$fakebin/tmux" send-keys -t @w -l 'codex --yolo'
+  JG_FAKE_LAUNCH_LOG="$log" "$fakebin/tmux" send-keys -t @w -l 'codex --yolo'
   assert_grep 'codex --yolo' "$log" "send-keys -l payload was not logged"
   [ -x "$fakebin/treehouse" ] || fail "spawn fakebin should include treehouse"
   [ -x "$fakebin/gh-axi" ] || fail "extra exit-0 tools should land in the spawn fakebin"
@@ -252,7 +252,7 @@ test_send_stubs_and_ssh() {
   ssh_log="$TMP_ROOT/send/ssh.log"
   : > "$log"
   jg_test_fake_ssh "$fakebin"
-  FM_SEND_LOG="$log" "$fakebin/tmux" send-keys -t sess:w -l 'hello steer'
+  JG_SEND_LOG="$log" "$fakebin/tmux" send-keys -t sess:w -l 'hello steer'
   assert_grep 'hello steer' "$log" "send stubs did not log the -l payload"
   out=$("$fakebin/tmux" display-message -p '#{cursor_y}')
   [ "$out" = 1 ] || fail "send tmux cursor_y should be 1, got '$out'"
@@ -261,10 +261,10 @@ test_send_stubs_and_ssh() {
     *'╭────╮'*) ;;
     *) fail "send tmux capture-pane should render an empty composer, got '$out'" ;;
   esac
-  printf 'ignored\n' | FM_SSH_LOG="$ssh_log" "$fakebin/fake-ssh" host -- cmd
+  printf 'ignored\n' | JG_SSH_LOG="$ssh_log" "$fakebin/fake-ssh" host -- cmd
   assert_grep 'host -- cmd' "$ssh_log" "fake ssh did not record argv"
-  FM_FAKE_SSH_RC=7 "$fakebin/fake-ssh" x < /dev/null
-  expect_code 7 $? "fake ssh should honor FM_FAKE_SSH_RC"
+  JG_FAKE_SSH_RC=7 "$fakebin/fake-ssh" x < /dev/null
+  expect_code 7 $? "fake ssh should honor JG_FAKE_SSH_RC"
   pass "send stubs log typed text and fake ssh records argv with a controllable exit"
 }
 
@@ -373,7 +373,7 @@ SH
         runner-*)
           env "$var=$value" TMPDIR="$dir" "$dir/runner/bin/jg-test-run.sh" --jobs "${helper#runner-}" \
             tests/jg-test-run.test.sh > "$dir/out.log" 2>&1 || rc=$?
-          [ "$rc" != 0 ] || assert_grep 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0' "$dir/out.log" \
+          [ "$rc" != 0 ] || assert_grep 'JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0' "$dir/out.log" \
             "$helper did not execute the Git fixture under $var" ;;
         *)
           # shellcheck disable=SC2016 # expanded by the child bash

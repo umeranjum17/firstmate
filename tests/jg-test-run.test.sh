@@ -210,16 +210,16 @@ test_task_marker_refuses_the_primary_checkout() {
   init_primary_and_linked_worktree "$repo" "$linked"
 
   # Marker set, primary checkout: refuse, name the primary, and run nothing.
-  out=$(FM_TASK_ID=probe-task "$repo/bin/jg-test-run.sh" tests/probe.test.sh 2>&1) && rc=0 || rc=$?
+  out=$(JG_TASK_ID=probe-task "$repo/bin/jg-test-run.sh" tests/probe.test.sh 2>&1) && rc=0 || rc=$?
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "the runner must refuse the primary checkout under a task marker"; }
   assert_contains "$out" "primary checkout" "refusal did not name the primary checkout"
-  assert_contains "$out" "FM_TASK_ID=probe-task" "refusal did not name the task marker"
+  assert_contains "$out" "JG_TASK_ID=probe-task" "refusal did not name the task marker"
   assert_contains "$out" "task worktree" "refusal did not point at the task worktree"
-  assert_not_contains "$out" "FM_TEST_BEGIN" "the refusal must happen before any suite runs"
+  assert_not_contains "$out" "JG_TEST_BEGIN" "the refusal must happen before any suite runs"
   assert_absent "$repo/ran" "the refused run still executed a suite"
 
   # Marker set, linked worktree: the assigned placement, so the suite runs.
-  FM_TASK_ID=probe-task "$linked/bin/jg-test-run.sh" tests/probe.test.sh >/dev/null 2>&1 \
+  JG_TASK_ID=probe-task "$linked/bin/jg-test-run.sh" tests/probe.test.sh >/dev/null 2>&1 \
     || { rm -rf "$tmp"; fail "the runner must still run in a linked task worktree"; }
   assert_present "$linked/ran" "the linked-worktree run did not execute its suite"
 
@@ -230,7 +230,7 @@ test_task_marker_refuses_the_primary_checkout() {
 
   # Inspection executes nothing, so it stays available even in the primary.
   rm -f "$repo/ran"
-  out=$(FM_TASK_ID=probe-task "$repo/bin/jg-test-run.sh" --list tests/probe.test.sh 2>&1) \
+  out=$(JG_TASK_ID=probe-task "$repo/bin/jg-test-run.sh" --list tests/probe.test.sh 2>&1) \
     || { rm -rf "$tmp"; fail "--list must remain available under a task marker"; }
   [ "$out" = "tests/probe.test.sh" ] \
     || { rm -rf "$tmp"; fail "--list under a task marker printed: $out"; }
@@ -482,15 +482,15 @@ SH
   (cd "$repo" && bin/jg-test-run.sh --changed --base HEAD --json "$tmp/parallel.json") \
     >"$tmp/parallel.out" 2>"$tmp/parallel.err" \
     || fail "default changed fixture run failed: $(cat "$tmp/parallel.err")"
-  parallel_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
-  [ "$parallel_shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
+  parallel_shape=$(grep -E '^JG_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$parallel_shape" = JG_TEST_BEGIN,JG_TEST_BEGIN ] \
     || fail "plain --changed did not use bounded concurrent scheduling: $parallel_shape"
 
   (cd "$repo" && bin/jg-test-run.sh --changed --base HEAD --jobs 1 --json "$tmp/serial.json") \
     >"$tmp/serial.out" 2>"$tmp/serial.err" \
     || fail "explicit serial changed fixture run failed: $(cat "$tmp/serial.err")"
-  serial_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
-  [ "$serial_shape" = FM_TEST_BEGIN,FM_TEST_END ] \
+  serial_shape=$(grep -E '^JG_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$serial_shape" = JG_TEST_BEGIN,JG_TEST_END ] \
     || fail "explicit --jobs 1 did not force serial execution: $serial_shape"
   expected_jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
   case "$expected_jobs" in
@@ -535,7 +535,7 @@ SH
   rc=$?
   set -e
   [ "$rc" -eq 1 ] || fail "single-script automatic timeout must fail the run, got $rc"
-  grep -Eq '^FM_TEST_END .+ tests/jg-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
+  grep -Eq '^JG_TEST_END .+ tests/jg-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
     || fail "single unproven changed script did not receive the automatic timeout: $(cat "$tmp/timeout.out")"
   [ ! -e "$timeout_repo/should-not-run" ] || fail "automatic timeout helper did not own the single changed script"
 
@@ -571,7 +571,7 @@ SH
   rc=$?
   set -e
   expect_code 0 "$rc" "native-Windows POSIX-mode emulation"
-  assert_contains "$out" "FM_TEST_SUMMARY total=2 failed=0" \
+  assert_contains "$out" "JG_TEST_SUMMARY total=2 failed=0" \
     "Windows mode emulation did not complete both parallel scripts"
 
   set +e
@@ -612,15 +612,15 @@ SH
   (cd "$repo" && bin/jg-test-run.sh tests/jg-cd-pretool-check.test.sh tests/jg-pr-merge.test.sh \
       --json "$tmp/parallel.json") >"$tmp/parallel.out" 2>"$tmp/parallel.err" \
     || fail "default script-list run failed: $(cat "$tmp/parallel.err")"
-  parallel_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
-  [ "$parallel_shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
+  parallel_shape=$(grep -E '^JG_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$parallel_shape" = JG_TEST_BEGIN,JG_TEST_BEGIN ] \
     || fail "a plain script list did not use bounded concurrent scheduling: $parallel_shape"
 
   (cd "$repo" && bin/jg-test-run.sh tests/jg-cd-pretool-check.test.sh tests/jg-pr-merge.test.sh \
       --jobs 1 --json "$tmp/serial.json") >"$tmp/serial.out" 2>"$tmp/serial.err" \
     || fail "explicit serial script-list run failed: $(cat "$tmp/serial.err")"
-  serial_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
-  [ "$serial_shape" = FM_TEST_BEGIN,FM_TEST_END ] \
+  serial_shape=$(grep -E '^JG_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$serial_shape" = JG_TEST_BEGIN,JG_TEST_END ] \
     || fail "explicit --jobs 1 did not force a serial script list: $serial_shape"
 
   # An unproven script in the list is scheduled around, never refused and never
@@ -628,8 +628,8 @@ SH
   (cd "$repo" && bin/jg-test-run.sh tests/jg-cd-pretool-check.test.sh tests/jg-pr-merge.test.sh \
       tests/jg-backend-orca.test.sh) >"$tmp/mixed.out" 2>"$tmp/mixed.err" \
     || fail "mixed proven/unproven script list failed: $(cat "$tmp/mixed.err")"
-  mixed_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/mixed.out" | awk '{print $1}' | paste -sd, -)
-  [ "$mixed_shape" = FM_TEST_BEGIN,FM_TEST_BEGIN,FM_TEST_END,FM_TEST_END,FM_TEST_BEGIN,FM_TEST_END ] \
+  mixed_shape=$(grep -E '^JG_TEST_(BEGIN|END)' "$tmp/mixed.out" | awk '{print $1}' | paste -sd, -)
+  [ "$mixed_shape" = JG_TEST_BEGIN,JG_TEST_BEGIN,JG_TEST_END,JG_TEST_END,JG_TEST_BEGIN,JG_TEST_END ] \
     || fail "an unproven script was not kept in the serial tail: $mixed_shape"
 
   expected_jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
@@ -651,7 +651,7 @@ PYJSON
   (cd "$repo" && bin/jg-test-run.sh tests/jg-backend-orca.test.sh) \
     >"$tmp/named.out" 2>"$tmp/named.err" \
     || fail "a named script unexpectedly required a timeout helper: $(cat "$tmp/named.err")"
-  grep -Eq '^FM_TEST_END .+ tests/jg-backend-orca\.test\.sh exit=0 ' "$tmp/named.out" \
+  grep -Eq '^JG_TEST_END .+ tests/jg-backend-orca\.test\.sh exit=0 ' "$tmp/named.out" \
     || fail "a named script did not run without an automatic bound: $(cat "$tmp/named.out")"
 
   rm -rf "$tmp"
@@ -690,7 +690,7 @@ import re, sys
 active = {}
 overlap = {"pure-contract-unit": False, "pr-forge": False}
 for line in open(sys.argv[1], encoding="utf-8"):
-    if line.startswith("FM_TEST_BEGIN "):
+    if line.startswith("JG_TEST_BEGIN "):
         match = re.search(r" (tests/\S+) family=(\S+) ", line)
         assert match, line
         path, family = match.groups()
@@ -698,7 +698,7 @@ for line in open(sys.argv[1], encoding="utf-8"):
         active[path] = family
         if sum(value == family for value in active.values()) > 1:
             overlap[family] = True
-    elif line.startswith("FM_TEST_END "):
+    elif line.startswith("JG_TEST_END "):
         match = re.search(r" (tests/\S+) exit=", line)
         assert match and match.group(1) in active, (active, line)
         del active[match.group(1)]
@@ -719,7 +719,7 @@ test_empty_selection_emits_summary() {
   out=$(cd "$repo" && bin/jg-test-run.sh --changed --base HEAD --json "$tmp/artifacts/timing.json" 2>"$tmp/err") \
     || fail "empty valid changed selection must pass"
   printf '%s\n' "$out" | grep -Eq \
-    '^FM_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' \
+    '^JG_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' \
     || fail "empty selection summary is missing or malformed: $out"
   json="$tmp/artifacts/timing.json"
   python3 -c '
@@ -751,9 +751,9 @@ SH
   rc=$?
   set -e
   [ "$rc" -eq 1 ] || fail "an empty run past its budget must fail normally, got $rc"
-  grep -Eq '^FM_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
+  grep -Eq '^JG_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its summary"
-  grep -Eq '^FM_TEST_BUDGET max_wall_ms=100 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
+  grep -Eq '^JG_TEST_BUDGET max_wall_ms=100 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its budget result"
   [ -e "$tmp/slow-git" ] || fail "the slow selection fixture did not run"
   set +e
@@ -786,20 +786,20 @@ SH
   chmod +x "$fixture"
   "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
     || { rm -rf "$tmp"; fail "runner should pass on a green fixture"; }
-  begin_n=$(grep -c '^FM_TEST_BEGIN ' "$out" || true)
-  end_n=$(grep -c '^FM_TEST_END ' "$out" || true)
-  [ "$begin_n" -eq 1 ] || fail "expected one FM_TEST_BEGIN, got $begin_n"
-  [ "$end_n" -eq 1 ] || fail "expected one FM_TEST_END, got $end_n"
-  grep -Eq '^FM_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$out" \
-    || fail "BEGIN line missing family/expected_gate_skip: $(grep '^FM_TEST_BEGIN' "$out")"
-  grep -Eq '^FM_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=false$' "$out" \
-    || fail "END line missing exit/duration/gate_skip: $(grep '^FM_TEST_END' "$out")"
-  summary=$(grep '^FM_TEST_SUMMARY ' "$out" || true)
+  begin_n=$(grep -c '^JG_TEST_BEGIN ' "$out" || true)
+  end_n=$(grep -c '^JG_TEST_END ' "$out" || true)
+  [ "$begin_n" -eq 1 ] || fail "expected one JG_TEST_BEGIN, got $begin_n"
+  [ "$end_n" -eq 1 ] || fail "expected one JG_TEST_END, got $end_n"
+  grep -Eq '^JG_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$out" \
+    || fail "BEGIN line missing family/expected_gate_skip: $(grep '^JG_TEST_BEGIN' "$out")"
+  grep -Eq '^JG_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=false$' "$out" \
+    || fail "END line missing exit/duration/gate_skip: $(grep '^JG_TEST_END' "$out")"
+  summary=$(grep '^JG_TEST_SUMMARY ' "$out" || true)
   assert_contains "$summary" "total=1" "summary total"
   assert_contains "$summary" "failed=0" "summary failed"
   assert_contains "$summary" "skipped_gate=0" "summary skipped_gate"
-  grep -q '^FM_TEST_SLOWEST rank=1 ' "$out" \
-    || fail "expected FM_TEST_SLOWEST rank=1"
+  grep -q '^JG_TEST_SLOWEST rank=1 ' "$out" \
+    || fail "expected JG_TEST_SLOWEST rank=1"
   [ -f "$json" ] || fail "JSON timing artifact was not written"
   python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$json" \
     || fail "JSON timing artifact is not valid JSON"
@@ -839,8 +839,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "aggregate exit must be non-zero when any script fails"
-  grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out.txt" \
-    || fail "summary should report total=2 failed=1: $(grep FM_TEST_SUMMARY "$tmp/out.txt")"
+  grep -q 'JG_TEST_SUMMARY total=2 failed=1' "$tmp/out.txt" \
+    || fail "summary should report total=2 failed=1: $(grep JG_TEST_SUMMARY "$tmp/out.txt")"
   # All-green stays 0.
   set +e
   "$RUNNER" "$pass_f" >"$tmp/out2.txt" 2>"$tmp/err2.txt"
@@ -865,10 +865,10 @@ SH
   chmod +x "$skip_f"
   "$RUNNER" --json "$json" "$skip_f" >"$out" 2>"$tmp/err.txt" \
     || fail "gate-skip fixture must exit 0 from the runner"
-  grep -Eq '^FM_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=true$' "$out" \
-    || fail "END must mark gate_skip=true: $(grep '^FM_TEST_END' "$out")"
-  grep -q 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$out" \
-    || fail "summary must count skipped_gate=1: $(grep FM_TEST_SUMMARY "$out")"
+  grep -Eq '^JG_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=true$' "$out" \
+    || fail "END must mark gate_skip=true: $(grep '^JG_TEST_END' "$out")"
+  grep -q 'JG_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$out" \
+    || fail "summary must count skipped_gate=1: $(grep JG_TEST_SUMMARY "$out")"
   python3 -c '
 import json, sys
 doc = json.load(open(sys.argv[1]))
@@ -935,13 +935,13 @@ test_live_guards_expect_a_capability_skip_class() {
   local tmp out
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/jg-test-run-liveclass.XXXXXX")
   out="$tmp/out.txt"
-  # FM_LIVE=0 makes every live guard refuse without touching a harness, so this
+  # JG_LIVE=0 makes every live guard refuse without touching a harness, so this
   # exercises the real family through the real runner in bounded time.
-  FM_LIVE=0 "$RUNNER" --json "$tmp/timing.json" \
+  JG_LIVE=0 "$RUNNER" --json "$tmp/timing.json" \
     tests/jg-composer-matrix-live-e2e.test.sh >"$out" 2>"$tmp/err.txt" \
     || fail "a disabled live guard must not fail the runner: $(cat "$tmp/err.txt")"
   grep -q 'expected_gate_skip=live-capability' "$out" \
-    || fail "the live-harness family must expect a capability skip: $(grep FM_TEST_BEGIN "$out")"
+    || fail "the live-harness family must expect a capability skip: $(grep JG_TEST_BEGIN "$out")"
   python3 -c '
 import json, sys
 doc = json.load(open(sys.argv[1]))
@@ -970,8 +970,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "fail-on-gate-skip must make herdr-not-found a hard failure"
-  grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
-    || fail "summary must report failed=1 under fail-on-gate-skip: $(grep FM_TEST_SUMMARY "$out")"
+  grep -q 'JG_TEST_SUMMARY total=1 failed=1' "$out" \
+    || fail "summary must report failed=1 under fail-on-gate-skip: $(grep JG_TEST_SUMMARY "$out")"
   grep -q 'required gate skip token' "$tmp/err.txt" \
     || fail "runner must log the required gate skip token"
   rm -rf "$tmp"
@@ -1070,7 +1070,7 @@ test_portable_shard_union_and_coverage_guard() {
   printf '%s\n' "$herdr" | grep -Fq 'tests/jg-backend-herdr-smoke.test.sh' \
     || fail "herdr family must include smoke"
   out=$("$RUNNER" --check-coverage)
-  assert_contains "$out" "FM_TEST_COVERAGE ok" "coverage guard success marker"
+  assert_contains "$out" "JG_TEST_COVERAGE ok" "coverage guard success marker"
   all_count=$("$RUNNER" --list --all | wc -l | tr -d ' ')
   union_count=$(printf '%s\n' "$s1" "$s2" "$serial" "$herdr" | LC_ALL=C sort -u | wc -l | tr -d ' ')
   [ "$union_count" = "$all_count" ] \
@@ -1217,14 +1217,14 @@ PY
     out=$(bash "$repo/bin/jg-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
     if [ "$weight" -eq 1200000 ]; then
       expect_code 0 "$rc" "packing exactly at the budget must be accepted"
-      assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
+      assert_contains "$out" "JG_TEST_COVERAGE ok" "boundary coverage did not pass"
       assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the budget"
       assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
     else
       expect_code 1 "$rc" "packing one millisecond above the budget must be refused"
       assert_contains "$out" "largest portable serial shard packs 1200001ms above the 1200000ms target" \
         "over-budget refusal did not explain the modeled excess"
-      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
+      assert_not_contains "$out" "JG_TEST_COVERAGE ok" "over-budget packing reported success"
     fi
   done
   pass "serial packing accepts the exact budget and refuses one millisecond above it"
@@ -1308,7 +1308,7 @@ test_jobs_admits_a_concurrent_safe_family() {
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "--jobs on a proven family must be admitted, got $rc: $(cat "$tmp/err") $(cat "$tmp/out")"
-  grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/out" \
+  grep -Fq 'JG_TEST_SUMMARY total=2 failed=0' "$tmp/out" \
     || fail "the admitted concurrent run did not report both scripts green: $(cat "$tmp/out")"
 
   set +e
@@ -1358,7 +1358,7 @@ test_unmapped_new_test_never_inherits_family_concurrency() {
   set -e
   [ "$rc" -eq 0 ] \
     || fail "two members of the proven residual family must be admitted, got $rc: $(cat "$tmp/family.err")"
-  grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/family.out" \
+  grep -Fq 'JG_TEST_SUMMARY total=2 failed=0' "$tmp/family.out" \
     || fail "the admitted residual-family run did not report both scripts green: $(cat "$tmp/family.out")"
 
   set +e
@@ -1380,7 +1380,7 @@ test_unmapped_new_test_never_inherits_family_concurrency() {
   set -e
   [ "$rc" -eq 0 ] \
     || fail "an unclassified test must still run serially, got $rc: $(cat "$tmp/serial.err")"
-  grep -Eq '^FM_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$tmp/serial.out" \
+  grep -Eq '^JG_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$tmp/serial.out" \
     || fail "the unmapped fixture did not land in the catch-all family: $(cat "$tmp/serial.out")"
   rm -rf "$tmp"
   pass "an unclassified new test stays serial while the proven residual family runs concurrently"
@@ -1441,7 +1441,7 @@ test_concurrent_runs_are_ordered_longest_first() {
     tests/jg-session-lock-ancestry.test.sh tests/jg-task-inbox.test.sh \
     >"$tmp/out" 2>"$tmp/err"
   set -e
-  first=$(grep -m1 '^FM_TEST_BEGIN' "$tmp/out" | awk '{print $3}')
+  first=$(grep -m1 '^JG_TEST_BEGIN' "$tmp/out" | awk '{print $3}')
   [ "$first" = tests/jg-task-inbox.test.sh ] \
     || fail "concurrent run did not start the longest script first, started: $first"
   rm -rf "$tmp"
@@ -1483,10 +1483,10 @@ SH
     || fail "the per-script bound did not stop a 600s hang (took $((ended - began))s)"
   grep -Fq 'exceeded the per-script bound' "$tmp/out" \
     || fail "the terminated script was not named: $(cat "$tmp/out")"
-  grep -Eq 'FM_TEST_END .* exit=124 ' "$tmp/out" \
+  grep -Eq 'JG_TEST_END .* exit=124 ' "$tmp/out" \
     || fail "a terminated script must be recorded as exit 124: $(cat "$tmp/out")"
   # The run still completes and accounts for the script, rather than dying.
-  grep -Fq 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out" \
+  grep -Fq 'JG_TEST_SUMMARY total=1 failed=1' "$tmp/out" \
     || fail "the bounded run did not report a complete summary: $(cat "$tmp/out")"
   [ -s "$grandchild_pid" ] || fail "the hanging fixture did not record its grandchild"
   grandchild=$(cat "$grandchild_pid")
@@ -1578,7 +1578,7 @@ SH
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "a run inside its budget must pass, got $rc: $(cat "$tmp/under.err")"
-  grep -Eq '^FM_TEST_BUDGET max_wall_ms=60000 duration_ms=[0-9]+$' "$tmp/under" \
+  grep -Eq '^JG_TEST_BUDGET max_wall_ms=60000 duration_ms=[0-9]+$' "$tmp/under" \
     || fail "an inside-budget run did not report the budget: $(cat "$tmp/under")"
 
   # Same green script, budget it cannot meet: the run must FAIL.
@@ -1587,16 +1587,16 @@ SH
   rc=$?
   set -e
   [ "$rc" -eq 1 ] || fail "an over-budget run must fail through the result path, got $rc"
-  grep -Eq '^FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/over" \
+  grep -Eq '^JG_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/over" \
     || fail "an over-budget run omitted its summary: $(cat "$tmp/over")"
-  grep -Eq '^FM_TEST_SUMMARY_FAMILY .+$' "$tmp/over" \
+  grep -Eq '^JG_TEST_SUMMARY_FAMILY .+$' "$tmp/over" \
     || fail "an over-budget run omitted its family summary: $(cat "$tmp/over")"
-  grep -Eq '^FM_TEST_SLOWEST rank=1 .+$' "$tmp/over" \
+  grep -Eq '^JG_TEST_SLOWEST rank=1 .+$' "$tmp/over" \
     || fail "an over-budget run omitted its slowest result: $(cat "$tmp/over")"
-  grep -Eq '^FM_TEST_BUDGET max_wall_ms=500 duration_ms=[0-9]+$' "$tmp/over" \
+  grep -Eq '^JG_TEST_BUDGET max_wall_ms=500 duration_ms=[0-9]+$' "$tmp/over" \
     || fail "an over-budget run omitted its budget result: $(cat "$tmp/over")"
-  summary_duration=$(awk '/^FM_TEST_SUMMARY / { for (i=1;i<=NF;i++) if ($i ~ /^duration_ms=/) { sub(/^duration_ms=/, "", $i); print $i } }' "$tmp/over")
-  budget_duration=$(awk '/^FM_TEST_BUDGET / { for (i=1;i<=NF;i++) if ($i ~ /^duration_ms=/) { sub(/^duration_ms=/, "", $i); print $i } }' "$tmp/over")
+  summary_duration=$(awk '/^JG_TEST_SUMMARY / { for (i=1;i<=NF;i++) if ($i ~ /^duration_ms=/) { sub(/^duration_ms=/, "", $i); print $i } }' "$tmp/over")
+  budget_duration=$(awk '/^JG_TEST_BUDGET / { for (i=1;i<=NF;i++) if ($i ~ /^duration_ms=/) { sub(/^duration_ms=/, "", $i); print $i } }' "$tmp/over")
   [ "$budget_duration" = "$summary_duration" ] \
     || fail "budget verdict used a different duration than the summary: $(cat "$tmp/over")"
 
@@ -1683,12 +1683,12 @@ SH
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || { cat "$tmp/out" "$tmp/err"; rm -rf "$tmp"; fail "jobs=2 must refill the first completed slot"; }
-  begin_n=$(grep -c '^FM_TEST_BEGIN ' "$tmp/out" || true)
-  end_n=$(grep -c '^FM_TEST_END ' "$tmp/out" || true)
+  begin_n=$(grep -c '^JG_TEST_BEGIN ' "$tmp/out" || true)
+  end_n=$(grep -c '^JG_TEST_END ' "$tmp/out" || true)
   [ "$begin_n" -eq 3 ] || fail "expected 3 BEGIN markers, got $begin_n"
   [ "$end_n" -eq 3 ] || fail "expected 3 END markers, got $end_n"
-  grep -q 'FM_TEST_SUMMARY total=3 failed=0' "$tmp/out" \
-    || fail "summary missing for jobs run: $(grep FM_TEST_SUMMARY "$tmp/out")"
+  grep -q 'JG_TEST_SUMMARY total=3 failed=0' "$tmp/out" \
+    || fail "summary missing for jobs run: $(grep JG_TEST_SUMMARY "$tmp/out")"
   python3 -c '
 import json,sys
 doc=json.load(open(sys.argv[1]))
@@ -1722,8 +1722,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "jobs aggregate must be non-zero when a proven worker fails"; }
-  grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out4" \
-    || { rm -rf "$tmp"; fail "jobs failure summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out4")"; }
+  grep -q 'JG_TEST_SUMMARY total=2 failed=1' "$tmp/out4" \
+    || { rm -rf "$tmp"; fail "jobs failure summary wrong: $(grep JG_TEST_SUMMARY "$tmp/out4")"; }
 
   cat >"$repo/$d" <<'SH'
 #!/usr/bin/env bash
@@ -1736,15 +1736,15 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "parallel stderr gate skip must hard-fail"; }
-  grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out5" \
-    || { rm -rf "$tmp"; fail "parallel stderr hard-fail summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out5")"; }
+  grep -q 'JG_TEST_SUMMARY total=1 failed=1' "$tmp/out5" \
+    || { rm -rf "$tmp"; fail "parallel stderr hard-fail summary wrong: $(grep JG_TEST_SUMMARY "$tmp/out5")"; }
 
   "$runner" --jobs 2 "$d" >"$tmp/out6" 2>"$tmp/err6" \
     || { rm -rf "$tmp"; fail "ordinary parallel stderr gate skip must remain successful"; }
-  grep -Eq '^FM_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=true$' "$tmp/out6" \
+  grep -Eq '^JG_TEST_END .+ exit=0 duration_ms=[0-9]+ gate_skip=true$' "$tmp/out6" \
     || { rm -rf "$tmp"; fail "parallel stderr gate skip was not recorded"; }
-  grep -q 'FM_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$tmp/out6" \
-    || { rm -rf "$tmp"; fail "parallel stderr skip summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out6")"; }
+  grep -q 'JG_TEST_SUMMARY total=1 failed=0 skipped_gate=1' "$tmp/out6" \
+    || { rm -rf "$tmp"; fail "parallel stderr skip summary wrong: $(grep JG_TEST_SUMMARY "$tmp/out6")"; }
 
   rm -rf "$tmp"
   pass "jobs scheduler runs proven scripts; failure propagates; non-proven refused"
@@ -1811,7 +1811,7 @@ JSON
 }
 JSON
   out=$("$RUNNER" --aggregate-json "$tmp/out.json" "$tmp/a.json" "$tmp/b.json")
-  assert_contains "$out" "FM_TEST_AGGREGATE lanes=2 total=3 failed=1" "aggregate summary line"
+  assert_contains "$out" "JG_TEST_AGGREGATE lanes=2 total=3 failed=1" "aggregate summary line"
   python3 -c '
 import json,sys
 doc=json.load(open(sys.argv[1]))

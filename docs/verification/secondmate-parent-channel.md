@@ -12,7 +12,7 @@ Tree: this change's branch on macOS with tmux 3.6a, bash 3.2 as `/bin/bash`, and
 Fixture: two isolated homes under a scratch directory, `$P` (parent) and `$M` (mate), with `config/backend` set to `tmux` in both.
 The mate home carries `.jg-secondmate-home` (`mate`) and a local `.jg-secondmate-parent` binding to `$P`; the parent home carries `state/mate.meta` (`kind=secondmate`, `home=$M`).
 The mate's child task `child` is a real tmux pane (`fmlive:jg-child`) recorded in `$M/state/child.meta` with `mode=no-mistakes` and `yolo=off`; the mate itself is a second real pane (`fmlive:jg-mate`).
-Both homes run the real `bin/jg-watch.sh` (`FM_POLL=2`), re-armed after every wake through `bin/jg-wake-drain.sh` acknowledgement, exactly as fleet supervision re-arms a watcher after a handled turn.
+Both homes run the real `bin/jg-watch.sh` (`JG_POLL=2`), re-armed after every wake through `bin/jg-wake-drain.sh` acknowledgement, exactly as fleet supervision re-arms a watcher after a handled turn.
 No agent harness and no model runs anywhere in the fixture.
 
 The child's only action is the ordinary operator status append, typed into its own pane with `tmux send-keys`.
@@ -43,7 +43,7 @@ signal: $P/state/mate.status
 
 $ # Step 2: the mate registers the PR with jg-pr-check; the ready line with the canonical URL reaches the parent from the script itself
 
-$ FM_HOME=$M FM_STATE_OVERRIDE=$M/state bin/jg-pr-check.sh child https://github.com/kunchenguid/firstmate/pull/9999
+$ JG_HOME=$M JG_STATE_OVERRIDE=$M/state bin/jg-pr-check.sh child https://github.com/kunchenguid/firstmate/pull/9999
 armed: state/child.check.sh
 
 $ cat $P/state/mate.status
@@ -57,12 +57,12 @@ signal: $P/state/mate.status
 
 $ # Step 3: the mate holds a task for the captain; the hold reaches the parent from jg-captain-hold itself
 
-$ FM_HOME=$M bin/jg-captain-hold.sh hold child-call --title 'Pick the rollout window' --reason 'rollout window choice pending' --repo alpha
+$ JG_HOME=$M bin/jg-captain-hold.sh hold child-call --title 'Pick the rollout window' --reason 'rollout window choice pending' --repo alpha
 child-call
 
 $ # Step 4: the captain's answer is recorded in the mate home; the close reaches the parent from jg-captain-hold itself
 
-$ FM_HOME=$M bin/jg-captain-hold.sh answer child-call --decision-file decision.txt   (decision: roll out on Monday)
+$ JG_HOME=$M bin/jg-captain-hold.sh answer child-call --decision-file decision.txt   (decision: roll out on Monday)
 answered: child-call
 
 $ cat $P/state/mate.status   (final parent channel)

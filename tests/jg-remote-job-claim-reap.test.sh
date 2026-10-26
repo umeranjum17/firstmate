@@ -59,14 +59,14 @@ git -C "$REMOTE_ROOT" config user.name Test
 git -C "$REMOTE_ROOT" add AGENTS.md bin
 git -C "$REMOTE_ROOT" commit -qm 'claim-reap fixture'
 
-export FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
-export FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
-export FM_REMOTE_JOB_QUEUE_TIMEOUT=60
-export FM_REMOTE_JOB_TIMEOUT=30
+export JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT"
+export JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux
+export JG_REMOTE_JOB_QUEUE_TIMEOUT=60
+export JG_REMOTE_JOB_TIMEOUT=30
 # shellcheck source=bin/jg-remote-job-lib.sh
 . "$ROOT/bin/jg-remote-job-lib.sh"
 
-jg_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+jg_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$JG_REMOTE_JOB_ERROR"
 
 python3 - "$STATE_ROOT/.seq-claims" "$CLAIM_COUNT" "$EXPIRED_COUNT" <<'PY'
 import os, sys, time
@@ -92,8 +92,8 @@ assert_present "$STATE_ROOT/.seq-claims/$EXPIRED_COUNT" "expired boundary seed m
 FRESH_KEEP=$((EXPIRED_COUNT + 1))
 assert_present "$STATE_ROOT/.seq-claims/$FRESH_KEEP" "fresh boundary seed missing"
 
-HOME="$ACCOUNT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
-  FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+HOME="$ACCOUNT_HOME" JG_ROOT_OVERRIDE="$REMOTE_ROOT" JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" \
+  JG_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
   "$REMOTE_ROOT/bin/jg-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/worker.out" 2> "$TMP_ROOT/worker.err" &
 WORKER_PID=$!
@@ -108,8 +108,8 @@ TOUCHED="$TMP_ROOT/served"
 began=$SECONDS
 jg_remote_job_stage "$ACCOUNT_HOME" "$REMOTE_ROOT" "$REMOTE_HOME" \
   jg-touch-job.sh "$TOUCHED" < /dev/null > /dev/null \
-  || fail "staging a job during the due claim sweep failed: $FM_REMOTE_JOB_ERROR"
-JOB_ID=$FM_REMOTE_JOB_ID
+  || fail "staging a job during the due claim sweep failed: $JG_REMOTE_JOB_ERROR"
+JOB_ID=$JG_REMOTE_JOB_ID
 
 # Bound the wait tightly so a fork-per-claim walk fails this test instead of
 # succeeding after the sweep finally finishes.
@@ -125,9 +125,9 @@ elapsed=$((SECONDS - began))
   || fail "job $JOB_ID stayed '$state' for ${elapsed}s during a due claim sweep (bound ${SERVE_BOUND_SECONDS}s); serving was starved"
 [ "$elapsed" -le "$SERVE_BOUND_SECONDS" ] \
   || fail "job $JOB_ID finished only after ${elapsed}s; serving was starved by the claim sweep"
-jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$FM_REMOTE_JOB_ERROR"
-[ "$FM_REMOTE_JOB_EXIT" -eq 0 ] \
-  || fail "the job staged during the claim sweep exited $FM_REMOTE_JOB_EXIT"
+jg_remote_job_wait "$ACCOUNT_HOME" "$JOB_ID" || fail "$JG_REMOTE_JOB_ERROR"
+[ "$JG_REMOTE_JOB_EXIT" -eq 0 ] \
+  || fail "the job staged during the claim sweep exited $JG_REMOTE_JOB_EXIT"
 assert_present "$TOUCHED" "the job staged during the claim sweep never ran"
 [ "$(cat "$TOUCHED")" = ran ] \
   || fail "the job staged during the claim sweep did not publish its side effect"

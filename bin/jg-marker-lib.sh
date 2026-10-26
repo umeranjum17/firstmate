@@ -8,7 +8,7 @@
 # carrier. Existing callers source this path so they do not need a flag-day
 # migration. No side effects on source. set -u / set -e safe.
 
-_FM_MARKER_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_MARKER_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-operational-input.sh
-. "$_FM_MARKER_LIB_DIR/jg-operational-input.sh"
-unset _FM_MARKER_LIB_DIR
+. "$_JG_MARKER_LIB_DIR/jg-operational-input.sh"
+unset _JG_MARKER_LIB_DIR

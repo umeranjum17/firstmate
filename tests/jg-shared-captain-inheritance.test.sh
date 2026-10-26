@@ -11,7 +11,7 @@ set -u
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-config-inherit-lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-shared-captain)
 
 jg_git_identity fmtest fmtest@example.invalid
@@ -55,8 +55,8 @@ new_home_pair() {
 
 assert_shared_readonly() {
   local path=$1
-  [ "$(file_mode "$path")" = "$FM_SHARED_CAPTAIN_MODE" ] \
-    || fail "$path mode should be $FM_SHARED_CAPTAIN_MODE, got $(file_mode "$path")"
+  [ "$(file_mode "$path")" = "$JG_SHARED_CAPTAIN_MODE" ] \
+    || fail "$path mode should be $JG_SHARED_CAPTAIN_MODE, got $(file_mode "$path")"
 }
 
 assert_secondmate_write_fails() {
@@ -74,7 +74,7 @@ test_first_copy_readonly_and_local_files_preserved() {
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/first-copy.report"
 
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
 
   [ -z "$out" ] || fail "first copy should not emit a quarantine diagnostic: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
@@ -86,14 +86,14 @@ test_first_copy_readonly_and_local_files_preserved() {
   assert_grep "second local learning" "$second/data/learnings.md" "domain-local learnings.md was changed"
 
   : > "$report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "unchanged convergence should stay quiet: $out"
   assert_grep $'data/captain-shared.md\tunchanged\t' "$report" "unchanged bytes should report unchanged"
   assert_shared_readonly "$second/data/captain-shared.md"
 
   write_shared "$primary/data/captain-shared.md" "shared v2"
   : > "$report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "source-only edit should not emit a quarantine diagnostic: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
     || fail "source-only edit did not converge secondmate shared preferences"
@@ -113,15 +113,15 @@ test_true_divergence_after_inherit_still_quarantines() {
   second=${rec#*|}
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/true-divergence.report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "setup inherit should stay quiet: $out"
 
   chmod u+w "$second/data/captain-shared.md"
   write_shared "$second/data/captain-shared.md" "local edit after inherit"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
   write_shared "$primary/data/captain-shared.md" "shared v2"
   : > "$report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   diag=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate home ' || true)
   [ -n "$diag" ] || fail "edited destination should emit a SECONDMATE_SYNC diagnostic"
   qpath=${diag##* at }
@@ -142,16 +142,16 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
   second=${rec#*|}
   write_shared "$primary/data/captain-shared.md" "shared v1"
   report="$TMP_ROOT/interrupted-pub.report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "setup inherit should stay quiet: $out"
 
   write_shared "$primary/data/captain-shared.md" "shared v2"
   chmod u+w "$second/data/captain-shared.md"
   cp "$primary/data/captain-shared.md" "$second/data/captain-shared.md"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
 
   : > "$report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "destination already matching the new source should not quarantine: $out"
   qcount=$(find "$second/data" -name '.captain-shared.md.quarantine.*' | wc -l | tr -d ' ')
   [ "$qcount" -eq 0 ] || fail "interrupted publication matching source created a quarantine artifact"
@@ -161,7 +161,7 @@ test_interrupted_publication_matching_source_does_not_quarantine() {
 
   write_shared "$primary/data/captain-shared.md" "shared v3"
   : > "$report"
-  out=$(FM_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
+  out=$(JG_CONFIG_INHERIT_REPORT="$report" propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "healed receipt should accept a later source-only edit quietly: $out"
   cmp -s "$primary/data/captain-shared.md" "$second/data/captain-shared.md" \
     || fail "later source-only edit after healed receipt did not converge"
@@ -177,7 +177,7 @@ remote_put_shared() {
   local home=$1 payload=$2 generation=$3 bytes hash
   bytes=$(LC_ALL=C wc -c < "$payload" | tr -d ' ')
   hash=$(jg_inherit_sha256 "$payload") || fail "cannot hash remote inheritance payload"
-  PATH="$BASE_PATH" FM_HOME="$home" "$ROOT/bin/jg-remote-inherit.sh" \
+  PATH="$BASE_PATH" JG_HOME="$home" "$ROOT/bin/jg-remote-inherit.sh" \
     put data/captain-shared.md "$bytes" "$hash" "$generation" < "$payload" 2>&1
 }
 
@@ -208,7 +208,7 @@ test_remote_receiver_accepts_source_only_edit_without_quarantine() {
 
   chmod u+w "$home/data/captain-shared.md"
   write_shared "$home/data/captain-shared.md" "remote local edit"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$home/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$home/data/captain-shared.md"
   write_shared "$source" "shared v3"
   out=$(remote_put_shared "$home" "$source" 3) || fail "remote divergent inherit failed: $out"
   assert_contains "$out" "quarantined:" "remote edited destination was replaced without a recovery copy"
@@ -229,7 +229,7 @@ test_drift_quarantine_collision_and_repeated_convergence() {
   second=${rec#*|}
   write_shared "$primary/data/captain-shared.md" "shared v2"
   write_shared "$second/data/captain-shared.md" "local drift"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
   hash=$(jg_inherit_sha256 "$second/data/captain-shared.md")
   collision="$second/data/.captain-shared.md.quarantine.20260102T030405Z.$hash"
   printf '%s\n' "preexisting different artifact" > "$collision"
@@ -244,7 +244,7 @@ SH
   chmod +x "$fakebin/date"
   report="$TMP_ROOT/drift.report"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_CONFIG_INHERIT_REPORT="$report" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_CONFIG_INHERIT_REPORT="$report" \
     propagate_secondmate_inheritance "$primary" "$second")
 
   diag=$(printf '%s\n' "$out" | grep '^SECONDMATE_SYNC: secondmate home ' || true)
@@ -259,7 +259,7 @@ SH
   assert_shared_readonly "$second/data/captain-shared.md"
 
   : > "$report"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_CONFIG_INHERIT_REPORT="$report" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_CONFIG_INHERIT_REPORT="$report" \
     propagate_secondmate_inheritance "$primary" "$second")
   [ -z "$out" ] || fail "repeated convergence should not quarantine again: $out"
   qcount=$(find "$second/data" -name '.captain-shared.md.quarantine.*' | wc -l | tr -d ' ')
@@ -274,7 +274,7 @@ test_missing_source_mirrors_absence_without_losing_local_bytes() {
   primary=${rec%%|*}
   second=${rec#*|}
   write_shared "$second/data/captain-shared.md" "orphaned local shared file"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
 
   out=$(propagate_secondmate_inheritance "$primary" "$second")
 
@@ -333,7 +333,7 @@ test_unsafe_artifacts_and_failure_restore_readonly_mode() {
   fi
 
   write_shared "$second/data/captain-shared.md" "permission drift"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$second/data/captain-shared.md"
   before_mode=$(file_mode "$second/data/captain-shared.md")
   chmod 500 "$second/data"
   err="$TMP_ROOT/restore-readonly.err"
@@ -388,7 +388,7 @@ SH
 add_bootstrap_compatible_tools() {
   local fakebin=$1
   jg_fake_exit0 "$fakebin" node chrome-devtools-axi gh treehouse
-  jg_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
+  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -467,16 +467,16 @@ EOF
   fakebin=$(make_fake_spawn_toolchain "$w")
 
   PATH="$fakebin:$BASE_PATH" TMUX='' \
-    FM_ROOT_OVERRIDE="$root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data_override" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_SPAWN_NO_GUARD=1 \
+    JG_ROOT_OVERRIDE="$root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$data_override" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" sm "$sm" codex --secondmate >/dev/null 2>&1 || true
 
   cmp -s "$data_override/captain-shared.md" "$sm/data/captain-shared.md" \
-    || fail "spawn convergence point did not copy shared captain preferences from FM_DATA_OVERRIDE"
+    || fail "spawn convergence point did not copy shared captain preferences from JG_DATA_OVERRIDE"
   assert_shared_readonly "$sm/data/captain-shared.md"
-  pass "spawn convergence point propagates data/captain-shared.md from FM_DATA_OVERRIDE"
+  pass "spawn convergence point propagates data/captain-shared.md from JG_DATA_OVERRIDE"
 }
 
 test_bootstrap_convergence_point_copies_shared_file() {
@@ -497,16 +497,16 @@ EOF
   fakebin=$(make_fake_spawn_toolchain "$w")
   add_bootstrap_compatible_tools "$fakebin"
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_DATA_OVERRIDE="$data_override" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_DATA_OVERRIDE="$data_override" \
     "$ROOT/bin/jg-bootstrap.sh" 2>/dev/null)
 
   assert_not_contains "$out" "SECONDMATE_SYNC: secondmate sm: skipped: inheritance failed" \
     "bootstrap inheritance should succeed"
   cmp -s "$data_override/captain-shared.md" "$sm/data/captain-shared.md" \
-    || fail "bootstrap convergence point did not copy shared captain preferences from FM_DATA_OVERRIDE"
+    || fail "bootstrap convergence point did not copy shared captain preferences from JG_DATA_OVERRIDE"
   assert_shared_readonly "$sm/data/captain-shared.md"
-  pass "bootstrap convergence point propagates data/captain-shared.md from FM_DATA_OVERRIDE"
+  pass "bootstrap convergence point propagates data/captain-shared.md from JG_DATA_OVERRIDE"
 }
 
 test_config_push_convergence_point_updates_changed_source() {
@@ -523,19 +523,19 @@ EOF
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
   write_shared "$sm/data/captain-shared.md" "old shared bytes"
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$sm/data/captain-shared.md"
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$sm/data/captain-shared.md"
   write_shared "$data_override/captain-shared.md" "changed override shared bytes"
 
-  out=$(PATH="$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_DATA_OVERRIDE="$data_override" \
+  out=$(PATH="$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_DATA_OVERRIDE="$data_override" \
     "$ROOT/bin/jg-config-push.sh" 2>/dev/null)
 
   assert_contains "$out" "data/captain-shared.md: pushed - quarantined local drift at" \
     "config-push should report the shared file update and quarantine"
   cmp -s "$data_override/captain-shared.md" "$sm/data/captain-shared.md" \
-    || fail "config-push convergence point did not update shared captain preferences from FM_DATA_OVERRIDE"
+    || fail "config-push convergence point did not update shared captain preferences from JG_DATA_OVERRIDE"
   assert_shared_readonly "$sm/data/captain-shared.md"
-  pass "jg-config-push convergence point updates changed shared captain source bytes from FM_DATA_OVERRIDE"
+  pass "jg-config-push convergence point updates changed shared captain source bytes from JG_DATA_OVERRIDE"
 }
 
 test_config_push_source_only_edit_after_inherit_stays_quiet() {
@@ -552,13 +552,13 @@ EOF
     printf 'home=%s\n' "$sm"
   } > "$home/state/sm.meta"
   write_shared "$data_override/captain-shared.md" "inherited shared bytes"
-  PATH="$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_DATA_OVERRIDE="$data_override" \
+  PATH="$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_DATA_OVERRIDE="$data_override" \
     "$ROOT/bin/jg-config-push.sh" >/dev/null 2>&1
   write_shared "$data_override/captain-shared.md" "updated shared bytes"
 
-  out=$(PATH="$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_DATA_OVERRIDE="$data_override" \
+  out=$(PATH="$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_DATA_OVERRIDE="$data_override" \
     "$ROOT/bin/jg-config-push.sh" 2>/dev/null)
 
   assert_contains "$out" "data/captain-shared.md: pushed" \
@@ -581,7 +581,7 @@ EOF
   add_bootstrap_compatible_tools "$fakebin"
   jg_fake_exit0 "$fakebin" pgrep
 
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
     "$ROOT/bin/jg-session-start.sh")
 
   assert_contains "$out" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)" \

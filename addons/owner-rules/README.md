@@ -26,12 +26,12 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
   home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
 - Design flag: a backlog body line `design: required` or `design: none`. `required` adds `Design discovery: required` to the brief; a design-like line with any other value is refused (`owner-rules: design: must be required or none (backlog item for <id>)`); no line on design-sounding work only prints a stderr note. Nothing blocks at merge time. Test: `tests/design-flag.test.sh [<firstmate-checkout>]` (the checkout adds the real `jg-brief.sh` journey).
 - Test: `tests/owner-rules.test.sh <firstmate-checkout>` drives the checkout's real `jg-brief.sh`.
-- Done-done proof: `FM_TEST_FORK=<firstmate-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
+- Done-done proof: `JG_TEST_FORK=<firstmate-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
 
 ## Merge gate (slice 2)
 
 3. **Done-done receipt.** `bin/jg-owner-rules-gate.sh` refuses a merge (exit 1) unless the task folder
-   `$FM_HOME/data/<id>/.done-done/runs/` holds a sealed clean done-done run at the merge head. That is merge-card's own
+   `$JG_HOME/data/<id>/.done-done/runs/` holds a sealed clean done-done run at the merge head. That is merge-card's own
    `receipt_run` check (`merge-card receipt`: exit 0, clean, files captured, run id). It checks only that the receipt
    exists, not what it shows: merge-card posts the Evidence-tab card after the merge, and only when the proof is real.
    Refusal, naming the PR URL (`local merge <head>` with no PR) and the exact command that seals the run:
@@ -39,12 +39,12 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
    A merge whose Checks block says `screen: none` still needs that sealed receipt for its text-only Evidence card (`merge-card screen-none`).
    The gate says so in one line at the top of its output: it takes the text-only card path, and no capture is demanded of it.
    A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
-4. **Checks-lint PASS.** After the receipt, the gate reads `$FM_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
+4. **Checks-lint PASS.** After the receipt, the gate reads `$JG_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
    `pass` row names the PR url at the merge head (a local merge matches the report-file rows of its own task folder; they carry no head).
-   `screen: none` exempts the receipt only. PR merges also require a passed-proof Evidence card on the fleet board, configured by `FM_FLEET_BOARD`, then the one-line `$FM_HOME/config/fleet-board`, then the main home board (`${FM_MAIN_HOME:-$HOME/firstmate}/config/fleet-board`); a screen-free PR with a sealed receipt gets a text-only card automatically. Local merges keep the existing receipt/lint behavior. Refusal:
-   `owner-rules: no checks-lint PASS for <pr> at <head>; run FM_HOME=<home> <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh <pr-url> <home>/data/<id> then merge again`.
+   `screen: none` exempts the receipt only. PR merges also require a passed-proof Evidence card on the fleet board, configured by `JG_FLEET_BOARD`, then the one-line `$JG_HOME/config/fleet-board`, then the main home board (`${JG_MAIN_HOME:-$HOME/firstmate}/config/fleet-board`); a screen-free PR with a sealed receipt gets a text-only card automatically. Local merges keep the existing receipt/lint behavior. Refusal:
+   `owner-rules: no checks-lint PASS for <pr> at <head>; run JG_HOME=<home> <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh <pr-url> <home>/data/<id> then merge again`.
 - Test: `tests/owner-rules-gate.test.sh` covers receipt and lint refusals, verifies the Evidence-card hint is an executable absolute path, and scans gate/check scripts for bare add-on command hints. `tests/gate-contract.test.sh` uses installed `sign-off-axi` to post a merge-card-shaped Evidence card, then proves matching commits pass and mismatches refuse; it skips only when the CLI is absent.
-- Roll out a new refusing gate with `config/owner-rules-canary`, one exact `FM_HOME` path per line; only listed homes enforce the new Evidence-card refusal while other homes retain prior behavior. A canary may self-waive that refusal by writing a future UTC expiry (`YYYY-MM-DDTHH:MMZ`) to `config/owner-rules-canary-waiver`; expired or malformed waivers do not apply. Remove the waiver after resolving any issue, then add homes to the canary file to expand rollout. With no canary config, all homes retain today's enforcement.
+- Roll out a new refusing gate with `config/owner-rules-canary`, one exact `JG_HOME` path per line; only listed homes enforce the new Evidence-card refusal while other homes retain prior behavior. A canary may self-waive that refusal by writing a future UTC expiry (`YYYY-MM-DDTHH:MMZ`) to `config/owner-rules-canary-waiver`; expired or malformed waivers do not apply. Remove the waiver after resolving any issue, then add homes to the canary file to expand rollout. With no canary config, all homes retain today's enforcement.
 
 ## Lavish refusal: secondmate notes and merge-card posts
 
@@ -58,8 +58,8 @@ Retiring existing registrations and removing old files remain outside this publi
 Existing homes need no reinstall when their add-on checkout is updated: the report hook and merge-card shims execute files from that checkout, and the existing owner-rules marker enables the checks.
 Homes without the marker enable it with `install.sh <jg-home>`; the report helper still needs the existing status-wait-check fork hook.
 Run `bash tests/no-lavish.test.sh` from this directory for the executable contract, note hook, and real sign-off board journey.
-Set `FM_TEST_FORK=<Firstmate checkout>` to also prove the real secondmate helper refuses before writing status; `FM_TEST_KEEP=1` preserves isolated fixtures for diagnosis.
-Capture the real commands and their outputs with `FM_PROOF_FORK=<Firstmate checkout> done-done run owner-rules-publication`, then check its `publication.txt` with done-done.
+Set `JG_TEST_FORK=<Firstmate checkout>` to also prove the real secondmate helper refuses before writing status; `JG_TEST_KEEP=1` preserves isolated fixtures for diagnosis.
+Capture the real commands and their outputs with `JG_PROOF_FORK=<Firstmate checkout> done-done run owner-rules-publication`, then check its `publication.txt` with done-done.
 
 ## Leads skill (slice 3)
 

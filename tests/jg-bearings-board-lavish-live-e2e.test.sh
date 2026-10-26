@@ -28,7 +28,7 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-jg_live_gate default-on FM_BEARINGS_LAVISH_LIVE lavish-axi jq curl
+jg_live_gate default-on JG_BEARINGS_LAVISH_LIVE lavish-axi jq curl
 
 pass() { printf 'ok - %s\n' "$1"; }
 note() { printf '# %s\n' "$1"; }
@@ -75,8 +75,8 @@ cat > "$LAB/payload.json" <<'JSON'
 JSON
 
 run_board() {
-  FM_HOME="$LAB" FM_STATE_OVERRIDE="$LAB/state" FM_DATA_OVERRIDE="$LAB/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$LAB/procevent-claims" \
+  JG_HOME="$LAB" JG_STATE_OVERRIDE="$LAB/state" JG_DATA_OVERRIDE="$LAB/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$LAB/procevent-claims" \
     "$ROOT/bin/jg-bearings-board.sh" "$@"
 }
 

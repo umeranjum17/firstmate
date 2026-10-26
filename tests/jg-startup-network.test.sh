@@ -28,10 +28,10 @@ set -u
 
 TMP_ROOT=$(jg_test_tmproot jg-startup-network-tests)
 DRAIN="$ROOT/bin/jg-wake-drain.sh"
-FM_TEST_CLEANUP_DIRS+=("$TMP_ROOT")
+JG_TEST_CLEANUP_DIRS+=("$TMP_ROOT")
 trap jg_test_cleanup EXIT
 
-# new_world <name>: an FM_HOME plus a fake code root whose bin/ is a real
+# new_world <name>: an JG_HOME plus a fake code root whose bin/ is a real
 # firstmate bin/ except for jg-bootstrap.sh, which is replaced by a scriptable
 # stand-in. The stage's contract is about WHEN and WHETHER the network half runs
 # and how its result is published; bin/jg-bootstrap.sh's own behavior is owned by
@@ -52,21 +52,21 @@ new_world() {
 # Scriptable stand-in: records how it was invoked, then behaves as the test asks.
 set -u
 printf 'network=%s detect_only=%s\n' \
-  "${FM_BOOTSTRAP_NETWORK:-all}" "${FM_BOOTSTRAP_DETECT_ONLY:-0}" \
-  >> "${FM_FAKE_BOOTSTRAP_LOG:?}"
+  "${JG_BOOTSTRAP_NETWORK:-all}" "${JG_BOOTSTRAP_DETECT_ONLY:-0}" \
+  >> "${JG_FAKE_BOOTSTRAP_LOG:?}"
 # The real sweeps record their elapsed times through jg-timing-lib.sh, which
-# reaches them as an exported FM_TIMING_LOG. Recording the same way here proves
+# reaches them as an exported JG_TIMING_LOG. Recording the same way here proves
 # the stage actually hands that channel to its child and publishes what the child
 # wrote - the part of the contract this suite owns. What the real sweeps measure
 # is owned by tests/jg-bootstrap.test.sh.
-if [ -n "${FM_TIMING_LOG:-}" ]; then
+if [ -n "${JG_TIMING_LOG:-}" ]; then
   . "$(dirname "$0")/jg-timing-lib.sh"
-  jg_timing_record phase "${FM_FAKE_TIMING_PHASE:-gh-auth}" \
-    "$(( $(jg_timing_now_ms) - 1500 ))" "${FM_FAKE_TIMING_DETAIL:-}"
+  jg_timing_record phase "${JG_FAKE_TIMING_PHASE:-gh-auth}" \
+    "$(( $(jg_timing_now_ms) - 1500 ))" "${JG_FAKE_TIMING_DETAIL:-}"
 fi
-[ -z "${FM_FAKE_BOOTSTRAP_SLEEP:-}" ] || sleep "$FM_FAKE_BOOTSTRAP_SLEEP"
-[ -z "${FM_FAKE_BOOTSTRAP_OUT:-}" ] || printf '%s\n' "$FM_FAKE_BOOTSTRAP_OUT"
-exit "${FM_FAKE_BOOTSTRAP_RC:-0}"
+[ -z "${JG_FAKE_BOOTSTRAP_SLEEP:-}" ] || sleep "$JG_FAKE_BOOTSTRAP_SLEEP"
+[ -z "${JG_FAKE_BOOTSTRAP_OUT:-}" ] || printf '%s\n' "$JG_FAKE_BOOTSTRAP_OUT"
+exit "${JG_FAKE_BOOTSTRAP_RC:-0}"
 SH
   chmod +x "$root/bin/jg-bootstrap.sh"
   cat > "$root/bin/ps" <<'SH'
@@ -77,7 +77,7 @@ for argument in "$@"; do
   [ "$previous" = -p ] && pid=$argument
   previous=$argument
 done
-if [ "$pid" = "${FM_FAKE_HARNESS_PID:-}" ]; then
+if [ "$pid" = "${JG_FAKE_HARNESS_PID:-}" ]; then
   case "$*" in
     *comm=*) printf '/usr/local/bin/claude\n' ;;
     *args=*) printf 'claude\n' ;;
@@ -120,8 +120,8 @@ EOF
 run_stage() {  # <home> <root> <args...>
   local home=$1 root=$2
   shift 2
-  PATH="$root/bin:$PATH" FM_FAKE_HARNESS_PID="${FM_FAKE_HARNESS_PID_OVERRIDE:-$$}" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$root/bin/jg-startup-network.sh" "$@"
+  PATH="$root/bin:$PATH" JG_FAKE_HARNESS_PID="${JG_FAKE_HARNESS_PID_OVERRIDE:-$$}" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" "$root/bin/jg-startup-network.sh" "$@"
 }
 
 wait_for_startup_network_wake() {  # <home> [tenths]
@@ -140,7 +140,7 @@ wait_for_startup_network_wake() {  # <home> [tenths]
 # stale-owner recovery never reclaims it while the test runs.
 hold_publish_lock() {  # <home>
   local lock="$1/state/.startup-network.lock" holder waited=0
-  FM_STATE_OVERRIDE="$1/state" FM_ROOT_OVERRIDE="$ROOT" bash -c '
+  JG_STATE_OVERRIDE="$1/state" JG_ROOT_OVERRIDE="$ROOT" bash -c '
     . "$1/jg-wake-lib.sh"
     jg_lock_try_acquire "$2" || exit 1
     exec sleep 120' _ "$ROOT/bin" "$lock" >/dev/null 2>&1 </dev/null &
@@ -181,7 +181,7 @@ EOF
 
   started=$(date +%s)
   # Command substitution reads to EOF, exactly like a hook harvesting hook output.
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=10 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=10 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$ >/dev/null
   elapsed=$(( $(date +%s) - started ))
 
@@ -209,7 +209,7 @@ EOF
 
   sleep 30 &
   claimant=$!
-  FM_SESSION_START_TIMEOUT=15 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='acknowledged result' \
+  JG_SESSION_START_TIMEOUT=15 JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_OUT='acknowledged result' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid "$claimant"
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the claimed worker never published"
   worker_pid=$(sed -n 's/^pid=//p' "$home/state/.startup-network.status")
@@ -234,13 +234,13 @@ EOF
   # stays about the claim mechanism; test_a_successful_result_never_queues_a_wake
   # below owns the separate "a clean success never wakes" contract.
   assert_absent "$home/state/.startup-network.claim" "harvest did not release its own claim"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" run --locked 0
   assert_grep 'check	startup-network' "$home/state/.wake-queue" \
     "an unclaimed actionable result never reached the wake queue"
 
   : > "$home/state/.wake-queue"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the dead-claim worker never published"
   wait_for_startup_network_wake "$home" || fail "the dead-claim worker never settled delivery"
@@ -260,8 +260,8 @@ EOF
   claimant=$!
   # Actionable output: a clean success in this same crash window must stay
   # silent (test_a_successful_result_never_queues_a_wake owns that case).
-  FM_SESSION_START_TIMEOUT=4 FM_FAKE_BOOTSTRAP_LOG="$log" \
-    FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+  JG_SESSION_START_TIMEOUT=4 JG_FAKE_BOOTSTRAP_LOG="$log" \
+    JG_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid "$claimant"
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the crash-window worker never published"
   kill -0 "$claimant" 2>/dev/null \
@@ -287,7 +287,7 @@ EOF
   sleep 10 &
   claimant=$!
 
-  FM_SESSION_START_TIMEOUT=4 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='unpublishable result' \
+  JG_SESSION_START_TIMEOUT=4 JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_OUT='unpublishable result' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid "$claimant"
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the report-publication failure never settled"
   state=$(sed -n 's/^state=//p' "$home/state/.startup-network.status")
@@ -323,7 +323,7 @@ $rec
 EOF
   sleep 10 &
   claimant=$!
-  FM_SESSION_START_TIMEOUT=4 FM_FAKE_BOOTSTRAP_LOG="$log" \
+  JG_SESSION_START_TIMEOUT=4 JG_FAKE_BOOTSTRAP_LOG="$log" \
     run_stage "$home" "$root" start --locked 0 --harvest-pid "$claimant"
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the unclaimed successful worker never published"
   kill "$claimant" 2>/dev/null || true
@@ -341,8 +341,8 @@ EOF
   # Bootstrap itself explicitly types completed benign work as BOOTSTRAP_INFO.
   # That producer-owned no-action record is durable but must remain just as
   # quiet as a fully silent success.
-  FM_FAKE_BOOTSTRAP_LOG="$log" \
-    FM_FAKE_BOOTSTRAP_OUT='BOOTSTRAP_INFO: fixture completed benign work' \
+  JG_FAKE_BOOTSTRAP_LOG="$log" \
+    JG_FAKE_BOOTSTRAP_OUT='BOOTSTRAP_INFO: fixture completed benign work' \
     run_stage "$home" "$root" run --locked 0
   [ ! -s "$home/state/.wake-queue" ] \
     || fail "a BOOTSTRAP_INFO-only success queued a main-blocking wake: $(cat "$home/state/.wake-queue")"
@@ -364,8 +364,8 @@ $rec
 EOF
   sleep 10 &
   claimant=$!
-  FM_SESSION_START_TIMEOUT=4 FM_FAKE_BOOTSTRAP_LOG="$log" \
-    FM_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
+  JG_SESSION_START_TIMEOUT=4 JG_FAKE_BOOTSTRAP_LOG="$log" \
+    JG_FAKE_BOOTSTRAP_OUT='MISSING: some-tool (install: brew install some-tool)' \
     run_stage "$home" "$root" start --locked 0 --harvest-pid "$claimant"
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the unclaimed actionable worker never published"
   kill "$claimant" 2>/dev/null || true
@@ -395,7 +395,7 @@ EOF
       ln -s "$target" "$home/.jg-secondmate-home"
     fi
 
-    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 1
+    JG_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 1
     assert_grep $'check\tinactive-reconcile-diagnostic:invalid-secondmate-home\t' "$home/state/.wake-queue" \
       "$kind marker finding was swallowed by the deferred startup stage"
     report=$(run_stage "$home" "$root" report)
@@ -403,12 +403,12 @@ EOF
       "$kind marker fixture unexpectedly depended on the network report"
 
     err="$home/drain.err"
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$DRAIN" >/dev/null 2> "$err"
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$DRAIN" >/dev/null 2> "$err"
     seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation .*/\1/p' "$err")
     generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
     [ -n "$seq" ] && [ -n "$generation" ] \
       || fail "$kind marker wake did not issue a durable acknowledgement"
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$DRAIN" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" "$DRAIN" \
       --ack-through "$seq" --recovery-generation "$generation" >/dev/null
     assert_no_grep 'inactive-reconcile-diagnostic:invalid-secondmate-home' "$home/state/.wake-queue" \
       "$kind marker wake could not be acknowledged"
@@ -427,7 +427,7 @@ $rec
 EOF
   printf '222222\n' > "$home/state/.lock"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 1 --lock-pid 111111
+  JG_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 1 --lock-pid 111111
   assert_grep 'network=only detect_only=1' "$log" \
     "the worker ran mutating sweeps for a lock it no longer held"
   report=$(run_stage "$home" "$root" report)
@@ -437,7 +437,7 @@ EOF
   # A detached start captures the lock itself and may run the mutating phase.
   : > "$log"
   printf '%s\n' $$ > "$home/state/.lock"
-  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 1 --harvest-pid $$
+  JG_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the lock-authorized worker never published"
   assert_grep 'network=only detect_only=0' "$log" \
     "the worker refused sweeps for the very session that still holds the lock"
@@ -454,10 +454,10 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=20 FM_STARTUP_NETWORK_TIMEOUT=2 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=20 JG_STARTUP_NETWORK_TIMEOUT=2 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   run_stage "$home" "$root" harvest --pid $$ >/dev/null
-  FM_STARTUP_NETWORK_TIMEOUT=2 run_stage "$home" "$root" wait 10 >/dev/null \
+  JG_STARTUP_NETWORK_TIMEOUT=2 run_stage "$home" "$root" wait 10 >/dev/null \
     || fail "the bounded worker never settled"
   report=$(run_stage "$home" "$root" report)
   assert_contains "$report" "NETWORK_CHECKS: hit the 2s bound before finishing" \
@@ -501,7 +501,7 @@ started=$(( $(date +%s) - 400 ))
 locked=1
 phases=probe,sweeps
 EOF
-  assert_contains "$(FM_STARTUP_NETWORK_TIMEOUT=10 run_stage "$home" "$root" report)" \
+  assert_contains "$(JG_STARTUP_NETWORK_TIMEOUT=10 run_stage "$home" "$root" report)" \
     "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
     "a record that outlived the stage bound still read as in progress"
   pass "jg-startup-network: an abandoned run reports as needing a rerun, never as in progress forever"
@@ -516,7 +516,7 @@ EOF
   printf '%s\n' $$ > "$home/state/.lock"
   printf '../other-home\n' > "$home/.jg-secondmate-home"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 0 --harvest-pid $$
   while ! grep -Fq 'detect_only=1' "$log" 2>/dev/null && [ "$waited" -lt 50 ]; do
     sleep 0.1
@@ -525,7 +525,7 @@ EOF
   assert_grep 'network=only detect_only=1' "$log" \
     "the probe-only worker was not in flight before the locked request"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" \
+  JG_FAKE_BOOTSTRAP_LOG="$log" \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   run_stage "$home" "$root" wait 30 >/dev/null \
     || fail "the locked request never published"
@@ -546,10 +546,10 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   await_worker_record "$home"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   run_stage "$home" "$root" wait 40 >/dev/null || fail "the worker never published"
 
@@ -577,7 +577,7 @@ lock_pid=
 EOF
   printf 'old result\n' > "$home/state/.startup-network.report"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=5 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=5 \
     run_stage "$home" "$root" start --locked 0 --harvest-pid $$
   report=$(run_stage "$home" "$root" harvest --pid $$)
   assert_contains "$report" "IN PROGRESS" \
@@ -595,13 +595,13 @@ test_new_lock_owner_does_not_reuse_the_previous_owners_worker() {
 $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   generation_one=$(sed -n 's/^generation=//p' "$home/state/.startup-network.status")
 
   next_owner=$(/bin/ps -o ppid= -p $$ | tr -d ' ')
   printf '%s\n' "$next_owner" > "$home/state/.lock"
-  FM_FAKE_HARNESS_PID_OVERRIDE="$next_owner" FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=1 \
+  JG_FAKE_HARNESS_PID_OVERRIDE="$next_owner" JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=1 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   generation_two=$(sed -n 's/^generation=//p' "$home/state/.startup-network.status")
   [ "$generation_one" != "$generation_two" ] \
@@ -617,7 +617,7 @@ test_lock_takeover_stays_read_only_while_a_sweep_holds_the_lease() {
 $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=6 \
     run_stage "$home" "$root" start --locked 1 --harvest-pid $$
   while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
     sleep 0.1
@@ -628,8 +628,8 @@ EOF
   next_owner=$(/bin/ps -o ppid= -p $$ | tr -d ' ')
   started=$(date +%s)
   rc=0
-  out=$(PATH="$root/bin:$PATH" FM_FAKE_HARNESS_PID="$next_owner" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$root/bin/jg-lock.sh" 2>&1) || rc=$?
+  out=$(PATH="$root/bin:$PATH" JG_FAKE_HARNESS_PID="$next_owner" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" "$root/bin/jg-lock.sh" 2>&1) || rc=$?
   elapsed=$(( $(date +%s) - started ))
   [ "$rc" -ne 0 ] || fail "lock takeover succeeded while the prior sweep was mutating"
   [ "$elapsed" -lt 4 ] || fail "lock takeover blocked ${elapsed}s behind deferred network work"
@@ -639,8 +639,8 @@ EOF
     || fail "the lease-blocked takeover replaced the prior owner"
 
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the leased sweep never settled"
-  out=$(PATH="$root/bin:$PATH" FM_FAKE_HARNESS_PID="$next_owner" \
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$root/bin/jg-lock.sh" 2>&1) \
+  out=$(PATH="$root/bin:$PATH" JG_FAKE_HARNESS_PID="$next_owner" \
+    JG_HOME="$home" JG_ROOT_OVERRIDE="$root" "$root/bin/jg-lock.sh" 2>&1) \
     || fail "lock takeover still failed after the sweep released its lease"
   new_owner=$(cat "$home/state/.lock")
   assert_contains "$out" "lock acquired: harness pid $new_owner" \
@@ -664,9 +664,9 @@ test_records_share_one_origin_so_offsets_form_a_timeline() {
   (
     # shellcheck source=bin/jg-timing-lib.sh
     . "$ROOT/bin/jg-timing-lib.sh"
-    unset FM_TIMING_EPOCH_MS
-    FM_TIMING_LOG=$log
-    export FM_TIMING_LOG
+    unset JG_TIMING_EPOCH_MS
+    JG_TIMING_LOG=$log
+    export JG_TIMING_LOG
     base=$(jg_timing_now_ms)
     jg_timing_record phase first "$base"
     jg_timing_record phase second "$(( base + 5000 ))"
@@ -701,8 +701,8 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='sweep finding' \
-    FM_FAKE_TIMING_PHASE=fleet-sync FM_FAKE_TIMING_DETAIL=dotfiles-private \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_OUT='sweep finding' \
+    JG_FAKE_TIMING_PHASE=fleet-sync JG_FAKE_TIMING_DETAIL=dotfiles-private \
     run_stage "$home" "$root" run --locked 1
 
   assert_present "$home/state/.startup-network.timings" \
@@ -739,9 +739,9 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  FM_STARTUP_NETWORK_TIMEOUT=1 FM_SESSION_START_TIMEOUT=2 \
-    FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=20 \
-    FM_FAKE_TIMING_PHASE=secondmate-liveness FM_FAKE_TIMING_DETAIL='mate-a@host-one' \
+  JG_STARTUP_NETWORK_TIMEOUT=1 JG_SESSION_START_TIMEOUT=2 \
+    JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=20 \
+    JG_FAKE_TIMING_PHASE=secondmate-liveness JG_FAKE_TIMING_DETAIL='mate-a@host-one' \
     run_stage "$home" "$root" run --locked 1
 
   [ "$(sed -n 's/^state=//p' "$home/state/.startup-network.status")" = timeout ] \
@@ -765,8 +765,8 @@ $rec
 EOF
   printf '%s\n' $$ > "$home/state/.lock"
 
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_TIMING_PHASE=secondmate-sync \
-    FM_FAKE_TIMING_DETAIL="ssh -i /key host	v1	forged	0	9999
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_TIMING_PHASE=secondmate-sync \
+    JG_FAKE_TIMING_DETAIL="ssh -i /key host	v1	forged	0	9999
 GITHUB_TOKEN=ghp_supersecretvalue" \
     run_stage "$home" "$root" run --locked 1
 
@@ -809,8 +809,8 @@ EOF
   holder=$(hold_publish_lock "$home")
   began=$(date +%s)
   rc=0
-  jg_run_timed 15 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
-    FM_STARTUP_NETWORK_TIMEOUT=2 FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
+  jg_run_timed 15 env PATH="$root/bin:$PATH" JG_HOME="$home" JG_ROOT_OVERRIDE="$root" \
+    JG_STARTUP_NETWORK_TIMEOUT=2 JG_SESSION_START_TIMEOUT=2 JG_FAKE_BOOTSTRAP_LOG="$log" \
     "$root/bin/jg-startup-network.sh" run --locked 0 >/dev/null 2>&1 || rc=$?
   took=$(( $(date +%s) - began ))
   [ "$rc" -ne 124 ] || fail "the worker was still waiting on the held publish lock 15s past a 2s budget"
@@ -832,8 +832,8 @@ EOF
   # After the sweeps: the worker registers and sweeps freely, then finds the
   # lock held when it comes to publish. What the sweeps produced must survive.
   rm -f "$home/state/.wake-queue" "$log"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=2 FM_FAKE_BOOTSTRAP_OUT='PROBE_RAN' \
-    FM_STARTUP_NETWORK_TIMEOUT=10 FM_SESSION_START_TIMEOUT=2 \
+  JG_FAKE_BOOTSTRAP_LOG="$log" JG_FAKE_BOOTSTRAP_SLEEP=2 JG_FAKE_BOOTSTRAP_OUT='PROBE_RAN' \
+    JG_STARTUP_NETWORK_TIMEOUT=10 JG_SESSION_START_TIMEOUT=2 \
     run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999
   await_worker_record "$home"
   worker=$(sed -n 's/^pid=//p' "$home/state/.startup-network.status")

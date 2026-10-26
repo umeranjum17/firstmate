@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Completion-receipt acceptance and brief/meta helpers, sourced by the fork's
 # bin/jg-dod-lib.sh, jg-spawn.sh and jg-promote.sh through an optional add-on
 # source. Needs the fork libs the caller already loaded (jg_dod_meta_value,
@@ -26,33 +35,33 @@
 # 0 when <receipt-pr> is the lane's next PR after a verifiably merged meta pr=:
 # same forge identity (provider/host/path), a different number, meta pr merge-
 # notified, and a live forge read showing the receipt PR open and unmerged.
-# Runs in a subshell so the caller's FM_PR_* identity is unchanged.
+# Runs in a subshell so the caller's JG_PR_* identity is unchanged.
 jg_receipts_next_pr_of_lane_ok() {  # <state> <id> <meta-pr> <receipt-pr>
   local state=$1 id=$2 meta_pr=$3 receipt_pr=$4
   [ -n "$meta_pr" ] && [ -n "$receipt_pr" ] && [ "$meta_pr" != "$receipt_pr" ] || return 1
   (
     m_provider='' m_host='' m_path='' m_number='' state_lc=''
     jg_pr_url_parse "$meta_pr" || exit 1
-    m_provider=$FM_PR_PROVIDER
-    m_host=$FM_PR_HOST
-    m_path=$FM_PR_PATH
-    m_number=$FM_PR_NUMBER
+    m_provider=$JG_PR_PROVIDER
+    m_host=$JG_PR_HOST
+    m_path=$JG_PR_PATH
+    m_number=$JG_PR_NUMBER
     jg_pr_poll_merge_already_notified "$state" "$id" \
       "$m_provider" "$m_host" "$m_path" "$m_number" || exit 1
     jg_pr_url_parse "$receipt_pr" || exit 1
-    [ "$FM_PR_PROVIDER" = "$m_provider" ] \
-      && [ "$FM_PR_HOST" = "$m_host" ] \
-      && [ "$FM_PR_PATH" = "$m_path" ] \
-      && [ "$FM_PR_NUMBER" != "$m_number" ] || exit 1
-    case "$FM_PR_PROVIDER" in
-      github) jg_pr_github_read_record "$FM_PR_OWNER" "$FM_PR_REPO" "$FM_PR_NUMBER" || exit 1 ;;
-      gitlab) jg_pr_gitlab_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || exit 1 ;;
-      forgejo) jg_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || exit 1 ;;
-      gerrit) jg_pr_gerrit_read_record "$FM_PR_HOST" "$FM_PR_NUMBER" || exit 1 ;;
+    [ "$JG_PR_PROVIDER" = "$m_provider" ] \
+      && [ "$JG_PR_HOST" = "$m_host" ] \
+      && [ "$JG_PR_PATH" = "$m_path" ] \
+      && [ "$JG_PR_NUMBER" != "$m_number" ] || exit 1
+    case "$JG_PR_PROVIDER" in
+      github) jg_pr_github_read_record "$JG_PR_OWNER" "$JG_PR_REPO" "$JG_PR_NUMBER" || exit 1 ;;
+      gitlab) jg_pr_gitlab_read_record "$JG_PR_HOST" "$JG_PR_PATH" "$JG_PR_NUMBER" || exit 1 ;;
+      forgejo) jg_pr_forgejo_read_record "$JG_PR_HOST" "$JG_PR_PATH" "$JG_PR_NUMBER" || exit 1 ;;
+      gerrit) jg_pr_gerrit_read_record "$JG_PR_HOST" "$JG_PR_NUMBER" || exit 1 ;;
       *) exit 1 ;;
     esac
-    [ "$FM_PR_RECORD_MERGED" = false ] || exit 1
-    state_lc=$(printf '%s' "$FM_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
+    [ "$JG_PR_RECORD_MERGED" = false ] || exit 1
+    state_lc=$(printf '%s' "$JG_PR_RECORD_STATE" | tr '[:upper:]' '[:lower:]')
     case "$state_lc" in
       open|opened) exit 0 ;;
       *) exit 1 ;;
@@ -72,7 +81,7 @@ jg_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
   fi
   if [ ! -e "$receipt" ] && [ ! -L "$receipt" ]; then
     [ "$required" != 1 ] && return 0
-    echo "completion receipt missing for $id: publish one with: FM_HOME=${FM_HOME:-${FM_ROOT:-}} ${FM_ADDONS_DIR:-${FM_HOME:-${FM_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh $id PASS <evidence-file>"
+    echo "completion receipt missing for $id: publish one with: JG_HOME=${JG_HOME:-${JG_ROOT:-}} ${JG_ADDONS_DIR:-${JG_HOME:-${JG_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh $id PASS <evidence-file>"
     return 1
   fi
   mode=$(jg_dod_meta_value "$meta" mode)
@@ -91,7 +100,7 @@ jg_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
       return 0
     fi
   fi
-  echo "completion receipt refused for $id: FAIL, mismatched candidate/incarnation, malformed or absent evidence; publish one for this head with: FM_HOME=${FM_HOME:-${FM_ROOT:-}}${pr:+ FM_RECEIPT_PR=$pr} ${FM_ADDONS_DIR:-${FM_HOME:-${FM_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh $id PASS <evidence-file>"
+  echo "completion receipt refused for $id: FAIL, mismatched candidate/incarnation, malformed or absent evidence; publish one for this head with: JG_HOME=${JG_HOME:-${JG_ROOT:-}}${pr:+ JG_RECEIPT_PR=$pr} ${JG_ADDONS_DIR:-${JG_HOME:-${JG_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh $id PASS <evidence-file>"
   return 1
 }
 
@@ -99,11 +108,11 @@ jg_dod_receipt_accept() {  # <state> <id> <meta> <candidate-head>
 # The brief's receipt contract for ship modes: <task-id>.
 jg_receipts_brief() {  # <id>
   local receipt_home_q receipt_tool_q
-  receipt_home_q=$(printf '%q' "${FM_HOME:-${FM_ROOT:-}}")
-  receipt_tool_q=$(printf '%q' "${FM_ADDONS_DIR:-${FM_HOME:-${FM_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh")
+  receipt_home_q=$(printf '%q' "${JG_HOME:-${JG_ROOT:-}}")
+  receipt_tool_q=$(printf '%q' "${JG_ADDONS_DIR:-${JG_HOME:-${JG_ROOT:-}}/projects/firstmate-addons}/receipts/bin/jg-run-receipt.sh")
   cat <<EOF
 Completion receipt: required
-Before the final ready report (after validation in no-mistakes mode), write a nonempty evidence file containing commands run, results and limitations, then run \`FM_HOME=$receipt_home_q $receipt_tool_q $1 PASS <evidence-file>\` from the clean candidate checkout.
+Before the final ready report (after validation in no-mistakes mode), write a nonempty evidence file containing commands run, results and limitations, then run \`JG_HOME=$receipt_home_q $receipt_tool_q $1 PASS <evidence-file>\` from the clean candidate checkout.
 Use FAIL when verification failed; never label failed or unperformed checks PASS.
 The evidence file may be a task-owned temporary file outside your worktree; that write and the helper's completion-receipt write into its supervising state directory are authorized.
 Regenerate the receipt after any candidate change, including validation fixes or a rebase.

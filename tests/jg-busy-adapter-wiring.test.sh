@@ -490,7 +490,7 @@ spawn_secondmate_harness() { # <case-dir> <id> <harness> [extra fake tools...]
     cp "$SECONDMATE_LOCAL_SETTINGS" "$sm/.claude/settings.local.json"
   fi
   : > "$case_dir/launch.log"
-  FM_BACKEND=tmux FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+  JG_BACKEND=tmux JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
     jg_test_run_spawn "$primary" "$sm" "$fakebin" "$id" "$sm" "$harness" --secondmate
 }
 
@@ -539,10 +539,10 @@ case "\${1:-}" in
 esac
 SH
   chmod +x "$fakebin/tmux"
-  PATH="$fakebin:$PATH" FM_HOME="$primary" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$state" FM_BACKEND=tmux \
-    FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 \
-    FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+  PATH="$fakebin:$PATH" JG_HOME="$primary" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_STATE_OVERRIDE="$state" JG_BACKEND=tmux \
+    JG_SECONDMATE_WAKE_STALL_SECS=1 JG_POLL=1 \
+    JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$ROOT/bin/jg-watch-checkpoint.sh" --seconds "$seconds" \
     > "$out" 2>"$out.err" || true
 }
@@ -597,7 +597,7 @@ test_secondmate_claude_spawn_arms_busy_for_the_stall_gate() {
 
 run_secondmate_stop_guard() { # <sm-home>
   printf '{"stop_hook_active":false,"session_id":"sm-guard"}' \
-    | CLAUDECODE=1 FM_ROOT_OVERRIDE="$1" FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
+    | CLAUDECODE=1 JG_ROOT_OVERRIDE="$1" JG_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
       bash "$ROOT/bin/jg-turnend-guard.sh" --claude >/dev/null 2>&1
 }
 
@@ -847,7 +847,7 @@ test_raw_secondmate_launch_writes_no_busy_wiring() {
   assert_present "$state/$id.busy-gen" "canonical claude secondmate spawn did not arm a busy generation"
   assert_present "$sm/.jg-busy-stop" "canonical claude secondmate spawn did not write the Stop pointer"
   : > "$case_dir/launch.log"
-  out=$(FM_BACKEND=tmux FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
+  out=$(JG_BACKEND=tmux JG_FAKE_LAUNCH_LOG="$case_dir/launch.log" \
     jg_test_run_spawn "$case_dir/primary" "$sm" "$case_dir/fake/fakebin" "$id" "$sm" 'claude --jg-raw-flag' --secondmate) \
     || fail "raw claude respawn over an armed secondmate must succeed: $out"
   assert_contains "$(cat "$case_dir/launch.log")" 'claude --jg-raw-flag' "raw respawn did not launch the raw command"

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Same-lane follow-up PR may reuse its own earlier frames; cross-task reuse must still fail.
 # Task identity comes from lane meta / data/<task>, not the PR branch tip name.
 set -euo pipefail
@@ -7,7 +16,7 @@ LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/fm/state" "$d/fm/data/lane-alpha" "$d/fm/data/lane-beta" "$d/bin"
-export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" FM_HOME=$d/fm
+export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" JG_HOME=$d/fm
 mkdir -p "$HOME" "$XDG_DATA_HOME"
 
 printf 'frame-alpha\n' > "$d/fm/data/lane-alpha/shot.png"
@@ -45,7 +54,7 @@ chmod +x "$d/bin/gh"
 printf 'pr=https://github.com/owner/repo/pull/2\nbranch=fm/lane-alpha-pr2\n' > "$d/fm/state/lane-alpha.meta"
 
 set +e
-same=$(FM_HOME=$d/fm "$LINT" 'https://github.com/owner/repo/pull/2' "$d/fm/data/lane-alpha" 2>&1)
+same=$(JG_HOME=$d/fm "$LINT" 'https://github.com/owner/repo/pull/2' "$d/fm/data/lane-alpha" 2>&1)
 same_rc=$?
 set -e
 [ "$same_rc" -eq 0 ] && [[ "$same" == *'checks-lint: PASS:'* ]] || {
@@ -65,7 +74,7 @@ proof: no verify skill - bash fixture
 evidence: shot.png
 EOF
 set +e
-cross=$(FM_HOME=$d/fm "$LINT" 'https://github.com/owner/repo/pull/3' "$d/fm/data/lane-beta" 2>&1)
+cross=$(JG_HOME=$d/fm "$LINT" 'https://github.com/owner/repo/pull/3' "$d/fm/data/lane-beta" 2>&1)
 cross_rc=$?
 set -e
 [ "$cross_rc" -ne 0 ] && [[ "$cross" == *'every evidence file was already used by another PR'* ]] || {

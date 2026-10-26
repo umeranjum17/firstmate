@@ -12,8 +12,8 @@ GUARD="$ROOT/bin/jg-jev-mem-guard.sh"
 WATCH="$ROOT/bin/jg-watch.sh"
 DRAIN="$ROOT/bin/jg-wake-drain.sh"
 TMP_ROOT=$(jg_test_tmproot jg-mem-guard)
-export FM_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
-export FM_ADDONS_DIR="${FM_ADDONS_DIR:-${FM_HOME:-$ROOT}/projects/firstmate-addons}"
+export JG_HOST_MEMORY_CGROUP_ROOT="$TMP_ROOT/no-cgroup"
+export JG_ADDONS_DIR="${JG_ADDONS_DIR:-${JG_HOME:-$ROOT}/projects/firstmate-addons}"
 APP_SLICE="user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
 
 # fake_host <proc> <available-gb> <pressure (both 10 s and 60 s averages)> [swap-used-gb]
@@ -28,17 +28,17 @@ fake_host() {
   printf 'some avg10=%s avg60=%s avg300=1.00 total=1\n' "$3" "$3" > "$(dirname "$proc")/cgroup/$APP_SLICE/memory.pressure"
 }
 
-# fake_pid <proc> <pid> <name> <rss-gb> <cwd> [FM_TASK_ID]
+# fake_pid <proc> <pid> <name> <rss-gb> <cwd> [JG_TASK_ID]
 fake_pid() {
   local dir="$1/$2"
   mkdir -p "$dir"
   printf 'Name:\t%s\nVmRSS:\t%s kB\nVmSwap:\t0 kB\n' "$3" "$(($4 * 1048576))" > "$dir/status"
   ln -s "$5" "$dir/cwd"
-  if [ -n "${6:-}" ]; then printf 'PATH=/bin\0FM_TASK_ID=%s\0' "$6" > "$dir/environ"; else printf 'PATH=/bin\0' > "$dir/environ"; fi
+  if [ -n "${6:-}" ]; then printf 'PATH=/bin\0JG_TASK_ID=%s\0' "$6" > "$dir/environ"; else printf 'PATH=/bin\0' > "$dir/environ"; fi
 }
 
 # A home with one ship task, one lead, and processes owned by the task (by
-# working directory and a path-qualified FM_TASK_ID), by the lead,
+# working directory and a path-qualified JG_TASK_ID), by the lead,
 # and by nothing Firstmate records.
 make_fleet() {
   local case=$1
@@ -56,28 +56,28 @@ test_verdicts_samples_and_owners() {
   case=$TMP_ROOT/verdicts tsv=$case/state/host-memory.tsv
   make_fleet "$case"
   fake_host "$case/proc" 40 2.5 1
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'OK\tpressure 2% (lower of 10 s and 60 s averages), 40.0 GB available, 1.0 GB swap used; host 2%, app.slice 2%' "$out" "calm host"
   fake_host "$case/proc" 30 24 3
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'WAIT\tpressure 24% (lower of 10 s and 60 s averages), 30.0 GB available, 3.0 GB swap used; host 24%, app.slice 24%; pressure at or above 20%' "$out" \
     "pressure past the wait threshold makes new agents wait"
   fake_host "$case/proc" 5 41.2 16
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --record "$tsv" --state-dir "$case" "$case/state")
   assert_equals $'ALERT\tpressure 41% (lower of 10 s and 60 s averages), 5.0 GB available, 16.0 GB swap used; host 41%, app.slice 41%; pressure at or above 35%; available memory below 6 GB; largest: task big-build (main) 14.0 GB in 2 processes, llama pid 104 6.0 GB, lead sm1 2.0 GB' "$out" \
     "an alert names the largest consumers by task, lead, or process"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "three samples should be recorded: $(cat "$tsv")"
   assert_equals $'5242880\t16777216\t41.20\tALERT' "$(tail -n 1 "$tsv" | cut -f2-)" "the sample row carries available kB, swap kB, pressure, verdict"
   # Thresholds come from the one config file; a broken one is refused with its line.
   printf '# tighter host\nalert_pressure=50\nalert_available_gb=1\nwait_pressure = 10\n' > "$case/host-memory"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory")
   assert_contains "$out" "pressure at or above 10%" "config thresholds replace the defaults"
   printf 'alert_pressure=lots\n' > "$case/host-memory"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory" 2>&1); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/host-memory" 2>&1); rc=$?
   [ "$rc" -eq 2 ] || fail "an invalid config must exit 2, got $rc: $out"
   assert_contains "$out" "line 1: 'alert_pressure=lots'" "the invalid line is named"
   # Not measurable: no verdict is invented and nothing is recorded.
-  out=$(FM_HOST_MEMORY_PROC="$case/none" "$GUARD" --record "$tsv")
+  out=$(JG_HOST_MEMORY_PROC="$case/none" "$GUARD" --record "$tsv")
   assert_contains "$out" "UNKNOWN" "an unmeasurable host reads unknown"
   [ "$(wc -l < "$tsv" | tr -d ' ')" -eq 3 ] || fail "an unmeasurable sample was recorded"
   pass "verdicts, recorded samples, and owner mapping follow the host"
@@ -86,21 +86,21 @@ test_verdicts_samples_and_owners() {
 # One watcher run against the case; legs that must wake exit on their own.
 watch_leg() {
   local case=$1 tag=$2
-  env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="${5:-$case/state}" \
-    FM_CREW_STATE_BIN="$case/fakebin/jg-crew-state.sh" FM_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' FM_BACKEND=tmux \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" FM_HOST_MEMORY_SECS="${3:-1}" FM_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
-    FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+  env PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_ROOT_OVERRIDE="$ROOT" JG_STATE_OVERRIDE="${5:-$case/state}" \
+    JG_CREW_STATE_BIN="$case/fakebin/jg-crew-state.sh" JG_FAKE_CREW_STATE='state: working · source: run-step · fixture build' TMUX='' JG_BACKEND=tmux \
+    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" JG_HOST_MEMORY_SECS="${3:-1}" JG_SECONDMATE_LIVENESS_SECS="${4:-99999999}" \
+    JG_POLL=1 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$case/watch-$tag.out" 2> "$case/watch-$tag.err" &
   LEG_PID=$!
 }
 
 drain_and_ack() {
   local state="$1/state" seq gen
-  FM_HOME="$1" FM_STATE_OVERRIDE="$state" "$DRAIN" > /dev/null 2> "$1/drain.err" || true
+  JG_HOME="$1" JG_STATE_OVERRIDE="$state" "$DRAIN" > /dev/null 2> "$1/drain.err" || true
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\).*$/\1/p' "$1/drain.err")
   gen=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\).*$/\1/p' "$1/drain.err")
   [ -n "$seq" ] && [ -n "$gen" ] || return 0
-  FM_HOME="$1" FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" > /dev/null 2>&1 || true
+  JG_HOME="$1" JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$seq" --recovery-generation "$gen" > /dev/null 2>&1 || true
 }
 
 # wait_rows <tsv> <n>: wait up to 30 s for the watcher to have recorded n samples.
@@ -130,7 +130,7 @@ case "$1" in
   display-message)
     case "$*" in *jg-sm1*pane_current_command*) printf 'zsh\n' ;; *pane_current_command*) printf 'pi\n' ;; *) printf '%%1\n' ;; esac ;;
   capture-pane) printf 'idle\n' ;;
-  send-keys) printf '%s\n' "$*" >> "$FM_HOME/keys" ;;
+  send-keys) printf '%s\n' "$*" >> "$JG_HOME/keys" ;;
   *) exit 1 ;;
 esac
 SH
@@ -159,7 +159,7 @@ test_watcher_wakes_once_per_alert_episode() {
 
   # A handling successor starts BEFORE acknowledgement. The same queued alert
   # must not close it before its owner can establish continuity and drain it.
-  FM_WATCH_HANDLING_SUCCESSOR=1 watch_leg "$case" successor
+  JG_WATCH_HANDLING_SUCCESSOR=1 watch_leg "$case" successor
   wait_rows "$case/state/host-memory.tsv" 2
   is_live_non_zombie "$LEG_PID" || fail "unacknowledged alert killed the handling successor: $(cat "$case/watch-successor.out")"
   [ ! -s "$case/watch-successor.out" ] || fail "the handling successor re-delivered the queued alert"
@@ -211,7 +211,7 @@ test_fast_spike_waits_without_alert() {
   prepare_control_task "$case"
   fake_host "$case/proc" 20 2
   printf 'some avg10=40 avg60=10 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 1 ] || fail "a 10 s spike with ample memory admitted work: $out"
   watch_leg "$case" fast-spike default
   wait_rows "$case/state/host-memory.tsv" 2
@@ -229,11 +229,11 @@ test_cgroup_pressure() {
   fake_host "$case/proc" 40 2
   # A 10 s spike that the sustained average has not caught up with holds admission as WAIT.
   printf 'some avg10=60 avg60=8 avg300=2 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 1 ] || fail "a fast app.slice spike admitted work: $out"
   assert_contains "$out" '10 s pressure at or above 35%' "the fast spike names its reason"
   printf 'some avg10=24 avg60=30 avg300=0 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
   assert_contains "$out" $'WAIT\tpressure 24%' "sustained app.slice pressure makes new agents wait"
   assert_contains "$out" 'host 2%, app.slice 24%' "host and app.slice are both visible"
   # A capped sibling slice thrashing (jg-heavy at its swap cap) is contained by design:
@@ -242,21 +242,21 @@ test_cgroup_pressure() {
   printf 'some avg10=95 avg60=90 avg300=50 total=1\n' > "$case/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/fm.slice/jg-heavy.slice/memory.pressure"
   printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
   fake_host "$case/proc" 40 2
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "sibling heavy-slice thrash refused admission: $out"
   # Host-wide pressure with a calm app.slice holds nothing and interrupts nothing.
   fake_host "$case/proc" 40 48
   printf 'some avg10=1 avg60=1 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "host-wide pressure refused admission with a calm app.slice: $out"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
   assert_contains "$out" $'OK\tpressure 1%' "host-wide pressure is not a verdict"
   assert_contains "$out" 'host 48%, app.slice 1%' "host-wide pressure stays visible as context"
   # Unreadable app.slice pressure is not judged, so host-wide pressure cannot hold a launch either.
   rm "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "unreadable app.slice pressure held admission on host-wide pressure: $out"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD")
   assert_contains "$out" $'OK\tapp.slice pressure unreadable, not judged' "unreadable app.slice pressure is not judged"
   pass "app.slice pressure alone governs admission; host-wide pressure is context only"
 }
@@ -269,7 +269,7 @@ test_host_pressure_neither_holds_nor_wakes() {
   prepare_control_task "$case"
   fake_host "$case/proc" 40 48
   printf 'some avg10=3 avg60=3 avg300=1 total=1\n' > "$case/cgroup/$app/memory.pressure"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build --state "$case/state"); rc=$?
   [ "$rc" -eq 0 ] || fail "host-wide pressure held an admission with a calm app.slice: $out"
   watch_leg "$case" host-only default
   wait_rows "$case/state/host-memory.tsv" 2
@@ -285,13 +285,13 @@ test_home_qualified_owners() {
   make_fleet "$case"
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 107 foreign 25 "$TMP_ROOT/independent-home/wt" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
   assert_contains "$out" 'foreign pid 107 25.0 GB, task big-build (main) 14.0 GB in 2 processes' "a unique visible ID still requires recorded path ownership"
   assert_equals '' "${out##*$'\t'}" "an independent home's matching ID cannot authorize control"
   jg_write_meta "$case/state/big-build.meta" kind=ship "worktree=$case/wt" "tasktmp=${case}-tmp"
   rm "$case/proc/107/cwd"
   ln -s "${case}-tmp" "$case/proc/107/cwd"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --owned-top-task "$case/state")
   assert_contains "$out" "foreign pid 107 25.0 GB" "a temp path outside the explicit home is not a worktree"
   assert_equals '' "${out##*$'\t'}" "an external temp path cannot authorize control"
   rm -r "$case/proc/107"
@@ -301,13 +301,13 @@ test_home_qualified_owners() {
   fake_pid "$case/proc" 106 node 10 "$case/mate" big-build
   rm "$case/proc/102/cwd"
   ln -s "$case/wt" "$case/proc/102/cwd"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_contains "$out" 'task big-build (sm1) 30.0 GB in 2 processes, task big-build (main) 14.0 GB in 2 processes' "equal task IDs remain separate owners"
   assert_equals '' "${out##*$'\t'}" "a foreign top task cannot be interrupted by this home"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/mate/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/mate/state")
   assert_equals big-build "${out##*$'\t'}" "the owning home receives its exact task ID"
   printf 'Name:\tpi\nVmRSS:\t41943040 kB\nVmSwap:\t0 kB\n' > "$case/proc/103/status"
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
   assert_equals sm1 "${out##*$'\t'}" "a lead is controlled only through its parent-owned task record"
   pass "task ownership stays home-qualified through grouping and control selection"
 }
@@ -328,14 +328,14 @@ test_homes_without_ordinary_tasks() {
       secondmate) jg_write_meta "$case/state/sm1.meta" kind=secondmate "home=$case/mate" ;;
       remote) jg_write_meta "$case/state/sm1.meta" kind=secondmate remote_host=other "home=$case/mate" ;;
     esac
-    out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+    out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
     assert_contains "$out" 'lead main 18.0 GB in 2 processes' "$mode home aggregates supervisors into the top three"
     if [ "$mode" = secondmate ]; then
       assert_equals sm1 "${out##*$'\t'}" "secondmate-only state retains parent-owned control"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
+      out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case/mate" "$case/mate/state" --state-dir "$case" "$case/state" --owned-top-task "$case/mate/state")
       assert_contains "$out" 'largest: lead sm1 20.0 GB in 2 processes, lead main 18.0 GB in 2 processes' "empty child state preserves the parent owner"
       assert_equals '' "${out##*$'\t'}" "child fallback cannot authorize parent-owned control"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
+      out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$case/state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$case/state")
       assert_equals sm1 "${out##*$'\t'}" "parent ownership is independent of argument order"
     else
       assert_equals '' "${out##*$'\t'}" "$mode fallback does not authorize task control"
@@ -355,7 +355,7 @@ test_remote_records_do_not_own_local_processes() {
   fake_host "$case/proc" 5 41
   fake_pid "$case/proc" 101 node 9 "$wt/sub"
   fake_pid "$case/proc" 102 java 5 "$wt" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$home" "$home/state" --owned-top-task "$home/state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$home" "$home/state" --owned-top-task "$home/state")
   assert_contains "$out" 'largest: task big-build (main) 14.0 GB in 2 processes' \
     "remote task paths and lead homes cannot steal tagged or untagged local processes"
   assert_equals big-build "${out##*$'\t'}" "the local task remains the interrupt target"
@@ -385,7 +385,7 @@ test_overridden_state_ownership() {
   [ ! -s "$case/keys" ] || fail "an overridden state caused the foreign process to interrupt a local task"
   rm -r "$case/proc/108"
   fake_pid "$case/proc" 109 shell 12 "$case" big-build
-  out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$state")
+  out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --state-dir "$case" "$state" --state-dir "$case/mate" "$case/mate/state" --owned-top-task "$state")
   assert_contains "$out" 'task big-build (main) 26.0 GB in 3 processes' "the explicit home and recorded worktree both qualify"
   assert_equals big-build "${out##*$'\t'}" "the selected state still authorizes its owned task"
   pass "overridden state paths never widen home ownership"
@@ -397,7 +397,7 @@ test_finite_thresholds() {
   for key in wait_pressure alert_pressure wait_available_gb alert_available_gb; do
     for value in nan inf -inf; do
       printf '%s=%s\n' "$key" "$value" > "$case/config"
-      out=$(FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/config" 2>&1); rc=$?
+      out=$(JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --config "$case/config" 2>&1); rc=$?
       [ "$rc" -eq 2 ] || fail "$key=$value should be invalid, got $rc: $out"
     done
   done
@@ -444,14 +444,14 @@ test_benign_liveness_outcomes() {
   real_ln=$(command -v ln)
   cat > "$case/fakebin/ln" <<SH
 #!/usr/bin/env bash
-if [ "\${3:-}" = "\$FM_HOME/state/.wake-queue.lock" ] \\
-  && [ "\$PPID" = "\$(cat "\$FM_HOME/state/.watch.lock/pid" 2>/dev/null)" ] \\
-  && [ -e "\$FM_HOME/publish-alert" ]; then
-  rm "\$FM_HOME/publish-alert"
-  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$FM_HOME/proc/pressure/memory"
-  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$FM_HOME/cgroup/$APP_SLICE/memory.pressure"
+if [ "\${3:-}" = "\$JG_HOME/state/.wake-queue.lock" ] \\
+  && [ "\$PPID" = "\$(cat "\$JG_HOME/state/.watch.lock/pid" 2>/dev/null)" ] \\
+  && [ -e "\$JG_HOME/publish-alert" ]; then
+  rm "\$JG_HOME/publish-alert"
+  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$JG_HOME/proc/pressure/memory"
+  printf 'some avg10=41 avg60=41 avg300=1.00 total=1\\n' > "\$JG_HOME/cgroup/$APP_SLICE/memory.pressure"
   for ((i=0; i<100; i++)); do
-    grep -q \$'\\tcheck\\thost-memory\\t' "\$FM_HOME/state/.wake-queue" 2>/dev/null && break
+    grep -q \$'\\tcheck\\thost-memory\\t' "\$JG_HOME/state/.wake-queue" 2>/dev/null && break
     sleep 0.1
   done
 fi
@@ -480,7 +480,7 @@ case "$1" in
   display-message)
     case "$*" in
       *pane_current_command*)
-        if [ -e "$FM_HOME/probed" ]; then printf 'pi\n'; else : > "$FM_HOME/probed"; printf 'zsh\n'; fi ;;
+        if [ -e "$JG_HOME/probed" ]; then printf 'pi\n'; else : > "$JG_HOME/probed"; printf 'zsh\n'; fi ;;
       *) printf '%%1\n' ;;
     esac ;;
   *) exit 0 ;;
@@ -503,9 +503,9 @@ test_default_home_interrupt() {
   state="$case/selected-state"
   mv "$case/state" "$state"
   fake_host "$case/proc" 5 41
-  env -u FM_HOME PATH="$case/fakebin:$PATH" FM_ROOT_OVERRIDE="$case" FM_STATE_OVERRIDE="$state" \
-    TMUX='' FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" \
-    FM_SECONDMATE_LIVENESS_SECS=99999999 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+  env -u JG_HOME PATH="$case/fakebin:$PATH" JG_ROOT_OVERRIDE="$case" JG_STATE_OVERRIDE="$state" \
+    TMUX='' JG_BACKEND=tmux JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" \
+    JG_SECONDMATE_LIVENESS_SECS=99999999 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 \
     "$WATCH" > "$case/default.out" 2> "$case/default.err" &
   LEG_PID=$!
   jg_test_track_watcher_state "$state"
@@ -524,11 +524,11 @@ test_independent_sampler_lifecycle() {
   fake_host "$case/proc" 40 2
   cat > "$case/state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
-: > "$FM_HOME/check-entered"
-while [ ! -e "$FM_HOME/check-release" ]; do sleep 0.1; done
+: > "$JG_HOME/check-entered"
+while [ ! -e "$JG_HOME/check-release" ]; do sleep 0.1; done
 SH
   chmod 700 "$case/state/slow.check.sh"
-  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" slow >/dev/null
+  JG_HOME="$case" JG_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" slow >/dev/null
   watch_leg "$case" slow default
   while [ ! -e "$case/check-entered" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
   [ -e "$case/check-entered" ] || fail "the custom check did not start: $(cat "$case/watch-slow.err")"
@@ -584,8 +584,8 @@ import time
 original_replace = os.replace
 
 def replace(src, dst, *args, **kwargs):
-    if os.fspath(dst) == os.environ.get("FM_TEST_ADMISSION_DEST"):
-        barrier = os.environ["FM_TEST_ADMISSION_BARRIER"]
+    if os.fspath(dst) == os.environ.get("JG_TEST_ADMISSION_DEST"):
+        barrier = os.environ["JG_TEST_ADMISSION_BARRIER"]
         with open(os.path.join(barrier, str(os.getpid())), "w"):
             pass
         for _ in range(200):
@@ -598,11 +598,11 @@ def replace(src, dst, *args, **kwargs):
 
 os.replace = replace
 PY
-  env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" > "$case/a.out" 2> "$case/a.err" &
+  env PYTHONPATH="$case/hook" JG_TEST_ADMISSION_DEST="$case/state/admission-refused" JG_TEST_ADMISSION_BARRIER="$case/barrier" \
+    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" > "$case/a.out" 2> "$case/a.err" &
   first=$!
-  env PYTHONPATH="$case/hook" FM_TEST_ADMISSION_DEST="$case/state/admission-refused" FM_TEST_ADMISSION_BARRIER="$case/barrier" \
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" > "$case/b.out" 2> "$case/b.err" &
+  env PYTHONPATH="$case/hook" JG_TEST_ADMISSION_DEST="$case/state/admission-refused" JG_TEST_ADMISSION_BARRIER="$case/barrier" \
+    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" > "$case/b.out" 2> "$case/b.err" &
   second=$!
   wait "$first"; rc1=$?
   wait "$second"; rc2=$?
@@ -621,8 +621,8 @@ assert reason.startswith("host memory under pressure:")
 assert os.listdir(state) == ["admission-refused"]
 PY
   fake_host "$case/proc" 40 2
-  FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" & first=$!
-  FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" & second=$!
+  JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-a --state "$case/state" & first=$!
+  JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" "$GUARD" --admit build-b --state "$case/state" & second=$!
   wait "$first"; rc1=$?
   wait "$second"; rc2=$?
   [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && [ ! -e "$case/state/admission-refused" ] || fail "parallel healthy admissions did not clear the refusal record"
@@ -636,12 +636,12 @@ test_failed_alert_publication() {
   make_fleet "$case"
   prepare_control_task "$case"
   fake_host "$case/proc" 5 41
-  tick=(env PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_STATE_OVERRIDE="$case/state"
-    STATE="$case/state" CONFIG="$case/config" SAMPLER_DIR="$ROOT/bin" FM_BACKEND=tmux
-    FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" bash -c "
+  tick=(env PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_STATE_OVERRIDE="$case/state"
+    STATE="$case/state" CONFIG="$case/config" SAMPLER_DIR="$ROOT/bin" JG_BACKEND=tmux
+    JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" bash -c "
       . \"\$1/bin/jg-wake-lib.sh\"
       . \"\$1/bin/jg-backend.sh\"
-      . \"\$FM_ADDONS_DIR/host-memory/bin/jg-host-memory-lib.sh\"
+      . \"\$JG_ADDONS_DIR/host-memory/bin/jg-host-memory-lib.sh\"
       jg_memory_sampler_tick
       wait
     " _ "$ROOT")
@@ -665,7 +665,7 @@ test_failed_alert_publication() {
   fake_host "$case/proc" 5 41
   "${tick[@]}" || fail "second episode sampling failed"
   [ "$(grep -c $'\tcheck\thost-memory\t' "$case/state/.wake-queue")" -eq 2 ] || fail "the old wake suppressed the new episode"
-  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$DRAIN" > "$case/drain.out" 2> "$case/drain.err" || fail "episode wakes could not be drained"
+  JG_HOME="$case" JG_STATE_OVERRIDE="$case/state" "$DRAIN" > "$case/drain.out" 2> "$case/drain.err" || fail "episode wakes could not be drained"
   assert_contains "$(cat "$case/drain.out")" "foreign pid 105 25.0 GB" "the new consumer reaches supervision"
   assert_contains "$(cat "$case/drain.out")" "automatic interrupt skipped" "the new episode action reaches supervision"
   watch_leg "$case" newest
@@ -687,17 +687,17 @@ test_shutdown_during_alert_publication() {
   fake_host "$case/proc" 40 2
   cat > "$case/state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
-: > "$FM_HOME/check-entered"
-while [ ! -e "$FM_HOME/check-release" ]; do sleep 0.1; done
+: > "$JG_HOME/check-entered"
+while [ ! -e "$JG_HOME/check-release" ]; do sleep 0.1; done
 SH
   chmod 700 "$case/state/slow.check.sh"
-  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" slow >/dev/null
+  JG_HOME="$case" JG_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" slow >/dev/null
   real_mv=$(command -v mv)
   cat > "$case/fakebin/mv" <<SH
 #!/usr/bin/env bash
 "$real_mv" "\$@" || exit \$?
-if [ "\${2:-}" = "\$FM_HOME/state/.host-memory-alerted" ] && mkdir "\$FM_HOME/term-sent" 2>/dev/null; then
-  IFS=\$'\t' read -r pid identity < "\$FM_HOME/state/.host-memory-sampler.pid"
+if [ "\${2:-}" = "\$JG_HOME/state/.host-memory-alerted" ] && mkdir "\$JG_HOME/term-sent" 2>/dev/null; then
+  IFS=\$'\t' read -r pid identity < "\$JG_HOME/state/.host-memory-sampler.pid"
   kill -TERM "\$pid"
 fi
 SH
@@ -725,7 +725,7 @@ SH
 # spawn through and clears the record.
 test_spawn_memory_admission() {
   local home=$TMP_ROOT/spawn-admission out status
-  local spawn_env=(FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' FM_HOME="$home" FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux FM_HOST_MEMORY_PROC="$home/proc" FM_HOST_MEMORY_CGROUP_ROOT="$home/cgroup")
+  local spawn_env=(JG_ROOT_OVERRIDE='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' JG_HOME="$home" JG_SPAWN_NO_GUARD=1 JG_BACKEND=tmux JG_HOST_MEMORY_PROC="$home/proc" JG_HOST_MEMORY_CGROUP_ROOT="$home/cgroup")
   mkdir -p "$home/data" "$home/config" "$home/projects/none"
   git -C "$home/projects/none" init -q || fail "could not initialize project fixture"
   fake_host "$home/proc" 30 42
@@ -751,13 +751,13 @@ test_default_supervision_poll() {
   fake_host "$case/proc" 40 2
   cat > "$case/state/poll.check.sh" <<'SH'
 #!/usr/bin/env bash
-date +%s >> "$FM_HOME/poll-times"
+date +%s >> "$JG_HOME/poll-times"
 SH
   chmod 700 "$case/state/poll.check.sh"
-  FM_HOME="$case" FM_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" poll >/dev/null
-  env -u FM_POLL PATH="$case/fakebin:$PATH" FM_HOME="$case" FM_ROOT_OVERRIDE="$ROOT" \
-    TMUX='' FM_BACKEND=tmux FM_SIGNAL_GRACE=0 FM_HOST_MEMORY_PROC="$case/proc" FM_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" FM_HOST_MEMORY_SECS=1 \
-    FM_CHECK_INTERVAL=1 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+  JG_HOME="$case" JG_STATE_OVERRIDE="$case/state" "$ROOT/bin/jg-check-register.sh" poll >/dev/null
+  env -u JG_POLL PATH="$case/fakebin:$PATH" JG_HOME="$case" JG_ROOT_OVERRIDE="$ROOT" \
+    TMUX='' JG_BACKEND=tmux JG_SIGNAL_GRACE=0 JG_HOST_MEMORY_PROC="$case/proc" JG_HOST_MEMORY_CGROUP_ROOT="$case/cgroup" JG_HOST_MEMORY_SECS=1 \
+    JG_CHECK_INTERVAL=1 JG_HEARTBEAT=999999 JG_SECONDMATE_LIVENESS_SECS=99999999 \
     "$WATCH" > "$case/poll.out" 2> "$case/poll.err" &
   LEG_PID=$!
   while [ "$i" -lt 250 ]; do
@@ -795,7 +795,7 @@ watcher_sampler_tests=(
   test_shutdown_during_alert_publication
   test_default_supervision_poll
 )
-if [ ! -f "$FM_ADDONS_DIR/host-memory/bin/jg-host-memory-lib.sh" ]; then
+if [ ! -f "$JG_ADDONS_DIR/host-memory/bin/jg-host-memory-lib.sh" ]; then
   echo "skip: host-memory add-on absent, ${#watcher_sampler_tests[@]} watcher sampler tests not run"
   exit 0
 fi

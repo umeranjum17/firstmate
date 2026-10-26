@@ -8,7 +8,7 @@
 # validate that target at startup. The script-owned away launcher
 # (bin/jg-afk-launch.sh) must resolve the SAME captain pane BEFORE it creates a
 # separate, non-visible terminal for the daemon, so it can pass that pane in as
-# FM_SUPERVISOR_TARGET (otherwise the daemon, running in its own terminal, would
+# JG_SUPERVISOR_TARGET (otherwise the daemon, running in its own terminal, would
 # auto-discover its OWN pane and inject there instead of into the captain's).
 #
 # Because both callers need the identical resolution, it lives here once. The
@@ -20,11 +20,11 @@
 # "firstmate:0" is a tmux session:window name, so the bare fallback (nothing
 # configured, nothing detected) assumes tmux - matching the daemon's pre-herdr
 # behavior byte-for-byte when run outside both tmux and herdr.
-FM_SUPERVISOR_TARGET_DEFAULT="firstmate:0"
-FM_SUPERVISOR_BACKEND_DEFAULT="tmux"
+JG_SUPERVISOR_TARGET_DEFAULT="firstmate:0"
+JG_SUPERVISOR_BACKEND_DEFAULT="tmux"
 
 # discover_supervisor_target: resolve the pane running firstmate. Priority:
-#   1. FM_SUPERVISOR_TARGET env (explicit override) - may be a tmux target or a
+#   1. JG_SUPERVISOR_TARGET env (explicit override) - may be a tmux target or a
 #      herdr "<session>:<pane-id>" target (paired with discover_supervisor_backend
 #      to know which).
 #   2. $TMUX_PANE - tmux sets this in every pane's environment; inherited by a
@@ -35,11 +35,11 @@ FM_SUPERVISOR_BACKEND_DEFAULT="tmux"
 #      jg_backend_herdr_session) and $HERDR_PANE_ID. Checked after $TMUX_PANE so a
 #      tmux pane nested inside herdr still resolves to tmux, matching
 #      jg_backend_detect's innermost-first rule.
-#   4. FM_SUPERVISOR_TARGET_DEFAULT - legacy tmux fallback (may not resolve if the
+#   4. JG_SUPERVISOR_TARGET_DEFAULT - legacy tmux fallback (may not resolve if the
 #      session is named differently). Returns 1 so the caller can warn.
 discover_supervisor_target() {
-  if [ -n "${FM_SUPERVISOR_TARGET:-}" ]; then
-    printf '%s' "$FM_SUPERVISOR_TARGET"
+  if [ -n "${JG_SUPERVISOR_TARGET:-}" ]; then
+    printf '%s' "$JG_SUPERVISOR_TARGET"
     return 0
   fi
   if [ -n "${TMUX_PANE:-}" ]; then
@@ -50,21 +50,21 @@ discover_supervisor_target() {
     printf '%s:%s' "${HERDR_SESSION:-default}" "$HERDR_PANE_ID"
     return 0
   fi
-  printf '%s' "$FM_SUPERVISOR_TARGET_DEFAULT"
+  printf '%s' "$JG_SUPERVISOR_TARGET_DEFAULT"
   return 1
 }
 
 # discover_supervisor_backend: resolve the supervisor pane's BACKEND, independent
-# of the target string so an explicit FM_SUPERVISOR_TARGET override still knows
+# of the target string so an explicit JG_SUPERVISOR_TARGET override still knows
 # which primitives (tmux vs herdr) to dispatch through. Priority mirrors
 # discover_supervisor_target and bin/jg-backend.sh's jg_backend_detect:
-#   1. FM_SUPERVISOR_BACKEND env (explicit override).
+#   1. JG_SUPERVISOR_BACKEND env (explicit override).
 #   2. $TMUX_PANE set - tmux.
 #   3. $HERDR_ENV=1 (with $HERDR_PANE_ID present) - herdr.
-#   4. FM_SUPERVISOR_BACKEND_DEFAULT (tmux) - matches the target fallback. Returns 1.
+#   4. JG_SUPERVISOR_BACKEND_DEFAULT (tmux) - matches the target fallback. Returns 1.
 discover_supervisor_backend() {
-  if [ -n "${FM_SUPERVISOR_BACKEND:-}" ]; then
-    printf '%s' "$FM_SUPERVISOR_BACKEND"
+  if [ -n "${JG_SUPERVISOR_BACKEND:-}" ]; then
+    printf '%s' "$JG_SUPERVISOR_BACKEND"
     return 0
   fi
   if [ -n "${TMUX_PANE:-}" ]; then
@@ -75,6 +75,6 @@ discover_supervisor_backend() {
     printf 'herdr'
     return 0
   fi
-  printf '%s' "$FM_SUPERVISOR_BACKEND_DEFAULT"
+  printf '%s' "$JG_SUPERVISOR_BACKEND_DEFAULT"
   return 1
 }

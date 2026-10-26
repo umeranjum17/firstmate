@@ -36,10 +36,10 @@
 # delivered or nothing is owed, and non-zero when the parent channel could not
 # be written, so teardown refuses instead of discarding an undelivered outcome.
 # The cadence-gated scan below then evaluates at most once per
-# FM_INACTIVE_RECONCILE_SECS (default 900, valid 60..1800) per home, except
+# JG_INACTIVE_RECONCILE_SECS (default 900, valid 60..1800) per home, except
 # that --startup performs the same scan immediately in the locked session
 # start's deferred worker. Each scan uses an aggregate
-# FM_INACTIVE_RECONCILE_BUDGET_SECS deadline (default 10, valid 1..30) and
+# JG_INACTIVE_RECONCILE_BUDGET_SECS deadline (default 10, valid 1..30) and
 # resumes after its last visited child on the next scan.
 # The scan enforces that budget itself through a whole-second deadline, and the
 # first due child of every scan is always visited with at least a one-second
@@ -101,12 +101,12 @@ set -u
 export LC_ALL=C
 
 SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 OUTCOME_DIR="$STATE/terminal-outcomes"
 SCAN_MARKER="$STATE/.inactive-outcome-reconcile"
 SCAN_LOCK="$STATE/.inactive-outcome-reconcile.lock"
-CREW_STATE_BIN="${FM_INACTIVE_CREW_STATE_BIN:-$SCRIPT_DIR/jg-crew-state.sh}"
+CREW_STATE_BIN="${JG_INACTIVE_CREW_STATE_BIN:-$SCRIPT_DIR/jg-crew-state.sh}"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
@@ -119,26 +119,26 @@ CREW_STATE_BIN="${FM_INACTIVE_CREW_STATE_BIN:-$SCRIPT_DIR/jg-crew-state.sh}"
 # shellcheck source=bin/jg-dod-lib.sh
 . "$SCRIPT_DIR/jg-dod-lib.sh"
 
-FM_INACTIVE_RECONCILE_SECS=${FM_INACTIVE_RECONCILE_SECS:-900}
-case "$FM_INACTIVE_RECONCILE_SECS" in
+JG_INACTIVE_RECONCILE_SECS=${JG_INACTIVE_RECONCILE_SECS:-900}
+case "$JG_INACTIVE_RECONCILE_SECS" in
   ''|*[!0-9]*|0)
-    printf 'jg-inactive-reconcile: FM_INACTIVE_RECONCILE_SECS must be a whole number from 60 to 1800\n' >&2
+    printf 'jg-inactive-reconcile: JG_INACTIVE_RECONCILE_SECS must be a whole number from 60 to 1800\n' >&2
     exit 2
     ;;
 esac
-if [ "$FM_INACTIVE_RECONCILE_SECS" -lt 60 ] || [ "$FM_INACTIVE_RECONCILE_SECS" -gt 1800 ]; then
-  printf 'jg-inactive-reconcile: FM_INACTIVE_RECONCILE_SECS must be a whole number from 60 to 1800\n' >&2
+if [ "$JG_INACTIVE_RECONCILE_SECS" -lt 60 ] || [ "$JG_INACTIVE_RECONCILE_SECS" -gt 1800 ]; then
+  printf 'jg-inactive-reconcile: JG_INACTIVE_RECONCILE_SECS must be a whole number from 60 to 1800\n' >&2
   exit 2
 fi
-FM_INACTIVE_RECONCILE_BUDGET_SECS=${FM_INACTIVE_RECONCILE_BUDGET_SECS:-10}
-case "$FM_INACTIVE_RECONCILE_BUDGET_SECS" in
+JG_INACTIVE_RECONCILE_BUDGET_SECS=${JG_INACTIVE_RECONCILE_BUDGET_SECS:-10}
+case "$JG_INACTIVE_RECONCILE_BUDGET_SECS" in
   ''|*[!0-9]*|0)
-    printf 'jg-inactive-reconcile: FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
+    printf 'jg-inactive-reconcile: JG_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
     exit 2
     ;;
 esac
-if [ "$FM_INACTIVE_RECONCILE_BUDGET_SECS" -gt 30 ]; then
-  printf 'jg-inactive-reconcile: FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
+if [ "$JG_INACTIVE_RECONCILE_BUDGET_SECS" -gt 30 ]; then
+  printf 'jg-inactive-reconcile: JG_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
   exit 2
 fi
 
@@ -149,9 +149,9 @@ else
 fi
 
 reconcile_now() {
-  case "${FM_INACTIVE_RECONCILE_NOW:-}" in
+  case "${JG_INACTIVE_RECONCILE_NOW:-}" in
     ''|*[!0-9]*) date +%s ;;
-    *) printf '%s\n' "$FM_INACTIVE_RECONCILE_NOW" ;;
+    *) printf '%s\n' "$JG_INACTIVE_RECONCILE_NOW" ;;
   esac
 }
 
@@ -361,14 +361,14 @@ pr_for_task() { # <meta> [preferred-line]
 }
 
 home_secondmate_id() {
-  jg_parent_channel_home_id "$FM_HOME"
+  jg_parent_channel_home_id "$JG_HOME"
 }
 
 report_to_parent() { # <task> <state> <outcome-key> <fingerprint> <pr>
   local task=$1 state=$2 outcome_key=$3 fingerprint=$4 pr=$5 line
   line="$state [key=$outcome_key]: inactive terminal child=$task fingerprint=$fingerprint"
   [ -z "$pr" ] || line="$line pr=$pr"
-  jg_parent_channel_report "$FM_HOME" "$STATE" "$line"
+  jg_parent_channel_report "$JG_HOME" "$STATE" "$line"
 }
 
 # Queue the once-per-record notice that a parent report could not be written.
@@ -377,7 +377,7 @@ report_to_parent() { # <task> <state> <outcome-key> <fingerprint> <pr>
 # binding is named when it is the cause.
 notice_parent_report_failed() { # <record> <fingerprint> <payload>
   local record=$1 fingerprint=$2 payload=$3
-  if ! jg_secondmate_parent_record_parse "$FM_HOME/.jg-secondmate-parent"; then
+  if ! jg_secondmate_parent_record_parse "$JG_HOME/.jg-secondmate-parent"; then
     payload="$payload (missing or unreadable parent binding .jg-secondmate-parent)"
   fi
   queue_notice_once "$record" "inactive-reconcile:$fingerprint" "$payload" || true
@@ -390,7 +390,7 @@ notice_parent_report_failed() { # <record> <fingerprint> <payload>
 # terminal record whose continuation prose trails it, and an unfinished line of
 # ordinary prose withholds nothing.
 child_terminal_ledger_line() { # <status>
-  local status=$1 snapshot last marker='__FM_LEDGER_SNAPSHOT_END__'
+  local status=$1 snapshot last marker='__JG_LEDGER_SNAPSHOT_END__'
   [ -f "$status" ] && [ ! -L "$status" ] && [ -s "$status" ] || return 1
   last=$(last_status_line "$status")
   case "$(status_line_verb "$last")" in done|failed) ;; *) return 1 ;; esac
@@ -464,7 +464,7 @@ report_child_ledger_locked() { # <id> <meta>
   note=$(clean_field "$(status_line_note "$last")")
   mode=$(clean_field "$(meta_field "$meta" mode)")
   yolo=$(clean_field "$(meta_field "$meta" yolo)")
-  data="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+  data="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
   line="$state [key=$outcome_key]: child $id $state: $note"
   [ -z "$pr" ] || line="$line pr=$pr"
   [ -z "$mode" ] || line="$line mode=$mode"
@@ -472,7 +472,7 @@ report_child_ledger_locked() { # <id> <meta>
   if [ -f "$data/$id/report.md" ] && [ ! -L "$data/$id/report.md" ]; then
     line="$line report=data/$id/report.md"
   fi
-  if jg_parent_channel_report "$FM_HOME" "$STATE" "$line"; then
+  if jg_parent_channel_report "$JG_HOME" "$STATE" "$line"; then
     mark_reported "$RECORD_PENDING" || return 1
     withdraw_notice "$fingerprint"
     return 0
@@ -532,8 +532,8 @@ reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeou
     case "$?" in 0|2) return 0 ;; esac
   fi
   age=$(last_activity_age "$meta" "$status" "$turn")
-  [ "$age" -ge "$FM_INACTIVE_RECONCILE_SECS" ] || return 0
-  state_line=$(jg_run_timed "$timeout" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CREW_STATE_NO_FORGE=1 \
+  [ "$age" -ge "$JG_INACTIVE_RECONCILE_SECS" ] || return 0
+  state_line=$(jg_run_timed "$timeout" env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" JG_CREW_STATE_NO_FORGE=1 \
     "$CREW_STATE_BIN" "$id" 2>/dev/null) || state_rc=$?
   [ "$state_rc" -ne 124 ] || return 3
   last=$(last_status_line "$status")
@@ -636,7 +636,7 @@ scan() {
   # Stale bookkeeping, not an outcome to surface: every poll, silent, ahead of the
   # cadence gate.
   retire_gone_child_records
-  if [ "$startup" != 1 ] && [ "$(scan_marker_age)" -lt "$FM_INACTIVE_RECONCILE_SECS" ]; then
+  if [ "$startup" != 1 ] && [ "$(scan_marker_age)" -lt "$JG_INACTIVE_RECONCILE_SECS" ]; then
     return 0
   fi
   cursor=$(scan_marker_cursor)
@@ -647,7 +647,7 @@ scan() {
       "inactive terminal outcomes remain unreconciled: invalid .jg-secondmate-home marker" || true
     return 0
   fi
-  deadline=$(( $(date +%s) + FM_INACTIVE_RECONCILE_BUDGET_SECS ))
+  deadline=$(( $(date +%s) + JG_INACTIVE_RECONCILE_BUDGET_SECS ))
   SCAN_FIRST_VISIT_PENDING=1
   scan_pass "$cursor" after "$deadline" "$self" || rc=$?
   if [ "$rc" -eq 0 ] && [ -n "$cursor" ]; then
@@ -718,7 +718,7 @@ build_receipt_index() { # <index-path>
 build_parent_key_set() { # <key-set-path>
   local keys=$1 destination rc=0
   : > "$keys" || return 1
-  destination=$(jg_parent_channel_destination "$FM_HOME" "$STATE") || rc=$?
+  destination=$(jg_parent_channel_destination "$JG_HOME" "$STATE") || rc=$?
   [ "$rc" -eq 0 ] || return 0
   [ -f "$destination" ] && [ ! -L "$destination" ] || return 0
   grep -o -- '\[key=[A-Za-z0-9._-]*\]' "$destination" | sort -u > "$keys" 2>/dev/null || true
@@ -827,7 +827,7 @@ case "$mode" in
     # process-group kill is only the backstop for a scan wedged outside every
     # bounded section (an unbounded lock wait), so it fires one second after
     # the deadline instead of racing the clean bounded exit it exists to guard.
-    if jg_run_timed $((FM_INACTIVE_RECONCILE_BUDGET_SECS + 1)) "$0" _scan-locked "$startup"; then
+    if jg_run_timed $((JG_INACTIVE_RECONCILE_BUDGET_SECS + 1)) "$0" _scan-locked "$startup"; then
       :
     elif [ "$?" -ne 124 ]; then
       exit 1

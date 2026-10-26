@@ -96,10 +96,10 @@ Each value is one line in your gitignored `config/` directory, and each has an e
 
 | File | Environment | Holds |
 | --- | --- | --- |
-| `config/voice-region` | `FM_VOICE_REGION` | The Bedrock region to open the session in, required. |
-| `config/voice-model` | `FM_VOICE_MODEL` | The Nova Sonic model id, required. |
-| `config/voice-profile` | `FM_VOICE_PROFILE` | The AWS profile to export credentials from, optional: with no profile the relay uses only credentials that are already in its environment. |
-| `config/voice-id` | `FM_VOICE_ID` | The output voice, optional and `matthew` when unset. |
+| `config/voice-region` | `JG_VOICE_REGION` | The Bedrock region to open the session in, required. |
+| `config/voice-model` | `JG_VOICE_MODEL` | The Nova Sonic model id, required. |
+| `config/voice-profile` | `JG_VOICE_PROFILE` | The AWS profile to export credentials from, optional: with no profile the relay uses only credentials that are already in its environment. |
+| `config/voice-id` | `JG_VOICE_ID` | The output voice, optional and `matthew` when unset. |
 
 A missing required value refuses with the path to write, so an unconfigured home cannot start the relay by accident, and that configuration is the whole opt-in.
 `docs/configuration.md` is the registry for these files.
@@ -146,7 +146,7 @@ python3 jg-voice-client.py --host <desktop> \
   --relay-python ~/.jg-voice-venv/bin/python
 ```
 
-The client has no built-in idea of where the relay lives on your desktop, so `--relay` is required and `FM_VOICE_RELAY` sets it once for a shell.
+The client has no built-in idea of where the relay lives on your desktop, so `--relay` is required and `JG_VOICE_RELAY` sets it once for a shell.
 
 Press Enter to start talking, press Enter again when you have finished. It prints
 the timings for each turn as JSON on stdout and everything human on stderr, so

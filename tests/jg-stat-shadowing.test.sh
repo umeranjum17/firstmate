@@ -124,9 +124,9 @@ pass "_jg_status_file_size returns correct byte size under GNU stat shadowing"
 
 # 4. stat_mtime from bin/jg-watch.sh
 # jg-watch.sh runs a top-level `mkdir -p` on its state dir when sourced; pin it
-# to the temp root via FM_STATE_OVERRIDE so no artifact escapes into the repo's
+# to the temp root via JG_STATE_OVERRIDE so no artifact escapes into the repo's
 # git-ignored state/ directory.
-export FM_STATE_OVERRIDE="$TMP_ROOT/state"
+export JG_STATE_OVERRIDE="$TMP_ROOT/state"
 . "$ROOT/bin/jg-watch.sh"
 RESULT_WATCH_MTIME=$(stat_mtime "$TESTFILE") || true
 if [ -z "$RESULT_WATCH_MTIME" ] || [ "$RESULT_WATCH_MTIME" != "$EXPECTED_MTIME" ]; then

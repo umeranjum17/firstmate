@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Fixture proof: a pooled-style lane worktree against a throwaway HOME, home
 # and patterns file holding only made-up values. A matching commit is refused
 # with file:line, a clean commit passes, a matching push is refused, a
@@ -20,7 +29,7 @@ check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want:
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 ME=you@example.com
 printf '%s\n' '# fixture-only patterns' '' 'testguard-fake-surname' 'guardtest[0-9]{3}@example\.test' >"$FM/config/owner-details-patterns"
-export FM_HOME=$FM
+export JG_HOME=$FM
 
 git init -q --bare -b main "$d/origin.git"
 git clone -q "$d/origin.git" "$d/clone"
@@ -68,13 +77,13 @@ out=$(lane git commit -q -m 'removal only' 2>&1) && rc=0 || rc=$?
 check "removal-only commit passes" "$rc" 0
 printf 'reach testguard-fake-surname here\n' >"$WT/fallback.txt"
 git -C "$WT" add fallback.txt
-out=$(FM_HOME=$d/empty lane git commit -m 'fallback' 2>&1) && rc=0 || rc=$?
+out=$(JG_HOME=$d/empty lane git commit -m 'fallback' 2>&1) && rc=0 || rc=$?
 check "lane home without patterns falls back to install home" "$rc" 1
 has "fallback refusal prints file:line" "$out" "fallback.txt:1"
 git -C "$WT" rm -q --cached fallback.txt && rm -f "$WT/fallback.txt"
 # Missing patterns file allows with one note line.
 mv "$FM/config/owner-details-patterns" "$d/patterns.off"
-out=$(FM_HOME=$d/empty lane git commit -q --allow-empty -m 'no patterns' 2>&1) && rc=0 || rc=$?
+out=$(JG_HOME=$d/empty lane git commit -q --allow-empty -m 'no patterns' 2>&1) && rc=0 || rc=$?
 check "missing patterns allows" "$rc" 0
 has "missing patterns prints one note" "$out" "nothing to protect"
 mv "$d/patterns.off" "$FM/config/owner-details-patterns"

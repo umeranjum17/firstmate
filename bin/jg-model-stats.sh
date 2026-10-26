@@ -5,17 +5,17 @@
 #
 # The reader moved to the firstmate-addons repository (fleet-stats/bin/jg-model-stats.sh,
 # importing jg_stats_lib from that same folder); this shim only resolves that
-# checkout and execs it with FM_BIN pointing at this fork's bin/, the same
+# checkout and execs it with JG_BIN pointing at this fork's bin/, the same
 # contract as the jg-dashboard.sh shim.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOME_DIR="${FM_HOME:-$CODE_ROOT}"
-ADDONS_DIR="${FM_ADDONS_DIR:-$HOME_DIR/projects/firstmate-addons}"
+HOME_DIR="${JG_HOME:-$CODE_ROOT}"
+ADDONS_DIR="${JG_ADDONS_DIR:-$HOME_DIR/projects/firstmate-addons}"
 TARGET="$ADDONS_DIR/fleet-stats/bin/jg-model-stats.sh"
 if [ ! -f "$TARGET" ]; then
-  echo "jg-model-stats: firstmate-addons checkout not found (set FM_ADDONS_DIR): looked for $TARGET" >&2
+  echo "jg-model-stats: firstmate-addons checkout not found (set JG_ADDONS_DIR): looked for $TARGET" >&2
   exit 1
 fi
-FM_BIN="$SCRIPT_DIR" FM_HOME="$HOME_DIR" exec "$TARGET" "$@"
+JG_BIN="$SCRIPT_DIR" JG_HOME="$HOME_DIR" exec "$TARGET" "$@"

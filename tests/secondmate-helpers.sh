@@ -10,11 +10,11 @@
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-# A fake tmux (window ops are logged to FM_FAKE_TMUX_LOG, list-windows returns
-# FM_FAKE_TMUX_WINDOW, capture-pane echoes FM_FAKE_TMUX_CAPTURE) plus a fake
-# treehouse (durable lease of FM_FAKE_TREEHOUSE_HOME, recording the lease holder
-# to FM_FAKE_TREEHOUSE_LEASE_FILE; `return` removes the target and lease unless
-# FM_FAKE_TREEHOUSE_RETURN_FAIL is set). Echoes the fakebin dir.
+# A fake tmux (window ops are logged to JG_FAKE_TMUX_LOG, list-windows returns
+# JG_FAKE_TMUX_WINDOW, capture-pane echoes JG_FAKE_TMUX_CAPTURE) plus a fake
+# treehouse (durable lease of JG_FAKE_TREEHOUSE_HOME, recording the lease holder
+# to JG_FAKE_TREEHOUSE_LEASE_FILE; `return` removes the target and lease unless
+# JG_FAKE_TREEHOUSE_RETURN_FAIL is set). Echoes the fakebin dir.
 make_fake_tmux() {
   local dir=$1 fakebin capture
   fakebin=$(jg_fakebin "$dir")
@@ -27,11 +27,11 @@ make_fake_tmux() {
 set -u
 case "${1:-}" in
   has-session|new-session|new-window|kill-window)
-    printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
+    printf '%s\n' "$*" >> "$JG_FAKE_TMUX_LOG"
     exit 0
     ;;
   send-keys)
-    printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
+    printf '%s\n' "$*" >> "$JG_FAKE_TMUX_LOG"
     prev=
     for arg in "$@"; do
       if [ "$prev" = -l ]; then
@@ -39,7 +39,7 @@ case "${1:-}" in
           ". '"*"'")
             staged=${arg#". '"}
             staged=${staged%"'"}
-            [ ! -f "$staged" ] || printf 'staged-launch %s\n' "$(cat "$staged")" >> "$FM_FAKE_TMUX_LOG"
+            [ ! -f "$staged" ] || printf 'staged-launch %s\n' "$(cat "$staged")" >> "$JG_FAKE_TMUX_LOG"
             ;;
         esac
       fi
@@ -66,7 +66,7 @@ case "${1:-}" in
         *) printf '%s\n' "$recorded" ;;
       esac
     done <<EOF
-${FM_FAKE_TMUX_WINDOW:-}
+${JG_FAKE_TMUX_WINDOW:-}
 EOF
     exit 0
     ;;
@@ -78,8 +78,8 @@ EOF
     exit 0
     ;;
   capture-pane)
-    printf '%s\n' "$*" >> "$FM_FAKE_TMUX_LOG"
-    cat "$FM_FAKE_TMUX_CAPTURE"
+    printf '%s\n' "$*" >> "$JG_FAKE_TMUX_LOG"
+    cat "$JG_FAKE_TMUX_CAPTURE"
     exit 0
     ;;
 esac
@@ -88,7 +88,7 @@ SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 set -u
-printf 'treehouse %s\n' "$*" >> "${FM_FAKE_TMUX_LOG:-/dev/null}"
+printf 'treehouse %s\n' "$*" >> "${JG_FAKE_TMUX_LOG:-/dev/null}"
 case "${1:-}" in
   get)
     # Durable lease: print only the worktree path to stdout (banners to stderr),
@@ -103,11 +103,11 @@ case "${1:-}" in
       esac
       shift
     done
-    if [ -n "${FM_FAKE_TREEHOUSE_HOME:-}" ]; then
-      mkdir -p "$FM_FAKE_TREEHOUSE_HOME"
-      [ -n "${FM_FAKE_TREEHOUSE_LEASE_FILE:-}" ] && printf '%s\n' "$holder" > "$FM_FAKE_TREEHOUSE_LEASE_FILE"
+    if [ -n "${JG_FAKE_TREEHOUSE_HOME:-}" ]; then
+      mkdir -p "$JG_FAKE_TREEHOUSE_HOME"
+      [ -n "${JG_FAKE_TREEHOUSE_LEASE_FILE:-}" ] && printf '%s\n' "$holder" > "$JG_FAKE_TREEHOUSE_LEASE_FILE"
       printf 'leased worktree for %s\n' "${holder:-unknown}" >&2
-      printf '%s\n' "$FM_FAKE_TREEHOUSE_HOME"
+      printf '%s\n' "$JG_FAKE_TREEHOUSE_HOME"
     fi
     exit 0
     ;;
@@ -121,8 +121,8 @@ case "${1:-}" in
       esac
       shift
     done
-    [ -z "${FM_FAKE_TREEHOUSE_RETURN_FAIL:-}" ] || exit 17
-    [ -n "${FM_FAKE_TREEHOUSE_LEASE_FILE:-}" ] && rm -f "$FM_FAKE_TREEHOUSE_LEASE_FILE"
+    [ -z "${JG_FAKE_TREEHOUSE_RETURN_FAIL:-}" ] || exit 17
+    [ -n "${JG_FAKE_TREEHOUSE_LEASE_FILE:-}" ] && rm -f "$JG_FAKE_TREEHOUSE_LEASE_FILE"
     [ -n "$target" ] && rm -rf -- "$target"
     exit 0
     ;;
@@ -153,15 +153,15 @@ SH
 }
 
 # A fake no-mistakes that records each "<pwd>\t<verb>" call to
-# FM_FAKE_NO_MISTAKES_LOG and fails for the project named FM_FAKE_NO_MISTAKES_FAIL_PROJECT.
+# JG_FAKE_NO_MISTAKES_LOG and fails for the project named JG_FAKE_NO_MISTAKES_FAIL_PROJECT.
 make_recording_no_mistakes() {
   local dir=$1 fakebin
   fakebin=$(jg_fakebin "$dir")
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 set -eu
-printf '%s\t%s\n' "$PWD" "${1:-}" >> "$FM_FAKE_NO_MISTAKES_LOG"
-if [ "$(basename "$PWD")" = "${FM_FAKE_NO_MISTAKES_FAIL_PROJECT:-}" ]; then
+printf '%s\t%s\n' "$PWD" "${1:-}" >> "$JG_FAKE_NO_MISTAKES_LOG"
+if [ "$(basename "$PWD")" = "${JG_FAKE_NO_MISTAKES_FAIL_PROJECT:-}" ]; then
   exit 1
 fi
 case "${1:-}" in
@@ -202,7 +202,7 @@ SH
 scaffold_secondmate_charter() {
   local home=$1 id=$2 charter=$3
   shift 3
-  FM_HOME="$home" FM_SECONDMATE_CHARTER="$charter" "$ROOT/bin/jg-brief.sh" "$id" --secondmate "$@" >/dev/null
+  JG_HOME="$home" JG_SECONDMATE_CHARTER="$charter" "$ROOT/bin/jg-brief.sh" "$id" --secondmate "$@" >/dev/null
 }
 
 # Make a directory look like a genuine seeded secondmate home (for handoff tests).

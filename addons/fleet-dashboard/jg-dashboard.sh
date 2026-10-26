@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # jg-dashboard.sh - build and serve the fleet dashboard for this home (read-only but for ticket comments).
 #
 # The dashboard is the app in bin/jg-dashboard/ (vendored Preact, htm and Inter; no network
@@ -56,9 +65,9 @@
 # Backlog lists default to action grouping, with a by-home variant.
 # Board and Overview leave parked homes out of totals; Insights labels its all-registered-home scope.
 # Sources are local records, existing caches and read-only probes; the one GitHub read is the forge count of merged
-# pull requests in the fleet's repositories (gh pr list, at most every 30 minutes, FM_DASHBOARD_FORGE=off skips it).
+# pull requests in the fleet's repositories (gh pr list, at most every 30 minutes, JG_DASHBOARD_FORGE=off skips it).
 # Insights invokes jg-flow.sh --json --capacity at the build cutoff (180 s overall deadline).
-# FM_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
+# JG_MAC_HOST opts into that reader's bounded read-only Mac SSH probe; unset means unknown.
 # The reader's live capacity timestamps remain separate from the durable-record cutoff.
 # Remote lane/backlog records are unavailable, not read from same-named local paths.
 # Insights also invokes jg-model-stats.sh and jg-skill-stats.sh (read-only, 10 s timeout each,
@@ -72,7 +81,7 @@
 #                                   are skipped, with a note; absent/empty means zero
 #   <home>/state/home-summary.json  local lead state; summaries older than 15 minutes are silent
 #                                   (bin/jg-home-summary-refresh.sh); Main's fresh endpoint view
-#                                   and Herdr inventory inform local liveness; remote leads use the existing route-keyed FM_SNAPSHOT_CACHE_DIR cache
+#                                   and Herdr inventory inform local liveness; remote leads use the existing route-keyed JG_SNAPSHOT_CACHE_DIR cache
 #   data/secondmates.md             registered homes: "- <name> - ... (home: <dir>; ...)"
 #   config/parked-homes             home ids the captain parked, one per line (# comments)
 #   <home>/state/*.meta + *.status  lanes: every ship/scout record, in one state by its last
@@ -84,7 +93,7 @@
 #                                   pipeline waits are validating (tests/jg-dashboard.test.sh ci-stuck)
 #   config/lane-caps                "<home> <cap>" lane plan per home (Main is "main" or the name
 #                                   of its home's parent folder); config/lane-target is the default (4)
-#   bin/jg-tasks-axi.sh list        each home's backlog (FM_HOME=<home>): queued = ready + held +
+#   bin/jg-tasks-axi.sh list        each home's backlog (JG_HOME=<home>): queued = ready + held +
 #                                   waiting on another item; held for the captain = hold-kind captain
 #   herdr agent list                agents busy now (agent_status working), the state the muxr
 #                                   app reads; role by pane id against the records: lead, worker,
@@ -112,8 +121,8 @@
 #   <locks>/jg-device-lock.log      the holder's pid, time and cwd, mapped to its home by
 #                                   each home's state/*.meta worktree=, tasktmp= or task id;
 #                                   an emulator matches a held lock its process ancestry took
-#   <proc> is FM_DASHBOARD_PROC (default /proc), <locks> FM_DEVICE_LOCK_DIR (default /tmp);
-#   FM_EMU_MAX, FM_GRADLE_MAX, FM_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
+#   <proc> is JG_DASHBOARD_PROC (default /proc), <locks> JG_DEVICE_LOCK_DIR (default /tmp);
+#   JG_EMU_MAX, JG_GRADLE_MAX, JG_MEM_MIN_GB (defaults 2, 2, 12) mirror the memory gate's caps
 # All day comparisons use the host timezone. A build writes only under state/dashboard:
 # HTML, data.json, board.json, filed.json (observed open-item filing days, kept 15 days), forge.json (GitHub's merge
 # times per fleet repository, read at most every 30 minutes), full-text.json (the whole
@@ -124,8 +133,8 @@
 # Usage:
 #   jg-dashboard.sh [build]
 #   jg-dashboard.sh serve [--bind ADDR] [--port N]
-# build (the default) writes $FM_HOME/state/dashboard/ and prints the index page path.
-# FM_BIN names the Firstmate bin/ holding the helper scripts this build runs (jg-tasks-axi.sh,
+# build (the default) writes $JG_HOME/state/dashboard/ and prints the index page path.
+# JG_BIN names the Firstmate bin/ holding the helper scripts this build runs (jg-tasks-axi.sh,
 # jg-flow.sh, ...); unset, it defaults to this script's own directory.
 # serve runs a small web server (python3 stdlib, IPv4) that answers GET or
 # HEAD for / and /index.html (the JavaScript app), its files under bin/jg-dashboard/,
@@ -141,8 +150,8 @@
 # the answer in the thread, and appends the attempt and its result to state/dashboard/comments.jsonl. The build shows
 # each comment in its ticket's thread with the lead's pickup (the steer moved to handled/ in state/<lead>.inbox, or
 # Main's note in state/inbox/handled) and answer: the lead's status line carrying corr=<comment id> on its channel
-# (state/<lead>.status: the lead runs "$FM_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer> with its own
-# FM_HOME), or Main's jg-inbox.sh reply.
+# (state/<lead>.status: the lead runs "$JG_HOME/bin/jg-secondmate-report.sh" note <comment id> <answer> with its own
+# JG_HOME), or Main's jg-inbox.sh reply.
 # Overview and Board are one app and one navigation; the old generated Overview page is no
 # longer reachable through the app. The app's
 # files and both JSON files carry an ETag, answer 304 while unchanged and are gzipped
@@ -167,14 +176,14 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The directory holding the Firstmate helper scripts this build runs. It defaults
 # to this script's own directory (the fork's bin/), so a fork copy needs nothing;
-# else FM_BIN names the Firstmate bin/ when this script runs from another repo.
-if [ -n "${FM_BIN+x}" ]; then
-  [ -d "$FM_BIN" ] && [ -f "$FM_BIN/jg-tasks-axi.sh" ] || { echo "jg-dashboard: FM_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $FM_BIN" >&2; exit 1; }
+# else JG_BIN names the Firstmate bin/ when this script runs from another repo.
+if [ -n "${JG_BIN+x}" ]; then
+  [ -d "$JG_BIN" ] && [ -f "$JG_BIN/jg-tasks-axi.sh" ] || { echo "jg-dashboard: JG_BIN is not a Firstmate bin directory (no jg-tasks-axi.sh): $JG_BIN" >&2; exit 1; }
 else
-  FM_BIN="$SCRIPT_DIR"
+  JG_BIN="$SCRIPT_DIR"
 fi
-FM_HOME="${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-out_dir="$FM_HOME/state/dashboard"
+JG_HOME="${JG_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+out_dir="$JG_HOME/state/dashboard"
 page="$out_dir/index.html"
 MAX_AGE=60
 
@@ -195,7 +204,7 @@ case "$cmd" in
       esac
     done
     case "$port" in ''|*[!0-9]*) usage ;; esac
-    exec python3 - "$0" "$FM_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" "$SCRIPT_DIR/jg-dashboard" "$FM_BIN" <<'PY'
+    exec python3 - "$0" "$JG_HOME" "$out_dir" "$bind" "$port" "$MAX_AGE" "$SCRIPT_DIR/jg-dashboard" "$JG_BIN" <<'PY'
 import gzip, hmac, http.server, json, os, re, secrets, subprocess, sys, threading, time, urllib.parse
 SCRIPT, HOME, DIR, BIND, PORT, MAX_AGE, APP, BIN = sys.argv[1:9]
 MAX_AGE = int(MAX_AGE)
@@ -215,7 +224,7 @@ def build():  # call holding `building`; the build replaces each page in one ren
     global last_error, last_took
     start = time.time()
     try:
-        r = subprocess.run(['bash', SCRIPT, 'build'], env=dict(os.environ, FM_HOME=HOME),
+        r = subprocess.run(['bash', SCRIPT, 'build'], env=dict(os.environ, JG_HOME=HOME),
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         last_error = (r.stderr or b'build exited unsuccessfully') if r.returncode else b''
         last_took = time.time() - start
@@ -317,10 +326,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if t['home'] == 'main':
             cmd = ['jg-inbox.sh', 'note', '--request-id', f'dash-{cid}', '--json', '--', msg + 'Answer the captain in the ticket thread: bin/jg-inbox.sh reply <this note id> "<your answer in plain words>"']
         else:
-            cmd = ['jg-send.sh', t['home'], '--fire-and-forget', cid, msg + f'Answer the captain in the ticket thread by running this as is (your FM_HOME already names your own home): "$FM_HOME/bin/jg-secondmate-report.sh" note {cid} "<your answer in plain words>"']
+            cmd = ['jg-send.sh', t['home'], '--fire-and-forget', cid, msg + f'Answer the captain in the ticket thread by running this as is (your JG_HOME already names your own home): "$JG_HOME/bin/jg-secondmate-report.sh" note {cid} "<your answer in plain words>"']
         note = None
         try:
-            r = subprocess.run(['bash', os.path.join(BIN, cmd[0]), *cmd[1:]], env=dict(os.environ, FM_HOME=HOME), capture_output=True, text=True, timeout=60)
+            r = subprocess.run(['bash', os.path.join(BIN, cmd[0]), *cmd[1:]], env=dict(os.environ, JG_HOME=HOME), capture_output=True, text=True, timeout=60)
             err = None if r.returncode == 0 else ((r.stderr or r.stdout).strip().splitlines() or [f'{cmd[0]} exited {r.returncode}'])[-1][:300]
             if not err and t['home'] == 'main': note = json.loads(r.stdout).get('id')
         except (OSError, subprocess.TimeoutExpired) as e: err = f'{cmd[0]} did not finish: {e}'
@@ -375,9 +384,9 @@ tmp="$out_dir/.build.$$"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp" || { echo "jg-dashboard: cannot create $tmp" >&2; exit 1; }
 
-FM_DASHBOARD_MODULES="$SCRIPT_DIR" python3 - "$FM_HOME" "$out_dir" "$tmp" "$FM_BIN" "$MAX_AGE" <<'PY' || { echo "jg-dashboard: page build failed" >&2; exit 1; }
+JG_DASHBOARD_MODULES="$SCRIPT_DIR" python3 - "$JG_HOME" "$out_dir" "$tmp" "$JG_BIN" "$MAX_AGE" <<'PY' || { echo "jg-dashboard: page build failed" >&2; exit 1; }
 import fcntl, hashlib, html, json, math, os, re, shutil, subprocess, sys, time
-sys.path.insert(0, os.environ["FM_DASHBOARD_MODULES"])
+sys.path.insert(0, os.environ["JG_DASHBOARD_MODULES"])
 from task_rows import toon_rows, TAGS, plain
 BUILD_STARTED = time.monotonic()
 from urllib.parse import urlsplit
@@ -464,7 +473,7 @@ SUMMARY_MAX_AGE = 900  # a home republishes at least every 5 minutes
 def summary(h):
     if h in remote_hosts:
         key = hashlib.sha256(f'{h}\n{remote_hosts[h]}\n{home_dir[h]}\n'.encode()).hexdigest()
-        p = os.path.join(os.environ.get('FM_SNAPSHOT_CACHE_DIR', os.path.join(HOME, 'state/secondmate-summary-cache')), key + '.json')
+        p = os.path.join(os.environ.get('JG_SNAPSHOT_CACHE_DIR', os.path.join(HOME, 'state/secondmate-summary-cache')), key + '.json')
     else: p = os.path.join(home_dir[h], 'state/home-summary.json')
     try:
         if os.path.getsize(p) > 262144: raise ValueError('summary larger than 256 KB')
@@ -605,14 +614,14 @@ backlog, backlog_sources = {}, {}
 for h, d in sorted(home_dir.items()):
     if h in remote_hosts:
         backlog[h] = None; notes.append(('backlog', f'{h}: remote records not cached')); continue
-    address, err = probe(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "${FM_DATA_OVERRIDE:-$FM_HOME/data}" || exit 1; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'dashboard', BIN], env=dict(os.environ, FM_HOME=d))
+    address, err = probe(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "${JG_DATA_OVERRIDE:-$JG_HOME/data}" || exit 1; printf "%s\\n%s\\n" "$JG_BACKLOG_AXI_ROOT" "$JG_BACKLOG_AXI_FILE"', 'dashboard', BIN], env=dict(os.environ, JG_HOME=d))
     fields = address.splitlines() if address is not None else []
     if len(fields) != 2:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "unsupported backlog source"}')); continue
     backlog_sources[h] = fields
     out, err = probe(['bash', os.path.join(BIN, 'jg-tasks-axi.sh'), 'list', '--limit', '10000',
                       '--fields', 'held,hold_kind,hold_reason,blocked,created,closed,priority,body,links'],
-                     timeout=20, env=dict(os.environ, FM_HOME=d))
+                     timeout=20, env=dict(os.environ, JG_HOME=d))
     rows = toon_rows(out) if out is not None else None
     if rows is None:
         backlog[h] = None; notes.append(('backlog', f'{h}: {err or "no task table in its output"}')); continue
@@ -652,7 +661,7 @@ def save_json(p, v):
 # cached by the cut text in full-text.json, so an unchanged item costs no call on the next build.
 CUT = '\n... (truncated, '
 def show_full(h, task):  # {title, body} of one backlog item, or None when show fails
-    out, _ = probe(['bash', os.path.join(BIN, 'jg-tasks-axi.sh'), 'show', task, '--full'], timeout=10, env=dict(os.environ, FM_HOME=home_dir[h]))
+    out, _ = probe(['bash', os.path.join(BIN, 'jg-tasks-axi.sh'), 'show', task, '--full'], timeout=10, env=dict(os.environ, JG_HOME=home_dir[h]))
     f = {}
     for l in (out or '').splitlines():
         m = re.match(r'^  (title|body): (.*)$', l)
@@ -711,7 +720,7 @@ LANDED = [landed_on(d) for d in DAYS]
 merges_read_at = time.time()
 # Forge: the pull requests GitHub shows merged in the repositories the fleet recorded merges in over these 14 days,
 # counted by local merge day like Landed, so the records' coverage shows. One read-only gh pr list per repository, at
-# most every 30 minutes (forge.json keeps the last good read and the cause of a failed one); FM_DASHBOARD_FORGE=off skips it.
+# most every 30 minutes (forge.json keeps the last good read and the cause of a failed one); JG_DASHBOARD_FORGE=off skips it.
 FORGE_AGE, GH_REPO = 1800, re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+')
 forge_repos = sorted({m[1] for url, (at, _, _) in merges.items() if at >= midnight(DAYS[0]) and (m := GH_REPO.match(url))})
 def forge_read(repo):
@@ -721,7 +730,7 @@ def forge_read(repo):
     except (TypeError, ValueError, KeyError, AttributeError): return dict(error=err or 'gh answered no merge list')
     return dict(merged=ats, capped=len(ats) >= 1000)
 forge = {}
-if os.environ.get('FM_DASHBOARD_FORGE', 'on') != 'off' and forge_repos:
+if os.environ.get('JG_DASHBOARD_FORGE', 'on') != 'off' and forge_repos:
     with open(os.path.join(STATE_DIR, '.cache.lock'), 'a') as cache_lock:
         fcntl.flock(cache_lock, fcntl.LOCK_EX)
         FORGE = os.path.join(STATE_DIR, 'forge.json')
@@ -898,12 +907,12 @@ BUSY = {r: sum(a[0] == r for a in busy) for r, _ in ROLES}
 
 # --- machine and devices: read-only probes, each with a short timeout ------
 # A probe that fails says "unknown" and why; it never guesses a value or a zero.
-PROC = os.environ.get('FM_DASHBOARD_PROC', '/proc')
-LOCK_DIR = os.environ.get('FM_DEVICE_LOCK_DIR', '/tmp')
+PROC = os.environ.get('JG_DASHBOARD_PROC', '/proc')
+LOCK_DIR = os.environ.get('JG_DEVICE_LOCK_DIR', '/tmp')
 def env_int(name, default):
     try: return int(os.environ.get(name, default))
     except ValueError: return default
-EMU_MAX, GRADLE_MAX, MEM_MIN_GB = env_int('FM_EMU_MAX', 2), env_int('FM_GRADLE_MAX', 2), env_int('FM_MEM_MIN_GB', 12)
+EMU_MAX, GRADLE_MAX, MEM_MIN_GB = env_int('JG_EMU_MAX', 2), env_int('JG_GRADLE_MAX', 2), env_int('JG_MEM_MIN_GB', 12)
 
 def read(rel):
     try: return open(os.path.join(PROC, rel), errors='replace').read(), None
@@ -1719,7 +1728,7 @@ metrics = {
 metrics['quota'].update(read_at_latest=quota_times[-1] if quota_times else None, read_at_policy='oldest contributing account reading')
 for key, value in zip(('heavy_jobs_gb', 'heavy_high_gb', 'heavy_max_gb'), mach['heavy']):
     metrics[key] = reading(value, 'machine', value is not None, reason=mach['heavy_why'], read_at=machine_read_at)
-if forge_repos and os.environ.get('FM_DASHBOARD_FORGE', 'on') != 'off':
+if forge_repos and os.environ.get('JG_DASHBOARD_FORGE', 'on') != 'off':
     metrics['landed_forge'] = reading(FORGE_N[-1], 'landed_forge', bool(forge_got), partial=bool(forge_problems),
                                       reason='; '.join(forge_problems) or 'GitHub did not answer', read_at=min((v['read'] for v in forge_got.values()), default=None))
     metrics['landed_forge'].update(repos=forge_repos, daily=[dict(day=d.isoformat(), value=v if forge_got else None) for d, v in zip(DAYS, FORGE_N)])
@@ -1909,7 +1918,7 @@ for h in {c['to'] for c in sent if c['to'] != 'main'}:
             if m and w and w.group(1): answers.setdefault(m.group(1), []).append(dict(at=int(a.group(1)) if a else None, text=w.group(1), by=h))
     except OSError: pass
 if any(c['note'] for c in sent):
-    out, why = probe(['bash', os.path.join(BIN, 'jg-inbox.sh'), 'receipts', '--all-replies'], timeout=10, env=dict(os.environ, FM_HOME=HOME))
+    out, why = probe(['bash', os.path.join(BIN, 'jg-inbox.sh'), 'receipts', '--all-replies'], timeout=10, env=dict(os.environ, JG_HOME=HOME))
     try: replies = {r['id']: r for r in json.loads(out)['replies']} if out else {}
     except (ValueError, KeyError, TypeError): replies, why = {}, 'unreadable receipts'
     if why: notes.append(("Main's inbox replies", why))
@@ -1941,7 +1950,7 @@ tickets_stale = sum(1 for t in tickets if t.get('state') != 'done' and (u := las
 cycles = sorted(at - d['ts'] for at, h, task in merges.values() if (d := dispatch(h, task, at)))
 # A failed read names its cause (the reader's last error line, its exit or the deadline), shown on Insights.
 flow_text, flow_why = probe(['bash', os.path.join(BIN, 'jg-flow.sh'), '--json', '--now', str(int(NOW_TS)), '--capacity'],
-                            timeout=180, env=dict(os.environ, FM_HOME=HOME))
+                            timeout=180, env=dict(os.environ, JG_HOME=HOME))
 flow, flow_error = None, None if flow_text is not None else f'Flow reader unavailable: {prose(flow_why)}'
 if flow_text is not None:
     try:
@@ -1980,7 +1989,7 @@ if flow_text is not None:
         flow, flow_error = None, f'Flow observations unreadable: {e}'
 def read_stat(kind, script):
     text = probe(['bash', os.path.join(BIN, script), '--json', '--now', str(int(NOW_TS))],
-                   timeout=10, env=dict(os.environ, FM_HOME=HOME))[0]
+                   timeout=10, env=dict(os.environ, JG_HOME=HOME))[0]
     if text is None:
         return None, f'{kind} statistics reader unavailable'
     try:

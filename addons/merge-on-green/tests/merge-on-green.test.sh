@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # End-to-end: drive merge-on-green.sh against a fixture firstmate home with stub jg-crew-state.sh and
-# jg-pr-merge.sh in the home's bin/ and a stub jg-checks-lint.sh behind FM_MOG_CHECKS_LINT, then install.sh
+# jg-pr-merge.sh in the home's bin/ and a stub jg-checks-lint.sh behind JG_MOG_CHECKS_LINT, then install.sh
 # against the same home. Usage: merge-on-green/tests/merge-on-green.test.sh
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -10,11 +19,11 @@ export HOME=$d/home XDG_DATA_HOME=$d/data TMPDIR=$d
 export STUB_DIR=$d/stub
 FM=$d/fm
 mkdir -p "$HOME" "$STUB_DIR" "$FM/state" "$FM/bin" "$FM/data/t1" "$FM/data/t2" "$FM/data/t3"
-export FM_MOG_CHECKS_LINT=$STUB_DIR/jg-checks-lint.sh
+export JG_MOG_CHECKS_LINT=$STUB_DIR/jg-checks-lint.sh
 fails=0
 check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want: %s\n  got:  %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
-mog() { FM_CHECK_TIMEOUT=30 "$SRC/merge-on-green.sh" check "$FM" 2>&1; }
+mog() { JG_CHECK_TIMEOUT=30 "$SRC/merge-on-green.sh" check "$FM" 2>&1; }
 meta() { # <task> <yolo> <head> <gen> -> meta + matching PASS receipt
   printf 'yolo=%s\npr=https://github.com/ex/r/pull/%s\npr_head=%s\nspawn_gen=%s\n' "$2" "${1#t}" "$3" "$4" > "$FM/state/$1.meta"
   printf '{\n  "verdict": "PASS",\n  "head": "%s",\n  "spawn_gen": "%s"\n}\n' "$3" "$4" > "$FM/state/$1.run-receipt.json"
@@ -35,7 +44,7 @@ fi
 EOF
 cat > "$FM/bin/jg-pr-merge.sh" <<'EOF'
 #!/usr/bin/env bash
-printf '%s|%s\n' "$FM_HOME" "$*" >> "$STUB_DIR/merge-calls"
+printf '%s|%s\n' "$JG_HOME" "$*" >> "$STUB_DIR/merge-calls"
 [ -f "$STUB_DIR/merge-slow" ] && sleep 600
 if [ -f "$STUB_DIR/merge-refuse" ]; then
   echo "error: pull request is not mergeable: required check ci is red" >&2
@@ -45,7 +54,7 @@ echo "merged pull request $2"
 EOF
 cat > "$STUB_DIR/jg-checks-lint.sh" <<'EOF'
 #!/usr/bin/env bash
-printf '%s|%s\n' "$FM_HOME" "$*" >> "$STUB_DIR/lint-calls"
+printf '%s|%s\n' "$JG_HOME" "$*" >> "$STUB_DIR/lint-calls"
 [ -f "$STUB_DIR/lint-slow" ] && sleep 600
 if [ -f "$STUB_DIR/lint-fail" ]; then
   echo "checks-lint: FAIL: evidence: not proven: no verify skill ran"
@@ -125,10 +134,10 @@ check "f: not-ready state -> silent" "$(mog)" ""
 check "f: no pr_head -> silent" "$(mog)" ""
 check "f: lint not consulted" "$(wc -l 2>/dev/null < "$STUB_DIR/lint-calls" || echo 0)" "$before"
 
-# (i) FM_CHECK_TIMEOUT too small to fit a merge: nothing is started and the head is never recorded,
+# (i) JG_CHECK_TIMEOUT too small to fit a merge: nothing is started and the head is never recorded,
 # so the next sweep can retry instead of a watcher kill burning the recorded head silently.
 meta t8 on "$H1" s8
-check "i: too-small bound -> silent" "$(FM_CHECK_TIMEOUT=4 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
+check "i: too-small bound -> silent" "$(JG_CHECK_TIMEOUT=4 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
 check "i: no merge started" "$(wc -l < "$STUB_DIR/merge-calls")" 2
 check "i: head not recorded" "$([ -e "$FM/data/jg-merge-on-green/t8.head" ] && echo recorded || echo never)" never
 rm "$FM/state/t8.meta" "$FM/state/t8.run-receipt.json"
@@ -173,20 +182,20 @@ rm "$FM/state/t9.meta" "$FM/state/t9.run-receipt.json"
 # task+head+reason, no merge attempt recorded, and the next sweep still retries silently.
 meta t10 on "$H1" s10
 touch "$STUB_DIR/lint-slow"
-out=$(FM_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)
+out=$(JG_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)
 check "k: lint timeout wakes once" "$(printf '%s\n' "$out" | wc -l)" 1
 has "k: lint timeout named" "$out" "checks lint timed out"
 has "k: lint timeout truthful" "$out" "retrying next sweep"
-check "k: repeat lint timeout silent" "$(FM_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
+check "k: repeat lint timeout silent" "$(JG_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
 check "k: lint timeout remembered, no head" "$([ -e "$FM/data/jg-merge-on-green/t10.refused" ] && [ ! -e "$FM/data/jg-merge-on-green/t10.head" ] && echo timeout-only || echo wrong)" timeout-only
 rm "$STUB_DIR/lint-slow"
 touch "$STUB_DIR/merge-slow"
-out=$(FM_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)
+out=$(JG_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)
 check "k: merge attempted then killed" "$(wc -l < "$STUB_DIR/merge-calls")" 4
 check "k: merge timeout wakes once" "$(printf '%s\n' "$out" | wc -l)" 1
 has "k: merge timeout named" "$out" "jg-pr-merge timed out"
 check "k: merge timeout not recorded as head" "$([ -e "$FM/data/jg-merge-on-green/t10.head" ] && echo recorded || echo never)" never
-check "k: repeat merge timeout silent" "$(FM_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
+check "k: repeat merge timeout silent" "$(JG_CHECK_TIMEOUT=9 "$SRC/merge-on-green.sh" check "$FM" 2>&1)" ""
 check "k: repeat merge timeout still retried" "$(wc -l < "$STUB_DIR/merge-calls")" 5
 rm "$STUB_DIR/merge-slow"
 out=$(mog)
@@ -224,8 +233,8 @@ rm "$FM/state/t12.meta" "$FM/state/t12.run-receipt.json"
 # (g) install --dry-run lists the steps and writes nothing.
 cat > "$FM/bin/jg-check-register.sh" <<'EOF'
 #!/bin/sh
-[ "${FM_STATE_OVERRIDE+set}" ] && exit 9
-echo "register $1" >> "${FM_HOME:?no FM_HOME}/reg-calls"
+[ "${JG_STATE_OVERRIDE+set}" ] && exit 9
+echo "register $1" >> "${JG_HOME:?no JG_HOME}/reg-calls"
 EOF
 chmod +x "$FM/bin/jg-check-register.sh"
 before=$(find "$d" -mindepth 1 | sort)
@@ -234,18 +243,18 @@ has "g: would copy" "$out" "would copy: $SRC/merge-on-green.sh -> $d/data/jg-mer
 has "g: lint adapter copied" "$out" "would copy: $SRC/checks-lint.sh -> $d/data/jg-merge-on-green/checks-lint.sh"
 has "g: legacy lint copied" "$out" "would copy: $SRC/jg-checks-lint.sh -> $d/data/jg-merge-on-green/jg-checks-lint.sh"
 has "g: done-done config copied" "$out" "would copy: $SRC/.done-done.yaml -> $d/data/jg-merge-on-green/.done-done.yaml"
-has "g: would register" "$out" "would run: env -u FM_STATE_OVERRIDE FM_HOME=$FM $FM/bin/jg-check-register.sh merge-on-green"
+has "g: would register" "$out" "would run: env -u JG_STATE_OVERRIDE JG_HOME=$FM $FM/bin/jg-check-register.sh merge-on-green"
 check "g: nothing written" "$(find "$d" -mindepth 1 | sort)" "$before"
 
-# (h) real install with FM_STATE_OVERRIDE exported empty: the shim execs the installed script with the home.
-out=$(FM_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
-check "h: install exits 0 with FM_STATE_OVERRIDE=''" "$rc" 0
+# (h) real install with JG_STATE_OVERRIDE exported empty: the shim execs the installed script with the home.
+out=$(JG_STATE_OVERRIDE='' "$SRC/install.sh" "$FM" 2>&1) && rc=0 || rc=$?
+check "h: install exits 0 with JG_STATE_OVERRIDE=''" "$rc" 0
 check "h: register ran without the override" "$(cat "$FM/reg-calls")" "register merge-on-green"
 check "h: adapter installed" "$([ -x "$d/data/jg-merge-on-green/checks-lint.sh" ] && echo yes)" yes
 check "h: legacy lint installed" "$([ -x "$d/data/jg-merge-on-green/jg-checks-lint.sh" ] && echo yes)" yes
 check "h: done-done config installed" "$([ -f "$d/data/jg-merge-on-green/.done-done.yaml" ] && echo yes)" yes
 check "h: shim execs the check" "$(sed -n 2p "$FM/state/merge-on-green.check.sh")" "exec $d/data/jg-merge-on-green/merge-on-green.sh check $FM"
 check "h: shim mode 0700" "$(stat -c %a "$FM/state/merge-on-green.check.sh")" 700
-check "h: installed script runs from the shim" "$(FM_CHECK_TIMEOUT=30 "$FM/state/merge-on-green.check.sh")" ""
+check "h: installed script runs from the shim" "$(JG_CHECK_TIMEOUT=30 "$FM/state/merge-on-green.check.sh")" ""
 
 [ "$fails" -eq 0 ] && echo "PASS: merge-on-green e2e" || { echo "FAIL: $fails check(s)"; exit 1; }

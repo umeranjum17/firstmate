@@ -5,7 +5,7 @@ This add-on owns all of it: `bin/jg-account-pool-lib.sh` parses `config/account-
 
 ## Wiring
 
-The fork's `bin/jg-spawn.sh` and `bin/jg-control.sh` carry one setup line that sources the lib from `$FM_ADDONS_DIR` (else `$FM_HOME/projects/firstmate-addons`) and makes `jg_account_hook` a no-op when the add-on is absent, plus one `jg_account_hook <event>` line at each call site:
+The fork's `bin/jg-spawn.sh` and `bin/jg-control.sh` carry one setup line that sources the lib from `$JG_ADDONS_DIR` (else `$JG_HOME/projects/firstmate-addons`) and makes `jg_account_hook` a no-op when the add-on is absent, plus one `jg_account_hook <event>` line at each call site:
 
 | Script | Events, in call order |
 |---|---|
@@ -69,7 +69,7 @@ jg-model-pool next --json   # prior selection + typed limit on stdin
 ```
 
 Request fields (`v:1`): `purpose` (`work`), optional `pool_config` (absolute path to `config/account-pool`), optional `model`, `capabilities`, `deadline` (unix seconds for the whole attempt chain), and `attempted` (account/route ids already tried).
-When `pool_config` is omitted (as learn-from-mistakes does for `account_picker`), the helper defaults to `$FM_HOME/config/account-pool` if that file is readable, else `$HOME/firstmate/config/account-pool` — the same order as `pipeline-quota-failover/switch.sh`. An explicit `pool_config` still wins; with no readable default the helper refuses as before.
+When `pool_config` is omitted (as learn-from-mistakes does for `account_picker`), the helper defaults to `$JG_HOME/config/account-pool` if that file is readable, else `$HOME/firstmate/config/account-pool` — the same order as `pipeline-quota-failover/switch.sh`. An explicit `pool_config` still wins; with no readable default the helper refuses as before.
 `next` also needs `selection` (prior answer) and `cause` (`quota`, `rate_limit`, `unavailable`, `timeout`).
 
 learn-from-mistakes account_picker (global lfm config argv, never shell text):
@@ -79,8 +79,8 @@ account_picker:
   - /absolute/path/to/firstmate-addons/account-pool/bin/jg-model-pool
 ```
 
-For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`FM_MODEL_POOL_FLOOR`, defaulting to `FM_ACCOUNT_POOL_REST_FLOOR`, **15%**).
-That is deliberately not the worker **launch admission** floor (`FM_CLAUDE_ACCOUNTS_LOW`, **5%**) used by `claude-accounts-pick` at spawn.
+For ordinary work it picks the eligible Claude account with the greatest minimum runway (min of 5h and 7d) above the **eligibility floor** (`JG_MODEL_POOL_FLOOR`, defaulting to `JG_ACCOUNT_POOL_REST_FLOOR`, **15%**).
+That is deliberately not the worker **launch admission** floor (`JG_CLAUDE_ACCOUNTS_LOW`, **5%**) used by `claude-accounts-pick` at spawn.
 Answers name both floors under `floor.eligibility` and `floor.launch_admission`.
 A registry account whose record enables `usage_credits`, `extra_usage`, or `overage` (or the same under `billing`) is refused; the check is logged; credentials are never printed or stored.
 When every Claude account is under the eligibility floor, normal-work ordering is Codex Sol (`openai-codex/gpt-6.1-sol`), then DeepSeek Goat (`deepseek/deepseek-goat`), then Cursor auto (`auto`), skipping any id already in `attempted`.

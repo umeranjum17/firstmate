@@ -11,7 +11,7 @@
 #
 # Most functions are pure, side-effect-free reads of status files: each takes
 # what it needs as arguments and touches no globals beyond the optional
-# FM_CAPTAIN_RE override. Consumers layer their own dedup/marker state on top (the
+# JG_CAPTAIN_RE override. Consumers layer their own dedup/marker state on top (the
 # daemon keeps its escalation-digest seen-markers; the watcher keeps its .seen-*
 # signatures).
 # Status-span classification captures one file endpoint and reports every
@@ -49,18 +49,18 @@
 # Directory of this library, used to locate the sibling jg-crew-state.sh reader.
 # Resolved at source time from BASH_SOURCE so it works whether sourced by a
 # bin/ script (which sets its own SCRIPT_DIR) or directly by a test.
-_FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
+_JG_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _JG_CLASSIFY_LIB_DIR="."
 
 # The kernel name, read once at source time rather than forked by every status
 # stat helper below. These helpers mostly run inside $() subshells, where a lazy
-# cache would never persist. jg-wake-lib.sh's _FM_UNAME is reused when it is
+# cache would never persist. jg-wake-lib.sh's _JG_UNAME is reused when it is
 # already loaded; either value is compared only against Darwin.
-_FM_CLASSIFY_UNAME_S=${_FM_UNAME:-$(uname -s 2>/dev/null)}
+_JG_CLASSIFY_UNAME_S=${_JG_UNAME:-$(uname -s 2>/dev/null)}
 
 # The crew current-state reader used for the "provably working" decision.
 # Overridable so tests can stub the run-step/pane verdict without a real worktree
 # or no-mistakes install; absent, it points at the real sibling script.
-FM_CREW_STATE_BIN="${FM_CREW_STATE_BIN:-$_FM_CLASSIFY_LIB_DIR/jg-crew-state.sh}"
+JG_CREW_STATE_BIN="${JG_CREW_STATE_BIN:-$_JG_CLASSIFY_LIB_DIR/jg-crew-state.sh}"
 
 # jg_run_timed, the shared hard bound the worktree write probe below puts around
 # its one filesystem walk. bin/jg-timeout-lib.sh owns bounded execution for this
@@ -71,14 +71,14 @@ FM_CREW_STATE_BIN="${FM_CREW_STATE_BIN:-$_FM_CLASSIFY_LIB_DIR/jg-crew-state.sh}"
 case $- in *u*) _jg_classify_nounset=on ;; *) _jg_classify_nounset=off ;; esac
 # shellcheck source=bin/jg-timeout-lib.sh
 # shellcheck disable=SC1091
-. "$_FM_CLASSIFY_LIB_DIR/jg-timeout-lib.sh"
+. "$_JG_CLASSIFY_LIB_DIR/jg-timeout-lib.sh"
 [ "$_jg_classify_nounset" = on ] || set +u
 unset _jg_classify_nounset
 
 # Captain-relevant status verbs. A status line carrying any of these is work
 # firstmate must see. Lines without these verbs are no-verb signals: the watcher
 # absorbs them only with positive provably-working evidence, while the daemon uses
-# its away-mode classification. FM_CAPTAIN_RE overrides the whole set when a home
+# its away-mode classification. JG_CAPTAIN_RE overrides the whole set when a home
 # needs a custom verb vocabulary; absent, this default applies.
 #
 # Free-text tokens (PR ready, checks green, ready in branch, merged) exist only for
@@ -92,7 +92,7 @@ unset _jg_classify_nounset
 # declaration cannot disappear behind an earlier recognized line. Continuation
 # prose is not a prefix and stays off that path. Recognized verbs keep the
 # classification below.
-FM_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'
+JG_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'
 
 # The declared-wait verb. A crew (or firstmate steering it) appends
 #   paused: <reason>
@@ -107,11 +107,11 @@ FM_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|
 # wedge-nagging this idle pane" signal, not work to keep surfacing. This constant
 # is the ONE definition of the verb; both the watcher and the daemon read it here
 # (status_is_paused) rather than hardcoding the literal, so the vocabulary cannot
-# drift between the two consumers. FM_CLASSIFY_PAUSED_VERB overrides it.
-FM_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
+# drift between the two consumers. JG_CLASSIFY_PAUSED_VERB overrides it.
+JG_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
 
 # Bounded re-surface cadence for a declared external-wait pause.
-# Far longer than the wedge threshold (FM_STALE_ESCALATE_SECS, default 240s), it
+# Far longer than the wedge threshold (JG_STALE_ESCALATE_SECS, default 240s), it
 # avoids nagging a deliberate wait while ensuring a forgotten wait cannot rot
 # invisibly - it re-surfaces once for a recheck every window. Four hours by
 # default: a declared wait is by definition expected to clear on its own, so a
@@ -119,11 +119,11 @@ FM_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
 # (the 2026-09-07 away-window audit). A worker that knows when its wait clears
 # names it with `until` (status_paused_until below) and is rechecked at that
 # time or this cadence bound, whichever comes first. Both consumers read
-# FM_PAUSE_RESURFACE_SECS with this default so
+# JG_PAUSE_RESURFACE_SECS with this default so
 # the cadence has one owner. An item held for the captain is not rechecked at all
 # while the away-posture record exists (bin/jg-watch.sh owns that rule).
 # shellcheck disable=SC2034 # Read by the watcher and daemon (jg-watch.sh, jg-supervise-daemon.sh), not this lib.
-FM_PAUSE_RESURFACE_SECS_DEFAULT=14400
+JG_PAUSE_RESURFACE_SECS_DEFAULT=14400
 
 # jg_utc_iso_to_epoch <YYYY-MM-DDTHH:MM[:SS]Z>: the one portable UTC ISO 8601
 # reader shared by the declared-wait vocabulary and the away-posture record
@@ -145,14 +145,14 @@ jg_utc_iso_to_epoch() {  # <timestamp>
 # status decision opened by needs-decision or blocked. See status_open_decisions
 # below for the status-fold contract. The transfer verb is written only after
 # jg-captain-hold.sh has verified the corresponding captain-held backlog item.
-FM_CLASSIFY_RESOLVE_VERB_DEFAULT='resolved'
-FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
+JG_CLASSIFY_RESOLVE_VERB_DEFAULT='resolved'
+JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
 
 # How many trailing lines the latest-event read parses before it widens to the
 # whole file. A status record and its continuation prose sit within a few lines
 # of the log's end, so this bounds the watcher's per-poll read on a long-lived
 # log while a log whose tail holds no event still gets a full pass.
-FM_CLASSIFY_EVENT_WINDOW_LINES=200
+JG_CLASSIFY_EVENT_WINDOW_LINES=200
 
 # Return the last recognized status event, ignoring continuation prose and blanks
 # (empty if missing/blank), and with <previous-event-var> the event before it.
@@ -165,7 +165,7 @@ last_status_line() {  # <status-file> [<previous-event-var>]
   [ -f "$f" ] && [ -r "$f" ] || return 0
   if [ "$#" -gt 1 ]; then
     scan=$(_jg_status_event_scan < "$f") || :
-  elif ! scan=$(tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" "$f" 2>/dev/null | _jg_status_event_scan); then
+  elif ! scan=$(tail -n "$JG_CLASSIFY_EVENT_WINDOW_LINES" "$f" 2>/dev/null | _jg_status_event_scan); then
     scan=$(_jg_status_event_scan < "$f") || :
   fi
   [ "$#" -lt 2 ] || printf -v "$2" '%s' "${scan%%$'\n'*}"
@@ -176,9 +176,9 @@ last_status_line() {  # <status-file> [<previous-event-var>]
 _jg_status_verb_recognized() {  # <verb>
   case "$1" in
     working|needs-decision|blocked|done|failed|note|\
-    "${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}"|\
-    "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"|\
-    "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}")
+    "${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}"|\
+    "${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}"|\
+    "${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}")
       return 0
       ;;
   esac
@@ -246,7 +246,7 @@ status_prefix_unrecognized() {  # <status-line>
 # latest line instead of disappearing behind an earlier recognized one.
 _jg_status_event_scan() {
   local line last='' prev='' fallback='' legacy_re
-  legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
+  legacy_re="^[[:space:]]*(${JG_CAPTAIN_RE:-$JG_CLASSIFY_CAPTAIN_RE_DEFAULT})"
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in *[![:space:]]*) fallback=$line ;; *) continue ;; esac
     _jg_status_line_is_event "$line" "$legacy_re" && { prev=$last; last=$line; }
@@ -296,7 +296,7 @@ status_is_terminal_verb() {
 # only lines without those leading verbs may still match free-text tokens for
 # legacy bare lines such as "merged" or "PR ready".
 # Regex matching ignores any emission-time tag before the first colon - here and
-# in the shared event scan, the module's two FM_CAPTAIN_RE sites - so an override
+# in the shared event scan, the module's two JG_CAPTAIN_RE sites - so an override
 # keeps matching a stamped event however the worker spelled the stamp; other
 # metadata and note text remain intact, as do the stored and surfaced event bytes.
 status_is_captain_relevant() {
@@ -304,7 +304,7 @@ status_is_captain_relevant() {
   [ -n "$line" ] || return 1
   status_line_verb "$line" verb
   case "$verb" in
-    working|resolved|captain-held|"${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}")
+    working|resolved|captain-held|"${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}")
       return 1
       ;;
   esac
@@ -312,13 +312,13 @@ status_is_captain_relevant() {
   # recognized nonterminal verbs, so working, paused, resolved, and captain-held
   # keep their existing non-relevant classification.
   status_prefix_unrecognized "$line" && return 0
-  if [ -z "${FM_CAPTAIN_RE+x}" ]; then
+  if [ -z "${JG_CAPTAIN_RE+x}" ]; then
     case "$verb" in
       done|needs-decision|blocked|failed) return 0 ;;
     esac
   fi
   _jg_status_unstamped "$line" unstamped
-  _jg_classify_matches "$unstamped" "${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT}"
+  _jg_classify_matches "$unstamped" "${JG_CAPTAIN_RE:-$JG_CLASSIFY_CAPTAIN_RE_DEFAULT}"
 }
 
 # 0 if a status line's leading verb is the pause verb (paused: <reason>). A pure
@@ -329,7 +329,7 @@ status_is_paused() {  # <status-line>
   local line=$1 verb
   [ -n "$line" ] || return 1
   verb=$(status_line_verb "$line")
-  [ "$verb" = "${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}" ]
+  [ "$verb" = "${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}" ]
 }
 
 # 0 if a status line's leading verb is the verified captain-held transfer verb.
@@ -342,7 +342,7 @@ status_is_captain_held() {  # <status-line>
   local line=$1 verb
   [ -n "$line" ] || return 1
   status_line_verb "$line" verb
-  [ "$verb" = "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" ]
+  [ "$verb" = "${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" ]
 }
 
 # 0 if a status line declares either an external-wait pause or a verified
@@ -374,11 +374,11 @@ status_declared_wait_line() {  # <status-file>
     printf '%s\n' "$last"
     return 0
   fi
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
   status_line_verb "$last" verb
   [ "$verb" = "$resolve" ] || return 0
-  legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
-  tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" "$f" 2>/dev/null \
+  legacy_re="^[[:space:]]*(${JG_CAPTAIN_RE:-$JG_CLASSIFY_CAPTAIN_RE_DEFAULT})"
+  tail -n "$JG_CLASSIFY_EVENT_WINDOW_LINES" "$f" 2>/dev/null \
     | _jg_status_declared_wait_scan "$resolve" "$legacy_re" \
     || _jg_status_declared_wait_scan "$resolve" "$legacy_re" < "$f" || :
 }
@@ -402,10 +402,10 @@ _jg_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
     status_line_verb "$line" verb
     case "$verb" in
       "$resolve") ;;
-      "${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}") ;;
+      "${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}") ;;
       *) return 0 ;;
     esac
-    key=$(_jg_decision_key "$line" "$_FM_CLASSIFY_KEYLESS_PHASE") || key=
+    key=$(_jg_decision_key "$line" "$_JG_CLASSIFY_KEYLESS_PHASE") || key=
     if [ "$verb" = "$resolve" ]; then
       keys="$keys$key"$'\n'
       continue
@@ -624,7 +624,7 @@ status_event_recorded() {  # <status-file> <new-status-line>
 # close a decision the captain is owed.
 #
 # The token grammar is OWNED by bin/jg-pending-reply-lib.sh
-# (jg_pending_reply_corr_token, FM_PENDING_REPLY_CORR_RE). That library sources
+# (jg_pending_reply_corr_token, JG_PENDING_REPLY_CORR_RE). That library sources
 # this one, so it cannot be sourced back here; the pattern below is a deliberate
 # second statement of the SHAPE alone, and tests/jg-classify-corr-token.test.sh
 # pins the two together through the real writers so they cannot drift.
@@ -826,12 +826,12 @@ EOF
 # consumer-side rule on purpose - it protects local and remote writers
 # identically, and it can never fail a whole delta or wedge a stream the way a
 # writer-side rejection would.
-FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT='pending-reply- waiting-timer-'
+JG_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT='pending-reply- waiting-timer-'
 
 # 0 when <key> is not reserved, or is reserved and <note> speaks its vocabulary.
 _jg_decision_key_transition_allowed() {  # <key> <note>
   local key=$1 note=$2 prefix
-  for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
+  for prefix in ${JG_CLASSIFY_RESERVED_KEY_PREFIXES:-$JG_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
     case "$key" in
       "$prefix"*)
         case "$note" in
@@ -941,7 +941,7 @@ _jg_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # most-recently-opened-last order; prints nothing when none are open. Reads the
 # status file, plus its sibling `.meta` for the task kind the terminal rule needs
 # when the caller passes no <kind>; no globals beyond the optional
-# FM_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
+# JG_CLASSIFY_RESOLVE_VERB override. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
 # The scan_open_decisions wrapper below enumerates a whole directory rather than
@@ -954,8 +954,8 @@ status_open_decisions() {  # <status-file> [<kind>]
   local f=$1 kind=${2:-} line resolve held open='' verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_jg_status_kind "$f" "$kind")
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -997,7 +997,7 @@ EOF
 status_own_open_decisions() {  # <status-file>
   local line prefix
   status_open_decisions "$1" | while IFS= read -r line || [ -n "$line" ]; do
-    for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT} remote-reply-continuity- captain-hold-; do
+    for prefix in ${JG_CLASSIFY_RESERVED_KEY_PREFIXES:-$JG_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT} remote-reply-continuity- captain-hold-; do
       case "$line" in "$prefix"*) continue 2 ;; esac
     done
     printf '%s\n' "$line"
@@ -1090,8 +1090,8 @@ status_key_closing_verb() {  # <status-file> <key>
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   [ -n "$want" ] || return 0
   kind=$(_jg_status_kind "$f")
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   candidates=$(grep -E \
     "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]" \
     "$f") || [ "$?" -eq 1 ] || candidates=$(cat "$f")
@@ -1141,7 +1141,7 @@ status_scan_parent_channel_exclude() {  # <state>
   local state=$1 exclude
   if ! command -v jg_parent_channel_outbound_status >/dev/null 2>&1; then
     # shellcheck source=bin/jg-parent-channel-lib.sh
-    . "$_FM_CLASSIFY_LIB_DIR/jg-parent-channel-lib.sh"
+    . "$_JG_CLASSIFY_LIB_DIR/jg-parent-channel-lib.sh"
   fi
   exclude=$(jg_parent_channel_outbound_status "$(dirname "$state")" "$state") || return 0
   printf '%s\n' "$exclude"
@@ -1194,9 +1194,9 @@ EOF
 # of how much new unrelated log content has since been folded in. Only a line the
 # shared fold rule retires removes one.
 #
-# The cursor format is `version` (FM_OPEN_DECISIONS_FOLD_VERSION plus the task
+# The cursor format is `version` (JG_OPEN_DECISIONS_FOLD_VERSION plus the task
 # kind, as `<n>:<kind>`), `offset`, `ident`, then the folded open set.
-# FM_OPEN_DECISIONS_FOLD_VERSION must be bumped whenever
+# JG_OPEN_DECISIONS_FOLD_VERSION must be bumped whenever
 # _jg_decision_fold_line semantics change, so persisted state from an older
 # interpretation is discarded and rebuilt from byte 0; the kind suffix does the
 # same when a task kind changes, because kind changes the fold below.
@@ -1257,16 +1257,16 @@ _jg_open_decisions_cursor_path() {  # <status-file>
 # Version 4 was already spent on the bracketed-tag parser change above, and a
 # cursor persisted under that reading predates this one, so it must still be
 # discarded and rebuilt from byte 0 under the new reading.
-FM_OPEN_DECISIONS_FOLD_VERSION=9
+JG_OPEN_DECISIONS_FOLD_VERSION=9
 
 # Portable device:inode identity for the rotation/recreation check below.
 _jg_open_decisions_file_ident() {  # <file> -> strongest available identity
   local f=$1 epoch birth ident
-  if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then
-    "$FM_STATUS_IDENTITY_READER" "$f"
+  if [ -n "${JG_STATUS_IDENTITY_READER:-}" ]; then
+    "$JG_STATUS_IDENTITY_READER" "$f"
     return
   fi
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+  if [ "$_JG_CLASSIFY_UNAME_S" = Darwin ]; then
     ident=$(LC_ALL=C /usr/bin/stat -f '%d:%i' "$f" 2>/dev/null) || return 1
     epoch=$(LC_ALL=C /usr/bin/stat -f '%B' "$f" 2>/dev/null) || epoch=0
     if [ "$epoch" != 0 ]; then birth=$(LC_ALL=C /usr/bin/stat -f '%FB' "$f" 2>/dev/null) || birth=''; else birth=''; fi
@@ -1281,11 +1281,11 @@ _jg_open_decisions_file_ident() {  # <file> -> strongest available identity
 
 _jg_status_file_size() {  # <status-file>
   local f=$1
-  if [ -n "${FM_STATUS_SIZE_READER:-}" ]; then
-    "$FM_STATUS_SIZE_READER" "$f"
+  if [ -n "${JG_STATUS_SIZE_READER:-}" ]; then
+    "$JG_STATUS_SIZE_READER" "$f"
     return
   fi
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+  if [ "$_JG_CLASSIFY_UNAME_S" = Darwin ]; then
     LC_ALL=C /usr/bin/stat -f '%z' "$f" 2>/dev/null
   else
     LC_ALL=C stat -c '%s' "$f" 2>/dev/null
@@ -1294,7 +1294,7 @@ _jg_status_file_size() {  # <status-file>
 
 _jg_status_file_mtime() {  # <status-file>
   local f=$1
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+  if [ "$_JG_CLASSIFY_UNAME_S" = Darwin ]; then
     LC_ALL=C /usr/bin/stat -f '%m' "$f" 2>/dev/null
   else
     LC_ALL=C stat -c '%Y' "$f" 2>/dev/null
@@ -1311,8 +1311,8 @@ _jg_status_span_scratch() {  # <status-file>
 
 _jg_status_read_span() {  # <status-file> <start-offset> <byte-length>
   local f=$1 start=$2 length=$3
-  if [ -n "${FM_STATUS_SPAN_READER:-}" ]; then
-    "$FM_STATUS_SPAN_READER" "$f" "$start" "$length"
+  if [ -n "${JG_STATUS_SPAN_READER:-}" ]; then
+    "$JG_STATUS_SPAN_READER" "$f" "$start" "$length"
     return
   fi
   perl -MFcntl=:DEFAULT -e '
@@ -1335,7 +1335,7 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local target_cursor kind fold_version
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   kind=$(_jg_status_kind "$f")
-  fold_version="$FM_OPEN_DECISIONS_FOLD_VERSION:$kind"
+  fold_version="$JG_OPEN_DECISIONS_FOLD_VERSION:$kind"
   cf=$(_jg_open_decisions_cursor_path "$f")
   offset=0
   ident=''
@@ -1420,10 +1420,10 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     # change): when set, records exactly how many bytes THIS call folded, so a
     # test can assert the incremental path stays bounded by new appends rather
     # than re-reading the whole file, without relying on timing or source text.
-    [ -n "${FM_OPEN_DECISIONS_READ_PROBE:-}" ] \
-      && printf '%s\t%s\n' "$f" "$chunk_size" >> "$FM_OPEN_DECISIONS_READ_PROBE"
-    resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-    held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+    [ -n "${JG_OPEN_DECISIONS_READ_PROBE:-}" ] \
+      && printf '%s\t%s\n' "$f" "$chunk_size" >> "$JG_OPEN_DECISIONS_READ_PROBE"
+    resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+    held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
     while IFS= read -r line || [ -n "$line" ]; do
       _jg_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open
     done < "$chunk_file"
@@ -1493,16 +1493,16 @@ status_presentation_snapshot() {  # <state>
 # below this bound. A pathological latest line that crosses the fixed bound is
 # intentionally unclassifiable and omitted: bounded memory and never presenting
 # a possibly routine line as captain-facing take precedence on that edge.
-FM_STATUS_SNAPSHOT_EVENT_LINE=
-FM_STATUS_SNAPSHOT_EVENT_MTIME=
-FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=
+JG_STATUS_SNAPSHOT_EVENT_LINE=
+JG_STATUS_SNAPSHOT_EVENT_MTIME=
+JG_STATUS_SNAPSHOT_EVENT_ENDPOINT=
 # shellcheck disable=SC2034 # Output globals are consumed by sourcing drain scripts.
 status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-identity>
   local f=$1 endpoint=$2 expected_ident=$3 limit=65536 start length scratch record line event_endpoint
   local before_mtime after_mtime before_size after_size before_ident after_ident skip_first=0
-  FM_STATUS_SNAPSHOT_EVENT_LINE=
-  FM_STATUS_SNAPSHOT_EVENT_MTIME=
-  FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=
+  JG_STATUS_SNAPSHOT_EVENT_LINE=
+  JG_STATUS_SNAPSHOT_EVENT_MTIME=
+  JG_STATUS_SNAPSHOT_EVENT_ENDPOINT=
   case "$endpoint" in ''|*[!0-9]*|0) return 1 ;; esac
   [ -n "$expected_ident" ] || return 1
 
@@ -1553,9 +1553,9 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
     && [ "$after_ident" = "$expected_ident" ] \
     || return 1
 
-  FM_STATUS_SNAPSHOT_EVENT_LINE=$line
-  FM_STATUS_SNAPSHOT_EVENT_MTIME=$before_mtime
-  FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=$event_endpoint
+  JG_STATUS_SNAPSHOT_EVENT_LINE=$line
+  JG_STATUS_SNAPSHOT_EVENT_MTIME=$before_mtime
+  JG_STATUS_SNAPSHOT_EVENT_ENDPOINT=$event_endpoint
 }
 
 status_presentation_cursor_offset() {  # <status-file>
@@ -1691,7 +1691,7 @@ status_presentation_marker_parse() {
 }
 
 _status_observed_path_state() {
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+  if [ "$_JG_CLASSIFY_UNAME_S" = Darwin ]; then
     LC_ALL=C /usr/bin/stat -f '%HT:%p' "$1" 2>/dev/null
   else
     LC_ALL=C stat -c '%F:%f' "$1" 2>/dev/null
@@ -1958,7 +1958,7 @@ status_open_decisions_cursor_offset() {  # <status-file>
   local f=$1 cf offset=0 ident='' version='' cursor_data first rest open=''
   local offset_line ident_line cur_ident size fold_version
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 1
-  fold_version="$FM_OPEN_DECISIONS_FOLD_VERSION:$(_jg_status_kind "$f")"
+  fold_version="$JG_OPEN_DECISIONS_FOLD_VERSION:$(_jg_status_kind "$f")"
   cf=$(_jg_open_decisions_cursor_path "$f")
   if [ -e "$cf" ] || [ -L "$cf" ]; then
     [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
@@ -2008,13 +2008,13 @@ status_open_decisions_cursor_offset() {  # <status-file>
     offset=0
     open=''
   fi
-  if [ -n "${FM_STATUS_CURSOR_SNAPSHOT_FILE:-}" ]; then
+  if [ -n "${JG_STATUS_CURSOR_SNAPSHOT_FILE:-}" ]; then
     {
       printf 'version=%s\n' "$fold_version"
       printf 'offset=%s\n' "$offset"
       printf 'ident=%s\n' "$cur_ident"
       if [ -n "$open" ]; then printf '%s' "$open"; fi
-    } > "$FM_STATUS_CURSOR_SNAPSHOT_FILE" || return 1
+    } > "$JG_STATUS_CURSOR_SNAPSHOT_FILE" || return 1
   fi
   printf '%s' "$offset"
 }
@@ -2061,15 +2061,15 @@ status_line_is_unread_surface() {  # <status-line>
   [ -n "$line" ] || return 1
   verb=$(status_line_verb "$line")
   [ "$verb" = note ] && return 0
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   case "$verb" in
     "$resolve"|"$held") ;;
     *) return 1 ;;
   esac
   key=$(_jg_decision_key "$line") || return 1
   note=$(status_line_note "$line")
-  for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
+  for prefix in ${JG_CLASSIFY_RESERVED_KEY_PREFIXES:-$JG_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
     case "$key" in
       "$prefix"*)
         _jg_decision_key_transition_allowed "$key" "$note"
@@ -2138,7 +2138,7 @@ EOF
 # phase outrank a structured home snapshot or jg-crew-state result.
 # Internal stand-in for a keyless phase. Outside the decision-key charset so it
 # cannot collide with a stated slug, and rewritten to "default" only on output.
-_FM_CLASSIFY_KEYLESS_PHASE=$'\036default'
+_JG_CLASSIFY_KEYLESS_PHASE=$'\036default'
 
 # Rewrite the keyless stand-in back to the public "default" key. Only the key
 # field is rewritten, so a note that happens to contain the stand-in stays put.
@@ -2148,7 +2148,7 @@ _jg_activity_publish_keys() {  # <open-set>
     [ -n "$line" ] || continue
     key=${line%%$'\t'*}
     rest=${line#*$'\t'}
-    [ "$key" = "$_FM_CLASSIFY_KEYLESS_PHASE" ] && key=default
+    [ "$key" = "$_JG_CLASSIFY_KEYLESS_PHASE" ] && key=default
     printf '%s\t%s\n' "$key" "$rest"
   done <<EOF
 $1
@@ -2157,9 +2157,9 @@ EOF
 
 _jg_status_open_activities_stream() {
   local line verb key note resolve held open='' pause
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  pause=${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  pause=${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}
   while IFS= read -r line || [ -n "$line" ]; do
     # Blank-line guard; see _jg_decision_fold_line for why this is a glob.
     case "$line" in
@@ -2167,7 +2167,7 @@ _jg_status_open_activities_stream() {
       *) continue ;;
     esac
     status_line_verb "$line" verb
-    _jg_decision_key "$line" "$_FM_CLASSIFY_KEYLESS_PHASE" key || continue
+    _jg_decision_key "$line" "$_JG_CLASSIFY_KEYLESS_PHASE" key || continue
     case "$verb" in
       working|"$pause")
         status_line_note "$line" note
@@ -2197,7 +2197,7 @@ status_open_activities() {  # <status-file-or-dash>
 # task id from a recorded window target, falling back to the tmux-shaped
 # "<session>:jg-<id>" form when no metadata state is available.
 window_to_task() {
-  local w=$1 state=${2:-${STATE:-${FM_STATE_OVERRIDE:-}}} meta mw mt t line
+  local w=$1 state=${2:-${STATE:-${JG_STATE_OVERRIDE:-}}} meta mw mt t line
   if [ -n "$state" ]; then
     for meta in "$state"/*.meta; do
       [ -e "$meta" ] || continue
@@ -2403,8 +2403,8 @@ _jg_status_open_decision_origins() {  # <status-file> [<kind>]
   local f=$1 line open='' after key verb note number=0 origins=''
   local resolve held kind __jg_origins_setverb
   kind=$(_jg_status_kind "$f" "${2:-}")
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
-  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${JG_CLASSIFY_CAPTAIN_HELD_VERB:-$JG_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS= read -r line || [ -n "$line" ]; do
     number=$((number + 1))
     _jg_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" after
@@ -2559,11 +2559,11 @@ status_span_has_actionable() {  # <status-file> <start-offset>
 # that appended paused: but then STARTED a run reports working, never paused.
 # NOT a pure read: jg-crew-state.sh may make a bounded no-mistakes call, so callers
 # run it only on no-verb signal and first-sighting stale paths, never every wake.
-# FM_CREW_STATE_BIN lets tests stub the verdict.
+# JG_CREW_STATE_BIN lets tests stub the verdict.
 crew_absorb_class() {  # <id>
   local id=$1 line state src
   [ -n "$id" ] || { printf 'none'; return; }
-  line=$("$FM_CREW_STATE_BIN" "$id" 2>/dev/null) || true
+  line=$("$JG_CREW_STATE_BIN" "$id" 2>/dev/null) || true
   case "$line" in state:*) ;; *) printf 'none'; return ;; esac
   state=${line#state: }; state=${state%% *}
   if [ "$state" = paused ]; then printf 'paused'; return; fi
@@ -2599,7 +2599,7 @@ crew_is_paused() {  # <id>
 # owed by a HUMAN. bin/jg-crew-state.sh mints it (nm_gate_awaits_human_decision
 # owns the derivation: the findings table's `action` column, read by position);
 # crew_gate_awaits_human_decision below is its only consumer.
-FM_GATE_HUMAN_DECISION='ask-user: authority decision'
+JG_GATE_HUMAN_DECISION='ask-user: authority decision'
 
 # 0 if crew <id>'s authoritative current state is a no-mistakes gate whose answer
 # is owed by a human rather than by the crewmate itself.
@@ -2625,7 +2625,7 @@ FM_GATE_HUMAN_DECISION='ask-user: authority decision'
 crew_gate_awaits_human_decision() {  # <id> -> <run-id> on stdout
   local id=$1 line state src rest part human='' run=''
   [ -n "$id" ] || return 1
-  line=$("$FM_CREW_STATE_BIN" "$id" 2>/dev/null) || true
+  line=$("$JG_CREW_STATE_BIN" "$id" 2>/dev/null) || true
   case "$line" in state:*) ;; *) return 1 ;; esac
   state=${line#state: }; state=${state%% *}
   [ "$state" = parked ] || return 1
@@ -2635,7 +2635,7 @@ crew_gate_awaits_human_decision() {  # <id> -> <run-id> on stdout
   while [ -n "$rest" ]; do
     part=${rest%% · *}
     rest=${rest#* · }
-    [ "$part" = "$FM_GATE_HUMAN_DECISION" ] && human=1
+    [ "$part" = "$JG_GATE_HUMAN_DECISION" ] && human=1
     case "$part" in "run: "?*) run=${part#run: } ;; esac
   done
   [ -n "$human" ] && [ -n "$run" ] || return 1
@@ -2655,8 +2655,8 @@ crew_gate_awaits_human_decision() {  # <id> -> <run-id> on stdout
 # an explicitly empty value stays empty: clearing the knob in the environment is the
 # documented way to ask for that wider walk, and treating empty as unset would hand
 # the default skip list back to exactly the home that asked for more coverage.
-FM_WORKTREE_WRITE_PRUNE=${FM_WORKTREE_WRITE_PRUNE-'.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'}
-FM_WORKTREE_WRITE_MAXDEPTH=${FM_WORKTREE_WRITE_MAXDEPTH:-6}
+JG_WORKTREE_WRITE_PRUNE=${JG_WORKTREE_WRITE_PRUNE-'.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'}
+JG_WORKTREE_WRITE_MAXDEPTH=${JG_WORKTREE_WRITE_MAXDEPTH:-6}
 
 # Wall-clock seconds the probe's single walk may take. The walk runs synchronously
 # inside the caller's poll loop at the exact moment an escalation would otherwise
@@ -2670,7 +2670,7 @@ FM_WORKTREE_WRITE_MAXDEPTH=${FM_WORKTREE_WRITE_MAXDEPTH:-6}
 # 0` and the perl fallback's `alarm 0` both disable the deadline), so the default
 # applies instead; the check lives at the point of use so an in-process override
 # gets it too.
-FM_WORKTREE_WRITE_TIMEOUT=${FM_WORKTREE_WRITE_TIMEOUT:-10}
+JG_WORKTREE_WRITE_TIMEOUT=${JG_WORKTREE_WRITE_TIMEOUT:-10}
 
 # 0 when some regular file under <id>'s recorded worktree is newer than
 # <anchor-file>: positive evidence the crew is still producing work even though its
@@ -2699,7 +2699,7 @@ FM_WORKTREE_WRITE_TIMEOUT=${FM_WORKTREE_WRITE_TIMEOUT:-10}
 # file, and no portable mtime-setting. Not a pure status-file read (see the header):
 # one pruned, depth-bounded, wall-clock-bounded walk per call, which callers must
 # reach only when they are otherwise about to escalate, never on every poll. A walk
-# that outlives FM_WORKTREE_WRITE_TIMEOUT is killed and reported as no evidence, so
+# that outlives JG_WORKTREE_WRITE_TIMEOUT is killed and reported as no evidence, so
 # a hung mount costs the escalation nothing but the bound. -xdev holds that walk to the
 # worktree's own filesystem rather than descending into a nested network or container
 # mount, so a write that lands only under such a mount is one more negative outcome.
@@ -2715,18 +2715,18 @@ crew_worktree_written_since() {  # <id> <state> <anchor-file>
   if [ -e "$wt/.jg-secondmate-home" ] || [ -L "$wt/.jg-secondmate-home" ]; then
     return 1
   fi
-  read -r -a names <<< "$FM_WORKTREE_WRITE_PRUNE"
+  read -r -a names <<< "$JG_WORKTREE_WRITE_PRUNE"
   for name in ${names[@]+"${names[@]}"}; do
     [ "${#prune[@]}" -eq 0 ] || prune+=( -o )
     prune+=( -name "$name" )
   done
-  bound=$FM_WORKTREE_WRITE_TIMEOUT
+  bound=$JG_WORKTREE_WRITE_TIMEOUT
   case "$bound" in ''|*[!0-9]*|0) bound=10 ;; esac
   if [ "${#prune[@]}" -gt 0 ]; then
-    hit=$(jg_run_timed "$bound" find "$wt" -xdev -maxdepth "$FM_WORKTREE_WRITE_MAXDEPTH" \
+    hit=$(jg_run_timed "$bound" find "$wt" -xdev -maxdepth "$JG_WORKTREE_WRITE_MAXDEPTH" \
       \( "${prune[@]}" \) -prune -o -type f -newer "$anchor" -print -quit 2>/dev/null || true)
   else
-    hit=$(jg_run_timed "$bound" find "$wt" -xdev -maxdepth "$FM_WORKTREE_WRITE_MAXDEPTH" \
+    hit=$(jg_run_timed "$bound" find "$wt" -xdev -maxdepth "$JG_WORKTREE_WRITE_MAXDEPTH" \
       -type f -newer "$anchor" -print -quit 2>/dev/null || true)
   fi
   [ -n "$hit" ]
@@ -2769,7 +2769,7 @@ _jg_secondmate_status_new_lines_routine() {  # <status-file> <state>
     case "$line" in *corr=*) return 1 ;; esac
     status_line_verb "$line" verb
     case "$verb" in
-      working|"${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}") ;;
+      working|"${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}") ;;
       *) return 1 ;;
     esac
   done <<EOF

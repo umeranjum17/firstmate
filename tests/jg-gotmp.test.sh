@@ -5,7 +5,7 @@
 # gotmp/, exports GOTMPDIR into the crewmate pane, and records tasktmp= in the task's
 # meta. jg-teardown reads tasktmp= and removes the whole root on cleanup.
 #
-# These tests exercise jg-teardown directly as a subprocess against a fake FM_HOME/FM_ROOT
+# These tests exercise jg-teardown directly as a subprocess against a fake JG_HOME/JG_ROOT
 # built so the real script resolves into it, with stub helper scripts.
 # The isolated jg-spawn subprocess in jg-kimi-harness.test.sh covers temp-root creation,
 # metadata publication, and the pane environment export.
@@ -15,7 +15,7 @@ set -u
 # the gate-lifecycle refusal (bin/jg-gate-refuse-lib.sh) the way lib.sh does for
 # the rest of the suite: the no-mistakes gate runs this suite from a gate worktree,
 # which the guard would otherwise refuse.
-export FM_GATE_REFUSE_BYPASS=1
+export JG_GATE_REFUSE_BYPASS=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEARDOWN="$ROOT/bin/jg-teardown.sh"
@@ -40,7 +40,7 @@ trap cleanup EXIT
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/jg-gotmp-tests.XXXXXX")
 
-# Build a fake FM_HOME/FM_ROOT so the real jg-teardown.sh (symlinked in) resolves
+# Build a fake JG_HOME/JG_ROOT so the real jg-teardown.sh (symlinked in) resolves
 # state and helper scripts inside it. Stub the helper scripts jg-teardown calls so no
 # live tmux/treehouse/fleet state is touched. A nonexistent worktree path makes both
 # `if [ -d "$WT" ]` guards skip, so teardown runs straight to the cleanup + state rm.
@@ -120,7 +120,7 @@ SH
   # fused backlog close is skipped and the follow-up echo takes the plain-message
   # path; there is no tasks-axi and no backlog in this fixture.
   cat > "$fake/bin/jg-tasks-axi-lib.sh" <<'SH'
-FM_TASKS_AXI_MIN=0.2.6
+JG_TASKS_AXI_MIN=0.2.6
 jg_tasks_axi_backend() { printf 'markdown\n'; }
 jg_tasks_axi_backend_available() { return 1; }
 jg_tasks_axi_compatible() { return 1; }
@@ -153,7 +153,7 @@ test_teardown_removes_tasktmp_dir() {
   # Sanity: dir + contents exist before teardown.
   [ -d "$task_tmp/gotmp" ] || fail "precondition: gotmp missing before teardown"
   # Run the REAL teardown against the fake root.
-  FM_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
+  JG_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
     || fail "teardown exited non-zero with a valid tasktmp"
   [ ! -e "$task_tmp" ] \
     || fail "teardown did not remove the tasktmp dir ($task_tmp still exists)"
@@ -223,7 +223,7 @@ exit 0
 SH
   chmod +x "$fake/bin/jg-fleet-sync.sh"
   cat > "$fake/bin/jg-tasks-axi-lib.sh" <<'SH'
-FM_TASKS_AXI_MIN=0.2.6
+JG_TASKS_AXI_MIN=0.2.6
 jg_tasks_axi_backend() { printf 'markdown\n'; }
 jg_tasks_axi_backend_available() { return 1; }
 jg_tasks_axi_compatible() { return 1; }
@@ -240,7 +240,7 @@ kind=ship
 mode=no-mistakes
 yolo=off
 META
-  FM_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
+  JG_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
     || fail "teardown exited non-zero when tasktmp= was absent"
   pass "jg-teardown skips gracefully when tasktmp= is absent (backward compat)"
 }
@@ -253,7 +253,7 @@ test_teardown_skips_gracefully_when_dir_missing() {
   [ ! -e "$task_tmp" ] || fail "precondition: task_tmp should not exist yet"
   local fake
   fake=$(make_fake_root "$id" "$task_tmp")
-  FM_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
+  JG_HOME="$fake" bash "$fake/bin/jg-teardown.sh" "$id" >/dev/null 2>&1 \
     || fail "teardown exited non-zero when tasktmp dir was missing"
   [ ! -e "$task_tmp" ] || fail "teardown created/left the tasktmp dir unexpectedly"
   pass "jg-teardown skips gracefully when tasktmp= points to a nonexistent dir"

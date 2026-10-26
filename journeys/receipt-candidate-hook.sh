@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # done-done journey: drive the real bin/jg-pr-check.sh in a disposable home with and without
 # a receipts add-on hook, and write the transcript and step record into the evidence folder.
 set -u
@@ -39,7 +48,7 @@ run() {  # <name> <addon-mode> <want-exit> <want-gate-log> <want-recorded> <want
   [ "$2" != none ] || rm -f "$addons/receipts/bin/jg-receipts-lib.sh"
   : > "$d/gate.log"
   echo "== scenario $1 (add-on: $2)"
-  FM_ROOT_OVERRIDE="$T/guardroot" FM_HOME="$d/home" FM_ADDONS_DIR="$addons" GATE_LOG="$d/gate.log" PATH="$T/fakebin:$PATH" \
+  JG_ROOT_OVERRIDE="$T/guardroot" JG_HOME="$d/home" JG_ADDONS_DIR="$addons" GATE_LOG="$d/gate.log" PATH="$T/fakebin:$PATH" \
     "$REPO/bin/jg-pr-check.sh" task-a "$URL" >"$d/out" 2>"$d/err"; rc=$?
   gate=$(cat "$d/gate.log")
   recorded=$(grep -E '^(pr|pr_head)=' "$d/home/state/task-a.meta" | paste -sd' ' -)

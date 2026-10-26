@@ -16,7 +16,7 @@
 #      overlays a content-historical permissive tmux kill fixture: after the
 #      exact-selector change lands on the default branch, merge-base with main
 #      collapses to HEAD and can no longer supply that baseline.
-#   3. Asserts the `--backend`/`FM_BACKEND` selection refuses unknown backends
+#   3. Asserts the `--backend`/`JG_BACKEND` selection refuses unknown backends
 #      and the blocked `codex-app` backend loudly.
 #
 # jg-watch.sh's signal/stale/check/heartbeat wake-string contract is already
@@ -68,17 +68,17 @@ printf '#!/bin/sh\necho Linux\n' > "$FAKE_NONDARWIN_BIN/uname"
 chmod +x "$FAKE_NONDARWIN_BIN/uname"
 
 # make_cmux_fallback_fakebin: PATH fakes for the DETECTING side of the cmux
-# fallback - uname pinned to Darwin, lsappinfo echoing $FM_FAKE_LSAPPINFO_OUT
+# fallback - uname pinned to Darwin, lsappinfo echoing $JG_FAKE_LSAPPINFO_OUT
 # (empty output mirrors the real lsappinfo's app-not-running behavior: prints
 # nothing, exit 0), and a ps answering `-o ppid=/-o comm= -p <pid>` from the
-# tab-separated "pid ppid comm" table file named by $FM_FAKE_PS_TABLE.
+# tab-separated "pid ppid comm" table file named by $JG_FAKE_PS_TABLE.
 make_cmux_fallback_fakebin() {  # <dir> -> echoes fakebin dir
   local fb="$1/fakebin-cmux-fallback"
   mkdir -p "$fb"
   printf '#!/bin/sh\necho Darwin\n' > "$fb/uname"
   cat > "$fb/lsappinfo" <<'SH'
 #!/bin/sh
-[ -n "${FM_FAKE_LSAPPINFO_OUT:-}" ] && printf '%s\n' "$FM_FAKE_LSAPPINFO_OUT"
+[ -n "${JG_FAKE_LSAPPINFO_OUT:-}" ] && printf '%s\n' "$JG_FAKE_LSAPPINFO_OUT"
 exit 0
 SH
   cat > "$fb/ps" <<'SH'
@@ -93,7 +93,7 @@ while IFS="	" read -r tpid tppid tcomm; do
     esac
     exit 0
   fi
-done < "${FM_FAKE_PS_TABLE:?}"
+done < "${JG_FAKE_PS_TABLE:?}"
 exit 1
 SH
   chmod +x "$fb/uname" "$fb/lsappinfo" "$fb/ps"
@@ -158,8 +158,8 @@ resolve_permissive_tmux_kill_ref() {
 # sibling on the same revision, while avoiding a hand-maintained dependency
 # list that can omit a newly sourced helper and make the old process abort
 # before it reaches the behavior under test.
-# FM_ROOT_OVERRIDE pointed at this dir's root makes
-# "$FM_ROOT/bin/jg-project-mode.sh" (etc.) resolve correctly.
+# JG_ROOT_OVERRIDE pointed at this dir's root makes
+# "$JG_ROOT/bin/jg-project-mode.sh" (etc.) resolve correctly.
 # The teardown conformance case applies its explicitly historical tmux adapter
 # after this complete baseline has been materialized.
 
@@ -188,21 +188,21 @@ test_backend_name_precedence() {
   # stays deterministic regardless of the runtime this test suite itself
   # happens to execute inside (e.g. a real tmux pane, which is the normal case
   # for a captain's session).
-  # jg_backend_name reads FM_BACKEND_CONFIG_DIR (bound once, at jg-backend.sh
-  # source time, from FM_CONFIG_OVERRIDE); a later FM_CONFIG_OVERRIDE=... prefix
+  # jg_backend_name reads JG_BACKEND_CONFIG_DIR (bound once, at jg-backend.sh
+  # source time, from JG_CONFIG_OVERRIDE); a later JG_CONFIG_OVERRIDE=... prefix
   # on the function call itself does not re-bind it, so these calls set
-  # FM_BACKEND_CONFIG_DIR directly.
-  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier; PATH="$FAKE_NONDARWIN_BIN:$PATH" FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
+  # JG_BACKEND_CONFIG_DIR directly.
+  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier; PATH="$FAKE_NONDARWIN_BIN:$PATH" JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
     || fail "jg_backend_name should default to tmux with no env/config/detection markers"
 
   printf 'tmux\n' > "$cfg/backend"
-  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
+  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
     || fail "jg_backend_name should read config/backend"
 
-  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; FM_BACKEND=tmux FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
-    || fail "FM_BACKEND env should win over config/backend"
+  [ "$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; JG_BACKEND=tmux JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)" = tmux ] \
+    || fail "JG_BACKEND env should win over config/backend"
 
-  pass "jg_backend_name: FM_BACKEND env > config/backend > default tmux"
+  pass "jg_backend_name: JG_BACKEND env > config/backend > default tmux"
 }
 
 # jg_backend_detect: environment-marker runtime auto-detection (mirrors
@@ -275,11 +275,11 @@ test_backend_detect_cmux_fallback_bundle_id() {
   (
     unset TMUX HERDR_ENV CMUX_WORKSPACE_ID
     PATH="$fb:$PATH" __CFBundleIdentifier='com.cmuxterm.app' jg_backend_detect >/dev/null || exit 1
-    [ "$FM_BACKEND_DETECT_SIGNAL" = bundle-id ] || exit 2
-  ) || fail "bundle-id fallback should set FM_BACKEND_DETECT_SIGNAL=bundle-id (subshell exit $?)"
+    [ "$JG_BACKEND_DETECT_SIGNAL" = bundle-id ] || exit 2
+  ) || fail "bundle-id fallback should set JG_BACKEND_DETECT_SIGNAL=bundle-id (subshell exit $?)"
 
   # A foreign bundle id (an ordinary terminal app) must not match.
-  if out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; PATH="$fb:$PATH" FM_FAKE_PS_TABLE="$dir/no-table" __CFBundleIdentifier='com.apple.Terminal' jg_backend_detect); then
+  if out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; PATH="$fb:$PATH" JG_FAKE_PS_TABLE="$dir/no-table" __CFBundleIdentifier='com.apple.Terminal' jg_backend_detect); then
     fail "a non-cmux __CFBundleIdentifier should not detect cmux, got '$out'"
   fi
 
@@ -328,9 +328,9 @@ test_backend_detect_cmux_fallback_ancestry_pid_match() {
 
   (
     unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier
-    PATH="$fb:$PATH" FM_FAKE_PS_TABLE="$table" FM_FAKE_LSAPPINFO_OUT='"pid"=66666' jg_backend_detect >/dev/null || exit 1
-    [ "$FM_BACKEND_DETECTED" = cmux ] || exit 2
-    [ "$FM_BACKEND_DETECT_SIGNAL" = ancestry ] || exit 3
+    PATH="$fb:$PATH" JG_FAKE_PS_TABLE="$table" JG_FAKE_LSAPPINFO_OUT='"pid"=66666' jg_backend_detect >/dev/null || exit 1
+    [ "$JG_BACKEND_DETECTED" = cmux ] || exit 2
+    [ "$JG_BACKEND_DETECT_SIGNAL" = ancestry ] || exit 3
   ) || fail "ancestry fallback should detect cmux via the lsappinfo-resolved app pid (subshell exit $?)"
 
   pass "jg_backend_detect: ancestry fallback matches the lsappinfo-resolved (bundle-id) cmux app pid in the parent chain"
@@ -347,10 +347,10 @@ test_backend_detect_cmux_fallback_ancestry_comm_match() {
   printf '%s\t77777\t/bin/zsh\n77777\t66666\t/usr/bin/login\n66666\t1\t/home/x/Applications/cmux.app/Contents/MacOS/cmux\n' "$$" > "$table"
 
   (
-    unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier FM_FAKE_LSAPPINFO_OUT
-    PATH="$fb:$PATH" FM_FAKE_PS_TABLE="$table" jg_backend_detect >/dev/null || exit 1
-    [ "$FM_BACKEND_DETECTED" = cmux ] || exit 2
-    [ "$FM_BACKEND_DETECT_SIGNAL" = ancestry ] || exit 3
+    unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier JG_FAKE_LSAPPINFO_OUT
+    PATH="$fb:$PATH" JG_FAKE_PS_TABLE="$table" jg_backend_detect >/dev/null || exit 1
+    [ "$JG_BACKEND_DETECTED" = cmux ] || exit 2
+    [ "$JG_BACKEND_DETECT_SIGNAL" = ancestry ] || exit 3
   ) || fail "ancestry fallback should detect cmux via a bundle-shaped comm path when lsappinfo resolves nothing (subshell exit $?)"
 
   pass "jg_backend_detect: ancestry fallback matches a bundle-shaped cmux comm path at any install location when lsappinfo cannot resolve a pid"
@@ -367,7 +367,7 @@ test_backend_detect_cmux_fallback_ancestry_stops_at_launchd() {
   table="$dir/ps-table"
   printf '%s\t77777\t/bin/zsh\n77777\t1\ttmux\n' "$$" > "$table"
 
-  if out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier FM_FAKE_LSAPPINFO_OUT; PATH="$fb:$PATH" FM_FAKE_PS_TABLE="$table" jg_backend_detect); then
+  if out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier JG_FAKE_LSAPPINFO_OUT; PATH="$fb:$PATH" JG_FAKE_PS_TABLE="$table" jg_backend_detect); then
     fail "ancestry fallback should stop undetected at a launchd-reparented chain, got '$out'"
   fi
   pass "jg_backend_detect: ancestry fallback stops undetected at launchd (a reparented tmux server never reaches cmux)"
@@ -383,7 +383,7 @@ test_backend_name_cmux_fallback_notice() {
   errfile="$dir/err.txt"
 
   : > "$errfile"
-  out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; PATH="$fb:$PATH" __CFBundleIdentifier='com.cmuxterm.app' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; PATH="$fb:$PATH" __CFBundleIdentifier='com.cmuxterm.app' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = cmux ] || fail "jg_backend_name should auto-detect cmux via the bundle-id fallback, got '$out'"
   assert_contains "$(cat "$errfile")" "FALLBACK signal __CFBundleIdentifier" \
     "the fallback-detected cmux notice did not name the bundle-id fallback signal"
@@ -395,7 +395,7 @@ test_backend_name_cmux_fallback_notice() {
   # The primary-marker notice is unchanged: it names CMUX_WORKSPACE_ID and
   # carries no FALLBACK wording.
   : > "$errfile"
-  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = cmux ] || fail "jg_backend_name should auto-detect cmux from CMUX_WORKSPACE_ID, got '$out'"
   assert_contains "$(cat "$errfile")" "(CMUX_WORKSPACE_ID)" \
     "the primary-marker cmux notice no longer names CMUX_WORKSPACE_ID"
@@ -406,7 +406,7 @@ test_backend_name_cmux_fallback_notice() {
   pass "jg_backend_name: a fallback-detected cmux prints a NOTICE naming the fallback signal; the primary-marker notice is unchanged"
 }
 
-# jg_backend_name's auto-detect step: fires only when FM_BACKEND/config/backend
+# jg_backend_name's auto-detect step: fires only when JG_BACKEND/config/backend
 # are both absent, selects between the three markers exactly as
 # jg_backend_detect does, and is loud only when it selects experimental cmux -
 # never when it selects verified herdr or tmux (today's default-path behavior
@@ -418,22 +418,22 @@ test_backend_name_autodetect_notice() {
   errfile="$dir/err.txt"
 
   : > "$errfile"
-  out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier; PATH="$FAKE_NONDARWIN_BIN:$PATH" FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID __CFBundleIdentifier; PATH="$FAKE_NONDARWIN_BIN:$PATH" JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = tmux ] || fail "jg_backend_name should default to tmux with no detection markers, got '$out'"
   [ -s "$errfile" ] && fail "jg_backend_name must stay silent with no detection markers"$'\n'"$(cat "$errfile")"
 
   : > "$errfile"
-  out=$(unset TMUX CMUX_WORKSPACE_ID; HERDR_ENV=1 FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset TMUX CMUX_WORKSPACE_ID; HERDR_ENV=1 JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = herdr ] || fail "jg_backend_name should auto-detect herdr from HERDR_ENV=1, got '$out'"
   [ ! -s "$errfile" ] || fail "jg_backend_name must keep verified Herdr auto-detection silent"$'\n'"$(cat "$errfile")"
 
   : > "$errfile"
-  out=$(unset HERDR_ENV CMUX_WORKSPACE_ID; TMUX='fake,1,0' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset HERDR_ENV CMUX_WORKSPACE_ID; TMUX='fake,1,0' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = tmux ] || fail "jg_backend_name should auto-detect tmux from \$TMUX, got '$out'"
   [ -s "$errfile" ] && fail "auto-detecting tmux must stay silent (today's unchanged default-path behavior)"$'\n'"$(cat "$errfile")"
 
   : > "$errfile"
-  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = cmux ] || fail "jg_backend_name should auto-detect cmux from CMUX_WORKSPACE_ID, got '$out'"
   assert_contains "$(cat "$errfile")" "EXPERIMENTAL cmux backend" \
     "jg_backend_name did not print a loud notice when auto-detecting cmux"
@@ -443,19 +443,19 @@ test_backend_name_autodetect_notice() {
     "jg_backend_name's cmux auto-detect notice did not name the --backend tmux opt-out"
 
   : > "$errfile"
-  out=$(unset CMUX_WORKSPACE_ID; TMUX='fake,1,0' HERDR_ENV=1 FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset CMUX_WORKSPACE_ID; TMUX='fake,1,0' HERDR_ENV=1 JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = tmux ] || fail "nested tmux-in-herdr should auto-detect tmux (innermost first), got '$out'"
   [ -s "$errfile" ] && fail "nested tmux-in-herdr auto-detect (result tmux) must stay silent"$'\n'"$(cat "$errfile")"
 
   : > "$errfile"
-  out=$(unset HERDR_ENV; TMUX='fake,1,0' CMUX_WORKSPACE_ID='fake-uuid' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
+  out=$(unset HERDR_ENV; TMUX='fake,1,0' CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name 2>"$errfile")
   [ "$out" = tmux ] || fail "nested tmux-in-cmux should auto-detect tmux (innermost first), got '$out'"
   [ -s "$errfile" ] && fail "nested tmux-in-cmux auto-detect (result tmux) must stay silent"$'\n'"$(cat "$errfile")"
 
   pass "jg_backend_name: verified Herdr and tmux stay silent while experimental cmux remains loud"
 }
 
-# Explicit configuration (FM_BACKEND env or config/backend) always wins over
+# Explicit configuration (JG_BACKEND env or config/backend) always wins over
 # runtime auto-detection, even when a detection marker points the other way.
 test_backend_name_explicit_beats_detection() {
   local dir cfg out
@@ -464,26 +464,26 @@ test_backend_name_explicit_beats_detection() {
   cfg="$dir/config-tmux"; mkdir -p "$cfg"; printf 'tmux\n' > "$cfg/backend"
   mkdir -p "$dir/config-empty"
 
-  # jg_backend_name reads FM_BACKEND_CONFIG_DIR (bound once, at jg-backend.sh
-  # source time, from FM_CONFIG_OVERRIDE); a later FM_CONFIG_OVERRIDE=... prefix
+  # jg_backend_name reads JG_BACKEND_CONFIG_DIR (bound once, at jg-backend.sh
+  # source time, from JG_CONFIG_OVERRIDE); a later JG_CONFIG_OVERRIDE=... prefix
   # on the function call itself does not re-bind it, so these calls set
-  # FM_BACKEND_CONFIG_DIR directly to control which config dir is checked.
-  out=$(unset TMUX; HERDR_ENV=1 FM_BACKEND=tmux FM_BACKEND_CONFIG_DIR="$dir/config-empty" jg_backend_name)
-  [ "$out" = tmux ] || fail "FM_BACKEND=tmux should win over an ambient HERDR_ENV=1 auto-detect marker, got '$out'"
+  # JG_BACKEND_CONFIG_DIR directly to control which config dir is checked.
+  out=$(unset TMUX; HERDR_ENV=1 JG_BACKEND=tmux JG_BACKEND_CONFIG_DIR="$dir/config-empty" jg_backend_name)
+  [ "$out" = tmux ] || fail "JG_BACKEND=tmux should win over an ambient HERDR_ENV=1 auto-detect marker, got '$out'"
 
-  out=$(unset TMUX; HERDR_ENV=1 FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)
+  out=$(unset TMUX; HERDR_ENV=1 JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)
   [ "$out" = tmux ] || fail "config/backend=tmux should win over an ambient HERDR_ENV=1 auto-detect marker, got '$out'"
 
   # The same opt-out must work for an ambient cmux auto-detect marker: a
   # captain who is running firstmate inside a cmux terminal but explicitly
   # wants tmux is never overridden by CMUX_WORKSPACE_ID.
-  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' FM_BACKEND=tmux FM_BACKEND_CONFIG_DIR="$dir/config-empty" jg_backend_name)
-  [ "$out" = tmux ] || fail "FM_BACKEND=tmux should win over an ambient CMUX_WORKSPACE_ID auto-detect marker, got '$out'"
+  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND=tmux JG_BACKEND_CONFIG_DIR="$dir/config-empty" jg_backend_name)
+  [ "$out" = tmux ] || fail "JG_BACKEND=tmux should win over an ambient CMUX_WORKSPACE_ID auto-detect marker, got '$out'"
 
-  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' FM_BACKEND='' FM_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)
+  out=$(unset TMUX HERDR_ENV; CMUX_WORKSPACE_ID='fake-uuid' JG_BACKEND='' JG_BACKEND_CONFIG_DIR="$cfg" jg_backend_name)
   [ "$out" = tmux ] || fail "config/backend=tmux should win over an ambient CMUX_WORKSPACE_ID auto-detect marker, got '$out'"
 
-  pass "jg_backend_name: an explicit FM_BACKEND or config/backend setting always wins over runtime auto-detection, including an ambient cmux marker"
+  pass "jg_backend_name: an explicit JG_BACKEND or config/backend setting always wins over runtime auto-detection, including an ambient cmux marker"
 }
 
 test_backend_validate_refuses_unknown() {
@@ -523,7 +523,7 @@ test_backend_source_shell_portable() {
     mkdir -p "$stub/backends"
     printf 'command -v dirname > "%s"\n' "$probe" > "$stub/backends/orca.sh"
     : > "$stub/jg-composer-lib.sh"
-    zsh -c "cd '$ROOT' && source bin/jg-backend.sh && FM_BACKEND_LIB_DIR='$stub' && jg_backend_source orca" >/dev/null 2>&1 \
+    zsh -c "cd '$ROOT' && source bin/jg-backend.sh && JG_BACKEND_LIB_DIR='$stub' && jg_backend_source orca" >/dev/null 2>&1 \
       || fail "zsh: jg_backend_source orca should load a stub adapter"
     [ -s "$probe" ] \
       || fail "zsh: jg_backend_source clobbered PATH while loading a backend adapter"
@@ -545,7 +545,7 @@ test_backend_source_requires_adapter_file() {
   local dir adapter exit_status continuation out rc condition test_bash
   dir="$TMP_ROOT/adapter-precheck"
   adapter="$dir/backends/tmux.sh"
-  test_bash=${FM_TEST_BASH:-${BASH:-bash}}
+  test_bash=${JG_TEST_BASH:-${BASH:-bash}}
   mkdir -p "$dir/backends"
 
   for condition in missing unreadable; do
@@ -562,7 +562,7 @@ test_backend_source_requires_adapter_file() {
     # shellcheck disable=SC2016 # The child Bash expands $1..$4 and $? at runtime.
     out=$("$test_bash" -c '
       . "$1"
-      FM_BACKEND_LIB_DIR=$2
+      JG_BACKEND_LIB_DIR=$2
       trap '\''printf "%s\n" "$?" > "$3"'\'' EXIT
       set -e
       jg_backend_source tmux
@@ -700,13 +700,13 @@ test_backend_of_selector_matches_explicit_target_meta() {
 
 # --- old vs new: jg-send.sh --------------------------------------------------
 
-make_send_fakebin() {  # <dir> -> echoes fakebin dir; logs every tmux call to $FM_TMUX_LOG
+make_send_fakebin() {  # <dir> -> echoes fakebin dir; logs every tmux call to $JG_TMUX_LOG
   local dir=$1 fb="$1/fakebin"
   mkdir -p "$fb"
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-{ printf 'tmux'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${FM_TMUX_LOG:?}"
+{ printf 'tmux'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${JG_TMUX_LOG:?}"
 case "${1:-}" in
   send-keys) exit 0 ;;
   display-message)
@@ -739,8 +739,8 @@ run_send_case() {  # <bin-root> <fakebin> <log> <home> -- <send args...>
   local bin=$1 fb=$2 log=$3 home=$4; shift 4
   [ "${1:-}" = -- ] && shift
   : > "$log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$bin" FM_HOME="$home" FM_TMUX_LOG="$log" \
-    FM_SEND_SETTLE=0 FM_SEND_SLEEP=0 \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$bin" JG_HOME="$home" JG_TMUX_LOG="$log" \
+    JG_SEND_SETTLE=0 JG_SEND_SLEEP=0 \
     "$bin/bin/jg-send.sh" "$@" >/dev/null 2>&1
 }
 
@@ -806,7 +806,7 @@ make_peek_fakebin() {  # <dir> <capture-output> -> echoes fakebin dir
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
 set -u
-{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
+{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${JG_TMUX_LOG:?}"
 case "\${1:-}" in
   capture-pane) cat "$dir/capture.out" ;;
 esac
@@ -824,15 +824,15 @@ test_peek_conformance_old_vs_new() {
   home="$TMP_ROOT/peek-home"; mkdir -p "$home/state"
   log_old="$TMP_ROOT/peek-old.log"; log_new="$TMP_ROOT/peek-new.log"
   # A fresh non-git dir keeps jg-guard.sh's worktree-tangle check inert (it warns
-  # to stderr, discarded below) - neither run needs FM_ROOT for anything beyond
+  # to stderr, discarded below) - neither run needs JG_ROOT for anything beyond
   # that guard, since STATE/HOME are already overridden directly.
   neutral_root="$TMP_ROOT/peek-neutral-root"; mkdir -p "$neutral_root"
 
   : > "$log_old"
-  out_old=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral_root" FM_HOME="$home" FM_TMUX_LOG="$log_old" \
+  out_old=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral_root" JG_HOME="$home" JG_TMUX_LOG="$log_old" \
     "$old_bin/bin/jg-peek.sh" "sess:win" 25 2>/dev/null)
   : > "$log_new"
-  out_new=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$neutral_root" FM_HOME="$home" FM_TMUX_LOG="$log_new" \
+  out_new=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$neutral_root" JG_HOME="$home" JG_TMUX_LOG="$log_new" \
     "$ROOT/bin/jg-peek.sh" "sess:win" 25 2>/dev/null)
 
   [ "$out_old" = "$out_new" ] || fail "jg-peek output differs old vs new"$'\n'"--- old ---"$'\n'"$out_old"$'\n'"--- new ---"$'\n'"$out_new"
@@ -853,7 +853,7 @@ make_spawn_fakebin() {  # <dir> <fake-worktree-path> -> echoes fakebin dir
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
 set -u
-{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
+{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${JG_TMUX_LOG:?}"
 case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_path*) printf '%s\\n' "$wt"; exit 0 ;; esac; done
@@ -874,10 +874,10 @@ run_spawn_case() {  # <bin-root> <fakebin> <log> <state> <data> <config> <proj> 
   home="$TMP_ROOT/spawn-home"
   mkdir -p "$home/state"
   : > "$log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$bin" FM_HOME="$home" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" \
-    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" FM_TMUX_LOG="$log" \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$bin" JG_HOME="$home" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" \
+    JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" JG_TMUX_LOG="$log" \
     "$bin/bin/jg-spawn.sh" "$@"
 }
 
@@ -918,7 +918,7 @@ make_spawn_symlink_fakebin() {  # <dir> <initial-project-path> <worktree-path> -
   cat > "$fb/tmux" <<SH
 #!/usr/bin/env bash
 set -u
-{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${FM_TMUX_LOG:?}"
+{ printf 'tmux'; for a in "\$@"; do printf '\\x1f%s' "\$a"; done; printf '\\n'; } >> "\${JG_TMUX_LOG:?}"
 case "\${1:-}" in
   display-message)
     for a in "\$@"; do case "\$a" in *pane_current_path*)
@@ -992,13 +992,13 @@ make_teardown_fakebin() {  # <dir> -> echoes fakebin dir; logs tmux+treehouse ca
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-{ printf 'tmux'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${FM_TMUX_LOG:?}"
+{ printf 'tmux'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${JG_TMUX_LOG:?}"
 exit 0
 SH
   cat > "$fb/treehouse" <<'SH'
 #!/usr/bin/env bash
 set -u
-{ printf 'treehouse'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${FM_TMUX_LOG:?}"
+{ printf 'treehouse'; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "${JG_TMUX_LOG:?}"
 exit 0
 SH
   cat > "$fb/tasks-axi" <<'SH'
@@ -1017,7 +1017,7 @@ SH
 }
 
 # run_teardown_case <script> <jg-root-override> <fakebin> <log> <state> <data> <config> <id>
-# FM_ROOT_OVERRIDE is passed separately from <script> so both the old and new
+# JG_ROOT_OVERRIDE is passed separately from <script> so both the old and new
 # runs can point it at the SAME neutral (non-git) shim root - that root's
 # bin/jg-guard.sh is a symlink to the real, unchanged script, so the
 # worktree-tangle check runs identically (and silently) for both, regardless
@@ -1025,9 +1025,9 @@ SH
 run_teardown_case() {
   local script=$1 fmroot=$2 fb=$3 log=$4 state=$5 data=$6 config=$7 id=$8
   : > "$log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$fmroot" \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_TMUX_LOG="$log" \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$fmroot" \
+    JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_TMUX_LOG="$log" \
     "$script" "$id"
 }
 
@@ -1098,8 +1098,8 @@ test_spawn_refuses_unknown_backend_flag() {
   local out status
   # bogus names a backend with no adapter at all; zellij and orca both
   # graduated to real adapters and have their own spawn tests.
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
-    FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' FM_SPAWN_NO_GUARD=1 \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
+    JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" nope-backend-z1 projects/none claude --mode no-mistakes --yolo off --backend bogus 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "jg-spawn --backend bogus should refuse"
@@ -1109,8 +1109,8 @@ test_spawn_refuses_unknown_backend_flag() {
 
 test_spawn_refuses_codex_app_backend_flag() {
   local out status
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
-    FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' FM_SPAWN_NO_GUARD=1 \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
+    JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' JG_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/jg-spawn.sh" nope-codex-app-z1 projects/none claude --mode no-mistakes --yolo off --backend codex-app 2>&1)
   status=$?
   [ "$status" -ne 0 ] || fail "jg-spawn --backend codex-app should refuse"
@@ -1120,13 +1120,13 @@ test_spawn_refuses_codex_app_backend_flag() {
 
 test_spawn_refuses_unknown_jg_backend_env() {
   local out status
-  out=$(FM_ROOT_OVERRIDE='' FM_HOME='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' \
-    FM_PROJECTS_OVERRIDE='' FM_CONFIG_OVERRIDE='' FM_SPAWN_NO_GUARD=1 FM_BACKEND=bogus \
+  out=$(JG_ROOT_OVERRIDE='' JG_HOME='' JG_STATE_OVERRIDE='' JG_DATA_OVERRIDE='' \
+    JG_PROJECTS_OVERRIDE='' JG_CONFIG_OVERRIDE='' JG_SPAWN_NO_GUARD=1 JG_BACKEND=bogus \
     "$ROOT/bin/jg-spawn.sh" nope-backend-z2 projects/none claude --mode no-mistakes --yolo off 2>&1)
   status=$?
-  [ "$status" -ne 0 ] || fail "FM_BACKEND=bogus should refuse"
-  assert_contains "$out" "unknown backend 'bogus'" "jg-spawn did not name the rejected FM_BACKEND"
-  pass "jg-spawn.sh honors FM_BACKEND and refuses an unimplemented value loudly"
+  [ "$status" -ne 0 ] || fail "JG_BACKEND=bogus should refuse"
+  assert_contains "$out" "unknown backend 'bogus'" "jg-spawn did not name the rejected JG_BACKEND"
+  pass "jg-spawn.sh honors JG_BACKEND and refuses an unimplemented value loudly"
 }
 
 test_spawn_default_backend_writes_no_meta_field() {
@@ -1140,10 +1140,10 @@ test_spawn_default_backend_writes_no_meta_field() {
   state="$TMP_ROOT/nobackend-state"; config="$TMP_ROOT/nobackend-config"
   mkdir -p "$state" "$config"
 
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
-    FM_TMUX_LOG="$TMP_ROOT/nobackend.log" \
+  out=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
+    JG_TMUX_LOG="$TMP_ROOT/nobackend.log" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
   expect_code 0 $? "explicit --backend tmux should spawn successfully"$'\n'"$out"
   assert_no_grep 'backend=' "$state/$id.meta" \
@@ -1164,10 +1164,10 @@ test_spawn_explicit_backend_flag_beats_autodetect_herdr_env() {
 
   # HERDR_ENV=1 is present (as if firstmate itself were running under herdr),
   # but an explicit --backend tmux flag must still win outright.
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
-    FM_TMUX_LOG="$TMP_ROOT/explicit-backend.log" \
+  out=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
+    JG_TMUX_LOG="$TMP_ROOT/explicit-backend.log" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend tmux 2>&1)
   expect_code 0 $? "explicit --backend tmux should spawn successfully even with HERDR_ENV=1 set"$'\n'"$out"
   assert_no_grep 'backend=' "$state/$id.meta" \
@@ -1186,15 +1186,15 @@ test_spawn_autodetect_nesting_resolves_tmux_silently() {
   state="$TMP_ROOT/nest-state"; config="$TMP_ROOT/nest-config"
   mkdir -p "$state" "$config"
 
-  # No --backend, no FM_BACKEND, no config/backend: nothing is explicitly
+  # No --backend, no JG_BACKEND, no config/backend: nothing is explicitly
   # configured, so auto-detect runs. $TMUX and HERDR_ENV=1 are both present
   # (tmux nested inside a herdr pane) - the full jg-spawn.sh pipeline, not just
   # jg_backend_name, must resolve this to tmux and stay completely silent about
   # it (today's default path, byte-identical).
-  out=$(PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
-    FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
-    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
-    FM_TMUX_LOG="$TMP_ROOT/nest.log" \
+  out=$(PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$ROOT" HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' \
+    JG_STATE_OVERRIDE="$state" JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$config" \
+    JG_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" JG_SPAWN_NO_GUARD=1 TMUX="fake,1,0" HERDR_ENV=1 \
+    JG_TMUX_LOG="$TMP_ROOT/nest.log" \
     "$ROOT/bin/jg-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off 2>&1)
   expect_code 0 $? "jg-spawn.sh should auto-detect tmux and spawn successfully for nested tmux-in-herdr"$'\n'"$out"
   assert_no_grep 'backend=' "$state/$id.meta" \
@@ -1206,8 +1206,8 @@ test_spawn_autodetect_nesting_resolves_tmux_silently() {
   pass "jg-spawn.sh: auto-detect resolves nested tmux-in-herdr to tmux and stays silent end to end"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
+if [ -n "${JG_TEST_ONLY:-}" ]; then
+  "$JG_TEST_ONLY"
   exit 0
 fi
 

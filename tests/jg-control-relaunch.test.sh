@@ -60,7 +60,7 @@ make_tmux_stub() {  # <dir>
   cat > "$fb/tmux" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=$JG_FAKE_DIR
 case "${1:-}" in
   send-keys)
     shift
@@ -81,24 +81,24 @@ case "${1:-}" in
       case "$payload" in
         /exit|/quit)
           printf 'zsh' > "$D/command"
-          [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
+          [ -z "${JG_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
           cat "$D/becomes" > "$D/command"
-          [ -z "${FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
+          [ -z "${JG_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
           ;;
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
       case "$payload" in
         'export GOTMPDIR='*)
-          if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
-            : > "$FM_FAKE_TRACE_PREPARE"
-            while [ ! -e "$FM_FAKE_TRACE_RELEASE" ]; do /bin/sleep 0.01; done
+          if [ -n "${JG_FAKE_TRACE_PREPARE:-}" ]; then
+            : > "$JG_FAKE_TRACE_PREPARE"
+            while [ ! -e "$JG_FAKE_TRACE_RELEASE" ]; do /bin/sleep 0.01; done
           fi
           ;;
         'export TRACEPARENT='*)
-          [ -z "${FM_FAKE_TRACE_EXPORTED:-}" ] || : > "$FM_FAKE_TRACE_EXPORTED"
+          [ -z "${JG_FAKE_TRACE_EXPORTED:-}" ] || : > "$JG_FAKE_TRACE_EXPORTED"
           ;;
       esac
     fi
@@ -109,8 +109,8 @@ case "${1:-}" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*) cat "$D/command"; printf '\n'; exit 0 ;;
         *pane_current_path*)
-          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ]; then
-            : > "$FM_FAKE_CWD_RACE_READY"
+          if [ -n "${JG_FAKE_CWD_RACE_READY:-}" ]; then
+            : > "$JG_FAKE_CWD_RACE_READY"
             /bin/sleep 1
           fi
           cat "$D/cwd"; printf '\n'; exit 0 ;;
@@ -118,7 +118,7 @@ case "${1:-}" in
     done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
-    [ -z "${FM_FAKE_COMPOSER_READ_FAIL:-}" ] || exit 1
+    [ -z "${JG_FAKE_COMPOSER_READ_FAIL:-}" ] || exit 1
     if [ -s "$D/screen" ]; then
       cat "$D/screen"
     elif [ -s "$D/composer" ]; then
@@ -147,7 +147,7 @@ case "${1:-}" in
   kill-window)
     printf 'kill-window\n' >> "$D/keys"
     rm -f "$D/screen"
-    grep -vx "jg-${FM_FAKE_KILL_ID:-}" "$D/windows" > "$D/windows.next" || true
+    grep -vx "jg-${JG_FAKE_KILL_ID:-}" "$D/windows" > "$D/windows.next" || true
     mv "$D/windows.next" "$D/windows"
     exit 0 ;;
   new-session)
@@ -186,7 +186,7 @@ SH
   chmod +x "$fb/tmux"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_FAKE_LOCK_WAITING:-}" ] || : > "$FM_FAKE_LOCK_WAITING"
+[ -z "${JG_FAKE_LOCK_WAITING:-}" ] || : > "$JG_FAKE_LOCK_WAITING"
 exit 0
 SH
   chmod +x "$fb/sleep"
@@ -247,17 +247,17 @@ run_control() {  # <case-dir> <args...>
   mkdir -p "$dir/user-home"
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
-    PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
-    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
-    FM_REAL_GIT="${FM_REAL_GIT:-}" FM_FAKE_GIT_FAILURE="${FM_FAKE_GIT_FAILURE:-}" \
-    FM_REAL_MV="${FM_REAL_MV:-}" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL="${FM_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" \
-    FM_FAKE_META_PUBLISH_MV_FAIL="${FM_FAKE_META_PUBLISH_MV_FAIL:-}" \
-    FM_FAKE_TRACE_PREPARE="${FM_FAKE_TRACE_PREPARE:-}" \
-    FM_FAKE_TRACE_RELEASE="${FM_FAKE_TRACE_RELEASE:-}" \
-    FM_FAKE_META_WRITER_READY="${FM_FAKE_META_WRITER_READY:-}" \
-    FM_FAKE_TRACE_EXPORTED="${FM_FAKE_TRACE_EXPORTED:-}" \
+    JG_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
+    JG_CONTROL_POLL=0.01 JG_CONTROL_EXIT_WAIT=0.05 JG_CONTROL_LAUNCH_WAIT=0.05 \
+    JG_REAL_GIT="${JG_REAL_GIT:-}" JG_FAKE_GIT_FAILURE="${JG_FAKE_GIT_FAILURE:-}" \
+    JG_REAL_MV="${JG_REAL_MV:-}" JG_FAKE_COMPLETE_JOURNAL_MV_FAIL="${JG_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" \
+    JG_FAKE_META_PUBLISH_MV_FAIL="${JG_FAKE_META_PUBLISH_MV_FAIL:-}" \
+    JG_FAKE_TRACE_PREPARE="${JG_FAKE_TRACE_PREPARE:-}" \
+    JG_FAKE_TRACE_RELEASE="${JG_FAKE_TRACE_RELEASE:-}" \
+    JG_FAKE_META_WRITER_READY="${JG_FAKE_META_WRITER_READY:-}" \
+    JG_FAKE_TRACE_EXPORTED="${JG_FAKE_TRACE_EXPORTED:-}" \
     "$CONTROL" "$@" 2>&1
 }
 
@@ -269,9 +269,9 @@ run_spawn() {  # <case-dir> <args...>
   mkdir -p "$dir/user-home"
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
-    PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
+    JG_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     "$SPAWN" "$@" 2>&1
 }
 
@@ -286,11 +286,11 @@ journal_field() {  # <case-dir> <id> <key>
 make_git_failure_stub() {  # <case-dir>
   cat > "$1/fakebin/git" <<'SH'
 #!/usr/bin/env bash
-case "${FM_FAKE_GIT_FAILURE:-}:$*" in
+case "${JG_FAKE_GIT_FAILURE:-}:$*" in
   head:*' rev-parse --verify HEAD'|head:*' symbolic-ref -q HEAD') exit 128 ;;
   status:*' status --porcelain') exit 128 ;;
 esac
-exec "$FM_REAL_GIT" "$@"
+exec "$JG_REAL_GIT" "$@"
 SH
   chmod +x "$1/fakebin/git"
 }
@@ -298,16 +298,16 @@ SH
 make_mv_failure_stub() {  # <case-dir>
   cat > "$1/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
-if [ -n "${FM_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" ]; then
+if [ -n "${JG_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" ]; then
   for path in "$@"; do
     if [ -f "$path" ] && grep -Fqx 'phase=complete' "$path"; then
       exit 1
     fi
   done
 fi
-if [ -n "${FM_FAKE_META_PUBLISH_MV_FAIL:-}" ]; then
+if [ -n "${JG_FAKE_META_PUBLISH_MV_FAIL:-}" ]; then
   for path in "$@"; do
-    [ "$path" != "$FM_FAKE_META_PUBLISH_MV_FAIL" ] || exit 1
+    [ "$path" != "$JG_FAKE_META_PUBLISH_MV_FAIL" ] || exit 1
   done
 fi
 source_path=
@@ -316,13 +316,13 @@ for path in "$@"; do
   source_path=$target_path
   target_path=$path
 done
-if [ -n "${FM_FAKE_META_WRITER_TARGET:-}" ] \
-   && [ "$target_path" = "$FM_FAKE_META_WRITER_TARGET" ] \
+if [ -n "${JG_FAKE_META_WRITER_TARGET:-}" ] \
+   && [ "$target_path" = "$JG_FAKE_META_WRITER_TARGET" ] \
    && grep -q '^x_request=' "$source_path" 2>/dev/null; then
-  : > "$FM_FAKE_META_WRITER_READY"
-  while [ ! -e "$FM_FAKE_META_WRITER_RELEASE" ]; do /bin/sleep 0.01; done
+  : > "$JG_FAKE_META_WRITER_READY"
+  while [ ! -e "$JG_FAKE_META_WRITER_RELEASE" ]; do /bin/sleep 0.01; done
 fi
-exec "$FM_REAL_MV" "$@"
+exec "$JG_REAL_MV" "$@"
 SH
   chmod +x "$1/fakebin/mv"
 }
@@ -331,11 +331,11 @@ make_rm_failure_stub() {  # <case-dir>
   cat > "$1/fakebin/rm" <<'SH'
 #!/usr/bin/env bash
 for arg in "$@"; do
-  if [ -n "${FM_FAKE_RM_FAIL_PATH:-}" ] && [ "$arg" = "$FM_FAKE_RM_FAIL_PATH" ]; then
+  if [ -n "${JG_FAKE_RM_FAIL_PATH:-}" ] && [ "$arg" = "$JG_FAKE_RM_FAIL_PATH" ]; then
     exit 1
   fi
 done
-exec "$FM_REAL_RM" "$@"
+exec "$JG_REAL_RM" "$@"
 SH
   chmod +x "$1/fakebin/rm"
 }
@@ -446,7 +446,7 @@ test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven() {
   dir=$(new_case unproven-exit rl44)
   add_ship_task "$dir" rl44 claude
 
-  out=$(FM_FAKE_COMPOSER_READ_FAIL=1 \
+  out=$(JG_FAKE_COMPOSER_READ_FAIL=1 \
     run_control "$dir" rl44 relaunch --note "preserve on an unreadable composer"); rc=$?
 
   expect_code 1 "$rc" "a relaunch must refuse before typing an exit command when the composer state cannot be proven empty"
@@ -476,7 +476,7 @@ test_relaunch_from_linked_home_preserves_recorded_worktree() {
   fetch_head=$(git -C "$dir/wt" rev-parse --git-path FETCH_HEAD)
 
   out=$(run_control "$dir" rl42 relaunch --note "continue from linked home"); rc=$?
-  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+  if [ "${JG_TEST_EVIDENCE:-0}" = 1 ]; then
     printf '# evidence begin: linked-home relaunch\n'
     printf '$ bin/jg-control.sh rl42 relaunch --note "continue from linked home"\n%s\nexit=%s\n' "$out" "$rc"
     printf 'worker HEAD before=%s after=%s\n' "$head" "$(git -C "$dir/wt" rev-parse HEAD)"
@@ -543,7 +543,7 @@ test_relaunch_keeps_pr_poll_parse_valid() {
     || fail "the relaunch did not record its transaction marker"
   jg_pr_metadata_identity_parse "$dir/home/state/rl29.meta" \
     || fail "the republished record failed the PR poll's identity validation"
-  [ "$FM_PR_META_URL" = "https://github.com/example/repo/pull/29" ] \
+  [ "$JG_PR_META_URL" = "https://github.com/example/repo/pull/29" ] \
     || fail "the republished record lost the task PR identity"
   pass "jg-control relaunch: a relaunch after PR registration keeps the PR poll identity valid"
 }
@@ -560,9 +560,9 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
   waiting="$dir/meta-writer-waiting"
   ready="$dir/meta-writer-ready"
   release="$dir/meta-writer-release"
-  FM_REAL_MV=$(command -v mv) \
-    FM_FAKE_TRACE_PREPARE="$prepare" \
-    FM_FAKE_TRACE_RELEASE="$launch_release" \
+  JG_REAL_MV=$(command -v mv) \
+    JG_FAKE_TRACE_PREPARE="$prepare" \
+    JG_FAKE_TRACE_RELEASE="$launch_release" \
     run_control "$dir" rl28 relaunch --note "continue after publication" > "$dir/control.out" &
   control_pid=$!
   while [ ! -e "$prepare" ] && [ "$i" -lt 500 ]; do
@@ -574,12 +574,12 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     wait "$control_pid" 2>/dev/null || true
     fail "relaunch did not reach trace delivery"
   }
-  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_REAL_MV="$(command -v mv)" \
-    FM_FAKE_LOCK_WAITING="$waiting" \
-    FM_FAKE_META_WRITER_TARGET="$dir/home/state/rl28.meta" \
-    FM_FAKE_META_WRITER_READY="$ready" \
-    FM_FAKE_META_WRITER_RELEASE="$release" \
+  env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_REAL_MV="$(command -v mv)" \
+    JG_FAKE_LOCK_WAITING="$waiting" \
+    JG_FAKE_META_WRITER_TARGET="$dir/home/state/rl28.meta" \
+    JG_FAKE_META_WRITER_READY="$ready" \
+    JG_FAKE_META_WRITER_RELEASE="$release" \
     "$X_LINK" rl28 request-28 --carry-count 1 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &
   link_pid=$!
@@ -683,7 +683,7 @@ test_relaunch_closes_a_claude_startup_gate_unanswered() {
     Yes, allow external imports
   Enter to confirm · Esc to cancel
 EOF
-  out=$(FM_FAKE_KILL_ID=rl52 run_control "$dir" rl52 relaunch --note "resumed outside its copy"); rc=$?
+  out=$(JG_FAKE_KILL_ID=rl52 run_control "$dir" rl52 relaunch --note "resumed outside its copy"); rc=$?
   # tmux cannot prove a closed window absent, so the relaunch stops there;
   # Herdr proves it and re-creates the endpoint (live e2e in
   # tests/jg-sentinel-herdr-restart-live-e2e.test.sh).
@@ -722,7 +722,7 @@ test_relaunch_under_memory_pressure_refuses_before_stop() {
   mkdir -p "$dir/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice"
   printf 'some avg10=27.00 avg60=20.00 avg300=9.00 total=1\n' > "$dir/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/memory.pressure"
   before=$(cat "$dir/home/state/rl52.meta")
-  out=$(FM_HOST_MEMORY_PROC="$dir/proc" FM_HOST_MEMORY_CGROUP_ROOT="$dir/cgroup" run_control "$dir" rl52 relaunch --note "stopped by a restart"); rc=$?
+  out=$(JG_HOST_MEMORY_PROC="$dir/proc" JG_HOST_MEMORY_CGROUP_ROOT="$dir/cgroup" run_control "$dir" rl52 relaunch --note "stopped by a restart"); rc=$?
   expect_code 1 "$rc" "a relaunch under memory pressure should refuse"
   assert_contains "$out" "host memory under pressure: pressure at or above 20%" "the refusal should name the pressure"
   assert_contains "$out" "refused before its agent was touched" "the refusal should say the agent is untouched"
@@ -1108,7 +1108,7 @@ test_wiring_removal_failure_refuses_before_replacement_arm() {
   printf '{}\n' > "$hook"
   real_rm=$(command -v rm)
   make_rm_failure_stub "$dir"
-  out=$(FM_REAL_RM="$real_rm" FM_FAKE_RM_FAIL_PATH="$hook" \
+  out=$(JG_REAL_RM="$real_rm" JG_FAKE_RM_FAIL_PATH="$hook" \
     run_control "$dir" rl29 relaunch --note "retry after wiring cleanup"); rc=$?
   expect_code 1 "$rc" "an undeletable prior hook must fail closed"$'\n'"$out"
   assert_contains "$out" "could not retire claude wiring" \
@@ -1189,13 +1189,13 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
     || fail "the configured effort token should come with the pin"
   assert_not_contains "$out" "not a verified harness" "codex is a verified harness"
   printf 'omp some-model high\n' > "$home/config/secondmates/sm3/harness"
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate sm3 2>&1); rc=$?
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate sm3 2>&1); rc=$?
   expect_code 0 "$rc" "an omp per-mate pin should resolve"$'\n'"$out"
   [ "$out" = omp ] \
     || fail "an omp per-mate pin should resolve to omp, got '$out'"
-  [ "$(FM_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-model sm3)" = some-model ] \
+  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-model sm3)" = some-model ] \
     || fail "the configured model token should come with the omp pin"
-  [ "$(FM_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-effort sm3)" = high ] \
+  [ "$(JG_HOME="$home" "$ROOT/bin/jg-harness.sh" secondmate-effort sm3)" = high ] \
     || fail "the configured effort token should come with the omp pin"
   assert_not_contains "$out" "unverified secondmate harness" "omp is a verified secondmate harness"
   pass "jg-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
@@ -1454,7 +1454,7 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
     dir=$(new_case "promoted-scout-$mode" "$id")
     home="$dir/home"
     jg_git_worktree "$dir/proj" "$dir/wt" "task-$id"
-    FM_HOME="$home" "$BRIEF" "$id" firstmate --scout >/dev/null \
+    JG_HOME="$home" "$BRIEF" "$id" firstmate --scout >/dev/null \
       || fail "$mode: could not scaffold the scout brief"
     brief="$home/data/$id/brief.md"
     sed 's/{TASK}/Fix the promotion relaunch contract./; s/{FIRSTMATE_SPEC}/Preserve the current delivery mode./' \
@@ -1474,7 +1474,7 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
     printf '%s\n' "jg-$id" > "$dir/fake/windows"
     printf '%s' "$dir/wt" > "$dir/fake/cwd"
 
-    out=$(FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    out=$(JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
       "$PROMOTE" "$id" --mode "$mode" --yolo off 2>&1) \
       || fail "$mode: scout promotion should succeed: $out"
     assert_grep 'This is a SCOUT task' "$brief" \
@@ -1616,7 +1616,7 @@ test_checkpoint_refuses_uninspectable_head_and_status() {
   dir=$(new_case badhead rl22)
   add_ship_task "$dir" rl22 claude
   make_git_failure_stub "$dir"
-  out=$(FM_REAL_GIT="$real_git" FM_FAKE_GIT_FAILURE=head \
+  out=$(JG_REAL_GIT="$real_git" JG_FAKE_GIT_FAILURE=head \
     run_control "$dir" rl22 relaunch --note "x"); rc=$?
   expect_code 1 "$rc" "an uninspectable HEAD should refuse"
   assert_contains "$out" "HEAD cannot be inspected" "the refusal should name the failed HEAD proof"
@@ -1625,7 +1625,7 @@ test_checkpoint_refuses_uninspectable_head_and_status() {
   dir=$(new_case badstatus rl23)
   add_ship_task "$dir" rl23 claude
   make_git_failure_stub "$dir"
-  out=$(FM_REAL_GIT="$real_git" FM_FAKE_GIT_FAILURE=status \
+  out=$(JG_REAL_GIT="$real_git" JG_FAKE_GIT_FAILURE=status \
     run_control "$dir" rl23 relaunch --note "x"); rc=$?
   expect_code 1 "$rc" "an uninspectable worktree status should refuse"
   assert_contains "$out" "status cannot be inspected" "the refusal should name the failed dirty-state proof"
@@ -1663,7 +1663,7 @@ test_prepublication_failure_keeps_concurrent_durable_metadata() {
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
+  JG_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
     run_control "$dir" rl30 relaunch --harness codex --note "preserve concurrent metadata" \
       > "$dir/control.out" &
   control_pid=$!
@@ -1676,7 +1676,7 @@ test_prepublication_failure_keeps_concurrent_durable_metadata() {
     wait "$control_pid" 2>/dev/null || true
     fail "relaunch did not reach its pre-publication endpoint check"
   }
-  link_out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  link_out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 2>&1); rc=$?
   expect_code 0 "$rc" "concurrent durable metadata publication should succeed"$'\n'"$link_out"
@@ -1696,7 +1696,7 @@ test_post_publication_launch_failure_keeps_the_new_record() {
   dir=$(new_case published rl24)
   add_ship_task "$dir" rl24 claude
   printf 'codex' > "$dir/fake/becomes"
-  out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
+  out=$(JG_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
     run_control "$dir" rl24 relaunch --harness codex --note "keep the published record"); rc=$?
   expect_code 1 "$rc" "a post-publication launch failure should fail closed"$'\n'"$out"
   [ "$(meta_field "$dir" rl24 harness)" = codex ] \
@@ -1712,7 +1712,7 @@ test_stop_transport_failure_reconciles_a_dead_agent() {
   local dir out rc
   dir=$(new_case stopfail rl25)
   add_ship_task "$dir" rl25 claude
-  out=$(FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 \
+  out=$(JG_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 \
     run_control "$dir" rl25 relaunch --note "preserve this after stop"); rc=$?
   expect_code 1 "$rc" "a stop transport failure should fail closed"$'\n'"$out"
   [ "$(cat "$dir/fake/command")" = zsh ] || fail "the fixture should stop the old agent before reporting transport failure"
@@ -1733,7 +1733,7 @@ test_complete_journal_failure_rolls_back_from_durable_phase() {
   printf 'codex' > "$dir/fake/becomes"
   real_mv=$(command -v mv)
   make_mv_failure_stub "$dir"
-  out=$(FM_REAL_MV="$real_mv" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
+  out=$(JG_REAL_MV="$real_mv" JG_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
     run_control "$dir" rl27 relaunch --harness codex --note "keep durable phase honest"); rc=$?
   expect_code 1 "$rc" "a failed complete journal replacement should fail closed"$'\n'"$out"
   [ "$(journal_field "$dir" rl27 phase)" = failed:launching ] \
@@ -1756,7 +1756,7 @@ test_prepublication_abort_retires_replacement_wiring_and_busy_state() {
   meta="$dir/home/state/rl28.meta"
   real_mv=$(command -v mv)
   make_mv_failure_stub "$dir"
-  out=$(FM_REAL_MV="$real_mv" FM_FAKE_META_PUBLISH_MV_FAIL="$meta" \
+  out=$(JG_REAL_MV="$real_mv" JG_FAKE_META_PUBLISH_MV_FAIL="$meta" \
     run_control "$dir" rl28 relaunch --note "clean partial replacement state"); rc=$?
   expect_code 1 "$rc" "a failed metadata publication should fail closed"$'\n'"$out"
   [ "$(meta_field "$dir" rl28 harness)" = claude ] \
@@ -2036,7 +2036,7 @@ test_promotion_participates_in_the_lifecycle_lock_before_metadata_resolution() {
     i=$((i + 1))
   done
   [ -e "$lock" ] || fail "could not stage the promotion lifecycle lock"
-  out=$(FM_HOME="$dir/home" "$PROMOTE" rl29 --mode direct-PR --yolo on 2>&1); rc=$?
+  out=$(JG_HOME="$dir/home" "$PROMOTE" rl29 --mode direct-PR --yolo on 2>&1); rc=$?
   kill "$holder" 2>/dev/null || true
   wait "$holder" 2>/dev/null || true
   expect_code 1 "$rc" "promotion should refuse a concurrent lifecycle action"
@@ -2372,7 +2372,7 @@ make_herdr_stub() {  # <case-dir>
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
-D=$FM_FAKE_DIR
+D=$JG_FAKE_DIR
 printf '%s\n' "$*" >> "$D/herdr-log"
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ]; then
   if [ -f "$D/herdr-stopped" ]; then
@@ -2469,7 +2469,7 @@ SH
   chmod +x "$fb/herdr"
   cat > "$fb/ps" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_FAKE_DIR/herdr-agent-registration" ]; then
+if [ -f "$JG_FAKE_DIR/herdr-agent-registration" ]; then
   case "$*" in
     '-axo pid=,ppid=,comm=') printf '4242 1 bash\n' ;;
     '-p 4242 -o args=') printf 'bash\n' ;;
@@ -2696,7 +2696,7 @@ test_herdr_reclaim_keeps_the_task_whole() {
   printf '%s\n' "pr=https://example.invalid/pr/7" >> "$dir/home/state/rl75.meta"
   printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$dir/home/state/rl75.check.sh"
   chmod 0700 "$dir/home/state/rl75.check.sh"
-  FM_HOME="$dir/home" "$ROOT/bin/jg-check-register.sh" rl75 >/dev/null \
+  JG_HOME="$dir/home" "$ROOT/bin/jg-check-register.sh" rl75 >/dev/null \
     || fail "could not arm a custom check for the reclaim fixture"
   printf 'working: parked on an approval nobody can answer\n' >> "$dir/home/state/rl75.status"
 
@@ -2774,7 +2774,7 @@ test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it() {
     return 0
   }
   jg_tasks_axi_compatible || {
-    pass "skipped: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so dispatch refuses automatic backlog transitions"
+    pass "skipped: installed tasks-axi predates ${JG_TASKS_AXI_MIN}, so dispatch refuses automatic backlog transitions"
     return 0
   }
   dir=$(new_case reverify rl40)
@@ -2796,7 +2796,7 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
     return 0
   }
   jg_tasks_axi_compatible || {
-    pass "skipped: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so dispatch refuses automatic backlog transitions"
+    pass "skipped: installed tasks-axi predates ${JG_TASKS_AXI_MIN}, so dispatch refuses automatic backlog transitions"
     return 0
   }
   dir=$(new_case drifted rl41)

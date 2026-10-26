@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Move memory-heavy and sustained CPU-heavy pane jobs out of herdr-server.
 set -euo pipefail
-herdr=${FM_HEAVY_ADOPT_HERDR_CGROUP:-/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service}
-proc=${FM_HEAVY_ADOPT_PROC:-/proc}
-state=${FM_HEAVY_ADOPT_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/jg-host-memory}
+herdr=${JG_HEAVY_ADOPT_HERDR_CGROUP:-/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/herdr-server.service}
+proc=${JG_HEAVY_ADOPT_PROC:-/proc}
+state=${JG_HEAVY_ADOPT_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/jg-host-memory}
 [ -d "$herdr" ] || exit 0
 mkdir -p "$state"
-if [ -n "${FM_HEAVY_ADOPT_DEST:-}" ]; then dest=$FM_HEAVY_ADOPT_DEST
+if [ -n "${JG_HEAVY_ADOPT_DEST:-}" ]; then dest=$JG_HEAVY_ADOPT_DEST
 else
   if ! systemctl --user is-active --quiet jg-heavy-adopt.scope; then
     systemd-run --user --scope --quiet --unit=jg-heavy-adopt --slice=jg-heavy.slice sleep infinity &

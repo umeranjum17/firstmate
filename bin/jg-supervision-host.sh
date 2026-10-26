@@ -20,7 +20,7 @@
 # (bin/jg-watch-checkpoint.sh). To that owner it IS an arm: it prints the
 # arm's own lines and exits only when main is needed, and stays parked across
 # every close it handled itself. Each owner passes its harness as
-# FM_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin.
+# JG_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin.
 #
 # OUTPUT, the contract every owner reads. The first cycle's status line
 # ("watcher: started ..." or "watcher: attached ...") is printed as soon as the
@@ -33,7 +33,7 @@
 # silently; an exit status above 128, or no output at all, means the host
 # itself died and the owner retries it. Any other close is judged exactly as
 # the arm's. --restart starts the first cycle with jg-watch-arm.sh --restart,
-# and an FM_WATCH_PREDECESSOR_ARM_PID the owner passes reaches that first
+# and an JG_WATCH_PREDECESSOR_ARM_PID the owner passes reaches that first
 # cycle only, for owners that start their own successor after every close
 # (OpenCode, omp).
 #
@@ -108,7 +108,7 @@
 # the hook's configured timeout (docs/verification/supervision.md), Cursor's
 # stop hook carries the same tracked 28800-second registration, and a host
 # that handles its own wakes is not shortened by them, so the host ends its
-# own park before that timeout: after FM_SUPERVISION_HOST_PARK_SECONDS (default
+# own park before that timeout: after JG_SUPERVISION_HOST_PARK_SECONDS (default
 # 27000, under the tracked 28800-second registration) it stops this home's
 # watcher and exits with one "supervision-host: cycle boundary" line, which the
 # owner delivers as an ordinary wake; main drains, acknowledges, and ends its
@@ -118,19 +118,19 @@
 # plus the engine grace), judged when the close arrives and again just before
 # the turn starts, is not handled: the host exits through the same boundary
 # with that close printed ahead of the line. The turn limit is the boundary
-# itself unless the owner sets FM_SUPERVISION_HOST_PARK_LIMIT later: Codex's
+# itself unless the owner sets JG_SUPERVISION_HOST_PARK_LIMIT later: Codex's
 # checkpoint, whose bound is the park itself rather than a harness timeout,
 # lets a turn that starts before the boundary finish after it.
 #
 # OWNERSHIP. Before activation, every successor cycle, and every engine turn
 # the host proves this session still holds the fleet lock
 # (bin/jg-session-lock-lib.sh) and, when launched by the auto-arm, that the
-# auto-arm generation it serves (FM_SUPERVISION_HOST_AUTOARM_GEN owned by
-# FM_SUPERVISION_HOST_OWNER_PID) is still current; otherwise it stands down
+# auto-arm generation it serves (JG_SUPERVISION_HOST_AUTOARM_GEN owned by
+# JG_SUPERVISION_HOST_OWNER_PID) is still current; otherwise it stands down
 # with a "supervision-host:" line and leaves the decision to its owner; a
 # host that stands down before activation leaves the owner's host record,
 # processes, arms, and leases alone. The engine runs with
-# FM_SUPERVISION_ACTOR=branch, the session-lock holder as FM_LEASE_HOLDER_PID,
+# JG_SUPERVISION_ACTOR=branch, the session-lock holder as JG_LEASE_HOLDER_PID,
 # the primary's harness pin, and this turn's report id, so every guarded
 # script applies the same partition, leases, and away relocation it applies to
 # the Pi branch. At activation the host stops anything a crashed predecessor
@@ -158,30 +158,30 @@
 # ledger of where every close went, with each engine turn's usage and
 # outcome).
 #
-# Tunables (environment): FM_SUPERVISION_HOST_PARK_SECONDS (27000; a positive
+# Tunables (environment): JG_SUPERVISION_HOST_PARK_SECONDS (27000; a positive
 # integer below the 28800-second registration, any other value is the default),
-# FM_SUPERVISION_HOST_PARK_LIMIT (the park boundary; a later value below the
+# JG_SUPERVISION_HOST_PARK_LIMIT (the park boundary; a later value below the
 # registration lets turns run past the boundary up to it, any other value is
-# the boundary), FM_SUPERVISION_HOST_TURN_TIMEOUT (1200), FM_SUPERVISION_HOST_ROTATE_TURNS (20:
+# the boundary), JG_SUPERVISION_HOST_TURN_TIMEOUT (1200), JG_SUPERVISION_HOST_ROTATE_TURNS (20:
 # a new engine conversation after this many turns; every main session start
-# also opens a new one), FM_SUPERVISION_HOST_READY_TIMEOUT (shared watcher startup budget: how long a
-# successor cycle may take to verify), FM_SUPERVISION_HOST_POLL (1).
+# also opens a new one), JG_SUPERVISION_HOST_READY_TIMEOUT (shared watcher startup budget: how long a
+# successor cycle may take to verify), JG_SUPERVISION_HOST_POLL (1).
 # Park duration uses Bash's process-relative SECONDS counter (including Bash
 # 3.2), while durable timestamps still use epoch time. This is not a portable
 # monotonic-clock guarantee. Arm exit probes use ordinary 0.5-second child
 # sleeps within the unchanged POLL-cadence maintenance and boundary checks;
 # close observation and a shell-only caught signal may wait that interval plus
 # work/scheduling time. No stop-signal disposition or cleanup bound changes.
-# FM_TEST_SUPERVISION_HOST_CLOCK names a file holding the park's elapsed
+# JG_TEST_SUPERVISION_HOST_CLOCK names a file holding the park's elapsed
 # seconds, which the park and turn boundary checks read in place of SECONDS
-# only when FM_TEST_SEAM=1; tests/lib.sh arms the marker for isolated suites.
+# only when JG_TEST_SEAM=1; tests/lib.sh arms the marker for isolated suites.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
@@ -211,25 +211,25 @@ numeric_or() {  # <value> <default>
   case "$1" in ''|0*|*[!0-9]*) printf '%s\n' "$2" ;; *) printf '%s\n' "$1" ;; esac
 }
 
-GRACE=${FM_GUARD_GRACE:-$(jg_poll_derived_grace)}
-ENGINE_GRACE=$(numeric_or "${FM_SUPERVISION_ENGINE_GRACE:-}" 30)
-PARK_SECONDS=$(numeric_or "${FM_SUPERVISION_HOST_PARK_SECONDS:-}" 27000)
+GRACE=${JG_GUARD_GRACE:-$(jg_poll_derived_grace)}
+ENGINE_GRACE=$(numeric_or "${JG_SUPERVISION_ENGINE_GRACE:-}" 30)
+PARK_SECONDS=$(numeric_or "${JG_SUPERVISION_HOST_PARK_SECONDS:-}" 27000)
 [ "$PARK_SECONDS" -lt 28800 ] 2>/dev/null || PARK_SECONDS=27000
-PARK_LIMIT=$(numeric_or "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" "$PARK_SECONDS")
+PARK_LIMIT=$(numeric_or "${JG_SUPERVISION_HOST_PARK_LIMIT:-}" "$PARK_SECONDS")
 { [ "$PARK_LIMIT" -lt 28800 ] && [ "$PARK_LIMIT" -ge "$PARK_SECONDS" ]; } 2>/dev/null || PARK_LIMIT=$PARK_SECONDS
-TURN_TIMEOUT=$(numeric_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200)
-ROTATE_TURNS=$(numeric_or "${FM_SUPERVISION_HOST_ROTATE_TURNS:-}" 20)
-POLL=$(numeric_or "${FM_SUPERVISION_HOST_POLL:-}" 1)
-COOLDOWN=$FM_SUPERVISION_HOST_COOLDOWN
+TURN_TIMEOUT=$(numeric_or "${JG_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200)
+ROTATE_TURNS=$(numeric_or "${JG_SUPERVISION_HOST_ROTATE_TURNS:-}" 20)
+POLL=$(numeric_or "${JG_SUPERVISION_HOST_POLL:-}" 1)
+COOLDOWN=$JG_SUPERVISION_HOST_COOLDOWN
 COOLDOWN_MAX=3600
-AUTOARM_GEN=${FM_SUPERVISION_HOST_AUTOARM_GEN:-}
-AUTOARM_OWNER=${FM_SUPERVISION_HOST_OWNER_PID:-}
-PRIMARY=${FM_SUPERVISION_HOST_PRIMARY:-}
+AUTOARM_GEN=${JG_SUPERVISION_HOST_AUTOARM_GEN:-}
+AUTOARM_OWNER=${JG_SUPERVISION_HOST_OWNER_PID:-}
+PRIMARY=${JG_SUPERVISION_HOST_PRIMARY:-}
 [ -n "$PRIMARY" ] || PRIMARY=$(jg_supervision_host_primary)
 # The owner's predecessor arm belongs to the first cycle only.
-OWNER_PREDECESSOR=${FM_WATCH_PREDECESSOR_ARM_PID:-}
+OWNER_PREDECESSOR=${JG_WATCH_PREDECESSOR_ARM_PID:-}
 case "$OWNER_PREDECESSOR" in *[!0-9]*) OWNER_PREDECESSOR= ;; esac
-unset FM_WATCH_PREDECESSOR_ARM_PID FM_SUPERVISION_ACTOR FM_BRANCH_REPORT_TURN
+unset JG_WATCH_PREDECESSOR_ARM_PID JG_SUPERVISION_ACTOR JG_BRANCH_REPORT_TURN
 
 HOST_RECORD="$STATE/.supervision-host"
 ENGINE_RECORD="$STATE/.supervision-host-engine"
@@ -337,7 +337,7 @@ stop_recorded() {  # <pid> <identity> <seconds>
 }
 
 branch_env() {  # <command...>: run with the branch actor identity
-  FM_SUPERVISION_ACTOR=branch "$@"
+  JG_SUPERVISION_ACTOR=branch "$@"
 }
 
 release_branch_leases() {
@@ -457,8 +457,8 @@ host_still_owner() {
   jg_session_lock_owned_by_self "$STATE" || return 1
   [ -n "$AUTOARM_GEN" ] || return 0
   jg_autoarm_ledger_read "$STATE" || return 1
-  [ "$FM_AUTOARM_GEN" = "$AUTOARM_GEN" ] && [ "$FM_AUTOARM_OWNER" = "$AUTOARM_OWNER" ] \
-    && [ "$FM_AUTOARM_OUTCOME" = arming ]
+  [ "$JG_AUTOARM_GEN" = "$AUTOARM_GEN" ] && [ "$JG_AUTOARM_OWNER" = "$AUTOARM_OWNER" ] \
+    && [ "$JG_AUTOARM_OUTCOME" = arming ]
 }
 
 start_arm() {  # <predecessor-arm-pid or empty> [--restart]; sets the started pid/output
@@ -470,9 +470,9 @@ start_arm() {  # <predecessor-arm-pid or empty> [--restart]; sets the started pi
   # (the shape start_handling_successor in bin/jg-claude-stop-autoarm.sh uses).
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set -m 2>/dev/null || true
   if [ -n "$predecessor" ]; then
-    FM_WATCH_PREDECESSOR_ARM_PID=$predecessor FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    JG_WATCH_PREDECESSOR_ARM_PID=$predecessor JG_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   else
-    FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    JG_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/jg-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   fi
   pid=$!
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set +m 2>/dev/null || true
@@ -482,8 +482,8 @@ start_arm() {  # <predecessor-arm-pid or empty> [--restart]; sets the started pi
 }
 
 park_elapsed() {  # Sets PARK_ELAPSED without a production clock/helper fork.
-  if [ "${FM_TEST_SEAM:-}" = 1 ] && [ -n "${FM_TEST_SUPERVISION_HOST_CLOCK:-}" ]; then
-    PARK_ELAPSED=$(numeric_or "$(cat "$FM_TEST_SUPERVISION_HOST_CLOCK" 2>/dev/null)" 0)
+  if [ "${JG_TEST_SEAM:-}" = 1 ] && [ -n "${JG_TEST_SUPERVISION_HOST_CLOCK:-}" ]; then
+    PARK_ELAPSED=$(numeric_or "$(cat "$JG_TEST_SUPERVISION_HOST_CLOCK" 2>/dev/null)" 0)
     return
   fi
   PARK_ELAPSED=$((SECONDS - HOST_STARTED_SECONDS))
@@ -657,8 +657,8 @@ start_successor() {  # <predecessor-arm-pid>
   local deadline line budget
   SUCCESSOR_WATCHER=
   SUCCESSOR_GENERATION=
-  budget=$(jg_watcher_confirmation_budget "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$FM_HOME")
-  budget=$(numeric_or "${FM_SUPERVISION_HOST_READY_TIMEOUT:-}" "$((budget + 2))")
+  budget=$(jg_watcher_confirmation_budget "$STATE" "$SCRIPT_DIR/jg-watch.sh" "$JG_HOME")
+  budget=$(numeric_or "${JG_SUPERVISION_HOST_READY_TIMEOUT:-}" "$((budget + 2))")
   start_arm "$1" || return 1
   SUCCESSOR_PID=$STARTED_ARM_PID
   SUCCESSOR_OUT=$STARTED_ARM_OUT
@@ -730,8 +730,8 @@ choose_conversation() {
   recorded_model=$(sed -n 's/^model=//p' "$ENGINE_RECORD" 2>/dev/null | head -n 1)
   turns=$(numeric_or "$(sed -n 's/^turns=//p' "$ENGINE_RECORD" 2>/dev/null | head -n 1)" 0)
   if [ -n "$key" ] && [ -n "$recorded_session" ] && [ "$recorded_key" = "$key" ] \
-    && [ "$recorded_engine" = "$FM_SUPERVISION_ENGINE" ] \
-    && [ "$recorded_model" = "$FM_SUPERVISION_ENGINE_MODEL" ] \
+    && [ "$recorded_engine" = "$JG_SUPERVISION_ENGINE" ] \
+    && [ "$recorded_model" = "$JG_SUPERVISION_ENGINE_MODEL" ] \
     && [ "$turns" -lt "$ROTATE_TURNS" ] && [ -s "$PROMPT_FILE" ]; then
     ENGINE_SESSION=$recorded_session
     ENGINE_MODE=resume
@@ -764,7 +764,7 @@ write_engine_record() {  # <turns> <conversation-cost>
   local tmp
   tmp=$(mktemp "$ENGINE_RECORD.tmp.XXXXXX") || return 1
   printf 'engine=%s\nmodel=%s\nsession=%s\nkey=%s\nturns=%s\nconversation_cost=%s\n' \
-    "$FM_SUPERVISION_ENGINE" "$FM_SUPERVISION_ENGINE_MODEL" "$ENGINE_SESSION" "$ENGINE_KEY" "$1" "$2" > "$tmp" \
+    "$JG_SUPERVISION_ENGINE" "$JG_SUPERVISION_ENGINE_MODEL" "$ENGINE_SESSION" "$ENGINE_KEY" "$1" "$2" > "$tmp" \
     && mv -f "$tmp" "$ENGINE_RECORD"
 }
 
@@ -911,7 +911,7 @@ handle_wake() {  # <reason-lines>
   if [ "$TURN_POSTURE" = away ]; then
     readback=$(mktemp "$STATE/.supervision-host-readback.XXXXXX") || readback=
     if [ -n "$readback" ]; then
-      FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" readback > "$readback" 2>/dev/null || : > "$readback"
+      JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-afk-contract.sh" readback > "$readback" 2>/dev/null || : > "$readback"
     fi
   fi
   # The dialog mirror (bin/jg-host-mirror.sh) rides at the head of an
@@ -960,15 +960,15 @@ handle_wake() {  # <reason-lines>
   # Backgrounded and waited, so a signal to the host is handled at once
   # instead of after the whole turn; the cleanup stops the engine.
   (
-    export FM_HOME STATE
-    [ -z "${FM_STATE_OVERRIDE:-}" ] || export FM_STATE_OVERRIDE
-    [ -z "${FM_CONFIG_OVERRIDE:-}" ] || export FM_CONFIG_OVERRIDE
-    export FM_SUPERVISION_ACTOR=branch
-    FM_LEASE_HOLDER_PID=$(sed -n '1p' "$STATE/.lock" 2>/dev/null | tr -cd '0-9')
-    export FM_LEASE_HOLDER_PID
-    export FM_SUPERVISION_PRIMARY_HARNESS="$PRIMARY"
-    export FM_BRANCH_REPORT_TURN="$turn"
-    jg_supervision_engine_turn "$FM_SUPERVISION_ENGINE" "$FM_SUPERVISION_ENGINE_MODEL" \
+    export JG_HOME STATE
+    [ -z "${JG_STATE_OVERRIDE:-}" ] || export JG_STATE_OVERRIDE
+    [ -z "${JG_CONFIG_OVERRIDE:-}" ] || export JG_CONFIG_OVERRIDE
+    export JG_SUPERVISION_ACTOR=branch
+    JG_LEASE_HOLDER_PID=$(sed -n '1p' "$STATE/.lock" 2>/dev/null | tr -cd '0-9')
+    export JG_LEASE_HOLDER_PID
+    export JG_SUPERVISION_PRIMARY_HARNESS="$PRIMARY"
+    export JG_BRANCH_REPORT_TURN="$turn"
+    jg_supervision_engine_turn "$JG_SUPERVISION_ENGINE" "$JG_SUPERVISION_ENGINE_MODEL" \
       "$PROMPT_FILE" "$WAKE_FILE" "$ENGINE_SESSION" "$ENGINE_MODE" "$TURN_TIMEOUT" \
       "$result" "$errors" "$ENGINE_PID_FILE"
   ) &
@@ -984,7 +984,7 @@ handle_wake() {  # <reason-lines>
   "$SCRIPT_DIR/jg-wake-grant.sh" release "$GEN" >/dev/null 2>&1 || true
   rm -f "$TURN_FILE"
   receipts=$(awk -F '\t' -v turn="$turn" '$1 == turn { n++ } END { print n + 0 }' "$RECEIPTS" 2>/dev/null)
-  usage=$(jg_supervision_engine_result "$FM_SUPERVISION_ENGINE" "$result" "${ENGINE_COST:-0}" 2>/dev/null || true)
+  usage=$(jg_supervision_engine_result "$JG_SUPERVISION_ENGINE" "$result" "${ENGINE_COST:-0}" 2>/dev/null || true)
   [ "$result" = /dev/null ] || rm -f "$result"
   TURN_RESULT=
   if [ "$rc" -ne 0 ] || [ -z "$usage" ] || [ "${usage#error=0}" = "$usage" ]; then
@@ -1009,7 +1009,7 @@ handle_wake() {  # <reason-lines>
   if jg_timed_out "$rc"; then
     HANDLE_WHY="the engine turn hit its ${TURN_TIMEOUT}s bound"
   elif [ "$rc" -eq 127 ]; then
-    HANDLE_WHY="the $FM_SUPERVISION_ENGINE engine could not run"
+    HANDLE_WHY="the $JG_SUPERVISION_ENGINE engine could not run"
   elif [ "$rc" -ne 0 ]; then
     HANDLE_WHY="the engine turn failed (exit $rc)"
   elif [ "${usage#error=0}" = "$usage" ]; then
@@ -1035,7 +1035,7 @@ attended_acceptor() {  # <first-reason-line>
   ATTENDED_WHY=
   ATTENDED_OFFER=
   if ! jg_supervision_host_attended_ready "$CONFIG" "$PRIMARY"; then
-    ATTENDED_WHY=$FM_SUPERVISION_HOST_UNREADY
+    ATTENDED_WHY=$JG_SUPERVISION_HOST_UNREADY
   elif ! jg_supervision_host_main_key "$STATE" >/dev/null; then
     ATTENDED_WHY="the main session could not be identified"
   elif health_cooling; then
@@ -1111,8 +1111,8 @@ while :; do
     if ! jg_supervision_host_config "$CONFIG" "$PRIMARY"; then
       exit_to_main "the home no longer runs the supervision host"
     fi
-    if [ -z "$FM_SUPERVISION_ENGINE" ]; then
-      exit_to_main "no supervision engine runs here: $FM_SUPERVISION_ENGINE_PROBLEM; this wake is yours"
+    if [ -z "$JG_SUPERVISION_ENGINE" ]; then
+      exit_to_main "no supervision engine runs here: $JG_SUPERVISION_ENGINE_PROBLEM; this wake is yours"
     fi
     if ! command -v node >/dev/null 2>&1; then
       exit_to_main "node is required to compute branch eligibility; this wake is yours"

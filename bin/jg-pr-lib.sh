@@ -22,82 +22,82 @@
 # The receipt binds the terminal observation to the canonical registration and
 # lets a restart finish fixed-path removal without executing state-file bytes.
 
-FM_PR_PROVIDER=
-FM_PR_URL=
-FM_PR_HOST=
-FM_PR_PATH=
-FM_PR_OWNER=
-FM_PR_REPO=
-FM_PR_NUMBER=
-FM_PR_DATA_PROVIDER=
-FM_PR_DATA_URL=
-FM_PR_DATA_HOST=
-FM_PR_DATA_PATH=
-FM_PR_DATA_NUMBER=
-FM_PR_META_PROVIDER=
-FM_PR_META_URL=
-FM_PR_META_HOST=
-FM_PR_META_PATH=
-FM_PR_META_NUMBER=
-FM_PR_REG_ID=
-FM_PR_REG_PROVIDER=
-FM_PR_REG_URL=
-FM_PR_REG_HOST=
-FM_PR_REG_PATH=
-FM_PR_REG_NUMBER=
-FM_PR_REG_DATA_HASH=
-FM_PR_REG_TEMPLATE_HASH=
-FM_PR_REG_DATA_IDENTITY=
-FM_PR_REG_CHECK_IDENTITY=
-FM_PR_POLL_DATA_TMP=
-FM_PR_POLL_CHECK_TMP=
-FM_PR_POLL_REG_TMP=
-FM_PR_POLL_DATA_DEST=
-FM_PR_POLL_CHECK_DEST=
-FM_PR_POLL_REG_DEST=
-FM_PR_POLL_EXPECT_ID=
-FM_PR_POLL_EXPECT_PROVIDER=
-FM_PR_POLL_EXPECT_URL=
-FM_PR_POLL_EXPECT_HOST=
-FM_PR_POLL_EXPECT_PATH=
-FM_PR_POLL_EXPECT_NUMBER=
-FM_PR_POLL_EXPECT_DATA_HASH=
-FM_PR_POLL_EXPECT_TEMPLATE_HASH=
-FM_PR_POLL_EXPECT_DATA_IDENTITY=
-FM_PR_POLL_EXPECT_CHECK_IDENTITY=
-FM_PR_POLL_TEMPLATE=
-FM_PR_POLL_STATE_DEVICE=
-FM_PR_POLL_SNAPSHOT_ID=
-FM_PR_POLL_SNAPSHOT_PROVIDER=
-FM_PR_POLL_SNAPSHOT_URL=
-FM_PR_POLL_SNAPSHOT_HOST=
-FM_PR_POLL_SNAPSHOT_PATH=
-FM_PR_POLL_SNAPSHOT_NUMBER=
-FM_PR_POLL_SNAPSHOT_DATA_HASH=
-FM_PR_POLL_SNAPSHOT_TEMPLATE_HASH=
-FM_PR_POLL_SNAPSHOT_DATA_IDENTITY=
-FM_PR_POLL_SNAPSHOT_CHECK_IDENTITY=
-FM_PR_POLL_SNAPSHOT_REG_HASH=
-FM_PR_POLL_SNAPSHOT_REG_IDENTITY=
-FM_PR_POLL_REARM_DATA_IDENTITY=
-FM_PR_POLL_REARM_CHECK_IDENTITY=
-FM_PR_RETIRE_ID=
-FM_PR_RETIRE_PROVIDER=
-FM_PR_RETIRE_URL=
-FM_PR_RETIRE_HOST=
-FM_PR_RETIRE_PATH=
-FM_PR_RETIRE_NUMBER=
-FM_PR_RETIRE_DATA_HASH=
-FM_PR_RETIRE_TEMPLATE_HASH=
-FM_PR_RETIRE_DATA_IDENTITY=
-FM_PR_RETIRE_CHECK_IDENTITY=
-FM_PR_RETIRE_REG_HASH=
-FM_PR_RETIRE_REG_IDENTITY=
-FM_PR_RETIRE_RECEIPT_HASH=
-FM_PR_RETIRE_RECEIPT_IDENTITY=
-FM_PR_RECORD_STATE=
-FM_PR_RECORD_MERGED=
-FM_PR_POLL_RETIREMENT_REJECTED=
+JG_PR_PROVIDER=
+JG_PR_URL=
+JG_PR_HOST=
+JG_PR_PATH=
+JG_PR_OWNER=
+JG_PR_REPO=
+JG_PR_NUMBER=
+JG_PR_DATA_PROVIDER=
+JG_PR_DATA_URL=
+JG_PR_DATA_HOST=
+JG_PR_DATA_PATH=
+JG_PR_DATA_NUMBER=
+JG_PR_META_PROVIDER=
+JG_PR_META_URL=
+JG_PR_META_HOST=
+JG_PR_META_PATH=
+JG_PR_META_NUMBER=
+JG_PR_REG_ID=
+JG_PR_REG_PROVIDER=
+JG_PR_REG_URL=
+JG_PR_REG_HOST=
+JG_PR_REG_PATH=
+JG_PR_REG_NUMBER=
+JG_PR_REG_DATA_HASH=
+JG_PR_REG_TEMPLATE_HASH=
+JG_PR_REG_DATA_IDENTITY=
+JG_PR_REG_CHECK_IDENTITY=
+JG_PR_POLL_DATA_TMP=
+JG_PR_POLL_CHECK_TMP=
+JG_PR_POLL_REG_TMP=
+JG_PR_POLL_DATA_DEST=
+JG_PR_POLL_CHECK_DEST=
+JG_PR_POLL_REG_DEST=
+JG_PR_POLL_EXPECT_ID=
+JG_PR_POLL_EXPECT_PROVIDER=
+JG_PR_POLL_EXPECT_URL=
+JG_PR_POLL_EXPECT_HOST=
+JG_PR_POLL_EXPECT_PATH=
+JG_PR_POLL_EXPECT_NUMBER=
+JG_PR_POLL_EXPECT_DATA_HASH=
+JG_PR_POLL_EXPECT_TEMPLATE_HASH=
+JG_PR_POLL_EXPECT_DATA_IDENTITY=
+JG_PR_POLL_EXPECT_CHECK_IDENTITY=
+JG_PR_POLL_TEMPLATE=
+JG_PR_POLL_STATE_DEVICE=
+JG_PR_POLL_SNAPSHOT_ID=
+JG_PR_POLL_SNAPSHOT_PROVIDER=
+JG_PR_POLL_SNAPSHOT_URL=
+JG_PR_POLL_SNAPSHOT_HOST=
+JG_PR_POLL_SNAPSHOT_PATH=
+JG_PR_POLL_SNAPSHOT_NUMBER=
+JG_PR_POLL_SNAPSHOT_DATA_HASH=
+JG_PR_POLL_SNAPSHOT_TEMPLATE_HASH=
+JG_PR_POLL_SNAPSHOT_DATA_IDENTITY=
+JG_PR_POLL_SNAPSHOT_CHECK_IDENTITY=
+JG_PR_POLL_SNAPSHOT_REG_HASH=
+JG_PR_POLL_SNAPSHOT_REG_IDENTITY=
+JG_PR_POLL_REARM_DATA_IDENTITY=
+JG_PR_POLL_REARM_CHECK_IDENTITY=
+JG_PR_RETIRE_ID=
+JG_PR_RETIRE_PROVIDER=
+JG_PR_RETIRE_URL=
+JG_PR_RETIRE_HOST=
+JG_PR_RETIRE_PATH=
+JG_PR_RETIRE_NUMBER=
+JG_PR_RETIRE_DATA_HASH=
+JG_PR_RETIRE_TEMPLATE_HASH=
+JG_PR_RETIRE_DATA_IDENTITY=
+JG_PR_RETIRE_CHECK_IDENTITY=
+JG_PR_RETIRE_REG_HASH=
+JG_PR_RETIRE_REG_IDENTITY=
+JG_PR_RETIRE_RECEIPT_HASH=
+JG_PR_RETIRE_RECEIPT_IDENTITY=
+JG_PR_RECORD_STATE=
+JG_PR_RECORD_MERGED=
+JG_PR_POLL_RETIREMENT_REJECTED=
 
 jg_task_id_path_safe() {
   local id=${1-}
@@ -207,21 +207,21 @@ jg_pr_forgejo_segment_valid() {
 # pull request's repository with a worktree's origin. Accepted forms are the
 # remotes git itself accepts: https://, http://, ssh://, and git:// URLs with
 # an optional user@, and scp-like [user@]host:path. A .git suffix and a
-# trailing slash are dropped. FM_PR_GIT_REPO is set only when the path is
+# trailing slash are dropped. JG_PR_GIT_REPO is set only when the path is
 # exactly owner/repository, so a subgroup, nested, or local path and any URL
 # whose repository cannot be isolated leave it empty and the caller keeps its
 # existing behavior instead of guessing a repository. An explicit port in a
 # scheme URL (ssh://host:2222/owner/repo.git) stays in the path, so such a
-# remote also leaves FM_PR_GIT_REPO empty and is never isolated.
+# remote also leaves JG_PR_GIT_REPO empty and is never isolated.
 jg_pr_repo_from_git_url() {  # <url>
   local url=$1 rest path
-  FM_PR_GIT_HOST=
-  FM_PR_GIT_REPO=
+  JG_PR_GIT_HOST=
+  JG_PR_GIT_REPO=
   case $url in
     https://* | http://* | ssh://* | git://*)
       rest=${url#*://}
       rest=${rest##*@}
-      FM_PR_GIT_HOST=${rest%%[:/]*}
+      JG_PR_GIT_HOST=${rest%%[:/]*}
       case $rest in
         */*) path=${rest#*/} ;;
         *) return 0 ;;
@@ -229,8 +229,8 @@ jg_pr_repo_from_git_url() {  # <url>
       ;;
     /*) return 0 ;;
     *:*)
-      FM_PR_GIT_HOST=${url%%:*}
-      FM_PR_GIT_HOST=${FM_PR_GIT_HOST##*@}
+      JG_PR_GIT_HOST=${url%%:*}
+      JG_PR_GIT_HOST=${JG_PR_GIT_HOST##*@}
       path=${url#*:}
       ;;
     *) return 0 ;;
@@ -240,7 +240,7 @@ jg_pr_repo_from_git_url() {  # <url>
   case $path in
     '' | /* | */*/*) ;;
     */*) # shellcheck disable=SC2034
-      FM_PR_GIT_REPO=$path ;;
+      JG_PR_GIT_REPO=$path ;;
   esac
   return 0
 }
@@ -250,35 +250,35 @@ jg_pr_repo_from_git_url() {  # <url>
 # username and repository rules are unchanged, and GitLab, Gerrit, and Forgejo
 # each get their own namespace rules rather than a loosened GitHub rule.
 #
-# FM_PR_OWNER and FM_PR_REPO are additionally set for github and forgejo
+# JG_PR_OWNER and JG_PR_REPO are additionally set for github and forgejo
 # because bin/jg-pr-merge.sh addresses both by owner/repository. A gitlab or
-# gerrit URL leaves them empty, and those paths address the project by FM_PR_HOST and
-# FM_PR_PATH instead, so a change on any instance resolves without a hardcoded
+# gerrit URL leaves them empty, and those paths address the project by JG_PR_HOST and
+# JG_PR_PATH instead, so a change on any instance resolves without a hardcoded
 # host.
 jg_pr_url_parse() {
   local raw=${1-} pattern host path
   local LC_ALL=C
-  FM_PR_PROVIDER=
-  FM_PR_URL=
-  FM_PR_HOST=
-  FM_PR_PATH=
-  FM_PR_OWNER=
-  FM_PR_REPO=
-  FM_PR_NUMBER=
+  JG_PR_PROVIDER=
+  JG_PR_URL=
+  JG_PR_HOST=
+  JG_PR_PATH=
+  JG_PR_OWNER=
+  JG_PR_REPO=
+  JG_PR_NUMBER=
   pattern='^https://github\.com/([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]{0,37}[A-Za-z0-9])/([A-Za-z0-9._-]{1,100})/pull/([1-9][0-9]*)$'
   if [[ "$raw" =~ $pattern ]]; then
     [[ "${BASH_REMATCH[1]}" != *--* ]] || return 1
     [ "${BASH_REMATCH[2]}" != . ] && [ "${BASH_REMATCH[2]}" != .. ] || return 1
-    FM_PR_PROVIDER=github
-    FM_PR_URL=$raw
-    FM_PR_HOST=github.com
-    FM_PR_PATH="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+    JG_PR_PROVIDER=github
+    JG_PR_URL=$raw
+    JG_PR_HOST=github.com
+    JG_PR_PATH="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
     # Consumed by bin/jg-pr-merge.sh, which addresses GitHub by owner/repository.
     # shellcheck disable=SC2034
-    FM_PR_OWNER=${BASH_REMATCH[1]}
+    JG_PR_OWNER=${BASH_REMATCH[1]}
     # shellcheck disable=SC2034
-    FM_PR_REPO=${BASH_REMATCH[2]}
-    FM_PR_NUMBER=${BASH_REMATCH[3]}
+    JG_PR_REPO=${BASH_REMATCH[2]}
+    JG_PR_NUMBER=${BASH_REMATCH[3]}
     return 0
   fi
   # The path class contains "/" and "-", so this match is greedy to the last
@@ -290,11 +290,11 @@ jg_pr_url_parse() {
     path=${BASH_REMATCH[2]}
     jg_pr_forge_host_valid "$host" || return 1
     jg_pr_gitlab_path_valid "$path" || return 1
-    FM_PR_PROVIDER=gitlab
-    FM_PR_URL=$raw
-    FM_PR_HOST=$host
-    FM_PR_PATH=$path
-    FM_PR_NUMBER=${BASH_REMATCH[3]}
+    JG_PR_PROVIDER=gitlab
+    JG_PR_URL=$raw
+    JG_PR_HOST=$host
+    JG_PR_PATH=$path
+    JG_PR_NUMBER=${BASH_REMATCH[3]}
     return 0
   fi
   # A Gerrit change URL is https://<host>/c/<project>/+/<number>. "+" is outside
@@ -309,11 +309,11 @@ jg_pr_url_parse() {
     path=${BASH_REMATCH[2]}
     jg_pr_forge_host_valid "$host" || return 1
     jg_pr_gerrit_path_valid "$path" || return 1
-    FM_PR_PROVIDER=gerrit
-    FM_PR_URL=$raw
-    FM_PR_HOST=$host
-    FM_PR_PATH=$path
-    FM_PR_NUMBER=${BASH_REMATCH[3]}
+    JG_PR_PROVIDER=gerrit
+    JG_PR_URL=$raw
+    JG_PR_HOST=$host
+    JG_PR_PATH=$path
+    JG_PR_NUMBER=${BASH_REMATCH[3]}
     return 0
   fi
   # Forgejo/Gitea serve pulls at owner/repo/pulls/<n>: plural "pulls", no "/-/"
@@ -325,16 +325,16 @@ jg_pr_url_parse() {
   jg_pr_forge_host_valid "$host" || return 1
   jg_pr_forgejo_segment_valid "${BASH_REMATCH[2]}" || return 1
   jg_pr_forgejo_segment_valid "${BASH_REMATCH[3]}" || return 1
-  FM_PR_PROVIDER=forgejo
-  FM_PR_URL=$raw
-  FM_PR_HOST=$host
-  FM_PR_PATH="${BASH_REMATCH[2]}/${BASH_REMATCH[3]}"
+  JG_PR_PROVIDER=forgejo
+  JG_PR_URL=$raw
+  JG_PR_HOST=$host
+  JG_PR_PATH="${BASH_REMATCH[2]}/${BASH_REMATCH[3]}"
   # Consumed by bin/jg-pr-merge.sh, which addresses Forgejo by owner/repository.
   # shellcheck disable=SC2034
-  FM_PR_OWNER=${BASH_REMATCH[2]}
+  JG_PR_OWNER=${BASH_REMATCH[2]}
   # shellcheck disable=SC2034
-  FM_PR_REPO=${BASH_REMATCH[3]}
-  FM_PR_NUMBER=${BASH_REMATCH[4]}
+  JG_PR_REPO=${BASH_REMATCH[3]}
+  JG_PR_NUMBER=${BASH_REMATCH[4]}
 }
 
 jg_pr_head_valid() {
@@ -438,11 +438,11 @@ jg_pr_regular_destination_on_device_or_absent() {
 
 jg_pr_metadata_identity_parse() {
   local file=$1 line value pr_count=0 seen_pr=0 post_pr_invalid=0
-  FM_PR_META_PROVIDER=
-  FM_PR_META_URL=
-  FM_PR_META_HOST=
-  FM_PR_META_PATH=
-  FM_PR_META_NUMBER=
+  JG_PR_META_PROVIDER=
+  JG_PR_META_URL=
+  JG_PR_META_HOST=
+  JG_PR_META_PATH=
+  JG_PR_META_NUMBER=
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   [ "$(jg_pr_file_link_count "$file")" = 1 ] || return 1
   while IFS= read -r line || [ -n "$line" ]; do
@@ -452,11 +452,11 @@ jg_pr_metadata_identity_parse() {
         [ "$pr_count" -eq 1 ] || continue
         value=${line#pr=}
         if jg_pr_url_parse "$value"; then
-          FM_PR_META_PROVIDER=$FM_PR_PROVIDER
-          FM_PR_META_URL=$FM_PR_URL
-          FM_PR_META_HOST=$FM_PR_HOST
-          FM_PR_META_PATH=$FM_PR_PATH
-          FM_PR_META_NUMBER=$FM_PR_NUMBER
+          JG_PR_META_PROVIDER=$JG_PR_PROVIDER
+          JG_PR_META_URL=$JG_PR_URL
+          JG_PR_META_HOST=$JG_PR_HOST
+          JG_PR_META_PATH=$JG_PR_PATH
+          JG_PR_META_NUMBER=$JG_PR_NUMBER
         fi
         seen_pr=1
         ;;
@@ -478,7 +478,7 @@ jg_pr_metadata_identity_parse() {
   done < "$file"
   [ "$pr_count" -eq 1 ] || return 1
   [ "$post_pr_invalid" -eq 0 ] || return 1
-  [ -n "$FM_PR_META_URL" ]
+  [ -n "$JG_PR_META_URL" ]
 }
 
 # Sidecar layout: provider, url, host, path, number, one per line. A sidecar
@@ -487,11 +487,11 @@ jg_pr_metadata_identity_parse() {
 # is refused rather than misread as a provider-tagged record.
 jg_pr_poll_data_parse() {
   local file=$1 provider url host path number
-  FM_PR_DATA_PROVIDER=
-  FM_PR_DATA_URL=
-  FM_PR_DATA_HOST=
-  FM_PR_DATA_PATH=
-  FM_PR_DATA_NUMBER=
+  JG_PR_DATA_PROVIDER=
+  JG_PR_DATA_URL=
+  JG_PR_DATA_HOST=
+  JG_PR_DATA_PATH=
+  JG_PR_DATA_NUMBER=
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   exec 8< "$file" || return 1
   IFS= read -r provider <&8 || { exec 8<&-; return 1; }
@@ -505,15 +505,15 @@ jg_pr_poll_data_parse() {
   fi
   exec 8<&-
   jg_pr_url_parse "$url" || return 1
-  [ "$provider" = "$FM_PR_PROVIDER" ] || return 1
-  [ "$host" = "$FM_PR_HOST" ] || return 1
-  [ "$path" = "$FM_PR_PATH" ] || return 1
-  [ "$number" = "$FM_PR_NUMBER" ] || return 1
-  FM_PR_DATA_PROVIDER=$FM_PR_PROVIDER
-  FM_PR_DATA_URL=$FM_PR_URL
-  FM_PR_DATA_HOST=$FM_PR_HOST
-  FM_PR_DATA_PATH=$FM_PR_PATH
-  FM_PR_DATA_NUMBER=$FM_PR_NUMBER
+  [ "$provider" = "$JG_PR_PROVIDER" ] || return 1
+  [ "$host" = "$JG_PR_HOST" ] || return 1
+  [ "$path" = "$JG_PR_PATH" ] || return 1
+  [ "$number" = "$JG_PR_NUMBER" ] || return 1
+  JG_PR_DATA_PROVIDER=$JG_PR_PROVIDER
+  JG_PR_DATA_URL=$JG_PR_URL
+  JG_PR_DATA_HOST=$JG_PR_HOST
+  JG_PR_DATA_PATH=$JG_PR_PATH
+  JG_PR_DATA_NUMBER=$JG_PR_NUMBER
 }
 
 # Registration layout: version tag, task id, then the same provider-tagged
@@ -522,16 +522,16 @@ jg_pr_poll_data_parse() {
 # by the previous release is recognised as old and refused.
 jg_pr_poll_registration_parse() {
   local file=$1 version id provider url host path number data_hash template_hash data_identity check_identity
-  FM_PR_REG_ID=
-  FM_PR_REG_PROVIDER=
-  FM_PR_REG_URL=
-  FM_PR_REG_HOST=
-  FM_PR_REG_PATH=
-  FM_PR_REG_NUMBER=
-  FM_PR_REG_DATA_HASH=
-  FM_PR_REG_TEMPLATE_HASH=
-  FM_PR_REG_DATA_IDENTITY=
-  FM_PR_REG_CHECK_IDENTITY=
+  JG_PR_REG_ID=
+  JG_PR_REG_PROVIDER=
+  JG_PR_REG_URL=
+  JG_PR_REG_HOST=
+  JG_PR_REG_PATH=
+  JG_PR_REG_NUMBER=
+  JG_PR_REG_DATA_HASH=
+  JG_PR_REG_TEMPLATE_HASH=
+  JG_PR_REG_DATA_IDENTITY=
+  JG_PR_REG_CHECK_IDENTITY=
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   exec 7< "$file" || return 1
   IFS= read -r version <&7 || { exec 7<&-; return 1; }
@@ -553,51 +553,51 @@ jg_pr_poll_registration_parse() {
   [ "$version" = jg-pr-poll-registration-v2 ] || return 1
   jg_pr_task_id_valid "$id" || return 1
   jg_pr_url_parse "$url" || return 1
-  [ "$provider" = "$FM_PR_PROVIDER" ] || return 1
-  [ "$host" = "$FM_PR_HOST" ] || return 1
-  [ "$path" = "$FM_PR_PATH" ] || return 1
-  [ "$number" = "$FM_PR_NUMBER" ] || return 1
+  [ "$provider" = "$JG_PR_PROVIDER" ] || return 1
+  [ "$host" = "$JG_PR_HOST" ] || return 1
+  [ "$path" = "$JG_PR_PATH" ] || return 1
+  [ "$number" = "$JG_PR_NUMBER" ] || return 1
   [[ "$data_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ "$template_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ "$data_identity" =~ ^[0-9]+:[0-9]+$ ]] || return 1
   [[ "$check_identity" =~ ^[0-9]+:[0-9]+$ ]] || return 1
-  FM_PR_REG_ID=$id
-  FM_PR_REG_PROVIDER=$FM_PR_PROVIDER
-  FM_PR_REG_URL=$FM_PR_URL
-  FM_PR_REG_HOST=$FM_PR_HOST
-  FM_PR_REG_PATH=$FM_PR_PATH
-  FM_PR_REG_NUMBER=$FM_PR_NUMBER
-  FM_PR_REG_DATA_HASH=$data_hash
-  FM_PR_REG_TEMPLATE_HASH=$template_hash
-  FM_PR_REG_DATA_IDENTITY=$data_identity
-  FM_PR_REG_CHECK_IDENTITY=$check_identity
+  JG_PR_REG_ID=$id
+  JG_PR_REG_PROVIDER=$JG_PR_PROVIDER
+  JG_PR_REG_URL=$JG_PR_URL
+  JG_PR_REG_HOST=$JG_PR_HOST
+  JG_PR_REG_PATH=$JG_PR_PATH
+  JG_PR_REG_NUMBER=$JG_PR_NUMBER
+  JG_PR_REG_DATA_HASH=$data_hash
+  JG_PR_REG_TEMPLATE_HASH=$template_hash
+  JG_PR_REG_DATA_IDENTITY=$data_identity
+  JG_PR_REG_CHECK_IDENTITY=$check_identity
 }
 
 jg_pr_poll_cleanup() {
-  [ -z "$FM_PR_POLL_DATA_TMP" ] || rm -f -- "$FM_PR_POLL_DATA_TMP"
-  [ -z "$FM_PR_POLL_CHECK_TMP" ] || rm -f -- "$FM_PR_POLL_CHECK_TMP"
-  [ -z "$FM_PR_POLL_REG_TMP" ] || rm -f -- "$FM_PR_POLL_REG_TMP"
-  FM_PR_POLL_DATA_TMP=
-  FM_PR_POLL_CHECK_TMP=
-  FM_PR_POLL_REG_TMP=
+  [ -z "$JG_PR_POLL_DATA_TMP" ] || rm -f -- "$JG_PR_POLL_DATA_TMP"
+  [ -z "$JG_PR_POLL_CHECK_TMP" ] || rm -f -- "$JG_PR_POLL_CHECK_TMP"
+  [ -z "$JG_PR_POLL_REG_TMP" ] || rm -f -- "$JG_PR_POLL_REG_TMP"
+  JG_PR_POLL_DATA_TMP=
+  JG_PR_POLL_CHECK_TMP=
+  JG_PR_POLL_REG_TMP=
 }
 
 jg_pr_poll_revoke_final() {
   local failed=0
   # Neutralize the runnable name first so a failed rearm cannot consume state
   # whose transactional registration did not commit successfully.
-  if [ -e "$FM_PR_POLL_CHECK_DEST" ] || [ -L "$FM_PR_POLL_CHECK_DEST" ]; then
-    rm -f -- "$FM_PR_POLL_CHECK_DEST" || failed=1
+  if [ -e "$JG_PR_POLL_CHECK_DEST" ] || [ -L "$JG_PR_POLL_CHECK_DEST" ]; then
+    rm -f -- "$JG_PR_POLL_CHECK_DEST" || failed=1
   fi
-  if [ -e "$FM_PR_POLL_REG_DEST" ] || [ -L "$FM_PR_POLL_REG_DEST" ]; then
-    rm -f -- "$FM_PR_POLL_REG_DEST" || failed=1
+  if [ -e "$JG_PR_POLL_REG_DEST" ] || [ -L "$JG_PR_POLL_REG_DEST" ]; then
+    rm -f -- "$JG_PR_POLL_REG_DEST" || failed=1
   fi
-  if [ -e "$FM_PR_POLL_DATA_DEST" ] || [ -L "$FM_PR_POLL_DATA_DEST" ]; then
-    rm -f -- "$FM_PR_POLL_DATA_DEST" || failed=1
+  if [ -e "$JG_PR_POLL_DATA_DEST" ] || [ -L "$JG_PR_POLL_DATA_DEST" ]; then
+    rm -f -- "$JG_PR_POLL_DATA_DEST" || failed=1
   fi
-  [ ! -e "$FM_PR_POLL_CHECK_DEST" ] && [ ! -L "$FM_PR_POLL_CHECK_DEST" ] || failed=1
-  [ ! -e "$FM_PR_POLL_REG_DEST" ] && [ ! -L "$FM_PR_POLL_REG_DEST" ] || failed=1
-  [ ! -e "$FM_PR_POLL_DATA_DEST" ] && [ ! -L "$FM_PR_POLL_DATA_DEST" ] || failed=1
+  [ ! -e "$JG_PR_POLL_CHECK_DEST" ] && [ ! -L "$JG_PR_POLL_CHECK_DEST" ] || failed=1
+  [ ! -e "$JG_PR_POLL_REG_DEST" ] && [ ! -L "$JG_PR_POLL_REG_DEST" ] || failed=1
+  [ ! -e "$JG_PR_POLL_DATA_DEST" ] && [ ! -L "$JG_PR_POLL_DATA_DEST" ] || failed=1
   return "$failed"
 }
 
@@ -605,69 +605,69 @@ jg_pr_poll_prepare() {
   local state=$1 id=$2 provider=$3 url=$4 host=$5 path=$6 number=$7 template=$8
   jg_pr_task_id_valid "$id" || return 1
   jg_pr_url_parse "$url" || return 1
-  [ "$provider" = "$FM_PR_PROVIDER" ] || return 1
-  [ "$host" = "$FM_PR_HOST" ] || return 1
-  [ "$path" = "$FM_PR_PATH" ] || return 1
-  [ "$number" = "$FM_PR_NUMBER" ] || return 1
+  [ "$provider" = "$JG_PR_PROVIDER" ] || return 1
+  [ "$host" = "$JG_PR_HOST" ] || return 1
+  [ "$path" = "$JG_PR_PATH" ] || return 1
+  [ "$number" = "$JG_PR_NUMBER" ] || return 1
   [ -f "$template" ] || return 1
 
   [ ! -L "$state" ] || return 1
   mkdir -p "$state" || return 1
   [ -d "$state" ] && [ ! -L "$state" ] || return 1
   umask 077
-  FM_PR_POLL_DATA_DEST="$state/$id.pr-poll"
-  FM_PR_POLL_CHECK_DEST="$state/$id.check.sh"
-  FM_PR_POLL_REG_DEST="$state/$id.pr-poll-registration"
-  FM_PR_POLL_EXPECT_ID=$id
-  FM_PR_POLL_EXPECT_PROVIDER=$provider
-  FM_PR_POLL_EXPECT_URL=$url
-  FM_PR_POLL_EXPECT_HOST=$host
-  FM_PR_POLL_EXPECT_PATH=$path
-  FM_PR_POLL_EXPECT_NUMBER=$number
-  FM_PR_POLL_TEMPLATE=$template
-  FM_PR_POLL_STATE_DEVICE=$(jg_pr_file_device "$state") || return 1
-  [ -n "$FM_PR_POLL_STATE_DEVICE" ] || return 1
-  FM_PR_POLL_DATA_TMP=$(mktemp "$state/.jg-pr-poll-data.XXXXXX") || return 1
-  FM_PR_POLL_CHECK_TMP=$(mktemp "$state/.jg-pr-poll-check.XXXXXX") || {
+  JG_PR_POLL_DATA_DEST="$state/$id.pr-poll"
+  JG_PR_POLL_CHECK_DEST="$state/$id.check.sh"
+  JG_PR_POLL_REG_DEST="$state/$id.pr-poll-registration"
+  JG_PR_POLL_EXPECT_ID=$id
+  JG_PR_POLL_EXPECT_PROVIDER=$provider
+  JG_PR_POLL_EXPECT_URL=$url
+  JG_PR_POLL_EXPECT_HOST=$host
+  JG_PR_POLL_EXPECT_PATH=$path
+  JG_PR_POLL_EXPECT_NUMBER=$number
+  JG_PR_POLL_TEMPLATE=$template
+  JG_PR_POLL_STATE_DEVICE=$(jg_pr_file_device "$state") || return 1
+  [ -n "$JG_PR_POLL_STATE_DEVICE" ] || return 1
+  JG_PR_POLL_DATA_TMP=$(mktemp "$state/.jg-pr-poll-data.XXXXXX") || return 1
+  JG_PR_POLL_CHECK_TMP=$(mktemp "$state/.jg-pr-poll-check.XXXXXX") || {
     jg_pr_poll_cleanup
     return 1
   }
-  FM_PR_POLL_REG_TMP=$(mktemp "$state/.jg-pr-poll-registration.XXXXXX") || {
+  JG_PR_POLL_REG_TMP=$(mktemp "$state/.jg-pr-poll-registration.XXXXXX") || {
     jg_pr_poll_cleanup
     return 1
   }
 
-  if ! printf '%s\n%s\n%s\n%s\n%s\n' "$provider" "$url" "$host" "$path" "$number" > "$FM_PR_POLL_DATA_TMP" \
-    || ! chmod 0600 "$FM_PR_POLL_DATA_TMP" \
-    || ! jg_pr_private_file_valid "$FM_PR_POLL_DATA_TMP" 600 "$FM_PR_POLL_STATE_DEVICE" \
-    || ! jg_pr_poll_data_parse "$FM_PR_POLL_DATA_TMP" \
-    || [ "$FM_PR_DATA_PROVIDER" != "$provider" ] \
-    || [ "$FM_PR_DATA_URL" != "$url" ] \
-    || [ "$FM_PR_DATA_HOST" != "$host" ] \
-    || [ "$FM_PR_DATA_PATH" != "$path" ] \
-    || [ "$FM_PR_DATA_NUMBER" != "$number" ] \
-    || ! cp "$template" "$FM_PR_POLL_CHECK_TMP" \
-    || ! chmod 0600 "$FM_PR_POLL_CHECK_TMP" \
-    || ! jg_pr_private_file_valid "$FM_PR_POLL_CHECK_TMP" 600 "$FM_PR_POLL_STATE_DEVICE" \
-    || ! cmp -s "$template" "$FM_PR_POLL_CHECK_TMP"; then
+  if ! printf '%s\n%s\n%s\n%s\n%s\n' "$provider" "$url" "$host" "$path" "$number" > "$JG_PR_POLL_DATA_TMP" \
+    || ! chmod 0600 "$JG_PR_POLL_DATA_TMP" \
+    || ! jg_pr_private_file_valid "$JG_PR_POLL_DATA_TMP" 600 "$JG_PR_POLL_STATE_DEVICE" \
+    || ! jg_pr_poll_data_parse "$JG_PR_POLL_DATA_TMP" \
+    || [ "$JG_PR_DATA_PROVIDER" != "$provider" ] \
+    || [ "$JG_PR_DATA_URL" != "$url" ] \
+    || [ "$JG_PR_DATA_HOST" != "$host" ] \
+    || [ "$JG_PR_DATA_PATH" != "$path" ] \
+    || [ "$JG_PR_DATA_NUMBER" != "$number" ] \
+    || ! cp "$template" "$JG_PR_POLL_CHECK_TMP" \
+    || ! chmod 0600 "$JG_PR_POLL_CHECK_TMP" \
+    || ! jg_pr_private_file_valid "$JG_PR_POLL_CHECK_TMP" 600 "$JG_PR_POLL_STATE_DEVICE" \
+    || ! cmp -s "$template" "$JG_PR_POLL_CHECK_TMP"; then
     jg_pr_poll_cleanup
     return 1
   fi
-  FM_PR_POLL_EXPECT_DATA_HASH=$(jg_pr_sha256 "$FM_PR_POLL_DATA_TMP") || { jg_pr_poll_cleanup; return 1; }
-  FM_PR_POLL_EXPECT_TEMPLATE_HASH=$(jg_pr_sha256 "$FM_PR_POLL_CHECK_TMP") || { jg_pr_poll_cleanup; return 1; }
-  FM_PR_POLL_EXPECT_DATA_IDENTITY=$(jg_pr_file_identity "$FM_PR_POLL_DATA_TMP") || { jg_pr_poll_cleanup; return 1; }
-  FM_PR_POLL_EXPECT_CHECK_IDENTITY=$(jg_pr_file_identity "$FM_PR_POLL_CHECK_TMP") || { jg_pr_poll_cleanup; return 1; }
+  JG_PR_POLL_EXPECT_DATA_HASH=$(jg_pr_sha256 "$JG_PR_POLL_DATA_TMP") || { jg_pr_poll_cleanup; return 1; }
+  JG_PR_POLL_EXPECT_TEMPLATE_HASH=$(jg_pr_sha256 "$JG_PR_POLL_CHECK_TMP") || { jg_pr_poll_cleanup; return 1; }
+  JG_PR_POLL_EXPECT_DATA_IDENTITY=$(jg_pr_file_identity "$JG_PR_POLL_DATA_TMP") || { jg_pr_poll_cleanup; return 1; }
+  JG_PR_POLL_EXPECT_CHECK_IDENTITY=$(jg_pr_file_identity "$JG_PR_POLL_CHECK_TMP") || { jg_pr_poll_cleanup; return 1; }
   if ! printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
       jg-pr-poll-registration-v2 "$id" "$provider" "$url" "$host" "$path" "$number" \
-      "$FM_PR_POLL_EXPECT_DATA_HASH" "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" \
-      "$FM_PR_POLL_EXPECT_DATA_IDENTITY" "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" \
-      > "$FM_PR_POLL_REG_TMP" \
-    || ! chmod 0600 "$FM_PR_POLL_REG_TMP" \
-    || ! jg_pr_private_file_valid "$FM_PR_POLL_REG_TMP" 600 "$FM_PR_POLL_STATE_DEVICE" \
-    || ! jg_pr_poll_registration_parse "$FM_PR_POLL_REG_TMP" \
-    || [ "$FM_PR_REG_ID" != "$id" ] \
-    || [ "$FM_PR_REG_DATA_HASH" != "$FM_PR_POLL_EXPECT_DATA_HASH" ] \
-    || [ "$FM_PR_REG_TEMPLATE_HASH" != "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ]; then
+      "$JG_PR_POLL_EXPECT_DATA_HASH" "$JG_PR_POLL_EXPECT_TEMPLATE_HASH" \
+      "$JG_PR_POLL_EXPECT_DATA_IDENTITY" "$JG_PR_POLL_EXPECT_CHECK_IDENTITY" \
+      > "$JG_PR_POLL_REG_TMP" \
+    || ! chmod 0600 "$JG_PR_POLL_REG_TMP" \
+    || ! jg_pr_private_file_valid "$JG_PR_POLL_REG_TMP" 600 "$JG_PR_POLL_STATE_DEVICE" \
+    || ! jg_pr_poll_registration_parse "$JG_PR_POLL_REG_TMP" \
+    || [ "$JG_PR_REG_ID" != "$id" ] \
+    || [ "$JG_PR_REG_DATA_HASH" != "$JG_PR_POLL_EXPECT_DATA_HASH" ] \
+    || [ "$JG_PR_REG_TEMPLATE_HASH" != "$JG_PR_POLL_EXPECT_TEMPLATE_HASH" ]; then
     jg_pr_poll_cleanup
     return 1
   fi
@@ -676,58 +676,58 @@ jg_pr_poll_prepare() {
 # The caller holds the task's poll publication lock while publishing this
 # prepared generation, so no registration can name another generation's files.
 jg_pr_poll_publish_prepared() {
-  [ -n "$FM_PR_POLL_DATA_TMP" ] && [ -n "$FM_PR_POLL_CHECK_TMP" ] \
-    && [ -n "$FM_PR_POLL_REG_TMP" ] || return 1
-  jg_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_DATA_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
-  jg_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_REG_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
-  jg_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" || return 1
+  [ -n "$JG_PR_POLL_DATA_TMP" ] && [ -n "$JG_PR_POLL_CHECK_TMP" ] \
+    && [ -n "$JG_PR_POLL_REG_TMP" ] || return 1
+  jg_pr_regular_destination_on_device_or_absent "$JG_PR_POLL_DATA_DEST" "$JG_PR_POLL_STATE_DEVICE" || return 1
+  jg_pr_regular_destination_on_device_or_absent "$JG_PR_POLL_REG_DEST" "$JG_PR_POLL_STATE_DEVICE" || return 1
+  jg_pr_regular_destination_on_device_or_absent "$JG_PR_POLL_CHECK_DEST" "$JG_PR_POLL_STATE_DEVICE" || return 1
 
-  if ! mv -f -- "$FM_PR_POLL_DATA_TMP" "$FM_PR_POLL_DATA_DEST"; then
+  if ! mv -f -- "$JG_PR_POLL_DATA_TMP" "$JG_PR_POLL_DATA_DEST"; then
     jg_pr_poll_revoke_final || true
     return 1
   fi
-  FM_PR_POLL_DATA_TMP=
-  if ! jg_pr_private_file_valid "$FM_PR_POLL_DATA_DEST" 600 "$FM_PR_POLL_STATE_DEVICE" \
-    || [ "$(jg_pr_file_identity "$FM_PR_POLL_DATA_DEST")" != "$FM_PR_POLL_EXPECT_DATA_IDENTITY" ] \
-    || [ "$(jg_pr_sha256 "$FM_PR_POLL_DATA_DEST")" != "$FM_PR_POLL_EXPECT_DATA_HASH" ] \
-    || ! jg_pr_poll_data_parse "$FM_PR_POLL_DATA_DEST" \
-    || [ "$FM_PR_DATA_PROVIDER" != "$FM_PR_POLL_EXPECT_PROVIDER" ] \
-    || [ "$FM_PR_DATA_URL" != "$FM_PR_POLL_EXPECT_URL" ] \
-    || [ "$FM_PR_DATA_HOST" != "$FM_PR_POLL_EXPECT_HOST" ] \
-    || [ "$FM_PR_DATA_PATH" != "$FM_PR_POLL_EXPECT_PATH" ] \
-    || [ "$FM_PR_DATA_NUMBER" != "$FM_PR_POLL_EXPECT_NUMBER" ]; then
-    jg_pr_poll_revoke_final || true
-    return 1
-  fi
-
-  if ! mv -f -- "$FM_PR_POLL_REG_TMP" "$FM_PR_POLL_REG_DEST"; then
-    jg_pr_poll_revoke_final || true
-    return 1
-  fi
-  FM_PR_POLL_REG_TMP=
-  if ! jg_pr_private_file_valid "$FM_PR_POLL_REG_DEST" 600 "$FM_PR_POLL_STATE_DEVICE" \
-    || ! jg_pr_poll_registration_parse "$FM_PR_POLL_REG_DEST" \
-    || [ "$FM_PR_REG_ID" != "$FM_PR_POLL_EXPECT_ID" ] \
-    || [ "$FM_PR_REG_PROVIDER" != "$FM_PR_POLL_EXPECT_PROVIDER" ] \
-    || [ "$FM_PR_REG_URL" != "$FM_PR_POLL_EXPECT_URL" ] \
-    || [ "$FM_PR_REG_HOST" != "$FM_PR_POLL_EXPECT_HOST" ] \
-    || [ "$FM_PR_REG_PATH" != "$FM_PR_POLL_EXPECT_PATH" ] \
-    || [ "$FM_PR_REG_NUMBER" != "$FM_PR_POLL_EXPECT_NUMBER" ] \
-    || [ "$FM_PR_REG_DATA_HASH" != "$FM_PR_POLL_EXPECT_DATA_HASH" ] \
-    || [ "$FM_PR_REG_TEMPLATE_HASH" != "$FM_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
-    || [ "$FM_PR_REG_DATA_IDENTITY" != "$FM_PR_POLL_EXPECT_DATA_IDENTITY" ] \
-    || [ "$FM_PR_REG_CHECK_IDENTITY" != "$FM_PR_POLL_EXPECT_CHECK_IDENTITY" ]; then
+  JG_PR_POLL_DATA_TMP=
+  if ! jg_pr_private_file_valid "$JG_PR_POLL_DATA_DEST" 600 "$JG_PR_POLL_STATE_DEVICE" \
+    || [ "$(jg_pr_file_identity "$JG_PR_POLL_DATA_DEST")" != "$JG_PR_POLL_EXPECT_DATA_IDENTITY" ] \
+    || [ "$(jg_pr_sha256 "$JG_PR_POLL_DATA_DEST")" != "$JG_PR_POLL_EXPECT_DATA_HASH" ] \
+    || ! jg_pr_poll_data_parse "$JG_PR_POLL_DATA_DEST" \
+    || [ "$JG_PR_DATA_PROVIDER" != "$JG_PR_POLL_EXPECT_PROVIDER" ] \
+    || [ "$JG_PR_DATA_URL" != "$JG_PR_POLL_EXPECT_URL" ] \
+    || [ "$JG_PR_DATA_HOST" != "$JG_PR_POLL_EXPECT_HOST" ] \
+    || [ "$JG_PR_DATA_PATH" != "$JG_PR_POLL_EXPECT_PATH" ] \
+    || [ "$JG_PR_DATA_NUMBER" != "$JG_PR_POLL_EXPECT_NUMBER" ]; then
     jg_pr_poll_revoke_final || true
     return 1
   fi
 
-  if ! jg_pr_regular_destination_on_device_or_absent "$FM_PR_POLL_CHECK_DEST" "$FM_PR_POLL_STATE_DEVICE" \
-    || ! mv -f -- "$FM_PR_POLL_CHECK_TMP" "$FM_PR_POLL_CHECK_DEST"; then
+  if ! mv -f -- "$JG_PR_POLL_REG_TMP" "$JG_PR_POLL_REG_DEST"; then
     jg_pr_poll_revoke_final || true
     return 1
   fi
-  FM_PR_POLL_CHECK_TMP=
-  if ! jg_pr_poll_artifacts_valid "${FM_PR_POLL_CHECK_DEST%/*}" "$FM_PR_POLL_EXPECT_ID" "$FM_PR_POLL_TEMPLATE"; then
+  JG_PR_POLL_REG_TMP=
+  if ! jg_pr_private_file_valid "$JG_PR_POLL_REG_DEST" 600 "$JG_PR_POLL_STATE_DEVICE" \
+    || ! jg_pr_poll_registration_parse "$JG_PR_POLL_REG_DEST" \
+    || [ "$JG_PR_REG_ID" != "$JG_PR_POLL_EXPECT_ID" ] \
+    || [ "$JG_PR_REG_PROVIDER" != "$JG_PR_POLL_EXPECT_PROVIDER" ] \
+    || [ "$JG_PR_REG_URL" != "$JG_PR_POLL_EXPECT_URL" ] \
+    || [ "$JG_PR_REG_HOST" != "$JG_PR_POLL_EXPECT_HOST" ] \
+    || [ "$JG_PR_REG_PATH" != "$JG_PR_POLL_EXPECT_PATH" ] \
+    || [ "$JG_PR_REG_NUMBER" != "$JG_PR_POLL_EXPECT_NUMBER" ] \
+    || [ "$JG_PR_REG_DATA_HASH" != "$JG_PR_POLL_EXPECT_DATA_HASH" ] \
+    || [ "$JG_PR_REG_TEMPLATE_HASH" != "$JG_PR_POLL_EXPECT_TEMPLATE_HASH" ] \
+    || [ "$JG_PR_REG_DATA_IDENTITY" != "$JG_PR_POLL_EXPECT_DATA_IDENTITY" ] \
+    || [ "$JG_PR_REG_CHECK_IDENTITY" != "$JG_PR_POLL_EXPECT_CHECK_IDENTITY" ]; then
+    jg_pr_poll_revoke_final || true
+    return 1
+  fi
+
+  if ! jg_pr_regular_destination_on_device_or_absent "$JG_PR_POLL_CHECK_DEST" "$JG_PR_POLL_STATE_DEVICE" \
+    || ! mv -f -- "$JG_PR_POLL_CHECK_TMP" "$JG_PR_POLL_CHECK_DEST"; then
+    jg_pr_poll_revoke_final || true
+    return 1
+  fi
+  JG_PR_POLL_CHECK_TMP=
+  if ! jg_pr_poll_artifacts_valid "${JG_PR_POLL_CHECK_DEST%/*}" "$JG_PR_POLL_EXPECT_ID" "$JG_PR_POLL_TEMPLATE"; then
     jg_pr_poll_revoke_final || true
     return 1
   fi
@@ -742,13 +742,13 @@ jg_pr_poll_artifacts_valid() {
   # check file objects published in its own transaction, so a byte-identical
   # replacement or a torn re-arm pairing one generation's check with another's
   # registration is refused.
-  [ "$FM_PR_REG_DATA_IDENTITY" = "$data_identity" ] || return 1
-  [ "$FM_PR_REG_CHECK_IDENTITY" = "$check_identity" ]
+  [ "$JG_PR_REG_DATA_IDENTITY" = "$data_identity" ] || return 1
+  [ "$JG_PR_REG_CHECK_IDENTITY" = "$check_identity" ]
 }
 
 # Everything jg_pr_poll_artifacts_valid proves except that the registration's
 # recorded file identities name the live sidecar and check. Success alone is
-# never authentication. On success FM_PR_DATA_*, FM_PR_REG_*, and FM_PR_META_*
+# never authentication. On success JG_PR_DATA_*, JG_PR_REG_*, and JG_PR_META_*
 # hold the parsed records.
 jg_pr_poll_artifacts_content_valid() {
   local state=$1 id=$2 template=$3 state_device check data registration meta data_hash template_hash
@@ -769,20 +769,20 @@ jg_pr_poll_artifacts_content_valid() {
   data_hash=$(jg_pr_sha256 "$data") || return 1
   template_hash=$(jg_pr_sha256 "$check") || return 1
   jg_pr_poll_registration_parse "$registration" || return 1
-  [ "$FM_PR_REG_ID" = "$id" ] || return 1
-  [ "$FM_PR_REG_PROVIDER" = "$FM_PR_DATA_PROVIDER" ] || return 1
-  [ "$FM_PR_REG_URL" = "$FM_PR_DATA_URL" ] || return 1
-  [ "$FM_PR_REG_HOST" = "$FM_PR_DATA_HOST" ] || return 1
-  [ "$FM_PR_REG_PATH" = "$FM_PR_DATA_PATH" ] || return 1
-  [ "$FM_PR_REG_NUMBER" = "$FM_PR_DATA_NUMBER" ] || return 1
-  [ "$FM_PR_REG_DATA_HASH" = "$data_hash" ] || return 1
-  [ "$FM_PR_REG_TEMPLATE_HASH" = "$template_hash" ] || return 1
+  [ "$JG_PR_REG_ID" = "$id" ] || return 1
+  [ "$JG_PR_REG_PROVIDER" = "$JG_PR_DATA_PROVIDER" ] || return 1
+  [ "$JG_PR_REG_URL" = "$JG_PR_DATA_URL" ] || return 1
+  [ "$JG_PR_REG_HOST" = "$JG_PR_DATA_HOST" ] || return 1
+  [ "$JG_PR_REG_PATH" = "$JG_PR_DATA_PATH" ] || return 1
+  [ "$JG_PR_REG_NUMBER" = "$JG_PR_DATA_NUMBER" ] || return 1
+  [ "$JG_PR_REG_DATA_HASH" = "$data_hash" ] || return 1
+  [ "$JG_PR_REG_TEMPLATE_HASH" = "$template_hash" ] || return 1
   jg_pr_metadata_identity_parse "$meta" || return 1
-  [ "$FM_PR_META_PROVIDER" = "$FM_PR_DATA_PROVIDER" ] || return 1
-  [ "$FM_PR_META_URL" = "$FM_PR_DATA_URL" ] || return 1
-  [ "$FM_PR_META_HOST" = "$FM_PR_DATA_HOST" ] || return 1
-  [ "$FM_PR_META_PATH" = "$FM_PR_DATA_PATH" ] || return 1
-  [ "$FM_PR_META_NUMBER" = "$FM_PR_DATA_NUMBER" ]
+  [ "$JG_PR_META_PROVIDER" = "$JG_PR_DATA_PROVIDER" ] || return 1
+  [ "$JG_PR_META_URL" = "$JG_PR_DATA_URL" ] || return 1
+  [ "$JG_PR_META_HOST" = "$JG_PR_DATA_HOST" ] || return 1
+  [ "$JG_PR_META_PATH" = "$JG_PR_DATA_PATH" ] || return 1
+  [ "$JG_PR_META_NUMBER" = "$JG_PR_DATA_NUMBER" ]
 }
 
 # A registration armed before a volume remount can name a device number the
@@ -795,12 +795,12 @@ jg_pr_poll_artifacts_content_valid() {
 # replaced, altered, re-moded, relinked, or foreign-device artifact fails a proof
 # here and stays refused. A pending retirement receipt owns its artifacts, so
 # none is re-recorded while one exists. On success
-# FM_PR_POLL_REARM_DATA_IDENTITY and FM_PR_POLL_REARM_CHECK_IDENTITY hold the
+# JG_PR_POLL_REARM_DATA_IDENTITY and JG_PR_POLL_REARM_CHECK_IDENTITY hold the
 # live identities.
 jg_pr_poll_registration_device_shifted() {  # <state> <id> <template>
   local state=$1 id=$2 template=$3 state_device recorded_device receipt data_identity check_identity
-  FM_PR_POLL_REARM_DATA_IDENTITY=
-  FM_PR_POLL_REARM_CHECK_IDENTITY=
+  JG_PR_POLL_REARM_DATA_IDENTITY=
+  JG_PR_POLL_REARM_CHECK_IDENTITY=
   jg_pr_task_id_valid "$id" || return 1
   [ -f "$state/$id.pr-poll-registration" ] || return 1
   receipt="$state/$id.pr-poll-retirement"
@@ -809,13 +809,13 @@ jg_pr_poll_registration_device_shifted() {  # <state> <id> <template>
   state_device=$(jg_pr_file_device "$state") || return 1
   data_identity=$(jg_pr_file_identity "$state/$id.pr-poll") || return 1
   check_identity=$(jg_pr_file_identity "$state/$id.check.sh") || return 1
-  recorded_device=${FM_PR_REG_DATA_IDENTITY%%:*}
-  [ "${FM_PR_REG_CHECK_IDENTITY%%:*}" = "$recorded_device" ] || return 1
+  recorded_device=${JG_PR_REG_DATA_IDENTITY%%:*}
+  [ "${JG_PR_REG_CHECK_IDENTITY%%:*}" = "$recorded_device" ] || return 1
   [ "$recorded_device" != "$state_device" ] || return 1
-  [ "$data_identity" = "$state_device:${FM_PR_REG_DATA_IDENTITY#*:}" ] || return 1
-  [ "$check_identity" = "$state_device:${FM_PR_REG_CHECK_IDENTITY#*:}" ] || return 1
-  FM_PR_POLL_REARM_DATA_IDENTITY=$data_identity
-  FM_PR_POLL_REARM_CHECK_IDENTITY=$check_identity
+  [ "$data_identity" = "$state_device:${JG_PR_REG_DATA_IDENTITY#*:}" ] || return 1
+  [ "$check_identity" = "$state_device:${JG_PR_REG_CHECK_IDENTITY#*:}" ] || return 1
+  JG_PR_POLL_REARM_DATA_IDENTITY=$data_identity
+  JG_PR_POLL_REARM_CHECK_IDENTITY=$check_identity
 }
 
 # Rewrite a device-shifted registration (jg_pr_poll_registration_device_shifted)
@@ -831,16 +831,16 @@ jg_pr_poll_registration_rerecord_device() {  # <state> <id> <template>
   local id_line provider url host path number data_hash template_hash data_identity check_identity
   jg_pr_poll_registration_device_shifted "$state" "$id" "$template" || return 1
   registration="$state/$id.pr-poll-registration"
-  id_line=$FM_PR_REG_ID
-  provider=$FM_PR_REG_PROVIDER
-  url=$FM_PR_REG_URL
-  host=$FM_PR_REG_HOST
-  path=$FM_PR_REG_PATH
-  number=$FM_PR_REG_NUMBER
-  data_hash=$FM_PR_REG_DATA_HASH
-  template_hash=$FM_PR_REG_TEMPLATE_HASH
-  data_identity=$FM_PR_POLL_REARM_DATA_IDENTITY
-  check_identity=$FM_PR_POLL_REARM_CHECK_IDENTITY
+  id_line=$JG_PR_REG_ID
+  provider=$JG_PR_REG_PROVIDER
+  url=$JG_PR_REG_URL
+  host=$JG_PR_REG_HOST
+  path=$JG_PR_REG_PATH
+  number=$JG_PR_REG_NUMBER
+  data_hash=$JG_PR_REG_DATA_HASH
+  template_hash=$JG_PR_REG_TEMPLATE_HASH
+  data_identity=$JG_PR_POLL_REARM_DATA_IDENTITY
+  check_identity=$JG_PR_POLL_REARM_CHECK_IDENTITY
   state_device=$(jg_pr_file_device "$state") || return 1
   reg_hash=$(jg_pr_sha256 "$registration") || return 1
   reg_identity=$(jg_pr_file_identity "$registration") || return 1
@@ -851,15 +851,15 @@ jg_pr_poll_registration_rerecord_device() {  # <state> <id> <template>
     || ! chmod 0600 "$tmp" \
     || ! jg_pr_private_file_valid "$tmp" 600 "$state_device" \
     || ! jg_pr_poll_registration_parse "$tmp" \
-    || [ "$FM_PR_REG_ID" != "$id" ] \
-    || [ "$FM_PR_REG_URL" != "$url" ] \
-    || [ "$FM_PR_REG_DATA_HASH" != "$data_hash" ] \
-    || [ "$FM_PR_REG_TEMPLATE_HASH" != "$template_hash" ] \
-    || [ "$FM_PR_REG_DATA_IDENTITY" != "$data_identity" ] \
-    || [ "$FM_PR_REG_CHECK_IDENTITY" != "$check_identity" ] \
+    || [ "$JG_PR_REG_ID" != "$id" ] \
+    || [ "$JG_PR_REG_URL" != "$url" ] \
+    || [ "$JG_PR_REG_DATA_HASH" != "$data_hash" ] \
+    || [ "$JG_PR_REG_TEMPLATE_HASH" != "$template_hash" ] \
+    || [ "$JG_PR_REG_DATA_IDENTITY" != "$data_identity" ] \
+    || [ "$JG_PR_REG_CHECK_IDENTITY" != "$check_identity" ] \
     || ! jg_pr_poll_registration_device_shifted "$state" "$id" "$template" \
-    || [ "$FM_PR_POLL_REARM_DATA_IDENTITY" != "$data_identity" ] \
-    || [ "$FM_PR_POLL_REARM_CHECK_IDENTITY" != "$check_identity" ] \
+    || [ "$JG_PR_POLL_REARM_DATA_IDENTITY" != "$data_identity" ] \
+    || [ "$JG_PR_POLL_REARM_CHECK_IDENTITY" != "$check_identity" ] \
     || [ "$(jg_pr_sha256 "$registration")" != "$reg_hash" ] \
     || [ "$(jg_pr_file_identity "$registration")" != "$reg_identity" ] \
     || ! jg_pr_regular_destination_on_device_or_absent "$registration" "$state_device" \
@@ -874,55 +874,55 @@ jg_pr_poll_snapshot_capture() {
   local state=$1 id=$2 template=$3 registration
   jg_pr_poll_artifacts_valid "$state" "$id" "$template" || return 1
   registration="$state/$id.pr-poll-registration"
-  FM_PR_POLL_SNAPSHOT_REG_HASH=$(jg_pr_sha256 "$registration") || return 1
-  FM_PR_POLL_SNAPSHOT_REG_IDENTITY=$(jg_pr_file_identity "$registration") || return 1
-  FM_PR_POLL_SNAPSHOT_ID=$id
-  FM_PR_POLL_SNAPSHOT_PROVIDER=$FM_PR_DATA_PROVIDER
-  FM_PR_POLL_SNAPSHOT_URL=$FM_PR_DATA_URL
-  FM_PR_POLL_SNAPSHOT_HOST=$FM_PR_DATA_HOST
-  FM_PR_POLL_SNAPSHOT_PATH=$FM_PR_DATA_PATH
-  FM_PR_POLL_SNAPSHOT_NUMBER=$FM_PR_DATA_NUMBER
-  FM_PR_POLL_SNAPSHOT_DATA_HASH=$FM_PR_REG_DATA_HASH
-  FM_PR_POLL_SNAPSHOT_TEMPLATE_HASH=$FM_PR_REG_TEMPLATE_HASH
-  FM_PR_POLL_SNAPSHOT_DATA_IDENTITY=$FM_PR_REG_DATA_IDENTITY
-  FM_PR_POLL_SNAPSHOT_CHECK_IDENTITY=$FM_PR_REG_CHECK_IDENTITY
+  JG_PR_POLL_SNAPSHOT_REG_HASH=$(jg_pr_sha256 "$registration") || return 1
+  JG_PR_POLL_SNAPSHOT_REG_IDENTITY=$(jg_pr_file_identity "$registration") || return 1
+  JG_PR_POLL_SNAPSHOT_ID=$id
+  JG_PR_POLL_SNAPSHOT_PROVIDER=$JG_PR_DATA_PROVIDER
+  JG_PR_POLL_SNAPSHOT_URL=$JG_PR_DATA_URL
+  JG_PR_POLL_SNAPSHOT_HOST=$JG_PR_DATA_HOST
+  JG_PR_POLL_SNAPSHOT_PATH=$JG_PR_DATA_PATH
+  JG_PR_POLL_SNAPSHOT_NUMBER=$JG_PR_DATA_NUMBER
+  JG_PR_POLL_SNAPSHOT_DATA_HASH=$JG_PR_REG_DATA_HASH
+  JG_PR_POLL_SNAPSHOT_TEMPLATE_HASH=$JG_PR_REG_TEMPLATE_HASH
+  JG_PR_POLL_SNAPSHOT_DATA_IDENTITY=$JG_PR_REG_DATA_IDENTITY
+  JG_PR_POLL_SNAPSHOT_CHECK_IDENTITY=$JG_PR_REG_CHECK_IDENTITY
 }
 
 jg_pr_poll_snapshot_matches() {
   local state=$1 id=$2 template=$3 registration reg_hash reg_identity
-  [ -n "$FM_PR_POLL_SNAPSHOT_ID" ] && [ "$id" = "$FM_PR_POLL_SNAPSHOT_ID" ] || return 1
+  [ -n "$JG_PR_POLL_SNAPSHOT_ID" ] && [ "$id" = "$JG_PR_POLL_SNAPSHOT_ID" ] || return 1
   jg_pr_poll_artifacts_valid "$state" "$id" "$template" || return 1
   registration="$state/$id.pr-poll-registration"
   reg_hash=$(jg_pr_sha256 "$registration") || return 1
   reg_identity=$(jg_pr_file_identity "$registration") || return 1
-  [ "$FM_PR_DATA_PROVIDER" = "$FM_PR_POLL_SNAPSHOT_PROVIDER" ] || return 1
-  [ "$FM_PR_DATA_URL" = "$FM_PR_POLL_SNAPSHOT_URL" ] || return 1
-  [ "$FM_PR_DATA_HOST" = "$FM_PR_POLL_SNAPSHOT_HOST" ] || return 1
-  [ "$FM_PR_DATA_PATH" = "$FM_PR_POLL_SNAPSHOT_PATH" ] || return 1
-  [ "$FM_PR_DATA_NUMBER" = "$FM_PR_POLL_SNAPSHOT_NUMBER" ] || return 1
-  [ "$FM_PR_REG_DATA_HASH" = "$FM_PR_POLL_SNAPSHOT_DATA_HASH" ] || return 1
-  [ "$FM_PR_REG_TEMPLATE_HASH" = "$FM_PR_POLL_SNAPSHOT_TEMPLATE_HASH" ] || return 1
-  [ "$FM_PR_REG_DATA_IDENTITY" = "$FM_PR_POLL_SNAPSHOT_DATA_IDENTITY" ] || return 1
-  [ "$FM_PR_REG_CHECK_IDENTITY" = "$FM_PR_POLL_SNAPSHOT_CHECK_IDENTITY" ] || return 1
-  [ "$reg_hash" = "$FM_PR_POLL_SNAPSHOT_REG_HASH" ] || return 1
-  [ "$reg_identity" = "$FM_PR_POLL_SNAPSHOT_REG_IDENTITY" ]
+  [ "$JG_PR_DATA_PROVIDER" = "$JG_PR_POLL_SNAPSHOT_PROVIDER" ] || return 1
+  [ "$JG_PR_DATA_URL" = "$JG_PR_POLL_SNAPSHOT_URL" ] || return 1
+  [ "$JG_PR_DATA_HOST" = "$JG_PR_POLL_SNAPSHOT_HOST" ] || return 1
+  [ "$JG_PR_DATA_PATH" = "$JG_PR_POLL_SNAPSHOT_PATH" ] || return 1
+  [ "$JG_PR_DATA_NUMBER" = "$JG_PR_POLL_SNAPSHOT_NUMBER" ] || return 1
+  [ "$JG_PR_REG_DATA_HASH" = "$JG_PR_POLL_SNAPSHOT_DATA_HASH" ] || return 1
+  [ "$JG_PR_REG_TEMPLATE_HASH" = "$JG_PR_POLL_SNAPSHOT_TEMPLATE_HASH" ] || return 1
+  [ "$JG_PR_REG_DATA_IDENTITY" = "$JG_PR_POLL_SNAPSHOT_DATA_IDENTITY" ] || return 1
+  [ "$JG_PR_REG_CHECK_IDENTITY" = "$JG_PR_POLL_SNAPSHOT_CHECK_IDENTITY" ] || return 1
+  [ "$reg_hash" = "$JG_PR_POLL_SNAPSHOT_REG_HASH" ] || return 1
+  [ "$reg_identity" = "$JG_PR_POLL_SNAPSHOT_REG_IDENTITY" ]
 }
 
 jg_pr_poll_retirement_parse() {
   local file=$1 version id provider url host path number data_hash template_hash
   local data_identity check_identity reg_hash reg_identity result _extra
-  FM_PR_RETIRE_ID=
-  FM_PR_RETIRE_PROVIDER=
-  FM_PR_RETIRE_URL=
-  FM_PR_RETIRE_HOST=
-  FM_PR_RETIRE_PATH=
-  FM_PR_RETIRE_NUMBER=
-  FM_PR_RETIRE_DATA_HASH=
-  FM_PR_RETIRE_TEMPLATE_HASH=
-  FM_PR_RETIRE_DATA_IDENTITY=
-  FM_PR_RETIRE_CHECK_IDENTITY=
-  FM_PR_RETIRE_REG_HASH=
-  FM_PR_RETIRE_REG_IDENTITY=
+  JG_PR_RETIRE_ID=
+  JG_PR_RETIRE_PROVIDER=
+  JG_PR_RETIRE_URL=
+  JG_PR_RETIRE_HOST=
+  JG_PR_RETIRE_PATH=
+  JG_PR_RETIRE_NUMBER=
+  JG_PR_RETIRE_DATA_HASH=
+  JG_PR_RETIRE_TEMPLATE_HASH=
+  JG_PR_RETIRE_DATA_IDENTITY=
+  JG_PR_RETIRE_CHECK_IDENTITY=
+  JG_PR_RETIRE_REG_HASH=
+  JG_PR_RETIRE_REG_IDENTITY=
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   exec 9< "$file" || return 1
   IFS= read -r version <&9 || { exec 9<&-; return 1; }
@@ -947,10 +947,10 @@ jg_pr_poll_retirement_parse() {
   [ "$version" = jg-pr-poll-retirement-v1 ] || return 1
   jg_pr_task_id_valid "$id" || return 1
   jg_pr_url_parse "$url" || return 1
-  [ "$provider" = "$FM_PR_PROVIDER" ] || return 1
-  [ "$host" = "$FM_PR_HOST" ] || return 1
-  [ "$path" = "$FM_PR_PATH" ] || return 1
-  [ "$number" = "$FM_PR_NUMBER" ] || return 1
+  [ "$provider" = "$JG_PR_PROVIDER" ] || return 1
+  [ "$host" = "$JG_PR_HOST" ] || return 1
+  [ "$path" = "$JG_PR_PATH" ] || return 1
+  [ "$number" = "$JG_PR_NUMBER" ] || return 1
   [[ "$data_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ "$template_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ "$data_identity" =~ ^[0-9]+:[0-9]+$ ]] || return 1
@@ -958,18 +958,18 @@ jg_pr_poll_retirement_parse() {
   [[ "$reg_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
   [[ "$reg_identity" =~ ^[0-9]+:[0-9]+$ ]] || return 1
   [ "$result" = merged ] || return 1
-  FM_PR_RETIRE_ID=$id
-  FM_PR_RETIRE_PROVIDER=$provider
-  FM_PR_RETIRE_URL=$url
-  FM_PR_RETIRE_HOST=$host
-  FM_PR_RETIRE_PATH=$path
-  FM_PR_RETIRE_NUMBER=$number
-  FM_PR_RETIRE_DATA_HASH=$data_hash
-  FM_PR_RETIRE_TEMPLATE_HASH=$template_hash
-  FM_PR_RETIRE_DATA_IDENTITY=$data_identity
-  FM_PR_RETIRE_CHECK_IDENTITY=$check_identity
-  FM_PR_RETIRE_REG_HASH=$reg_hash
-  FM_PR_RETIRE_REG_IDENTITY=$reg_identity
+  JG_PR_RETIRE_ID=$id
+  JG_PR_RETIRE_PROVIDER=$provider
+  JG_PR_RETIRE_URL=$url
+  JG_PR_RETIRE_HOST=$host
+  JG_PR_RETIRE_PATH=$path
+  JG_PR_RETIRE_NUMBER=$number
+  JG_PR_RETIRE_DATA_HASH=$data_hash
+  JG_PR_RETIRE_TEMPLATE_HASH=$template_hash
+  JG_PR_RETIRE_DATA_IDENTITY=$data_identity
+  JG_PR_RETIRE_CHECK_IDENTITY=$check_identity
+  JG_PR_RETIRE_REG_HASH=$reg_hash
+  JG_PR_RETIRE_REG_IDENTITY=$reg_identity
 }
 
 jg_pr_poll_retirement_receipt_valid() {
@@ -980,23 +980,23 @@ jg_pr_poll_retirement_receipt_valid() {
   receipt="$state/$id.pr-poll-retirement"
   jg_pr_private_file_valid "$receipt" 600 "$state_device" || return 1
   jg_pr_poll_retirement_parse "$receipt" || return 1
-  [ "$FM_PR_RETIRE_ID" = "$id" ] || return 1
+  [ "$JG_PR_RETIRE_ID" = "$id" ] || return 1
   meta="$state/$id.meta"
   jg_pr_metadata_identity_parse "$meta" || return 1
-  [ "$FM_PR_META_PROVIDER" = "$FM_PR_RETIRE_PROVIDER" ] || return 1
-  [ "$FM_PR_META_URL" = "$FM_PR_RETIRE_URL" ] || return 1
-  [ "$FM_PR_META_HOST" = "$FM_PR_RETIRE_HOST" ] || return 1
-  [ "$FM_PR_META_PATH" = "$FM_PR_RETIRE_PATH" ] || return 1
-  [ "$FM_PR_META_NUMBER" = "$FM_PR_RETIRE_NUMBER" ] || return 1
-  FM_PR_RETIRE_RECEIPT_HASH=$(jg_pr_sha256 "$receipt") || return 1
-  FM_PR_RETIRE_RECEIPT_IDENTITY=$(jg_pr_file_identity "$receipt") || return 1
+  [ "$JG_PR_META_PROVIDER" = "$JG_PR_RETIRE_PROVIDER" ] || return 1
+  [ "$JG_PR_META_URL" = "$JG_PR_RETIRE_URL" ] || return 1
+  [ "$JG_PR_META_HOST" = "$JG_PR_RETIRE_HOST" ] || return 1
+  [ "$JG_PR_META_PATH" = "$JG_PR_RETIRE_PATH" ] || return 1
+  [ "$JG_PR_META_NUMBER" = "$JG_PR_RETIRE_NUMBER" ] || return 1
+  JG_PR_RETIRE_RECEIPT_HASH=$(jg_pr_sha256 "$receipt") || return 1
+  JG_PR_RETIRE_RECEIPT_IDENTITY=$(jg_pr_file_identity "$receipt") || return 1
 }
 
 jg_pr_github_read_record_with_gh() {  # <owner> <repo> <number>
   local owner=$1 repo=$2 number=$3 fields line total=0 named=0
   local state='' merged=''
-  FM_PR_RECORD_STATE=
-  FM_PR_RECORD_MERGED=
+  JG_PR_RECORD_STATE=
+  JG_PR_RECORD_MERGED=
 
   # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
   if ! fields=$(gh api graphql \
@@ -1024,16 +1024,16 @@ FIELDS
 
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_STATE=$state
+  JG_PR_RECORD_STATE=$state
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_MERGED=$merged
 }
 
 jg_pr_github_read_record_with_gh_axi() {  # <owner> <repo> <number>
   local owner=$1 repo=$2 number=$3 output state
-  FM_PR_RECORD_STATE=
-  FM_PR_RECORD_MERGED=
+  JG_PR_RECORD_STATE=
+  JG_PR_RECORD_MERGED=
   if ! output=$(gh-axi pr view "$number" --repo "$owner/$repo" 2>/dev/null); then
     return 1
   fi
@@ -1047,26 +1047,26 @@ jg_pr_github_read_record_with_gh_axi() {  # <owner> <repo> <number>
     MERGED|merged)
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_STATE=MERGED
+      JG_PR_RECORD_STATE=MERGED
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_MERGED=true
+      JG_PR_RECORD_MERGED=true
       ;;
     OPEN|open)
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_STATE=OPEN
+      JG_PR_RECORD_STATE=OPEN
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_MERGED=false
+      JG_PR_RECORD_MERGED=false
       ;;
     CLOSED|closed)
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_STATE=CLOSED
+      JG_PR_RECORD_STATE=CLOSED
       # Consumed by bin/jg-crew-state.sh passed_pr_detail.
       # shellcheck disable=SC2034
-      FM_PR_RECORD_MERGED=false
+      JG_PR_RECORD_MERGED=false
       ;;
     *)
       return 1
@@ -1085,8 +1085,8 @@ jg_pr_github_read_record() {  # <owner> <repo> <number>
 jg_pr_gitlab_read_record() {  # <host> <path> <number>
   local host=$1 path=$2 number=$3 project_url json fields line
   local total=0 named=0 state='' merged=''
-  FM_PR_RECORD_STATE=
-  FM_PR_RECORD_MERGED=
+  JG_PR_RECORD_STATE=
+  JG_PR_RECORD_MERGED=
   command -v glab >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
   project_url="https://$host/$path"
@@ -1122,10 +1122,10 @@ FIELDS
 
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_STATE=$state
+  JG_PR_RECORD_STATE=$state
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_MERGED=$merged
 }
 
 # tea addresses a repo by slug only and takes the host from a named login, so
@@ -1138,7 +1138,7 @@ FIELDS
 # userinfo, port, and path stripped - is exactly <host>. bin/jg-pr-poll.sh keeps
 # its own copy of this filter because the watcher body sources nothing.
 # shellcheck disable=SC2016 # $h is a jq variable bound by --arg, not a shell one.
-FM_PR_FORGEJO_LOGIN_JQ='
+JG_PR_FORGEJO_LOGIN_JQ='
   if type == "array" then
     [ .[]
       | select(type == "object" and (.name | type) == "string" and (.name | length) > 0
@@ -1156,7 +1156,7 @@ FM_PR_FORGEJO_LOGIN_JQ='
 jg_pr_forgejo_login() {  # <host>
   command -v tea >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
-  tea login list --output json 2>/dev/null | jq -er --arg h "$1" "$FM_PR_FORGEJO_LOGIN_JQ" 2>/dev/null
+  tea login list --output json 2>/dev/null | jq -er --arg h "$1" "$JG_PR_FORGEJO_LOGIN_JQ" 2>/dev/null
 }
 
 # The state, merged flag, and head commit of one Forgejo pull request, read
@@ -1167,9 +1167,9 @@ jg_pr_forgejo_login() {  # <host>
 jg_pr_forgejo_read_record() {  # <host> <path> <number>
   local host=$1 path=$2 number=$3 login json fields line
   local total=0 named=0 state='' merged='' head=''
-  FM_PR_RECORD_STATE=
-  FM_PR_RECORD_MERGED=
-  FM_PR_RECORD_HEAD=
+  JG_PR_RECORD_STATE=
+  JG_PR_RECORD_MERGED=
+  JG_PR_RECORD_HEAD=
   command -v jq >/dev/null 2>&1 || return 1
   case "$number" in
     ''|*[!0-9]*) return 1 ;;
@@ -1211,13 +1211,13 @@ FIELDS
 
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_STATE=$state
+  JG_PR_RECORD_STATE=$state
   # Consumed by bin/jg-crew-state.sh passed_pr_detail and bin/jg-teardown.sh.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_MERGED=$merged
   # Consumed by bin/jg-teardown.sh pr_is_merged.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_HEAD=$head
+  JG_PR_RECORD_HEAD=$head
 }
 
 # gerrit-axi resolves its server from the current directory's origin remote
@@ -1258,8 +1258,8 @@ jg_pr_gerrit_read_change() {  # <host> <number>
 # submittable, and blocked_on values, so only the status separates them.
 jg_pr_gerrit_read_record() {  # <host> <number>
   local record state merged=false
-  FM_PR_RECORD_STATE=
-  FM_PR_RECORD_MERGED=
+  JG_PR_RECORD_STATE=
+  JG_PR_RECORD_MERGED=
   record=$(jg_pr_gerrit_read_change "$1" "$2") || return 1
   state=$(printf '%s' "$record" | jq -r '
     if (.status | type) == "string" and .status != "" and (.status | test("\n") | not)
@@ -1271,10 +1271,10 @@ jg_pr_gerrit_read_record() {  # <host> <number>
 
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_STATE=$state
+  JG_PR_RECORD_STATE=$state
   # Consumed by bin/jg-crew-state.sh passed_pr_detail.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_MERGED=$merged
+  JG_PR_RECORD_MERGED=$merged
 }
 
 # The current patch set revision of one Gerrit change, read from the same exact
@@ -1284,7 +1284,7 @@ jg_pr_gerrit_read_record() {  # <host> <number>
 # amend replaces it.
 jg_pr_gerrit_read_revision() {  # <host> <number>
   local record revision
-  FM_PR_RECORD_REVISION=
+  JG_PR_RECORD_REVISION=
   record=$(jg_pr_gerrit_read_change "$1" "$2") || return 1
   revision=$(printf '%s' "$record" | jq -r '
     if (.revision | type) == "string" then .revision else error("no revision") end' 2>/dev/null) \
@@ -1292,7 +1292,7 @@ jg_pr_gerrit_read_revision() {  # <host> <number>
   jg_pr_head_valid "$revision" || return 1
   # Consumed by bin/jg-dod-lib.sh jg_dod_gerrit_change_carries_head.
   # shellcheck disable=SC2034
-  FM_PR_RECORD_REVISION=$revision
+  JG_PR_RECORD_REVISION=$revision
 }
 
 jg_pr_poll_retirement_data_valid() {
@@ -1303,13 +1303,13 @@ jg_pr_poll_retirement_data_valid() {
   jg_pr_poll_data_parse "$data" || return 1
   data_hash=$(jg_pr_sha256 "$data") || return 1
   data_identity=$(jg_pr_file_identity "$data") || return 1
-  [ "$FM_PR_DATA_PROVIDER" = "$FM_PR_RETIRE_PROVIDER" ] || return 1
-  [ "$FM_PR_DATA_URL" = "$FM_PR_RETIRE_URL" ] || return 1
-  [ "$FM_PR_DATA_HOST" = "$FM_PR_RETIRE_HOST" ] || return 1
-  [ "$FM_PR_DATA_PATH" = "$FM_PR_RETIRE_PATH" ] || return 1
-  [ "$FM_PR_DATA_NUMBER" = "$FM_PR_RETIRE_NUMBER" ] || return 1
-  [ "$data_hash" = "$FM_PR_RETIRE_DATA_HASH" ] || return 1
-  [ "$data_identity" = "$FM_PR_RETIRE_DATA_IDENTITY" ]
+  [ "$JG_PR_DATA_PROVIDER" = "$JG_PR_RETIRE_PROVIDER" ] || return 1
+  [ "$JG_PR_DATA_URL" = "$JG_PR_RETIRE_URL" ] || return 1
+  [ "$JG_PR_DATA_HOST" = "$JG_PR_RETIRE_HOST" ] || return 1
+  [ "$JG_PR_DATA_PATH" = "$JG_PR_RETIRE_PATH" ] || return 1
+  [ "$JG_PR_DATA_NUMBER" = "$JG_PR_RETIRE_NUMBER" ] || return 1
+  [ "$data_hash" = "$JG_PR_RETIRE_DATA_HASH" ] || return 1
+  [ "$data_identity" = "$JG_PR_RETIRE_DATA_IDENTITY" ]
 }
 
 jg_pr_poll_retirement_registration_valid() {
@@ -1320,18 +1320,18 @@ jg_pr_poll_retirement_registration_valid() {
   jg_pr_poll_registration_parse "$registration" || return 1
   reg_hash=$(jg_pr_sha256 "$registration") || return 1
   reg_identity=$(jg_pr_file_identity "$registration") || return 1
-  [ "$FM_PR_REG_ID" = "$id" ] || return 1
-  [ "$FM_PR_REG_PROVIDER" = "$FM_PR_RETIRE_PROVIDER" ] || return 1
-  [ "$FM_PR_REG_URL" = "$FM_PR_RETIRE_URL" ] || return 1
-  [ "$FM_PR_REG_HOST" = "$FM_PR_RETIRE_HOST" ] || return 1
-  [ "$FM_PR_REG_PATH" = "$FM_PR_RETIRE_PATH" ] || return 1
-  [ "$FM_PR_REG_NUMBER" = "$FM_PR_RETIRE_NUMBER" ] || return 1
-  [ "$FM_PR_REG_DATA_HASH" = "$FM_PR_RETIRE_DATA_HASH" ] || return 1
-  [ "$FM_PR_REG_TEMPLATE_HASH" = "$FM_PR_RETIRE_TEMPLATE_HASH" ] || return 1
-  [ "$FM_PR_REG_DATA_IDENTITY" = "$FM_PR_RETIRE_DATA_IDENTITY" ] || return 1
-  [ "$FM_PR_REG_CHECK_IDENTITY" = "$FM_PR_RETIRE_CHECK_IDENTITY" ] || return 1
-  [ "$reg_hash" = "$FM_PR_RETIRE_REG_HASH" ] || return 1
-  [ "$reg_identity" = "$FM_PR_RETIRE_REG_IDENTITY" ]
+  [ "$JG_PR_REG_ID" = "$id" ] || return 1
+  [ "$JG_PR_REG_PROVIDER" = "$JG_PR_RETIRE_PROVIDER" ] || return 1
+  [ "$JG_PR_REG_URL" = "$JG_PR_RETIRE_URL" ] || return 1
+  [ "$JG_PR_REG_HOST" = "$JG_PR_RETIRE_HOST" ] || return 1
+  [ "$JG_PR_REG_PATH" = "$JG_PR_RETIRE_PATH" ] || return 1
+  [ "$JG_PR_REG_NUMBER" = "$JG_PR_RETIRE_NUMBER" ] || return 1
+  [ "$JG_PR_REG_DATA_HASH" = "$JG_PR_RETIRE_DATA_HASH" ] || return 1
+  [ "$JG_PR_REG_TEMPLATE_HASH" = "$JG_PR_RETIRE_TEMPLATE_HASH" ] || return 1
+  [ "$JG_PR_REG_DATA_IDENTITY" = "$JG_PR_RETIRE_DATA_IDENTITY" ] || return 1
+  [ "$JG_PR_REG_CHECK_IDENTITY" = "$JG_PR_RETIRE_CHECK_IDENTITY" ] || return 1
+  [ "$reg_hash" = "$JG_PR_RETIRE_REG_HASH" ] || return 1
+  [ "$reg_identity" = "$JG_PR_RETIRE_REG_IDENTITY" ]
 }
 
 jg_pr_poll_retirement_check_valid() {
@@ -1341,8 +1341,8 @@ jg_pr_poll_retirement_check_valid() {
   jg_pr_private_file_valid "$check" 600 "$state_device" || return 1
   check_hash=$(jg_pr_sha256 "$check") || return 1
   check_identity=$(jg_pr_file_identity "$check") || return 1
-  [ "$check_hash" = "$FM_PR_RETIRE_TEMPLATE_HASH" ] || return 1
-  [ "$check_identity" = "$FM_PR_RETIRE_CHECK_IDENTITY" ]
+  [ "$check_hash" = "$JG_PR_RETIRE_TEMPLATE_HASH" ] || return 1
+  [ "$check_identity" = "$JG_PR_RETIRE_CHECK_IDENTITY" ]
 }
 
 jg_pr_poll_retirement_state_valid() {
@@ -1388,17 +1388,17 @@ jg_pr_poll_retirement_discard_obsolete() {
   receipt="$state/$id.pr-poll-retirement"
   jg_pr_private_file_valid "$receipt" 600 "$state_device" || return 1
   jg_pr_poll_retirement_parse "$receipt" || return 1
-  [ "$FM_PR_RETIRE_ID" = "$id" ] || return 1
+  [ "$JG_PR_RETIRE_ID" = "$id" ] || return 1
   receipt_hash=$(jg_pr_sha256 "$receipt") || return 1
   receipt_identity=$(jg_pr_file_identity "$receipt") || return 1
   jg_pr_poll_artifacts_valid "$state" "$id" "$template" || return 1
   registration="$state/$id.pr-poll-registration"
   current_reg_hash=$(jg_pr_sha256 "$registration") || return 1
   current_reg_identity=$(jg_pr_file_identity "$registration") || return 1
-  if [ "$current_reg_hash" = "$FM_PR_RETIRE_REG_HASH" ] \
-    && [ "$current_reg_identity" = "$FM_PR_RETIRE_REG_IDENTITY" ] \
-    && [ "$FM_PR_REG_DATA_IDENTITY" = "$FM_PR_RETIRE_DATA_IDENTITY" ] \
-    && [ "$FM_PR_REG_CHECK_IDENTITY" = "$FM_PR_RETIRE_CHECK_IDENTITY" ]; then
+  if [ "$current_reg_hash" = "$JG_PR_RETIRE_REG_HASH" ] \
+    && [ "$current_reg_identity" = "$JG_PR_RETIRE_REG_IDENTITY" ] \
+    && [ "$JG_PR_REG_DATA_IDENTITY" = "$JG_PR_RETIRE_DATA_IDENTITY" ] \
+    && [ "$JG_PR_REG_CHECK_IDENTITY" = "$JG_PR_RETIRE_CHECK_IDENTITY" ]; then
     return 1
   fi
   jg_pr_poll_retirement_remove_exact "$receipt" "$state_device" \
@@ -1417,23 +1417,23 @@ jg_pr_poll_retirement_publish() {
   tmp=$(mktemp "$state/.jg-pr-poll-retirement.XXXXXX") || return 1
   if ! printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
       jg-pr-poll-retirement-v1 \
-      "$FM_PR_POLL_SNAPSHOT_ID" \
-      "$FM_PR_POLL_SNAPSHOT_PROVIDER" \
-      "$FM_PR_POLL_SNAPSHOT_URL" \
-      "$FM_PR_POLL_SNAPSHOT_HOST" \
-      "$FM_PR_POLL_SNAPSHOT_PATH" \
-      "$FM_PR_POLL_SNAPSHOT_NUMBER" \
-      "$FM_PR_POLL_SNAPSHOT_DATA_HASH" \
-      "$FM_PR_POLL_SNAPSHOT_TEMPLATE_HASH" \
-      "$FM_PR_POLL_SNAPSHOT_DATA_IDENTITY" \
-      "$FM_PR_POLL_SNAPSHOT_CHECK_IDENTITY" \
-      "$FM_PR_POLL_SNAPSHOT_REG_HASH" \
-      "$FM_PR_POLL_SNAPSHOT_REG_IDENTITY" \
+      "$JG_PR_POLL_SNAPSHOT_ID" \
+      "$JG_PR_POLL_SNAPSHOT_PROVIDER" \
+      "$JG_PR_POLL_SNAPSHOT_URL" \
+      "$JG_PR_POLL_SNAPSHOT_HOST" \
+      "$JG_PR_POLL_SNAPSHOT_PATH" \
+      "$JG_PR_POLL_SNAPSHOT_NUMBER" \
+      "$JG_PR_POLL_SNAPSHOT_DATA_HASH" \
+      "$JG_PR_POLL_SNAPSHOT_TEMPLATE_HASH" \
+      "$JG_PR_POLL_SNAPSHOT_DATA_IDENTITY" \
+      "$JG_PR_POLL_SNAPSHOT_CHECK_IDENTITY" \
+      "$JG_PR_POLL_SNAPSHOT_REG_HASH" \
+      "$JG_PR_POLL_SNAPSHOT_REG_IDENTITY" \
       merged > "$tmp" \
     || ! chmod 0600 "$tmp" \
     || ! jg_pr_private_file_valid "$tmp" 600 "$state_device" \
     || ! jg_pr_poll_retirement_parse "$tmp" \
-    || [ "$FM_PR_RETIRE_ID" != "$id" ] \
+    || [ "$JG_PR_RETIRE_ID" != "$id" ] \
     || ! jg_pr_poll_snapshot_matches "$state" "$id" "$template" \
     || ! jg_pr_regular_destination_on_device_or_absent "$receipt" "$state_device" \
     || [ -e "$receipt" ] || [ -L "$receipt" ] \
@@ -1460,19 +1460,19 @@ jg_pr_poll_retirement_recover_one() {
   check="$state/$id.check.sh"
   data="$state/$id.pr-poll"
   registration="$state/$id.pr-poll-registration"
-  receipt_hash=$FM_PR_RETIRE_RECEIPT_HASH
-  receipt_identity=$FM_PR_RETIRE_RECEIPT_IDENTITY
+  receipt_hash=$JG_PR_RETIRE_RECEIPT_HASH
+  receipt_identity=$JG_PR_RETIRE_RECEIPT_IDENTITY
   if [ -e "$check" ] || [ -L "$check" ]; then
     jg_pr_poll_retirement_remove_exact "$check" "$state_device" \
-      "$FM_PR_RETIRE_CHECK_IDENTITY" "$FM_PR_RETIRE_TEMPLATE_HASH" || return 1
+      "$JG_PR_RETIRE_CHECK_IDENTITY" "$JG_PR_RETIRE_TEMPLATE_HASH" || return 1
   fi
   if [ -e "$registration" ] || [ -L "$registration" ]; then
     jg_pr_poll_retirement_remove_exact "$registration" "$state_device" \
-      "$FM_PR_RETIRE_REG_IDENTITY" "$FM_PR_RETIRE_REG_HASH" || return 1
+      "$JG_PR_RETIRE_REG_IDENTITY" "$JG_PR_RETIRE_REG_HASH" || return 1
   fi
   if [ -e "$data" ] || [ -L "$data" ]; then
     jg_pr_poll_retirement_remove_exact "$data" "$state_device" \
-      "$FM_PR_RETIRE_DATA_IDENTITY" "$FM_PR_RETIRE_DATA_HASH" || return 1
+      "$JG_PR_RETIRE_DATA_IDENTITY" "$JG_PR_RETIRE_DATA_HASH" || return 1
   fi
   jg_pr_poll_retirement_remove_exact "$receipt" "$state_device" \
     "$receipt_identity" "$receipt_hash" || return 1
@@ -1484,16 +1484,16 @@ jg_pr_poll_retirement_recover_one() {
 
 jg_pr_poll_retirement_recover_all() {
   local state=$1 template=$2 receipt id
-  FM_PR_POLL_RETIREMENT_REJECTED=
+  JG_PR_POLL_RETIREMENT_REJECTED=
   for receipt in "$state"/*.pr-poll-retirement; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     id=$(basename "$receipt" .pr-poll-retirement)
     if ! jg_pr_task_id_valid "$id" \
       || ! jg_pr_poll_retirement_recover_one "$state" "$id" "$template"; then
-      FM_PR_POLL_RETIREMENT_REJECTED="$FM_PR_POLL_RETIREMENT_REJECTED $receipt"
+      JG_PR_POLL_RETIREMENT_REJECTED="$JG_PR_POLL_RETIREMENT_REJECTED $receipt"
     fi
   done
-  [ -z "$FM_PR_POLL_RETIREMENT_REJECTED" ]
+  [ -z "$JG_PR_POLL_RETIREMENT_REJECTED" ]
 }
 
 # --- merge-notification canonical-identity marker ----------------------------

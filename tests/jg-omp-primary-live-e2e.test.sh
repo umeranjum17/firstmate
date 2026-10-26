@@ -19,7 +19,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_OMP_LIVE_E2E omp node jq
+jg_live_gate opt-in JG_OMP_LIVE_E2E omp node jq
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 unset NO_MISTAKES_GATE
@@ -33,7 +33,7 @@ fail() {
     tail -12 "${GUARD_SPY_LOG:-/dev/null}" >&2 2>/dev/null
     printf '# last stderr lines:\n' >&2
     tail -5 "${RPC_ERR:-/dev/null}" >&2
-    if [ "${FM_OMP_LIVE_KEEP:-0}" = 1 ]; then
+    if [ "${JG_OMP_LIVE_KEEP:-0}" = 1 ]; then
       printf '# lab kept at %s\n' "$LAB" >&2
       trap - EXIT
       exec 3>&- 2>/dev/null || true
@@ -46,8 +46,8 @@ pass() { printf 'ok - %s\n' "$1"; }
 note() { printf '# %s\n' "$1"; }
 
 OMP_VERSION=$(omp --version 2>/dev/null | head -1)
-MODEL=${FM_OMP_LIVE_MODEL:-openai-codex/gpt-6-astra}
-# The guard's beacon grace for this lab. The watcher beats every FM_POLL=1s, so
+MODEL=${JG_OMP_LIVE_MODEL:-openai-codex/gpt-6-astra}
+# The guard's beacon grace for this lab. The watcher beats every JG_POLL=1s, so
 # a 20s grace is comfortably healthy in normal operation and lets stage 3 make
 # the beacon stale by freezing the watcher for a bounded time instead of killing
 # it: a killed watcher closes its arm child and the extension re-arms within
@@ -188,10 +188,10 @@ mkfifo "$RPC_IN" || fail "could not create the rpc fifo"
 : > "$RPC_LOG"
 (
   cd "$PROJECT" &&
-    env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
-      FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=600 \
-      FM_GUARD_GRACE="$GUARD_GRACE" \
+    env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u JG_PI_HARNESS -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
+      -u JG_HOME -u JG_ROOT_OVERRIDE -u JG_STATE_OVERRIDE -u JG_CONFIG_OVERRIDE -u JG_DATA_OVERRIDE \
+      JG_OMP_HARNESS=omp OMP_SKIP_SETUP=1 JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HEARTBEAT=600 \
+      JG_GUARD_GRACE="$GUARD_GRACE" \
       omp --mode rpc --no-session --cwd "$PROJECT" --config "$PROJECT/.omp/jg-worker-overlay.yml" --auto-approve \
         --model "$MODEL" --thinking low < "$RPC_IN" > "$RPC_LOG" 2> "$RPC_ERR"
 ) &

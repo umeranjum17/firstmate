@@ -234,10 +234,10 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
 # shellcheck source=bin/jg-classify-lib.sh
 # shellcheck disable=SC1091
@@ -262,7 +262,7 @@ PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
   local id=$1 occurrence=$2 verb=$3 note=$4 rc=0
   PARENT_HOLD_PUBLISHED=0
-  jg_parent_channel_report "$FM_HOME" "$STATE" \
+  jg_parent_channel_report "$JG_HOME" "$STATE" \
     "$verb [key=captain-hold-$id-$occurrence]: captain hold $id: $(jg_parent_channel_clean_note "$note")" || rc=$?
   case "$rc" in
     0|1) PARENT_HOLD_PUBLISHED=1 ;;
@@ -371,10 +371,10 @@ load_decision() {  # <path>; sets DECISION_TEXT and DECISION_DIGEST
 tasks_axi() {
   local data file root backend
   data=$(jg_backlog_data_absolute "$DATA") || fail "data directory cannot be resolved: $DATA"
-  root=$(jg_backlog_root "$data") || fail "$FM_BACKLOG_TRANSITION_ERROR"
+  root=$(jg_backlog_root "$data") || fail "$JG_BACKLOG_TRANSITION_ERROR"
   backend=$(jg_tasks_axi_backend "$root") || return 2
   if [ "$backend" = markdown ]; then
-    file=$(jg_backlog_file "$data") || fail "$FM_BACKLOG_TRANSITION_ERROR"
+    file=$(jg_backlog_file "$data") || fail "$JG_BACKLOG_TRANSITION_ERROR"
     (cd "$root" && tasks-axi "$@" --file "$file")
   else
     (cd "$root" && tasks-axi "$@")
@@ -627,7 +627,7 @@ captain_migration_scan_load() {  # <resolved-data-dir>
   local data=$1 root entries bd_bin bd_path backend
   [ "$CAPTAIN_MIGRATION_SCAN_LOADED" = 1 ] && return 0
   root=$(jg_backlog_root "$data") || {
-    printf 'jg-captain-hold: the configured data directory cannot be resolved for a migration scan: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
+    printf 'jg-captain-hold: the configured data directory cannot be resolved for a migration scan: %s\n' "$JG_BACKLOG_TRANSITION_ERROR" >&2
     return 2
   }
   backend=$(jg_tasks_axi_backend "$root") || return 2
@@ -685,12 +685,12 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
   local candidate candidate_matches prefixed matches count prefixed_matches prefixed_count
   data=$(jg_backlog_data_absolute "$DATA") || {
     printf 'jg-captain-hold: the migrated hold of %s cannot be resolved: %s\n' \
-      "$entry" "${FM_BACKLOG_TRANSITION_ERROR:-the configured data directory $DATA cannot be resolved}" >&2
+      "$entry" "${JG_BACKLOG_TRANSITION_ERROR:-the configured data directory $DATA cannot be resolved}" >&2
     return 2
   }
   root=$(jg_backlog_root "$data") || {
     printf 'jg-captain-hold: the migrated hold of %s cannot be resolved: %s\n' \
-      "$entry" "${FM_BACKLOG_TRANSITION_ERROR:-the configured data directory $DATA cannot be resolved}" >&2
+      "$entry" "${JG_BACKLOG_TRANSITION_ERROR:-the configured data directory $DATA cannot be resolved}" >&2
     return 2
   }
   backend=$(jg_tasks_axi_backend "$root") || return 2
@@ -961,10 +961,10 @@ command_hold() {
       *) fail "--until must be a YYYY-MM-DD date: $until" ;;
     esac
   fi
-  hold_set=${FM_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+  hold_set=${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   case "$hold_set" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) : ;;
-    *) fail "FM_CAPTAIN_HOLD_NOW must be a UTC YYYY-MM-DDTHH:MM:SSZ timestamp" ;;
+    *) fail "JG_CAPTAIN_HOLD_NOW must be a UTC YYYY-MM-DDTHH:MM:SSZ timestamp" ;;
   esac
   acquire_task_control_lock "$id"
   require_tasks_axi
@@ -995,7 +995,7 @@ command_hold() {
     validate_one_line repo "$repo"
     [ -z "$origin" ] || body=$(printf 'Origin: %s' "$origin")
     # Optional task-priority add-on: a created task must carry --priority. No-op when not installed.
-    priority_check=${FM_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}
+    priority_check=${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}
     if [ -x "$priority_check" ]; then
       "$priority_check" add "$id" "$title" --kind captain ${priority:+--priority "$priority"} >/dev/null \
         || exit 1
@@ -1056,9 +1056,9 @@ command_hold() {
     release_task_control_lock
     if [ -f "$STATE/procevent/signoff.source" ]; then
       signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
-      addon_signoff=${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/signoff/bin/jg-procevent-signoff.sh
+      addon_signoff=${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/signoff/bin/jg-procevent-signoff.sh
       [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
-      FM_HOME=$FM_HOME FM_CODE_ROOT=${FM_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
+      JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }
     fi
   fi
@@ -1100,7 +1100,7 @@ write_resolution_record() {  # <task-id> <mode> <shown-body>
 
 report_retained_artifact_failure() {  # <task-id> <marker-path>
   printf 'jg-captain-hold: cannot apply the artifact recorded for %s in %s: %s\n' \
-    "$1" "$2" "${FM_BACKLOG_TRANSITION_ERROR:-no reason reported}" >&2
+    "$1" "$2" "${JG_BACKLOG_TRANSITION_ERROR:-no reason reported}" >&2
 }
 
 apply_pending_retained_artifact() {  # <task-id>
@@ -1111,8 +1111,8 @@ apply_pending_retained_artifact() {  # <task-id>
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   jg_backlog_close_marker_validate "$marker" "$DATA" "$id" "$STATE" \
     || { report_retained_artifact_failure "$id" "$marker"; return 1; }
-  [ "$FM_BACKLOG_CLOSE_VALIDATED_MODE" = retain ] || return 0
-  args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
+  [ "$JG_BACKLOG_CLOSE_VALIDATED_MODE" = retain ] || return 0
+  args=("${JG_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${JG_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
   case "${args[0]-}" in
     --pr|--report)
       if [ "${args[0]}" = --pr ] && jg_backlog_pr_is_gerrit_change "${args[1]-}"; then
@@ -1551,7 +1551,7 @@ reconcile_request_record() {  # <task-id> <provenance>
   if {
     printf 'schema=%s\n' "$RECONCILE_SCHEMA"
     printf 'task=%s\n' "$id"
-    printf 'requested=%s\n' "${FM_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+    printf 'requested=%s\n' "${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
     printf 'source=%s\n' "$(sanitize_reconcile_provenance "$source")"
   } > "$tmp" && chmod 0600 "$tmp" && mv -f -- "$tmp" "$path"; then
     return 0
@@ -1783,7 +1783,7 @@ reconcile_note() {
       return 0
       ;;
   esac
-  stamp=${FM_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+  stamp=${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/jg-captain-hold-note.XXXXXX") \
     || fail "cannot stage the reconcile note"
   if ! printf '%s\n\nCaptain hold reconciled: %s\n%s\n%s\n' "$body" "$stamp" "$marker" "$note" > "$tmp"; then
@@ -1816,7 +1816,7 @@ command_complete() {
     [ -f "$meta" ] || fail "task metadata disappeared while recording completion"
   fi
   require_tasks_axi
-  origin_exists_here "$origin" || fail "origin $origin is not owned by the active home $FM_HOME"
+  origin_exists_here "$origin" || fail "origin $origin is not owned by the active home $JG_HOME"
   if [ "$#" -eq 1 ] && [ "$1" = --none ]; then
     supplied=''
   else
@@ -1990,18 +1990,18 @@ command_diverged() {
   local ids resolve f origin tokens id keys key show title
   [ "$#" -eq 0 ] || { usage >&2; exit 2; }
   # Both records must belong to the SAME home or the comparison is meaningless:
-  # tasks-axi reads $FM_HOME's backlog, so a state dir pointed somewhere else
+  # tasks-axi reads $JG_HOME's backlog, so a state dir pointed somewhere else
   # would report one home's status logs against another home's tasks. Every
   # production caller pairs the two; a mismatch stays silent rather than
   # inventing a cross-home divergence.
-  [ "$STATE" = "$FM_HOME/state" ] || return 0
+  [ "$STATE" = "$JG_HOME/state" ] || return 0
   # A read-only listing on a per-wake path, so it skips the mutation-oriented
   # compatibility floor and its extra probes: a listing this parser cannot read
   # simply yields no candidates and the report stays silent.
   command -v tasks-axi >/dev/null 2>&1 || return 0
   ids=$(open_task_ids) || return 0
   [ -n "$ids" ] || return 0
-  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  resolve=${JG_CLASSIFY_RESOLVE_VERB:-$JG_CLASSIFY_RESOLVE_VERB_DEFAULT}
   for f in "$STATE"/*.status; do
     [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || continue
     origin=$(basename "$f"); origin=${origin%.status}
@@ -2079,13 +2079,13 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   data=$(jg_backlog_data_absolute "$DATA") \
     || { printf 'jg-captain-hold: data directory cannot be resolved: %s\n' "$DATA" >&2; exit 2; }
   root=$(jg_backlog_root "$data") \
-    || { printf 'jg-captain-hold: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
+    || { printf 'jg-captain-hold: %s\n' "$JG_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
   if ! backend=$(jg_tasks_axi_backend_resolve "$root"); then
     exit 2
   fi
   if [ "$backend" = markdown ]; then
     file=$(jg_backlog_file "$data") \
-      || { printf 'jg-captain-hold: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
+      || { printf 'jg-captain-hold: %s\n' "$JG_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
     if [ ! -e "$file" ] && [ ! -L "$file" ]; then
       # No backlog file at all: this home records no captain calls, so the task
       # is absent from it rather than held. A record that EXISTS but cannot be
@@ -2097,8 +2097,8 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   fi
   jg_tasks_axi_compatible || { printf 'jg-captain-hold: compatible tasks-axi is required\n' >&2; exit 2; }
   if jg_backlog_row_probe "$data" "$id"; then
-    state=${FM_BACKLOG_ROW_STATE%% *}
-    if [ "$state" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    state=${JG_BACKLOG_ROW_STATE%% *}
+    if [ "$state" != "done" ] && [ "$JG_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       if [ "$identity" -eq 1 ]; then
         task_show "$id" || {
           printf 'jg-captain-hold: captain call %s is open but its record could not be read\n' "$id" >&2
@@ -2114,11 +2114,11 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
     fi
     return 1
   fi
-  if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+  if [ "$JG_BACKLOG_ROW_RESULT" = not_found ]; then
     [ "$distinguish_absent" = 0 ] || return 3
     return 1
   fi
-  printf 'jg-captain-hold: %s\n' "$FM_BACKLOG_ROW_ERROR" >&2
+  printf 'jg-captain-hold: %s\n' "$JG_BACKLOG_ROW_ERROR" >&2
   exit 2
 }
 

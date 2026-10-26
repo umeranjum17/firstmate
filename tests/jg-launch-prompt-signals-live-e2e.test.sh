@@ -33,7 +33,7 @@
 # machine reports that precondition explicitly rather than failing the
 # signature.
 #
-# Run explicitly with FM_LAUNCH_PROMPT_SIGNALS_LIVE=1. Refresh
+# Run explicitly with JG_LAUNCH_PROMPT_SIGNALS_LIVE=1. Refresh
 # docs/verification/runtime-backends.md ("Launch-prompt backstop signatures")
 # from this guard's output after any of claude/pi/gemini upgrades.
 set -u
@@ -61,7 +61,7 @@ trap cleanup_all EXIT
 
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 
-jg_live_gate opt-in FM_LAUNCH_PROMPT_SIGNALS_LIVE tmux
+jg_live_gate opt-in JG_LAUNCH_PROMPT_SIGNALS_LIVE tmux
 
 # shellcheck source=bin/jg-busy-lib.sh
 . "$ROOT/bin/jg-busy-lib.sh"
@@ -75,11 +75,11 @@ watcher_gate_not_busy() {  # <lab> <state> <target> <harness> <tail>
   local lab=$1 state=$2 target=$3 harness=$4 tail=$5
   mkdir -p "$lab/config"
   printf 'window=%s\nbackend=tmux\nharness=%s\n' "$target" "$harness" > "$state/t1.meta"
-  FM_ROOT_OVERRIDE="$ROOT"
-  FM_HOME="$lab"
-  FM_STATE_OVERRIDE="$state"
-  FM_CONFIG_OVERRIDE="$lab/config"
-  export FM_ROOT_OVERRIDE FM_HOME FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE
+  JG_ROOT_OVERRIDE="$ROOT"
+  JG_HOME="$lab"
+  JG_STATE_OVERRIDE="$state"
+  JG_CONFIG_OVERRIDE="$lab/config"
+  export JG_ROOT_OVERRIDE JG_HOME JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE
   # shellcheck source=bin/jg-watch.sh
   . "$ROOT/bin/jg-watch.sh"
   if window_is_busy "$target" "$tail"; then

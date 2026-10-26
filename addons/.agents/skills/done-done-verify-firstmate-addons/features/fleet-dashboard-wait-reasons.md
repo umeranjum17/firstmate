@@ -6,7 +6,7 @@ Insights names each waiting task's recorded reason, leaves only missing reasons 
 
 ## Drive
 
-Run `DASH_HOME=<home> FLOW_JSON=<saved jg-flow --json --capacity run of it> FM_BIN=<Firstmate bin/> done-done run fleet-dashboard-wait-reasons`. The committed `fleet-dashboard/run-proof.sh` builds and serves the dashboard from this checkout against that home's real fleet data, opens Insights at 390px with `chrome-devtools-axi`, and captures the page. A live jg-flow run takes minutes, so save it first with `FM_HOME=<home> bash fleet-flow/bin/jg-flow.sh --json --capacity` from a bin/ dir that holds its helper libraries.
+Run `DASH_HOME=<home> FLOW_JSON=<saved jg-flow --json --capacity run of it> JG_BIN=<Firstmate bin/> done-done run fleet-dashboard-wait-reasons`. The committed `fleet-dashboard/run-proof.sh` builds and serves the dashboard from this checkout against that home's real fleet data, opens Insights at 390px with `chrome-devtools-axi`, and captures the page. A live jg-flow run takes minutes, so save it first with `JG_HOME=<home> bash fleet-flow/bin/jg-flow.sh --json --capacity` from a bin/ dir that holds its helper libraries.
 
 ## Evidence
 

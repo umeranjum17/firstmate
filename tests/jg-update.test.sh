@@ -49,7 +49,7 @@ new_world() {
 #!/usr/bin/env bash
 set -u
 case "${1:-}" in
-  list-windows) cat "$FM_FAKE_DIR/windows" ;;
+  list-windows) cat "$JG_FAKE_DIR/windows" ;;
   display-message)
     target=
     for arg in "$@"; do
@@ -58,7 +58,7 @@ case "${1:-}" in
     case "${*: -1}" in
       *pane_current_command*)
         id=${target##*jg-}
-        if [ -e "$FM_FAKE_DIR/dead-$id" ]; then printf 'zsh\n'; else printf 'claude\n'; fi
+        if [ -e "$JG_FAKE_DIR/dead-$id" ]; then printf 'zsh\n'; else printf 'claude\n'; fi
         ;;
       *) printf '\n' ;;
     esac
@@ -135,9 +135,9 @@ bump_origin() {
 
 run_update() {
   local w=$1
-  PATH="$w/fakebin:$PATH" FM_FAKE_DIR="$w/fake" \
-    FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" "$UPDATE" 2>/dev/null
+  PATH="$w/fakebin:$PATH" JG_FAKE_DIR="$w/fake" \
+    JG_SSH_BIN="${JG_TEST_SSH_BIN:-ssh}" \
+    JG_ROOT_OVERRIDE="$w/main" JG_HOME="$w/home" "$UPDATE" 2>/dev/null
 }
 
 # --- T1: main + secondmate behind, instruction change; FF, not a merge ------
@@ -285,7 +285,7 @@ EOF
   printf -- '- sm1 - remote domain (host: remote-mac; root: /srv/fm; home: /srv/sm1; scope: things; projects: p; added 2026-09-03)\n' \
     > "$w/home/data/secondmates.md"
 
-  out=$(FM_TEST_SSH_BIN="$fake_ssh" run_update "$w")
+  out=$(JG_TEST_SSH_BIN="$fake_ssh" run_update "$w")
 
   assert_contains "$out" "remote secondmate sm1: updated on remote-mac" \
     "the legacy remote advance was not accepted"
@@ -535,7 +535,7 @@ test_primary_update_rebinds_local_watch() {
   git -C "$w/seed" push -q origin main
   git -C "$w/main" pull -q origin main
 
-  FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" "$ROOT/bin/jg-procevent-when.sh" \
+  JG_ROOT_OVERRIDE="$w/main" JG_HOME="$w/home" "$ROOT/bin/jg-procevent-when.sh" \
     arm rebind-primary --interval 60 --stable 1 \
     --condition true --action "$w/main/bin/watched-action.sh" "$w/rebind.log" >/dev/null
   spec="$w/home/state/when/when-rebind-primary.spec"

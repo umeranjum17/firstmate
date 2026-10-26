@@ -27,12 +27,12 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_CURSOR_PRIMARY_LIVE_E2E tmux jq
+jg_live_gate opt-in JG_CURSOR_PRIMARY_LIVE_E2E tmux jq
 
 REAL_TMUX=$(command -v tmux)
-CURSOR_BIN=${FM_CURSOR_BIN:-$(command -v cursor-agent || true)}
+CURSOR_BIN=${JG_CURSOR_BIN:-$(command -v cursor-agent || true)}
 [ -n "$CURSOR_BIN" ] && [ -x "$CURSOR_BIN" ] \
-  || fail "cursor-agent not found; install it or set FM_CURSOR_BIN. This guard refuses to pass without checking the real harness."
+  || fail "cursor-agent not found; install it or set JG_CURSOR_BIN. This guard refuses to pass without checking the real harness."
 CURSOR_VERSION=$("$CURSOR_BIN" --version 2>/dev/null | head -1)
 [ -n "$CURSOR_VERSION" ] || fail "cursor-agent did not report a version; refusing to claim a verified result"
 printf 'harness: cursor-agent %s\n' "$CURSOR_VERSION"
@@ -45,7 +45,7 @@ harness_fail() {  # <message>
 SOCKET="jg-cursor-primary-$$"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-cursor-primary.XXXXXX")
 HOME_DIR="$LAB/home"
-MARKER="FM_CURSOR_LIVE_MARKER_$$"
+MARKER="JG_CURSOR_LIVE_MARKER_$$"
 
 cleanup_all() {
   "$REAL_TMUX" -L "$SOCKET" kill-server >/dev/null 2>&1 || true
@@ -84,7 +84,7 @@ EOF
 printf 'blocked: fixture needs a decision\n' > "$HOME_DIR/state/probe.status"
 
 "$REAL_TMUX" -L "$SOCKET" new-session -d -s primary -x 220 -y 60 -c "$HOME_DIR" \
-  "cd '$HOME_DIR' && FM_HOME='$HOME_DIR' FM_HEARTBEAT=30 FM_HEARTBEAT_MAX=30 exec '$CURSOR_BIN' --trust --yolo --workspace '$HOME_DIR'" \
+  "cd '$HOME_DIR' && JG_HOME='$HOME_DIR' JG_HEARTBEAT=30 JG_HEARTBEAT_MAX=30 exec '$CURSOR_BIN' --trust --yolo --workspace '$HOME_DIR'" \
   || harness_fail "could not start the private tmux server"
 
 pane_text() {
@@ -186,10 +186,10 @@ cat > "$LAB/inject.sh" <<EOS
 set -u
 tmux() { command "$REAL_TMUX" -L "$SOCKET" "\$@"; }
 export -f tmux 2>/dev/null || true
-export FM_STATE_OVERRIDE="$HOME_DIR/state"
-export FM_SUPERVISOR_TARGET=primary
-export FM_SUPERVISOR_BACKEND=tmux
-export FM_DAEMON_PRIMARY_HARNESS=cursor
+export JG_STATE_OVERRIDE="$HOME_DIR/state"
+export JG_SUPERVISOR_TARGET=primary
+export JG_SUPERVISOR_BACKEND=tmux
+export JG_DAEMON_PRIMARY_HARNESS=cursor
 . "$HOME_DIR/bin/jg-supervise-daemon.sh"
 composer=\$(jg_backend_composer_state tmux primary)
 printf 'composer=%s\n' "\$composer"

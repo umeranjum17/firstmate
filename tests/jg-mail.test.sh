@@ -18,13 +18,13 @@ mkdir -p "$HOME_DIR"
 
 test_missing_secret_fails_cleanly() {
   local out rc
-  env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST \
-    FM_HOME="$HOME_DIR" "$MAIL" status >"$TMP_ROOT/out" 2>"$TMP_ROOT/err"
+  env -u JG_MAIL_USER -u JG_MAIL_PASS -u JG_IMAP_HOST -u JG_SMTP_HOST \
+    JG_HOME="$HOME_DIR" "$MAIL" status >"$TMP_ROOT/out" 2>"$TMP_ROOT/err"
   rc=$?
   expect_code 1 "$rc" "status without configuration must fail"
   out=$(cat "$TMP_ROOT/err")
-  assert_contains "$out" "FM_MAIL_USER" "missing-config error names the missing variable"
-  assert_contains "$out" "FM_MAIL_*" "missing-config error names the configuration family"
+  assert_contains "$out" "JG_MAIL_USER" "missing-config error names the missing variable"
+  assert_contains "$out" "JG_MAIL_*" "missing-config error names the configuration family"
   assert_not_contains "$out" "test-pass" "missing-config error never leaks a secret"
   pass "jg-mail: missing required configuration fails cleanly naming the variable"
 }
@@ -34,26 +34,26 @@ test_env_overrides_env_file() {
   env_home="$TMP_ROOT/envfile-home"
   mkdir -p "$env_home"
   cat > "$env_home/.env" <<'EOF'
-FM_MAIL_USER=fromfile@example.com
-FM_MAIL_PASS=filepass
-FM_IMAP_HOST=imap.file.invalid
-FM_SMTP_HOST=smtp.file.invalid
+JG_MAIL_USER=fromfile@example.com
+JG_MAIL_PASS=filepass
+JG_IMAP_HOST=imap.file.invalid
+JG_SMTP_HOST=smtp.file.invalid
 EOF
   # No environment: .env supplies the configuration.
-  out=$(FM_HOME="$env_home" "$MAIL" status 2>&1)
+  out=$(JG_HOME="$env_home" "$MAIL" status 2>&1)
   assert_contains "$out" "mail account: fromfile@example.com" "status uses .env when environment is unset"
   # A single environment value wins for that key; the other keys still come
   # from .env, matching the Relay/FMX "env wins over .env" contract.
-  out=$(FM_MAIL_USER=fromenv@example.com FM_HOME="$env_home" "$MAIL" status 2>&1)
+  out=$(JG_MAIL_USER=fromenv@example.com JG_HOME="$env_home" "$MAIL" status 2>&1)
   assert_contains "$out" "mail account: fromenv@example.com" "environment overrides .env for a direct invocation"
   pass "jg-mail: environment values override the .env file"
 }
 
 test_status_without_network() {
   local out rc
-  out=$(FM_MAIL_USER="test@example.com" FM_MAIL_PASS="test-pass" \
-    FM_IMAP_HOST="imap.test.invalid" FM_SMTP_HOST="smtp.test.invalid" \
-    FM_HOME="$HOME_DIR" "$MAIL" status 2>&1)
+  out=$(JG_MAIL_USER="test@example.com" JG_MAIL_PASS="test-pass" \
+    JG_IMAP_HOST="imap.test.invalid" JG_SMTP_HOST="smtp.test.invalid" \
+    JG_HOME="$HOME_DIR" "$MAIL" status 2>&1)
   rc=$?
   expect_code 0 "$rc" "status with configuration must succeed without network"
   assert_contains "$out" "mail account: test@example.com" "status prints the configured account"
@@ -65,9 +65,9 @@ test_status_without_network() {
 
 test_help_plumbing() {
   local out rc
-  out=$(FM_MAIL_USER="test@example.com" FM_MAIL_PASS="test-pass" \
-    FM_IMAP_HOST="imap.test.invalid" FM_SMTP_HOST="smtp.test.invalid" \
-    FM_HOME="$HOME_DIR" "$MAIL" --help 2>&1)
+  out=$(JG_MAIL_USER="test@example.com" JG_MAIL_PASS="test-pass" \
+    JG_IMAP_HOST="imap.test.invalid" JG_SMTP_HOST="smtp.test.invalid" \
+    JG_HOME="$HOME_DIR" "$MAIL" --help 2>&1)
   rc=$?
   expect_code 0 "$rc" "--help must exit 0"
   assert_contains "$out" "read" "--help lists the read subcommand"
@@ -79,9 +79,9 @@ test_help_plumbing() {
 
 test_unknown_subcommand_prints_usage() {
   local out rc
-  out=$(FM_MAIL_USER="test@example.com" FM_MAIL_PASS="test-pass" \
-    FM_IMAP_HOST="imap.test.invalid" FM_SMTP_HOST="smtp.test.invalid" \
-    FM_HOME="$HOME_DIR" "$MAIL" bogus 2>&1)
+  out=$(JG_MAIL_USER="test@example.com" JG_MAIL_PASS="test-pass" \
+    JG_IMAP_HOST="imap.test.invalid" JG_SMTP_HOST="smtp.test.invalid" \
+    JG_HOME="$HOME_DIR" "$MAIL" bogus 2>&1)
   rc=$?
   expect_code 1 "$rc" "unknown subcommand must exit 1"
   assert_contains "$out" "read" "unknown subcommand prints usage"
@@ -91,9 +91,9 @@ test_unknown_subcommand_prints_usage() {
 
 test_no_secret_leaked_to_status() {
   local out
-  out=$(FM_MAIL_USER="test@example.com" FM_MAIL_PASS="test-pass" \
-    FM_IMAP_HOST="imap.test.invalid" FM_SMTP_HOST="smtp.test.invalid" \
-    FM_HOME="$HOME_DIR" "$MAIL" status 2>&1)
+  out=$(JG_MAIL_USER="test@example.com" JG_MAIL_PASS="test-pass" \
+    JG_IMAP_HOST="imap.test.invalid" JG_SMTP_HOST="smtp.test.invalid" \
+    JG_HOME="$HOME_DIR" "$MAIL" status 2>&1)
   assert_not_contains "$out" "test-pass" "status must never print the password"
   pass "jg-mail: status never prints the password"
 }
@@ -106,17 +106,17 @@ test_send_passes_body() {
   # Fake python3 that reads stdin (the body pipe) and writes it to a file.
   cat > "$fakebin/python3" <<'SH'
 #!/usr/bin/env bash
-cat > "${FM_MAIL_TEST_STDIN_FILE:-/dev/null}"
+cat > "${JG_MAIL_TEST_STDIN_FILE:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/python3"
 
   body_file="$TMP_ROOT/body.txt"
   printf '%s' "hello world" > "$body_file"
-  export FM_MAIL_TEST_STDIN_FILE="$stdin_file"
+  export JG_MAIL_TEST_STDIN_FILE="$stdin_file"
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=h FM_SMTP_HOST=h \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=h JG_SMTP_HOST=h \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" send to@example.com subj "hello world" 2>&1) || rc=$?
   expect_code 0 "$rc" "send with body must succeed"
   local captured
@@ -141,9 +141,9 @@ SH
   chmod +x "$fakebin/python3"
 
   local out rc=0
-  out=$(env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST \
-    FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(env -u JG_MAIL_USER -u JG_MAIL_PASS -u JG_IMAP_HOST -u JG_SMTP_HOST \
+    JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must propagate python3 errors"
   assert_contains "$out" "connection refused" "poll error message is visible"
@@ -170,8 +170,8 @@ SH
   [ -e "$homedir_bin/jg-wake-lib.sh" ] || ln -s "$ROOT/bin/jg-wake-lib.sh" "$homedir_bin/jg-wake-lib.sh"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "poll must succeed when python3 lists mail"
   assert_contains "$out" "woke for 42" "first poll wakes the new uid"
@@ -179,8 +179,8 @@ SH
   assert_contains "$(cat "$wakeq" 2>/dev/null)" "mail from alice@example.com" "wake queue names the sender"
   assert_contains "$(cat "$HOME_DIR/state/.mail-seen" 2>/dev/null)" "42" "cursor records the surfaced uid"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "second poll must succeed"
   assert_not_contains "$out" "woke for 42" "re-polling the same uid must not re-wake"
@@ -206,8 +206,8 @@ SH
   chmod +x "$fakebin/python3"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first-generation poll must succeed"
   assert_contains "$out" "woke for 77" "first generation wakes uid 77"
@@ -220,8 +220,8 @@ printf '77\t2026-09-06T00:00:00Z\tbob@example.com\tAgain\n'
 SH
   chmod +x "$fakebin/python3"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "second-generation poll must succeed"
   assert_contains "$out" "woke for 77" "reused uid wakes again under a new generation"
@@ -244,8 +244,8 @@ SH
 
   # First poll wakes 99 and records it, proving the normal path.
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first poll must succeed"
   assert_contains "$out" "woke for 99" "first poll wakes uid 99"
@@ -254,8 +254,8 @@ SH
   # write: remove the uid from the cursor while its wake stays queued.
   printf 'uidvalidity=60006\n' > "$HOME_DIR/state/.mail-seen"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "healing poll must succeed"
   assert_not_contains "$out" "woke for 99" "healing poll must not re-wake the queued mail"
@@ -284,11 +284,11 @@ SH
   chmod +x "$fakebin/python3"
 
   local combined woke_count
-  FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll >"$TMP_ROOT/poll-a.out" 2>&1 &
-  FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll >"$TMP_ROOT/poll-b.out" 2>&1 &
   wait
 
@@ -316,8 +316,8 @@ SH
   chmod +x "$fakebin/python3"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first poll must succeed"
   assert_contains "$out" "woke for 55" "first poll wakes uid 55"
@@ -331,8 +331,8 @@ SH
   grep -v "check: mail 55" "$HOME_DIR/state/.wake-queue" > "$TMP_ROOT/wakeq.acked" 2>/dev/null || true
   mv "$TMP_ROOT/wakeq.acked" "$HOME_DIR/state/.wake-queue"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "recovery poll must succeed"
   assert_not_contains "$out" "woke for 55" "recovery must not re-wake the acked mail"
@@ -362,8 +362,8 @@ SH
   chmod +x "$fakebin/python3"
 
   # First poll appends the wake and writes the evidence.
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$interrupted_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$interrupted_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first poll must succeed"
   assert_contains "$out" "woke for 33" "first poll wakes uid 33"
@@ -380,8 +380,8 @@ SH
   expect_code 1 "$wakeq" "the wake row survived the simulated interruption"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$interrupted_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$interrupted_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "healing poll must succeed"
   assert_not_contains "$out" "woke for 33" "healing poll must not duplicate the queued mail"
@@ -411,8 +411,8 @@ printf '44\t2026-09-05T00:00:00Z\talice@example.com\tHello\n'
 SH
   chmod +x "$fakebin/python3"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$acked_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$acked_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first poll must succeed"
   assert_contains "$out" "woke for 44" "first poll wakes uid 44"
@@ -424,8 +424,8 @@ SH
   mv "$TMP_ROOT/wakeq.acked" "$acked_home/state/.wake-queue"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$acked_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$acked_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "recovery poll must succeed"
   assert_not_contains "$out" "woke for 44" "recovery must not re-wake the acknowledged mail"
@@ -460,8 +460,8 @@ SH
   printf '0\t9001\tcheck\tmail:42\tcheck: mail 42 - legacy\n' >> "$HOME_DIR/state/.wake-queue"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "poll with a queued legacy wake must succeed"
   assert_contains "$out" "woke for 42" "a reused uid must still wake under the current generation"
@@ -475,7 +475,7 @@ test_poll_missing_wake_lib_does_not_suppress() {
   miss_bin="$TMP_ROOT/misslib-bin"
   mkdir -p "$miss_home" "$miss_bin"
   # Hide the script-relative wake library: poll sources jg-wake-lib.sh from
-  # next to jg-mail.sh, not from $FM_HOME/bin. Copy only the plane scripts.
+  # next to jg-mail.sh, not from $JG_HOME/bin. Copy only the plane scripts.
   cp "$ROOT/bin/jg-mail.sh" "$miss_bin/jg-mail.sh"
   cp "$ROOT/bin/jg-mail.py" "$miss_bin/jg-mail.py"
   chmod +x "$miss_bin/jg-mail.sh"
@@ -488,8 +488,8 @@ SH
   chmod +x "$fakebin/python3"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$miss_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$miss_home" PATH="$fakebin:$PATH" \
     "$miss_bin/jg-mail.sh" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must stop when the wake library is missing"
   assert_contains "$out" "jg-wake-lib.sh missing" "missing-lib error names the wake library"
@@ -524,8 +524,8 @@ SH
   [ -w "$roll_home/state/.mail-seen" ] && { echo "fixture unexpected: cursor still writable"; return 1; }
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$roll_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$roll_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when no durable record can be written"
   assert_contains "$out" "rolled back" "poll reports the wake was rolled back"
@@ -537,8 +537,8 @@ SH
   # once, as if the interrupted attempt never happened.
   chmod 0600 "$roll_home/state/.mail-seen" "$roll_home/state/.mail-woken"
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$roll_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$roll_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "retry poll must succeed"
   assert_contains "$out" "woke for 66" "retry poll surfaces the mail exactly once"
@@ -575,8 +575,8 @@ SH
   [ -w "$roll_home/state/.wake-queue" ] || { echo "fixture unexpected: queue not appendable"; return 1; }
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$roll_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$roll_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the wake can be neither recorded nor rolled back"
   assert_not_contains "$out" "rolled back (journal and cursor writes failed)" "poll must not report a rollback it did not achieve"
@@ -588,8 +588,8 @@ SH
   chmod 0600 "$roll_home/state/.mail-seen" "$roll_home/state/.mail-woken"
   chmod 0644 "$roll_home/state/.wake-queue"
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$roll_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$roll_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "retry poll must succeed after access is restored"
   assert_contains "$out" "no new mail" "retry poll heals the retained wake without re-waking"
@@ -607,12 +607,12 @@ test_poll_retry_surfaces_under_new_mail_flood() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -657,13 +657,13 @@ test_poll_cap_one_alternates_new_and_retry() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_TURN': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_TURN': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -719,14 +719,14 @@ test_poll_cap_one_does_not_advance_unexamined_retry_window() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_TURN': sys.argv[3],
-    'FM_MAIL_RETRY_POS': sys.argv[4],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_TURN': sys.argv[3],
+    'JG_MAIL_RETRY_POS': sys.argv[4],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -792,12 +792,12 @@ test_poll_cap_one_never_suppresses_new_mail() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -852,8 +852,8 @@ SH
   : > "$HOME_DIR/state/.wake-queue.seq"
   chmod 0000 "$HOME_DIR/state/.wake-queue.seq"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the recovered wake cannot be appended"
   assert_contains "$(cat "$HOME_DIR/state/.mail-retry" 2>/dev/null)" "77" "the retry record is restored so the recovered metadata can be re-fetched"
@@ -891,8 +891,8 @@ SH
   : > "$test_home/state/.wake-queue.seq"
   chmod 0000 "$test_home/state/.wake-queue.seq"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail closed when the recovered wake cannot be published"
   assert_contains "$out" "wake append failed for 77" "poll reports the failed wake append"
@@ -903,8 +903,8 @@ SH
   # Restore writable state: the next poll must recover the metadata.
   rm -f "$test_home/state/.wake-queue.seq"
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "follow-up poll must succeed and recover the metadata"
   assert_contains "$out" "woke for 77" "follow-up poll re-surfaces the recovered uid"
@@ -922,7 +922,7 @@ test_poll_fails_closed_when_poll_list_fails() {
   [ -e "$HOME_DIR/bin/jg-wake-lib.sh" ] || ln -s "$ROOT/bin/jg-wake-lib.sh" "$HOME_DIR/bin/jg-wake-lib.sh"
   cat > "$fakebin/python3" <<'SH'
 #!/usr/bin/env bash
-if [ -f "$FM_POLL_FAIL_MARKER" ]; then
+if [ -f "$JG_POLL_FAIL_MARKER" ]; then
   echo 'jg-mail poll error: simulated failure' >&2
   exit 1
 fi
@@ -933,9 +933,9 @@ SH
   printf 'uidvalidity=90009\n' > "$HOME_DIR/state/.mail-seen"
   touch "$HOME_DIR/fail.marker"
 
-  out=$(FM_POLL_FAIL_MARKER="$HOME_DIR/fail.marker" FM_MAIL_USER=test FM_MAIL_PASS=pass \
-    FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_POLL_FAIL_MARKER="$HOME_DIR/fail.marker" JG_MAIL_USER=test JG_MAIL_PASS=pass \
+    JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when poll_list fails"
   assert_not_contains "$out" "woke for 7" "nothing is woken from a failed poll_list"
@@ -943,9 +943,9 @@ SH
 
   rm -f "$HOME_DIR/fail.marker"
   rc=0
-  out=$(FM_POLL_FAIL_MARKER="$HOME_DIR/fail.marker" FM_MAIL_USER=test FM_MAIL_PASS=pass \
-    FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_POLL_FAIL_MARKER="$HOME_DIR/fail.marker" JG_MAIL_USER=test JG_MAIL_PASS=pass \
+    JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "a later poll must succeed, proving the mail-seen lock was released"
   assert_contains "$out" "woke for 7" "the later poll wakes the new mail"
@@ -972,8 +972,8 @@ SH
   printf '77\n' > "$test_home/state/.mail-retry"
   chmod 0000 "$test_home/state/.mail-retry"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the retry record cannot be cleared"
   assert_contains "$out" "could not clear retry for recovered 77 after publish" "failure names the post-publish retry cleanup"
@@ -982,8 +982,8 @@ SH
   expect_code 1 "$wakeq" "exactly one recovery wake is queued after the failed clear"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "a later poll must still fail closed while the retry record cannot be cleared"
   assert_not_contains "$out" "woke for 77" "a later poll must not re-append a recovery wake"
@@ -993,8 +993,8 @@ SH
   chmod 0600 "$test_home/state/.mail-retry"
   assert_grep "77" "$test_home/state/.mail-retry" "the retry entry remains for the next poll to clear"
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "poll must succeed once the retry record can be cleared"
   assert_not_contains "$out" "woke for 77" "clearing the retry record must not re-wake the uid"
@@ -1025,8 +1025,8 @@ SH
   printf '77\n' > "$test_home/state/.mail-retry"
   chmod 0000 "$test_home/state/.mail-retry"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$test_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$test_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when a stale retry cannot be cleared after wake"
   assert_contains "$out" "could not clear retry for recovered 77 after publish" "failure names the post-publish retry cleanup"
@@ -1063,8 +1063,8 @@ SH
   : > "$HOME_DIR/state/.mail-retry"
   chmod 0400 "$HOME_DIR/state/.mail-retry"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the retry record cannot be written"
   assert_not_contains "$out" "woke for 77" "no wake is emitted before the retry record"
@@ -1094,8 +1094,8 @@ SH
   : > "$HOME_DIR/state/.mail-woken"
   chmod 0400 "$HOME_DIR/state/.mail-woken"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the journal cannot be written"
   assert_not_contains "$out" "woke for 78" "no wake is emitted before the journal commits"
@@ -1111,12 +1111,12 @@ test_poll_resurfaces_degraded_uid_whose_wake_never_recorded() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_POLL_MAX_WAKES': '2',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_POLL_MAX_WAKES': '2',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1161,11 +1161,11 @@ test_poll_fetch_raise_does_not_abort_the_scan() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_POLL_MAX_WAKES': '2',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_POLL_MAX_WAKES': '2',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1206,13 +1206,13 @@ test_poll_retry_cursor_advances_past_failures() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[5],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[5],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 FAILING = set(sys.argv[3].split(',')) if len(sys.argv) > 3 else set()
 class FakeConn:
@@ -1298,13 +1298,13 @@ test_poll_retry_position_does_not_advance_past_unpublished_wake() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1389,15 +1389,15 @@ test_poll_retry_budget_advances_by_examined_not_window() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
     # cap=4 -> retry_budget = max(1, 4//4) = 1, so only one retry uid may
     # emit per poll while the window (max(4*4, 4+10) = 16) holds all 12.
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 FAILING = set(sys.argv[5].split(',')) if len(sys.argv) > 5 else set()
 class FakeConn:
@@ -1467,13 +1467,13 @@ test_poll_retry_window_of_unseen_never_stalls_cursor() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1533,13 +1533,13 @@ test_poll_retry_unfetchable_window_advances_with_new_mail() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 # First window (cap=4 -> window=16) is 301..316; those stay unfetchable.
 # 320 has recovered and sits beyond that window. 400 is sustained new mail.
@@ -1606,13 +1606,13 @@ test_poll_retry_unseen_window_advances_with_new_mail() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1670,13 +1670,13 @@ test_poll_retry_logout_before_emit_and_position_save() {
   cat > "$harness" <<'PYEOF'
 import os, signal, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1730,11 +1730,11 @@ test_poll_list_logs_out_on_imap_error() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[2],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[2],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1781,13 +1781,13 @@ test_poll_retry_position_not_saved_when_row_emitted() {
   cat > "$harness" <<'PYEOF'
 import os, signal, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1848,14 +1848,14 @@ test_poll_retry_small_window_rotates_past_unfetchable_prefix() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_RETRY_POS': sys.argv[3],
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_RETRY_POS': sys.argv[3],
     # cap=4 -> window = max(4*4, 4+10) = 16, which is larger than the retry set.
-    'FM_MAIL_POLL_MAX_WAKES': '4',
+    'JG_MAIL_POLL_MAX_WAKES': '4',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -1948,13 +1948,13 @@ test_poll_cap_one_turn_not_saved_before_emit() {
   cat > "$harness" <<'PYEOF'
 import os, signal, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_TURN': sys.argv[3],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_TURN': sys.argv[3],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -2008,14 +2008,14 @@ test_poll_cap_one_turn_not_saved_when_retry_pos_write_fails() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_RETRY': sys.argv[2],
-    'FM_MAIL_TURN': sys.argv[3],
-    'FM_MAIL_RETRY_POS': sys.argv[4],
-    'FM_MAIL_POLL_MAX_WAKES': '1',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_RETRY': sys.argv[2],
+    'JG_MAIL_TURN': sys.argv[3],
+    'JG_MAIL_RETRY_POS': sys.argv[4],
+    'JG_MAIL_POLL_MAX_WAKES': '1',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -2073,11 +2073,11 @@ test_poll_skips_unfetchable_uid_but_keeps_progress() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
-    'FM_MAIL_CURSOR': sys.argv[1],
-    'FM_MAIL_POLL_MAX_WAKES': '2',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
+    'JG_MAIL_CURSOR': sys.argv[1],
+    'JG_MAIL_POLL_MAX_WAKES': '2',
 })
 class FakeConn:
     untagged_responses = {'UIDVALIDITY': [b'90009']}
@@ -2146,7 +2146,7 @@ class FakeConn:
         if cmd == 'search':
             return ('OK', [b'41'])
         if cmd == 'fetch':
-            n = int(open(os.environ['FM_MAIL_TEST_FETCH_COUNT']).read() or '0')
+            n = int(open(os.environ['JG_MAIL_TEST_FETCH_COUNT']).read() or '0')
             if n < 3:
                 return ('NO', None)
             return ('OK', [(b'', b'Subject: Hello captain\r\nFrom: alice@example.com\r\nDate: 5 Sep 2026 00:00:00 +0000\r\n\r\n')])
@@ -2159,7 +2159,7 @@ spec = importlib.util.spec_from_file_location('jg_mail', sys.argv[1])
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 if len(sys.argv) > 2 and sys.argv[2] == 'poll_list':
-    path = os.environ['FM_MAIL_TEST_FETCH_COUNT']
+    path = os.environ['JG_MAIL_TEST_FETCH_COUNT']
     n = int(open(path).read() or '0')
     open(path, 'w').write(str(n + 1))
     sys.exit(mod.cmd_poll_list())
@@ -2173,9 +2173,9 @@ EOF
   printf 'uidvalidity=90009\n' > "$retry_home/state/.mail-seen"
   : > "$retry_home/state/.wake-queue"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$retry_home" PATH="$fakebin:$PATH" \
-    FM_MAIL_TEST_FETCH_COUNT="$control" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$retry_home" PATH="$fakebin:$PATH" \
+    JG_MAIL_TEST_FETCH_COUNT="$control" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first poll of a failing fetch must succeed"
   assert_contains "$out" "woke for 41" "failed fetch still wakes once, never missed"
@@ -2189,9 +2189,9 @@ EOF
     "the degraded surfacing is still cursor-recorded"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$retry_home" PATH="$fakebin:$PATH" \
-    FM_MAIL_TEST_FETCH_COUNT="$control" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$retry_home" PATH="$fakebin:$PATH" \
+    JG_MAIL_TEST_FETCH_COUNT="$control" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "still-failing retry poll must succeed"
   assert_not_contains "$out" "woke for 41" "a still-unfetchable retry uid must not re-wake"
@@ -2202,9 +2202,9 @@ EOF
   expect_code 1 "$wakeq" "still-failing retry must not append a second wake"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$retry_home" PATH="$fakebin:$PATH" \
-    FM_MAIL_TEST_FETCH_COUNT="$control" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$retry_home" PATH="$fakebin:$PATH" \
+    JG_MAIL_TEST_FETCH_COUNT="$control" \
     "$MAIL" poll 2>&1) || rc=$?
   if [ "$rc" != 0 ]; then
     printf 'poll output on failure:\n%s\n' "$out" >&2
@@ -2239,8 +2239,8 @@ SH
   printf '%s\t%s\n' '90009' '55' > "$HOME_DIR/state/.mail-woken"
   chmod 0400 "$HOME_DIR/state/.mail-seen"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "poll must fail when the heal cannot record a uid"
   assert_contains "$out" "heal could not record a uid" "poll reports the unrecordable heal"
@@ -2271,8 +2271,8 @@ SH
   : > "$heal_home/state/.wake-queue"
   chmod 0400 "$heal_home/state/.mail-seen"
 
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$heal_home" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$heal_home" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 1 "$rc" "heal failure with unseen mail must fail the poll"
   assert_not_contains "$out" "woke for 55" "heal failure must not re-wake a journaled uid"
@@ -2289,7 +2289,7 @@ test_body_preview_falls_back_from_empty_plain() {
   harness="$TMP_ROOT/body-preview-harness.py"
   cat > "$harness" <<'PYEOF'
 import os, sys
-os.environ.update({'FM_MAIL_USER':'t','FM_MAIL_PASS':'p','FM_IMAP_HOST':'h','FM_IMAP_PORT':'993','FM_SMTP_HOST':'s','FM_SMTP_PORT':'465'})
+os.environ.update({'JG_MAIL_USER':'t','JG_MAIL_PASS':'p','JG_IMAP_HOST':'h','JG_IMAP_PORT':'993','JG_SMTP_HOST':'s','JG_SMTP_PORT':'465'})
 import email, importlib.util
 spec = importlib.util.spec_from_file_location('jg_mail', sys.argv[1])
 mod = importlib.util.module_from_spec(spec)
@@ -2311,7 +2311,7 @@ test_body_preview_tolerates_none_payload() {
   harness="$TMP_ROOT/none-payload-harness.py"
   cat > "$harness" <<'PYEOF'
 import os, sys
-os.environ.update({'FM_MAIL_USER':'t','FM_MAIL_PASS':'p','FM_IMAP_HOST':'h','FM_IMAP_PORT':'993','FM_SMTP_HOST':'s','FM_SMTP_PORT':'465'})
+os.environ.update({'JG_MAIL_USER':'t','JG_MAIL_PASS':'p','JG_IMAP_HOST':'h','JG_IMAP_PORT':'993','JG_SMTP_HOST':'s','JG_SMTP_PORT':'465'})
 import importlib.util
 spec = importlib.util.spec_from_file_location('jg_mail', sys.argv[1])
 mod = importlib.util.module_from_spec(spec)
@@ -2339,9 +2339,9 @@ test_read_surfaces_unfetchable_uid() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
 })
 class FakeConn:
     def __init__(self, *a, **k):
@@ -2383,9 +2383,9 @@ test_read_tolerates_none_payload() {
   cat > "$harness" <<'PYEOF'
 import os, sys
 os.environ.update({
-    'FM_MAIL_USER': 't', 'FM_MAIL_PASS': 'p',
-    'FM_IMAP_HOST': 'imap.test', 'FM_IMAP_PORT': '993',
-    'FM_SMTP_HOST': 'smtp.test', 'FM_SMTP_PORT': '465',
+    'JG_MAIL_USER': 't', 'JG_MAIL_PASS': 'p',
+    'JG_IMAP_HOST': 'imap.test', 'JG_IMAP_PORT': '993',
+    'JG_SMTP_HOST': 'smtp.test', 'JG_SMTP_PORT': '465',
 })
 class FakeConn:
     def __init__(self, *a, **k):
@@ -2420,16 +2420,16 @@ PYEOF
 
 test_invalid_port_fails_cleanly() {
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=h FM_SMTP_HOST=h \
-    FM_IMAP_PORT=abc FM_HOME="$HOME_DIR" "$MAIL" status 2>&1) || rc=$?
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=h JG_SMTP_HOST=h \
+    JG_IMAP_PORT=abc JG_HOME="$HOME_DIR" "$MAIL" status 2>&1) || rc=$?
   expect_code 1 "$rc" "a non-numeric IMAP port must fail"
-  assert_contains "$out" "FM_IMAP_PORT" "invalid IMAP port names the variable"
+  assert_contains "$out" "JG_IMAP_PORT" "invalid IMAP port names the variable"
   assert_not_contains "$out" "ValueError" "invalid port must not leak a python traceback"
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=h FM_SMTP_HOST=h \
-    FM_SMTP_PORT=abc FM_HOME="$HOME_DIR" "$MAIL" status 2>&1) || rc=$?
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=h JG_SMTP_HOST=h \
+    JG_SMTP_PORT=abc JG_HOME="$HOME_DIR" "$MAIL" status 2>&1) || rc=$?
   expect_code 1 "$rc" "a non-numeric SMTP port must fail"
-  assert_contains "$out" "FM_SMTP_PORT" "invalid SMTP port names the variable"
+  assert_contains "$out" "JG_SMTP_PORT" "invalid SMTP port names the variable"
   pass "jg-mail: a non-numeric port fails cleanly in bash"
 }
 
@@ -2454,8 +2454,8 @@ SH
   : > "$HOME_DIR/state/.wake-queue"
 
   local out rc=0 wakeq
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" FM_MAIL_POLL_MAX_WAKES=2 \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" JG_MAIL_POLL_MAX_WAKES=2 \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "capped poll must succeed"
   assert_contains "$out" "woke for 71" "first message wakes within the cap"
@@ -2467,8 +2467,8 @@ SH
 
   # The third message is still unseen: the next poll surfaces it.
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" FM_MAIL_POLL_MAX_WAKES=2 \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" JG_MAIL_POLL_MAX_WAKES=2 \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "follow-up poll must succeed"
   assert_contains "$out" "woke for 73" "deferred message wakes on the next poll"
@@ -2529,8 +2529,8 @@ EOF
   : > "$HOME_DIR/state/.wake-queue"
 
   local out rc=0 wakeq
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "sanitizing poll must succeed"
   assert_contains "$out" "woke for 60" "tab-bearing subject still wakes once"
@@ -2551,14 +2551,14 @@ test_poll_bounded_fetch_progresses_large_backlog() {
   mkdir -p "$homedir_bin"
   [ -e "$homedir_bin/jg-wake-lib.sh" ] || ln -s "$ROOT/bin/jg-wake-lib.sh" "$homedir_bin/jg-wake-lib.sh"
 
-  # Fake python3 emulating the bounded poll_list: read FM_MAIL_CURSOR, return
+  # Fake python3 emulating the bounded poll_list: read JG_MAIL_CURSOR, return
   # only uids not already recorded in the cursor, capped at the poll cap. Five
   # unseen messages with a cap of two must progress two per poll and finish
   # cleanly, never stalling on the already-surfaced head of a large backlog.
   cat > "$fakebin/python3" <<'SH'
 #!/usr/bin/env bash
-cursor="$FM_MAIL_CURSOR"
-cap="${FM_MAIL_POLL_MAX_WAKES:-20}"
+cursor="$JG_MAIL_CURSOR"
+cap="${JG_MAIL_POLL_MAX_WAKES:-20}"
 seen=""
 [ -f "$cursor" ] && seen="$(grep -v '^uidvalidity=' "$cursor" 2>/dev/null || true)"
 printf 'uidvalidity\t90009\n'
@@ -2575,24 +2575,24 @@ SH
   : > "$HOME_DIR/state/.wake-queue"
 
   local out rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" FM_MAIL_POLL_MAX_WAKES=2 \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" JG_MAIL_POLL_MAX_WAKES=2 \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "first bounded poll must succeed"
   assert_contains "$out" "woke for 91" "first batch surfaces 91"
   assert_contains "$out" "woke for 92" "first batch surfaces 92"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" FM_MAIL_POLL_MAX_WAKES=2 \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" JG_MAIL_POLL_MAX_WAKES=2 \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "second bounded poll must succeed"
   assert_contains "$out" "woke for 93" "second batch surfaces 93"
   assert_contains "$out" "woke for 94" "second batch surfaces 94"
 
   rc=0
-  out=$(FM_MAIL_USER=test FM_MAIL_PASS=pass FM_IMAP_HOST=imap.test FM_SMTP_HOST=smtp.test \
-    FM_HOME="$HOME_DIR" PATH="$fakebin:$PATH" FM_MAIL_POLL_MAX_WAKES=2 \
+  out=$(JG_MAIL_USER=test JG_MAIL_PASS=pass JG_IMAP_HOST=imap.test JG_SMTP_HOST=smtp.test \
+    JG_HOME="$HOME_DIR" PATH="$fakebin:$PATH" JG_MAIL_POLL_MAX_WAKES=2 \
     "$MAIL" poll 2>&1) || rc=$?
   expect_code 0 "$rc" "third bounded poll must succeed"
   assert_contains "$out" "woke for 95" "tail batch surfaces 95"

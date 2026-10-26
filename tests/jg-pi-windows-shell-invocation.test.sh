@@ -20,24 +20,24 @@ cp "$ROOT/.pi/extensions/lib/jg-operational-input.ts" \
 
 cat >"$project/bin/jg-sessionstart-run.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'sessionstart:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
+printf 'sessionstart:%s\n' "$*" >> "$JG_WINDOWS_SHELL_LOG"
 SH
 cat >"$project/bin/jg-cd-pretool-check.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'cd:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
+printf 'cd:%s\n' "$*" >> "$JG_WINDOWS_SHELL_LOG"
 SH
 cat >"$project/bin/jg-arm-pretool-check.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'arm:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
+printf 'arm:%s\n' "$*" >> "$JG_WINDOWS_SHELL_LOG"
 SH
 cat >"$project/bin/jg-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
 cat >/dev/null
-printf 'turnend:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
+printf 'turnend:%s\n' "$*" >> "$JG_WINDOWS_SHELL_LOG"
 SH
 cat >"$project/bin/jg-operational-input.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'operational:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
+printf 'operational:%s\n' "$*" >> "$JG_WINDOWS_SHELL_LOG"
 input=$(cat)
 if [ "$1" = encode ]; then
   printf 'encoded:%s:%s\n' "$2" "$input"
@@ -49,8 +49,8 @@ chmod +x "$project/bin/"*.sh
 
 log="$project/state/calls"
 out=$(EXT="$project/.pi/extensions/jg-primary-turnend-guard.ts" \
-  FM_HOME="$project" FM_ROOT_OVERRIDE="$project" FM_WINDOWS_SHELL_LOG="$log" \
-  FM_OPERATIONAL_INPUT_SCRIPT="$project/bin/jg-operational-input.sh" \
+  JG_HOME="$project" JG_ROOT_OVERRIDE="$project" JG_WINDOWS_SHELL_LOG="$log" \
+  JG_OPERATIONAL_INPUT_SCRIPT="$project/bin/jg-operational-input.sh" \
   node --input-type=module 2>&1 <<'JS'
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -92,7 +92,7 @@ if (encoded !== "encoded:branch-outcome:branch result\n") {
 if (
   asyncInvocation.command !== "bash" ||
   asyncInvocation.args.join("\0") !== [
-    process.env.FM_OPERATIONAL_INPUT_SCRIPT,
+    process.env.JG_OPERATIONAL_INPUT_SCRIPT,
     "encode",
     "branch-outcome",
   ].join("\0") ||
@@ -100,7 +100,7 @@ if (
 ) {
   throw new Error(`unexpected async invocation: ${JSON.stringify(asyncInvocation)}`);
 }
-const calls = readFileSync(process.env.FM_WINDOWS_SHELL_LOG, "utf8");
+const calls = readFileSync(process.env.JG_WINDOWS_SHELL_LOG, "utf8");
 for (const expected of [
   "sessionstart:--source startup --pi-prerequisite",
   "cd:--command printf test",

@@ -31,7 +31,7 @@ mkdir -p "$lab" "$foreign_state" "$checkout"
 . "$ROOT/bin/jg-gate-refuse-lib.sh"
 jg_gate_lab_mark "$lab" || fail "could not mark the watcher lab"
 cp "$WATCH_ARM" "$ROOT/bin/jg-gate-refuse-lib.sh" "$checkout/"
-if env -u FM_GATE_REFUSE_BYPASS -u FM_STATE_OVERRIDE FM_HOME="$lab" STATE="$foreign_state" \
+if env -u JG_GATE_REFUSE_BYPASS -u JG_STATE_OVERRIDE JG_HOME="$lab" STATE="$foreign_state" \
   bash "$checkout/jg-watch-arm.sh" > "$TMP_ROOT/lab-guard.out" 2>&1; then
   fail "disposable watcher accepted an inherited state outside its lab"
 fi
@@ -43,12 +43,12 @@ pass "disposable watcher refuses inherited state outside its marked lab"
 drain_and_ack() {  # <state>
   local state=$1 err sequence generation
   err="$state/.test-drain.err"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
+  JG_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
 
@@ -115,9 +115,9 @@ test_singleton_start() {
   fakebin="$dir/fakebin"
   out1="$dir/watch-one.out"
   out2="$dir/watch-two.out"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out1" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out1" &
   pid1=$!
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out2" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out2" &
   pid2=$!
   i=0
   while [ "$i" -lt 50 ]; do
@@ -153,7 +153,7 @@ test_stale_watch_lock_reclaimed() {
   done
   mkdir "$state/.watch.lock"
   printf '%s\n' "$dead_pid" > "$state/.watch.lock/pid"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
   i=0
   live=0
@@ -184,7 +184,7 @@ test_live_stale_watch_lock_is_actionable() {
   printf '%s\n' "$$" > "$state/.watch.lock/pid"
   touch -t 200001010000 "$state/.last-watcher-beat"
   status=0
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=1 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
   [ "$status" -ne 0 ] || fail "watcher silently no-opped behind a live stale holder"
   grep -F 'heartbeat is stale' "$err" >/dev/null || fail "watcher did not explain the stale live lock"
   pass "live watcher lock with stale heartbeat is actionable"
@@ -203,7 +203,7 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   err="$dir/watch.err"
   sleep 300 &
   holder=$!
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$holder") || fail "could not identify the fake holder"
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$holder") || fail "could not identify the fake holder"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
   printf '%s\n' "$dir" > "$state/.watch.lock/jg-home"
@@ -215,12 +215,12 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   # Beacon decades old: past the grace, but a bound beyond it -> still refused.
   touch -t 200001010000 "$state/.last-watcher-beat"
   status=0
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_WATCHER_STALL_BOUND=9999999999 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=1 JG_WATCHER_STALL_BOUND=9999999999 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
   [ "$status" -ne 0 ] || fail "watcher replaced a holder whose beacon was under the hard bound"
   grep -F 'heartbeat is stale' "$err" >/dev/null || fail "under-bound stale holder lost its refusal"
   is_live_non_zombie "$holder" || fail "under-bound stale holder was signalled"
   # Same holder and beacon, a bound it is past -> evicted and replaced.
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_WATCHER_STALL_BOUND=3 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=1 JG_WATCHER_STALL_BOUND=3 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" &
   pid=$!
   i=0
   lock_pid=
@@ -264,10 +264,10 @@ test_rearm_proves_resumed_supervision() (
   trap 'for id in "$sleeper" "$holder" "$oldarm" "$arm" "$unrelated"; do
     [ -z "$id" ] || kill -KILL "$id" 2>/dev/null || true
   done; wait 2>/dev/null || true' EXIT
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state"
-  export FM_POLL=1 FM_SIGNAL_GRACE=1 FM_GUARD_GRACE=300
-  export FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999
-  unset FM_ARM_CONFIRM_TIMEOUT FM_WATCHER_STALL_BOUND FM_WATCHER_STALE_GRACE FM_CHECK_TIMEOUT
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$state"
+  export JG_POLL=1 JG_SIGNAL_GRACE=1 JG_GUARD_GRACE=300
+  export JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999
+  unset JG_ARM_CONFIRM_TIMEOUT JG_WATCHER_STALL_BOUND JG_WATCHER_STALE_GRACE JG_CHECK_TIMEOUT
   bound=$(bash -c '. "$1"; jg_watcher_stall_bound' _ "$LIB")
   [ "$bound" -eq 900 ] || fail "proof requires the normal 900-second stall bound"
   sleep 1800 &
@@ -276,7 +276,7 @@ test_rearm_proves_resumed_supervision() (
 #!/usr/bin/env bash
 # A sampler-style child owns a separate session, so the normal check-group
 # cleanup cannot accidentally satisfy the descendant-retirement assertion.
-python3 - "$FM_HOME/child.pid" "$FM_HOME/parent.pid" <<'PYTHON'
+python3 - "$JG_HOME/child.pid" "$JG_HOME/parent.pid" <<'PYTHON'
 import os
 import subprocess
 import sys
@@ -345,13 +345,13 @@ SH
   "$ROOT/bin/jg-check-unregister.sh" hung >/dev/null || fail "retire hung check"
   for id in one two three four five; do
     # shellcheck disable=SC2016 # The check expands its private home at runtime.
-    printf '#!/usr/bin/env bash\nprintf "%%s\\n" %s >> "$FM_HOME/scanned"\n' "$id" > "$state/$id.check.sh"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" %s >> "$JG_HOME/scanned"\n' "$id" > "$state/$id.check.sh"
     chmod 0700 "$state/$id.check.sh"
     "$ROOT/bin/jg-check-register.sh" "$id" >/dev/null || fail "register task $id"
   done
   # A handling successor is the existing continuation that resumes scans after
   # the recovery wake, rather than delivering the same downtime wake again.
-  PATH="$fakebin:$PATH" FM_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/new-arm.out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_WATCH_HANDLING_SUCCESSOR=1 "$WATCH_ARM" > "$dir/new-arm.out" 2>&1 &
   arm=$!
   for ((i=0; i<250; i++)); do
     grep -q 'watcher: started' "$dir/new-arm.out" && break
@@ -366,7 +366,7 @@ SH
   for id in one two three four five; do
     grep -qx "$id" "$dir/scanned" 2>/dev/null || status+="; started before supervising task $id"
   done
-  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir" \
+  JG_HOME="$dir" JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir" \
     || status+="; replacement lacks fresh identity-bound heartbeat"
   [ -z "$status" ] || fail "$status"
   # A new task event must still leave the watcher through its public arm path.
@@ -380,7 +380,7 @@ SH
 test_child_retirement_continues_after_descendant_exits() (
   local dir first='' second='' records pid
   dir=$(make_case child-retirement-exit-race)
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state"
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$dir/state"
   # shellcheck source=/dev/null
   . "$LIB"
   trap 'for pid in "$first" "$second"; do
@@ -411,17 +411,17 @@ test_first_scan_confirmation_budget() (
   dir=$(make_case "first-scan-budget-$mode")
   state="$dir/state"
   fakebin="$dir/fakebin"
-  export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_HEARTBEAT=999999
-  unset FM_ARM_CONFIRM_TIMEOUT FM_SIGNAL_GRACE
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_POLL=1 JG_HEARTBEAT=999999
+  unset JG_ARM_CONFIRM_TIMEOUT JG_SIGNAL_GRACE
   trap '[ -z "$holder" ] || kill -KILL "$holder" 2>/dev/null || true
     [ -z "$arm" ] || kill -KILL "$arm" 2>/dev/null || true
     wait 2>/dev/null || true' EXIT
   if [ "$mode" = check ]; then
-    export FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0
+    export JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=0
     cat > "$state/slow.check.sh" <<'SH'
 #!/usr/bin/env bash
 sleep 20
-touch "$FM_HOME/scanned"
+touch "$JG_HOME/scanned"
 SH
     chmod 0700 "$state/slow.check.sh"
     "$ROOT/bin/jg-check-register.sh" slow >/dev/null || fail "register slow check"
@@ -476,12 +476,12 @@ test_guard_warnings() {
   err="$dir/guard.err"
 
   # (1) watcher down (no beacon) + two in-flight tasks + a queued wake.
-  # FM_ROOT_OVERRIDE points the worktree-tangle check at a non-git dir so it stays
+  # JG_ROOT_OVERRIDE points the worktree-tangle check at a non-git dir so it stays
   # inert here; this case is about the watcher-down banner, not the tangle guard.
   printf 'project=x\n' > "$state/task.meta"
   printf 'project=y\n' > "$state/task2.meta"
   append_wake "$state" heartbeat heartbeat heartbeat || fail "guard heartbeat append failed"
-  PATH="$blind:$PATH" CLAUDECODE=1 PI_CODING_AGENT='' GROK_AGENT='' FM_ROOT_OVERRIDE="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
+  PATH="$blind:$PATH" CLAUDECODE=1 PI_CODING_AGENT='' GROK_AGENT='' JG_ROOT_OVERRIDE="$dir" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=1 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
   first=$(grep -v '^[[:space:]]*$' "$err" | head -1)
   case "$first" in
     '●'*) ;;
@@ -507,7 +507,7 @@ test_guard_warnings() {
   mkdir -p "$dir/config"
   printf 'project=x\n' > "$state/task.meta"
   : > "$dir/config/x-mode.env"
-  PATH="$blind:$PATH" CLAUDECODE=1 PI_CODING_AGENT='' GROK_AGENT='' FM_ROOT_OVERRIDE="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
+  PATH="$blind:$PATH" CLAUDECODE=1 PI_CODING_AGENT='' GROK_AGENT='' JG_ROOT_OVERRIDE="$dir" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=1 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
   grep -F "source '$dir/config/x-mode.env' first" "$err" >/dev/null || fail "guard repair line did not source the X-mode cadence config"
 
   # (2) live watcher plus fresh beacon, empty queue -> silence.
@@ -517,16 +517,16 @@ test_guard_warnings() {
   printf 'project=x\n' > "$state/task.meta"
   sleep 60 &
   pid=$!
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") || fail "could not identify fresh guard watcher"
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") || fail "could not identify fresh guard watcher"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$pid" > "$state/.watch.lock/pid"
   printf '%s\n' "$dir" > "$state/.watch.lock/jg-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   touch "$state/.last-watcher-beat"
-  # Non-git FM_ROOT keeps the worktree-tangle check inert so "fresh watcher ->
+  # Non-git JG_ROOT keeps the worktree-tangle check inert so "fresh watcher ->
   # total silence" stays a pure assertion about watcher state.
-  FM_ROOT_OVERRIDE="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=300 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
+  JG_ROOT_OVERRIDE="$dir" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=300 "$ROOT/bin/jg-guard.sh" 2> "$err" >/dev/null || fail "guard failed"
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   [ ! -s "$err" ] || fail "guard warned with a live watcher and fresh beacon: $(cat "$err")"
@@ -543,7 +543,7 @@ test_lock_single_winner_under_concurrency() {
   pids=
   i=1
   while [ "$i" -le 40 ]; do
-    FM_STATE_OVERRIDE="$state" bash -c '
+    JG_STATE_OVERRIDE="$state" bash -c '
       . "$1"
       if jg_lock_try_acquire "$2"; then
         printf "%s\n" "$$" >> "$3"
@@ -572,7 +572,7 @@ test_lock_steals_dead_pid_lock() {
   mkdir "$lockdir"
   printf '%s\n' "$dead" > "$lockdir/pid"
   rc=0
-  newpid=$(FM_STATE_OVERRIDE="$state" bash -c '
+  newpid=$(JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     if jg_lock_try_acquire "$2"; then cat "$2/pid"; else exit 7; fi
   ' _ "$LIB" "$lockdir") || rc=$?
@@ -588,7 +588,7 @@ leave_dead_link_locks() {  # <state> <lock>...
   local state=$1 holder i last
   shift
   last=${!#}
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     shift
     for lock do jg_lock_try_create "$lock" || exit 7; done
@@ -619,14 +619,14 @@ test_lock_reclaims_dead_steal_owner_without_nested_markers() {
 #!/usr/bin/env bash
 last=
 for arg do last=$arg; done
-printf '%s\n' "$last" >> "$FM_TEST_LN_LOG"
+printf '%s\n' "$last" >> "$JG_TEST_LN_LOG"
 exec /bin/ln "$@"
 SH
   chmod +x "$fakebin/ln"
   : > "$lnlog"
 
   rc=0
-  PATH="$fakebin:$PATH" FM_TEST_LN_LOG="$lnlog" FM_STATE_OVERRIDE="$state" bash -c '
+  PATH="$fakebin:$PATH" JG_TEST_LN_LOG="$lnlog" JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_try_acquire "$2" || exit 8
     jg_lock_release "$2"
@@ -649,7 +649,7 @@ test_lock_recovers_dead_nested_steal_chain() {
   leave_dead_link_locks "$state" "$lockdir.steal" "$lockdir.steal.steal"
 
   rc=0
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_try_acquire "$2" || exit 8
     jg_lock_release "$2"
@@ -673,7 +673,7 @@ test_lock_reclaims_self_held_steal_mutex() {
   printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
 
   rc=0
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_try_create "$2.steal" || exit 7
     jg_lock_try_acquire "$2" || exit 8
@@ -699,7 +699,7 @@ test_lock_resumes_own_interrupted_steal_reap() {
   leave_dead_link_locks "$state" "$lockdir.steal"
 
   rc=0
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_current_pid me || exit 6
     owner=$(jg_lock_link_owner "$2.steal") || exit 6
@@ -732,7 +732,7 @@ test_lock_steal_reap_cannot_remove_successor() {
 #!/usr/bin/env bash
 last=
 for arg do last=$arg; done
-if [ "$last" = "$FM_TEST_RACE_PATH" ] && mkdir "$FM_TEST_RACE_ONCE" 2>/dev/null; then
+if [ "$last" = "$JG_TEST_RACE_PATH" ] && mkdir "$JG_TEST_RACE_ONCE" 2>/dev/null; then
   bash -c '
     . "$1"
     if jg_lock_try_acquire_steal_mutex "$2"; then
@@ -740,9 +740,9 @@ if [ "$last" = "$FM_TEST_RACE_PATH" ] && mkdir "$FM_TEST_RACE_ONCE" 2>/dev/null;
       exec sleep 30
     fi
     printf "lost\n" > "$3"
-  ' _ "$FM_TEST_LIB" "$last" "$FM_TEST_RACE_OUT" >/dev/null 2>&1 &
+  ' _ "$JG_TEST_LIB" "$last" "$JG_TEST_RACE_OUT" >/dev/null 2>&1 &
   i=0
-  while [ "$i" -lt 100 ] && [ ! -s "$FM_TEST_RACE_OUT" ]; do
+  while [ "$i" -lt 100 ] && [ ! -s "$JG_TEST_RACE_OUT" ]; do
     sleep 0.05
     i=$((i + 1))
   done
@@ -752,9 +752,9 @@ SH
   chmod +x "$fakebin/rm"
 
   rc=0
-  PATH="$fakebin:$PATH" FM_TEST_LIB="$LIB" FM_TEST_RACE_PATH="$steal" \
-    FM_TEST_RACE_ONCE="$dir/race-once" FM_TEST_RACE_OUT="$out" \
-    FM_STATE_OVERRIDE="$state" bash -c '
+  PATH="$fakebin:$PATH" JG_TEST_LIB="$LIB" JG_TEST_RACE_PATH="$steal" \
+    JG_TEST_RACE_ONCE="$dir/race-once" JG_TEST_RACE_OUT="$out" \
+    JG_STATE_OVERRIDE="$state" bash -c '
       . "$1"
       jg_lock_try_acquire_steal_mutex "$2" || exit 1
       [ "$(cat "$2/pid" 2>/dev/null)" = "${BASHPID:-$$}" ] || exit 2
@@ -789,7 +789,7 @@ test_lock_stale_steal_single_winner_under_concurrency() {
   # try_acquire is nonblocking: all one-shot candidates may lose to a transient
   # steal mutex. A waiting contender guarantees eventual acquisition, and the
   # FIFO keeps the winner alive until every other contender has finished.
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_acquire_wait "$2" || exit 1
     printf "%s\n" "${BASHPID:-$$}" >> "$3"
@@ -800,7 +800,7 @@ test_lock_stale_steal_single_winner_under_concurrency() {
   pids=
   i=1
   while [ "$i" -le 39 ]; do
-    FM_STATE_OVERRIDE="$state" bash -c '
+    JG_STATE_OVERRIDE="$state" bash -c '
       . "$1"
       if jg_lock_try_acquire "$2"; then
         printf "%s\n" "${BASHPID:-$$}" >> "$3"
@@ -832,7 +832,7 @@ test_lock_live_steal_mutex_is_not_reclaimed() {
   dead=$(dead_pid)
   mkdir "$lockdir"
   printf '%s\n' "$dead" > "$lockdir/pid"
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_try_acquire "$2.steal" || exit 7
     printf "%s\n" "${BASHPID:-$$}" > "$3"
@@ -846,10 +846,10 @@ test_lock_live_steal_mutex_is_not_reclaimed() {
     i=$((i + 1))
   done
   [ -s "$holder_file" ] || fail "live steal mutex holder did not start"
-  out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+  out=$(JG_LOCK_STALE_AFTER=0 JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     if jg_lock_try_acquire "$2"; then rc=0; else rc=1; fi
-    printf "rc=%s held=%s lockpid=%s stealpid=%s\n" "$rc" "${FM_LOCK_HELD_PID:-}" "$(cat "$2/pid" 2>/dev/null || true)" "$(cat "$2.steal/pid" 2>/dev/null || true)"
+    printf "rc=%s held=%s lockpid=%s stealpid=%s\n" "$rc" "${JG_LOCK_HELD_PID:-}" "$(cat "$2/pid" 2>/dev/null || true)" "$(cat "$2.steal/pid" 2>/dev/null || true)"
   ' _ "$LIB" "$lockdir")
   wait "$holder" || fail "live steal mutex holder failed"
   case "$out" in
@@ -872,10 +872,10 @@ test_lock_does_not_steal_live_lock() {
   live=$!
   mkdir "$lockdir"
   printf '%s\n' "$live" > "$lockdir/pid"
-  out=$(FM_STATE_OVERRIDE="$state" bash -c '
+  out=$(JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     if jg_lock_try_acquire "$2"; then rc=0; else rc=1; fi
-    printf "rc=%s held=%s\n" "$rc" "${FM_LOCK_HELD_PID:-}"
+    printf "rc=%s held=%s\n" "$rc" "${JG_LOCK_HELD_PID:-}"
   ' _ "$LIB" "$lockdir")
   kill "$live" 2>/dev/null || true
   wait "$live" 2>/dev/null || true
@@ -885,7 +885,7 @@ test_lock_does_not_steal_live_lock() {
   esac
   case "$out" in
     *"held=$live"*) ;;
-    *) fail "live holder pid not reported via FM_LOCK_HELD_PID: $out" ;;
+    *) fail "live holder pid not reported via JG_LOCK_HELD_PID: $out" ;;
   esac
   lockpid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$lockpid" = "$live" ] || fail "live holder's lock pid was clobbered (got '$lockpid')"
@@ -898,10 +898,10 @@ test_lock_empty_pid_uses_minimum_grace() {
   state="$dir/state"
   lockdir="$state/.contend.lock"
   mkdir "$lockdir"
-  out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+  out=$(JG_LOCK_STALE_AFTER=0 JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     if jg_lock_try_acquire "$2"; then rc=0; else rc=1; fi
-    printf "rc=%s held=%s\n" "$rc" "${FM_LOCK_HELD_PID:-}"
+    printf "rc=%s held=%s\n" "$rc" "${JG_LOCK_HELD_PID:-}"
   ' _ "$LIB" "$lockdir")
   case "$out" in
     *"rc=1"*) ;;
@@ -917,7 +917,7 @@ test_lock_late_claim_loses_after_recreate() {
   dir=$(make_case lock-late-claim)
   state="$dir/state"
   lockdir="$state/.contend.lock"
-  out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+  out=$(JG_LOCK_STALE_AFTER=0 JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     owner1=$(jg_lock_owner_dir "$2") || exit 20
     ln -s "$owner1" "$2" || exit 21
@@ -949,12 +949,12 @@ test_lock_paused_mid_acquire_claim_fails_during_steal() {
   dir=$(make_case lock-paused-claim-steal)
   state="$dir/state"
   lockdir="$state/.contend.lock"
-  out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
+  out=$(JG_LOCK_STALE_AFTER=0 JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     owner=$(jg_lock_owner_dir "$2") || exit 20
     ln -s "$owner" "$2" || exit 21
     jg_lock_try_acquire "$2.steal" || exit 22
-    steal_owner=${FM_LOCK_OWNER_DIR:-}
+    steal_owner=${JG_LOCK_OWNER_DIR:-}
     if jg_lock_claim "$2" "$owner"; then late=won; else late=lost; fi
     if jg_lock_try_create "$2" "$steal_owner"; then stealer=won; else stealer=lost; fi
     pid=$(cat "$2/pid" 2>/dev/null || true)
@@ -986,7 +986,7 @@ test_watch_restart_rejects_reused_pid() {
   printf '%s\n' "$dir" > "$state/.watch.lock/jg-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "stale watcher identity" > "$state/.watch.lock/pid-identity"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" --restart > "$out" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" --restart > "$out" &
   pid=$!
   i=0
   while [ "$i" -lt 80 ] && is_live_non_zombie "$pid"; do
@@ -1023,14 +1023,14 @@ test_watch_restart_attaches_to_healthy_peer() {
     wait "$peer" 2>/dev/null || true
     fail "TERM-resistant peer did not become ready"
   fi
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$peer" > "$state/.watch.lock/pid"
   printf '%s\n' "$dir" > "$state/.watch.lock/jg-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
   touch "$state/.last-watcher-beat"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" --restart > "$out" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_ARM_ATTACH_POLL=0.1 JG_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" --restart > "$out" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1056,7 +1056,7 @@ test_watcher_self_evicts_on_lock_takeover() {
   state="$dir/state"
   fakebin="$dir/fakebin"
   out="$dir/watch.out"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=0.2 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1093,7 +1093,7 @@ test_arm_self_eviction_is_loud_without_successor() {
   # beacon" and broke this case's premise under full-suite load (issue #2844).
   # It stays at the production default rather than something roomier because the
   # same budget bounds the successor wait this case deliberately spends below.
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=0.2 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1124,7 +1124,7 @@ test_arm_attaches_and_waits_for_live_fresh_watcher() {
   out="$dir/watch.out"
   armout="$dir/arm.out"
   # A genuinely live watcher with a fresh beacon already holds the singleton.
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" 2>&1 &
   wpid=$!
   i=0
   while [ "$i" -lt 60 ]; do
@@ -1135,7 +1135,7 @@ test_arm_attaches_and_waits_for_live_fresh_watcher() {
   [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$wpid" ] || fail "seed watcher did not take the lock"
   # Arming must attach to the existing watcher, NOT start a second one, and NOT
   # exit while the seed still holds the healthy lock.
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 JG_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1164,7 +1164,7 @@ test_attached_arm_signal_is_recorded_in_cycle_ledger() {
   fakebin="$dir/fakebin"
   out="$dir/watch.out"
   armout="$dir/arm.out"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2>&1 &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH" > "$out" 2>&1 &
   wpid=$!
   i=0
   while [ "$i" -lt 60 ]; do
@@ -1173,7 +1173,7 @@ test_attached_arm_signal_is_recorded_in_cycle_ledger() {
     i=$((i + 1))
   done
   [ "$(cat "$state/.watch.lock/pid" 2>/dev/null || true)" = "$wpid" ] || fail "seed watcher did not take the lock"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_ARM_ATTACH_POLL=0.1 JG_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1211,16 +1211,16 @@ for arg do last=$arg; done
 case "$last" in
   *.watch.lock.steal)
     sleep 0.2
-    arm_pid=$(cat "$FM_TEST_ARM_PID_FILE" 2>/dev/null || true)
+    arm_pid=$(cat "$JG_TEST_ARM_PID_FILE" 2>/dev/null || true)
     [ -n "$arm_pid" ] && kill -TERM "$arm_pid" 2>/dev/null || true
     ;;
 esac
 exec /bin/ln "$@"
 SH
   chmod +x "$fakebin/ln"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_TEST_ARM_PID_FILE="$pidfile" FM_POLL=5 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_TEST_ARM_PID_FILE="$pidfile" JG_POLL=5 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" 2>&1 &
   armpid=$!
   printf '%s\n' "$armpid" > "$pidfile"
   i=0
@@ -1252,21 +1252,21 @@ for arg do last=$arg; done
 case "$last" in
   */.watch.lock)
     i=0
-    while [ "$i" -lt 100 ] && [ ! -s "$FM_TEST_ARM_PID_FILE" ]; do
+    while [ "$i" -lt 100 ] && [ ! -s "$JG_TEST_ARM_PID_FILE" ]; do
       sleep 0.02
       i=$((i + 1))
     done
-    kill -TERM "$(cat "$FM_TEST_ARM_PID_FILE")" 2>/dev/null || true
-    while [ ! -e "$FM_TEST_RELEASE" ]; do sleep 0.05; done
+    kill -TERM "$(cat "$JG_TEST_ARM_PID_FILE")" 2>/dev/null || true
+    while [ ! -e "$JG_TEST_RELEASE" ]; do sleep 0.05; done
     ;;
 esac
 exec /bin/ln "$@"
 SH
   chmod +x "$fakebin/ln"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
-    FM_TEST_ARM_PID_FILE="$pidfile" FM_TEST_RELEASE="$release" \
-    FM_ARM_CONFIRM_TIMEOUT=2 FM_POLL=5 FM_SIGNAL_GRACE=1 \
-    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" 2>&1 &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" \
+    JG_TEST_ARM_PID_FILE="$pidfile" JG_TEST_RELEASE="$release" \
+    JG_ARM_CONFIRM_TIMEOUT=2 JG_POLL=5 JG_SIGNAL_GRACE=1 \
+    JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" 2>&1 &
   armpid=$!
   printf '%s\n' "$armpid" > "$pidfile"
   i=0
@@ -1308,7 +1308,7 @@ test_arm_starts_and_self_heals() {
       printf '%s\n' "dead watcher identity" > "$state/.watch.lock/pid-identity"
       touch "$state/.last-watcher-beat"
     fi
-    PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+    PATH="$fakebin:$PATH" JG_HOME="$dir" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
     armpid=$!
     i=0
     while [ "$i" -lt 80 ]; do
@@ -1347,7 +1347,7 @@ test_arm_hup_cleans_child_and_temp_output() {
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1384,7 +1384,7 @@ test_arm_propagates_immediate_wake_before_confirmation() {
 printf 'merged: https://example.test/pr/7\n'
 SH
   chmod 0700 "$check_file"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" task >/dev/null \
+  JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" task >/dev/null \
     || fail "could not register immediate-wake custom check"
   rc=0
   # This case asserts wake propagation, not the confirmation deadline, and its
@@ -1393,11 +1393,11 @@ SH
   # budget. An explicit budget takes the deadline out of the assertion and costs
   # nothing on a passing run, because the arm returns as soon as the child
   # settles (issue #2844).
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=0 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=60 "$WATCH_ARM" > "$armout" || rc=$?
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=0 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 JG_ARM_CONFIRM_TIMEOUT=60 "$WATCH_ARM" > "$armout" || rc=$?
   [ "$rc" -eq 0 ] || fail "arm returned non-zero for an immediate wake (status $rc): $(cat "$armout")"
   grep -F "check: $check_file: merged: https://example.test/pr/7" "$armout" >/dev/null || fail "arm did not propagate the immediate check wake"
   ! grep -qF 'watcher: FAILED' "$armout" || fail "arm printed FAILED after a valid immediate wake"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" || fail "drain after immediate arm wake failed"
+  JG_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" || fail "drain after immediate arm wake failed"
   grep "$(printf '\tcheck\t')" "$drain_out" | grep -F "$check_file" | grep -F 'merged: https://example.test/pr/7' >/dev/null || fail "immediate check wake was not queued"
   pass "arm propagates an immediate watcher wake before confirmation"
 }
@@ -1410,7 +1410,7 @@ test_arm_waits_for_peer_beacon_after_child_stands_down() {
   armout="$dir/arm.out"
   sleep 300 &
   peer=$!
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$peer" > "$state/.watch.lock/pid"
   printf '%s\n' "$dir" > "$state/.watch.lock/jg-home"
@@ -1419,7 +1419,7 @@ test_arm_waits_for_peer_beacon_after_child_stands_down() {
   # Same budget contract as the self-eviction case: the owned child's real
   # startup and stand-down happen inside the arm's confirmation window, so the
   # window stays production-sized (issue #2844).
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_ATTACH_POLL=0.1 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_ARM_ATTACH_POLL=0.1 "$WATCH_ARM" > "$armout" &
   armpid=$!
   # Synchronize on the owned child declining the live peer lock before making
   # the peer healthy. Sleeping for the same budget the arm spends made this
@@ -1466,7 +1466,7 @@ test_arm_fails_fast_when_child_stands_down_for_a_dead_holder() {
   # exists and no successor can come from it.
   sleep 300 &
   holder=$!
-  identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$holder") \
+  identity=$(JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$holder") \
     || fail "could not identify the seed holder pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
@@ -1488,7 +1488,7 @@ SH
   # stays at the exported 30 and this case's own ceiling stays well inside the
   # budget-plus-one burn an arm pays while waiting for a successor a dead
   # holder can never give.
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=30 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_ARM_CONFIRM_TIMEOUT=30 "$WATCH_ARM" > "$armout" &
   armpid=$!
   wait_for_exit "$armpid" 200
   status=$?
@@ -1504,7 +1504,7 @@ SH
     || fail "dead-holder arm spent the confirmation window before failing"
   # The same stand-down must fail loudly and promptly under a minimal budget
   # too, where waiting out the window is no longer even available.
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout_fast" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" > "$armout_fast" &
   armpid=$!
   wait_for_exit "$armpid" 100
   status=$?
@@ -1528,7 +1528,7 @@ test_arm_fails_loud_when_no_fresh_watcher_confirmable() {
   mkdir "$state/.watch.lock"
   printf '%s\n' "$live" > "$state/.watch.lock/pid"
   touch -t 200001010000 "$state/.last-watcher-beat"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=3 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_ARM_CONFIRM_TIMEOUT=3 "$WATCH_ARM" > "$armout" &
   armpid=$!
   wait_for_exit "$armpid" 120
   status=$?
@@ -1555,10 +1555,10 @@ test_cycle_exit_ledger_links_successor_and_stays_bounded() {
 printf 'done: synthetic cycle\n'
 SH
   chmod 0700 "$check_file"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" task >/dev/null \
+  JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-check-register.sh" task >/dev/null \
     || fail "could not register cycle-ledger check"
 
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=0 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_GUARD_GRACE=0 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=0 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   first_arm=$!
   wait "$first_arm" || fail "first ledger cycle did not surface its actionable wake"
   grep -q "arm_pid=$first_arm.*reason=actionable-check.*successor=none" "$state/.watch-cycle-exits.log" \
@@ -1567,7 +1567,7 @@ SH
 
   rm -f "$check_file" "$state/task.check-trust"
   armout="$dir/successor-arm.out"
-  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_WATCH_PREDECESSOR_ARM_PID="$first_arm" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_WATCH_PREDECESSOR_ARM_PID="$first_arm" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   successor_arm=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1592,7 +1592,7 @@ SH
   iteration=0
   while [ "$iteration" -lt 6 ]; do
     armout="$dir/bounded-$iteration.out"
-    PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_WATCH_CYCLE_LOG_MAX_BYTES=1400 FM_WATCH_CYCLE_LOG_KEEP_LINES=2 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+    PATH="$fakebin:$PATH" JG_STATE_OVERRIDE="$state" JG_WATCH_CYCLE_LOG_MAX_BYTES=1400 JG_WATCH_CYCLE_LOG_KEEP_LINES=2 JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
     successor_arm=$!
     i=0
     while [ "$i" -lt 80 ]; do
@@ -1620,7 +1620,7 @@ test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  PATH="$fakebin:$PATH" JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_POLL=5 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
@@ -1633,9 +1633,9 @@ test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
 
   kill -STOP "$watcher_pid" 2>/dev/null || fail "could not SIGSTOP watcher"
   touch -t 200001010000 "$state/.last-watcher-beat"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_alive "$2"' _ "$LIB" "$watcher_pid" \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_alive "$2"' _ "$LIB" "$watcher_pid" \
     || fail "SIGSTOP watcher was not classified as a live pid"
-  if FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir"; then
+  if JG_HOME="$dir" JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir"; then
     fail "SIGSTOP watcher with a stale beacon was classified healthy"
   fi
 
@@ -1680,15 +1680,15 @@ stamp=$(date -d @1784094040 '+%a %b %e %H:%M:%S %Y' 2>/dev/null) \
 printf '%s sleep 300\n' "$stamp"
 SH
   chmod +x "$fakebin/ps"
-  baseline=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" FM_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=C bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
-  via_lc_all=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" FM_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=ko_KR.UTF-8 bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
-  via_lc_time=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" FM_PROC_ROOT_OVERRIDE="$no_proc" LC_TIME=ko_KR.UTF-8 bash -c 'unset LC_ALL; . "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+  baseline=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" JG_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=C bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+  via_lc_all=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" JG_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=ko_KR.UTF-8 bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+  via_lc_time=$(PATH="$fakebin:$PATH" FAKE_PS_LOCALE_LOG="$locale_log" JG_PROC_ROOT_OVERRIDE="$no_proc" LC_TIME=ko_KR.UTF-8 bash -c 'unset LC_ALL; . "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
   # Keep the real ps fallback exercised wherever it supports the portable -o fields.
   real_first=
   real_second=
   if LC_ALL=C ps -p "$live" -o lstart= -o command= >/dev/null 2>&1; then
-    real_first=$(FM_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=C bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
-    real_second=$(FM_PROC_ROOT_OVERRIDE="$no_proc" LC_TIME=ko_KR.UTF-8 bash -c 'unset LC_ALL; . "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+    real_first=$(JG_PROC_ROOT_OVERRIDE="$no_proc" LC_ALL=C bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+    real_second=$(JG_PROC_ROOT_OVERRIDE="$no_proc" LC_TIME=ko_KR.UTF-8 bash -c 'unset LC_ALL; . "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
   fi
   kill "$live" 2>/dev/null || true
   wait "$live" 2>/dev/null || true
@@ -1724,8 +1724,8 @@ test_pid_identity_is_terminal_width_invariant() {
   fi
   sleep "$long_arg" &
   live=$!
-  narrow=$(COLUMNS=20 FM_PROC_ROOT_OVERRIDE="$no_proc" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
-  wide=$(COLUMNS=1000 FM_PROC_ROOT_OVERRIDE="$no_proc" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+  narrow=$(COLUMNS=20 JG_PROC_ROOT_OVERRIDE="$no_proc" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
+  wide=$(COLUMNS=1000 JG_PROC_ROOT_OVERRIDE="$no_proc" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$live" 2>/dev/null)
   kill "$live" 2>/dev/null || true
   wait "$live" 2>/dev/null || true
   [ -n "$wide" ] || fail "jg_pid_identity produced no identity under a wide COLUMNS"
@@ -1756,10 +1756,10 @@ test_proc_pid_identity_ignores_wall_clock_and_detects_pid_reuse() {
   printf 'btime 1784094040\n' > "$proc_root/stat"
   write_fake_proc_identity "$proc_root" "$pid" 987654
 
-  before=$(FM_PROC_ROOT_OVERRIDE="$proc_root" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
+  before=$(JG_PROC_ROOT_OVERRIDE="$proc_root" JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
     || fail "could not read initial fake Linux process identity"
   printf 'btime 1784094016\n' > "$proc_root/stat"
-  after_time_jump=$(FM_PROC_ROOT_OVERRIDE="$proc_root" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
+  after_time_jump=$(JG_PROC_ROOT_OVERRIDE="$proc_root" JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
     || fail "could not re-read fake Linux process identity after btime change"
 
   [ "$after_time_jump" = "$before" ] \
@@ -1769,7 +1769,7 @@ test_proc_pid_identity_ignores_wall_clock_and_detects_pid_reuse() {
   pass "/proc process identity ignores simulated btime changes"
 
   write_fake_proc_identity "$proc_root" "$pid" 987655
-  after_pid_reuse=$(FM_PROC_ROOT_OVERRIDE="$proc_root" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
+  after_pid_reuse=$(JG_PROC_ROOT_OVERRIDE="$proc_root" JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_pid_identity "$2"' _ "$LIB" "$pid") \
     || fail "could not read reused fake /proc pid identity"
   [ "$after_pid_reuse" != "$before" ] || fail "/proc process identity missed changed starttime for reused pid"
   pass "/proc process identity detects pid reuse"
@@ -1783,7 +1783,7 @@ test_stale_watch_reclaim_publishes_before_clear() {
   mkdir -p "$lockdir"
   printf '99999999\n' > "$lockdir/pid"
 
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_remove_path() {
       if [ "$1" = "$STATE/.watch.lock" ]; then
@@ -1797,10 +1797,10 @@ test_stale_watch_reclaim_publishes_before_clear() {
   [ "$rc" -ne 0 ] || fail "interrupted stale watcher reclaim unexpectedly completed"
   [ -e "$lockdir" ] || [ -L "$lockdir" ] \
     || fail "stale watcher lock cleared before recovery publication boundary"
-  token=$(FM_STATE_OVERRIDE="$state" bash -c '
+  token=$(JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_recovery_marker_read "$2" || exit 1
-    printf "%s\n" "$FM_RECOVERY_MARKER_TOKEN"
+    printf "%s\n" "$JG_RECOVERY_MARKER_TOKEN"
   ' _ "$LIB" "$state/.watcher-down") \
     || fail "stale watcher reclaim interruption left no durable recovery evidence"
   case "$token" in
@@ -1808,7 +1808,7 @@ test_stale_watch_reclaim_publishes_before_clear() {
     *) fail "stale watcher reclaim published invalid recovery evidence: $token" ;;
   esac
 
-  FM_STATE_OVERRIDE="$state" bash -c '
+  JG_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     jg_lock_try_acquire "$2" || exit 1
     jg_lock_release "$2"

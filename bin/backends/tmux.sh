@@ -19,11 +19,11 @@
 # its submit core under the backend's naming convention rather than
 # duplicating it, so the two consumers cannot drift apart.
 # shellcheck source=bin/jg-tmux-lib.sh
-. "$FM_BACKEND_LIB_DIR/jg-tmux-lib.sh"
+. "$JG_BACKEND_LIB_DIR/jg-tmux-lib.sh"
 # shellcheck source=bin/jg-session-lock-lib.sh
-. "$FM_BACKEND_LIB_DIR/jg-session-lock-lib.sh"
+. "$JG_BACKEND_LIB_DIR/jg-session-lock-lib.sh"
 # shellcheck source=bin/jg-agent-process-lib.sh
-. "$FM_BACKEND_LIB_DIR/jg-agent-process-lib.sh"
+. "$JG_BACKEND_LIB_DIR/jg-agent-process-lib.sh"
 
 # jg_backend_tmux_resolve_bare_selector: the live-window-listing fallback for a
 # selector that is neither an explicit target nor a task selector routed

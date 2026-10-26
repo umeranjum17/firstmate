@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # jg-model-pool - JSON pick/next for model-calling tools over the existing account pool.
 # Protocol v1: stdin JSON, stdout JSON. Folder paths and variable names only; never credentials.
-# Eligibility floor for this helper is the verified-rest floor (default 15%, FM_ACCOUNT_POOL_REST_FLOOR).
-# Worker-launch admission in claude-accounts-pick stays at FM_CLAUDE_ACCOUNTS_LOW (default 5%).
+# Eligibility floor for this helper is the verified-rest floor (default 15%, JG_ACCOUNT_POOL_REST_FLOOR).
+# Worker-launch admission in claude-accounts-pick stays at JG_CLAUDE_ACCOUNTS_LOW (default 5%).
 # Those two numbers stay separate on purpose: launch admission vs tool rotation / rest.
 # Usage: jg-model-pool pick --json | jg-model-pool next --json
 set -euo pipefail
@@ -14,9 +14,9 @@ type jg_run_timed >/dev/null 2>&1 || jg_run_timed() { shift; "$@"; }
 # shellcheck source=account-pool/bin/jg-account-pool-lib.sh
 . "$here/jg-account-pool-lib.sh"
 
-FLOOR=${FM_MODEL_POOL_FLOOR:-${FM_ACCOUNT_POOL_REST_FLOOR:-15}}
-LAUNCH_FLOOR=${FM_CLAUDE_ACCOUNTS_LOW:-5}
-REGISTRY=${FM_CLAUDE_ACCOUNTS_REGISTRY:-${HOME}/.muxr/plans/accounts-v1.json}
+FLOOR=${JG_MODEL_POOL_FLOOR:-${JG_ACCOUNT_POOL_REST_FLOOR:-15}}
+LAUNCH_FLOOR=${JG_CLAUDE_ACCOUNTS_LOW:-5}
+REGISTRY=${JG_CLAUDE_ACCOUNTS_REGISTRY:-${HOME}/.muxr/plans/accounts-v1.json}
 
 # Built-in normal-work fallovers after every eligible Claude account is under the floor.
 # selection ids are stable route:* keys; billing is plan unless a route record enables credits.
@@ -69,11 +69,11 @@ parse_pool_config() {
 }
 
 # When the request omits pool_config (lfm account_picker does), use the same default
-# order as pipeline-quota-failover/switch.sh: $FM_HOME/config/account-pool when that
+# order as pipeline-quota-failover/switch.sh: $JG_HOME/config/account-pool when that
 # file is readable, else $HOME/firstmate/config/account-pool.
 default_pool_config() {
-  if [ -n "${FM_HOME:-}" ] && [ -f "$FM_HOME/config/account-pool" ] && [ -r "$FM_HOME/config/account-pool" ]; then
-    printf '%s\n' "$FM_HOME/config/account-pool"
+  if [ -n "${JG_HOME:-}" ] && [ -f "$JG_HOME/config/account-pool" ] && [ -r "$JG_HOME/config/account-pool" ]; then
+    printf '%s\n' "$JG_HOME/config/account-pool"
     return 0
   fi
   if [ -f "$HOME/firstmate/config/account-pool" ] && [ -r "$HOME/firstmate/config/account-pool" ]; then
@@ -100,7 +100,7 @@ roster_json() {
 rank_claude() {
   local state=$1 attempted=$2 reading file roster row id
   file=
-  for cand in ${FM_HOME:+"$FM_HOME/state/claude-accounts.json"} "$state/claude-accounts.json"; do
+  for cand in ${JG_HOME:+"$JG_HOME/state/claude-accounts.json"} "$state/claude-accounts.json"; do
     [ -n "${cand:-}" ] && [ -r "$cand" ] || continue
     file=$cand
   done
@@ -141,7 +141,7 @@ emit_claude() {
   fi
   log "credits-check accept id=$id usage_credits_or_overage=disabled"
   [ -d "$folder" ] && [ -r "$folder" ] && [ -x "$folder" ] || return 1
-  out=$(jg_run_timed "${FM_ACCOUNT_POOL_PICK_SECONDS:-120}" "$command" pick claude --json --prefer "$id" --state "$state") || return 1
+  out=$(jg_run_timed "${JG_ACCOUNT_POOL_PICK_SECONDS:-120}" "$command" pick claude --json --prefer "$id" --state "$state") || return 1
   jq -e --arg id "$id" '.ok == true and .id == $id' <<<"$out" >/dev/null || return 1
   jq -c --argjson floor "$FLOOR" --argjson launch "$LAUNCH_FLOOR" --arg model "$model" \
     --argjson now "$(date +%s)" '
@@ -225,7 +225,7 @@ do_next() {
     if [[ $id == route:* ]]; then
       log "next: route $id limited ($cause); not resting a pool account"
     else
-      if jg_run_timed "${FM_ACCOUNT_POOL_REST_SECONDS:-60}" "$command" rest "$id" --json --state "$state" >/dev/null 2>&1; then
+      if jg_run_timed "${JG_ACCOUNT_POOL_REST_SECONDS:-60}" "$command" rest "$id" --json --state "$state" >/dev/null 2>&1; then
         log "next: rested $id after $cause"
       else
         log "next: rest failed for $id after $cause; excluding locally and advancing"

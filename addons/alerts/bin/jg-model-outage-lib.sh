@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Model-error observation, called by jg-watch.sh before stale suppression.
 # OpenCode lanes use explicit provider banners in the visible viewport,
 # never scrollback or worker-printed "Error:" lines. Unchanged error observations
@@ -17,10 +26,10 @@
 # owns subsequent attention. Each scan reads only this home's recorded lanes.
 
 # Sibling libraries live in the fork's bin/, not beside this add-on file: the
-# watcher sets SCRIPT_DIR, other callers FM_HOME.
-_FM_MODEL_ERROR_DIR="${SCRIPT_DIR:-$FM_HOME/bin}"
+# watcher sets SCRIPT_DIR, other callers JG_HOME.
+_JG_MODEL_ERROR_DIR="${SCRIPT_DIR:-$JG_HOME/bin}"
 # shellcheck source=bin/jg-timeout-lib.sh
-. "$_FM_MODEL_ERROR_DIR/jg-timeout-lib.sh"
+. "$_JG_MODEL_ERROR_DIR/jg-timeout-lib.sh"
 # Parked-home reader (firstmate-addons/parked-homes): the watcher defines it;
 # without it nothing is ever parked.
 declare -F jg_parked_meta >/dev/null || jg_parked_meta() { return 1; }
@@ -28,7 +37,7 @@ declare -F jg_parked_meta >/dev/null || jg_parked_meta() { return 1; }
 # observer reads that variable so the outage alert cannot drift from the
 # staleness furniture the banner was captured with.
 # shellcheck source=bin/jg-composer-lib.sh
-. "$_FM_MODEL_ERROR_DIR/jg-composer-lib.sh"
+. "$_JG_MODEL_ERROR_DIR/jg-composer-lib.sh"
 
 jg_model_outage_text() {
   LC_ALL=C tr -c '[:print:]' ' ' | awk '{$1=$1; print}' | cut -c1-1000
@@ -63,7 +72,7 @@ jg_model_outage_tick() {
     [ "$harness" = opencode ] || continue
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     verdict=$(jg_run_timed 3 bash -c '. "$1/jg-backend.sh"; . "$1/jg-busy-lib.sh"; jg_busy_classify_semantic "$2" "$3" "$4" "$5" "$6"' \
-      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
+      model-error "$_JG_MODEL_ERROR_DIR" "$backend" "$target" "$harness" "$id" "$STATE") \
       || continue
     mid=0
     if [ "${verdict%% *}" = busy ]; then mid=1; fi
@@ -71,12 +80,12 @@ jg_model_outage_tick() {
     # rest of the fleet scan. Never discover another home's unrecorded panes.
     # shellcheck disable=SC2016 # The child expands its own positional arguments.
     rows=$(jg_run_timed 3 bash -c '. "$1/jg-backend.sh"; jg_backend_agent_state "$2" "$3" "$4" "$5"' \
-      model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || continue
+      model-error "$_JG_MODEL_ERROR_DIR" "$backend" "$target" "$meta" "$id") || continue
     case "$rows" in alive) ;; dead|missing) rm -f "$dir/lane-$id"; continue ;; *) continue ;; esac
     if jg_backend_visible_capture_supported "$backend"; then
       # shellcheck disable=SC2016 # The child expands its own positional arguments.
       rows=$(jg_run_timed 3 bash -c '. "$1/jg-backend.sh"; jg_backend_visible_capture "$2" "$3"' \
-        model-error "$_FM_MODEL_ERROR_DIR" "$backend" "$target") || continue
+        model-error "$_JG_MODEL_ERROR_DIR" "$backend" "$target") || continue
       # Only explicit provider/harness banners, never worker-printed output; a
       # wrapped banner keeps up to two continuation lines. The provider-error
       # read stays idle-only: a mid-turn lane is matched against the
@@ -96,7 +105,7 @@ jg_model_outage_tick() {
           jg_composer_normalize_trim_var trimmed
           if _jg_composer_leftbar_floor_row "$trimmed"; then floor=$n; fi
         done <<< "$rows"
-        if [ "$floor" -gt 0 ] && printf '%s\n' "$rows" | sed -n "$((floor + 1))p" | grep -Eq "$FM_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"; then
+        if [ "$floor" -gt 0 ] && printf '%s\n' "$rows" | sed -n "$((floor + 1))p" | grep -Eq "$JG_COMPOSER_OPENCODE_LIMIT_BANNER_RE_DEFAULT"; then
           line=$((floor + 1))
         fi
         # The banner's reset and retry clocks tick every scan; digits fold

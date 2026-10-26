@@ -48,7 +48,7 @@
 # so a reused task id starts at byte 0 of its fresh log.
 # Every write holds state/.fleet-ledger.lock.
 #
-# Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
+# Environment: JG_HOME, JG_STATE_OVERRIDE, and JG_CONFIG_OVERRIDE resolve the
 # home exactly as the other bin/ scripts do.
 #
 # Exit status: 0 on success or when off, 2 on a usage error, 1 when a record
@@ -58,10 +58,10 @@ set -u
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 LEDGER="$STATE/fleet-ledger.jsonl"
 LOCK="$STATE/.fleet-ledger.lock"
 TEXT_MAX_CHARS=2000

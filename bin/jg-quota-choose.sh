@@ -336,7 +336,7 @@ provider_for_harness() {
 # on a schema 6 snapshot.
 effective_for_provider_model() {
   local provider=$1 model=${2:-default} lane=${3:-}
-  printf '%s\n' "$QUOTA_JSON" | jq -c --arg provider "$provider" --arg model "$model" --arg lane "$lane" "$FM_QUOTA_ROW_JQ"'
+  printf '%s\n' "$QUOTA_JSON" | jq -c --arg provider "$provider" --arg model "$model" --arg lane "$lane" "$JG_QUOTA_ROW_JQ"'
     ($model | sub("^model:"; "")) as $model_token |
     quota_row(.; $provider; $lane) as $p |
     if ($p // null) == null then {status: "unknown"}
@@ -380,7 +380,7 @@ for c in "${CANDIDATES[@]}"; do
   provider=$(provider_for_harness "$harness" "$model")
   scope_model=$model
   [ "$harness" != omp ] || scope_model=${model#*/}
-  lane=$(jq -rn --arg h "$harness" --arg m "$model" "$FM_QUOTA_ROW_JQ"'quota_lane($h; $m)')
+  lane=$(jq -rn --arg h "$harness" --arg m "$model" "$JG_QUOTA_ROW_JQ"'quota_lane($h; $m)')
   effective=$(effective_for_provider_model "$provider" "$scope_model" "$lane")
   if [ -z "$effective" ] || [ "$effective" = "null" ]; then
     continue

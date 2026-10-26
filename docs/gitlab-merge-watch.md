@@ -187,7 +187,7 @@ Arm a current watch with `bin/jg-pr-check.sh`.
 ## Merging a merge request
 
 `bin/jg-pr-merge.sh` now merges a GitLab merge request through the shared recording helper and GitLab's own live pre-merge guards.
-Every run below used a throwaway `FM_HOME`, so no live task record was touched, and a `glab` wrapper that refused any `merge` subcommand outright, so no merge could reach the forge even if a check were wrong.
+Every run below used a throwaway `JG_HOME`, so no live task record was touched, and a `glab` wrapper that refused any `merge` subcommand outright, so no merge could reach the forge even if a check were wrong.
 That wrapper is why the open fixture merge request could be used as evidence at all: it is `mergeable` with discussions resolved, so the pipeline conditions are the only thing between it and a real merge.
 
 Merging needs `glab` for the read and `jq` to parse it, and either one absent refuses before anything is recorded:

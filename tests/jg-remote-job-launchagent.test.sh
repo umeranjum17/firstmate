@@ -35,16 +35,16 @@ cat > "$STUB_BIN/rmdir" <<'SH'
 last=${!#}
 case "$last" in
   */.seq-claims/[0-9]*)
-    if [ -n "${FM_TEST_SWEEP_GATE:-}" ] && mkdir "$FM_TEST_SWEEP_GATE.once" 2>/dev/null; then
-      : > "$FM_TEST_SWEEP_GATE"
+    if [ -n "${JG_TEST_SWEEP_GATE:-}" ] && mkdir "$JG_TEST_SWEEP_GATE.once" 2>/dev/null; then
+      : > "$JG_TEST_SWEEP_GATE"
       for _ in $(seq 1 1200); do
-        [ -f "$FM_TEST_SWEEP_GATE.release" ] && break
+        [ -f "$JG_TEST_SWEEP_GATE.release" ] && break
         /bin/sleep 0.05
       done
     fi
     ;;
 esac
-exec "$FM_TEST_REAL_RMDIR" "$@"
+exec "$JG_TEST_REAL_RMDIR" "$@"
 SH
 # Fault injection keeps the heartbeat process alive but prevents timestamp
 # refresh, so ensure must handle a genuinely stale live owner's readiness.
@@ -52,11 +52,11 @@ REAL_TOUCH=$(command -v touch)
 cat > "$STUB_BIN/touch" <<'SH'
 #!/bin/bash
 last=${!#}
-if [ "$last" = "$FM_TEST_STATE/worker.ready" ] && [ -f "$FM_TEST_STALE_GATE" ]; then
-  : > "$FM_TEST_STALE_GATE.observed"
+if [ "$last" = "$JG_TEST_STATE/worker.ready" ] && [ -f "$JG_TEST_STALE_GATE" ]; then
+  : > "$JG_TEST_STALE_GATE.observed"
   exit 0
 fi
-exec "$FM_TEST_REAL_TOUCH" "$@"
+exec "$JG_TEST_REAL_TOUCH" "$@"
 SH
 # Hold lock-owner publication so probes run against crash leftovers before
 # the replacement has recorded ownership or published its code identity.
@@ -64,54 +64,54 @@ REAL_MV=$(command -v mv)
 cat > "$STUB_BIN/mv" <<'SH'
 #!/bin/bash
 last=${!#}
-if [ "$last" = "$FM_TEST_STATE/worker.lock/pid" ] && [ -f "$FM_TEST_OWNER_GATE" ]; then
-  : > "$FM_TEST_OWNER_GATE.observed"
+if [ "$last" = "$JG_TEST_STATE/worker.lock/pid" ] && [ -f "$JG_TEST_OWNER_GATE" ]; then
+  : > "$JG_TEST_OWNER_GATE.observed"
   for _ in $(seq 1 400); do
-    [ -f "$FM_TEST_OWNER_GATE.release" ] && break
+    [ -f "$JG_TEST_OWNER_GATE.release" ] && break
     /bin/sleep 0.05
   done
-  [ -f "$FM_TEST_OWNER_GATE.release" ] || exit 1
+  [ -f "$JG_TEST_OWNER_GATE.release" ] || exit 1
 fi
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
 cat > "$STUB_BIN/launchctl" <<'SH'
 #!/bin/bash
-printf '%s\n' "$*" >> "$FM_TEST_LAUNCH_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_LAUNCH_LOG"
 tracked_pid() {
   local pid
-  pid=$(cat "$FM_TEST_TRACKED" 2>/dev/null) || return 1
+  pid=$(cat "$JG_TEST_TRACKED" 2>/dev/null) || return 1
   kill -0 "$pid" 2>/dev/null || return 1
   printf '%s\n' "$pid"
 }
 stop_tracked() {
   local pid
-  pid=$(tracked_pid) || { rm -f "$FM_TEST_TRACKED"; return 0; }
+  pid=$(tracked_pid) || { rm -f "$JG_TEST_TRACKED"; return 0; }
   kill -TERM "$pid" 2>/dev/null || true
   for _ in $(seq 1 200); do
     kill -0 "$pid" 2>/dev/null || break
     /bin/sleep 0.05
   done
-  rm -f "$FM_TEST_TRACKED"
+  rm -f "$JG_TEST_TRACKED"
 }
 # The tracked process sleeps before exec'ing the worker, so the spawn stays
 # unpublished for a moment after launchctl returns, as a slow startup does.
 start_worker() {
   set -m
   (
-    /bin/sleep "${FM_TEST_SPAWN_DELAY:-1}"
-    HOME="$FM_TEST_ACCOUNT" FM_ROOT_OVERRIDE="$FM_TEST_ROOT" \
-      FM_REMOTE_JOB_STATE_ROOT="$FM_TEST_STATE" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Darwin \
-      exec "$FM_TEST_WORKER"
-  ) >> "$FM_TEST_WORKER_LOG" 2>&1 < /dev/null &
-  printf '%s\n' "$!" > "$FM_TEST_TRACKED"
+    /bin/sleep "${JG_TEST_SPAWN_DELAY:-1}"
+    HOME="$JG_TEST_ACCOUNT" JG_ROOT_OVERRIDE="$JG_TEST_ROOT" \
+      JG_REMOTE_JOB_STATE_ROOT="$JG_TEST_STATE" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Darwin \
+      exec "$JG_TEST_WORKER"
+  ) >> "$JG_TEST_WORKER_LOG" 2>&1 < /dev/null &
+  printf '%s\n' "$!" > "$JG_TEST_TRACKED"
   set +m
 }
 case "${1:-}" in
   print)
     case "${2:-}" in
       gui/*/dev.firstmate.remote-job)
-        [ -f "$FM_TEST_LOADED" ] || exit 113
-        printf 'path = %s\nprogram = %s\n' "$FM_TEST_PLIST" "$FM_TEST_WORKER"
+        [ -f "$JG_TEST_LOADED" ] || exit 113
+        printf 'path = %s\nprogram = %s\n' "$JG_TEST_PLIST" "$JG_TEST_WORKER"
         if pid=$(tracked_pid); then printf '\tpid = %s\n' "$pid"; fi
         printf 'label = dev.firstmate.remote-job\n'
         ;;
@@ -120,23 +120,23 @@ case "${1:-}" in
     esac
     ;;
   bootout)
-    [ -f "$FM_TEST_LOADED" ] || exit 113
+    [ -f "$JG_TEST_LOADED" ] || exit 113
     stop_tracked
-    if [ "${FM_TEST_ASYNC_BOOTOUT:-0}" -eq 1 ]; then
-      : > "$FM_TEST_REMOVING"
-      nohup /bin/sh -c 'sleep "$1"; rm -f "$2" "$3"' sh "${FM_TEST_BOOTOUT_DELAY:-1}" "$FM_TEST_LOADED" "$FM_TEST_REMOVING" \
+    if [ "${JG_TEST_ASYNC_BOOTOUT:-0}" -eq 1 ]; then
+      : > "$JG_TEST_REMOVING"
+      nohup /bin/sh -c 'sleep "$1"; rm -f "$2" "$3"' sh "${JG_TEST_BOOTOUT_DELAY:-1}" "$JG_TEST_LOADED" "$JG_TEST_REMOVING" \
         </dev/null >/dev/null 2>&1 &
     else
-      rm -f "$FM_TEST_LOADED"
+      rm -f "$JG_TEST_LOADED"
     fi
     ;;
   bootstrap)
-    [ ! -f "$FM_TEST_LOADED" ] && [ ! -f "$FM_TEST_REMOVING" ] || { printf 'Bootstrap failed: 5: Input/output error\n' >&2; exit 5; }
-    : > "$FM_TEST_LOADED"
+    [ ! -f "$JG_TEST_LOADED" ] && [ ! -f "$JG_TEST_REMOVING" ] || { printf 'Bootstrap failed: 5: Input/output error\n' >&2; exit 5; }
+    : > "$JG_TEST_LOADED"
     start_worker
     ;;
   kickstart)
-    [ -f "$FM_TEST_LOADED" ] || exit 113
+    [ -f "$JG_TEST_LOADED" ] || exit 113
     stop_tracked
     start_worker
     ;;
@@ -145,18 +145,18 @@ esac
 SH
 chmod +x "$STUB_BIN/rmdir" "$STUB_BIN/touch" "$STUB_BIN/mv" "$STUB_BIN/launchctl"
 export PATH="$STUB_BIN:$PATH"
-export FM_TEST_REAL_RMDIR="$REAL_RMDIR" FM_TEST_LAUNCH_LOG="$LAUNCH_LOG"
-export FM_TEST_REAL_TOUCH="$REAL_TOUCH" FM_TEST_STALE_GATE="$TMP_ROOT/stale-gate"
-export FM_TEST_REAL_MV="$REAL_MV"
-export FM_TEST_OWNER_GATE="$TMP_ROOT/owner-gate"
-export FM_TEST_ROOT="$REMOTE_ROOT" FM_TEST_ACCOUNT="$ACCOUNT_HOME"
-export FM_TEST_WORKER="$REMOTE_ROOT/bin/jg-remote-job-worker.sh"
-export FM_TEST_WORKER_LOG="$TMP_ROOT/worker.log" FM_TEST_STATE="$STATE_ROOT"
-export FM_TEST_LOADED="$TMP_ROOT/launchagent.loaded" FM_TEST_TRACKED="$TMP_ROOT/launchagent.pid"
-export FM_TEST_REMOVING="$TMP_ROOT/launchagent.removing"
-export FM_TEST_PLIST="$ACCOUNT_HOME/Library/LaunchAgents/dev.firstmate.remote-job.plist"
-export FM_TEST_SWEEP_GATE="$SWEEP_GATE"
-export FM_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Darwin
+export JG_TEST_REAL_RMDIR="$REAL_RMDIR" JG_TEST_LAUNCH_LOG="$LAUNCH_LOG"
+export JG_TEST_REAL_TOUCH="$REAL_TOUCH" JG_TEST_STALE_GATE="$TMP_ROOT/stale-gate"
+export JG_TEST_REAL_MV="$REAL_MV"
+export JG_TEST_OWNER_GATE="$TMP_ROOT/owner-gate"
+export JG_TEST_ROOT="$REMOTE_ROOT" JG_TEST_ACCOUNT="$ACCOUNT_HOME"
+export JG_TEST_WORKER="$REMOTE_ROOT/bin/jg-remote-job-worker.sh"
+export JG_TEST_WORKER_LOG="$TMP_ROOT/worker.log" JG_TEST_STATE="$STATE_ROOT"
+export JG_TEST_LOADED="$TMP_ROOT/launchagent.loaded" JG_TEST_TRACKED="$TMP_ROOT/launchagent.pid"
+export JG_TEST_REMOVING="$TMP_ROOT/launchagent.removing"
+export JG_TEST_PLIST="$ACCOUNT_HOME/Library/LaunchAgents/dev.firstmate.remote-job.plist"
+export JG_TEST_SWEEP_GATE="$SWEEP_GATE"
+export JG_REMOTE_JOB_STATE_ROOT="$STATE_ROOT" JG_REMOTE_JOB_PLATFORM_OVERRIDE=Darwin
 # shellcheck source=bin/jg-remote-job-lib.sh
 . "$ROOT/bin/jg-remote-job-lib.sh"
 
@@ -169,7 +169,7 @@ stop_pid() {
 
 cleanup() {
   : > "$SWEEP_GATE.release" 2>/dev/null || true
-  stop_pid "$(cat "$FM_TEST_TRACKED" 2>/dev/null)"
+  stop_pid "$(cat "$JG_TEST_TRACKED" 2>/dev/null)"
   stop_pid "$(cat "$STATE_ROOT/worker.lock/pid" 2>/dev/null)"
   stop_pid "${ORPHAN_PID:-}"
   rm -rf -- "$TMP_ROOT"
@@ -178,7 +178,7 @@ trap cleanup EXIT
 
 ensure_darwin() (
   jg_remote_job_ensure_worker "$REMOTE_ROOT" "$ACCOUNT_HOME" || {
-    printf 'ensure failed: %s\n' "$FM_REMOTE_JOB_ERROR" >&2
+    printf 'ensure failed: %s\n' "$JG_REMOTE_JOB_ERROR" >&2
     exit 1
   }
 )
@@ -191,7 +191,7 @@ file_mode() {
   fi
 }
 
-tracked() { cat "$FM_TEST_TRACKED" 2>/dev/null; }
+tracked() { cat "$JG_TEST_TRACKED" 2>/dev/null; }
 lock_owner() { cat "$STATE_ROOT/worker.lock/pid" 2>/dev/null; }
 launch_count() { grep -c "^$1 " "$LAUNCH_LOG" 2>/dev/null || true; }
 
@@ -204,13 +204,13 @@ jg_remote_job_write_launchagent "$REMOTE_ROOT" "$ACCOUNT_HOME" || fail 'could no
 printf 'stale-code\n' > "$STATE_ROOT/worker.identity"
 printf '99999999\n' > "$STATE_ROOT/worker.ready"
 chmod 600 "$STATE_ROOT/worker.identity" "$STATE_ROOT/worker.ready"
-: > "$FM_TEST_OWNER_GATE"
-launchctl bootstrap "gui/$(id -u)" "$FM_TEST_PLIST" || fail 'could not start the replacement'
+: > "$JG_TEST_OWNER_GATE"
+launchctl bootstrap "gui/$(id -u)" "$JG_TEST_PLIST" || fail 'could not start the replacement'
 for _ in $(seq 1 200); do
-  [ -f "$FM_TEST_OWNER_GATE.observed" ] && break
+  [ -f "$JG_TEST_OWNER_GATE.observed" ] && break
   /bin/sleep 0.05
 done
-[ -f "$FM_TEST_OWNER_GATE.observed" ] || fail 'replacement did not reach lock-owner publication'
+[ -f "$JG_TEST_OWNER_GATE.observed" ] || fail 'replacement did not reach lock-owner publication'
 jg_remote_job_worker_identity_matches "$REMOTE_ROOT" "$ACCOUNT_HOME" \
   && fail 'replacement published its current identity before ownership'
 [ ! -e "$STATE_ROOT/worker.ready" ] || fail 'replacement retained the predecessor heartbeat'
@@ -219,11 +219,11 @@ jg_remote_job_wait_for_probe "$REMOTE_ROOT" "$ACCOUNT_HOME" > "$TMP_ROOT/wait-ow
 PROBE_WAITER=$!
 /bin/sleep 1
 kill -0 "$PROBE_WAITER" 2>/dev/null || fail 'startup wait accepted the predecessor heartbeat'
-: > "$FM_TEST_OWNER_GATE.release"
+: > "$JG_TEST_OWNER_GATE.release"
 wait "$PROBE_WAITER" || fail 'replacement did not become ready after ownership publication'
 [ "$(jg_remote_job_read_single_line "$STATE_ROOT/worker.ready" 64)" = "$(lock_owner)" ] \
   || fail 'replacement readiness did not identify its recorded lock owner'
-rm -f "$FM_TEST_OWNER_GATE" "$FM_TEST_OWNER_GATE.observed" "$FM_TEST_OWNER_GATE.release"
+rm -f "$JG_TEST_OWNER_GATE" "$JG_TEST_OWNER_GATE.observed" "$JG_TEST_OWNER_GATE.release"
 launchctl bootout "gui/$(id -u)/dev.firstmate.remote-job" || fail 'could not stop the replacement'
 pass 'a stale-code crash heartbeat cannot count as replacement readiness'
 
@@ -232,13 +232,13 @@ pass 'a stale-code crash heartbeat cannot count as replacement readiness'
 rm -f "$STATE_ROOT/.seq-claims-reaped"
 mkdir -p "$STATE_ROOT/.seq-claims/1"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/1"
-launchctl bootstrap "gui/$(id -u)" "$FM_TEST_PLIST" || fail 'the stub launchd did not load the agent'
+launchctl bootstrap "gui/$(id -u)" "$JG_TEST_PLIST" || fail 'the stub launchd did not load the agent'
 SWEEP_PID=$(tracked)
 for _ in $(seq 1 200); do
   [ -f "$SWEEP_GATE" ] && break
   /bin/sleep 0.05
 done
-[ -f "$SWEEP_GATE" ] || { cat "$FM_TEST_WORKER_LOG"; fail 'the real worker did not enter its sequence-claim sweep'; }
+[ -f "$SWEEP_GATE" ] || { cat "$JG_TEST_WORKER_LOG"; fail 'the real worker did not enter its sequence-claim sweep'; }
 [ "$(lock_owner)" = "$SWEEP_PID" ] || fail 'the launchd-tracked worker does not own the worker lock'
 # Remove readiness under a live worker blocked in its sweep: only the
 # independent heartbeat can restore it before the sweep is released.
@@ -292,12 +292,12 @@ pass 'concurrent Darwin ensures serialize one reload and adopt its fresh worker'
 
 jg_remote_job_launchagent_owner_current "$REMOTE_ROOT" "$ACCOUNT_HOME" "$(id -u)" \
   || fail 'the stale-readiness fixture is not a verified launchd-tracked current owner'
-: > "$FM_TEST_STALE_GATE"
+: > "$JG_TEST_STALE_GATE"
 for _ in $(seq 1 100); do
-  [ -f "$FM_TEST_STALE_GATE.observed" ] && break
+  [ -f "$JG_TEST_STALE_GATE.observed" ] && break
   /bin/sleep 0.05
 done
-[ -f "$FM_TEST_STALE_GATE.observed" ] || fail 'heartbeat refresh fault injection was not reached'
+[ -f "$JG_TEST_STALE_GATE.observed" ] || fail 'heartbeat refresh fault injection was not reached'
 "$REAL_TOUCH" -t 200001010000 "$STATE_ROOT/worker.ready"
 jg_remote_job_probe "$ACCOUNT_HOME" && fail 'the fault-injected readiness was not stale'
 : > "$LAUNCH_LOG"
@@ -312,7 +312,7 @@ done
 kill -0 "$FRESH_PID" 2>/dev/null || fail 'stale readiness killed the verified live worker'
 [ "$(tracked)" = "$FRESH_PID" ] && [ "$(lock_owner)" = "$FRESH_PID" ] \
   || fail 'stale readiness changed launchd tracking or lock ownership'
-rm -f "$FM_TEST_STALE_GATE"
+rm -f "$JG_TEST_STALE_GATE"
 jg_remote_job_wait_for_probe "$REMOTE_ROOT" "$ACCOUNT_HOME" \
   || fail 'the same worker did not recover readiness after refresh resumed'
 pass 'stale readiness logs the named condition without reloading a verified launchd-tracked live owner'
@@ -321,7 +321,7 @@ pass 'stale readiness logs the named condition without reloading a verified laun
 
 # launchd lost the worker while it kept the lock, then code changed under it.
 ORPHAN_PID=$FRESH_PID
-rm -f "$FM_TEST_TRACKED"
+rm -f "$JG_TEST_TRACKED"
 printf '\n# updated fixture code\n' >> "$REMOTE_ROOT/bin/jg-remote-job-worker.sh"
 git -C "$REMOTE_ROOT" commit -qam 'updated worker identity'
 : > "$LAUNCH_LOG"
@@ -339,7 +339,7 @@ pass 'Darwin stops an untracked stale-code owner and starts the current worker t
 # exited because the orphan still held the worker lock. Current code alone must
 # not let the orphan keep the service.
 ORPHAN_PID=$REPLACEMENT_PID
-rm -f "$FM_TEST_TRACKED"
+rm -f "$JG_TEST_TRACKED"
 : > "$LAUNCH_LOG"
 ensure_darwin > "$TMP_ROOT/ensure-loaded-orphan.out" 2>&1 \
   || { cat "$TMP_ROOT/ensure-loaded-orphan.out"; fail 'Darwin did not recover the untracked current-code owner'; }
@@ -366,8 +366,8 @@ plant_dead_repair_lock() {
 # Caller A reloads the agent and dies before its asynchronous spawn publishes
 # the worker lock or identity. Caller B must let that spawn finish starting.
 launchctl bootout "gui/$(id -u)/dev.firstmate.remote-job" || fail 'the stub launchd did not unload the agent'
-launchctl bootstrap "gui/$(id -u)" "$FM_TEST_PLIST" || fail 'the stub launchd did not load the agent'
-FM_TEST_SPAWN_DELAY=3 launchctl kickstart -k "gui/$(id -u)/dev.firstmate.remote-job" \
+launchctl bootstrap "gui/$(id -u)" "$JG_TEST_PLIST" || fail 'the stub launchd did not load the agent'
+JG_TEST_SPAWN_DELAY=3 launchctl kickstart -k "gui/$(id -u)/dev.firstmate.remote-job" \
   || fail 'the stub launchd did not kickstart the agent'
 plant_dead_repair_lock || fail 'could not plant the dead caller repair lock'
 SPAWN_PID=$(tracked)
@@ -415,12 +415,12 @@ pass 'a dead repair-lock holder is reclaimed by one caller at a time'
 # --- wait for Darwin bootout cleanup before bootstrapping the same label -----
 
 : > "$LAUNCH_LOG"
-FM_TEST_ASYNC_BOOTOUT=1 FM_TEST_BOOTOUT_DELAY=1
-export FM_TEST_ASYNC_BOOTOUT FM_TEST_BOOTOUT_DELAY
+JG_TEST_ASYNC_BOOTOUT=1 JG_TEST_BOOTOUT_DELAY=1
+export JG_TEST_ASYNC_BOOTOUT JG_TEST_BOOTOUT_DELAY
 OLD_PID=$(tracked)
 START=$SECONDS
 jg_remote_job_reload_launchagent "$ACCOUNT_HOME" "$(id -u)" \
-  || fail "Darwin reload failed while bootout cleanup was pending: ${FM_REMOTE_JOB_ERROR:-no diagnostic}"
+  || fail "Darwin reload failed while bootout cleanup was pending: ${JG_REMOTE_JOB_ERROR:-no diagnostic}"
 ELAPSED=$((SECONDS - START))
 NEW_PID=$(tracked)
 [ -n "$NEW_PID" ] && [ "$NEW_PID" != "$OLD_PID" ] \
@@ -431,7 +431,7 @@ jg_remote_job_wait_for_probe "$REMOTE_ROOT" "$ACCOUNT_HOME" \
   || { cat "$WORKER_LOG"; fail 'the replacement worker did not become ready after async bootout cleanup'; }
 [ "$(tracked)" = "$NEW_PID" ] && [ "$(lock_owner)" = "$NEW_PID" ] \
   || fail 'launchd tracking and worker ownership diverged after async bootout cleanup'
-[ ! -e "$FM_TEST_REMOVING" ] || fail 'launchd removal remained pending after successful bootstrap'
+[ ! -e "$JG_TEST_REMOVING" ] || fail 'launchd removal remained pending after successful bootstrap'
 pass "Darwin reload waits for asynchronous bootout cleanup before bootstrap (${ELAPSED}s)"
 
 printf 'ALL TESTS PASSED\n'

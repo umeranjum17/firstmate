@@ -4,8 +4,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-BIN="$FM_ROOT/bin"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+BIN="$JG_ROOT/bin"
 
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/jg-quota-choose.XXXXXX")
 FIXTURE="$LAB/quota.json"

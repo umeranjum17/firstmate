@@ -64,7 +64,7 @@ The gate opens with one line saying so.
 Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
 
 ```
-owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh $src $FM_HOME/data/<id> then merge again
+owner-rules: no checks-lint PASS for $src at $3; run JG_HOME=$JG_HOME <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh $src $JG_HOME/data/<id> then merge again
 ```
 
 Fix: run that command (it logs the row), then merge again.

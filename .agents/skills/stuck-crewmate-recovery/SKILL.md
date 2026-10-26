@@ -72,9 +72,9 @@ Only positive socket refusal or absence is a daemon-down finding; escalate that 
 Escalate in order:
 
 1. Peek the pane, and check the task's steering inbox (`state/<id>.inbox/`) for unhandled `*.msg` records - a stale wake naming an unread Juggernaut instruction means the worker never acknowledged a durable steer, and the record itself shows exactly what was intended.
-2. If the operator is waiting on a question its brief already answers, answer in one line via `FM_HOME=<this-juggernaut-home> bin/jg-send.sh` from an active Juggernaut session unless `FM_HOME` is already set to the active Juggernaut home.
-3. If the operator is confused or looping, interrupt with `FM_HOME=<this-juggernaut-home> bin/jg-control.sh <task-id> interrupt`, then redirect with one corrective line through `jg-send`.
-4. If the operator is genuinely wedged after redirection, relaunch it with `FM_HOME=<this-juggernaut-home> bin/jg-control.sh <task-id> relaunch --note '<progress so far>'`, which stops the agent, carries the brief plus that note into a replacement in the same local copy, and restores the prior record if the replacement cannot start.
+2. If the operator is waiting on a question its brief already answers, answer in one line via `JG_HOME=<this-juggernaut-home> bin/jg-send.sh` from an active Juggernaut session unless `JG_HOME` is already set to the active Juggernaut home.
+3. If the operator is confused or looping, interrupt with `JG_HOME=<this-juggernaut-home> bin/jg-control.sh <task-id> interrupt`, then redirect with one corrective line through `jg-send`.
+4. If the operator is genuinely wedged after redirection, relaunch it with `JG_HOME=<this-juggernaut-home> bin/jg-control.sh <task-id> relaunch --note '<progress so far>'`, which stops the agent, carries the brief plus that note into a replacement in the same local copy, and restores the prior record if the replacement cannot start.
    Pass `--harness`, `--model`, or `--effort` on that same command when the worker should come back on a different runtime.
    Genuine wedging means looping, unresponsive, repeating the same obstacle, or truly dead.
    A low context reading is not wedging; modern harnesses auto-compact and keep going.

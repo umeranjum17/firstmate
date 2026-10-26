@@ -8,9 +8,9 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 
 # shellcheck source=bin/jg-gate-refuse-lib.sh
 . "$SCRIPT_DIR/jg-gate-refuse-lib.sh"
@@ -19,8 +19,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 # shellcheck source=bin/jg-operational-input.sh
 . "$SCRIPT_DIR/jg-operational-input.sh"
 
-jg_is_gate_agent "$FM_ROOT" && exit 0
-jg_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+jg_is_gate_agent "$JG_ROOT" && exit 0
+jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
 lock_is_in_ancestry() {
   local lock_pid pid=$$ _

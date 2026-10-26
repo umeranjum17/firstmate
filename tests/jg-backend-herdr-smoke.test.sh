@@ -194,7 +194,7 @@ SM_HOME="$SM_SCRATCH/secondmate-home"
 mkdir -p "$SM_HOME"
 printf 'smoketest-sm1\n' > "$SM_HOME/.jg-secondmate-home"
 
-SM_CONTAINER_RAW=$(FM_HOME="$SM_HOME" jg_backend_herdr_container_ensure /tmp) || fail "secondmate-shaped container_ensure failed"
+SM_CONTAINER_RAW=$(JG_HOME="$SM_HOME" jg_backend_herdr_container_ensure /tmp) || fail "secondmate-shaped container_ensure failed"
 SM_CONTAINER=${SM_CONTAINER_RAW%%$'\t'*}
 SM_SEEDED_TAB_ID=${SM_CONTAINER_RAW#*$'\t'}
 case "$SM_CONTAINER" in
@@ -211,7 +211,7 @@ SM_LABEL_REAL=$(herdr workspace list --session "$SESSION" 2>&1 | jq -r --arg id 
 pass "real herdr: the secondmate-shaped home's workspace is labeled 2ndmate-<secondmate-id> in herdr itself"
 
 SM_TASK_LABEL="jg-smtask1"
-SM_TASK_IDS=$(FM_HOME="$SM_HOME" jg_backend_herdr_create_task "$SM_CONTAINER" "$SM_TASK_LABEL" /tmp "$SM_SEEDED_TAB_ID") || fail "secondmate create_task failed"
+SM_TASK_IDS=$(JG_HOME="$SM_HOME" jg_backend_herdr_create_task "$SM_CONTAINER" "$SM_TASK_LABEL" /tmp "$SM_SEEDED_TAB_ID") || fail "secondmate create_task failed"
 read -r SM_TAB_ID SM_PANE_ID <<EOF
 $SM_TASK_IDS
 EOF
@@ -225,7 +225,7 @@ PRIMARY_LIVE=$(jg_backend_herdr_list_live "$SESSION")
 case "$PRIMARY_LIVE" in
   *"$SM_TASK_LABEL"*) fail "the primary home's list_live must not see a secondmate-shaped home's task"$'\n'"$PRIMARY_LIVE" ;;
 esac
-SM_LIVE=$(FM_HOME="$SM_HOME" jg_backend_herdr_list_live "$SESSION")
+SM_LIVE=$(JG_HOME="$SM_HOME" jg_backend_herdr_list_live "$SESSION")
 case "$SM_LIVE" in
   *"$SM_TASK_LABEL"*) : ;;
   *) fail "the secondmate-shaped home's list_live did not see its own task"$'\n'"$SM_LIVE" ;;
@@ -299,7 +299,7 @@ pass "real herdr: current_path reads the pane's live cwd"
 
 # --- busy_state on a real claude harness (verified in herdr-verification-p2.md) ---
 
-if [ "${FM_HERDR_SMOKE_REAL_CLAUDE:-0}" = 1 ] && command -v claude >/dev/null 2>&1; then
+if [ "${JG_HERDR_SMOKE_REAL_CLAUDE:-0}" = 1 ] && command -v claude >/dev/null 2>&1; then
   jg_backend_herdr_send_literal "$TARGET" "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}' --print 'say the word HERDRSMOKEOK and nothing else'"
   sleep 0.2
   jg_backend_herdr_send_key "$TARGET" Enter
@@ -322,8 +322,8 @@ if [ "${FM_HERDR_SMOKE_REAL_CLAUDE:-0}" = 1 ] && command -v claude >/dev/null 2>
     *HERDRSMOKEOK*) pass "real herdr: agent_status busy/idle detection tracks a real claude turn, and capture shows its output" ;;
     *) echo "note: claude output marker not observed within the bound (timing-dependent, not fatal to this smoke suite)" >&2 ;;
   esac
-elif [ "${FM_HERDR_SMOKE_REAL_CLAUDE:-0}" != 1 ]; then
-  echo "note: FM_HERDR_SMOKE_REAL_CLAUDE=1 not set; skipping the real-agent busy_state check" >&2
+elif [ "${JG_HERDR_SMOKE_REAL_CLAUDE:-0}" != 1 ]; then
+  echo "note: JG_HERDR_SMOKE_REAL_CLAUDE=1 not set; skipping the real-agent busy_state check" >&2
 else
   echo "note: claude not installed; skipping the real-agent busy_state check" >&2
 fi

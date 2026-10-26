@@ -9,7 +9,7 @@
 #
 #   jg_timeout_mechanism
 #       Prints the mechanism jg_run_timed will use on this host: "timeout",
-#       "gtimeout", "perl", or "bash". Set FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+#       "gtimeout", "perl", or "bash". Set JG_TIMEOUT_MECHANISM_OVERRIDE=bash
 #       to force the dependency-free fallback.
 #
 #   jg_run_timed <seconds> <command> [args...]
@@ -36,7 +36,7 @@
 #       also starts that escalation when its own parent dies before it could
 #       be signalled (an owner torn down by an outer group-kill cannot leave
 #       the bounded subtree orphaned behind it). The owner is captured before
-#       the watchdog starts: FM_EXEC_TIMED_OWNER_PID when the caller names it,
+#       the watchdog starts: JG_EXEC_TIMED_OWNER_PID when the caller names it,
 #       else the calling script ($$) when jg_exec_timed runs in a subshell,
 #       else the shell's parent. The escalation starts once that owner is gone
 #       or the watchdog's parent changes, so an owner that dies while the
@@ -76,7 +76,7 @@
 set -u
 
 jg_timeout_mechanism() {
-  if [ "${FM_TIMEOUT_MECHANISM_OVERRIDE:-}" = bash ]; then
+  if [ "${JG_TIMEOUT_MECHANISM_OVERRIDE:-}" = bash ]; then
     printf 'bash\n'
   elif command -v timeout >/dev/null 2>&1; then
     printf 'timeout\n'
@@ -222,8 +222,8 @@ jg_exec_timed() {  # <seconds> <grace-seconds> <command...>
     echo "jg_exec_timed: usage: jg_exec_timed <positive-seconds> <positive-grace-seconds> <command> [args...]" >&2
     exit 125
   fi
-  owner=${FM_EXEC_TIMED_OWNER_PID:-$$}
-  unset FM_EXEC_TIMED_OWNER_PID
+  owner=${JG_EXEC_TIMED_OWNER_PID:-$$}
+  unset JG_EXEC_TIMED_OWNER_PID
   if command -v perl >/dev/null 2>&1; then
     exec perl -MPOSIX=WNOHANG,setpgid -MTime::HiRes=time -e '
       my ($bound, $grace, $owner, $shell_parent) = (shift, shift, shift, shift);

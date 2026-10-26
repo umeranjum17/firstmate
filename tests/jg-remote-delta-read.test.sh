@@ -30,7 +30,7 @@ EMPTY_SHA=$(: | shasum -a 256 | awk '{print $1}')
 sha() { printf '%b' "$1" | shasum -a 256 | awk '{print $1}'; }
 
 run_reader() { # <offset> <prefix> <wait> [rel]
-  FM_HOME="$DELTA_HOME" FM_REMOTE_DELTA_POLL_SECONDS=0.05 \
+  JG_HOME="$DELTA_HOME" JG_REMOTE_DELTA_POLL_SECONDS=0.05 \
     "$READER" "${4:-$DELTA_LOG_REL}" "$1" "$2" "$3"
 }
 
@@ -61,14 +61,14 @@ for TOOL in perl shasum sha256sum od tail head wc tr date stat dirname basename;
   [ -n "$REAL" ] || continue
   cat > "$DELTA_SHIM/$TOOL" <<SH
 #!/bin/sh
-printf '%s\n' $TOOL >> "\$FM_TEST_EXEC_LOG"
+printf '%s\n' $TOOL >> "\$JG_TEST_EXEC_LOG"
 exec $REAL "\$@"
 SH
   chmod +x "$DELTA_SHIM/$TOOL"
 done
 : > "$EXEC_LOG"
 : > "$DELTA_HOME/$DELTA_LOG_REL"
-FM_TEST_EXEC_LOG="$EXEC_LOG" PATH="$DELTA_SHIM:/usr/bin:/bin" run_reader 0 "$EMPTY_SHA" 2 > /dev/null && \
+JG_TEST_EXEC_LOG="$EXEC_LOG" PATH="$DELTA_SHIM:/usr/bin:/bin" run_reader 0 "$EMPTY_SHA" 2 > /dev/null && \
   fail "an unchanged log did not exit 75" || RC=$?
 [ "${RC:-0}" -eq 75 ] || fail "an unchanged log closed its window with $RC instead of 75"
 perl_execs=$(grep -cx perl "$EXEC_LOG" || true)
@@ -85,7 +85,7 @@ pass 'an unchanged log costs one stat per poll and exits 75 at the window'
 
 # Growth still pays the capture and hashing tools exactly when bytes appear.
 : > "$EXEC_LOG"
-FM_TEST_EXEC_LOG="$EXEC_LOG" PATH="$DELTA_SHIM:/usr/bin:/bin" run_reader 0 "$EMPTY_SHA" 4 > "$TMP_ROOT/growth2.out" &
+JG_TEST_EXEC_LOG="$EXEC_LOG" PATH="$DELTA_SHIM:/usr/bin:/bin" run_reader 0 "$EMPTY_SHA" 4 > "$TMP_ROOT/growth2.out" &
 READER_PID=$!
 sleep 0.3
 printf 'counted change\n' >> "$DELTA_HOME/$DELTA_LOG_REL"
@@ -138,7 +138,7 @@ mkdir -p "$SUBSECOND_SHIM"
 cat > "$SUBSECOND_SHIM/stat" <<'SH'
 #!/bin/sh
 fraction=111111111
-[ ! -e "$FM_TEST_REWRITE_DONE" ] || fraction=222222222
+[ ! -e "$JG_TEST_REWRITE_DONE" ] || fraction=222222222
 printf '11:100.%s:100.%s:123:456\n' "$fraction" "$fraction"
 SH
 REAL_SHASUM=$(command -v shasum)
@@ -147,21 +147,21 @@ cat > "$SUBSECOND_SHIM/shasum" <<SH
 "$REAL_SHASUM" "\$@" || exit \$?
 case "\$3" in
 */prefix)
-  if [ ! -e "\$FM_TEST_REWRITE_DONE" ]; then
-    if [ "\${FM_TEST_REMOVE_LOG:-0}" = 1 ]; then
-      rm -- "\$FM_TEST_REWRITE_LOG"
+  if [ ! -e "\$JG_TEST_REWRITE_DONE" ]; then
+    if [ "\${JG_TEST_REMOVE_LOG:-0}" = 1 ]; then
+      rm -- "\$JG_TEST_REWRITE_LOG"
     else
-      printf 'OMEGA\\nbeta\\n' > "\$FM_TEST_REWRITE_LOG"
+      printf 'OMEGA\\nbeta\\n' > "\$JG_TEST_REWRITE_LOG"
     fi
-    : > "\$FM_TEST_REWRITE_DONE"
+    : > "\$JG_TEST_REWRITE_DONE"
   fi
   ;;
 esac
 SH
 chmod +x "$SUBSECOND_SHIM/stat" "$SUBSECOND_SHIM/shasum"
 printf 'alpha\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
-FM_TEST_REWRITE_LOG="$DELTA_HOME/$DELTA_LOG_REL" \
-  FM_TEST_REWRITE_DONE="$TMP_ROOT/rewrite-done" \
+JG_TEST_REWRITE_LOG="$DELTA_HOME/$DELTA_LOG_REL" \
+  JG_TEST_REWRITE_DONE="$TMP_ROOT/rewrite-done" \
   PATH="$SUBSECOND_SHIM:/usr/bin:/bin" \
   run_reader 11 "$PREFIX_SHA" 10 > "$TMP_ROOT/same-second.out" \
   || fail 'the same-second rewrite read did not exit 0'
@@ -173,8 +173,8 @@ pass 'a same-second same-size rewrite of the same inode breaks continuity'
 
 # A log that disappears mid-wait breaks as missing only for a nonzero cursor.
 printf 'alpha\nbeta\n' > "$DELTA_HOME/$DELTA_LOG_REL"
-FM_TEST_REWRITE_LOG="$DELTA_HOME/$DELTA_LOG_REL" \
-  FM_TEST_REWRITE_DONE="$TMP_ROOT/remove-done" FM_TEST_REMOVE_LOG=1 \
+JG_TEST_REWRITE_LOG="$DELTA_HOME/$DELTA_LOG_REL" \
+  JG_TEST_REWRITE_DONE="$TMP_ROOT/remove-done" JG_TEST_REMOVE_LOG=1 \
   PATH="$SUBSECOND_SHIM:/usr/bin:/bin" \
   run_reader 11 "$PREFIX_SHA" 10 > "$TMP_ROOT/missing.out" \
   || fail 'the missing-file read did not exit 0'
@@ -209,7 +209,7 @@ pass 'an unterminated tail is withheld until the newline completes it'
 # The same continuity rules apply to the schema's other break and refusal
 # surfaces, with the wait window never entered.
 printf 'past-bound tail' > "$DELTA_HOME/$DELTA_LOG_REL"
-FM_HOME="$DELTA_HOME" FM_REMOTE_DELTA_MAX_BYTES=8 \
+JG_HOME="$DELTA_HOME" JG_REMOTE_DELTA_MAX_BYTES=8 \
   run_reader 0 "$EMPTY_SHA" 1 > "$TMP_ROOT/bound.out" || fail 'the bound break did not exit 0'
 assert_contains "$(<"$TMP_ROOT/bound.out")" 'reason=line-exceeds-bound' \
   'a tail line longer than the payload bound did not break'

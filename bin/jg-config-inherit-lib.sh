@@ -43,7 +43,7 @@
 # before removing. The receipt is written only after the destination file
 # matches the intended generation.
 #
-# Usage: . bin/jg-config-inherit-lib.sh   (no FM_* setup required)
+# Usage: . bin/jg-config-inherit-lib.sh   (no JG_* setup required)
 #
 # Why this is separate from the tracked-files fast-forward (jg-ff-lib.sh): config/
 # is gitignored, so a tracked-files fast-forward never carries these items. This
@@ -57,7 +57,7 @@
 # invoke jg_config_send_reread_nudge so the live agent re-reads exact post-write
 # bytes (spawn/respawn already re-reads at launch and needs no redundant nudge).
 #
-# Extensible by design: FM_INHERITABLE_CONFIG is the single declared list of
+# Extensible by design: JG_INHERITABLE_CONFIG is the single declared list of
 # config-dir-relative items the primary propagates. Add an item there and every
 # convergence point inherits it - no other change needed. config/secondmate-harness
 # is deliberately NOT in the list: it is the primary's own setting for launching
@@ -80,15 +80,15 @@
 
 # The one shared data file in this inheritance contract. There is deliberately
 # no shared learnings file.
-FM_SHARED_CAPTAIN_FILE="captain-shared.md"
-FM_SHARED_CAPTAIN_REL="data/$FM_SHARED_CAPTAIN_FILE"
-FM_SHARED_CAPTAIN_MODE="444"
+JG_SHARED_CAPTAIN_FILE="captain-shared.md"
+JG_SHARED_CAPTAIN_REL="data/$JG_SHARED_CAPTAIN_FILE"
+JG_SHARED_CAPTAIN_MODE="444"
 
 # The declared inheritable set (space-separated, config-dir-relative item paths).
 # Extend here to inherit more of the primary's local config; override via the
 # environment only in tests. Items must not contain whitespace.
-FM_INHERITABLE_CONFIG="${FM_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
-_bi="${FM_ADDONS_DIR:-${FM_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
+JG_INHERITABLE_CONFIG="${JG_INHERITABLE_CONFIG:-crew-dispatch.json dispatch-never-send crew-harness backlog-backend backend herdr-presentation-spaces startup-memory-budget trace-context launch-env-allowlist claude-permission-mode lavish-axi-host keep-ai-trailers supervision-host-off firstmate-role lane-target}"
+_bi="${JG_ADDONS_DIR:-${JG_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/firstmate-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"; [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_config; }
 
 # firstmate-role additionally carries a proof-of-state receipt: a scoped role
 # grant (or its recorded absence) authorizes a secondmate home only while
@@ -109,27 +109,27 @@ _bi="${FM_ADDONS_DIR:-${FM_HOME:-$(dirname "${BASH_SOURCE[0]}")/..}/projects/fir
 # the primary also hands the new process its frozen on/off decision, and left
 # untouched by live convergence into an already-running home, whose decision is
 # already frozen for its current session (bin/jg-trace-context-lib.sh).
-FM_SESSION_SCOPED_INHERITABLE_CONFIG="trace-context"
+JG_SESSION_SCOPED_INHERITABLE_CONFIG="trace-context"
 
 # True when <item> is session-scoped in the sense above.
 jg_config_inherit_item_session_scoped() {  # <item>
   local item=$1 candidate
-  for candidate in $FM_SESSION_SCOPED_INHERITABLE_CONFIG; do
+  for candidate in $JG_SESSION_SCOPED_INHERITABLE_CONFIG; do
     [ "$candidate" = "$item" ] && return 0
   done
   return 1
 }
 
 # The complete declared inherited-material set as home-relative paths, one per
-# line, in propagation order: every FM_INHERITABLE_CONFIG item under config/,
+# line, in propagation order: every JG_INHERITABLE_CONFIG item under config/,
 # then the one shared data file. This is what remote senders and receivers
 # derive from, so both ends of a transfer agree by construction.
 jg_config_inherit_items() {
   local item
-  for item in $FM_INHERITABLE_CONFIG; do
+  for item in $JG_INHERITABLE_CONFIG; do
     printf 'config/%s\n' "$item"
   done
-  printf '%s\n' "$FM_SHARED_CAPTAIN_REL"
+  printf '%s\n' "$JG_SHARED_CAPTAIN_REL"
 }
 
 jg_config_source_present() {
@@ -231,7 +231,7 @@ destination_allows_inherited_item() {
 # leave that destination item unchanged and report an error; inaccessible paths
 # and dangling source links must never silently remove an inherited grant.
 # The destination dir is created lazily, only when there is something to copy;
-# absence on both sides is a no-op. When FM_CONFIG_INHERIT_REPORT points at a writable
+# absence on both sides is a no-op. When JG_CONFIG_INHERIT_REPORT points at a writable
 # file, one tab-separated line per item is appended there:
 #   <item> <status> <reason>
 # Status is pushed, unchanged, skipped, or error. Skipped items are warnings and
@@ -239,7 +239,7 @@ destination_allows_inherited_item() {
 # error, such as copy or remove failure, occurs.
 record_inheritable_config_result() {
   local item=$1 status=$2 reason=${3:-}
-  if [ "$item" = firstmate-role ] && [ -n "${FM_INHERIT_DEST_CONFIG:-}" ]; then
+  if [ "$item" = firstmate-role ] && [ -n "${JG_INHERIT_DEST_CONFIG:-}" ]; then
     # The inherited role grant is provable only through its receipt: write it
     # for converged outcomes that produced a destination state (a copied grant
     # or a mirrored absence), and drop it for every outcome that wrote nothing,
@@ -249,32 +249,32 @@ record_inheritable_config_result() {
     # to exist.
     case $status in
     pushed)
-      if ! jg_inherit_role_receipt_commit "$FM_INHERIT_DEST_CONFIG"; then
+      if ! jg_inherit_role_receipt_commit "$JG_INHERIT_DEST_CONFIG"; then
         status=error
         reason="could not commit the role inheritance receipt"
-        warn_inheritable_config_error "$item" "$FM_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
-        FM_INHERIT_ROLE_RECEIPT_FAILED=1
+        warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
+        JG_INHERIT_ROLE_RECEIPT_FAILED=1
       fi
       ;;
     unchanged)
-      if [ -f "$FM_INHERIT_DEST_CONFIG/firstmate-role" ] && [ ! -L "$FM_INHERIT_DEST_CONFIG/firstmate-role" ]; then
-        if ! jg_inherit_role_receipt_commit "$FM_INHERIT_DEST_CONFIG"; then
+      if [ -f "$JG_INHERIT_DEST_CONFIG/firstmate-role" ] && [ ! -L "$JG_INHERIT_DEST_CONFIG/firstmate-role" ]; then
+        if ! jg_inherit_role_receipt_commit "$JG_INHERIT_DEST_CONFIG"; then
           status=error
           reason="could not commit the role inheritance receipt"
-          warn_inheritable_config_error "$item" "$FM_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
-          FM_INHERIT_ROLE_RECEIPT_FAILED=1
+          warn_inheritable_config_error "$item" "$JG_INHERIT_DEST_CONFIG/firstmate-role" "$reason"
+          JG_INHERIT_ROLE_RECEIPT_FAILED=1
         fi
       else
-        rm -f "$FM_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
+        rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
       fi
       ;;
     *)
-      rm -f "$FM_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
+      rm -f "$JG_INHERIT_DEST_CONFIG/.jg-inherit-firstmate-role.generation" 2>/dev/null || true
       ;;
     esac
   fi
-  [ -n "${FM_CONFIG_INHERIT_REPORT:-}" ] || return 0
-  printf '%s\t%s\t%s\n' "$item" "$status" "$reason" >> "$FM_CONFIG_INHERIT_REPORT" 2>/dev/null || true
+  [ -n "${JG_CONFIG_INHERIT_REPORT:-}" ] || return 0
+  printf '%s\t%s\t%s\n' "$item" "$status" "$reason" >> "$JG_CONFIG_INHERIT_REPORT" 2>/dev/null || true
 }
 
 # jg_inherit_role_receipt_commit <dest-config-dir> - commit the post-propagation
@@ -384,11 +384,11 @@ restore_shared_captain_readonly() {
   local dest=$1
   [ -e "$dest" ] || [ -L "$dest" ] || return 0
   shared_captain_file_safe_existing "$dest" || return 1
-  chmod "$FM_SHARED_CAPTAIN_MODE" "$dest" 2>/dev/null || return 1
+  chmod "$JG_SHARED_CAPTAIN_MODE" "$dest" 2>/dev/null || return 1
 }
 
 shared_captain_inherited_receipt_path() {
-  printf '%s/.%s.inherited\n' "$1" "$FM_SHARED_CAPTAIN_FILE"
+  printf '%s/.%s.inherited\n' "$1" "$JG_SHARED_CAPTAIN_FILE"
 }
 
 # Prints the recorded SHA-256 when the receipt is a safe ordinary file containing
@@ -452,7 +452,7 @@ shared_captain_record_inherited_hash() {
 
 shared_captain_quarantine_existing_for_hash() {
   local parent=$1 hash=$2 artifact artifact_hash
-  for artifact in "$parent"/."$FM_SHARED_CAPTAIN_FILE".quarantine.*."$hash" "$parent"/."$FM_SHARED_CAPTAIN_FILE".quarantine.*."$hash".[0-9]*; do
+  for artifact in "$parent"/."$JG_SHARED_CAPTAIN_FILE".quarantine.*."$hash" "$parent"/."$JG_SHARED_CAPTAIN_FILE".quarantine.*."$hash".[0-9]*; do
     [ -e "$artifact" ] || [ -L "$artifact" ] || continue
     shared_captain_file_safe_existing "$artifact" || return 1
     artifact_hash=$(jg_inherit_sha256 "$artifact") || return 1
@@ -466,7 +466,7 @@ shared_captain_quarantine_existing_for_hash() {
 shared_captain_quarantine_name() {
   local parent=$1 hash=$2 stamp base candidate n
   stamp=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null) || return 1
-  base="$parent/.$FM_SHARED_CAPTAIN_FILE.quarantine.$stamp.$hash"
+  base="$parent/.$JG_SHARED_CAPTAIN_FILE.quarantine.$stamp.$hash"
   candidate=$base
   n=0
   while [ -e "$candidate" ] || [ -L "$candidate" ]; do
@@ -513,7 +513,7 @@ copy_shared_captain_file() {
   chmod 0600 "$tmp" 2>/dev/null || { rm -f "$tmp" 2>/dev/null || true; return 1; }
   shared_captain_file_safe_existing "$tmp" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
   if mv -f -- "$tmp" "$dest" 2>/dev/null; then
-    chmod "$FM_SHARED_CAPTAIN_MODE" "$dest" 2>/dev/null || return 1
+    chmod "$JG_SHARED_CAPTAIN_MODE" "$dest" 2>/dev/null || return 1
     shared_captain_file_safe_existing "$dest" || return 1
     return 0
   fi
@@ -526,8 +526,8 @@ propagate_shared_captain_preferences() {
   local quarantine inherited_hash reason rc missing
   [ -n "$src_data" ] || return 1
   [ -n "$dest_data" ] || return 1
-  src="$src_data/$FM_SHARED_CAPTAIN_FILE"
-  dest="$dest_data/$FM_SHARED_CAPTAIN_FILE"
+  src="$src_data/$JG_SHARED_CAPTAIN_FILE"
+  dest="$dest_data/$JG_SHARED_CAPTAIN_FILE"
   dest_parent=${dest%/*}
   dest_home=${dest_data%/data}
   rc=0
@@ -535,34 +535,34 @@ propagate_shared_captain_preferences() {
   if [ -e "$src" ] || [ -L "$src" ]; then
     if ! shared_captain_file_safe_existing "$src"; then
       reason="unsafe primary source"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$src" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$src" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     fi
     if ! missing=$(shared_captain_header_valid "$src"); then
       reason="primary source header missing required main-authoritative warning"
       [ -z "$missing" ] || reason="$reason: missing \"$missing\""
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$src" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$src" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     fi
     src_hash=$(jg_inherit_sha256 "$src") || {
       reason="failed to hash primary source"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$src" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$src" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     }
     if [ -e "$dest" ] || [ -L "$dest" ]; then
       if ! shared_captain_file_safe_existing "$dest"; then
         reason="unsafe destination"
-        warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-        record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+        warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+        record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
         return 1
       fi
       dest_hash=$(jg_inherit_sha256 "$dest") || {
         reason="failed to hash destination"
-        warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-        record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+        warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+        record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
         restore_shared_captain_readonly "$dest" || true
         return 1
       }
@@ -570,84 +570,84 @@ propagate_shared_captain_preferences() {
       if [ "$src_hash" = "$dest_hash" ]; then
         if restore_shared_captain_readonly "$dest" \
           && shared_captain_record_inherited_hash "$dest_parent" "$dest_hash"; then
-          record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" unchanged ""
+          record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" unchanged ""
           return 0
         fi
         reason="failed to restore read-only mode or record inherited generation"
-        warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-        record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+        warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+        record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
         return 1
       fi
       if ! shared_captain_dir_safe "$dest_parent"; then
         reason="unsafe destination directory"
-        warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
-        record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+        warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
+        record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
         restore_shared_captain_readonly "$dest" || true
         return 1
       fi
       if [ "$dest_hash" != "$inherited_hash" ]; then
         if ! quarantine=$(quarantine_shared_captain_dest "$dest" "$dest_parent"); then
           reason="failed to quarantine divergent destination"
-          warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-          record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+          warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+          record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
           restore_shared_captain_readonly "$dest" || true
           return 1
         fi
-        printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$FM_SHARED_CAPTAIN_REL" "$quarantine"
+        printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
       fi
     elif ! shared_captain_dir_safe "$dest_parent"; then
       reason="unsafe destination directory"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     fi
     if copy_shared_captain_file "$src" "$dest"; then
       if shared_captain_record_inherited_hash "$dest_parent" "$src_hash"; then
         if [ -n "${quarantine:-}" ]; then
-          record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" pushed "quarantined local drift at $quarantine"
+          record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" pushed "quarantined local drift at $quarantine"
         else
-          record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" pushed ""
+          record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" pushed ""
         fi
       else
         reason="failed to record inherited generation"
-        warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-        record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+        warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+        record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
         rc=1
       fi
     else
       reason="failed to copy"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       rc=1
     fi
   elif [ -e "$dest" ] || [ -L "$dest" ]; then
     if ! shared_captain_file_safe_existing "$dest"; then
       reason="unsafe destination"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     fi
     if ! shared_captain_dir_safe "$dest_parent"; then
       reason="unsafe destination directory"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest_parent" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       restore_shared_captain_readonly "$dest" || true
       return 1
     fi
     if quarantine=$(quarantine_shared_captain_dest "$dest" "$dest_parent"); then
       shared_captain_remove_inherited_receipt "$dest_parent" || true
-      printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$FM_SHARED_CAPTAIN_REL" "$quarantine"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" pushed "mirrored primary absence after quarantining local copy at $quarantine"
+      printf 'SECONDMATE_SYNC: secondmate home %s: quarantined %s drift at %s\n' "$dest_home" "$JG_SHARED_CAPTAIN_REL" "$quarantine"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" pushed "mirrored primary absence after quarantining local copy at $quarantine"
     else
       reason="failed to quarantine destination before mirroring primary absence"
-      warn_inheritable_config_error "$FM_SHARED_CAPTAIN_REL" "$dest" "$reason"
-      record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" error "$reason"
+      warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$dest" "$reason"
+      record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       restore_shared_captain_readonly "$dest" || true
       rc=1
     fi
   else
     shared_captain_remove_inherited_receipt "$dest_parent" || true
-    record_inheritable_config_result "$FM_SHARED_CAPTAIN_REL" unchanged ""
+    record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" unchanged ""
   fi
   return "$rc"
 }
@@ -666,23 +666,23 @@ propagate_secondmate_inheritance() {
 
 propagate_inheritable_config() {
   local src_config=$1 dest_config=$2 src_home=${3:-${1%/*}} item src dest source_present reason rc
-  local prior_dest_config=${FM_INHERIT_DEST_CONFIG-} role_stage=
+  local prior_dest_config=${JG_INHERIT_DEST_CONFIG-} role_stage=
   [ -n "$src_config" ] || return 1
   [ -n "$dest_config" ] || return 1
   rc=0
   # Dest dir the per-item outcome recorder uses for firstmate-role receipt
   # bookkeeping; restored on return so nested callers keep their own.
-  FM_INHERIT_DEST_CONFIG=$dest_config
-  FM_INHERIT_ROLE_RECEIPT_FAILED=
-  for item in $FM_INHERITABLE_CONFIG; do
+  JG_INHERIT_DEST_CONFIG=$dest_config
+  JG_INHERIT_ROLE_RECEIPT_FAILED=
+  for item in $JG_INHERITABLE_CONFIG; do
     case "$item" in
       ''|/*|.|..|../*|*/../*|*/..)
-        FM_INHERIT_DEST_CONFIG=$prior_dest_config
+        JG_INHERIT_DEST_CONFIG=$prior_dest_config
         [ -z "$role_stage" ] || rm -rf "$role_stage"
         return 1
         ;;
     esac
-    if [ "${FM_CONFIG_INHERIT_LIVE:-0}" = 1 ] && jg_config_inherit_item_session_scoped "$item"; then
+    if [ "${JG_CONFIG_INHERIT_LIVE:-0}" = 1 ] && jg_config_inherit_item_session_scoped "$item"; then
       record_inheritable_config_result "$item" unchanged "session-scoped"
       continue
     fi
@@ -709,10 +709,10 @@ propagate_inheritable_config() {
     # This one scalar config is consumed as a local safety boundary, so reject
     # every unsafe or malformed source/destination artifact before the generic
     # byte-copy behavior below can treat it as ordinary inherited material.
-    if [ "$item" = "$FM_STARTUP_MEMORY_BUDGET_FILE" ]; then
+    if [ "$item" = "$JG_STARTUP_MEMORY_BUDGET_FILE" ]; then
       if [ -e "$src_config" ] || [ -L "$src_config" ]; then
         if ! jg_startup_memory_budget_config_dir_safe "$src_config"; then
-          reason="unsafe primary config directory: $FM_STARTUP_MEMORY_BUDGET_ERROR"
+          reason="unsafe primary config directory: $JG_STARTUP_MEMORY_BUDGET_ERROR"
           warn_inheritable_config_error "$item" "$src_config" "$reason"
           record_inheritable_config_result "$item" error "$reason"
           rc=1
@@ -721,7 +721,7 @@ propagate_inheritable_config() {
       fi
       if [ -e "$dest_config" ] || [ -L "$dest_config" ]; then
         if ! jg_startup_memory_budget_config_dir_safe "$dest_config"; then
-          reason="unsafe destination config directory: $FM_STARTUP_MEMORY_BUDGET_ERROR"
+          reason="unsafe destination config directory: $JG_STARTUP_MEMORY_BUDGET_ERROR"
           warn_inheritable_config_error "$item" "$dest_config" "$reason"
           record_inheritable_config_result "$item" error "$reason"
           rc=1
@@ -730,7 +730,7 @@ propagate_inheritable_config() {
       fi
       if [ -e "$src" ] || [ -L "$src" ]; then
         if ! jg_startup_memory_budget_file_valid "$src"; then
-          reason="unsafe or invalid primary source: $FM_STARTUP_MEMORY_BUDGET_ERROR"
+          reason="unsafe or invalid primary source: $JG_STARTUP_MEMORY_BUDGET_ERROR"
           warn_inheritable_config_error "$item" "$src" "$reason"
           record_inheritable_config_result "$item" error "$reason"
           rc=1
@@ -739,7 +739,7 @@ propagate_inheritable_config() {
       fi
       if [ -e "$dest" ] || [ -L "$dest" ]; then
         if ! jg_startup_memory_budget_file_valid "$dest"; then
-          reason="unsafe or invalid destination: $FM_STARTUP_MEMORY_BUDGET_ERROR"
+          reason="unsafe or invalid destination: $JG_STARTUP_MEMORY_BUDGET_ERROR"
           warn_inheritable_config_error "$item" "$dest" "$reason"
           record_inheritable_config_result "$item" error "$reason"
           rc=1
@@ -791,33 +791,33 @@ propagate_inheritable_config() {
       record_inheritable_config_result "$item" unchanged ""
     fi
   done
-  FM_INHERIT_DEST_CONFIG=$prior_dest_config
+  JG_INHERIT_DEST_CONFIG=$prior_dest_config
   [ -z "$role_stage" ] || rm -rf "$role_stage"
-  [ -z "${FM_INHERIT_ROLE_RECEIPT_FAILED:-}" ] || rc=1
+  [ -z "${JG_INHERIT_ROLE_RECEIPT_FAILED:-}" ] || rc=1
   return "$rc"
 }
 
 # Relative prefix of per-home instruction files written after a successful
 # config push so the live secondmate can re-read exact post-write bytes.
 # Kept under state/ (gitignored operational dir) so it never dirties the home.
-FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL="state/.jg-inherited-config-reread"
-FM_CONFIG_REREAD_MAX_SENT=16
-FM_CONFIG_REREAD_RETRY_ROOT_REL="state/.jg-inherited-config-reread-retry"
-FM_CONFIG_REREAD_MAX_PENDING=16
-FM_CONFIG_REREAD_MAX_QUARANTINE=16
-FM_CONFIG_INHERIT_LOCK_REL="state/.jg-inherited-config.lock"
+JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL="state/.jg-inherited-config-reread"
+JG_CONFIG_REREAD_MAX_SENT=16
+JG_CONFIG_REREAD_RETRY_ROOT_REL="state/.jg-inherited-config-reread-retry"
+JG_CONFIG_REREAD_MAX_PENDING=16
+JG_CONFIG_REREAD_MAX_QUARANTINE=16
+JG_CONFIG_INHERIT_LOCK_REL="state/.jg-inherited-config.lock"
 
 # Framing lines for the config-reread instruction. Defaults/rules only - never
 # an enforcement claim, and never a parsed summary of file contents.
-FM_CONFIG_REREAD_FRAMING='These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.'
+JG_CONFIG_REREAD_FRAMING='These inherited config files changed. Re-read and apply their exact contents at every future intake. They are defaults/rules and do not remove your judgment to choose differently when warranted.'
 
 # jg_config_reread_is_allowlisted_item <item>
 # True only for the declared inheritable config allowlist (bare item name as
-# recorded in FM_CONFIG_INHERIT_REPORT). data/captain-shared.md is never
+# recorded in JG_CONFIG_INHERIT_REPORT). data/captain-shared.md is never
 # allowlisted here and must never be inlined into a reread instruction.
 jg_config_reread_is_allowlisted_item() {
   local item=$1 candidate
-  for candidate in $FM_INHERITABLE_CONFIG; do
+  for candidate in $JG_INHERITABLE_CONFIG; do
     [ "$candidate" = "$item" ] && return 0
   done
   return 1
@@ -825,11 +825,11 @@ jg_config_reread_is_allowlisted_item() {
 
 # jg_config_reread_changed_items <report>
 # Print bare allowlisted config item names whose report status is "pushed",
-# in FM_INHERITABLE_CONFIG order (deterministic path order). Empty when none.
+# in JG_INHERITABLE_CONFIG order (deterministic path order). Empty when none.
 jg_config_reread_changed_items() {
   local report=$1 item status
   [ -n "$report" ] && [ -f "$report" ] || return 0
-  for item in $FM_INHERITABLE_CONFIG; do
+  for item in $JG_INHERITABLE_CONFIG; do
     status=$(awk -F '\t' -v item="$item" '$1 == item { print $2; exit }' "$report" 2>/dev/null) || status=""
     [ "$status" = pushed ] || continue
     printf '%s\n' "$item"
@@ -839,7 +839,7 @@ jg_config_reread_changed_items() {
 jg_config_inherit_lock_path() {
   local dest_home=$1
   [ -n "$dest_home" ] || return 1
-  printf '%s/%s\n' "$dest_home" "$FM_CONFIG_INHERIT_LOCK_REL"
+  printf '%s/%s\n' "$dest_home" "$JG_CONFIG_INHERIT_LOCK_REL"
 }
 
 jg_config_reread_retry_dir() {
@@ -847,7 +847,7 @@ jg_config_reread_retry_dir() {
   [ -n "$source_home" ] && [ -n "$id" ] || return 1
   token=${id//[^a-zA-Z0-9_.-]/_}
   [ -n "$token" ] || token=unknown
-  printf '%s/%s/%s\n' "$source_home" "$FM_CONFIG_REREAD_RETRY_ROOT_REL" "$token"
+  printf '%s/%s/%s\n' "$source_home" "$JG_CONFIG_REREAD_RETRY_ROOT_REL" "$token"
 }
 
 jg_config_reread_pending_stages() {
@@ -888,7 +888,7 @@ jg_config_reread_retry_queue_is_full() {
   count=$(jg_config_reread_pending_stages "$source_home" "$id" | wc -l | tr -d ' ')
   report_count=$(jg_config_reread_pending_reports "$source_home" "$id" | wc -l | tr -d ' ')
   count=$((count + report_count))
-  [ "$count" -ge "$FM_CONFIG_REREAD_MAX_PENDING" ]
+  [ "$count" -ge "$JG_CONFIG_REREAD_MAX_PENDING" ]
 }
 
 jg_config_reread_retry_pending() {
@@ -948,7 +948,7 @@ jg_config_reread_save_retry_report() {
 # values, selected profiles, or any generated interpretation.
 jg_config_write_reread_instruction() {
   local dest_home=$1 report=$2 instruction_path=$3 item rel dest parent tmp first=1
-  FM_CONFIG_REREAD_FAILED_TEMP=""
+  JG_CONFIG_REREAD_FAILED_TEMP=""
   [ -n "$dest_home" ] || return 1
   [ -n "$report" ] && [ -f "$report" ] || return 1
   [ -n "$instruction_path" ] || return 1
@@ -963,7 +963,7 @@ jg_config_write_reread_instruction() {
     rel="config/$item"
     dest="$dest_home/config/$item"
     if [ "$first" = 1 ]; then
-      printf '%s\n' "$FM_CONFIG_REREAD_FRAMING" >> "$tmp" || { rm -f "$tmp"; return 1; }
+      printf '%s\n' "$JG_CONFIG_REREAD_FRAMING" >> "$tmp" || { rm -f "$tmp"; return 1; }
       first=0
     fi
     {
@@ -984,7 +984,7 @@ jg_config_write_reread_instruction() {
     return 1
   fi
   if ! mv -f "$tmp" "$instruction_path" 2>/dev/null; then
-    FM_CONFIG_REREAD_FAILED_TEMP="$tmp"
+    JG_CONFIG_REREAD_FAILED_TEMP="$tmp"
     return 1
   fi
   return 0
@@ -1018,7 +1018,7 @@ jg_config_reread_pending_instructions() {
 
 jg_config_reread_has_pending() {
   local dest_home=$1 state pending
-  state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   for pending in "$state"/.jg-inherited-config-reread.*.pending; do
     [ -f "$pending" ] && [ ! -L "$pending" ] || continue
     return 0
@@ -1028,7 +1028,7 @@ jg_config_reread_has_pending() {
 
 jg_config_reread_cleanup_sent() {
   local dest_home=$1 state path paths sorted total remove
-  state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   [ -d "$state" ] || return 0
   paths=""
   for path in "$state"/.jg-inherited-config-reread.*; do
@@ -1045,7 +1045,7 @@ jg_config_reread_cleanup_sent() {
   [ -n "$paths" ] || return 0
   sorted=$(printf '%s\n' "$paths" | LC_ALL=C sort)
   total=$(printf '%s\n' "$sorted" | wc -l | tr -d ' ')
-  remove=$((total - FM_CONFIG_REREAD_MAX_SENT))
+  remove=$((total - JG_CONFIG_REREAD_MAX_SENT))
   [ "$remove" -gt 0 ] || return 0
   while IFS= read -r path; do
     [ "$remove" -gt 0 ] || break
@@ -1082,7 +1082,7 @@ jg_config_reread_mark_pending() {
 jg_config_reread_publish_stage() {
   local dest_home=$1 stage=$2 state final pending_pointer tmp
   [ -f "$stage" ] && [ ! -L "$stage" ] || return 1
-  state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   mkdir -p "$state" 2>/dev/null || return 1
   final="$state/${stage##*/}"
   if [ -f "$final.pending" ] && [ ! -L "$final.pending" ]; then
@@ -1132,15 +1132,15 @@ jg_config_reread_send_pointer() {
     jg_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "jg-send.sh not executable at $send_bin"
     return 1
   fi
-  if [ -z "${FM_HOME:-}" ]; then
-    jg_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "FM_HOME is not set"
+  if [ -z "${JG_HOME:-}" ]; then
+    jg_config_reread_send_failure "$id" "$instruction_path" "$pending_path" "JG_HOME is not set"
     return 1
   fi
   message="CONFIG_REREAD: $instruction_path"
-  out=$(FM_HOME="$FM_HOME" \
-    FM_ROOT_OVERRIDE="${FM_ROOT_OVERRIDE:-}" \
-    FM_STATE_OVERRIDE="${FM_STATE_OVERRIDE:-}" \
-    FM_SEND_SETTLE="${FM_SEND_SETTLE:-0}" \
+  out=$(JG_HOME="$JG_HOME" \
+    JG_ROOT_OVERRIDE="${JG_ROOT_OVERRIDE:-}" \
+    JG_STATE_OVERRIDE="${JG_STATE_OVERRIDE:-}" \
+    JG_SEND_SETTLE="${JG_SEND_SETTLE:-0}" \
     "$send_bin" "$selector" "$message" 2>&1) && rc=0 || rc=$?
   if [ "$rc" -eq 0 ]; then
     rm -f "$pending_path"
@@ -1155,7 +1155,7 @@ jg_config_reread_send_pointer() {
 # jg_config_reread_discard_pending <dest-home>
 jg_config_reread_discard_pending() {
   local dest_home=$1 id=${2:-} source_home=${3:-} state pending instruction retry_dir retry_stage rc=0
-  state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   for pending in "$state"/.jg-inherited-config-reread.*.pending; do
     [ -f "$pending" ] && [ ! -L "$pending" ] || continue
     instruction=${pending%.pending}
@@ -1177,9 +1177,9 @@ jg_config_reread_discard_pending() {
 }
 
 jg_config_reread_quarantine_prune() {
-  local root=$1 keep=${2:-$FM_CONFIG_REREAD_MAX_QUARANTINE} dirs dir oldest path remove
+  local root=$1 keep=${2:-$JG_CONFIG_REREAD_MAX_QUARANTINE} dirs dir oldest path remove
   case "$keep" in
-    ''|*[!0-9]*) keep=$FM_CONFIG_REREAD_MAX_QUARANTINE ;;
+    ''|*[!0-9]*) keep=$JG_CONFIG_REREAD_MAX_QUARANTINE ;;
   esac
   [ -d "$root" ] || return 0
   dirs=""
@@ -1214,11 +1214,11 @@ jg_config_reread_quarantine_prune() {
 
 jg_config_reread_quarantine_dir() {
   local home=$1 state root quarantine
-  state="$home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   root="$state/.jg-inherited-config-reread-quarantine"
   mkdir -p "$root" 2>/dev/null || return 1
   chmod 0700 "$root" 2>/dev/null || return 1
-  jg_config_reread_quarantine_prune "$root" $((FM_CONFIG_REREAD_MAX_QUARANTINE - 1)) || return 1
+  jg_config_reread_quarantine_prune "$root" $((JG_CONFIG_REREAD_MAX_QUARANTINE - 1)) || return 1
   quarantine=$(umask 077; mktemp -d "$root/generation.XXXXXX" 2>/dev/null) || return 1
   chmod 0700 "$quarantine" 2>/dev/null || return 1
   printf '%s\n' "$quarantine"
@@ -1228,7 +1228,7 @@ jg_config_reread_quarantine_pending() {
   local dest_home=$1 id=${2:-} source_home=${3:-}
   local state pending instruction retry_dir retry_stage dest_quarantine source_quarantine
   local dest_has_artifacts source_has_artifacts rc=0
-  state="$dest_home/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   dest_has_artifacts=0
   for pending in "$state"/.jg-inherited-config-reread.*.pending; do
     [ -f "$pending" ] && [ ! -L "$pending" ] || continue
@@ -1315,14 +1315,14 @@ jg_config_send_reread_nudge() {
     printf 'CONFIG_REREAD: secondmate %s: send failed: destination home is not readable\n' "$id"
     return 1
   }
-  state="$dest_home_abs/${FM_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
+  state="$dest_home_abs/${JG_CONFIG_REREAD_INSTRUCTION_PREFIX_REL%/*}"
   changed_items=$(jg_config_reread_changed_items "$report")
   pending_paths=""
   stage_paths=""
   retry_report_paths=""
-  if [ "${FM_CONFIG_REREAD_SKIP_PENDING:-0}" != 1 ]; then
+  if [ "${JG_CONFIG_REREAD_SKIP_PENDING:-0}" != 1 ]; then
     pending_paths=$(jg_config_reread_pending_instructions "$state")
-    source_home_abs=$(cd "${FM_HOME:-}" 2>/dev/null && pwd -P || true)
+    source_home_abs=$(cd "${JG_HOME:-}" 2>/dev/null && pwd -P || true)
     if [ -n "$source_home_abs" ]; then
       stage_paths=$(jg_config_reread_pending_stages "$source_home_abs" "$id")
       retry_report_paths=$(jg_config_reread_pending_reports "$source_home_abs" "$id")
@@ -1349,7 +1349,7 @@ jg_config_send_reread_nudge() {
       fi
       stage_paths+="$retry_stage_path"
     else
-      exact_tmp=${FM_CONFIG_REREAD_FAILED_TEMP:-}
+      exact_tmp=${JG_CONFIG_REREAD_FAILED_TEMP:-}
       if [ -n "$exact_tmp" ] \
         && jg_config_reread_adopt_exact_temp "$exact_tmp" "$retry_stage_path"; then
         rm -f "$retry_report_path" 2>/dev/null || send_failures=1
@@ -1375,7 +1375,7 @@ EOF
     return 1
   fi
   if [ -n "$changed_items" ]; then
-    source_home_abs=$(cd "${FM_HOME:-}" 2>/dev/null && pwd -P || true)
+    source_home_abs=$(cd "${JG_HOME:-}" 2>/dev/null && pwd -P || true)
     if [ -z "$source_home_abs" ]; then
       printf 'CONFIG_REREAD: secondmate %s: send failed: could not reserve retry instruction\n' "$id"
       return 1
@@ -1389,7 +1389,7 @@ EOF
       return 1
     }
     if ! jg_config_write_reread_instruction "$dest_home_abs" "$report" "$current_stage_path"; then
-      exact_tmp=${FM_CONFIG_REREAD_FAILED_TEMP:-}
+      exact_tmp=${JG_CONFIG_REREAD_FAILED_TEMP:-}
       if [ -n "$exact_tmp" ] \
         && jg_config_reread_adopt_exact_temp "$exact_tmp" "$current_stage_path"; then
         printf 'CONFIG_REREAD: secondmate %s: send failed: could not publish retry instruction; retained exact retry generation %s\n' "$id" "$current_stage_path"

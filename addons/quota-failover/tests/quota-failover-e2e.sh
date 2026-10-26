@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # quota-failover e2e: the real script against a fixture home (one stub lib
 # symlinked under the five names it sources, stub quota-axi and opencode on
 # PATH). The fixture is a step-5-preview-free incident: a
@@ -47,10 +56,10 @@ awk -v w="$work" '
 jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
 jg_backend_of_meta() { echo fixture; }
 jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
-jg_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }
-jg_busy_classify_meta() { cat "$FM_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
+jg_backend_visible_capture() { [ -f "$JG_HOME/state/$2.screen" ] && cat "$JG_HOME/state/$2.screen"; return 0; }
+jg_busy_classify_meta() { cat "$JG_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
 jg_busy_record_read() { echo ''; }
-FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
+JG_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
 jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 jg_quota_single_provider_for_harness() { return 1; }
 jg_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
@@ -60,15 +69,15 @@ jg_run_timed() { shift; "$@"; }
 echo 'state: working · source: fixture'
 #--- home/bin/jg-control.sh
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/jg-control.log"
+printf '%s\n' "$*" >>"$JG_HOME/state/jg-control.log"
 [ "${2:-}" = relaunch ] || exit 0
 id=${1:-}
 # d1's pool has no next account ready, as jg-control answers after its rest.
 [ "$id $3 $4" != "d1 --account next" ] || { echo "error: config/account-pool cannot start a claude worker: no account is ready"; exit 1; }
 # p6's relaunch replaces the incarnation, then fails a later launch step.
-[ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$FM_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
-rm -f "$FM_HOME/state/$id.screen"
-date +%s >"$FM_HOME/state/$id.status"
+[ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$JG_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
+rm -f "$JG_HOME/state/$id.screen"
+date +%s >"$JG_HOME/state/$id.status"
 #--- bin/opencode
 #!/usr/bin/env bash
 # Every model answers PONG except the two dead routes, which answer the
@@ -84,7 +93,7 @@ exit 1
 #!/usr/bin/env bash
 # The one-line test records the profile folder it ran on, so a pass can prove a
 # pool task's limit was read on its own account and not on the ambient login.
-printf '%s\n' "${CLAUDE_CONFIG_DIR:-ambient}" >>"$FM_HOME/state/claude-probe.log"
+printf '%s\n' "${CLAUDE_CONFIG_DIR:-ambient}" >>"$JG_HOME/state/claude-probe.log"
 case ${CLAUDE_LIMIT_ACCOUNT:-} in
   '') ;;
   *) case "${CLAUDE_CONFIG_DIR:-}" in *"/profiles/$CLAUDE_LIMIT_ACCOUNT") echo "You've hit your usage limit for your plan; try again in 3h"; exit 1 ;; esac ;;
@@ -102,14 +111,14 @@ echo '{"schemaVersion":5,"providers":[]}'
 # The pool command: `status <id>` names one account's tool and profile folder.
 case ${1:-} in
   status) id=${2:-}
-    [ -d "$FM_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
-    printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$FM_HOME/state/profiles/$id" ;;
+    [ -d "$JG_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
+    printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$JG_HOME/state/profiles/$id" ;;
   rest) id=${2:-}
     [ "$id" = deadpool ] && { echo "error: pool lib broken at $(date +%s%N)" >&2; exit 1; }
-    printf 'rest %s\n' "$id" >>"$FM_HOME/state/pool.log" ;;
+    printf 'rest %s\n' "$id" >>"$JG_HOME/state/pool.log" ;;
   pick) [ -z "${POOL_PICK_FAIL:-}" ] || { echo "error: no account can take a worker" >&2; exit 1; }
-    mkdir -p "$FM_HOME/state/profiles/pooled"
-    printf '{"ok":true,"id":"pooled","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$FM_HOME/state/profiles/pooled" ;;
+    mkdir -p "$JG_HOME/state/profiles/pooled"
+    printf '{"ok":true,"id":"pooled","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$JG_HOME/state/profiles/pooled" ;;
   *) echo "usage: byokit-accounts status <id>" >&2; exit 1 ;;
 esac
 STUBS
@@ -139,7 +148,7 @@ printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$ho
 log=$home/state/quota-failover.log ctl=$home/state/jg-control.log
 dead=$home/state/quota-failover-dead.json disp=$home/config/crew-dispatch.json
 run() { # one watcher pass, with the knobs the fixture needs
-  env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" FM_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
+  env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" JG_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
     QUOTA_FAILOVER_RETEST_SECS="${RETEST_SECS:-1800}" "$here/../quota-failover" "$home"
 }
 

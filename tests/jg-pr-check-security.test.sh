@@ -18,7 +18,7 @@ TEARDOWN="$ROOT/bin/jg-teardown.sh"
 REGISTER="$ROOT/bin/jg-check-register.sh"
 TMP_ROOT=$(jg_test_tmproot jg-pr-check-security)
 jg_git_identity fmtest fmtest@example.invalid
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)
 REAL_MV=$(command -v mv)
 REAL_STAT=$(command -v stat)
@@ -31,12 +31,12 @@ REAL_JQ=$(command -v jq) || fail "these tests read glab's JSON with the real jq,
 ack_watcher_cycle() {  # <state>
   local state=$1 err sequence generation
   err="$state/.test-wake-drain.err"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2> "$err" || return 1
+  JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2> "$err" || return 1
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-drain.sh" --ack-through "$sequence" \
+  JG_STATE_OVERRIDE="$state" "$ROOT/bin/jg-wake-drain.sh" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
 
@@ -133,39 +133,39 @@ make_case() {
   git -C "$dir/wt" update-ref refs/remotes/origin/main "$(git -C "$dir/wt" rev-parse HEAD)"
   cat > "$fake_root/bin/jg-guard.sh" <<'SH'
 #!/usr/bin/env bash
-printf 'guard\n' >> "$FM_TEST_GUARD_LOG"
+printf 'guard\n' >> "$JG_TEST_GUARD_LOG"
 SH
   chmod +x "$fake_root/bin/jg-guard.sh"
   cat > "$fakebin/gh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "api graphql")
     printf '%s\n' \
-      "state=${FM_TEST_GH_GRAPHQL_STATE:-MERGED}" \
-      "merged=${FM_TEST_GH_GRAPHQL_MERGED:-true}" \
-      "queued=${FM_TEST_GH_GRAPHQL_QUEUED:-false}" \
+      "state=${JG_TEST_GH_GRAPHQL_STATE:-MERGED}" \
+      "merged=${JG_TEST_GH_GRAPHQL_MERGED:-true}" \
+      "queued=${JG_TEST_GH_GRAPHQL_QUEUED:-false}" \
       'base=main'
     exit 0
     ;;
   "pr view")
     case " $* " in
       *statusCheckRollup*)
-        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\",\"statusCheckRollup\":[{\"__typename\":\"CheckRun\",\"name\":\"ci\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}"
+        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${JG_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\",\"statusCheckRollup\":[{\"__typename\":\"CheckRun\",\"name\":\"ci\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}"
         exit 0
         ;;
       *" --json isDraft "*)
-        printf '%s\n' "{\"isDraft\":${FM_TEST_GH_DRAFT:-false}}"
+        printf '%s\n' "{\"isDraft\":${JG_TEST_GH_DRAFT:-false}}"
         exit 0
         ;;
       *headRefOid,reviewDecision*)
-        printf '%s\n' "{\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"reviewDecision\":\"APPROVED\"}"
+        printf '%s\n' "{\"headRefOid\":\"${JG_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"reviewDecision\":\"APPROVED\"}"
         exit 0
         ;;
     esac
     ;;
   "pr merge")
-    [ -z "${FM_TEST_GH_MERGE_HOOK:-}" ] || "$FM_TEST_GH_MERGE_HOOK"
+    [ -z "${JG_TEST_GH_MERGE_HOOK:-}" ] || "$JG_TEST_GH_MERGE_HOOK"
     exit 0
     ;;
 esac
@@ -188,39 +188,39 @@ case " $* " in
     printf '%s\n' '{"name":"main","protected":false}'
     ;;
   *" api repos/"*"/pulls/"*)
-    printf '%s\n' "{\"state\":\"open\",\"user\":{\"login\":\"author\"},\"head\":{\"sha\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\"},\"draft\":false,\"mergeable\":true,\"merged_at\":null}"
+    printf '%s\n' "{\"state\":\"open\",\"user\":{\"login\":\"author\"},\"head\":{\"sha\":\"${JG_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\"},\"draft\":false,\"mergeable\":true,\"merged_at\":null}"
     ;;
   *" api repos/"*)
     printf '%s\n' '{"permissions":{"push":false}}'
     ;;
-  *" headRefOid "*) printf '%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
+  *" headRefOid "*) printf '%s\n' "${JG_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" ;;
   *" state "*)
-    [ "${FM_TEST_GH_FAIL:-0}" = 0 ] || exit 1
-    [ -z "${FM_TEST_GH_STATE_STARTED:-}" ] || : > "$FM_TEST_GH_STATE_STARTED"
-    [ "${FM_TEST_GH_SLEEP:-0}" = 0 ] || sleep "$FM_TEST_GH_SLEEP"
-    printf '%s\n' "${FM_TEST_GH_STATE:-OPEN}"
+    [ "${JG_TEST_GH_FAIL:-0}" = 0 ] || exit 1
+    [ -z "${JG_TEST_GH_STATE_STARTED:-}" ] || : > "$JG_TEST_GH_STATE_STARTED"
+    [ "${JG_TEST_GH_SLEEP:-0}" = 0 ] || sleep "$JG_TEST_GH_SLEEP"
+    printf '%s\n' "${JG_TEST_GH_STATE:-OPEN}"
     ;;
 esac
 SH
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_AXI_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     [ "$#" -eq 5 ] && [ "${4:-}" = --repo ] || exit 2
-    printf 'pull_request:\n  number: %s\n  state: %s\n' "$3" "${FM_TEST_GH_MERGE_STATE:-merged}"
+    printf 'pull_request:\n  number: %s\n  state: %s\n' "$3" "${JG_TEST_GH_MERGE_STATE:-merged}"
     ;;
 esac
-exit "${FM_TEST_GH_AXI_RC:-0}"
+exit "${JG_TEST_GH_AXI_RC:-0}"
 SH
   # Plain glab, reproducing the real CLI's contract: its field output on stdout
   # and exit 0 on success, and a non-zero exit with no stdout on any failure.
   cat > "$fakebin/glab" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GLAB_LOG"
-[ "${FM_TEST_GLAB_FAIL:-0}" = 0 ] || exit 1
-[ "${FM_TEST_GLAB_SLEEP:-0}" = 0 ] || sleep "$FM_TEST_GLAB_SLEEP"
-printf 'title:\tfixture merge request\nstate:\t%s\nauthor:\tsomeone\n' "${FM_TEST_GLAB_STATE:-opened}"
+printf '%s\n' "$*" >> "$JG_TEST_GLAB_LOG"
+[ "${JG_TEST_GLAB_FAIL:-0}" = 0 ] || exit 1
+[ "${JG_TEST_GLAB_SLEEP:-0}" = 0 ] || sleep "$JG_TEST_GLAB_SLEEP"
+printf 'title:\tfixture merge request\nstate:\t%s\nauthor:\tsomeone\n' "${JG_TEST_GLAB_STATE:-opened}"
 SH
   # gerrit-axi, reproducing the real CLI's contract: one JSON record on stdout
   # and exit 0 on success, and a non-zero exit with no stdout on any failure.
@@ -229,22 +229,22 @@ SH
   # the reading a merged change and a merely submittable change share.
   cat > "$fakebin/gerrit-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GERRIT_AXI_LOG"
-[ "${FM_TEST_GERRIT_FAIL:-0}" = 0 ] || exit 1
-if [ -n "${FM_TEST_GERRIT_RAW:-}" ]; then
-  printf '%s\n' "$FM_TEST_GERRIT_RAW"
+printf '%s\n' "$*" >> "$JG_TEST_GERRIT_AXI_LOG"
+[ "${JG_TEST_GERRIT_FAIL:-0}" = 0 ] || exit 1
+if [ -n "${JG_TEST_GERRIT_RAW:-}" ]; then
+  printf '%s\n' "$JG_TEST_GERRIT_RAW"
   exit 0
 fi
-change=${FM_TEST_GERRIT_CHANGE:-${2:-0}}
+change=${JG_TEST_GERRIT_CHANGE:-${2:-0}}
 printf '{"ok":true,"op":"show","count":1,"missing":[],"changes":[{"change":%s,"subject":%s,"project":"p","status":"%s","wip":false,"submit":"%s","submittable":%s,"blocked_on":"%s","patch_set":1,"revision":"%s","url":"%s"}]}\n' \
   "$change" \
-  "${FM_TEST_GERRIT_SUBJECT:-\"fixture change\"}" \
-  "${FM_TEST_GERRIT_STATUS:-NEW}" \
-  "${FM_TEST_GERRIT_SUBMIT:-NOT_READY}" \
-  "${FM_TEST_GERRIT_SUBMITTABLE:-false}" \
-  "${FM_TEST_GERRIT_BLOCKED_ON:-Code-Review}" \
-  "${FM_TEST_GERRIT_REVISION:-5f07a68436929a527ddc7abadc8ef1abceae40ed}" \
-  "${FM_TEST_GERRIT_URL:-https://gerrit.example/c/group/apps/console/+/4201}"
+  "${JG_TEST_GERRIT_SUBJECT:-\"fixture change\"}" \
+  "${JG_TEST_GERRIT_STATUS:-NEW}" \
+  "${JG_TEST_GERRIT_SUBMIT:-NOT_READY}" \
+  "${JG_TEST_GERRIT_SUBMITTABLE:-false}" \
+  "${JG_TEST_GERRIT_BLOCKED_ON:-Code-Review}" \
+  "${JG_TEST_GERRIT_REVISION:-5f07a68436929a527ddc7abadc8ef1abceae40ed}" \
+  "${JG_TEST_GERRIT_URL:-https://gerrit.example/c/group/apps/console/+/4201}"
 SH
   # no-mistakes, answering only `axi status` the way the real CLI does from a
   # worker copy: a run object, then its branch_sync block. By default the run's
@@ -253,17 +253,17 @@ SH
   # fail.
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
-[ -z "${FM_TEST_NM_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_TEST_NM_LOG"
+[ -z "${JG_TEST_NM_LOG:-}" ] || printf '%s\n' "$*" >> "$JG_TEST_NM_LOG"
 [ "${1:-} ${2:-}" = "axi status" ] || exit 2
-[ "${FM_TEST_NM_FAIL:-0}" = 0 ] || exit 1
+[ "${JG_TEST_NM_FAIL:-0}" = 0 ] || exit 1
 head=$(git rev-parse HEAD 2>/dev/null) || exit 1
-pipeline=${FM_TEST_NM_PIPELINE_HEAD:-$head}
+pipeline=${JG_TEST_NM_PIPELINE_HEAD:-$head}
 printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\noutcome: %s\n' \
-  "$pipeline" "${FM_TEST_NM_OUTCOME-passed}"
+  "$pipeline" "${JG_TEST_NM_OUTCOME-passed}"
 printf 'branch_sync:\n  state: %s\n  local:\n    head: %s\n  pipeline:\n    current_head: %s\n' \
-  "${FM_TEST_NM_SYNC_STATE:-synchronized}" "$head" "$pipeline"
-if [ -n "${FM_TEST_NM_NEXT_ACTION:-}" ]; then
-  printf '  next_action:\n    code: %s\n    command: no-mistakes axi status\n' "$FM_TEST_NM_NEXT_ACTION"
+  "${JG_TEST_NM_SYNC_STATE:-synchronized}" "$head" "$pipeline"
+if [ -n "${JG_TEST_NM_NEXT_ACTION:-}" ]; then
+  printf '  next_action:\n    code: %s\n    command: no-mistakes axi status\n' "$JG_TEST_NM_NEXT_ACTION"
 fi
 SH
   chmod +x "$fakebin/gh" "$fakebin/gh-axi" "$fakebin/glab" "$fakebin/gerrit-axi"
@@ -304,10 +304,10 @@ write_poll_meta() {
 run_check_entry() {
   local dir=$1
   shift
-  FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
-    FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
-    FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
-    FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
+  JG_ROOT_OVERRIDE="$dir/root" JG_HOME="$dir/home" \
+    JG_TEST_GUARD_LOG="$dir/guard.log" JG_TEST_GH_LOG="$dir/gh.log" \
+    JG_TEST_GH_AXI_LOG="$dir/gh-axi.log" JG_TEST_GLAB_LOG="$dir/glab.log" \
+    JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
     PATH="$dir/fakebin:$BASE_PATH" \
     "$PR_CHECK" "$@"
 }
@@ -315,10 +315,10 @@ run_check_entry() {
 run_merge_entry() {
   local dir=$1
   shift
-  FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
-    FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
-    FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
-    FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
+  JG_ROOT_OVERRIDE="$dir/root" JG_HOME="$dir/home" \
+    JG_TEST_GUARD_LOG="$dir/guard.log" JG_TEST_GH_LOG="$dir/gh.log" \
+    JG_TEST_GH_AXI_LOG="$dir/gh-axi.log" JG_TEST_GLAB_LOG="$dir/glab.log" \
+    JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
     PATH="$dir/fakebin:$BASE_PATH" \
     "$PR_MERGE" "$@"
 }
@@ -478,10 +478,10 @@ test_parser_matrix() {
   while IFS='|' read -r url owner repo number; do
     [ -n "$url" ] || continue
     jg_pr_url_parse "$url" || fail "parser rejected canonical URL"
-    [ "$FM_PR_URL" = "$url" ] || fail "parser changed canonical URL"
-    [ "$FM_PR_OWNER" = "$owner" ] || fail "parser returned wrong owner"
-    [ "$FM_PR_REPO" = "$repo" ] || fail "parser returned wrong repository"
-    [ "$FM_PR_NUMBER" = "$number" ] || fail "parser returned wrong PR number"
+    [ "$JG_PR_URL" = "$url" ] || fail "parser changed canonical URL"
+    [ "$JG_PR_OWNER" = "$owner" ] || fail "parser returned wrong owner"
+    [ "$JG_PR_REPO" = "$repo" ] || fail "parser returned wrong repository"
+    [ "$JG_PR_NUMBER" = "$number" ] || fail "parser returned wrong PR number"
   done <<'EOF'
 https://github.com/a/b/pull/1|a|b|1
 https://github.com/my-org/repo/pull/42|my-org|repo|42
@@ -490,12 +490,12 @@ EOF
   while IFS='|' read -r url host path number; do
     [ -n "$url" ] || continue
     jg_pr_url_parse "$url" || fail "parser rejected a canonical merge request URL"
-    [ "$FM_PR_PROVIDER" = gitlab ] || fail "parser did not tag a merge request URL as gitlab"
-    [ "$FM_PR_URL" = "$url" ] || fail "parser changed a canonical merge request URL"
-    [ "$FM_PR_HOST" = "$host" ] || fail "parser returned wrong GitLab host"
-    [ "$FM_PR_PATH" = "$path" ] || fail "parser returned wrong GitLab project path"
-    [ "$FM_PR_NUMBER" = "$number" ] || fail "parser returned wrong merge request number"
-    [ -z "$FM_PR_OWNER" ] && [ -z "$FM_PR_REPO" ] \
+    [ "$JG_PR_PROVIDER" = gitlab ] || fail "parser did not tag a merge request URL as gitlab"
+    [ "$JG_PR_URL" = "$url" ] || fail "parser changed a canonical merge request URL"
+    [ "$JG_PR_HOST" = "$host" ] || fail "parser returned wrong GitLab host"
+    [ "$JG_PR_PATH" = "$path" ] || fail "parser returned wrong GitLab project path"
+    [ "$JG_PR_NUMBER" = "$number" ] || fail "parser returned wrong merge request number"
+    [ -z "$JG_PR_OWNER" ] && [ -z "$JG_PR_REPO" ] \
       || fail "parser set GitHub owner/repository for a merge request URL"
   done <<'EOF'
 https://gitlab.com/group/project/-/merge_requests/1|gitlab.com|group/project|1
@@ -508,12 +508,12 @@ EOF
   while IFS='|' read -r url host path number; do
     [ -n "$url" ] || continue
     jg_pr_url_parse "$url" || fail "parser rejected a canonical Gerrit change URL"
-    [ "$FM_PR_PROVIDER" = gerrit ] || fail "parser did not tag a Gerrit change URL as gerrit"
-    [ "$FM_PR_URL" = "$url" ] || fail "parser changed a canonical Gerrit change URL"
-    [ "$FM_PR_HOST" = "$host" ] || fail "parser returned wrong Gerrit host"
-    [ "$FM_PR_PATH" = "$path" ] || fail "parser returned wrong Gerrit project path"
-    [ "$FM_PR_NUMBER" = "$number" ] || fail "parser returned wrong Gerrit change number"
-    [ -z "$FM_PR_OWNER" ] && [ -z "$FM_PR_REPO" ] \
+    [ "$JG_PR_PROVIDER" = gerrit ] || fail "parser did not tag a Gerrit change URL as gerrit"
+    [ "$JG_PR_URL" = "$url" ] || fail "parser changed a canonical Gerrit change URL"
+    [ "$JG_PR_HOST" = "$host" ] || fail "parser returned wrong Gerrit host"
+    [ "$JG_PR_PATH" = "$path" ] || fail "parser returned wrong Gerrit project path"
+    [ "$JG_PR_NUMBER" = "$number" ] || fail "parser returned wrong Gerrit change number"
+    [ -z "$JG_PR_OWNER" ] && [ -z "$JG_PR_REPO" ] \
       || fail "parser set GitHub owner/repository for a Gerrit change URL"
   done <<'EOF'
 https://review.internal/c/group/apps/console/+/4201|review.internal|group/apps/console|4201
@@ -524,13 +524,13 @@ EOF
   while IFS='|' read -r url host owner repo number; do
     [ -n "$url" ] || continue
     jg_pr_url_parse "$url" || fail "parser rejected a canonical Forgejo pull request URL"
-    [ "$FM_PR_PROVIDER" = forgejo ] || fail "parser did not tag a plural-pulls URL as forgejo"
-    [ "$FM_PR_URL" = "$url" ] || fail "parser changed a canonical Forgejo pull request URL"
-    [ "$FM_PR_HOST" = "$host" ] || fail "parser returned wrong Forgejo host"
-    [ "$FM_PR_PATH" = "$owner/$repo" ] || fail "parser returned wrong Forgejo project path"
-    [ "$FM_PR_OWNER" = "$owner" ] || fail "parser returned wrong Forgejo owner"
-    [ "$FM_PR_REPO" = "$repo" ] || fail "parser returned wrong Forgejo repository"
-    [ "$FM_PR_NUMBER" = "$number" ] || fail "parser returned wrong Forgejo pull request number"
+    [ "$JG_PR_PROVIDER" = forgejo ] || fail "parser did not tag a plural-pulls URL as forgejo"
+    [ "$JG_PR_URL" = "$url" ] || fail "parser changed a canonical Forgejo pull request URL"
+    [ "$JG_PR_HOST" = "$host" ] || fail "parser returned wrong Forgejo host"
+    [ "$JG_PR_PATH" = "$owner/$repo" ] || fail "parser returned wrong Forgejo project path"
+    [ "$JG_PR_OWNER" = "$owner" ] || fail "parser returned wrong Forgejo owner"
+    [ "$JG_PR_REPO" = "$repo" ] || fail "parser returned wrong Forgejo repository"
+    [ "$JG_PR_NUMBER" = "$number" ] || fail "parser returned wrong Forgejo pull request number"
   done <<'EOF'
 https://git.example.com/fixture/fixture-repo/pulls/1|git.example.com|fixture|fixture-repo|1
 https://code.internal/my-org/repo.name_with-parts/pulls/123456|code.internal|my-org|repo.name_with-parts|123456
@@ -546,9 +546,9 @@ EOF
     ! jg_pr_url_parse "$row" || fail "parser accepted a URL that must not resolve as forgejo: $row"
   done
   jg_pr_url_parse https://github.com/a/b/pull/1 || fail "parser rejected canonical URL"
-  [ "$FM_PR_PROVIDER" = github ] || fail "parser did not tag a pull request URL as github"
-  [ "$FM_PR_HOST" = github.com ] || fail "parser returned wrong GitHub host"
-  [ "$FM_PR_PATH" = a/b ] || fail "parser returned wrong GitHub project path"
+  [ "$JG_PR_PROVIDER" = github ] || fail "parser did not tag a pull request URL as github"
+  [ "$JG_PR_HOST" = github.com ] || fail "parser returned wrong GitHub host"
+  [ "$JG_PR_PATH" = a/b ] || fail "parser returned wrong GitHub project path"
   for row in "${INVALID_URLS[@]}"; do
     ! jg_pr_url_parse "$row" || fail "parser accepted a rejected raw-byte URL class"
   done
@@ -620,7 +620,7 @@ test_invalid_entrypoints_have_zero_side_effects() {
   for value in "${UNSAFE_LIFECYCLE_IDS[@]}"; do
     before=$(state_snapshot "$dir/home/state")
     set +e
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/root" FM_TEST_GUARD_LOG="$dir/guard.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/root" JG_TEST_GUARD_LOG="$dir/guard.log" \
       "$TEARDOWN" "$value" --force > "$dir/stdout" 2> "$dir/stderr"
     rc=$?
     set -e
@@ -660,7 +660,7 @@ test_draft_pull_request_is_not_armed() {
   write_task_meta "$dir"
   cp "$dir/home/state/task-a.meta" "$dir/meta.before"
   set +e
-  FM_TEST_GH_DRAFT=true run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
+  JG_TEST_GH_DRAFT=true run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
     > "$dir/stdout" 2> "$dir/stderr"; rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a draft pull request"
@@ -673,7 +673,7 @@ test_draft_pull_request_is_not_armed() {
 
   dir=$(make_case draft-cleared)
   write_task_meta "$dir"
-  FM_TEST_GH_DRAFT=false run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
+  JG_TEST_GH_DRAFT=false run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
     > "$dir/stdout" 2> "$dir/stderr" || fail "arming refused a pull request that is not a draft"
   grep -qxF 'pr=https://github.com/o/r/pull/9' "$dir/home/state/task-a.meta" \
     || fail "a non-draft pull request was not recorded"
@@ -681,7 +681,7 @@ test_draft_pull_request_is_not_armed() {
 
   dir=$(make_case draft-unreadable)
   write_task_meta "$dir"
-  FM_TEST_GH_DRAFT=null run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
+  JG_TEST_GH_DRAFT=null run_check_entry "$dir" task-a https://github.com/o/r/pull/9 \
     > "$dir/stdout" 2> "$dir/stderr" || fail "an unreadable draft state blocked arming"
   [ -f "$dir/home/state/task-a.check.sh" ] || fail "an unreadable draft state was not armed"
   pass "arming refuses a draft pull request, naming it, and arms a ready or unreadable one"
@@ -726,14 +726,14 @@ test_retired_secondmate_merge_poll_keeps_signal_wake() {
   local dir rc
   dir=$(make_case secondmate-merge-poll-signal)
   write_task_meta "$dir"
-  FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+  JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/12 >/dev/null 2>"$dir/stderr" \
     || fail "could not arm the merge poll before the record became a secondmate: $(cat "$dir/stderr")"
   sed 's/^kind=ship$/kind=secondmate/' "$dir/home/state/task-a.meta" > "$dir/meta.tmp"
   mv "$dir/meta.tmp" "$dir/home/state/task-a.meta"
   printf 'done: handoff ready\n' > "$dir/home/state/task-a.status"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "watcher did not exit on the signal: $(cat "$dir/watch.err")"
@@ -751,7 +751,7 @@ test_unpushed_named_head_refuses_registration() {
   write_task_meta "$dir"
   git -C "$dir/wt" commit -q --allow-empty -m 'only in the copy'
   sha=$(git -C "$dir/wt" rev-parse HEAD)
-  FM_TEST_GH_HEAD=unavailable run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+  JG_TEST_GH_HEAD=unavailable run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
     > "$dir/stdout" 2> "$dir/stderr" && fail "unpushed PR head was registered"
   grep -Fq "named head $sha is unreachable outside the worker copy" "$dir/stderr" \
     || fail "refusal did not name the unreachable head: $(cat "$dir/stderr")"
@@ -772,7 +772,7 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
   git -C "$dir/wt" commit -q --allow-empty -m 'fix only in the copy'
   later=$(git -C "$dir/wt" rev-parse HEAD)
-  FM_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+  JG_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
     > "$dir/stdout" 2> "$dir/stderr" && fail "direct-PR head with an unpushed later commit was registered"
   grep -Fq "named head $later is unreachable outside the worker copy" "$dir/stderr" \
     || fail "direct-PR refusal did not name the unpushed commit: $(cat "$dir/stderr")"
@@ -792,7 +792,7 @@ test_fork_head_without_tracking_ref_registers() {
     "project=$dir/project" "kind=ship" "mode=direct-PR"
   git -C "$dir/wt" commit -q --allow-empty -m 'pushed to the fork, no tracking ref'
   sha=$(git -C "$dir/wt" rev-parse HEAD)
-  FM_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+  JG_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
     > "$dir/stdout" 2> "$dir/stderr" || fail "a fork head the forge holds was not registered: $(cat "$dir/stderr")"
   grep -Fq "pr=https://github.com/o/r/pull/4" "$dir/home/state/task-a.meta" \
     || fail "registration did not record pr=: $(cat "$dir/home/state/task-a.meta")"
@@ -813,17 +813,17 @@ test_receipt_candidate_hook() {
     mkdir -p "$addons/receipts/bin"
     {
       # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
-      printf '%s\n' 'jg_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }'
+      printf '%s\n' 'jg_receipts_accept_done() { printf "%s" "${7:-}" > "$JG_TEST_CANDIDATE_OUT"; }'
       if [ "$arg" = present ]; then
         # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
-        printf '%s\n' 'jg_receipts_pr_candidate() { printf "%s|%s|%s|%s|%s" "$1" "$2" "$3" "$4" "$5" > "$FM_TEST_HOOK_ARGS"; printf "%s" "$5"; }'
+        printf '%s\n' 'jg_receipts_pr_candidate() { printf "%s|%s|%s|%s|%s" "$1" "$2" "$3" "$4" "$5" > "$JG_TEST_HOOK_ARGS"; printf "%s" "$5"; }'
       fi
     } > "$addons/receipts/bin/jg-receipts-lib.sh"
     jg_write_meta "$dir/home/state/task-a.meta" \
       "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
       "project=$dir/project" "kind=ship" "mode=direct-PR"
-    FM_ADDONS_DIR="$addons" FM_TEST_CANDIDATE_OUT="$dir/candidate" FM_TEST_HOOK_ARGS="$dir/hook-args" \
-      FM_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+    JG_ADDONS_DIR="$addons" JG_TEST_CANDIDATE_OUT="$dir/candidate" JG_TEST_HOOK_ARGS="$dir/hook-args" \
+      JG_TEST_GH_HEAD=$sha run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
       > "$dir/stdout" 2> "$dir/stderr" || fail "check failed with receipt hook $arg: $(cat "$dir/stderr")"
     if [ "$arg" = absent ]; then
       [ -z "$(cat "$dir/candidate")" ] || fail "no hook still forwarded a candidate: $(cat "$dir/candidate")"
@@ -844,7 +844,7 @@ test_receipt_candidate_hook_failure_refuses() {
   jg_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
-  if FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+  if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
     fail "a failing receipt hook did not refuse the check"
   fi
@@ -862,7 +862,7 @@ test_receipt_candidate_hook_junk_output_refuses() {
   jg_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
-  if FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+  if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
     fail "a receipt hook printing a non-SHA did not refuse the check"
   fi
@@ -878,13 +878,13 @@ test_receipt_candidate_hook_empty_output_passes_on_non_github() {
   mkdir -p "$dir/addons/receipts/bin"
   {
     # shellcheck disable=SC2016 # Literal stub source is written to the add-on file.
-    printf '%s\n' 'jg_receipts_accept_done() { printf "%s" "${7:-}" > "$FM_TEST_CANDIDATE_OUT"; }'
+    printf '%s\n' 'jg_receipts_accept_done() { printf "%s" "${7:-}" > "$JG_TEST_CANDIDATE_OUT"; }'
     printf '%s\n' 'jg_receipts_pr_candidate() { return 0; }'
   } > "$dir/addons/receipts/bin/jg-receipts-lib.sh"
   jg_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
-  FM_ADDONS_DIR="$dir/addons" FM_TEST_CANDIDATE_OUT="$dir/candidate" \
+  JG_ADDONS_DIR="$dir/addons" JG_TEST_CANDIDATE_OUT="$dir/candidate" \
     run_check_entry "$dir" task-a https://gitlab.example/group/project/-/merge_requests/7 > "$dir/stdout" 2> "$dir/stderr" \
     || fail "a non-GitHub check with an empty hook candidate refused: $(cat "$dir/stderr")"
   [ -e "$dir/candidate" ] || fail "the receipt gate was not reached on a non-GitHub check"
@@ -901,7 +901,7 @@ test_receipt_candidate_hook_older_head_refuses() {
   jg_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=direct-PR"
-  if FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+  if JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr"; then
     fail "a receipt hook naming an older head than the verified pull request head did not refuse"
   fi
@@ -919,7 +919,7 @@ test_receipt_candidate_hook_skipped_when_gate_ignores_candidate() {
   jg_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:jg-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
     "project=$dir/project" "kind=ship" "mode=no-mistakes"
-  FM_ADDONS_DIR="$dir/addons" FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+  JG_ADDONS_DIR="$dir/addons" JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/4 > "$dir/stdout" 2> "$dir/stderr" \
     || fail "a no-mistakes check with a verified head refused on an unused receipt hook: $(cat "$dir/stderr")"
   [ -e "$dir/home/state/task-a.check.sh" ] || fail "a no-mistakes check with a verified head did not arm the merge poll"
@@ -931,7 +931,7 @@ test_valid_recording_and_merge_derivation() {
   dir=$(make_case valid-recording)
   write_task_meta "$dir"
   expected=0123456789abcdef0123456789abcdef01234567
-  FM_TEST_GH_HEAD=$expected run_check_entry "$dir" task-a https://github.com/my-org/repo_name.with-dots/pull/37 \
+  JG_TEST_GH_HEAD=$expected run_check_entry "$dir" task-a https://github.com/my-org/repo_name.with-dots/pull/37 \
     > "$dir/stdout" 2> "$dir/stderr" || fail "valid direct check failed"
 
   grep -qxF 'pr=https://github.com/my-org/repo_name.with-dots/pull/37' "$dir/home/state/task-a.meta" \
@@ -952,7 +952,7 @@ test_valid_recording_and_merge_derivation() {
   [ "$sidecar" = $'github\nhttps://github.com/my-org/repo_name.with-dots/pull/37\ngithub.com\nmy-org/repo_name.with-dots\n37' ] \
     || fail "published sidecar bytes were not exact"
 
-  FM_TEST_GH_HEAD=$expected run_check_entry "$dir" task-a https://github.com/my-org/repo_name.with-dots/pull/37 \
+  JG_TEST_GH_HEAD=$expected run_check_entry "$dir" task-a https://github.com/my-org/repo_name.with-dots/pull/37 \
     >/dev/null 2>/dev/null || fail "valid duplicate check failed"
   count=$(grep -c '^pr=' "$dir/home/state/task-a.meta")
   [ "$count" -eq 1 ] || fail "duplicate pr metadata was appended"
@@ -974,7 +974,7 @@ test_valid_recording_and_merge_derivation() {
   # watcher absorbs, so this cycle needs its own reason to end.
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/merged-watch.out" 2> "$dir/merged-watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/merged-watch.out" 2> "$dir/merged-watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "guarded merge poll retirement failed: $(cat "$dir/merged-watch.err")"
@@ -988,7 +988,7 @@ test_valid_recording_and_merge_derivation() {
 
   dir=$(make_case newline-head)
   write_task_meta "$dir"
-  FM_TEST_GH_HEAD=$'0123456789abcdef0123456789abcdef01234567\nwindow=unexpected' \
+  JG_TEST_GH_HEAD=$'0123456789abcdef0123456789abcdef01234567\nwindow=unexpected' \
     run_check_entry "$dir" task-a https://github.com/o/r/pull/2 >/dev/null 2>/dev/null \
     || fail "valid check with malformed remote head failed"
   assert_no_grep 'pr_head=' "$dir/home/state/task-a.meta" "multiline PR head reached metadata"
@@ -1008,7 +1008,7 @@ exit 0
 SH
   chmod 0700 "$dir/fakebin/tmux"
   touch "$dir/home/state/.last-watcher-beat"
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
     "$TEARDOWN" Task_A.1 --force > "$dir/teardown.out" 2> "$dir/teardown.err" \
     || fail "safe lifecycle-compatible task ID could not be torn down"
   [ ! -e "$dir/home/state/Task_A.1.meta" ] \
@@ -1031,7 +1031,7 @@ SH
     touch "$dir/home/state/.last-watcher-beat"
     mkdir "$dir/home/state/$id.check.sh"
     set +e
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
       "$TEARDOWN" "$id" --force > "$dir/unsafe-teardown.out" 2> "$dir/unsafe-teardown.err"
     rc=$?
     set -e
@@ -1041,7 +1041,7 @@ SH
     [ -d "$dir/home/state/$id.check.sh" ] \
       || fail "legacy task teardown changed the unsafe direct artifact"
     rmdir "$dir/home/state/$id.check.sh"
-    FM_HOME="$dir/home" "$ROOT/bin/jg-x-link.sh" "$id" req-legacy \
+    JG_HOME="$dir/home" "$ROOT/bin/jg-x-link.sh" "$id" req-legacy \
       --carry-count 0 --carry-ts 1700000000 --carry-platform x --carry-max 280 \
       > "$dir/x-link.out" 2> "$dir/x-link.err" \
       || fail "path-safe legacy task ID could not link an X request"
@@ -1051,7 +1051,7 @@ SH
     jg_pr_poll_artifacts_valid "$dir/home/state" "$id" "$POLL" \
       || fail "path-safe legacy task ID did not publish an authenticated poll"
     rm -rf "$dir/wt"
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
       "$TEARDOWN" "$id" --force > "$dir/teardown.out" 2> "$dir/teardown.err" \
       || fail "legacy path-safe task ID could not be torn down"
     [ ! -e "$dir/home/state/$id.meta" ] || fail "legacy task teardown retained metadata"
@@ -1061,22 +1061,22 @@ SH
 
 # Runs one watcher under a hang guard that TERMs it and returns 124 once it has
 # used sixty seconds of its own time. The guard pauses while the file named by
-# FM_TEST_WATCH_BOUND_PAUSE exists, so a case that holds the watcher on work it
+# JG_TEST_WATCH_BOUND_PAUSE exists, so a case that holds the watcher on work it
 # injects, or makes it wait on concurrent work it started, charges that work's
 # duration to itself instead of to the watcher.
-# FM_TEST_CHECK_TIMEOUT sets the per-check timeout for a case that exercises it.
+# JG_TEST_CHECK_TIMEOUT sets the per-check timeout for a case that exercises it.
 # Otherwise the product default applies: a tighter override silently kills a
 # correct poll on a loaded machine, and the watcher then only retries it or
 # exits on a later check's wake without the poll's result.
 run_watcher_bounded() {
-  local home=$1 fakebin=$2 check_interval=${FM_TEST_CHECK_INTERVAL:-0} watch_root=${FM_TEST_WATCH_ROOT:-$ROOT}
-  local check_timeout_env=(-u FM_CHECK_TIMEOUT)
-  [ -z "${FM_TEST_CHECK_TIMEOUT:-}" ] || check_timeout_env=("FM_CHECK_TIMEOUT=$FM_TEST_CHECK_TIMEOUT")
+  local home=$1 fakebin=$2 check_interval=${JG_TEST_CHECK_INTERVAL:-0} watch_root=${JG_TEST_WATCH_ROOT:-$ROOT}
+  local check_timeout_env=(-u JG_CHECK_TIMEOUT)
+  [ -z "${JG_TEST_CHECK_TIMEOUT:-}" ] || check_timeout_env=("JG_CHECK_TIMEOUT=$JG_TEST_CHECK_TIMEOUT")
   shift 2
   perl -MPOSIX=WNOHANG -MTime::HiRes=time,sleep -e 'my $pause=shift; my $left=60; my $pid=fork; die unless defined $pid; if (!$pid) { exec @ARGV } my $last=time; while (waitpid($pid, WNOHANG) == 0) { my $now=time; $left -= $now - $last unless length $pause && -e $pause; $last=$now; if ($left <= 0) { kill "TERM", $pid; waitpid $pid, 0; exit 124 } sleep 0.02 } exit($? >> 8)' \
-    "${FM_TEST_WATCH_BOUND_PAUSE:-}" env "${check_timeout_env[@]}" \
-      FM_HOME="$home" FM_ROOT_OVERRIDE="$watch_root" FM_CHECK_INTERVAL="$check_interval" \
-      FM_POLL=0.02 FM_HEARTBEAT=999999 FM_SIGNAL_GRACE=0 PATH="$fakebin:$BASE_PATH" "$WATCH" "$@"
+    "${JG_TEST_WATCH_BOUND_PAUSE:-}" env "${check_timeout_env[@]}" \
+      JG_HOME="$home" JG_ROOT_OVERRIDE="$watch_root" JG_CHECK_INTERVAL="$check_interval" \
+      JG_POLL=0.02 JG_HEARTBEAT=999999 JG_SIGNAL_GRACE=0 PATH="$fakebin:$BASE_PATH" "$WATCH" "$@"
 }
 
 test_rejected_metacharacter_bytes_are_inert() {
@@ -1104,14 +1104,14 @@ test_rejected_metacharacter_bytes_are_inert() {
     jg_pr_poll_publish_prepared || fail "could not publish bounded watcher poll"
 
     set +e
-    FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+    JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
     rc=$?
     set -e
     [ "$rc" -eq 0 ] || fail "bounded watcher did not complete through the authenticated poll"
     rm -f "$dir/home/state/.last-check"
   done
 
-  FM_TEST_GH_STATE=OPEN run_check_entry "$dir" task-a https://github.com/o/r/pull/1 >/dev/null 2>/dev/null \
+  JG_TEST_GH_STATE=OPEN run_check_entry "$dir" task-a https://github.com/o/r/pull/1 >/dev/null 2>/dev/null \
     || fail "could not seed a prior valid static poll"
   before=$(state_snapshot "$dir/home/state")
   set +e
@@ -1134,8 +1134,8 @@ make_poll_fixture() {
 
 run_poll() {
   local dir=$1
-  FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
-    FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
+  JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GLAB_LOG="$dir/glab.log" \
+    JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
     PATH="$dir/fakebin:$BASE_PATH" \
     bash "$dir/home/state/task-a.check.sh"
 }
@@ -1151,12 +1151,12 @@ test_static_poll_contract() {
       MALFORMED) value='not-a-state' ;;
       *) value=$state ;;
     esac
-    out=$(FM_TEST_GH_STATE="$value" run_poll "$dir")
+    out=$(JG_TEST_GH_STATE="$value" run_poll "$dir")
     [ -z "$out" ] || fail "static poll emitted for non-merged state"
   done
-  out=$(FM_TEST_GH_STATE=MERGED run_poll "$dir")
+  out=$(JG_TEST_GH_STATE=MERGED run_poll "$dir")
   [ "$out" = merged ] || fail "static poll did not emit exactly one merged line"
-  out=$(FM_TEST_GH_FAIL=1 run_poll "$dir")
+  out=$(JG_TEST_GH_FAIL=1 run_poll "$dir")
   [ -z "$out" ] || fail "static poll emitted after gh failure"
 
   mv "$dir/home/state/task-a.pr-poll" "$dir/home/state/task-a.pr-poll.missing"
@@ -1164,16 +1164,16 @@ test_static_poll_contract() {
   [ -z "$out" ] || fail "static poll emitted with missing sidecar"
   mv "$dir/home/state/task-a.pr-poll.missing" "$dir/home/state/task-a.pr-poll"
   printf '%s\n%s\n%s\n%s\n%s\n%s\n' github https://github.com/o/r/pull/1 github.com o/r 1 extra > "$dir/home/state/task-a.pr-poll"
-  out=$(FM_TEST_GH_STATE=MERGED run_poll "$dir")
+  out=$(JG_TEST_GH_STATE=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "static poll emitted with multiline sidecar"
   printf '%s\n%s\n%s\n%s\n%s\n' github https://github.com/o/r/pull/1x github.com o/r 1x > "$dir/home/state/task-a.pr-poll"
-  out=$(FM_TEST_GH_STATE=MERGED run_poll "$dir")
+  out=$(JG_TEST_GH_STATE=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "static poll emitted with malformed numeric data"
 
   make_poll_fixture "$dir"
   set +e
-  out=$(FM_STATE_OVERRIDE="$dir/home/state" FM_CHECK_TIMEOUT=1 FM_TEST_GH_LOG="$dir/gh.log" \
-    FM_TEST_GH_SLEEP=3 PATH="$dir/fakebin:$BASE_PATH" \
+  out=$(JG_STATE_OVERRIDE="$dir/home/state" JG_CHECK_TIMEOUT=1 JG_TEST_GH_LOG="$dir/gh.log" \
+    JG_TEST_GH_SLEEP=3 PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1"; run_check "$2"' bash "$WATCH" "$dir/home/state/task-a.check.sh")
   rc=$?
   set -e
@@ -1186,7 +1186,7 @@ test_static_poll_contract() {
   jg_pr_poll_publish_prepared || fail "could not publish authenticated watcher poll"
   rm -f "$dir/home/state/.last-check"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll"
@@ -1238,7 +1238,7 @@ sleep 0.3
 SH
     chmod +x "$dir/fakebin/cp"
 
-    FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
+    JG_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
       run_check_entry "$dir" "$id" https://github.com/o/r/pull/1 > "$dir/direct.out" 2> "$dir/direct.err" &
     direct_pid=$!
     i=0
@@ -1251,7 +1251,7 @@ SH
     # The watcher runs while publication is still in flight, and its hang
     # guard is not charged for the time it spends waiting on that publication.
     : > "$dir/direct-in-flight"
-    FM_TEST_WATCH_BOUND_PAUSE="$dir/direct-in-flight" FM_TEST_GH_STATE=MERGED \
+    JG_TEST_WATCH_BOUND_PAUSE="$dir/direct-in-flight" JG_TEST_GH_STATE=MERGED \
       run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
     watch_pid=$!
     direct_rc=0
@@ -1342,13 +1342,13 @@ test_live_artifact_single_link_and_privacy_validation() {
   alias="$dir/custom-check.alias"
   ln "$state/custom.check.sh" "$alias"
   set +e
-  FM_HOME="$dir/home" "$REGISTER" custom > "$dir/register.out" 2> "$dir/register.err"
+  JG_HOME="$dir/home" "$REGISTER" custom > "$dir/register.out" 2> "$dir/register.err"
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "custom check registration accepted a hard-linked source"
   [ ! -e "$state/custom.check-trust" ] || fail "rejected hard-linked custom check received a trust record"
   rm -f "$alias"
-  FM_HOME="$dir/home" "$REGISTER" custom >/dev/null \
+  JG_HOME="$dir/home" "$REGISTER" custom >/dev/null \
     || fail "could not register the custom check single-link fixture"
   ln "$state/custom.check.sh" "$alias"
   ! jg_custom_check_registered "$state" custom \
@@ -1371,13 +1371,13 @@ test_live_artifact_single_link_and_privacy_validation() {
   printf '#!/usr/bin/env bash\nprintf "custom-ready\\n"\n' > "$state/custom.check.sh"
   chmod 0755 "$state/custom.check.sh"
   set +e
-  FM_HOME="$dir/home" "$REGISTER" custom > "$dir/register.out" 2> "$dir/register.err"
+  JG_HOME="$dir/home" "$REGISTER" custom > "$dir/register.out" 2> "$dir/register.err"
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "custom check registration accepted a non-private source"
   [ ! -e "$state/custom.check-trust" ] || fail "non-private custom check received a trust record"
   chmod 0700 "$state/custom.check.sh"
-  FM_HOME="$dir/home" "$REGISTER" custom >/dev/null \
+  JG_HOME="$dir/home" "$REGISTER" custom >/dev/null \
     || fail "could not register private custom check fixture"
   chmod 0755 "$state/custom.check.sh"
   ! jg_custom_check_registered "$state" custom \
@@ -1393,28 +1393,28 @@ install_final_publication_fault() {
   cat > "$dir/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-"${FM_TEST_REAL_MV:?}" "$@" || exit $?
-[ "$last" = "${FM_TEST_FINAL_PATH:?}" ] || exit 0
-case "${FM_TEST_FINAL_ACTION:?}" in
+"${JG_TEST_REAL_MV:?}" "$@" || exit $?
+[ "$last" = "${JG_TEST_FINAL_PATH:?}" ] || exit 0
+case "${JG_TEST_FINAL_ACTION:?}" in
   type)
     rm -f -- "$last"
-    ln -s "${FM_TEST_FAULT_LINK_TARGET:?}" "$last"
+    ln -s "${JG_TEST_FAULT_LINK_TARGET:?}" "$last"
     ;;
-  mode) "${FM_TEST_REAL_CHMOD:?}" 0644 "$last" ;;
+  mode) "${JG_TEST_REAL_CHMOD:?}" 0644 "$last" ;;
   content) printf 'faulted final bytes\n' > "$last" ;;
-  device) : > "${FM_TEST_FAULT_GATE:?}" ;;
+  device) : > "${JG_TEST_FAULT_GATE:?}" ;;
   *) exit 2 ;;
 esac
 SH
   cat > "$dir/fakebin/stat" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-if [ "$last" = "${FM_TEST_FINAL_PATH:-}" ] && [ -e "${FM_TEST_FAULT_GATE:-/nonexistent}" ]; then
+if [ "$last" = "${JG_TEST_FINAL_PATH:-}" ] && [ -e "${JG_TEST_FAULT_GATE:-/nonexistent}" ]; then
   case " $* " in
     *" %d "*) printf '%s\n' 999999; exit 0 ;;
   esac
 fi
-exec "${FM_TEST_REAL_STAT:?}" "$@"
+exec "${JG_TEST_REAL_STAT:?}" "$@"
 SH
   chmod +x "$dir/fakebin/mv" "$dir/fakebin/stat"
 }
@@ -1458,9 +1458,9 @@ test_postrename_poll_validation_revokes_and_retries() {
       printf 'external sentinel\n' > "$link_target"
       chmod 0644 "$link_target"
       install_final_publication_fault "$dir"
-      if FM_TEST_FINAL_PATH="$destination" FM_TEST_FINAL_ACTION="$action" \
-        FM_TEST_FAULT_LINK_TARGET="$link_target" FM_TEST_FAULT_GATE="$gate" \
-        FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REAL_STAT="$REAL_STAT" FM_TEST_REAL_CHMOD="$REAL_CHMOD" \
+      if JG_TEST_FINAL_PATH="$destination" JG_TEST_FINAL_ACTION="$action" \
+        JG_TEST_FAULT_LINK_TARGET="$link_target" JG_TEST_FAULT_GATE="$gate" \
+        JG_TEST_REAL_MV="$REAL_MV" JG_TEST_REAL_STAT="$REAL_STAT" JG_TEST_REAL_CHMOD="$REAL_CHMOD" \
         PATH="$dir/fakebin:$BASE_PATH" jg_pr_poll_publish_prepared; then
         fail "post-rename $artifact $action fault was reported as success"
       fi
@@ -1490,7 +1490,7 @@ test_bootstrap_leaves_unauthenticated_checks() {
 
   mkdir -p "$dir/home/config"
   printf '%s\n' manual > "$dir/home/config/backlog-backend"
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_BOOTSTRAP_NETWORK=skip \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_BOOTSTRAP_NETWORK=skip \
     PATH="$dir/fakebin:$BASE_PATH" \
     "$ROOT/bin/jg-bootstrap.sh" > "$dir/bootstrap.out" 2> "$dir/bootstrap.err" \
     || fail "bootstrap failed after migration retirement"
@@ -1510,7 +1510,7 @@ test_custom_snapshot_cleanup_on_signal() {
   child_pid_file="$dir/custom-child.pid"
   # shellcheck disable=SC2016  # The generated child expands $$ when it runs.
   printf '%s\n' '#!/usr/bin/env bash' 'trap "" TERM' \
-    'printf "%s\n" "$$" > "$FM_TEST_CUSTOM_CHILD_PID"' 'while :; do sleep 1; done' \
+    'printf "%s\n" "$$" > "$JG_TEST_CUSTOM_CHILD_PID"' 'while :; do sleep 1; done' \
     > "$state/custom.check.sh"
   chmod 0700 "$state/custom.check.sh"
   cat > "$dir/fakebin/timeout" <<'SH'
@@ -1522,11 +1522,11 @@ trap 'kill -TERM "$child" 2>/dev/null; exit 124' TERM
 wait "$child"
 SH
   chmod 0700 "$dir/fakebin/timeout"
-  FM_HOME="$dir/home" "$REGISTER" custom >/dev/null \
+  JG_HOME="$dir/home" "$REGISTER" custom >/dev/null \
     || fail "could not register signal cleanup custom check"
 
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=0 FM_CHECK_INTERVAL=0 \
-    FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_POLL=0 JG_CHECK_INTERVAL=0 \
+    JG_SIGNAL_GRACE=0 JG_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
   pid=$!
@@ -1577,24 +1577,24 @@ test_returned_custom_check_descendants_are_drained() {
     # directory exists, so its absence can only mean the watcher drained it.
     cat > "$state/custom.check.sh" <<'SH'
 #!/usr/bin/env bash
-perl -e '$SIG{TERM}="IGNORE"; open my $ready, ">", $ENV{FM_TEST_DESCENDANT_READY} or die $!; print {$ready} "ready\n"; close $ready; select undef, undef, undef, 0.2 while -d $ENV{FM_TEST_DESCENDANT_HOLD}' &
-printf '%s\n' "$!" > "$FM_TEST_DESCENDANT_PID"
-while [ ! -s "$FM_TEST_DESCENDANT_READY" ]; do sleep 0.01; done
-: > "$FM_TEST_DIRECT_DONE"
+perl -e '$SIG{TERM}="IGNORE"; open my $ready, ">", $ENV{JG_TEST_DESCENDANT_READY} or die $!; print {$ready} "ready\n"; close $ready; select undef, undef, undef, 0.2 while -d $ENV{JG_TEST_DESCENDANT_HOLD}' &
+printf '%s\n' "$!" > "$JG_TEST_DESCENDANT_PID"
+while [ ! -s "$JG_TEST_DESCENDANT_READY" ]; do sleep 0.01; done
+: > "$JG_TEST_DIRECT_DONE"
 SH
     # The watcher runs this check next in the same cycle, only after it has
     # finished with the returned one, so its wake both records whether the
     # descendant outlived that drain and stops the watcher.
     cat > "$state/z-drain-witness.check.sh" <<'SH'
 #!/usr/bin/env bash
-case "$(ps -o stat= -p "$(cat "$FM_TEST_DESCENDANT_PID")" 2>/dev/null)" in
+case "$(ps -o stat= -p "$(cat "$JG_TEST_DESCENDANT_PID")" 2>/dev/null)" in
   ''|Z*) printf 'descendant drained\n' ;;
   *) printf 'descendant alive\n' ;;
 esac
 SH
     for check in custom z-drain-witness; do
       chmod 0700 "$state/$check.check.sh"
-      FM_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
+      JG_HOME="$dir/home" "$REGISTER" "$check" >/dev/null \
         || fail "could not register $backend returned-descendant $check check"
     done
     if [ "$backend" = installed-timeout ]; then
@@ -1611,9 +1611,9 @@ SH
     fi
 
     rc=0
-    FM_TEST_CHECK_TIMEOUT=10 FM_CHECK_FORCE_FALLBACK="$force_fallback" \
-      FM_TEST_DESCENDANT_READY="$ready" FM_TEST_DESCENDANT_HOLD="$dir" \
-      FM_TEST_DESCENDANT_PID="$child_pid_file" FM_TEST_DIRECT_DONE="$direct_done" \
+    JG_TEST_CHECK_TIMEOUT=10 JG_CHECK_FORCE_FALLBACK="$force_fallback" \
+      JG_TEST_DESCENDANT_READY="$ready" JG_TEST_DESCENDANT_HOLD="$dir" \
+      JG_TEST_DESCENDANT_PID="$child_pid_file" JG_TEST_DIRECT_DONE="$direct_done" \
       run_watcher_bounded "$dir/home" "$fakebin" > "$dir/watch.out" 2> "$dir/watch.err" || rc=$?
     child_pid=$(cat "$child_pid_file" 2>/dev/null || true)
     if [ -n "$child_pid" ] && process_is_live_non_zombie "$child_pid"; then
@@ -1657,7 +1657,7 @@ SH
   chmod +x "$fakebin/tmux"
   touch "$dir/home/state/.last-watcher-beat"
 
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$BASE_PATH" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$BASE_PATH" \
     "$TEARDOWN" task-a --force > "$dir/teardown.out" 2> "$dir/teardown.err" \
     || fail "teardown cleanup fixture failed"
   [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "teardown left the runnable check"
@@ -1687,7 +1687,7 @@ exit 0
 SH
   chmod +x "$fakebin/tmux"
   touch "$dir/home/state/.last-watcher-beat"
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$BASE_PATH" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$fakebin:$BASE_PATH" \
     "$TEARDOWN" task-a --force > "$dir/teardown.out" 2> "$dir/teardown.err" \
     || fail "teardown could not finish a valid crash-left retirement receipt"
   assert_poll_absent "$dir/home/state" task-a
@@ -1713,13 +1713,13 @@ SH
     printf 'counterpart sentinel\n' > "$dir/home/state/task-a.$counterpart"
     cat > "$fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_TMUX_LOG:?}"
+printf '%s\n' "$*" >> "${JG_FAKE_TMUX_LOG:?}"
 exit 0
 SH
     chmod +x "$fakebin/tmux"
     touch "$dir/home/state/.last-watcher-beat"
     set +e
-    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" FM_FAKE_TMUX_LOG="$dir/tmux.log" \
+    JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" JG_FAKE_TMUX_LOG="$dir/tmux.log" \
       PATH="$fakebin:$BASE_PATH" "$TEARDOWN" task-a --force \
       > "$dir/teardown.out" 2> "$dir/teardown.err"
     rc=$?
@@ -1767,7 +1767,7 @@ group/apps/console
   # an abandoned change, a lowercase spelling, and a changed format, stays
   # silent rather than reporting a merge.
   for value in NEW ABANDONED merged Merged MERGED_LATER '' not-a-status; do
-    out=$(FM_TEST_GERRIT_STATUS="$value" run_poll "$dir")
+    out=$(JG_TEST_GERRIT_STATUS="$value" run_poll "$dir")
     [ -z "$out" ] || fail "Gerrit poll emitted for status '$value'"
   done
 
@@ -1775,29 +1775,29 @@ group/apps/console
   # blocked_on list, submit OK, submittable true - is exactly what an approved
   # but unsubmitted change looks like, and a merged change reports the same
   # three fields. Only the status separates them, so only the status is read.
-  out=$(FM_TEST_GERRIT_STATUS=NEW FM_TEST_GERRIT_SUBMIT=OK \
-    FM_TEST_GERRIT_SUBMITTABLE=true FM_TEST_GERRIT_BLOCKED_ON='' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=NEW JG_TEST_GERRIT_SUBMIT=OK \
+    JG_TEST_GERRIT_SUBMITTABLE=true JG_TEST_GERRIT_BLOCKED_ON='' run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll read a submittable open change as merged"
 
-  out=$(FM_TEST_GERRIT_STATUS=MERGED FM_TEST_GERRIT_SUBMIT=OK \
-    FM_TEST_GERRIT_SUBMITTABLE=true FM_TEST_GERRIT_BLOCKED_ON='' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED JG_TEST_GERRIT_SUBMIT=OK \
+    JG_TEST_GERRIT_SUBMITTABLE=true JG_TEST_GERRIT_BLOCKED_ON='' run_poll "$dir")
   [ "$out" = merged ] || fail "Gerrit poll did not emit exactly one merged line"
 
-  out=$(FM_TEST_GERRIT_FAIL=1 FM_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
+  out=$(JG_TEST_GERRIT_FAIL=1 JG_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted after a gerrit-axi failure"
-  out=$(FM_TEST_GERRIT_RAW='not json at all' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_RAW='not json at all' run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for unparseable output"
-  out=$(FM_TEST_GERRIT_RAW='{"ok":false,"error":"unauthenticated"}' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_RAW='{"ok":false,"error":"unauthenticated"}' run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for a typed error record"
-  out=$(FM_TEST_GERRIT_RAW='{"ok":true,"changes":[]}' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_RAW='{"ok":true,"changes":[]}' run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for a record naming no change"
 
   # A record for some other change can never wake this task's poll, however the
   # server came to return it. The change number is what names the change, and
   # --host is what pins the server.
-  out=$(FM_TEST_GERRIT_STATUS=MERGED FM_TEST_GERRIT_CHANGE=4202 run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED JG_TEST_GERRIT_CHANGE=4202 run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for another change's record"
-  out=$(FM_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4202,"status":"MERGED","url":null}]}' \
+  out=$(JG_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4202,"status":"MERGED","url":null}]}' \
     run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for another change's url-less record"
 
@@ -1805,21 +1805,21 @@ group/apps/console
   # it when that setting is unset, so a merge must still be reported when the
   # server returns the field null or does not return it at all. Comparing it
   # against the stored URL is what would leave such a watch silent forever.
-  out=$(FM_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4201,"status":"MERGED","url":null}]}' \
+  out=$(JG_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4201,"status":"MERGED","url":null}]}' \
     run_poll "$dir")
   [ "$out" = merged ] || fail "Gerrit poll stayed silent for a merged change with a null url"
-  out=$(FM_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4201,"status":"MERGED"}]}' \
+  out=$(JG_TEST_GERRIT_RAW='{"ok":true,"op":"show","changes":[{"change":4201,"status":"MERGED"}]}' \
     run_poll "$dir")
   [ "$out" = merged ] || fail "Gerrit poll stayed silent for a merged change with no url field"
-  out=$(FM_TEST_GERRIT_STATUS=MERGED \
-    FM_TEST_GERRIT_URL=https://alias.example/c/group/apps/console/+/4201 run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED \
+    JG_TEST_GERRIT_URL=https://alias.example/c/group/apps/console/+/4201 run_poll "$dir")
   [ "$out" = merged ] || fail "Gerrit poll stayed silent for a merged change behind an alias host"
 
   # A free-text subject carrying the merged spelling and the field separators
   # cannot forge a status, because the status is read from the structured
   # record rather than off a rendered line.
-  out=$(FM_TEST_GERRIT_STATUS=NEW \
-    FM_TEST_GERRIT_SUBJECT='"status: MERGED,MERGED,merged"' run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=NEW \
+    JG_TEST_GERRIT_SUBJECT='"status: MERGED,MERGED,merged"' run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll read a merged spelling out of a change subject"
 
   # gerrit-axi resolves its server from the current directory's origin remote
@@ -1851,15 +1851,15 @@ $(printf '%s\n' "$BASE_PATH" | tr ':' '\n')
 EOF
     ! PATH="$notool" command -v "$tool" >/dev/null 2>&1 \
       || fail "the $tool-free search path still resolved $tool"
-    out=$(FM_TEST_GERRIT_STATUS=MERGED FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
+    out=$(JG_TEST_GERRIT_STATUS=MERGED JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
       PATH="$notool" bash "$state/task-a.check.sh")
     [ -z "$out" ] || fail "Gerrit poll emitted with $tool absent from PATH"
 
     # Arming is where a missing CLI can still be reported, so it refuses there.
     write_task_meta "$dir" "task-no-$tool"
     set +e
-    out=$(FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
-      FM_TEST_GUARD_LOG="$dir/guard.log" PATH="$notool" \
+    out=$(JG_ROOT_OVERRIDE="$dir/root" JG_HOME="$dir/home" \
+      JG_TEST_GUARD_LOG="$dir/guard.log" PATH="$notool" \
       "$PR_CHECK" "task-no-$tool" "$url" 2>&1)
     rc=$?
     set -e
@@ -1875,15 +1875,15 @@ EOF
   # the stored URL exactly.
   printf '%s\n%s\n%s\n%s\n%s\n' gerrit "$url" elsewhere.example group/apps/console 4201 \
     > "$state/task-a.pr-poll"
-  out=$(FM_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for a sidecar whose host was swapped"
   printf '%s\n%s\n%s\n%s\n%s\n' gerrit "$url" gerrit.example group/apps/other 4201 \
     > "$state/task-a.pr-poll"
-  out=$(FM_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for a sidecar whose project was swapped"
   printf '%s\n%s\n%s\n%s\n%s\n' gerrit "$url" gerrit.example group/apps/console 4202 \
     > "$state/task-a.pr-poll"
-  out=$(FM_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
+  out=$(JG_TEST_GERRIT_STATUS=MERGED run_poll "$dir")
   [ -z "$out" ] || fail "Gerrit poll emitted for a sidecar whose change number was swapped"
 
   pass "the Gerrit watch wakes only on an explicit merged status and never on submittability"
@@ -1900,7 +1900,7 @@ test_gerrit_arming_records_no_patch_set_revision() {
   ln -sf "$REAL_JQ" "$dir/fakebin/jq"
 
   write_task_meta "$dir" task-rev
-  FM_TEST_GERRIT_REVISION=$(git -C "$dir/wt" rev-parse HEAD) run_check_entry "$dir" task-rev \
+  JG_TEST_GERRIT_REVISION=$(git -C "$dir/wt" rev-parse HEAD) run_check_entry "$dir" task-rev \
     https://gerrit.example/c/group/apps/console/+/4201 >/dev/null \
     || fail "arming a Gerrit watch failed"
   grep -qxF 'pr=https://gerrit.example/c/group/apps/console/+/4201' "$state/task-rev.meta" \
@@ -1955,7 +1955,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
 
   write_task_meta "$dir" task-mismatch
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$other run_check_entry "$dir" task-mismatch \
+  out=$(JG_TEST_GERRIT_REVISION=$other run_check_entry "$dir" task-mismatch \
     https://gerrit.example/c/group/apps/console/+/4201 2>&1)
   rc=$?
   set -e
@@ -1969,7 +1969,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
 
   write_task_meta "$dir" task-unknown
   set +e
-  FM_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 run_check_entry "$dir" task-unknown \
+  JG_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 run_check_entry "$dir" task-unknown \
     https://gerrit.example/c/group/apps/console/+/4201 >/dev/null 2>&1
   rc=$?
   set -e
@@ -1977,7 +1977,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
 
   write_task_meta "$dir" task-unread
   set +e
-  FM_TEST_GERRIT_FAIL=1 run_check_entry "$dir" task-unread \
+  JG_TEST_GERRIT_FAIL=1 run_check_entry "$dir" task-unread \
     https://gerrit.example/c/group/apps/console/+/4201 >/dev/null 2>&1
   rc=$?
   set -e
@@ -1985,7 +1985,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
 
   : > "$dir/gerrit-axi.log"
   write_task_meta "$dir" task-published
-  FM_TEST_GERRIT_REVISION=$published run_check_entry "$dir" task-published \
+  JG_TEST_GERRIT_REVISION=$published run_check_entry "$dir" task-published \
     https://gerrit.example/c/group/apps/console/+/4201 >/dev/null \
     || fail "arming refused a change whose current patch set carries this copy's HEAD tree"
   grep -qF -- "show 4201 --host gerrit.example --json" "$dir/gerrit-axi.log" \
@@ -1997,8 +1997,8 @@ test_gerrit_ready_gate_reads_the_published_tree() {
   git -C "$dir/wt" update-ref -d refs/remotes/no-mistakes/fm/task
   : > "$dir/gerrit-axi.log"
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 \
-    FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
+  out=$(JG_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 \
+    JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/jg-timeout-lib.sh"; . "$1/bin/jg-dod-lib.sh"
       jg_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4" "$5" task-published "$6"' \
     _ "$ROOT" "$dir/wt" "$dir/project" \
@@ -2044,8 +2044,8 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   # matches the unrecovered HEAD, and the run reports custody unreturned.
   write_task_meta "$dir" task-unrecovered
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_PIPELINE_HEAD=$fixed \
-    FM_TEST_NM_NEXT_ACTION=recover_custody run_check_entry "$dir" task-unrecovered "$url" 2>&1)
+  out=$(JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_PIPELINE_HEAD=$fixed \
+    JG_TEST_NM_NEXT_ACTION=recover_custody run_check_entry "$dir" task-unrecovered "$url" 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a publish of the head before the pipeline's fixes were recovered"
@@ -2058,7 +2058,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
 
   # The same state with no next action reported still refuses on the trees.
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_PIPELINE_HEAD=$fixed run_check_entry "$dir" task-unrecovered "$url" 2>&1)
+  out=$(JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_PIPELINE_HEAD=$fixed run_check_entry "$dir" task-unrecovered "$url" 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a copy whose HEAD is not the run's result"
@@ -2068,14 +2068,14 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   esac
 
   set +e
-  FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_NEXT_ACTION=continue_active_run \
+  JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_NEXT_ACTION=continue_active_run \
     run_check_entry "$dir" task-unrecovered "$url" >/dev/null 2>&1
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a publish while the run is still active"
 
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_FAIL=1 run_check_entry "$dir" task-unrecovered "$url" 2>&1)
+  out=$(JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_FAIL=1 run_check_entry "$dir" task-unrecovered "$url" 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a publish whose no-mistakes run could not be read"
@@ -2087,7 +2087,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   # A failed run whose own head was published has nothing to recover, so the
   # trees agree; its outcome alone refuses it, as does a missing outcome.
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_OUTCOME=failed run_check_entry "$dir" task-unrecovered "$url" 2>&1)
+  out=$(JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_OUTCOME=failed run_check_entry "$dir" task-unrecovered "$url" 2>&1)
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a publish of a failed no-mistakes run"
@@ -2097,7 +2097,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   esac
   grep -q '^pr=' "$state/task-unrecovered.meta" && fail "a refused failed-run publish recorded pr="
   set +e
-  FM_TEST_GERRIT_REVISION=$unfixed FM_TEST_NM_OUTCOME='' run_check_entry "$dir" task-unrecovered "$url" >/dev/null 2>&1
+  JG_TEST_GERRIT_REVISION=$unfixed JG_TEST_NM_OUTCOME='' run_check_entry "$dir" task-unrecovered "$url" >/dev/null 2>&1
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "arming accepted a publish of a run with no outcome"
@@ -2106,7 +2106,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   # refused, even though a gate push left HEAD on a remote-tracking ref.
   git -C "$dir/wt" update-ref refs/remotes/no-mistakes/fm/task "$unfixed"
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$unfixed PATH="$dir/fakebin:$BASE_PATH" \
+  out=$(JG_TEST_GERRIT_REVISION=$unfixed PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/jg-timeout-lib.sh"; . "$1/bin/jg-dod-lib.sh"
       jg_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4"' \
     _ "$ROOT" "$dir/wt" "$dir/project" \
@@ -2132,8 +2132,8 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
 
   # The done gate itself, as crew-state and the secondmate ledger call it.
   set +e
-  out=$(FM_TEST_GERRIT_REVISION=$squash FM_TEST_NM_PIPELINE_HEAD=$fixed \
-    FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
+  out=$(JG_TEST_GERRIT_REVISION=$squash JG_TEST_NM_PIPELINE_HEAD=$fixed \
+    JG_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/jg-timeout-lib.sh"; . "$1/bin/jg-dod-lib.sh"
       jg_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4"' \
     _ "$ROOT" "$dir/wt" "$dir/project" "$line" 2>&1)
@@ -2142,7 +2142,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   [ "$rc" -eq 0 ] || fail "the done gate refused a recovered, published copy: $out"
 
   write_task_meta "$dir" task-recovered
-  FM_TEST_GERRIT_REVISION=$squash FM_TEST_NM_PIPELINE_HEAD=$fixed run_check_entry "$dir" task-recovered "$url" >/dev/null \
+  JG_TEST_GERRIT_REVISION=$squash JG_TEST_NM_PIPELINE_HEAD=$fixed run_check_entry "$dir" task-recovered "$url" >/dev/null \
     || fail "arming refused a recovered copy whose squash carries the pipeline's result"
   grep -qxF "pr=$url" "$state/task-recovered.meta" || fail "the recovered publish was not recorded"
 
@@ -2150,7 +2150,7 @@ test_gerrit_nm_ready_gate_requires_recovered_custody() {
   : > "$dir/nm.log"
   write_task_meta "$dir" task-direct
   sed -i.bak 's/^mode=no-mistakes$/mode=direct-PR/' "$state/task-direct.meta" && rm -f "$state/task-direct.meta.bak"
-  FM_TEST_GERRIT_REVISION=$squash FM_TEST_NM_FAIL=1 FM_TEST_NM_LOG="$dir/nm.log" \
+  JG_TEST_GERRIT_REVISION=$squash JG_TEST_NM_FAIL=1 JG_TEST_NM_LOG="$dir/nm.log" \
     run_check_entry "$dir" task-direct "$url" >/dev/null \
     || fail "a direct-PR Gerrit publish was refused over a pipeline it never runs"
   [ ! -s "$dir/nm.log" ] || fail "a direct-PR Gerrit publish consulted no-mistakes"
@@ -2175,19 +2175,19 @@ test_forgejo_merge_watch() {
   url=https://forgejo.example/o/r/pulls/7
   cat > "$dir/fakebin/tea" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_TEA_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_TEA_LOG"
 if [ "${1:-} ${2:-}" = "login list" ]; then
   printf '[\n'
   printf '  {\n    "name": "main",\n    "url": "https://forgejo.example"\n  }'
-  if [ -n "${FM_TEST_TEA_SECOND_LOGIN:-}" ]; then
+  if [ -n "${JG_TEST_TEA_SECOND_LOGIN:-}" ]; then
     printf ',\n  {\n    "name": "other",\n    "url": "https://forgejo.example"\n  }'
   fi
   printf '\n]\n'
   exit 0
 fi
 [ "${1:-}" = api ] || exit 0
-[ -z "${FM_TEST_TEA_FAIL:-}" ] || exit 1
-case "${FM_TEST_TEA_PULL:-open}" in
+[ -z "${JG_TEST_TEA_FAIL:-}" ] || exit 1
+case "${JG_TEST_TEA_PULL:-open}" in
   merged) printf '{"state":"closed","merged":true,"head":{"sha":"abc"}}\n' ;;
   error) printf '{"message":"The target couldn'"'"'t be found.","url":"x"}\n' ;;
   *) printf '{"state":"open","merged":false,"head":{"sha":"abc"}}\n' ;;
@@ -2203,14 +2203,14 @@ SH
   jg_pr_poll_publish_prepared || fail "could not publish a Forgejo poll"
 
   for value in open error; do
-    out=$(FM_TEST_TEA_LOG="$dir/tea.log" FM_TEST_TEA_PULL=$value run_poll "$dir")
+    out=$(JG_TEST_TEA_LOG="$dir/tea.log" JG_TEST_TEA_PULL=$value run_poll "$dir")
     [ -z "$out" ] || fail "Forgejo poll emitted for a $value reading"
   done
-  out=$(FM_TEST_TEA_LOG="$dir/tea.log" FM_TEST_TEA_PULL=merged FM_TEST_TEA_FAIL=1 run_poll "$dir")
+  out=$(JG_TEST_TEA_LOG="$dir/tea.log" JG_TEST_TEA_PULL=merged JG_TEST_TEA_FAIL=1 run_poll "$dir")
   [ -z "$out" ] || fail "Forgejo poll emitted after a tea failure"
-  out=$(FM_TEST_TEA_LOG="$dir/tea.log" FM_TEST_TEA_PULL=merged FM_TEST_TEA_SECOND_LOGIN=1 run_poll "$dir")
+  out=$(JG_TEST_TEA_LOG="$dir/tea.log" JG_TEST_TEA_PULL=merged JG_TEST_TEA_SECOND_LOGIN=1 run_poll "$dir")
   [ -z "$out" ] || fail "Forgejo poll emitted with an ambiguous tea login"
-  out=$(FM_TEST_TEA_LOG="$dir/tea.log" FM_TEST_TEA_PULL=merged run_poll "$dir")
+  out=$(JG_TEST_TEA_LOG="$dir/tea.log" JG_TEST_TEA_PULL=merged run_poll "$dir")
   [ "$out" = merged ] || fail "Forgejo poll did not emit exactly one merged line"
 
   grep -qF -- "api --login main --repo o/r /repos/{owner}/{repo}/pulls/7" "$dir/tea.log" \
@@ -2262,11 +2262,11 @@ JSON
   cat > "$dir/fakebin/tea" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-} ${2:-}" = "login list" ]; then
-  cat "$FM_TEST_TEA_LOGINS"
+  cat "$JG_TEST_TEA_LOGINS"
   exit 0
 fi
 [ "${1:-}" = api ] || exit 0
-printf '%s\n' "$*" >> "$FM_TEST_TEA_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_TEA_LOG"
 printf '{"state":"closed","merged":true,"head":{"sha":"abc"}}\n'
 SH
   chmod +x "$dir/fakebin/tea"
@@ -2280,23 +2280,23 @@ SH
   jg_pr_poll_publish_prepared || fail "could not publish a Forgejo poll"
 
   for shape in multiline oneline perobject; do
-    out=$(FM_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login git.example.com) \
+    out=$(JG_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login git.example.com) \
       || fail "$shape: the login helper refused a host with exactly one login"
     [ "$out" = fixture-one ] || fail "$shape: the login helper resolved '$out' for git.example.com"
-    out=$(FM_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login code.internal) \
+    out=$(JG_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login code.internal) \
       || fail "$shape: the login helper refused a url with a port and trailing slash"
     [ "$out" = fixture-two ] || fail "$shape: the login helper resolved '$out' for code.internal"
-    ! FM_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login elsewhere.example >/dev/null \
+    ! JG_TEST_TEA_LOGINS="$dir/tea-$shape.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login elsewhere.example >/dev/null \
       || fail "$shape: the login helper resolved a host with no registered login"
-    out=$(FM_TEST_TEA_LOGINS="$dir/tea-$shape.json" FM_TEST_TEA_LOG="$dir/tea.log" run_poll "$dir")
+    out=$(JG_TEST_TEA_LOGINS="$dir/tea-$shape.json" JG_TEST_TEA_LOG="$dir/tea.log" run_poll "$dir")
     [ "$out" = merged ] || fail "$shape: the static poll did not resolve the login and report the merge"
     grep -qF -- "api --login fixture-two --repo o/r" "$dir/tea.log" \
       || fail "$shape: the static poll did not read through the host's login"
     : > "$dir/tea.log"
   done
-  ! FM_TEST_TEA_LOGINS="$dir/tea-ambiguous.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login git.example.com >/dev/null \
+  ! JG_TEST_TEA_LOGINS="$dir/tea-ambiguous.json" PATH="$dir/fakebin:$PATH" jg_pr_forgejo_login git.example.com >/dev/null \
     || fail "the login helper picked one of two logins for the same host"
-  out=$(FM_TEST_TEA_LOGINS="$dir/tea-ambiguous.json" FM_TEST_TEA_LOG="$dir/tea.log" run_poll "$dir")
+  out=$(JG_TEST_TEA_LOGINS="$dir/tea-ambiguous.json" JG_TEST_TEA_LOG="$dir/tea.log" run_poll "$dir")
   [ -z "$out" ] || fail "the static poll read through an ambiguous login"
   pass "Forgejo login match parses tea's JSON in every line shape, in the helper and the static poll"
 }
@@ -2322,12 +2322,12 @@ group/subgroup/project
   # Only an exact merged state wakes firstmate. Every other reading, including
   # an unreadable merge request and a changed output format, stays silent.
   for value in opened closed locked '' not-a-state MERGED merged-but-not; do
-    out=$(FM_TEST_GLAB_STATE="$value" run_poll "$dir")
+    out=$(JG_TEST_GLAB_STATE="$value" run_poll "$dir")
     [ -z "$out" ] || fail "GitLab poll emitted for a non-merged state"
   done
-  out=$(FM_TEST_GLAB_STATE=merged run_poll "$dir")
+  out=$(JG_TEST_GLAB_STATE=merged run_poll "$dir")
   [ "$out" = merged ] || fail "GitLab poll did not emit exactly one merged line"
-  out=$(FM_TEST_GLAB_FAIL=1 run_poll "$dir")
+  out=$(JG_TEST_GLAB_FAIL=1 run_poll "$dir")
   [ -z "$out" ] || fail "GitLab poll emitted after a glab failure"
 
   # glab is addressed by project URL and merge request number, never by the
@@ -2357,7 +2357,7 @@ $(printf '%s\n' "$BASE_PATH" | tr ':' '\n')
 EOF
   ! PATH="$noglab" command -v glab >/dev/null 2>&1 \
     || fail "the glab-free search path still resolved glab"
-  out=$(FM_TEST_GLAB_STATE=merged FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
+  out=$(JG_TEST_GLAB_STATE=merged JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GLAB_LOG="$dir/glab.log" \
     PATH="$noglab" \
     bash "$state/task-a.check.sh")
   [ -z "$out" ] || fail "GitLab poll emitted with glab absent from PATH"
@@ -2366,18 +2366,18 @@ EOF
   # the stored URL exactly.
   printf '%s\n%s\n%s\n%s\n%s\n' gitlab "$url" elsewhere.example group/subgroup/project 7 \
     > "$state/task-a.pr-poll"
-  out=$(FM_TEST_GLAB_STATE=merged run_poll "$dir")
+  out=$(JG_TEST_GLAB_STATE=merged run_poll "$dir")
   [ -z "$out" ] || fail "GitLab poll emitted for a sidecar whose host was swapped"
   printf '%s\n%s\n%s\n%s\n%s\n' gitlab "$url" gitlab.example group/subgroup/other 7 \
     > "$state/task-a.pr-poll"
-  out=$(FM_TEST_GLAB_STATE=merged run_poll "$dir")
+  out=$(JG_TEST_GLAB_STATE=merged run_poll "$dir")
   [ -z "$out" ] || fail "GitLab poll emitted for a sidecar whose project was swapped"
 
   # Arming is where a missing CLI can still be reported, so it refuses there.
   write_task_meta "$dir" task-b
   set +e
-  out=$(FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
-    FM_TEST_GUARD_LOG="$dir/guard.log" PATH="$noglab" \
+  out=$(JG_ROOT_OVERRIDE="$dir/root" JG_HOME="$dir/home" \
+    JG_TEST_GUARD_LOG="$dir/guard.log" PATH="$noglab" \
     "$PR_CHECK" task-b "$url" 2>&1)
   rc=$?
   set -e
@@ -2417,10 +2417,10 @@ seed_canonical_poll() {
   local dir=$1 id=$2 url=$3 template=${4:-$POLL} state provider host path number
   state="$dir/home/state"
   jg_pr_url_parse "$url" || fail "retirement fixture URL was invalid"
-  provider=$FM_PR_PROVIDER
-  host=$FM_PR_HOST
-  path=$FM_PR_PATH
-  number=$FM_PR_NUMBER
+  provider=$JG_PR_PROVIDER
+  host=$JG_PR_HOST
+  path=$JG_PR_PATH
+  number=$JG_PR_NUMBER
   jg_pr_poll_prepare "$state" "$id" "$provider" "$url" "$host" "$path" "$number" "$template" \
     || fail "could not prepare retirement fixture"
   jg_pr_poll_publish_prepared || fail "could not publish retirement fixture"
@@ -2431,7 +2431,7 @@ add_stop_custom_check() {
   state="$dir/home/state"
   printf '#!/usr/bin/env bash\nprintf "stop-cycle\\n"\n' > "$state/z-stop.check.sh"
   chmod 0700 "$state/z-stop.check.sh"
-  FM_HOME="$dir/home" "$REGISTER" z-stop >/dev/null \
+  JG_HOME="$dir/home" "$REGISTER" z-stop >/dev/null \
     || fail "could not register stop-cycle custom check"
 }
 
@@ -2469,7 +2469,7 @@ test_merged_poll_retires_once() {
   add_stop_custom_check "$dir"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "merged retirement watcher failed: $(cat "$dir/watch-1.err")"
@@ -2481,7 +2481,7 @@ test_merged_poll_retires_once() {
 
   rm -f "$state/.last-check"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "second watcher cycle failed: $(cat "$dir/watch-2.err")"
@@ -2534,7 +2534,7 @@ test_merged_poll_reregistration_after_notification_is_absorbed() {
   add_stop_custom_check "$dir"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "first merged watcher cycle failed: $(cat "$dir/watch-1.err")"
@@ -2551,7 +2551,7 @@ test_merged_poll_reregistration_after_notification_is_absorbed() {
   rm -f "$state/.last-check"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "second watcher cycle failed: $(cat "$dir/watch-2.err")"
@@ -2591,7 +2591,7 @@ test_merged_poll_retries_a_failed_upward_report() {
   add_stop_custom_check "$dir"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
     > "$dir/watch-1.out" 2> "$dir/watch-1.err"
   rc=$?
   set -e
@@ -2607,7 +2607,7 @@ test_merged_poll_retries_a_failed_upward_report() {
     > "$dir/home/.jg-secondmate-parent"
   rm -f "$state/.last-check"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
     > "$dir/watch-2.out" 2> "$dir/watch-2.err"
   rc=$?
   set -e
@@ -2617,7 +2617,7 @@ test_merged_poll_retries_a_failed_upward_report() {
       || fail "merged-poll-upward-retry: recovery acknowledgement failed"
     rm -f "$state/.last-check"
     set +e
-    FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+    JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch-3.out" 2> "$dir/watch-3.err"
     rc=$?
     set -e
@@ -2646,7 +2646,7 @@ test_self_merge_and_poll_publish_one_outcome() {
     || fail "merge-outcome-committed: merge entrypoint failed: $(cat "$dir/merge.err")"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
     >"$dir/watch.out" 2>"$dir/watch.err"
   rc=$?
   set -e
@@ -2671,11 +2671,11 @@ test_self_merge_and_poll_publish_one_outcome() {
 case " $* " in
   *pr-poll-merge-notified*) exit 1 ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$dir/fakebin/mv"
   set +e
-  FM_TEST_REAL_MV="$REAL_MV" run_merge_entry "$dir" task-a "$url" \
+  JG_TEST_REAL_MV="$REAL_MV" run_merge_entry "$dir" task-a "$url" \
     >"$dir/merge.out" 2>"$dir/merge.err"
   rc=$?
   set -e
@@ -2692,7 +2692,7 @@ SH
   rm -f "$dir/fakebin/mv" "$state/.last-check"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
     >"$dir/watch.out" 2>"$dir/watch.err"
   rc=$?
   set -e
@@ -2722,7 +2722,7 @@ test_merged_poll_reports_upward_from_a_secondmate_home_once() {
   add_stop_custom_check "$dir"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "merged-poll-upward: watcher failed: $(cat "$dir/watch-1.err")"
@@ -2741,7 +2741,7 @@ test_merged_poll_reports_upward_from_a_secondmate_home_once() {
   seed_canonical_poll "$dir" task-a "$url"
   rm -f "$state/.last-check"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "merged-poll-upward: second watcher cycle failed: $(cat "$dir/watch-2.err")"
@@ -2758,7 +2758,7 @@ test_different_merged_pr_for_same_task_is_not_absorbed() {
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/1
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-1.out" 2> "$dir/watch-1.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "first merged watcher cycle failed: $(cat "$dir/watch-1.err")"
@@ -2774,7 +2774,7 @@ test_different_merged_pr_for_same_task_is_not_absorbed() {
   rm -f "$state/.last-check"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch-2.out" 2> "$dir/watch-2.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "different-PR watcher cycle failed: $(cat "$dir/watch-2.err")"
@@ -2824,7 +2824,7 @@ test_persistent_secondmate_retirement_is_poll_only() {
   add_stop_custom_check "$dir"
 
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "persistent secondmate merged watcher failed: $(cat "$dir/watch.err")"
@@ -2854,16 +2854,16 @@ test_retirement_crash_recovery() {
   state="$dir/home/state"
   write_poll_meta "$state" task-a https://github.com/o/r/pull/3
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/3
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_wake_append check "$2" "$3"' _ \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_wake_append check "$2" "$3"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$state/task-a.check.sh" "check: $state/task-a.check.sh: merged" \
     || fail "could not seed post-queue crash"
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/recovery.out" 2> "$dir/recovery.err" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/recovery.out" 2> "$dir/recovery.err" \
     || fail "post-queue crash recovery wake failed: $(cat "$dir/recovery.err")"
   grep -F 'check: rearm-resurface' "$dir/recovery.out" >/dev/null \
     || fail "post-queue crash did not surface its durable recovery first"
   ack_watcher_cycle "$state" || fail "post-queue crash recovery acknowledgement failed"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "post-queue retry watcher failed: $(cat "$dir/watch.err")"
@@ -2871,7 +2871,7 @@ test_retirement_crash_recovery() {
   raw_count=$(grep -cF "$(printf '\tcheck\tmerged-task-a-https://github.com/o/r/pull/3\t')" \
     "$state/.wake-queue" || true)
   [ "$raw_count" -eq 1 ] || fail "post-queue retry did not publish exactly one new terminal row"
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-wake-drain.sh" > "$dir/drain.out" 2>/dev/null
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/jg-wake-drain.sh" > "$dir/drain.out" 2>/dev/null
   drain_count=$(grep -cF "$(printf '\tcheck\tmerged-task-a-https://github.com/o/r/pull/3\t')" \
     "$dir/drain.out" || true)
   [ "$drain_count" -eq 1 ] || fail "same-key crash retry rows did not deduplicate at drain"
@@ -2884,7 +2884,7 @@ test_retirement_crash_recovery() {
   jg_pr_poll_retirement_publish "$state" task-a "$POLL" merged || fail "could not publish crash receipt"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "receipt recovery watcher failed: $(cat "$dir/restart.err")"
@@ -2900,7 +2900,7 @@ test_retirement_crash_recovery() {
   rm -f "$state/task-a.check.sh"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "post-check-removal restart failed: $(cat "$dir/restart.err")"
@@ -2917,7 +2917,7 @@ test_retirement_crash_recovery() {
   rm -f "$state/task-a.check.sh" "$state/task-a.pr-poll-registration"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "post-registration-removal restart failed: $(cat "$dir/restart.err")"
@@ -2933,7 +2933,7 @@ test_retirement_crash_recovery() {
   rm -f "$state/task-a.check.sh" "$state/task-a.pr-poll-registration" "$state/task-a.pr-poll"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "receipt-only restart failed: $(cat "$dir/restart.err")"
@@ -2948,7 +2948,7 @@ test_retirement_crash_recovery() {
   chmod 0600 "$historical_poll"
   write_poll_meta "$state" task-a https://github.com/o/r/pull/22
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/22 "$historical_poll"
-  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_wake_append check "$2" "$3"' _ \
+  JG_STATE_OVERRIDE="$state" bash -c '. "$1"; jg_wake_append check "$2" "$3"' _ \
     "$ROOT/bin/jg-wake-lib.sh" "$state/task-a.check.sh" "check: $state/task-a.check.sh: merged" \
     || fail "could not seed pre-update terminal wake"
   jg_pr_poll_snapshot_capture "$state" task-a "$historical_poll" \
@@ -2956,13 +2956,13 @@ test_retirement_crash_recovery() {
   jg_pr_poll_retirement_publish "$state" task-a "$historical_poll" merged \
     || fail "could not publish pre-update retirement receipt"
   add_stop_custom_check "$dir"
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/template-recovery.out" 2> "$dir/template-recovery.err" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/template-recovery.out" 2> "$dir/template-recovery.err" \
     || fail "template-update recovery wake failed: $(cat "$dir/template-recovery.err")"
   grep -F 'check: rearm-resurface' "$dir/template-recovery.out" >/dev/null \
     || fail "template-update recovery did not surface its durable wake first"
   ack_watcher_cycle "$state" || fail "template-update recovery acknowledgement failed"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/restart.out" 2> "$dir/restart.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "template-update recovery watcher failed: $(cat "$dir/restart.err")"
@@ -2988,16 +2988,16 @@ test_external_merge_transition_retires_only_terminal_poll() {
     set +e
     case "$label" in
       open-green|open-red)
-        FM_TEST_GH_STATE=OPEN run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
+        JG_TEST_GH_STATE=OPEN run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
         ;;
       closed-unmerged)
-        FM_TEST_GH_STATE=CLOSED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
+        JG_TEST_GH_STATE=CLOSED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
         ;;
       forge-error)
-        FM_TEST_GH_FAIL=1 run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
+        JG_TEST_GH_FAIL=1 run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
         ;;
       malformed)
-        FM_TEST_GH_STATE=NOT_A_FORGE_STATE run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
+        JG_TEST_GH_STATE=NOT_A_FORGE_STATE run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/$label.out" 2> "$dir/$label.err"
         ;;
     esac
     rc=$?
@@ -3010,7 +3010,7 @@ test_external_merge_transition_retires_only_terminal_poll() {
 
   rm -f "$state/z-stop.check.sh" "$state/z-stop.check-trust" "$state/.last-check"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/merged.out" 2> "$dir/merged.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/merged.out" 2> "$dir/merged.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "external merged transition failed: $(cat "$dir/merged.err")"
@@ -3101,7 +3101,7 @@ test_retirement_refuses_replacement_and_nonterminal_results() {
   state="$dir/home/state"
   printf '#!/usr/bin/env bash\nprintf "merged\\n"\n' > "$state/custom.check.sh"
   chmod 0700 "$state/custom.check.sh"
-  FM_HOME="$dir/home" "$REGISTER" custom >/dev/null || fail "could not register merged custom check"
+  JG_HOME="$dir/home" "$REGISTER" custom >/dev/null || fail "could not register merged custom check"
   set +e
   run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/custom.out" 2> "$dir/custom.err"
   rc=$?
@@ -3125,7 +3125,7 @@ test_retirement_queue_failure_and_receipt_tampering() {
   mkdir "$state/.wake-queue.seq"
   before=$(poll_artifact_snapshot "$state" task-a)
   set +e
-  FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=MERGED \
+  JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GH_STATE=MERGED \
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
@@ -3174,7 +3174,7 @@ test_gitlab_merged_poll_retires() {
   write_poll_meta "$state" task-a "$url"
   seed_canonical_poll "$dir" task-a "$url"
   set +e
-  FM_TEST_GLAB_STATE=merged run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GLAB_STATE=merged run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "GitLab merged retirement watcher failed: $(cat "$dir/watch.err")"
@@ -3189,13 +3189,13 @@ test_gitlab_merged_poll_retires() {
 write_away_record() {  # <dir> [<jg-afk-contract.sh enter args>...]
   local dir=$1
   shift
-  FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" \
+  JG_HOME="$dir/home" JG_STATE_OVERRIDE="$dir/home/state" \
     "$ROOT/bin/jg-afk-contract.sh" enter "$@" >/dev/null \
     || fail "could not enter an away-posture record"
 }
 
 archive_away_record() {  # <dir>
-  FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" \
+  JG_HOME="$1/home" JG_STATE_OVERRIDE="$1/home/state" \
     "$ROOT/bin/jg-afk-contract.sh" archive >/dev/null \
     || fail "could not archive the away-posture record"
 }
@@ -3212,7 +3212,7 @@ merged_ledger_row() {  # <state> <task-id>
 # charging that work to the run's hang guard. Only ever call this while no
 # watcher runs, because a check removed mid-cycle is reported as rejected.
 retire_contributions_observer() {  # <dir>
-  FM_HOME="$1/home" "$ROOT/bin/jg-check-unregister.sh" contributions >/dev/null \
+  JG_HOME="$1/home" "$ROOT/bin/jg-check-unregister.sh" contributions >/dev/null \
     || fail "could not retire the contributions observer"
 }
 
@@ -3221,7 +3221,7 @@ run_merged_poll_cycle() {  # <dir>
   retire_contributions_observer "$dir"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
     > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
@@ -3231,8 +3231,8 @@ run_merged_poll_cycle() {  # <dir>
 queue_merge() {  # <dir> <url>
   local dir=$1 url=$2 rc=0
   set +e
-  FM_TEST_GH_GRAPHQL_STATE=OPEN FM_TEST_GH_GRAPHQL_MERGED=false \
-    FM_TEST_GH_GRAPHQL_QUEUED=true \
+  JG_TEST_GH_GRAPHQL_STATE=OPEN JG_TEST_GH_GRAPHQL_MERGED=false \
+    JG_TEST_GH_GRAPHQL_QUEUED=true \
     run_merge_entry "$dir" task-a "$url" > "$dir/merge.out" 2> "$dir/merge.err"
   rc=$?
   set -e
@@ -3315,9 +3315,9 @@ test_authority_persistence_refuses_rebound_metadata() {
 SH
   chmod +x "$dir/rebind.sh"
   set +e
-  FM_TEST_GH_MERGE_HOOK="$dir/rebind.sh" \
-    FM_TEST_GH_GRAPHQL_STATE=OPEN FM_TEST_GH_GRAPHQL_MERGED=false \
-    FM_TEST_GH_GRAPHQL_QUEUED=true \
+  JG_TEST_GH_MERGE_HOOK="$dir/rebind.sh" \
+    JG_TEST_GH_GRAPHQL_STATE=OPEN JG_TEST_GH_GRAPHQL_MERGED=false \
+    JG_TEST_GH_GRAPHQL_QUEUED=true \
     run_merge_entry "$dir" task-a "$url_a" > "$dir/merge.out" 2> "$dir/merge.err"
   rc=$?
   set -e
@@ -3341,13 +3341,13 @@ test_authority_persists_before_control_unlock() {
 #!/usr/bin/env bash
 case " $* " in
   *"task-a.merge-authority "*)
-    [ -d "$FM_TEST_CONTROL_LOCK" ] || exit 91
+    [ -d "$JG_TEST_CONTROL_LOCK" ] || exit 91
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$dir/fakebin/mv"
-  FM_TEST_CONTROL_LOCK="$state/.control-task-a.lock" FM_TEST_REAL_MV="$REAL_MV" \
+  JG_TEST_CONTROL_LOCK="$state/.control-task-a.lock" JG_TEST_REAL_MV="$REAL_MV" \
     queue_merge "$dir" "$url"
   pass "accepted merge authority persists under the lifecycle lock"
 }
@@ -3370,8 +3370,8 @@ test_teardown_cannot_race_authority_consumption() {
     || fail "teardown race: could not arm the merge poll"
   queue_merge "$dir" "$url"
   archive_away_record "$dir"
-  FM_TEST_GH_STATE_STARTED="$dir/poll-started" FM_TEST_GH_STATE=MERGED \
-    FM_TEST_GH_SLEEP=0.5 FM_TEST_CHECK_TIMEOUT=3 \
+  JG_TEST_GH_STATE_STARTED="$dir/poll-started" JG_TEST_GH_STATE=MERGED \
+    JG_TEST_GH_SLEEP=0.5 JG_TEST_CHECK_TIMEOUT=3 \
     run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch.out" 2> "$dir/watch.err" &
   watcher_pid=$!
@@ -3386,7 +3386,7 @@ test_teardown_cannot_race_authority_consumption() {
     fi
   done
   set +e
-  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
+  JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$ROOT" PATH="$dir/fakebin:$BASE_PATH" \
     "$TEARDOWN" task-a --force > "$dir/teardown.out" 2> "$dir/teardown.err"
   rc=$?
   set -e
@@ -3415,11 +3415,11 @@ test_authority_retirement_preserves_replacement() {
   # firstmate root, so restore the fixture root every other arming here uses.
   cat > "$dir/replace-authority.sh" <<SH
 #!/usr/bin/env bash
-export FM_ROOT_OVERRIDE="$dir/root" FM_TEST_GUARD_LOG="$dir/guard.log"
+export JG_ROOT_OVERRIDE="$dir/root" JG_TEST_GUARD_LOG="$dir/guard.log"
 "$PR_CHECK" task-a "$url_b" >/dev/null
 (
-  FM_TEST_GH_GRAPHQL_STATE=OPEN FM_TEST_GH_GRAPHQL_MERGED=false \\
-  FM_TEST_GH_GRAPHQL_QUEUED=true \\
+  JG_TEST_GH_GRAPHQL_STATE=OPEN JG_TEST_GH_GRAPHQL_MERGED=false \\
+  JG_TEST_GH_GRAPHQL_QUEUED=true \\
   "$PR_MERGE" task-a "$url_b" > "$dir/replacement-merge.out" 2> "$dir/replacement-merge.err"
   printf '%s\n' \$? > "$dir/replacement-merge.rc"
 ) &
@@ -3430,14 +3430,14 @@ SH
   # work pauses the watcher's hang guard.
   cat > "$dir/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
-"$FM_TEST_REAL_MV" "$@" || exit $?
+"$JG_TEST_REAL_MV" "$@" || exit $?
 case " $* " in
   *"task-a.pr-poll-merge-notified "*)
-    if [ ! -e "$FM_TEST_REPLACEMENT_RAN" ]; then
-      : > "$FM_TEST_REPLACEMENT_RAN"
-      : > "$FM_TEST_WATCH_BOUND_PAUSE"
-      "$FM_TEST_REPLACEMENT_SCRIPT"
-      rm -f "$FM_TEST_WATCH_BOUND_PAUSE"
+    if [ ! -e "$JG_TEST_REPLACEMENT_RAN" ]; then
+      : > "$JG_TEST_REPLACEMENT_RAN"
+      : > "$JG_TEST_WATCH_BOUND_PAUSE"
+      "$JG_TEST_REPLACEMENT_SCRIPT"
+      rm -f "$JG_TEST_WATCH_BOUND_PAUSE"
     fi
     ;;
 esac
@@ -3446,10 +3446,10 @@ SH
   retire_contributions_observer "$dir"
   add_stop_custom_check "$dir"
   set +e
-  FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REPLACEMENT_RAN="$dir/replacement-ran" \
-    FM_TEST_REPLACEMENT_SCRIPT="$dir/replace-authority.sh" \
-    FM_TEST_WATCH_BOUND_PAUSE="$dir/replacement-in-flight" \
-    FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
+  JG_TEST_REAL_MV="$REAL_MV" JG_TEST_REPLACEMENT_RAN="$dir/replacement-ran" \
+    JG_TEST_REPLACEMENT_SCRIPT="$dir/replace-authority.sh" \
+    JG_TEST_WATCH_BOUND_PAUSE="$dir/replacement-in-flight" \
+    JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch-a.out" 2> "$dir/watch-a.err"
   rc=$?
   set -e
@@ -3518,7 +3518,7 @@ test_device_renumbered_poll_stays_armed() {
   ! jg_pr_poll_artifacts_valid "$state" task-a "$POLL" \
     || fail "renumber fixture still authenticated before any watcher cycle"
   set +e
-  FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  JG_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
   [ "$rc" -eq 0 ] || fail "renumbered poll watcher failed: $(cat "$dir/watch.err")"
@@ -3541,19 +3541,19 @@ test_device_renumbered_poll_stays_armed() {
 #!/usr/bin/env bash
 case " $* " in
   *"task-a.pr-poll-registration "*)
-    [ -d "$FM_TEST_CONTROL_LOCK" ] || exit 91
-    [ -d "$FM_TEST_POLL_PUBLISH_LOCK" ] || exit 92
-    : > "$FM_TEST_REGISTRATION_RENAMED"
+    [ -d "$JG_TEST_CONTROL_LOCK" ] || exit 91
+    [ -d "$JG_TEST_POLL_PUBLISH_LOCK" ] || exit 92
+    : > "$JG_TEST_REGISTRATION_RENAMED"
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$dir/fakebin/mv"
   set +e
-  FM_TEST_CONTROL_LOCK="$state/.control-task-a.lock" \
-    FM_TEST_POLL_PUBLISH_LOCK="$state/.pr-poll-publish-task-a.lock" FM_TEST_REAL_MV="$REAL_MV" \
-    FM_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" \
-    FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=OPEN \
+  JG_TEST_CONTROL_LOCK="$state/.control-task-a.lock" \
+    JG_TEST_POLL_PUBLISH_LOCK="$state/.pr-poll-publish-task-a.lock" JG_TEST_REAL_MV="$REAL_MV" \
+    JG_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" \
+    JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GH_STATE=OPEN \
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
   rc=$?
   set -e
@@ -3623,12 +3623,12 @@ test_device_rerecord_refuses_tampered_artifacts() {
         cat > "$dir/fakebin/stat" <<'SH'
 #!/usr/bin/env bash
 last=${!#}
-if [ "$last" = "$FM_TEST_FOREIGN_PATH" ]; then
+if [ "$last" = "$JG_TEST_FOREIGN_PATH" ]; then
   case " $* " in
-    *" %d "*) printf '%s\n' "$FM_TEST_FOREIGN_DEVICE"; exit 0 ;;
+    *" %d "*) printf '%s\n' "$JG_TEST_FOREIGN_DEVICE"; exit 0 ;;
   esac
 fi
-exec "$FM_TEST_REAL_STAT" "$@"
+exec "$JG_TEST_REAL_STAT" "$@"
 SH
         chmod +x "$dir/fakebin/stat"
         ;;
@@ -3637,8 +3637,8 @@ SH
       || fail "$mutation fixture was authenticated before any watcher cycle"
     registration_sha=$(jg_pr_sha256 "$state/task-a.pr-poll-registration")
     set +e
-    FM_TEST_FOREIGN_PATH="$state/task-a.check.sh" FM_TEST_FOREIGN_DEVICE="$shifted_device" \
-      FM_TEST_REAL_STAT="$REAL_STAT" FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=MERGED \
+    JG_TEST_FOREIGN_PATH="$state/task-a.check.sh" JG_TEST_FOREIGN_DEVICE="$shifted_device" \
+      JG_TEST_REAL_STAT="$REAL_STAT" JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GH_STATE=MERGED \
       run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
     rc=$?
     set -e
@@ -3680,15 +3680,15 @@ start_poll_publish_holder() {  # <dir> <state> <id>
   cat > "$dir/poll-publish-holder.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-. "$FM_TEST_ROOT/bin/jg-wake-lib.sh"
-trap 'jg_lock_release "$FM_TEST_LOCK" || true' EXIT
-jg_lock_acquire_wait "$FM_TEST_LOCK"
-: > "$FM_TEST_ACQUIRED"
-while [ ! -e "$FM_TEST_RELEASE" ]; do sleep 0.01; done
+. "$JG_TEST_ROOT/bin/jg-wake-lib.sh"
+trap 'jg_lock_release "$JG_TEST_LOCK" || true' EXIT
+jg_lock_acquire_wait "$JG_TEST_LOCK"
+: > "$JG_TEST_ACQUIRED"
+while [ ! -e "$JG_TEST_RELEASE" ]; do sleep 0.01; done
 SH
   chmod +x "$dir/poll-publish-holder.sh"
-  FM_TEST_ROOT="$ROOT" FM_TEST_LOCK="$PR_POLL_HOLDER_LOCK" \
-    FM_TEST_ACQUIRED="$PR_POLL_HOLDER_ACQUIRED" FM_TEST_RELEASE="$PR_POLL_HOLDER_RELEASE" \
+  JG_TEST_ROOT="$ROOT" JG_TEST_LOCK="$PR_POLL_HOLDER_LOCK" \
+    JG_TEST_ACQUIRED="$PR_POLL_HOLDER_ACQUIRED" JG_TEST_RELEASE="$PR_POLL_HOLDER_RELEASE" \
     "$dir/poll-publish-holder.sh" &
   PR_POLL_HOLDER_PID=$!
   for i in $(seq 1 100); do
@@ -3717,16 +3717,16 @@ test_device_rerecord_serializes_direct_rearm() {
   cp "$state/task-a.pr-poll-registration" "$dir/published.registration"
   cp "$state/task-a.check.sh" "$dir/published.check.sh"
   start_poll_publish_holder "$dir" "$state" task-a
-  FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" FM_TEST_GUARD_LOG="$dir/guard.log" \
+  JG_ROOT_OVERRIDE="$dir/root" JG_HOME="$dir/home" JG_TEST_GUARD_LOG="$dir/guard.log" \
     PATH="$dir/fakebin:$BASE_PATH" "$PR_CHECK" task-a "$url_b" > "$dir/rearm.out" 2> "$dir/rearm.err" &
   rearm_pid=$!
   for i in $(seq 1 100); do
-    if jg_pr_metadata_identity_parse "$state/task-a.meta" && [ "$FM_PR_META_URL" = "$url_b" ]; then
+    if jg_pr_metadata_identity_parse "$state/task-a.meta" && [ "$JG_PR_META_URL" = "$url_b" ]; then
       break
     fi
     sleep 0.02
   done
-  [ "$FM_PR_META_URL" = "$url_b" ] || fail "direct re-arm did not rewrite metadata before publication"
+  [ "$JG_PR_META_URL" = "$url_b" ] || fail "direct re-arm did not rewrite metadata before publication"
   sleep 1
   process_is_live_non_zombie "$rearm_pid" || fail "direct re-arm did not wait for poll publication"
   cmp -s "$dir/published.pr-poll" "$state/task-a.pr-poll" \
@@ -3757,19 +3757,19 @@ test_device_rerecord_serializes_rerecord() {
 #!/usr/bin/env bash
 case " $* " in
   *"task-a.pr-poll-registration "*)
-    [ -d "$FM_TEST_CONTROL_LOCK" ] || exit 91
-    [ -d "$FM_TEST_POLL_PUBLISH_LOCK" ] || exit 92
-    : > "$FM_TEST_REGISTRATION_RENAMED"
+    [ -d "$JG_TEST_CONTROL_LOCK" ] || exit 91
+    [ -d "$JG_TEST_POLL_PUBLISH_LOCK" ] || exit 92
+    : > "$JG_TEST_REGISTRATION_RENAMED"
     ;;
 esac
-exec "$FM_TEST_REAL_MV" "$@"
+exec "$JG_TEST_REAL_MV" "$@"
 SH
   chmod +x "$dir/fakebin/mv"
   start_poll_publish_holder "$dir" "$state" task-a
-  FM_TEST_CONTROL_LOCK="$state/.control-task-a.lock" \
-    FM_TEST_POLL_PUBLISH_LOCK="$state/.pr-poll-publish-task-a.lock" \
-    FM_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" FM_TEST_REAL_MV="$REAL_MV" \
-    FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=OPEN \
+  JG_TEST_CONTROL_LOCK="$state/.control-task-a.lock" \
+    JG_TEST_POLL_PUBLISH_LOCK="$state/.pr-poll-publish-task-a.lock" \
+    JG_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" JG_TEST_REAL_MV="$REAL_MV" \
+    JG_TEST_GH_LOG="$dir/gh.log" JG_TEST_GH_STATE=OPEN \
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
   watcher_pid=$!
   for i in $(seq 1 100); do

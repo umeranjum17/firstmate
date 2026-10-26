@@ -111,7 +111,7 @@ PY
 # home, NM_HOME, and fake no-mistakes.
 spend() {
   local d=$1
-  env -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE FM_HOME="$d/home" NM_HOME="$d/nm" \
+  env -u JG_STATE_OVERRIDE -u JG_DATA_OVERRIDE JG_HOME="$d/home" NM_HOME="$d/nm" \
     FAKE_NM_REPO="${FAKE_NM_REPO-$d/project}" FAKE_NM_LOG="$d/nm-invocations" PATH="$d/fakebin:$PATH" \
     "$SPEND" "$2" "${3:-task}"
 }

@@ -29,15 +29,15 @@ SHELLCHECK_SHA_LINUX_AARCH64=12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e26
 SHELLCHECK_SHA_DARWIN_X86_64=3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6
 SHELLCHECK_SHA_DARWIN_AARCH64=56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79
 
-# jg_install_stub_uname <fakebin>: uname -s / uname -m from FM_TEST_UNAME_S/M.
+# jg_install_stub_uname <fakebin>: uname -s / uname -m from JG_TEST_UNAME_S/M.
 jg_install_stub_uname() {
   local fakebin=$1
   cat > "$fakebin/uname" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
-  -s) printf '%s\n' "${FM_TEST_UNAME_S:-Linux}" ;;
-  -m) printf '%s\n' "${FM_TEST_UNAME_M:-x86_64}" ;;
-  *) printf '%s\n' "${FM_TEST_UNAME_S:-Linux}" ;;
+  -s) printf '%s\n' "${JG_TEST_UNAME_S:-Linux}" ;;
+  -m) printf '%s\n' "${JG_TEST_UNAME_M:-x86_64}" ;;
+  *) printf '%s\n' "${JG_TEST_UNAME_S:-Linux}" ;;
 esac
 SH
   chmod +x "$fakebin/uname"
@@ -195,7 +195,7 @@ test_canonical_partitions_preserve_full_lint() {
     flags="$tmp/$part.flags"
     mode="$tmp/$part.mode"
     jg_lint_stub_shellcheck "$fakebin" "$log"
-    PATH="$fakebin:$PATH" FM_TEST_FLAG_LOG="$flags" FM_TEST_MODE_LOG="$mode" \
+    PATH="$fakebin:$PATH" JG_TEST_FLAG_LOG="$flags" JG_TEST_MODE_LOG="$mode" \
       "$LINT" --partition "$part" > "$tmp/$part.out" 2>&1 \
       || fail "canonical partition $part failed: $(cat "$tmp/$part.out")"
     [ "$(LC_ALL=C sort "$log")" = "$(printf '%s\n' "$selected" | LC_ALL=C sort)" ] \
@@ -231,43 +231,43 @@ test_canonical_partitions_preserve_full_lint() {
 # tests below. Its answers are driven by env vars the caller sets before
 # invoking jg-lint.sh, so those tests can steer git state without depending on
 # this worktree's actual branch, remotes, or history:
-#   FM_TEST_GIT_INSIDE_WORKTREE  1 (default) or 0
-#   FM_TEST_GIT_BRANCH           branch name for `rev-parse --abbrev-ref HEAD`
-#   FM_TEST_GIT_HAS_ORIGIN_MAIN  1 (default) or 0
-#   FM_TEST_GIT_HAS_MAIN         1 (default) or 0
-#   FM_TEST_GIT_MERGE_BASE_OK    1 (default) or 0
-#   FM_TEST_GIT_MERGE_BASE       merge-base value to print when OK
-#   FM_TEST_GIT_DIFF_FILE        path to a file of NUL-separated changed paths
+#   JG_TEST_GIT_INSIDE_WORKTREE  1 (default) or 0
+#   JG_TEST_GIT_BRANCH           branch name for `rev-parse --abbrev-ref HEAD`
+#   JG_TEST_GIT_HAS_ORIGIN_MAIN  1 (default) or 0
+#   JG_TEST_GIT_HAS_MAIN         1 (default) or 0
+#   JG_TEST_GIT_MERGE_BASE_OK    1 (default) or 0
+#   JG_TEST_GIT_MERGE_BASE       merge-base value to print when OK
+#   JG_TEST_GIT_DIFF_FILE        path to a file of NUL-separated changed paths
 jg_lint_stub_git() {
   local fakebin=$1
   cat > "$fakebin/git" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
   "rev-parse --is-inside-work-tree")
-    [ "${FM_TEST_GIT_INSIDE_WORKTREE:-1}" = 1 ] || exit 1
+    [ "${JG_TEST_GIT_INSIDE_WORKTREE:-1}" = 1 ] || exit 1
     printf 'true\n'
     exit 0
     ;;
   "rev-parse --abbrev-ref HEAD")
-    printf '%s\n' "${FM_TEST_GIT_BRANCH:-feature}"
+    printf '%s\n' "${JG_TEST_GIT_BRANCH:-feature}"
     exit 0
     ;;
   "rev-parse --verify -q origin/main")
-    [ "${FM_TEST_GIT_HAS_ORIGIN_MAIN:-1}" = 1 ] && exit 0 || exit 1
+    [ "${JG_TEST_GIT_HAS_ORIGIN_MAIN:-1}" = 1 ] && exit 0 || exit 1
     ;;
   "rev-parse --verify -q main")
-    [ "${FM_TEST_GIT_HAS_MAIN:-1}" = 1 ] && exit 0 || exit 1
+    [ "${JG_TEST_GIT_HAS_MAIN:-1}" = 1 ] && exit 0 || exit 1
     ;;
   "merge-base "*)
-    if [ "${FM_TEST_GIT_MERGE_BASE_OK:-1}" = 1 ]; then
-      printf '%s\n' "${FM_TEST_GIT_MERGE_BASE:-fakebase123}"
+    if [ "${JG_TEST_GIT_MERGE_BASE_OK:-1}" = 1 ]; then
+      printf '%s\n' "${JG_TEST_GIT_MERGE_BASE:-fakebase123}"
       exit 0
     fi
     exit 1
     ;;
   "diff --name-only --diff-filter=ACMR -z "*)
-    if [ -n "${FM_TEST_GIT_DIFF_FILE:-}" ] && [ -f "$FM_TEST_GIT_DIFF_FILE" ]; then
-      cat "$FM_TEST_GIT_DIFF_FILE"
+    if [ -n "${JG_TEST_GIT_DIFF_FILE:-}" ] && [ -f "$JG_TEST_GIT_DIFF_FILE" ]; then
+      cat "$JG_TEST_GIT_DIFF_FILE"
     fi
     exit 0
     ;;
@@ -280,7 +280,7 @@ SH
 }
 
 # jg_lint_write_diff_file <file> <path>...: writes NUL-separated changed paths
-# in the shape `git diff --name-only -z` produces, for FM_TEST_GIT_DIFF_FILE.
+# in the shape `git diff --name-only -z` produces, for JG_TEST_GIT_DIFF_FILE.
 jg_lint_write_diff_file() {
   local file=$1
   shift
@@ -292,8 +292,8 @@ jg_lint_write_diff_file() {
 # roots it was asked to check (one per line) instead of actually analyzing
 # them, so changed-file mode tests can assert exactly which files jg-lint.sh
 # selected without depending on real ShellCheck findings. When
-# FM_TEST_MODE_LOG is set, it records the effective analysis mode, treating
-# ShellCheck's default as full analysis. When FM_TEST_FLAG_LOG is set, it
+# JG_TEST_MODE_LOG is set, it records the effective analysis mode, treating
+# ShellCheck's default as full analysis. When JG_TEST_FLAG_LOG is set, it
 # records whether --external-sources was passed and the --exclude value.
 jg_lint_stub_shellcheck() {
   local fakebin=$1 log=$2
@@ -319,11 +319,11 @@ while [ "\$#" -gt 0 ] && [ "\$1" != -- ]; do
   esac
   shift
 done
-if [ -n "\${FM_TEST_MODE_LOG:-}" ]; then
-  printf '%s\n' "\$mode" >> "\$FM_TEST_MODE_LOG"
+if [ -n "\${JG_TEST_MODE_LOG:-}" ]; then
+  printf '%s\n' "\$mode" >> "\$JG_TEST_MODE_LOG"
 fi
-if [ -n "\${FM_TEST_FLAG_LOG:-}" ]; then
-  printf 'external-sources=%s\nexclude=%s\n' "\$follow" "\$exclude" >> "\$FM_TEST_FLAG_LOG"
+if [ -n "\${JG_TEST_FLAG_LOG:-}" ]; then
+  printf 'external-sources=%s\nexclude=%s\n' "\$follow" "\$exclude" >> "\$JG_TEST_FLAG_LOG"
 fi
 [ "\$#" -eq 0 ] || shift
 printf '%s\n' "\$@" >> "$log"
@@ -348,13 +348,13 @@ jg_lint_bounds_supported() {
 # behavior is steered by the basename of the root it is asked to analyze, so
 # bounded-execution tests can mix a hang, a memory-limit death, and clean
 # roots in one run. A *blocker* root spawns a tracked child (pid written to
-# FM_TEST_CHILD_PID), records its own pid on FM_TEST_STUB_PID, and then blocks;
+# JG_TEST_CHILD_PID), records its own pid on JG_TEST_STUB_PID, and then blocks;
 # a *hoarder* root runs a perl allocator that grows to 512 MiB and fails only
 # when perl itself reports that the allocation was refused, forwarding perl's
 # own error and exiting with GHC's heap-exhaustion status 251, as ShellCheck
 # does when its runtime is refused memory; an allocation that succeeds falls
 # through like any other root.
-# Anything else records its path on FM_TEST_STUB_LOG and exits cleanly.
+# Anything else records its path on JG_TEST_STUB_LOG and exits cleanly.
 jg_lint_stub_reactive_shellcheck() {
   local fakebin=$1
   cat > "$fakebin/shellcheck" <<'SH'
@@ -366,10 +366,10 @@ fi
 target=${!#}
 case "$target" in
   *blocker*)
-    sleep "${FM_TEST_BLOCK_SECS:-300}" &
-    printf '%s\n' "$!" > "${FM_TEST_CHILD_PID:-/dev/null}"
-    printf '%s\n' "$$" > "${FM_TEST_STUB_PID:-/dev/null}"
-    exec sleep "${FM_TEST_BLOCK_SECS:-300}"
+    sleep "${JG_TEST_BLOCK_SECS:-300}" &
+    printf '%s\n' "$!" > "${JG_TEST_CHILD_PID:-/dev/null}"
+    printf '%s\n' "$$" > "${JG_TEST_STUB_PID:-/dev/null}"
+    exec sleep "${JG_TEST_BLOCK_SECS:-300}"
     ;;
   *hoarder*)
     alloc_rc=0
@@ -400,7 +400,7 @@ case "$target" in
     exit 1
     ;;
 esac
-printf '%s\n' "$target" >> "${FM_TEST_STUB_LOG:-/dev/null}"
+printf '%s\n' "$target" >> "${JG_TEST_STUB_LOG:-/dev/null}"
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
@@ -421,8 +421,8 @@ SH
   chmod +x "$fixture"
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_MODE_LOG="$mode_log" "$LINT" --fast --telemetry "$telemetry" "$fixture" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_MODE_LOG="$mode_log" "$LINT" --fast --telemetry "$telemetry" "$fixture" 2>&1) \
     || fail "fast lint mode failed"$'\n'"$out"
   [ "$(cat "$mode_log")" = off ] \
     || fail "fast lint mode did not disable extended analysis"
@@ -446,8 +446,8 @@ SH
   chmod +x "$fixture"
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
-  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true FM_LINT_FAST=1 FM_LINT_JOBS=1 \
-    FM_TEST_MODE_LOG="$mode_log" "$LINT" "$fixture" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true JG_LINT_FAST=1 JG_LINT_JOBS=1 \
+    JG_TEST_MODE_LOG="$mode_log" "$LINT" "$fixture" 2>&1) \
     || fail "CI full lint mode failed"$'\n'"$out"
   [ "$(cat "$mode_log")" = on ] \
     || fail "CI default did not keep full ShellCheck analysis"
@@ -468,7 +468,7 @@ SH
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
   rc=0
-  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true FM_LINT_JOBS=1 \
+  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true JG_LINT_JOBS=1 \
     "$LINT" --fast "$fixture" 2>&1) || rc=$?
   [ "$rc" -eq 2 ] \
     || fail "CI accepted explicit fast lint mode (exit $rc)"$'\n'"$out"
@@ -514,9 +514,9 @@ test_changed_mode_lints_only_the_changed_file() {
 
   # Clear the ambient CI/GITHUB_ACTIONS signals so changed-file mode is actually
   # exercised: a CI run sets them and would otherwise force the full lint here.
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" 2>&1) \
     || fail "changed-mode lint run failed"$'\n'"$out"
   [ "$(cat "$log")" = "$target" ] \
     || fail "changed-mode lint did not run ShellCheck on exactly the changed file"$'\n'"logged: $(cat "$log")"
@@ -543,7 +543,7 @@ test_main_branch_forces_full_lint() {
   # Clear CI/GITHUB_ACTIONS so the on-main branch is what forces the full lint,
   # not the ambient CI signal a real CI run would otherwise supply.
   listed=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' \
-    FM_TEST_GIT_BRANCH=main "$LINT" --list-files)
+    JG_TEST_GIT_BRANCH=main "$LINT" --list-files)
   expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "jg-lint.sh did not force a full lint when HEAD is on main"
@@ -563,8 +563,8 @@ test_explicit_path_bypasses_changed_logic() {
   # under the no-args default. Clearing CI/GITHUB_ACTIONS keeps changed-file
   # selection live so this proves the explicit path bypasses it, not that CI
   # already forced full mode. An explicit path must never even consult git.
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_MERGE_BASE_OK=0 \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_MERGE_BASE_OK=0 \
     "$LINT" "$target" 2>&1) || fail "explicit-path lint failed"$'\n'"$out"
   [ "$(cat "$log")" = "$target" ] \
     || fail "explicit path lint did not run on exactly the requested file"$'\n'"logged: $(cat "$log")"
@@ -582,8 +582,8 @@ test_zero_changed_files_exits_clean() {
   rc=0
   # Clear CI/GITHUB_ACTIONS so changed-file mode runs and can reach the empty
   # target set; a CI run would otherwise force a full lint instead.
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" 2>&1) || rc=$?
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "zero changed lint targets must exit 0, got $rc"$'\n'"$out"
   assert_contains "$out" "ShellCheck 0.11.0" "zero-changed run did not print the ShellCheck version line"
   assert_contains "$out" "no changed lint targets" "zero-changed run did not note the empty target set"
@@ -605,8 +605,8 @@ test_list_files_respects_changed_mode() {
 
   # Clear CI/GITHUB_ACTIONS so --list-files reflects the changed set rather than
   # the full canonical set a CI run's ambient signals would otherwise force.
-  listed=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" --list-files)
+  listed=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" "$LINT" --list-files)
   [ "$listed" = "tests/jg-lint.test.sh" ] \
     || fail "--list-files did not report the would-be changed set in changed mode"$'\n'"got: $listed"
   pass "jg-lint.sh --list-files reports the would-be changed set in changed mode"
@@ -638,10 +638,10 @@ test_changed_mode_drops_external_sources_and_excludes_cross_file_codes() {
   target="bin/jg-afk-launch.sh"
   jg_lint_write_diff_file "$diff_file" "$target"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" FM_TEST_MODE_LOG="$mode_log" \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" \
+    JG_TEST_FLAG_LOG="$flag_log" JG_TEST_MODE_LOG="$mode_log" \
     "$LINT" --telemetry "$telemetry" 2>&1) \
     || fail "changed-mode local lint failed"$'\n'"$out"
   [ "$(cat "$log")" = "$target" ] \
@@ -673,9 +673,9 @@ test_changed_mode_invokes_shellcheck_once_per_root() {
   second="bin/jg-lint-workflows.sh"
   jg_lint_write_diff_file "$diff_file" "$first" "$second"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature JG_TEST_GIT_DIFF_FILE="$diff_file" \
+    JG_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
     || fail "changed-mode per-root lint failed"$'\n'"$out"
   [ "$(LC_ALL=C sort "$log")" = "$first"$'\n'"$second" ] \
     || fail "changed-mode lint did not analyze both changed roots"$'\n'"logged: $(cat "$log")"
@@ -700,8 +700,8 @@ printf '%s\n' "${1:-ok}"
 SH
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
-  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true FM_LINT_JOBS=1 \
-    FM_TEST_FLAG_LOG="$flag_log" FM_TEST_MODE_LOG="$mode_log" \
+  out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true JG_LINT_JOBS=1 \
+    JG_TEST_FLAG_LOG="$flag_log" JG_TEST_MODE_LOG="$mode_log" \
     "$LINT" "$fixture" 2>&1) \
     || fail "CI lint with explicit path failed"$'\n'"$out"
   [ "$(cat "$mode_log")" = on ] \
@@ -719,9 +719,9 @@ test_main_branch_keeps_external_sources() {
   flag_log="$tmp/flags.log"
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=main \
-    FM_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=main \
+    JG_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
     || fail "main-branch lint failed"$'\n'"$out"
   jg_lint_assert_flag_log "$flag_log" yes none
   pass "jg-lint.sh on main keeps source following without the local exclusion list"
@@ -736,9 +736,9 @@ test_merge_base_less_keeps_external_sources() {
   flag_log="$tmp/flags.log"
   jg_lint_stub_shellcheck "$fakebin" "$log"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature FM_TEST_GIT_MERGE_BASE_OK=0 \
-    FM_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature JG_TEST_GIT_MERGE_BASE_OK=0 \
+    JG_TEST_FLAG_LOG="$flag_log" "$LINT" 2>&1) \
     || fail "merge-base-less lint failed"$'\n'"$out"
   jg_lint_assert_flag_log "$flag_log" yes none
   pass "jg-lint.sh without a merge-base keeps source following without the local exclusion list"
@@ -754,9 +754,9 @@ test_explicit_path_keeps_external_sources() {
   jg_lint_stub_shellcheck "$fakebin" "$log"
   target="bin/jg-install-shellcheck.sh"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_FLAG_LOG="$flag_log" "$LINT" "$target" 2>&1) \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_FLAG_LOG="$flag_log" "$LINT" "$target" 2>&1) \
     || fail "explicit-path lint failed"$'\n'"$out"
   jg_lint_assert_flag_log "$flag_log" yes none
   pass "jg-lint.sh explicit paths keep source following"
@@ -775,10 +775,10 @@ test_fast_mode_on_a_local_branch_keeps_source_following() {
   target="bin/jg-install-shellcheck.sh"
   jg_lint_write_diff_file "$diff_file" "$target"
 
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" \
-    FM_TEST_FLAG_LOG="$flag_log" FM_TEST_MODE_LOG="$mode_log" \
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" \
+    JG_TEST_FLAG_LOG="$flag_log" JG_TEST_MODE_LOG="$mode_log" \
     "$LINT" --fast 2>&1) \
     || fail "fast local-branch lint failed"$'\n'"$out"
   [ "$(cat "$mode_log")" = off ] \
@@ -823,9 +823,9 @@ SH
   jg_lint_write_diff_file "$diff_file" "tests/jg-lint-local-exclude-fixture.test.sh"
 
   rc=0
-  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' FM_LINT_JOBS=1 \
-    FM_TEST_GIT_BRANCH=feature \
-    FM_TEST_GIT_DIFF_FILE="$diff_file" "$lint" 2>&1) || rc=$?
+  out=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' JG_LINT_JOBS=1 \
+    JG_TEST_GIT_BRANCH=feature \
+    JG_TEST_GIT_DIFF_FILE="$diff_file" "$lint" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "changed-mode local lint failed a cross-file-only fixture"$'\n'"$out"
   assert_not_contains "$out" "SC2034" "changed-mode local lint still reported SC2034"
@@ -919,7 +919,7 @@ test_installer_retries_transient_download_failure() {
   # retry path stays the CI archive even when this suite runs on macOS.
   out=$(CURL_COUNT="$tmp/curl-count" CURL_FAIL_UNTIL=3 \
     SHA256_STUB_HASH="$SHELLCHECK_SHA_LINUX_X86_64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) \
     || fail "installer did not recover from a transient download failure"$'\n'"$out"
   [ "$(cat "$tmp/curl-count")" -eq 4 ] || fail "installer did not recover after three failed downloads"
@@ -946,7 +946,7 @@ test_installer_selects_platform_archive_url_and_checksum() {
     rm -rf "$destination"
     : > "$url_log"
     out=$(CURL_URL_LOG="$url_log" SHA256_STUB_HASH="$sha" \
-      FM_TEST_UNAME_S="$uname_s" FM_TEST_UNAME_M="$uname_m" \
+      JG_TEST_UNAME_S="$uname_s" JG_TEST_UNAME_M="$uname_m" \
       PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) \
       || fail "installer failed for ${uname_s}/${uname_m}"$'\n'"$out"
     assert_contains "$(cat "$url_log")" "$archive" \
@@ -982,7 +982,7 @@ test_installer_rejects_wrong_checksum() {
 
   rc=0
   out=$(SHA256_STUB_HASH=0000000000000000000000000000000000000000000000000000000000000000 \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted a wrong checksum"$'\n'"$out"
   assert_contains "$out" "checksum mismatch" "installer did not report a checksum mismatch"
@@ -1014,7 +1014,7 @@ test_installer_falls_back_to_shasum() {
   : > "$hasher_log"
   out=$(CURL_URL_LOG="$tmp/curl-url.log" HASHER_LOG="$hasher_log" \
     SHA256_STUB_HASH="$SHELLCHECK_SHA_LINUX_X86_64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     PATH="$fakebin" "$INSTALLER" "$destination" 2>&1) \
     || fail "installer did not fall back to shasum -a 256"$'\n'"$out"
   assert_grep 'shasum -a 256' "$hasher_log" "installer did not invoke shasum -a 256"
@@ -1039,7 +1039,7 @@ test_installer_prefers_sha256sum_over_shasum() {
   : > "$hasher_log"
   PATH="$fakebin:$PATH" HASHER_LOG="$hasher_log" \
     SHA256_STUB_HASH="$SHELLCHECK_SHA_LINUX_X86_64" \
-    FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=x86_64 \
+    JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=x86_64 \
     "$INSTALLER" "$destination" >/dev/null \
     || fail "installer failed when both hashers were present"
   assert_grep 'sha256sum' "$hasher_log" "installer did not prefer sha256sum"
@@ -1059,14 +1059,14 @@ test_installer_rejects_unsupported_platform() {
   jg_install_stub_curl "$fakebin"
 
   rc=0
-  out=$(FM_TEST_UNAME_S=FreeBSD FM_TEST_UNAME_M=amd64 \
+  out=$(JG_TEST_UNAME_S=FreeBSD JG_TEST_UNAME_M=amd64 \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted an unsupported OS"$'\n'"$out"
   assert_contains "$out" "unsupported platform" "installer did not name the unsupported platform"
   assert_contains "$out" "FreeBSD-amd64" "installer did not report the detected OS/arch"
 
   rc=0
-  out=$(FM_TEST_UNAME_S=Linux FM_TEST_UNAME_M=ppc64le \
+  out=$(JG_TEST_UNAME_S=Linux JG_TEST_UNAME_M=ppc64le \
     PATH="$fakebin:$PATH" "$INSTALLER" "$destination" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "installer accepted an unsupported architecture"$'\n'"$out"
   assert_contains "$out" "unsupported platform" "installer did not reject linux/ppc64le"
@@ -1298,18 +1298,18 @@ bad_b() {
 SH
 
   rc_clean_1=0
-  out_clean_1=$(FM_LINT_JOBS=1 "$LINT" "$good" 2>&1) || rc_clean_1=$?
+  out_clean_1=$(JG_LINT_JOBS=1 "$LINT" "$good" 2>&1) || rc_clean_1=$?
   rc_clean_2=0
-  out_clean_2=$(FM_LINT_JOBS=2 "$LINT" "$good" 2>&1) || rc_clean_2=$?
+  out_clean_2=$(JG_LINT_JOBS=2 "$LINT" "$good" 2>&1) || rc_clean_2=$?
   [ "$rc_clean_1" -eq 0 ] && [ "$rc_clean_2" -eq 0 ] || fail "clean jobs=1/jobs=2 paths must both pass"
   [ "$out_clean_1" = "$out_clean_2" ] || fail "clean jobs=1/jobs=2 output differs"
 
   rc_fail_1=0
-  out_fail_1=$(FM_LINT_JOBS=1 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_1=$?
+  out_fail_1=$(JG_LINT_JOBS=1 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_1=$?
   rc_fail_2=0
-  out_fail_2=$(FM_LINT_JOBS=2 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_2=$?
+  out_fail_2=$(JG_LINT_JOBS=2 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_2=$?
   rc_fail_2b=0
-  out_fail_2b=$(FM_LINT_JOBS=2 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_2b=$?
+  out_fail_2b=$(JG_LINT_JOBS=2 "$LINT" "$bad_a" "$bad_b" 2>&1) || rc_fail_2b=$?
   [ "$rc_fail_1" -ne 0 ] && [ "$rc_fail_1" -eq "$rc_fail_2" ] && [ "$rc_fail_2" -eq "$rc_fail_2b" ] \
     || fail "failing jobs=1/jobs=2 exit results differ: $rc_fail_1/$rc_fail_2/$rc_fail_2b"
   [ "$out_fail_1" = "$out_fail_2" ] && [ "$out_fail_2" = "$out_fail_2b" ] \
@@ -1317,10 +1317,10 @@ SH
   assert_contains "$out_fail_1" "SC1007" "the first failing root diagnostic was lost"
   assert_contains "$out_fail_1" "SC2086" "the later failing root diagnostic was lost"
   rc_bad_jobs=0
-  FM_LINT_JOBS=3 "$LINT" "$good" >/dev/null 2>&1 || rc_bad_jobs=$?
+  JG_LINT_JOBS=3 "$LINT" "$good" >/dev/null 2>&1 || rc_bad_jobs=$?
   [ "$rc_bad_jobs" -eq 2 ] || fail "the lint owner must reject unbounded worker counts"
 
-  telemetry_out=$(FM_LINT_JOBS=2 FM_LINT_TELEMETRY="$telemetry" "$LINT" "$good" 2>&1) \
+  telemetry_out=$(JG_LINT_JOBS=2 JG_LINT_TELEMETRY="$telemetry" "$LINT" "$good" 2>&1) \
     || fail "telemetry-enabled clean lint failed"
   [ "$telemetry_out" = "$out_clean_2" ] || fail "quiet telemetry changed routine lint output"
   assert_grep $'format\tjg-lint-telemetry-v1' "$telemetry" "telemetry format marker is missing"
@@ -1336,7 +1336,7 @@ SH
 
   cleanup_tmp="$tmp/lint-tmp"
   mkdir -p "$cleanup_tmp"
-  cleanup_out=$(TMPDIR="$cleanup_tmp" FM_LINT_JOBS=2 "$LINT" "$good" 2>&1) \
+  cleanup_out=$(TMPDIR="$cleanup_tmp" JG_LINT_JOBS=2 "$LINT" "$good" 2>&1) \
     || fail "cleanup fixture lint failed"
   [ "$cleanup_out" = "$out_clean_2" ] || fail "cleanup fixture changed routine diagnostics"
   [ -z "$(find "$cleanup_tmp" -mindepth 1 -maxdepth 1 -name 'jg-lint.*' -print -quit)" ] \
@@ -1361,7 +1361,7 @@ if [ "${1:-}" = "--version" ]; then
   printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
   exit 0
 fi
-printf '%s\n' "$$" > "$FM_TEST_SHELLCHECK_PID"
+printf '%s\n' "$$" > "$JG_TEST_SHELLCHECK_PID"
 trap 'exit 143' HUP INT TERM
 while :; do
   sleep 1
@@ -1379,8 +1379,8 @@ SH
       if [ "$telemetry" = on ]; then
         telemetry_file="$tmp/telemetry-$jobs.tsv"
       fi
-      PATH="$fakebin:$PATH" TMPDIR="$lint_tmp" FM_LINT_JOBS="$jobs" \
-        FM_LINT_TELEMETRY="$telemetry_file" FM_TEST_SHELLCHECK_PID="$pid_file" \
+      PATH="$fakebin:$PATH" TMPDIR="$lint_tmp" JG_LINT_JOBS="$jobs" \
+        JG_LINT_TELEMETRY="$telemetry_file" JG_TEST_SHELLCHECK_PID="$pid_file" \
         "$LINT" "$fixture" > "$out_file" 2>&1 &
       parent_pid=$!
       i=0
@@ -1443,11 +1443,11 @@ test_root_deadline_names_the_root_and_reaps_the_tree() {
   sleep 300 &
   sentinel_pid=$!
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 \
-    FM_LINT_REQUIRE_BOUNDS=1 \
-    FM_LINT_ROOT_SECONDS=1 FM_LINT_ROOT_GRACE=1 \
-    FM_TEST_STUB_LOG="$stub_log" FM_TEST_CHILD_PID="$child_pid_file" \
-    FM_TEST_STUB_PID="$stub_pid_file" FM_TEST_BLOCK_SECS=300 \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 \
+    JG_LINT_REQUIRE_BOUNDS=1 \
+    JG_LINT_ROOT_SECONDS=1 JG_LINT_ROOT_GRACE=1 \
+    JG_TEST_STUB_LOG="$stub_log" JG_TEST_CHILD_PID="$child_pid_file" \
+    JG_TEST_STUB_PID="$stub_pid_file" JG_TEST_BLOCK_SECS=300 \
     "$LINT" --telemetry "$telemetry" "$ok" "$blocker" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a root pinned at the wall deadline unexpectedly passed"
   assert_contains "$out" "blocker.sh" "the timed-out root was not named"
@@ -1499,8 +1499,8 @@ test_root_memory_limit_reports_a_named_death() {
   # Control: with no memory limit the same allocator succeeds, so a memory
   # death below can only come from the enforced cap.
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 \
-    FM_TEST_STUB_LOG="$stub_log" \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 \
+    JG_TEST_STUB_LOG="$stub_log" \
     "$LINT" --telemetry "$tmp/control.tsv" "$ok" "$hoarder" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "the allocator failed without any memory limit"$'\n'"$out"
   grep -q $'^meta\tbounds_enforced\t0$' "$tmp/control.roots.tsv" \
@@ -1513,9 +1513,9 @@ test_root_memory_limit_reports_a_named_death() {
   sleep 300 &
   sentinel_pid=$!
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 \
-    FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=262144 \
-    FM_TEST_STUB_LOG="$stub_log" \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 \
+    JG_LINT_REQUIRE_BOUNDS=1 JG_LINT_ROOT_MEMORY_KIB=262144 \
+    JG_TEST_STUB_LOG="$stub_log" \
     "$LINT" --telemetry "$telemetry" "$ok" "$hoarder" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a root killed by its memory limit unexpectedly passed"
   assert_contains "$out" "hoarder.sh" "the memory-limited root was not named"
@@ -1559,7 +1559,7 @@ while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
   shift
 done
 shift
-printf '%s\t%s\n' "$follow" "$exclude" >> "$FM_TEST_FALLBACK_LOG"
+printf '%s\t%s\n' "$follow" "$exclude" >> "$JG_TEST_FALLBACK_LOG"
 if [ "$follow" = yes ]; then
   printf 'shellcheck: Heap exhausted;\n' >&2
   exit 251
@@ -1571,8 +1571,8 @@ SH
   for mode in "${modes[@]}"; do
     : > "$log"
     rc=0
-    out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS="$mode" \
-      FM_TEST_FALLBACK_LOG="$log" "$LINT" --telemetry "$tmp/pass.$mode.tsv" "$fixture" 2>&1) || rc=$?
+    out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 JG_LINT_REQUIRE_BOUNDS="$mode" \
+      JG_TEST_FALLBACK_LOG="$log" "$LINT" --telemetry "$tmp/pass.$mode.tsv" "$fixture" 2>&1) || rc=$?
     [ "$rc" -eq 0 ] || fail "a clean no-source fallback did not pass (bounded=$mode)"$'\n'"$out"
     assert_grep $'source_directives\t1' "$tmp/pass.$mode.tsv" "telemetry lost the root's source directive"
     assert_grep $'source_followed_directives\t0' "$tmp/pass.$mode.tsv" \
@@ -1610,7 +1610,7 @@ SH
   cat > "$fakebin/shellcheck" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  exec "$FM_REAL_SHELLCHECK" "$@"
+  exec "$JG_REAL_SHELLCHECK" "$@"
 fi
 for arg in "$@"; do
   if [ "$arg" = --external-sources ]; then
@@ -1618,14 +1618,14 @@ for arg in "$@"; do
     exit 251
   fi
 done
-exec "$FM_REAL_SHELLCHECK" "$@"
+exec "$JG_REAL_SHELLCHECK" "$@"
 SH
   chmod +x "$fakebin/shellcheck"
   # shellcheck disable=SC2016 # The fixture intentionally contains an unexpanded parameter.
   printf '#!/usr/bin/env bash\nx=$1\nprintf "%%s\\n" $x\n' > "$fixture"
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_REAL_SHELLCHECK="$real_shellcheck" \
-    FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS="$require_bounds" \
+  out=$(PATH="$fakebin:$PATH" JG_REAL_SHELLCHECK="$real_shellcheck" \
+    JG_LINT_JOBS=1 JG_LINT_REQUIRE_BOUNDS="$require_bounds" \
     "$LINT" --telemetry "$tmp/finding.tsv" "$fixture" 2>&1) || rc=$?
   [ "$rc" -eq 1 ] || fail "a real ShellCheck finding in the fallback did not fail lint (exit $rc)"$'\n'"$out"
   assert_contains "$out" "fallback reason=findings rc=1" \
@@ -1655,13 +1655,13 @@ if [ "${1:-}" = --version ]; then
 fi
 for arg in "$@"; do
   if [ "$arg" = --external-sources ]; then
-    printf 'follow\n' >> "$FM_TEST_ATTEMPT_LOG"
-    sleep "$FM_TEST_FIRST_SECS"
+    printf 'follow\n' >> "$JG_TEST_ATTEMPT_LOG"
+    sleep "$JG_TEST_FIRST_SECS"
     printf 'shellcheck: Heap exhausted;\n' >&2
     exit 251
   fi
 done
-printf 'fallback\n' >> "$FM_TEST_ATTEMPT_LOG"
+printf 'fallback\n' >> "$JG_TEST_ATTEMPT_LOG"
 sleep 60
 exit 0
 SH
@@ -1671,9 +1671,9 @@ SH
   # killed there; a fresh deadline would let the root run for about 9s.
   : > "$log"
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 \
-    FM_LINT_ROOT_SECONDS=6 FM_LINT_ROOT_GRACE=1 \
-    FM_TEST_ATTEMPT_LOG="$log" FM_TEST_FIRST_SECS=3 \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 JG_LINT_REQUIRE_BOUNDS=1 \
+    JG_LINT_ROOT_SECONDS=6 JG_LINT_ROOT_GRACE=1 \
+    JG_TEST_ATTEMPT_LOG="$log" JG_TEST_FIRST_SECS=3 \
     "$LINT" --telemetry "$tmp/partial.tsv" "$fixture" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a fallback cut off by the root deadline unexpectedly passed"
   [ "$(cat "$log")" = "$(printf 'follow\nfallback')" ] \
@@ -1687,9 +1687,9 @@ SH
   # With under a second of the deadline left, no retry starts.
   : > "$log"
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 \
-    FM_LINT_ROOT_SECONDS=6 FM_LINT_ROOT_GRACE=1 \
-    FM_TEST_ATTEMPT_LOG="$log" FM_TEST_FIRST_SECS=5.2 \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 JG_LINT_REQUIRE_BOUNDS=1 \
+    JG_LINT_ROOT_SECONDS=6 JG_LINT_ROOT_GRACE=1 \
+    JG_TEST_ATTEMPT_LOG="$log" JG_TEST_FIRST_SECS=5.2 \
     "$LINT" --telemetry "$tmp/spent.tsv" "$fixture" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a memory failure with no deadline left unexpectedly passed"
   [ "$(cat "$log")" = follow ] \
@@ -1725,10 +1725,10 @@ test_memory_evidence_outranks_findings_and_signal_reasons() {
     roots_log="$tmp/lint.$bounded.roots.tsv"
     rc=0
     if [ "$bounded" = 1 ]; then
-      out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 \
+      out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 JG_LINT_REQUIRE_BOUNDS=1 \
         "$LINT" --telemetry "$tmp/lint.$bounded.tsv" "${roots[@]}" 2>&1) || rc=$?
     else
-      out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 \
+      out=$(PATH="$fakebin:$PATH" JG_LINT_JOBS=1 \
         "$LINT" --telemetry "$tmp/lint.$bounded.tsv" "${roots[@]}" 2>&1) || rc=$?
     fi
     [ "$rc" -ne 0 ] || fail "memory deaths unexpectedly passed (bounded=$bounded)"
@@ -1806,7 +1806,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
   cp "$LINT" "$lone_dir/jg-lint.sh"
   chmod +x "$lone_dir/jg-lint.sh"
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
+  out=$(PATH="$fakebin:$PATH" JG_LINT_REQUIRE_BOUNDS=1 \
     "$lone_dir/jg-lint.sh" "$fixture" 2>&1) || rc=$?
   [ "$rc" -eq 2 ] || fail "a watchdog-less run under REQUIRE_BOUNDS exited $rc, expected 2"
   assert_contains "$out" "jg-timeout-lib.sh" "the refusal did not name the missing watchdog library"
@@ -1818,7 +1818,7 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
     # The host accepts the memory limit, so a required-bounds run proceeds and
     # still lints the root.
     rc=0
-    out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
+    out=$(PATH="$fakebin:$PATH" JG_LINT_REQUIRE_BOUNDS=1 \
       "$LINT" "$fixture" 2>&1) || rc=$?
     [ "$rc" -eq 0 ] || fail "an enforceable bounded run was refused"$'\n'"$out"
     [ -s "$stub_log" ] || fail "an enforceable bounded run never invoked ShellCheck"
@@ -1826,16 +1826,16 @@ test_require_bounds_refuses_when_enforcement_is_missing() {
     # The host rejects the address-space limit outright (macOS), so the run
     # must refuse by name rather than lint uncapped.
     rc=0
-    out=$(PATH="$fakebin:$PATH" FM_LINT_REQUIRE_BOUNDS=1 \
+    out=$(PATH="$fakebin:$PATH" JG_LINT_REQUIRE_BOUNDS=1 \
       "$LINT" "$fixture" 2>&1) || rc=$?
     [ "$rc" -eq 2 ] || fail "an unenforceable memory limit under REQUIRE_BOUNDS exited $rc, expected 2"
-    assert_contains "$out" "FM_LINT_ROOT_MEMORY_KIB" \
+    assert_contains "$out" "JG_LINT_ROOT_MEMORY_KIB" \
       "the refusal did not name the unenforceable memory limit"
     assert_contains "$out" "refusing to lint uncapped" "the refusal did not explain itself"
     [ ! -s "$stub_log" ] \
       || fail "a bound-refused run still invoked ShellCheck"
   fi
-  pass "FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable"
+  pass "JG_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable"
 }
 
 test_pinned_shellcheck_memory_limit() {
@@ -1858,7 +1858,7 @@ test_pinned_shellcheck_memory_limit() {
   # limit - this is what proves the address-space cap leaves GHC enough head
   # room instead of discovering the conflict mid-partition in CI.
   rc=0
-  out=$(FM_LINT_REQUIRE_BOUNDS=1 "$LINT" \
+  out=$(JG_LINT_REQUIRE_BOUNDS=1 "$LINT" \
     --telemetry "$telemetry" "$fixture" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "pinned ShellCheck did not lint under the default memory limit"$'\n'"$out"
   grep -q $'^meta\tbounds_enforced\t1$' "$roots_log" \
@@ -1874,7 +1874,7 @@ test_pinned_shellcheck_memory_limit() {
   # still lint under a few hundred MiB; only a cap under the binary itself
   # binds on every Linux architecture.
   rc=0
-  out=$(FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_MEMORY_KIB=8192 \
+  out=$(JG_LINT_REQUIRE_BOUNDS=1 JG_LINT_ROOT_MEMORY_KIB=8192 \
     "$LINT" --telemetry "$tmp/tiny.tsv" "$fixture" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "pinned ShellCheck ignored an 8 MiB address-space limit"
   assert_contains "$out" "small.sh" "the memory-bound pinned root was not named"
@@ -1939,7 +1939,7 @@ test_roots_sidecar_records_per_root_lifecycle() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$gamma"
 
   rc=0
-  out=$(PATH="$fakebin:$PATH" FM_TEST_STUB_LOG="$stub_log" \
+  out=$(PATH="$fakebin:$PATH" JG_TEST_STUB_LOG="$stub_log" \
     "$LINT" --telemetry "$telemetry" "$alpha" "$beta" "$gamma" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "a clean bounded run failed"$'\n'"$out"
   [ -f "$roots_log" ] || fail "the run wrote no per-root sidecar beside telemetry"
@@ -2016,7 +2016,7 @@ test_local_bad() {
 SH
 
   rc=0
-  out=$(FM_LINT_JOBS=2 "$LINT" "$dispatcher" "$adapter" "$owner" "$test_root" 2>&1) || rc=$?
+  out=$(JG_LINT_JOBS=2 "$LINT" "$dispatcher" "$adapter" "$owner" "$test_root" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "seeded module-boundary defects unexpectedly passed"
   assert_contains "$out" "SC1007" "representative dispatcher defect was hidden"
   assert_contains "$out" "SC2086" "representative canonical adapter defect was hidden"

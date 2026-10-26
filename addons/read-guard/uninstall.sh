@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # Remove only this guard's Claude hook and runtime adapters. Usage: uninstall.sh [--dry-run]
 set -euo pipefail
 DRY=0
@@ -7,7 +16,7 @@ DRY=0
 DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-read-guard
 # Every Claude config folder: ~/.claude and each Claude account folder in the muxr registry the account pool launches
 # workers with (CLAUDE_CONFIG_DIR), whose settings.json replaces ~/.claude's. Rerun after adding an account.
-REG=${FM_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+REG=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
 CLAUDE_DIRS=$( { echo "$HOME/.claude"; [ ! -e "$REG" ] || jq -r '.accounts[] | select(.provider == "claude") | .folder' "$REG" || echo "warning: cannot read $REG; only ~/.claude is covered" >&2; } | awk '!seen[$0]++')
 while read -r d; do
   if [ -s "$d/settings.json" ] && jq -e '[.hooks.PreToolUse[]?.hooks[]? | (.command // "") | select(contains("jg-read-guard/guard.mjs"))] | length > 0' "$d/settings.json" >/dev/null; then

@@ -18,21 +18,21 @@ cp "$ROOT/AGENTS.md" "$TMP_ROOT/source/AGENTS.md"
 cat > "$TMP_ROOT/source/bin/jg-home-seed.sh" <<'SH'
 #!/usr/bin/env bash
 mkdir -p "$2/state" "$2/config" "$2/bin"
-cp "$FM_HOME/bin/jg-supervision-engine-lib.sh" "$2/bin/"
-if [ -f "$FM_HOME/config/supervision-host-off" ]; then
+cp "$JG_HOME/bin/jg-supervision-engine-lib.sh" "$2/bin/"
+if [ -f "$JG_HOME/config/supervision-host-off" ]; then
   : > "$2/config/supervision-host-off"
 fi
 SH
 cat > "$TMP_ROOT/source/bin/jg-spawn.sh" <<'SH'
 #!/usr/bin/env bash
-tmux new-window -d -t firstmate: -n "jg-$1" -c "$FM_HOME/../mate" 'exec sleep 45' || exit 1
+tmux new-window -d -t firstmate: -n "jg-$1" -c "$JG_HOME/../mate" 'exec sleep 45' || exit 1
 pid=$(tmux display-message -p -t "firstmate:=jg-$1" '#{pane_pid}')
-printf '%s\n' "$pid" > "$FM_HOME/../mate/state/.lock"
-printf 'window=firstmate:jg-%s\n' "$1" > "$FM_HOME/state/$1.meta"
+printf '%s\n' "$pid" > "$JG_HOME/../mate/state/.lock"
+printf 'window=firstmate:jg-%s\n' "$1" > "$JG_HOME/state/$1.meta"
 SH
 cat > "$TMP_ROOT/fakebin/claude" <<'SH'
 #!/usr/bin/env bash
-: > "$FM_HOME/state/.session-start-complete"
+: > "$JG_HOME/state/.session-start-complete"
 exec sleep 45
 SH
 chmod +x "$TMP_ROOT/source/bin/"{jg-home-seed,jg-spawn}.sh "$TMP_ROOT/fakebin/claude"
@@ -86,8 +86,8 @@ cat > "$TMP_ROOT/source-worker/bin/jg-spawn.sh" <<'SH'
 # cannot answer.
 tmux new-window -d -t firstmate: -n "jg-$1" -c "$2" 'exec sleep 45' || exit 1
 pid=$(tmux display-message -p -t "firstmate:=jg-$1" '#{pane_pid}')
-printf 'window=firstmate:jg-%s\nworktree=%s\nkind=secondmate\ntasktmp=/tmp/jg-%s\n' "$1" "$2" "$1" > "$FM_HOME/state/$1.meta"
-printf 'paused [at=1]: waiting on gate file %s to exist\n' "$FM_HOME/data/$1/gate" > "$FM_HOME/state/$1.status"
+printf 'window=firstmate:jg-%s\nworktree=%s\nkind=secondmate\ntasktmp=/tmp/jg-%s\n' "$1" "$2" "$1" > "$JG_HOME/state/$1.meta"
+printf 'paused [at=1]: waiting on gate file %s to exist\n' "$JG_HOME/data/$1/gate" > "$JG_HOME/state/$1.status"
 SH
 chmod +x "$TMP_ROOT/source-worker/bin/jg-spawn.sh"
 git -C "$TMP_ROOT/source-worker" add -A

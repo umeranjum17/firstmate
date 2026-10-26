@@ -8,7 +8,7 @@ This record owns concurrent isolation evidence for the portable parallel candida
 
 - Date: 2026-08-20
 - Command: `bin/jg-test-isolation-proof.sh --jobs 4 --json /tmp/jg-isolation-proof.json`
-- Result: `FM_ISOLATION_SUMMARY total=24 failed=0 concurrency=4 duration_ms=113278`
+- Result: `JG_ISOLATION_SUMMARY total=24 failed=0 concurrency=4 duration_ms=113278`
 
 | Field | Value |
 |---|---|
@@ -90,8 +90,8 @@ Admission is by family rather than by script, so a script that joins an admitted
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=18 failed=0 concurrency=4 duration_ms=394675` |
-| 2 | `FM_ISOLATION_SUMMARY total=18 failed=0 concurrency=4 duration_ms=374869` |
+| 1 | `JG_ISOLATION_SUMMARY total=18 failed=0 concurrency=4 duration_ms=394675` |
+| 2 | `JG_ISOLATION_SUMMARY total=18 failed=0 concurrency=4 duration_ms=374869` |
 
 Those archived harness runs used alphabetical launch order and oldest-worker reclamation.
 They establish the worker isolation result, but they did not reproduce the production scheduler's load profile and are not the sole basis for admission.
@@ -117,8 +117,8 @@ Both `bin/jg-test-run.sh` and the current proof harness therefore order concurre
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=32 failed=0 concurrency=4 duration_ms=161837` |
-| 2 | `FM_ISOLATION_SUMMARY total=32 failed=0 concurrency=4 duration_ms=156462` |
+| 1 | `JG_ISOLATION_SUMMARY total=32 failed=0 concurrency=4 duration_ms=161837` |
+| 2 | `JG_ISOLATION_SUMMARY total=32 failed=0 concurrency=4 duration_ms=156462` |
 
 The current runner-change selection is owned by [`bin/jg-test-run.sh`](../bin/jg-test-run.sh)'s changed-file map.
 Before admission, 14 of the family's scripts fell to the serial tail and the 33-script selection measured 327.3s against a 300s budget: the concurrent group was 19 scripts totalling 273.4s while the tail alone was 215.7s, dominated by `jg-calm-pi-extension` (77.5s), `jg-vendor-auth-probe` (51.0s), and `jg-muse-harness` (39.7s).
@@ -137,8 +137,8 @@ All five runs used plain `--changed` with no `--jobs` flag, exercised the produc
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=6 failed=0 concurrency=4 duration_ms=198594` |
-| 2 | `FM_ISOLATION_SUMMARY total=6 failed=0 concurrency=4 duration_ms=186796` |
+| 1 | `JG_ISOLATION_SUMMARY total=6 failed=0 concurrency=4 duration_ms=198594` |
+| 2 | `JG_ISOLATION_SUMMARY total=6 failed=0 concurrency=4 duration_ms=186796` |
 
 The production runner measured the same family at `--family pr-forge --jobs 1` in 409.2s and at `--jobs 4` in 237.9s, both with 0 failures, so four workers return 1.72x on it.
 That is close to the family's ceiling rather than a scheduling loss: its longest script runs 198.5s, so no partition of these six can finish faster than about 2.1x.
@@ -155,8 +155,8 @@ Admitting them inside their own family is a different question and this proof an
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=8 failed=0 concurrency=4 duration_ms=367947` |
-| 2 | `FM_ISOLATION_SUMMARY total=8 failed=0 concurrency=4 duration_ms=352910` |
+| 1 | `JG_ISOLATION_SUMMARY total=8 failed=0 concurrency=4 duration_ms=367947` |
+| 2 | `JG_ISOLATION_SUMMARY total=8 failed=0 concurrency=4 duration_ms=352910` |
 
 Both recorded runs began with the machine's one-minute load average below 6.0, at 5.55 and 5.76, so they measure isolation rather than contention.
 A third run taken between them also reported `total=8 failed=0 concurrency=4 duration_ms=357804`, but it started at a load average of 9.20 while the previous run's workers were still decaying, so it is disclosed here rather than recorded as a measurement.
@@ -173,8 +173,8 @@ For the same reason the 1.72x four-worker figure recorded above is left as a sta
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=536586` |
-| 2 | `FM_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=571247` |
+| 1 | `JG_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=536586` |
+| 2 | `JG_ISOLATION_SUMMARY total=21 failed=0 concurrency=4 duration_ms=571247` |
 
 An earlier proof on 2026-09-03 refused this family on `tests/jg-backlog-handoff.test.sh`, failing two runs of three with `Task "pre-move-crash" not found in this backlog`.
 The cause was in the case's crash injection, not in shared secondmate state.
@@ -195,8 +195,8 @@ Under a synthetic five-minute load average above 30, the case failed on the old 
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=11 failed=0 concurrency=4 duration_ms=337928` |
-| 2 | `FM_ISOLATION_SUMMARY total=11 failed=0 concurrency=4 duration_ms=335204` |
+| 1 | `JG_ISOLATION_SUMMARY total=11 failed=0 concurrency=4 duration_ms=337928` |
+| 2 | `JG_ISOLATION_SUMMARY total=11 failed=0 concurrency=4 duration_ms=335204` |
 
 The earlier refusal was `tests/jg-session-start.test.sh` reporting `the digest waited 9s for inactive reconciliation's 8s state read`.
 That case proves the startup digest does not block on a slow current-state read, and it decided that by timing the whole digest against a fixed eight-second sleep, which a loaded host can exceed without the property being violated.
@@ -213,8 +213,8 @@ Both proof runs above were taken while the machine carried a five-minute load av
 
 | Run | Summary |
 |---|---|
-| 1 | `FM_ISOLATION_SUMMARY total=28 failed=0 concurrency=4 duration_ms=301792` |
-| 2 | `FM_ISOLATION_SUMMARY total=28 failed=0 concurrency=4 duration_ms=250230` |
+| 1 | `JG_ISOLATION_SUMMARY total=28 failed=0 concurrency=4 duration_ms=301792` |
+| 2 | `JG_ISOLATION_SUMMARY total=28 failed=0 concurrency=4 duration_ms=250230` |
 
 This family is the residual set that used to sit in `unclassified`, and it exists because the catch-all itself must never be admitted.
 `unclassified` is the family map's `*)` arm, so admitting it would silently grant concurrency to every test added afterwards, which is exactly the population with no proof.
@@ -228,7 +228,7 @@ Its current live-backend result is recorded under [workspace-removal focus safet
 
 One member needs a current Pi to pass at all.
 `tests/jg-pi-branch-extension.test.sh` compares Juggernaut's supervision-branch extension against the stock renderers of the installed `@earendil-works/pi-coding-agent`, and the proof host's global install was stale at 0.81.1 while the published release was 0.84.4.
-On the stale package the case fails serially as well as concurrently, so it is a prerequisite rather than a concurrency result; both runs above pinned the current package with `FM_PI_PACKAGE_DIR`, and on a host whose global install is current the plain command reproduces them.
+On the stale package the case fails serially as well as concurrently, so it is a prerequisite rather than a concurrency result; both runs above pinned the current package with `JG_PI_PACKAGE_DIR`, and on a host whose global install is current the plain command reproduces them.
 
 ## Production runner effect of the 2026-09-03 admissions
 
@@ -249,7 +249,7 @@ The three families retain the same coverage guarantees; what changed is one cras
 ## Scope
 
 Each worker used a separate mode-`0700` temporary root and private `TMPDIR` and `TMP`.
-The harness cleared ambient `FM_HOME` and `FM_*_OVERRIDE` values for every worker and verified that global Git configuration was unchanged.
+The harness cleared ambient `JG_HOME` and `JG_*_OVERRIDE` values for every worker and verified that global Git configuration was unchanged.
 A candidate failure fails the aggregate run and requires investigation rather than a retry.
 
 ## Re-run

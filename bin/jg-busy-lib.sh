@@ -135,7 +135,7 @@
 #
 # Sourcing: set -u and set -e safe; no subshell-unfriendly globals.
 
-FM_BUSY_LIB_VERSION=v1
+JG_BUSY_LIB_VERSION=v1
 
 # Standalone-Kimi verification gate. Empty means no installed Kimi version
 # has passed live verification, so every standalone Kimi task classifies
@@ -155,10 +155,10 @@ FM_BUSY_LIB_VERSION=v1
 # record the version, exact commands, and observed output in
 # docs/verification/supervision.md, add the verified version string(s) here,
 # and land the wiring in jg-spawn behind this same gate in the same change.
-FM_BUSY_KIMI_VERIFIED_VERSIONS=""
+JG_BUSY_KIMI_VERIFIED_VERSIONS=""
 
 jg_busy_kimi_verified() {
-  [ -n "$FM_BUSY_KIMI_VERIFIED_VERSIONS" ]
+  [ -n "$JG_BUSY_KIMI_VERIFIED_VERSIONS" ]
 }
 
 # jg_busy_codex_appserver_observable: capability/version negotiation for the
@@ -293,7 +293,7 @@ jg_busy_record_read() {  # <state-dir> <id>
   local -a fields
   IFS=' ' read -r -a fields <<< "$line"
   ver=${fields[0]:-}
-  [ "$ver" = "$FM_BUSY_LIB_VERSION" ] || { printf 'malformed'; return 1; }
+  [ "$ver" = "$JG_BUSY_LIB_VERSION" ] || { printf 'malformed'; return 1; }
   for f in "${fields[@]:1}"; do
     case "$f" in
       gen=*) r_gen=${f#gen=} ;;
@@ -877,11 +877,11 @@ jg_busy_cursor_turn_state() {  # <transcript>
 
 # jg_busy_grok_tail_busy: the Grok-only temporary rendered-tail fallback.
 # Consumes the tail on stdin; 0 when Grok's verified busy signature matches.
-# FM_BUSY_REGEX still globally overrides the signature, mirroring the
+# JG_BUSY_REGEX still globally overrides the signature, mirroring the
 # historical operator escape hatch.
 jg_busy_grok_tail_busy() {
   grep -v '^[[:space:]]*$' | tail -12 \
-    | grep -qiE "${FM_BUSY_REGEX:-${FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT:-Ctrl\\+c:cancel}}"
+    | grep -qiE "${JG_BUSY_REGEX:-${JG_DELIVERY_GROK_BUSY_REGEX_DEFAULT:-Ctrl\\+c:cancel}}"
 }
 
 # jg_busy_rovo_tail_busy: the Rovo-only temporary rendered-tail fallback.
@@ -891,10 +891,10 @@ jg_busy_grok_tail_busy() {
 # literal text). rovo has no turn-end hook - its eventHooks fire at tool
 # granularity only - so this fallback, like Grok's, is the only source; it is
 # never armed as a semantic writer (jg_busy_sources_for_harness trusts
-# nothing for rovo). FM_BUSY_ROVO_REGEX overrides the signature.
+# nothing for rovo). JG_BUSY_ROVO_REGEX overrides the signature.
 jg_busy_rovo_tail_busy() {
   grep -v '^[[:space:]]*$' | tail -12 \
-    | grep -qiE "${FM_BUSY_ROVO_REGEX:-Rovo is thinking}"
+    | grep -qiE "${JG_BUSY_ROVO_REGEX:-Rovo is thinking}"
 }
 
 # jg_busy_agy_tail_busy: the AGY-only temporary rendered-tail fallback.
@@ -948,7 +948,7 @@ jg_busy_agy_tail_busy() {
 jg_busy_claude_trust_dialog_tail() {
   local buf
   buf=$(cat)
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_TRUST_PROMPT_REGEX:-Quick safety check: Is this a project you created or one you trust\\?}" \
+  printf '%s' "$buf" | grep -qiE "${JG_BUSY_CLAUDE_TRUST_PROMPT_REGEX:-Quick safety check: Is this a project you created or one you trust\\?}" \
     && printf '%s' "$buf" | grep -qiE 'No, exit|Enter to confirm'
 }
 
@@ -960,7 +960,7 @@ jg_busy_claude_trust_dialog_tail() {
 jg_busy_claude_imports_dialog_tail() {
   local buf
   buf=$(cat)
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
+  printf '%s' "$buf" | grep -qiE "${JG_BUSY_CLAUDE_IMPORTS_PROMPT_REGEX:-Allow external CLAUDE\\.md file imports\\?}" \
     && printf '%s' "$buf" | grep -qiE 'No, disable external imports|Yes, allow external imports'
 }
 
@@ -988,7 +988,7 @@ jg_busy_claude_launch_prompt_tail() {
 jg_busy_pi_launch_prompt_tail() {
   local buf
   buf=$(cat)
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_PI_LAUNCH_PROMPT_REGEX:-Trust project folder\\?}" \
+  printf '%s' "$buf" | grep -qiE "${JG_BUSY_PI_LAUNCH_PROMPT_REGEX:-Trust project folder\\?}" \
     && printf '%s' "$buf" | grep -qiE 'Do not trust'
 }
 
@@ -1015,15 +1015,15 @@ jg_busy_pi_launch_prompt_tail() {
 jg_busy_gemini_launch_prompt_tail() {
   local buf
   buf=$(cat)
-  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_GEMINI_TRUST_PROMPT_REGEX:-Do you trust the files in this folder\\?}" \
+  if printf '%s' "$buf" | grep -qiE "${JG_BUSY_GEMINI_TRUST_PROMPT_REGEX:-Do you trust the files in this folder\\?}" \
     && printf '%s' "$buf" | grep -qiE "Trust folder|Don't trust"; then
     return 0
   fi
-  if printf '%s' "$buf" | grep -qiE "${FM_BUSY_GEMINI_AUTH_PROMPT_REGEX:-How would you like to authenticate for this project\\?}" \
+  if printf '%s' "$buf" | grep -qiE "${JG_BUSY_GEMINI_AUTH_PROMPT_REGEX:-How would you like to authenticate for this project\\?}" \
     && printf '%s' "$buf" | grep -qiE 'Use Gemini API Key|No authentication method selected'; then
     return 0
   fi
-  printf '%s' "$buf" | grep -qiE "${FM_BUSY_GEMINI_APIKEY_PROMPT_REGEX:-Enter Gemini API Key}"
+  printf '%s' "$buf" | grep -qiE "${JG_BUSY_GEMINI_APIKEY_PROMPT_REGEX:-Enter Gemini API Key}"
 }
 
 # jg_busy_launch_prompt_parked: dispatch to the signature above for <harness>,

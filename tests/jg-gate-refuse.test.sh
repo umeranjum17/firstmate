@@ -15,8 +15,8 @@
 #
 # The one authorized exception is a disposable LAB home: bin/jg-lab-home.sh
 # stamps a marker file only on a fresh empty dir, and inside a gate context the
-# refusal lets a lifecycle call proceed only when FM_HOME is a marked lab home
-# used through its stock layout (any FM_*_OVERRIDE relocation stays refused).
+# refusal lets a lifecycle call proceed only when JG_HOME is a marked lab home
+# used through its stock layout (any JG_*_OVERRIDE relocation stays refused).
 # The helper legs below cover the admit/refuse contract; teardown additionally
 # proves the admit end-to-end through a real entrypoint.
 #
@@ -93,7 +93,7 @@ run_guard_lib() {
   local cwd=$1 marker=${2:-unset}
   (
     cd "$cwd" || exit 111
-    unset NO_MISTAKES_GATE FM_GATE_REFUSE_BYPASS
+    unset NO_MISTAKES_GATE JG_GATE_REFUSE_BYPASS
     case "$marker" in
       set) export NO_MISTAKES_GATE=1 ;;
       empty) export NO_MISTAKES_GATE= ;;
@@ -142,17 +142,17 @@ test_helper_normal_is_noop() {
 # --- disposable lab homes ----------------------------------------------------
 
 # run_guard_lib_home <cwd> <home> [ASSIGN...] -> combined output : like
-# run_guard_lib but with FM_HOME=<home>; extra ASSIGN args carry the gate
+# run_guard_lib but with JG_HOME=<home>; extra ASSIGN args carry the gate
 # signal (NO_MISTAKES_GATE=1) or an override to exercise the stock-layout
-# requirement. All FM_*_OVERRIDE vars are unset first so the suite stays
+# requirement. All JG_*_OVERRIDE vars are unset first so the suite stays
 # hermetic inside a real gate.
 run_guard_lib_home() {
   local cwd=$1 home=$2; shift 2
   # shellcheck disable=SC2016 # $1/$2 expand in the child shell, not here.
-  env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS \
-      -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE \
-      -u FM_PROJECTS_OVERRIDE -u FM_CONFIG_OVERRIDE \
-      FM_HOME="$home" "$@" \
+  env -u NO_MISTAKES_GATE -u JG_GATE_REFUSE_BYPASS \
+      -u JG_ROOT_OVERRIDE -u JG_STATE_OVERRIDE -u JG_DATA_OVERRIDE \
+      -u JG_PROJECTS_OVERRIDE -u JG_CONFIG_OVERRIDE \
+      JG_HOME="$home" "$@" \
       bash -c 'cd "$1" || exit 111; set -eu; . "$2"; jg_refuse_if_gate_agent' \
       _ "$cwd" "$GATE_LIB" 2>&1
 }
@@ -173,10 +173,10 @@ test_helper_lab_home_admits() {
   expect_code 3 "$rc" "helper: gate + unmarked home must still refuse"
   assert_contains "$out" "$ENV_MSG" "helper: unmarked-home refusal message"
 
-  # gate + marked lab + an FM_*_OVERRIDE -> refused: the allowance requires
+  # gate + marked lab + an JG_*_OVERRIDE -> refused: the allowance requires
   # the stock layout so an override cannot split state onto the real fleet.
-  out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1 FM_STATE_OVERRIDE="$lab/state"); rc=$?
-  expect_code 3 "$rc" "helper: lab home driven through FM_STATE_OVERRIDE must refuse"
+  out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1 JG_STATE_OVERRIDE="$lab/state"); rc=$?
+  expect_code 3 "$rc" "helper: lab home driven through JG_STATE_OVERRIDE must refuse"
   assert_contains "$out" "$ENV_MSG" "helper: override refusal message"
 
   # no gate signal + lab home -> still a normal no-op.
@@ -283,11 +283,11 @@ test_lab_home_helper() {
 run_spawn() {
   local cwd=$1 home=$2 id=$3 proj=$4 pane=$5 fakebin=$6; shift 6
   jg_test_spawn_brief "$home" "$id" brief
-  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS \
-      FM_ROOT_OVERRIDE='' FM_HOME="$home" \
-      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-      FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
-      FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$pane" TMUX=fake,1,0 \
+  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u JG_GATE_REFUSE_BYPASS \
+      JG_ROOT_OVERRIDE='' JG_HOME="$home" \
+      JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+      JG_PROJECTS_OVERRIDE="$home/projects" JG_CONFIG_OVERRIDE="$home/config" \
+      JG_SPAWN_NO_GUARD=1 JG_FAKE_PANE_PATH="$pane" TMUX=fake,1,0 \
       PATH="$fakebin:$PATH" "$@" \
       "$SPAWN" "$id" "$proj" codex --mode no-mistakes --yolo off ) 2>&1
 }
@@ -325,7 +325,7 @@ test_spawn_refuses_and_admits() {
 
 # --- jg-send ----------------------------------------------------------------
 
-# A fake tmux that logs send-keys to FM_TMUX_LOG and reports live endpoints
+# A fake tmux that logs send-keys to JG_TMUX_LOG and reports live endpoints
 # (mirrors tests/jg-send-strict), so a successful send is observable and a
 # refused one leaves an empty log (proving no message was typed).
 make_send_fakebin() {
@@ -344,7 +344,7 @@ case "${1:-}" in
         *) break ;;
       esac
     done
-    printf 'send-keys target=%s literal=%s arg=%s\n' "$target" "$literal" "${1:-}" >> "$FM_TMUX_LOG"
+    printf 'send-keys target=%s literal=%s arg=%s\n' "$target" "$literal" "${1:-}" >> "$JG_TMUX_LOG"
     exit 0 ;;
   display-message)
     for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
@@ -363,9 +363,9 @@ SH
 # run_send <cwd> <home> <fakebin> <log> <target> <text> [ASSIGN...] -> combined output
 run_send() {
   local cwd=$1 home=$2 fakebin=$3 log=$4 target=$5 text=$6; shift 6
-  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS \
-      "PATH=$fakebin:$PATH" "FM_HOME=$home" "FM_ROOT_OVERRIDE=$home" \
-      "FM_TMUX_LOG=$log" "FM_SEND_SETTLE=0" "$@" \
+  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u JG_GATE_REFUSE_BYPASS \
+      "PATH=$fakebin:$PATH" "JG_HOME=$home" "JG_ROOT_OVERRIDE=$home" \
+      "JG_TMUX_LOG=$log" "JG_SEND_SETTLE=0" "$@" \
       "$SEND" "$target" "$text" ) 2>&1
 }
 
@@ -458,19 +458,19 @@ SH
 # run_teardown <cwd> <case_dir> [ASSIGN...] -> combined output
 run_teardown() {
   local cwd=$1 case_dir=$2; shift 2
-  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS \
-      "FM_ROOT_OVERRIDE=$ROOT" "FM_STATE_OVERRIDE=$case_dir/state" \
-      "FM_DATA_OVERRIDE=$case_dir/data" "FM_CONFIG_OVERRIDE=$case_dir/config" \
+  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u JG_GATE_REFUSE_BYPASS \
+      "JG_ROOT_OVERRIDE=$ROOT" "JG_STATE_OVERRIDE=$case_dir/state" \
+      "JG_DATA_OVERRIDE=$case_dir/data" "JG_CONFIG_OVERRIDE=$case_dir/config" \
       "PATH=$case_dir/fakebin:$PATH" "$@" \
       "$TEARDOWN" task-x1 ) 2>&1
 }
 
 # run_teardown_lab <cwd> <case_dir> [ASSIGN...] -> combined output
-# Lab-home counterpart of run_teardown: FM_HOME=<case_dir>, no FM_*_OVERRIDE.
+# Lab-home counterpart of run_teardown: JG_HOME=<case_dir>, no JG_*_OVERRIDE.
 run_teardown_lab() {
   local cwd=$1 case_dir=$2; shift 2
-  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS \
-      "FM_HOME=$case_dir" \
+  ( cd "$cwd" && env -u NO_MISTAKES_GATE -u JG_GATE_REFUSE_BYPASS \
+      "JG_HOME=$case_dir" \
       "PATH=$case_dir/fakebin:$PATH" "$@" \
       "$TEARDOWN" task-x1 ) 2>&1
 }
@@ -509,7 +509,7 @@ test_teardown_refuses_and_admits() {
   assert_not_contains "$out" "$PATH_MSG" "teardown: normal teardown must not print the backstop refusal"
   assert_not_contains "$out" "REFUSED" "teardown: normal teardown of landed work must not refuse"
 
-  # lab-home admit: gate context + FM_HOME=marked lab home -> tears down.
+  # lab-home admit: gate context + JG_HOME=marked lab home -> tears down.
   case_dir=$(make_teardown_lab_case teardown-lab)
   out=$(run_teardown_lab "$GATE_WT" "$case_dir"); rc=$?
   expect_code 0 "$rc" "teardown: gate + marked lab home must tear down landed work"

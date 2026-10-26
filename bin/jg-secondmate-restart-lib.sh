@@ -22,11 +22,11 @@
 # <id> relaunch either way, run here for a local mate and run on the host over
 # bin/jg-on.sh for a remote one.
 
-_FM_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_JG_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-backend.sh disable=SC1091
-. "$_FM_SECONDMATE_RESTART_LIB_DIR/jg-backend.sh"
+. "$_JG_SECONDMATE_RESTART_LIB_DIR/jg-backend.sh"
 # shellcheck source=bin/jg-control-lib.sh disable=SC1091
-. "$_FM_SECONDMATE_RESTART_LIB_DIR/jg-control-lib.sh"
+. "$_JG_SECONDMATE_RESTART_LIB_DIR/jg-control-lib.sh"
 
 # The persist request the primary sends before it restarts anything. It is the
 # open-record half of /stow and nothing more: a restart needs the state of work
@@ -35,67 +35,67 @@ _FM_SECONDMATE_RESTART_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The mate answers through its parent channel, which is what resolves the
 # parent-owned reply expectation jg-send arms for a marked request; that
 # correlated answer, never the wall clock, is what releases the restart.
-FM_SECONDMATE_PERSIST_REQUEST='Firstmate was updated and I am about to restart your agent so it comes up on the current instructions and launch-time settings, which drops your conversation but keeps every durable record. Before that, persist the open work you are holding only in this conversation, following the /stow skill'"'"'s "Open-record persistence" section and nothing else from that skill: file a task for each open record that exists only in this conversation, including any captain call you had formed but never registered, and correct any task whose status no longer reflects what you now know. Do NOT run the memory, learnings, or captain-preference sweeps. Then reply on your parent channel saying it is done, or saying what you deliberately left alone and why.'
+JG_SECONDMATE_PERSIST_REQUEST='Firstmate was updated and I am about to restart your agent so it comes up on the current instructions and launch-time settings, which drops your conversation but keeps every durable record. Before that, persist the open work you are holding only in this conversation, following the /stow skill'"'"'s "Open-record persistence" section and nothing else from that skill: file a task for each open record that exists only in this conversation, including any captain call you had formed but never registered, and correct any task whose status no longer reflects what you now know. Do NOT run the memory, learnings, or captain-preference sweeps. Then reply on your parent channel saying it is done, or saying what you deliberately left alone and why.'
 
 # Resolve one mate's restart capability from its durable record alone.
 # Publishes, on success:
-#   FM_SECONDMATE_RESTART_PLACEMENT  local|remote
-#   FM_SECONDMATE_RESTART_BACKEND    the backend whose classifier must prove the stop
-#   FM_SECONDMATE_RESTART_HARNESS    the verified control adapter it runs on
-#   FM_SECONDMATE_RESTART_HOST       the configured host (remote placement only)
-# and on failure sets FM_SECONDMATE_RESTART_REASON to one operator-readable line.
-FM_SECONDMATE_RESTART_PLACEMENT=""
-FM_SECONDMATE_RESTART_BACKEND=""
-FM_SECONDMATE_RESTART_HARNESS=""
-FM_SECONDMATE_RESTART_HOST=""
-FM_SECONDMATE_RESTART_REASON=""
+#   JG_SECONDMATE_RESTART_PLACEMENT  local|remote
+#   JG_SECONDMATE_RESTART_BACKEND    the backend whose classifier must prove the stop
+#   JG_SECONDMATE_RESTART_HARNESS    the verified control adapter it runs on
+#   JG_SECONDMATE_RESTART_HOST       the configured host (remote placement only)
+# and on failure sets JG_SECONDMATE_RESTART_REASON to one operator-readable line.
+JG_SECONDMATE_RESTART_PLACEMENT=""
+JG_SECONDMATE_RESTART_BACKEND=""
+JG_SECONDMATE_RESTART_HARNESS=""
+JG_SECONDMATE_RESTART_HOST=""
+JG_SECONDMATE_RESTART_REASON=""
 jg_secondmate_restart_capable() {  # <meta-file>
   local meta=$1 kind window remote_host backend harness family
-  FM_SECONDMATE_RESTART_PLACEMENT=""
-  FM_SECONDMATE_RESTART_BACKEND=""
-  FM_SECONDMATE_RESTART_HARNESS=""
-  FM_SECONDMATE_RESTART_HOST=""
-  FM_SECONDMATE_RESTART_REASON=""
+  JG_SECONDMATE_RESTART_PLACEMENT=""
+  JG_SECONDMATE_RESTART_BACKEND=""
+  JG_SECONDMATE_RESTART_HARNESS=""
+  JG_SECONDMATE_RESTART_HOST=""
+  JG_SECONDMATE_RESTART_REASON=""
 
   if [ ! -f "$meta" ] || [ -L "$meta" ]; then
-    FM_SECONDMATE_RESTART_REASON="no durable record for this second mate in this home"
+    JG_SECONDMATE_RESTART_REASON="no durable record for this second mate in this home"
     return 1
   fi
   kind=$(jg_meta_get "$meta" kind)
   if [ "$kind" != secondmate ]; then
-    FM_SECONDMATE_RESTART_REASON="the durable record is not a second mate's"
+    JG_SECONDMATE_RESTART_REASON="the durable record is not a second mate's"
     return 1
   fi
   window=$(jg_meta_get "$meta" window)
   if [ -z "$window" ]; then
-    FM_SECONDMATE_RESTART_REASON="the durable record names no endpoint, so there is no agent to replace"
+    JG_SECONDMATE_RESTART_REASON="the durable record names no endpoint, so there is no agent to replace"
     return 1
   fi
   harness=$(jg_meta_get "$meta" harness)
   remote_host=$(jg_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then
-    FM_SECONDMATE_RESTART_PLACEMENT=remote
-    FM_SECONDMATE_RESTART_HOST=$remote_host
+    JG_SECONDMATE_RESTART_PLACEMENT=remote
+    JG_SECONDMATE_RESTART_HOST=$remote_host
     # A remote mate's endpoint record lives on its host; the parent's own record
     # names the backend that launch established there, and the remote route
     # accepts nothing but herdr.
     backend=$(jg_meta_get "$meta" remote_backend)
     [ -n "$backend" ] || backend=herdr
   else
-    FM_SECONDMATE_RESTART_PLACEMENT=local
+    JG_SECONDMATE_RESTART_PLACEMENT=local
     backend=$(jg_backend_of_meta "$meta")
   fi
-  FM_SECONDMATE_RESTART_BACKEND=$backend
+  JG_SECONDMATE_RESTART_BACKEND=$backend
   if ! jg_control_backend_state_verified "$backend"; then
-    FM_SECONDMATE_RESTART_REASON="its runtime cannot prove an agent stopped and came back (backend $backend)"
+    JG_SECONDMATE_RESTART_REASON="its runtime cannot prove an agent stopped and came back (backend $backend)"
     return 1
   fi
   if ! family=$(jg_control_harness_family "$harness") \
     || ! jg_control_harness_supported "$family" \
     || ! jg_control_harness_supports_kind "$family" secondmate; then
-    FM_SECONDMATE_RESTART_REASON="its worker runtime '${harness:-none}' has no verified restart mechanics for a second mate"
+    JG_SECONDMATE_RESTART_REASON="its worker runtime '${harness:-none}' has no verified restart mechanics for a second mate"
     return 1
   fi
-  FM_SECONDMATE_RESTART_HARNESS=$family
+  JG_SECONDMATE_RESTART_HARNESS=$family
   return 0
 }

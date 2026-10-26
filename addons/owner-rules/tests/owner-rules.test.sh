@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
+  eval "_jg_val=\${_jg_old}"
+  export "$_jg_new=$_jg_val"
+done
+unset _jg_old _jg_new _jg_val 2>/dev/null || true
 # owner-rules e2e: the real jg-brief.sh of a firstmate checkout that carries the brief-inherit seam.
 # Usage: owner-rules/tests/owner-rules.test.sh <firstmate-checkout>
 # Proves a no-owner-ask refusal, a no-risk-reason refusal and a clean pass (brief written), plus the
@@ -58,7 +67,7 @@ BL
 # brief <id> <args...>: stderr, then rc= on the last line.
 brief() {
   local id=$1 out rc; shift
-  out=$(FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
+  out=$(JG_HOME=$home JG_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
 ASK='owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this lane serves (add it to the backlog item for no-ask)'
@@ -95,7 +104,7 @@ is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)
 [ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
 is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
-FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
+JG_HOME=$home JG_ADDONS_DIR=$addons JG_SECONDMATE_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
   && ok "pass: secondmate charter is exempt" || no "secondmate charter refused"
 
 tree=$(bash "$addons/owner-rules/bin/jg-owner-rules-tree.sh" "$home/data/backlog.md")

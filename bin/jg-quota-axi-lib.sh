@@ -3,7 +3,7 @@
 # --json snapshot validator, and the provider-row join dispatch consumers use.
 # Usage: . bin/jg-quota-axi-lib.sh
 #
-# FM_QUOTA_AXI_MIN follows the axi-family floor policy owned beside the floor
+# JG_QUOTA_AXI_MIN follows the axi-family floor policy owned beside the floor
 # constants in bin/jg-bootstrap.sh.
 #
 # This file is the single owner of that version number. bin/jg-bootstrap.sh
@@ -14,11 +14,11 @@
 # provider, no accountKey) and schema 6 (every row carries accountKey, unique on
 # provider + accountKey; quota-axi emits it once any provider expands to more
 # than one account). Schema 5 keeps its exact pre-schema-6 rules so an older
-# quota-axi keeps working unchanged. FM_QUOTA_ROW_JQ is the one join used to
+# quota-axi keeps working unchanged. JG_QUOTA_ROW_JQ is the one join used to
 # bind a candidate to its row under either schema.
 
-FM_QUOTA_AXI_MIN=0.1.51
-FM_QUOTA_PROVIDER_ID_RE='^[a-z0-9]+(-[a-z0-9]+)*\z'
+JG_QUOTA_AXI_MIN=0.1.51
+JG_QUOTA_PROVIDER_ID_RE='^[a-z0-9]+(-[a-z0-9]+)*\z'
 
 # The eligibility section of .agents/skills/quota-array-dispatch/SKILL.md
 # owns the account-matching contract these jq definitions implement.
@@ -29,7 +29,7 @@ FM_QUOTA_PROVIDER_ID_RE='^[a-z0-9]+(-[a-z0-9]+)*\z'
 #                                  the one provider row the candidate binds to,
 #                                  or null; schema 5 ignores $lane.
 # shellcheck disable=SC2016,SC2034  # jq program text, not shell expansion; read by the sourcing consumers
-FM_QUOTA_ROW_JQ='
+JG_QUOTA_ROW_JQ='
   def quota_lane($harness; $model):
     if $harness == "codex" then "codex-home"
     elif ($harness == "pi" or $harness == "pi-signed") and (($model // "") | contains("/"))
@@ -45,7 +45,7 @@ FM_QUOTA_ROW_JQ='
 '
 
 # jg_quota_axi_version_compatible <version-output>
-# True when the printed `quota-axi --version` text meets FM_QUOTA_AXI_MIN.
+# True when the printed `quota-axi --version` text meets JG_QUOTA_AXI_MIN.
 # Callers that already captured a bounded --version pass that text here so they
 # do not launch a second, unbounded version probe.
 jg_quota_axi_version_compatible() {
@@ -58,8 +58,8 @@ jg_quota_axi_version_compatible() {
   # An unparseable version is incompatible, never assumed current, so a
   # development or vendored build cannot pass a floor it was never checked against.
   [ -n "$major" ] && [ -n "$minor" ] && [ -n "$patch" ] && [ -z "$extra" ] || return 1
-  # The floor is compared from FM_QUOTA_AXI_MIN so bumping it needs one edit.
-  IFS='.' read -r min_major min_minor min_patch min_extra <<< "$FM_QUOTA_AXI_MIN"
+  # The floor is compared from JG_QUOTA_AXI_MIN so bumping it needs one edit.
+  IFS='.' read -r min_major min_minor min_patch min_extra <<< "$JG_QUOTA_AXI_MIN"
   [ -n "$min_major" ] && [ -n "$min_minor" ] && [ -n "$min_patch" ] && [ -z "$min_extra" ] || return 1
   [ "$major" -gt "$min_major" ] && return 0
   [ "$major" -eq "$min_major" ] || return 1
@@ -84,7 +84,7 @@ jg_quota_axi_compatible() {
 }
 
 jg_quota_json_valid() {
-  jq -se --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+  jq -se --arg provider_re "$JG_QUOTA_PROVIDER_ID_RE" '
     length == 1 and
     (.[0] | type) == "object" and
     (.[0] |

@@ -6,7 +6,7 @@
 # It exercises the end-user command shape against metadata written by a real
 # jg-spawn.sh --secondmate launch, captures Pi's before_agent_start prompt bytes,
 # and proves both sides of the routing boundary:
-#   - exact task id through explicit FM_HOME receives exactly one marker;
+#   - exact task id through explicit JG_HOME receives exactly one marker;
 #   - direct terminal input remains unmarked.
 #
 # Every Herdr call, including calls made inside the production backend adapter,
@@ -22,7 +22,7 @@ set -u
 # shellcheck source=/dev/null
 . "$ROOT/bin/jg-backend.sh"
 
-jg_live_gate opt-in FM_SEND_MARKER_HERDR_E2E git herdr jq pi
+jg_live_gate opt-in JG_SEND_MARKER_HERDR_E2E git herdr jq pi
 
 LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/jg-herdr-lab.sh}
 SESSION=$("$LAB_HELPER" name jg-send-secondmate-marker-v7)
@@ -34,8 +34,8 @@ FAKEBIN="$TMP_ROOT/fakebin"
 ORIGINAL_PATH=$PATH
 REAL_PI=$(command -v pi)
 ID='marker-pi-sm'
-REQUEST='FM_MARKER_HERDR_E2E exact-id request'
-DIRECT='FM_MARKER_HERDR_DIRECT captain input'
+REQUEST='JG_MARKER_HERDR_E2E exact-id request'
+DIRECT='JG_MARKER_HERDR_DIRECT captain input'
 
 cleanup() {
   local rc=$?
@@ -108,7 +108,7 @@ printf '#!/usr/bin/env bash\nexec %q -e %q "$@"\n' "$REAL_PI" "$CAPTURE_EXTENSIO
 chmod +x "$FAKEBIN/pi"
 
 "$LAB_HELPER" provision "$SESSION"
-PATH="$FAKEBIN:$ORIGINAL_PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$SENDER_HOME" HERDR_SESSION="$SESSION" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" JG_GATE_REFUSE_BYPASS=1 JG_HOME="$SENDER_HOME" HERDR_SESSION="$SESSION" \
   "$ROOT/bin/jg-spawn.sh" "$ID" "$SECOND_HOME" --secondmate --harness pi --backend herdr >/dev/null
 
 META="$SENDER_HOME/state/$ID.meta"
@@ -156,14 +156,14 @@ wait_for_prompt 'Isolated marker capture secondmate' \
   || fail "real Pi before_agent_start capture did not load for the startup charter"
 wait_for_idle || fail "real Pi did not become idle after the startup capture"
 
-PATH="$FAKEBIN:$ORIGINAL_PATH" FM_GATE_REFUSE_BYPASS=1 FM_HOME="$SENDER_HOME" \
+PATH="$FAKEBIN:$ORIGINAL_PATH" JG_GATE_REFUSE_BYPASS=1 JG_HOME="$SENDER_HOME" \
   "$ROOT/bin/jg-send.sh" "$ID" "$REQUEST" >/dev/null
 wait_for_prompt "$REQUEST" || fail "real Pi did not receive the exact-id jg-send request"
 GOT=$(jq -r --arg needle "$REQUEST" 'select(.prompt | contains($needle)) | .prompt' "$CAPTURE" | tail -1)
-[ "$GOT" = "${FM_FROMFIRST_MARK}${REQUEST}" ] \
+[ "$GOT" = "${JG_FROMFIRST_MARK}${REQUEST}" ] \
   || fail "real Pi exact-id prompt did not contain exactly one terminal-safe marker"$'\n'"--- bytes ---"$'\n'"$(printf '%s' "$GOT" | od -An -tx1)"
 printf 'evidence: exact-id received-hex=%s\n' "$(printf '%s' "$GOT" | od -An -tx1 | tr -d ' \n')"
-pass "real Pi/Herdr: exact-id FM_HOME send delivers exactly one from-firstmate marker"
+pass "real Pi/Herdr: exact-id JG_HOME send delivers exactly one from-firstmate marker"
 wait_for_idle || fail "real Pi did not become idle after the exact-id capture"
 
 # Direct terminal input bypasses jg-send's metadata-routed transformation and

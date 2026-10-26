@@ -9,7 +9,7 @@
 # standing in for a host that does or does not have the tool. Nothing here reads
 # tests/lib.sh's source text.
 #
-# The family sweep at the end runs every real live guard with FM_LIVE=0 and
+# The family sweep at the end runs every real live guard with JG_LIVE=0 and
 # requires the shared refusal line, which is the only way to prove each guard is
 # wired to the shared gate rather than to a private env check of its own. It is
 # cheap because a disabled gate exits before a guard touches a harness.
@@ -37,7 +37,7 @@ clean_env() {
     TMPDIR="${TMPDIR:-/tmp}" \
     LANG="${LANG:-C}" \
     TERM="${TERM:-dumb}" \
-    FM_TEST_SKIP_ORPHAN_REAP=1 \
+    JG_TEST_SKIP_ORPHAN_REAP=1 \
     "$@"
 }
 
@@ -75,7 +75,7 @@ run_guard() {
 
 test_default_on_runs_when_the_tool_is_installed() {
   local path result
-  path=$(guard default-present default-on FM_FAKE_LIVE fmfakeharness)
+  path=$(guard default-present default-on JG_FAKE_LIVE fmfakeharness)
   result=$(run_guard "$path")
   [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "a default-on guard with its tool installed must succeed: $result"
   assert_contains "$result" ran "a default-on guard must run with no variable set when its tool is installed"
@@ -83,7 +83,7 @@ test_default_on_runs_when_the_tool_is_installed() {
 
 test_default_on_skips_and_names_the_absent_tool() {
   local path result
-  path=$(guard default-absent default-on FM_FAKE_LIVE fmmissingharness)
+  path=$(guard default-absent default-on JG_FAKE_LIVE fmmissingharness)
   result=$(run_guard "$path")
   [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "an absent tool must be a skip, not a failure: $result"
   assert_contains "$result" "skip: live: fmmissingharness absent" \
@@ -93,65 +93,65 @@ test_default_on_skips_and_names_the_absent_tool() {
 
 test_opt_in_stays_off_until_asked() {
   local path result
-  path=$(guard optin-idle opt-in FM_FAKE_LIVE fmfakeharness)
+  path=$(guard optin-idle opt-in JG_FAKE_LIVE fmfakeharness)
   result=$(run_guard "$path")
   [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "an unrequested opt-in guard must skip cleanly: $result"
-  assert_contains "$result" "skip: live: opt-in; set FM_FAKE_LIVE=1 to run" \
+  assert_contains "$result" "skip: live: opt-in; set JG_FAKE_LIVE=1 to run" \
     "an opt-in skip must name the variable that turns the guard on"
   assert_not_contains "$result" ran "a token-spending guard must not run unasked"
 }
 
 test_own_variable_turns_an_opt_in_guard_on() {
   local path result
-  path=$(guard optin-on opt-in FM_FAKE_LIVE fmfakeharness)
-  result=$(run_guard "$path" FM_FAKE_LIVE=1)
-  [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "FM_FAKE_LIVE=1 must run the guard: $result"
+  path=$(guard optin-on opt-in JG_FAKE_LIVE fmfakeharness)
+  result=$(run_guard "$path" JG_FAKE_LIVE=1)
+  [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "JG_FAKE_LIVE=1 must run the guard: $result"
   assert_contains "$result" ran "an explicitly requested opt-in guard must run"
 }
 
 test_requested_run_fails_rather_than_skipping_on_an_absent_tool() {
   local path result
-  path=$(guard optin-strict opt-in FM_FAKE_LIVE fmmissingharness)
-  result=$(run_guard "$path" FM_FAKE_LIVE=1)
+  path=$(guard optin-strict opt-in JG_FAKE_LIVE fmmissingharness)
+  result=$(run_guard "$path" JG_FAKE_LIVE=1)
   [ "$(printf '%s' "$result" | sed -n 1p)" = 1 ] || fail "a demanded run with no tool must fail, not skip: $result"
-  assert_contains "$result" "FM_FAKE_LIVE was requested but fmmissingharness is not installed" \
+  assert_contains "$result" "JG_FAKE_LIVE was requested but fmmissingharness is not installed" \
     "the hard failure must name the request and the missing tool"
   assert_not_contains "$result" "skip:" "a demanded run must never report itself as a skip"
 }
 
 test_jg_live_turns_the_whole_family_off_and_on() {
   local path result
-  path=$(guard fmlive-off default-on FM_FAKE_LIVE fmfakeharness)
-  result=$(run_guard "$path" FM_LIVE=0)
-  [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "FM_LIVE=0 must skip cleanly: $result"
-  assert_contains "$result" "skip: live: disabled by FM_LIVE=0" "FM_LIVE=0 must say why it skipped"
+  path=$(guard fmlive-off default-on JG_FAKE_LIVE fmfakeharness)
+  result=$(run_guard "$path" JG_LIVE=0)
+  [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "JG_LIVE=0 must skip cleanly: $result"
+  assert_contains "$result" "skip: live: disabled by JG_LIVE=0" "JG_LIVE=0 must say why it skipped"
 
-  path=$(guard fmlive-on opt-in FM_FAKE_LIVE fmfakeharness)
-  result=$(run_guard "$path" FM_LIVE=1)
-  assert_contains "$result" ran "FM_LIVE=1 must turn an opt-in guard on"
+  path=$(guard fmlive-on opt-in JG_FAKE_LIVE fmfakeharness)
+  result=$(run_guard "$path" JG_LIVE=1)
+  assert_contains "$result" ran "JG_LIVE=1 must turn an opt-in guard on"
 
-  path=$(guard fmlive-on-strict opt-in FM_FAKE_LIVE fmmissingharness)
-  result=$(run_guard "$path" FM_LIVE=1)
-  [ "$(printf '%s' "$result" | sed -n 1p)" = 1 ] || fail "FM_LIVE=1 must make an absent tool a failure: $result"
+  path=$(guard fmlive-on-strict opt-in JG_FAKE_LIVE fmmissingharness)
+  result=$(run_guard "$path" JG_LIVE=1)
+  [ "$(printf '%s' "$result" | sed -n 1p)" = 1 ] || fail "JG_LIVE=1 must make an absent tool a failure: $result"
 }
 
 test_a_guards_own_variable_wins_over_jg_live() {
   local path result
-  path=$(guard own-off default-on FM_FAKE_LIVE fmfakeharness)
-  result=$(run_guard "$path" FM_LIVE=1 FM_FAKE_LIVE=0)
+  path=$(guard own-off default-on JG_FAKE_LIVE fmfakeharness)
+  result=$(run_guard "$path" JG_LIVE=1 JG_FAKE_LIVE=0)
   [ "$(printf '%s' "$result" | sed -n 1p)" = 0 ] || fail "an explicit per-guard opt-out must skip cleanly: $result"
-  assert_contains "$result" "skip: live: disabled by FM_FAKE_LIVE=0" \
-    "a guard's own 0 must win over FM_LIVE=1 and say so"
+  assert_contains "$result" "skip: live: disabled by JG_FAKE_LIVE=0" \
+    "a guard's own 0 must win over JG_LIVE=1 and say so"
   assert_not_contains "$result" ran "a guard switched off by name must not run"
 }
 
 test_any_of_several_entry_points_turns_a_guard_on() {
   local path result
-  path=$(guard multi opt-in FM_FAKE_LIVE,FM_FAKE_ALT_LIVE fmfakeharness)
+  path=$(guard multi opt-in JG_FAKE_LIVE,JG_FAKE_ALT_LIVE fmfakeharness)
   result=$(run_guard "$path")
-  assert_contains "$result" "set FM_FAKE_LIVE=1 to run" \
+  assert_contains "$result" "set JG_FAKE_LIVE=1 to run" \
     "a multi-entry guard must point at its primary variable when idle"
-  result=$(run_guard "$path" FM_FAKE_ALT_LIVE=1)
+  result=$(run_guard "$path" JG_FAKE_ALT_LIVE=1)
   assert_contains "$result" ran "a secondary entry point must also turn the guard on"
 }
 
@@ -165,7 +165,7 @@ test_gate_lets_a_guard_drive_the_real_fleet_scripts_under_a_gate_marker() {
   {
     printf '#!/usr/bin/env bash\nset -u\n'
     printf '. "%s/tests/lib.sh"\n' "$ROOT"
-    printf 'jg_live_gate default-on FM_FAKE_LIVE fmfakeharness\n'
+    printf 'jg_live_gate default-on JG_FAKE_LIVE fmfakeharness\n'
     printf '. "%s/bin/jg-gate-refuse-lib.sh"\n' "$ROOT"
     printf 'if jg_is_gate_agent; then printf "refused\\n"; else printf "allowed\\n"; fi\n'
   } > "$path"
@@ -185,7 +185,7 @@ test_gate_exports_disable_autoupdater_for_a_proceeding_run() {
   {
     printf '#!/usr/bin/env bash\nset -u\n'
     printf '. "%s/tests/lib.sh"\n' "$ROOT"
-    printf 'jg_live_gate default-on FM_FAKE_LIVE fmfakeharness\n'
+    printf 'jg_live_gate default-on JG_FAKE_LIVE fmfakeharness\n'
     # shellcheck disable=SC2016 # the written guard script expands this at its own runtime, not here
     printf 'printf "autoupdater=%%s\\n" "${DISABLE_AUTOUPDATER:-unset}"\n'
   } > "$path"
@@ -216,7 +216,7 @@ test_disable_autoupdater_reaches_the_claude_pane_on_the_jg_spawn_launch_path() {
   jg_git_worktree "$proj" "$wt" "wt-autoupdater"
   jg_test_spawn_brief "$home" AU-1
   : > "$launchlog"
-  FM_FAKE_LAUNCH_LOG="$launchlog" \
+  JG_FAKE_LAUNCH_LOG="$launchlog" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" AU-1 "$proj" --mode no-mistakes --yolo off \
     >/dev/null 2>&1 || fail "the claude spawn must stage its launch command"
   launch=$(cat "$launchlog")
@@ -259,7 +259,7 @@ test_disable_autoupdater_survives_a_daemon_pane_that_never_inherited_it() {
   jg_git_worktree "$proj" "$wt" "wt-daemon-autoupdater"
   jg_test_spawn_brief "$home" AU-2
   : > "$launchlog"
-  DISABLE_AUTOUPDATER=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+  DISABLE_AUTOUPDATER=1 JG_FAKE_LAUNCH_LOG="$launchlog" \
     jg_test_run_spawn "$home" "$wt" "$fakebin" AU-2 "$proj" --mode no-mistakes --yolo off \
     >/dev/null 2>&1 || fail "the claude spawn must stage its launch command"
   launch=$(cat "$launchlog")
@@ -293,15 +293,15 @@ test_every_live_guard_is_wired_to_the_shared_gate() {
     script="$ROOT/$script"
     # bin/jg-test-run.sh runs every script through bash, so a guard that is not
     # marked executable is still a real suite member here.
-    out=$(clean_env FM_LIVE=0 bash "$script" 2>&1) || fail "$(basename "$script") must exit 0 when live guards are disabled"
-    assert_contains "$out" "skip: live: disabled by FM_LIVE=0" \
+    out=$(clean_env JG_LIVE=0 bash "$script" 2>&1) || fail "$(basename "$script") must exit 0 when live guards are disabled"
+    assert_contains "$out" "skip: live: disabled by JG_LIVE=0" \
       "$(basename "$script") must open with the shared live gate"
     checked=$((checked + 1))
   done <<EOF
 $listing
 EOF
   [ "$checked" -ge 20 ] || fail "expected the whole live-guard family to be swept, saw only $checked"
-  pass "all $checked live guards refuse together on FM_LIVE=0"
+  pass "all $checked live guards refuse together on JG_LIVE=0"
 }
 
 test_default_on_runs_when_the_tool_is_installed
@@ -315,9 +315,9 @@ pass "a guard's own variable turns it on"
 test_requested_run_fails_rather_than_skipping_on_an_absent_tool
 pass "a demanded run refuses to pass as a skip"
 test_jg_live_turns_the_whole_family_off_and_on
-pass "FM_LIVE switches the whole family"
+pass "JG_LIVE switches the whole family"
 test_a_guards_own_variable_wins_over_jg_live
-pass "a guard's own setting wins over FM_LIVE"
+pass "a guard's own setting wins over JG_LIVE"
 test_any_of_several_entry_points_turns_a_guard_on
 pass "any entry point of a multi-mode guard turns it on"
 test_gate_lets_a_guard_drive_the_real_fleet_scripts_under_a_gate_marker

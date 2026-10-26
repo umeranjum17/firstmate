@@ -15,7 +15,7 @@
 # although its initial no-verb status signal still surfaces in normal mode.
 # That cadence is hours long and condition-aware: a paused: line naming
 # `until <UTC ISO 8601>` is rechecked when that time passes, but a declared time
-# beyond FM_PAUSE_RESURFACE_SECS cannot extend the ordinary recheck cadence, and
+# beyond JG_PAUSE_RESURFACE_SECS cannot extend the ordinary recheck cadence, and
 # while an away record (state/.afk-contract, never quiet mode's) exists an
 # item held for the captain is never rechecked at all, in either posture.
 # jg-watch-progress-lib.sh owns the independent activity proof.
@@ -40,7 +40,7 @@
 #                          terminal (captain-relevant) or non-terminal (no verb),
 #                          both surfaced at once. A busy verdict without progress
 #                          past the wedge threshold surfaces, with an "escalation N"
-#                          count in the reason; at FM_WEDGE_DEMAND_INSPECT_COUNT
+#                          count in the reason; at JG_WEDGE_DEMAND_INSPECT_COUNT
 #                          consecutive escalations on the SAME pane, the reason
 #                          also carries a "demand-deep-inspection" marker so the
 #                          wake payload itself, not just repetition, forces a
@@ -152,7 +152,7 @@
 #   check: secondmate wake-loop stalled: mate=<id> row=<seq> idle=<seconds>s
 #                          an actionable row in an endpoint-recorded local
 #                          secondmate home's durable wake queue did not advance
-#                          between observations for FM_SECONDMATE_WAKE_STALL_SECS
+#                          between observations for JG_SECONDMATE_WAKE_STALL_SECS
 #                          while the mate was not in an active turn (a busy mate
 #                          is exempt only until the queue has been frozen for
 #                          BUSY_TURN_MAX_SECS); declared external-wait pause
@@ -181,8 +181,8 @@
 #   check: secondmate <id> auto-relaunch paused after <n> attempts in <s>s; ...
 #                          a mate that kept dying exceeded its bounded relaunch
 #                          budget and is parked until a probe reads it live
-#                          again (FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
-#                          FM_SECONDMATE_LIVENESS_WINDOW_SECS)
+#                          again (JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS and
+#                          JG_SECONDMATE_LIVENESS_WINDOW_SECS)
 #   check: host memory ALERT: <summary>; largest: <owner> <size>, ...; <action>
 #                          durable sampler wake; docs/configuration.md "Host
 #                          memory guard" owns admission and alert behavior;
@@ -190,9 +190,9 @@
 # For normal supervision, resume the session-start primary-harness protocol
 # after each printed reason. Direct duplicate invocations of this script still
 # no-op through the watcher singleton lock. A live holder whose beacon is stale
-# past the grace (FM_WATCHER_STALE_GRACE, default max(300, FM_POLL+60)) is
+# past the grace (JG_WATCHER_STALE_GRACE, default max(300, JG_POLL+60)) is
 # refused with "lock held by live pid ... but heartbeat is stale"; one stale past
-# the hard bound FM_WATCHER_STALL_BOUND (default 3x that grace) is instead
+# the hard bound JG_WATCHER_STALL_BOUND (default 3x that grace) is instead
 # evicted with TERM after its recorded identity is re-verified, and this arm
 # starts in its place, printing "watcher: replaced stalled pid <N> (...)". A
 # holder that survives the five-second TERM grace is re-verified as the same
@@ -209,15 +209,15 @@
 set -u
 
 SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 mkdir -p "$STATE"
 # A home that never existed (a state-only test fixture) is not a home that
 # disappeared, so the per-poll home-gone exit below applies only when it did.
 WATCH_HOME_EXISTED=0
-[ ! -d "$FM_HOME" ] || WATCH_HOME_EXISTED=1
+[ ! -d "$JG_HOME" ] || WATCH_HOME_EXISTED=1
 
 # The native event fast-path and only its true dependencies have one narrow
 # production owner. The Herdr event-wait smoke test consumes this same owner
@@ -229,7 +229,7 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-push-transition-lib.sh"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$SCRIPT_DIR/jg-pr-lib.sh"
-# Only for the arm-time check on FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS below;
+# Only for the arm-time check on JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS below;
 # the per-cycle reconcile itself runs as a separate process.
 # shellcheck source=bin/jg-procevent-lib.sh
 . "$SCRIPT_DIR/jg-procevent-lib.sh"
@@ -263,7 +263,7 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
 # Optional alerts add-on: defines jg_model_outage_tick.
 # shellcheck source=/dev/null
-[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/alerts/bin/jg-model-outage-lib.sh"
 # Parked-home reader (firstmate-addons/parked-homes): the shared predicate
 # every parked-home guard in the watcher calls. The shim answers not parked
 # when the add-on is absent (stock behavior).
@@ -291,7 +291,7 @@ WATCH_HOME_EXISTED=0
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-secondmate-liveness-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
-[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/jg-watch.sh"
@@ -321,7 +321,7 @@ fi
 # markers, while bin/jg-wake-lib.sh owns their wake-facing routing, the legacy
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
-POLL=${FM_POLL:-15}                   # seconds between cycles
+POLL=${JG_POLL:-15}                   # seconds between cycles
 # Beacon publication and scan timing are owned by docs/turnend-guard.md
 # "Guard grace and the poll cadence".
 # jg_poll_derived_grace (bin/jg-wake-lib.sh, already sourced
@@ -329,7 +329,7 @@ POLL=${FM_POLL:-15}                   # seconds between cycles
 # derivation - see docs/turnend-guard.md "Guard grace and the poll cadence".
 # This recomputes the library default above now that the real configured
 # POLL is known.
-WATCHER_STALE_GRACE=${FM_WATCHER_STALE_GRACE:-${FM_GUARD_GRACE:-$(jg_poll_derived_grace "$POLL")}}
+WATCHER_STALE_GRACE=${JG_WATCHER_STALE_GRACE:-${JG_GUARD_GRACE:-$(jg_poll_derived_grace "$POLL")}}
 # Hard bound on a live holder's beacon age. Under it a re-arm refuses and asks
 # for inspection (the grace above); at or past it the re-arm evicts the holder
 # instead, because a watcher whose beacon has stalled that long is not polling
@@ -337,18 +337,18 @@ WATCHER_STALE_GRACE=${FM_WATCHER_STALE_GRACE:-${FM_GUARD_GRACE:-$(jg_poll_derive
 # jg_watcher_stall_bound (bin/jg-wake-lib.sh) owns the derivation, shared with
 # the arm that follows this watcher.
 WATCHER_STALL_BOUND=$(jg_watcher_stall_bound "$POLL")
-HEARTBEAT=${FM_HEARTBEAT:-600}        # base seconds between heartbeat scans
-HEARTBEAT_MAX=${FM_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
-CHECK_INTERVAL=${FM_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps and ask-default decide ticks
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
-HOME_SUMMARY_INTERVAL=${FM_HOME_SUMMARY_INTERVAL:-300}
+HEARTBEAT=${JG_HEARTBEAT:-600}        # base seconds between heartbeat scans
+HEARTBEAT_MAX=${JG_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
+CHECK_INTERVAL=${JG_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps and ask-default decide ticks
+CHECK_TIMEOUT=${JG_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
+HOME_SUMMARY_INTERVAL=${JG_HOME_SUMMARY_INTERVAL:-300}
 case "$HOME_SUMMARY_INTERVAL" in
   ''|*[!0-9]*|0) HOME_SUMMARY_INTERVAL=300 ;;
 esac
-SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
+SIGNAL_GRACE=${JG_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
-CLEANUP_LOCK_BOUND=${FM_WATCHER_CLEANUP_LOCK_BOUND:-2}  # seconds EXIT cleanup may
+CLEANUP_LOCK_BOUND=${JG_WATCHER_CLEANUP_LOCK_BOUND:-2}  # seconds EXIT cleanup may
                                       # wait on the downtime-marker lock; a live
                                       # foreign holder must not strand a TERM'd
                                       # watcher inside its own trap
@@ -357,7 +357,7 @@ case "$CLEANUP_LOCK_BOUND" in
   *) CLEANUP_LOCK_BOUND=$((10#$CLEANUP_LOCK_BOUND)) ;;
 esac
 [ "$CLEANUP_LOCK_BOUND" -gt 0 ] || CLEANUP_LOCK_BOUND=2
-TURNEND_CHURN_ABSORB_SECS=${FM_TURNEND_CHURN_ABSORB_SECS:-900}  # longest a task's
+TURNEND_CHURN_ABSORB_SECS=${JG_TURNEND_CHURN_ABSORB_SECS:-900}  # longest a task's
                                       # bare turn-ends may be deferred on pane-churn
                                       # evidence alone (signal_turnend_panes_churned)
 # Busy state is decided by the semantic contract in bin/jg-busy-lib.sh, which
@@ -383,7 +383,7 @@ TURNEND_CHURN_ABSORB_SECS=${FM_TURNEND_CHURN_ABSORB_SECS:-900}  # longest a task
 # daemon owns triage, so this watcher reverts to one-shot (enqueue + exit on every
 # wake) and never double-triages. The progress add-on still checks positive
 # validation execution evidence before surfacing a stale pane.
-STALE_ESCALATE_SECS=${FM_STALE_ESCALATE_SECS:-240}  # idle secs before a provably-working stale escalates as a possible wedge
+STALE_ESCALATE_SECS=${JG_STALE_ESCALATE_SECS:-240}  # idle secs before a provably-working stale escalates as a possible wedge
 # A busy pane is unconditional proof of liveness with no built-in duration bound,
 # so a hung foreground call can remain hidden even while its rendered busy
 # footer changes every poll. BUSY_TURN_MAX_SECS bounds how long any busy pane
@@ -398,13 +398,13 @@ STALE_ESCALATE_SECS=${FM_STALE_ESCALATE_SECS:-240}  # idle secs before a provabl
 # itself, which takes the long pause cadence instead. Set generously above
 # any legitimate interval without observable progress, including silent long
 # tool calls, builds, or test runs.
-BUSY_TURN_MAX_SECS=${FM_BUSY_TURN_MAX_SECS:-3600}
+BUSY_TURN_MAX_SECS=${JG_BUSY_TURN_MAX_SECS:-3600}
 # A local secondmate's foreign queue is checked on every poll, but only after this
 # bounded interval with no drain progress can it produce a parent notification.
 # A healthy mate drains its queue between turns, not inside one, so this default
 # sits above a real turn; it is only the backstop behind the active-turn gate in
 # secondmate_wake_stall_tick, never a substitute for it.
-SECONDMATE_WAKE_STALL_SECS=${FM_SECONDMATE_WAKE_STALL_SECS:-}
+SECONDMATE_WAKE_STALL_SECS=${JG_SECONDMATE_WAKE_STALL_SECS:-}
 case "$SECONDMATE_WAKE_STALL_SECS" in ''|*[!0-9]*|0) SECONDMATE_WAKE_STALL_SECS=180 ;; esac
 # Secondmate ENDPOINT liveness (distinct from the wake-loop stall observation
 # above): on this cadence the watcher probes each registered mate's recorded
@@ -412,18 +412,18 @@ case "$SECONDMATE_WAKE_STALL_SECS" in ''|*[!0-9]*|0) SECONDMATE_WAKE_STALL_SECS=
 # same recovery-grade `dead` or `missing` verdicts the session-start sweep
 # uses. The cadence survives watcher restarts via a state marker's mtime, so a
 # relaunch wake cannot restart the probe into a tight loop.
-SECONDMATE_LIVENESS_SECS=${FM_SECONDMATE_LIVENESS_SECS:-}
+SECONDMATE_LIVENESS_SECS=${JG_SECONDMATE_LIVENESS_SECS:-}
 case "$SECONDMATE_LIVENESS_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_SECS=60 ;; esac
 # Per-relaunch wall-clock bound, so a wedged spawn cannot stall the poll.
-SECONDMATE_LIVENESS_TIMEOUT=${FM_SECONDMATE_LIVENESS_TIMEOUT:-}
+SECONDMATE_LIVENESS_TIMEOUT=${JG_SECONDMATE_LIVENESS_TIMEOUT:-}
 case "$SECONDMATE_LIVENESS_TIMEOUT" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_TIMEOUT=120 ;; esac
 # Relaunch bound: at most this many automatic attempts per window per mate,
 # counted from the durable attempt ledger the shared library appends to. A mate
 # that keeps dying past the bound wakes once and is parked until a probe reads
 # it alive again, so a flapping endpoint cannot relaunch forever unseen.
-SECONDMATE_LIVENESS_MAX_ATTEMPTS=${FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS:-}
+SECONDMATE_LIVENESS_MAX_ATTEMPTS=${JG_SECONDMATE_LIVENESS_MAX_ATTEMPTS:-}
 case "$SECONDMATE_LIVENESS_MAX_ATTEMPTS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_MAX_ATTEMPTS=3 ;; esac
-SECONDMATE_LIVENESS_WINDOW_SECS=${FM_SECONDMATE_LIVENESS_WINDOW_SECS:-}
+SECONDMATE_LIVENESS_WINDOW_SECS=${JG_SECONDMATE_LIVENESS_WINDOW_SECS:-}
 case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WINDOW_SECS=3600 ;; esac
 # A crew that declared a pause is idling on a known external wait, so its stale
 # pane is absorbed rather than wedge-escalated.
@@ -436,12 +436,12 @@ case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WI
 # longer than the wedge threshold, but finite so a forgotten wait cannot rot
 # invisibly - except an item held for the captain while the away-posture record
 # exists, which is never rechecked (away_record_present below).
-PAUSE_RESURFACE_SECS=${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}
+PAUSE_RESURFACE_SECS=${JG_PAUSE_RESURFACE_SECS:-$JG_PAUSE_RESURFACE_SECS_DEFAULT}
 # A secondmate home below its lane floor with ready work re-raises the same
 # condition on this cadence instead of going silent after one wake: the lead
 # either starts the work or records why it waits, and that answer must not need a
 # fresh incident to be repeated.
-READY_WORK_RESURFACE_SECS=${FM_READY_WORK_RESURFACE_SECS:-1800}
+READY_WORK_RESURFACE_SECS=${JG_READY_WORK_RESURFACE_SECS:-1800}
 case "$READY_WORK_RESURFACE_SECS" in ''|*[!0-9]*|0) READY_WORK_RESURFACE_SECS=1800 ;; esac
 # A declared wait that names WHEN it clears (`paused: ... until <UTC ISO 8601>`,
 # status_paused_until in jg-classify-lib.sh) is condition-aware: it is not
@@ -452,7 +452,7 @@ case "$READY_WORK_RESURFACE_SECS" in ''|*[!0-9]*|0) READY_WORK_RESURFACE_SECS=18
 # of this watcher process and the loop reverts to pure polling (report section
 # 5c trigger 3: proven-unreliable-at-runtime). A watcher restart re-probes
 # capability, so a transient herdr hiccup self-heals on the next cycle chain.
-EVENT_CAP_FAIL_MAX=${FM_EVENT_CAP_FAIL_MAX:-3}
+EVENT_CAP_FAIL_MAX=${JG_EVENT_CAP_FAIL_MAX:-3}
 # Per-process memo for the push-capability probe (jg_backend_events_capable runs
 # a ~220KB `herdr api schema` read, too heavy to repeat every poll). Keyed by
 # "<backend>:<session>"; re-probed only when that key changes.
@@ -684,7 +684,7 @@ inbox_steer_check() {  # <window> <task>
           wake "$reason"
         fi
       fi
-      triage_log "steer-inbox delivery attempt: $task ${rec##*/} result=$ring_rc${FM_TASK_INBOX_RING_REASON:+ reason=$FM_TASK_INBOX_RING_REASON}"
+      triage_log "steer-inbox delivery attempt: $task ${rec##*/} result=$ring_rc${JG_TASK_INBOX_RING_REASON:+ reason=$JG_TASK_INBOX_RING_REASON}"
       ;;
     retry)
       ring_rc=0
@@ -694,7 +694,7 @@ inbox_steer_check() {  # <window> <task>
         jg_wake_append stale "$w" "$reason" || exit 1
         wake "$reason"
       fi
-      triage_log "steer-inbox retry ring: $task ${rec##*/} result=$ring_rc${FM_TASK_INBOX_RING_REASON:+ reason=$FM_TASK_INBOX_RING_REASON}"
+      triage_log "steer-inbox retry ring: $task ${rec##*/} result=$ring_rc${JG_TASK_INBOX_RING_REASON:+ reason=$JG_TASK_INBOX_RING_REASON}"
       ;;
     escalate)
       reason=${reason:-"stale: $w (unread firstmate instruction: $rec still unhandled after $count doorbell delivery attempts with an idle pane; inspect the worker)"}
@@ -735,7 +735,7 @@ inbox_steer_check() {  # <window> <task>
 # recorded on the previous poll, which is why the derivation lives here with the
 # marker format rather than in the shared classifier. Absorbing here DEFERS a wake
 # rather than swallowing it, and the deferral is BOUNDED: a task's turn-ends may
-# ride churn evidence for at most FM_TURNEND_CHURN_ABSORB_SECS, tracked per window
+# ride churn evidence for at most JG_TURNEND_CHURN_ABSORB_SECS, tracked per window
 # in .churn-since-, after which the wake surfaces and the window restarts. The
 # bound is what keeps churn from muting supervision outright. A pane that renders
 # continuously - a clock, a spinner, a shell heartbeat, a harness that leaves a
@@ -1038,7 +1038,7 @@ secondmate_ring_to_drain() {  # <task> <window> <seq>
   case "$delivery_id" in ''|*[!0-9a-f]*) return 1 ;; esac
   [ "${#delivery_id}" -eq 16 ] || return 1
   rec=$(jg_task_inbox_write "$STATE" "$task" \
-    "${FM_FROMFIRST_MARK}delivery=${delivery_id} Wake row $seq is still queued in this home. Run bin/jg-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision." \
+    "${JG_FROMFIRST_MARK}delivery=${delivery_id} Wake row $seq is still queued in this home. Run bin/jg-wake-drain.sh and read its whole output, handle what it presents, then run the exact WAKE_ACK_REQUIRED command it prints, which is what removes the row. Then resume idle supervision." \
     fire-and-forget) || return 1
   jg_task_inbox_ring "$backend" "$w" "$rec" "$(window_label "$w")"
 }
@@ -1178,7 +1178,7 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-jg_host_memory_lib="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/host-memory/bin/jg-host-memory-lib.sh"
+jg_host_memory_lib="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/host-memory/bin/jg-host-memory-lib.sh"
 # shellcheck disable=SC1090,SC1091 # The optional add-on source is installed outside this repository.
 if [ -f "$jg_host_memory_lib" ]; then . "$jg_host_memory_lib"; fi
 
@@ -1190,23 +1190,23 @@ host_memory_surface_after_output() {
   if [ "$status" -eq 0 ]; then
     printf '%s\n' "$HOST_MEMORY_SURFACED" > "$STATE/.host-memory-surfaced" || status=1
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK" || status=1
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK" || status=1
   return "$status"
 }
 
 host_memory_surface_queued() {
   local row reason
-  [ -s "$FM_WAKE_QUEUE" ] || return 0
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
-  row=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { row=$0 } END { if (row != "") print row }' "$FM_WAKE_QUEUE")
+  [ -s "$JG_WAKE_QUEUE" ] || return 0
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK" || return 1
+  row=$(awk -F '\t' '$3 == "check" && $4 == "host-memory" { row=$0 } END { if (row != "") print row }' "$JG_WAKE_QUEUE")
   HOST_MEMORY_SURFACED=$(printf '%s\n' "$row" | cut -f1,2)
   if [ -z "$row" ] || [ "$HOST_MEMORY_SURFACED" = "$(cat "$STATE/.host-memory-surfaced" 2>/dev/null)" ]; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   reason=$(printf '%s\n' "$row" | cut -f5-)
   # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
-  FM_WAKE_POST_OUTPUT_ACTION=host_memory_surface_after_output
+  JG_WAKE_POST_OUTPUT_ACTION=host_memory_surface_after_output
   wake "$reason"
 }
 
@@ -1216,7 +1216,7 @@ host_memory_surface_queued() {
 # The ordinary arm owner delivers the reason, never a synthetic keyboard ring.
 own_queue_resurface() {
   local row epoch seq kind key reason now previous observed_at observed_key row_key idle
-  row=$(secondmate_oldest_queue_row "$FM_WAKE_QUEUE")
+  row=$(secondmate_oldest_queue_row "$JG_WAKE_QUEUE")
   if [ -z "$row" ]; then
     rm -f "$STATE/.own-wake-progress"
     return 0
@@ -1236,7 +1236,7 @@ EOF
   fi
   idle=$((now - observed_at))
   [ "$idle" -ge "$SECONDMATE_WAKE_STALL_SECS" ] || return 0
-  secondmate_in_active_turn '' "$idle" "$FM_HOME" "$seq" && return 0
+  secondmate_in_active_turn '' "$idle" "$JG_HOME" "$seq" && return 0
   printf '%s\t%s\n' "$now" "$row_key" > "$STATE/.own-wake-progress" || return 1
   case "$kind:$reason" in
     signal:needs-decision:*) reason="signal:${reason#needs-decision:}" ;;
@@ -1265,28 +1265,28 @@ secondmate_liveness_tick() {
     jg_secondmate_liveness_probe "$meta" "$id" poll
     bound_marker="$STATE/.secondmate-relaunch-bound-$id"
     reason='' notify_key='' err=''
-    case "$FM_SM_LIVE_STATUS" in
+    case "$JG_SM_LIVE_STATUS" in
       relaunchable)
         if [ -e "$bound_marker" ] || [ -L "$bound_marker" ]; then
           :
         elif ! attempts=$(jg_secondmate_liveness_recent_attempts "$id" "$SECONDMATE_LIVENESS_WINDOW_SECS"); then
-          err="relaunch ledger is unreadable; endpoint left $FM_SM_LIVE_STATE"
+          err="relaunch ledger is unreadable; endpoint left $JG_SM_LIVE_STATE"
         elif [ "$attempts" -ge "$SECONDMATE_LIVENESS_MAX_ATTEMPTS" ]; then
-          if printf '%s\t%s\n' "$now" "$FM_SM_LIVE_STATE" > "$bound_marker"; then
-            reason="check: secondmate $id auto-relaunch paused after $SECONDMATE_LIVENESS_MAX_ATTEMPTS attempts in ${SECONDMATE_LIVENESS_WINDOW_SECS}s; endpoint still $FM_SM_LIVE_STATE - relaunch it manually or retire the route"
+          if printf '%s\t%s\n' "$now" "$JG_SM_LIVE_STATE" > "$bound_marker"; then
+            reason="check: secondmate $id auto-relaunch paused after $SECONDMATE_LIVENESS_MAX_ATTEMPTS attempts in ${SECONDMATE_LIVENESS_WINDOW_SECS}s; endpoint still $JG_SM_LIVE_STATE - relaunch it manually or retire the route"
             notify_key="secondmate-relaunch-bound-$id"
           else
-            err="relaunch park marker could not be written; endpoint left $FM_SM_LIVE_STATE"
+            err="relaunch park marker could not be written; endpoint left $JG_SM_LIVE_STATE"
           fi
         elif jg_secondmate_liveness_relaunch "$meta" "$id" "$SECONDMATE_LIVENESS_TIMEOUT"; then
-          reason="check: secondmate $id auto-relaunched after $FM_SM_LIVE_CAUSE ($FM_SM_LIVE_WHERE)"
+          reason="check: secondmate $id auto-relaunched after $JG_SM_LIVE_CAUSE ($JG_SM_LIVE_WHERE)"
           notify_key="secondmate-relaunch-$id-$now"
-        elif [ "$FM_SM_LIVE_STATUS" = deferred ]; then
-          triage_log "secondmate $id liveness deferred: $FM_SM_LIVE_REASON"
-        elif [ "$FM_SM_LIVE_STATUS" = skipped ]; then
-          err=$FM_SM_LIVE_REASON
+        elif [ "$JG_SM_LIVE_STATUS" = deferred ]; then
+          triage_log "secondmate $id liveness deferred: $JG_SM_LIVE_REASON"
+        elif [ "$JG_SM_LIVE_STATUS" = skipped ]; then
+          err=$JG_SM_LIVE_REASON
         else
-          reason="check: secondmate $id auto-relaunch failed after $FM_SM_LIVE_CAUSE: $(jg_sm_live_first_line "$FM_SM_LIVE_OUT")"
+          reason="check: secondmate $id auto-relaunch failed after $JG_SM_LIVE_CAUSE: $(jg_sm_live_first_line "$JG_SM_LIVE_OUT")"
           notify_key="secondmate-relaunch-failed-$id-$now"
         fi
         ;;
@@ -1302,7 +1302,7 @@ secondmate_liveness_tick() {
         fi
         ;;
       skipped)
-        triage_log "secondmate $id liveness: $FM_SM_LIVE_REASON"
+        triage_log "secondmate $id liveness: $JG_SM_LIVE_REASON"
         ;;
     esac
     if [ -n "$reason" ]; then
@@ -1325,7 +1325,7 @@ secondmate_liveness_tick() {
   [ "$failed" -eq 0 ]
 }
 
-# Consecutive wedge-escalation count for a window past FM_WEDGE_DEMAND_INSPECT_COUNT
+# Consecutive wedge-escalation count for a window past JG_WEDGE_DEMAND_INSPECT_COUNT
 # (default 3): a pane that keeps re-wedging on the SAME stale hash - each
 # escalation gets absorbed again as "still validating" one poll later, since the
 # hash never changes - can otherwise repeat forever with no signal that this is
@@ -1335,7 +1335,7 @@ secondmate_liveness_tick() {
 # look instead of another routine supervision resume. Reset wherever a window's
 # pane/hash state resets to genuinely active (see the two rm-on-reset call sites
 # below).
-FM_WEDGE_DEMAND_INSPECT_COUNT=${FM_WEDGE_DEMAND_INSPECT_COUNT:-3}
+JG_WEDGE_DEMAND_INSPECT_COUNT=${JG_WEDGE_DEMAND_INSPECT_COUNT:-3}
 
 # One bounded re-surface for a pane the watcher is deliberately absorbing, so no
 # absorb can rot invisibly. <age> is how long the current absorb has held and
@@ -1743,7 +1743,7 @@ wedge_timer_check() {  # <window> <since-file> <triage-label> <escalation-count-
         n=$(( $(cat "$escalation_file" 2>/dev/null || echo 0) + 1 ))
         echo "$n" > "$escalation_file"
         reason="stale: $win (idle ${age}s, possible wedge, escalation $n)"
-        if [ "$n" -ge "$FM_WEDGE_DEMAND_INSPECT_COUNT" ]; then
+        if [ "$n" -ge "$JG_WEDGE_DEMAND_INSPECT_COUNT" ]; then
           reason="stale: $win (idle ${age}s, possible wedge, escalation $n, demand-deep-inspection: same pane has wedge-escalated $n times in a row - do not re-absorb on the run-step/pane state alone)"
         fi
         jg_wake_append stale "$win" "$reason" || exit 1
@@ -1866,7 +1866,7 @@ busy_turn_bound_check() {  # <window> <task> <hash> <since-file> <escalation-fil
       # timer here instead would decorate the wake as a possible wedge, and that
       # decoration overrides the daemon's own pause verdict for the pane: the
       # ladder then climbs on every re-arm, escalating a crew that declared the
-      # wait itself once per FM_STALE_ESCALATE_SECS for as long as the wait lasts.
+      # wait itself once per JG_STALE_ESCALATE_SECS for as long as the wait lasts.
       # The one-shot is keyed on the DECLARATION (the status log's signature),
       # never on the pane hash: a busy pane's harness footer ticks on every
       # capture, so a hash-keyed one-shot would re-fire on every poll and the
@@ -1931,7 +1931,7 @@ clear_pause_tracking() {  # <window-key>
 # with its whole herdr workspace, and no task record references it anymore,
 # nothing evaluates the pane again - but nothing prunes the markers either, so
 # any path that keeps classifying the vanished pane escalates it every
-# FM_STALE_ESCALATE_SECS forever (observed live: one vanished pane reached 16+
+# JG_STALE_ESCALATE_SECS forever (observed live: one vanished pane reached 16+
 # demand-deep-inspection escalations after its record was torn down), and a
 # later pane that reuses the window key inherits dead bookkeeping such as an
 # old wedge-escalation count.
@@ -2256,7 +2256,7 @@ declared_wait_contradiction() {  # <window> <task> <window-key>
     return 0
   fi
   printf '%s' "$sig" > "$read_marker"
-  state=$("$FM_CREW_STATE_BIN" "$task" 2>/dev/null) || true
+  state=$("$JG_CREW_STATE_BIN" "$task" 2>/dev/null) || true
   case "$state" in "state: parked · source: run-step · "?*) ;; *) return 0 ;; esac
   # A gate the worker already escalated under its run-bound key is one firstmate
   # was told about; wedge_wait_evidence owns that verified wait.
@@ -2374,15 +2374,15 @@ procevent_surface_after_output() {
       fi
     done
   fi
-  jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+  jg_lock_release "$JG_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
 procevent_surface_queued() {
   local key reason captured="" stranded="" unstarted=""
   PROCEVENT_SURFACED=
-  [ -s "$FM_WAKE_QUEUE" ] || return 0
-  jg_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  [ -s "$JG_WAKE_QUEUE" ] || return 0
+  jg_lock_acquire_wait "$JG_WAKE_QUEUE_LOCK"
   while IFS= read -r key; do
     case "$key" in procevent:*) ;; *) continue ;; esac
     [ -e "$(procevent_surfaced_marker "$key")" ] && continue
@@ -2398,7 +2398,7 @@ procevent_surface_queued() {
     esac
   done < <(jg_wake_queued_keys_locked check)
   if [ -z "$PROCEVENT_SURFACED" ]; then
-    jg_lock_release "$FM_WAKE_QUEUE_LOCK"
+    jg_lock_release "$JG_WAKE_QUEUE_LOCK"
     return 0
   fi
   reason="check:"
@@ -2412,20 +2412,20 @@ procevent_surface_queued() {
     reason="$reason process-event source failed to start:$unstarted"
   fi
   # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
-  FM_WAKE_POST_OUTPUT_ACTION=procevent_surface_after_output
+  JG_WAKE_POST_OUTPUT_ACTION=procevent_surface_after_output
   wake "$reason"
 }
 
 run_check_process() {
   local c=$1
   shift
-  if [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v timeout >/dev/null 2>&1; then
+  if [ "${JG_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v timeout >/dev/null 2>&1; then
     exec timeout "$CHECK_TIMEOUT" bash "$c" "$@"
-  elif [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v gtimeout >/dev/null 2>&1; then
+  elif [ "${JG_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v gtimeout >/dev/null 2>&1; then
     exec gtimeout "$CHECK_TIMEOUT" bash "$c" "$@"
   else
     # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
-    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${FM_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
+    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${JG_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
   fi
 }
 
@@ -2433,19 +2433,19 @@ run_check() {
   ( run_check_process "$@" ) 2>/dev/null || true
 }
 
-FM_ACTIVE_CHECK_PID=
-FM_ACTIVE_CHECK_PGID=
-FM_CHECK_OUTPUT=
-FM_CHECK_RESULT=
-FM_CHECK_SIGNAL_PENDING=
+JG_ACTIVE_CHECK_PID=
+JG_ACTIVE_CHECK_PGID=
+JG_CHECK_OUTPUT=
+JG_CHECK_RESULT=
+JG_CHECK_SIGNAL_PENDING=
 
 jg_check_output_cleanup() {
-  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT"
-  FM_CHECK_OUTPUT=
+  [ -z "$JG_CHECK_OUTPUT" ] || rm -f -- "$JG_CHECK_OUTPUT"
+  JG_CHECK_OUTPUT=
 }
 
 jg_active_check_stop() {
-  local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-} i
+  local pid=${JG_ACTIVE_CHECK_PID:-} pgid=${JG_ACTIVE_CHECK_PGID:-} i
   [ -n "$pid" ] || [ -n "$pgid" ] || return 0
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
@@ -2465,8 +2465,8 @@ jg_active_check_stop() {
   if [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null; then
     return 1
   fi
-  FM_ACTIVE_CHECK_PID=
-  FM_ACTIVE_CHECK_PGID=
+  JG_ACTIVE_CHECK_PID=
+  JG_ACTIVE_CHECK_PGID=
 }
 
 # Stop-signal dispositions, installed with the EXIT trap below. HUP and TERM
@@ -2488,40 +2488,40 @@ watcher_stop_signals() {
 run_check_capture() {
   local pgid
   jg_check_output_cleanup
-  FM_CHECK_RESULT=
-  FM_CHECK_OUTPUT=$(mktemp "$STATE/.jg-check-output.XXXXXX") || return 1
-  chmod 0600 "$FM_CHECK_OUTPUT" || { jg_check_output_cleanup; return 1; }
-  FM_CHECK_SIGNAL_PENDING=
+  JG_CHECK_RESULT=
+  JG_CHECK_OUTPUT=$(mktemp "$STATE/.jg-check-output.XXXXXX") || return 1
+  chmod 0600 "$JG_CHECK_OUTPUT" || { jg_check_output_cleanup; return 1; }
+  JG_CHECK_SIGNAL_PENDING=
   # Defer stop signals only until the check's process group is recorded for
   # watcher_cleanup. Keep command substitutions out of this window: bash 5.2
   # can drop a trap that is pending when one is parsed (watcher_stop_signals).
-  trap 'FM_CHECK_SIGNAL_PENDING=1' HUP INT TERM
+  trap 'JG_CHECK_SIGNAL_PENDING=1' HUP INT TERM
   set -m
-  ( FM_CHECK_OWNED_GROUP=1 run_check_process "$@" ) > "$FM_CHECK_OUTPUT" 2>/dev/null &
-  FM_ACTIVE_CHECK_PID=$!
-  FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
+  ( JG_CHECK_OWNED_GROUP=1 run_check_process "$@" ) > "$JG_CHECK_OUTPUT" 2>/dev/null &
+  JG_ACTIVE_CHECK_PID=$!
+  JG_ACTIVE_CHECK_PGID=$JG_ACTIVE_CHECK_PID
   set +m
   watcher_stop_signals
-  [ -z "$FM_CHECK_SIGNAL_PENDING" ] || exit 1
-  pgid=$(ps -o pgid= -p "$FM_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
-  if [ -n "$pgid" ] && [ "$pgid" != "$FM_ACTIVE_CHECK_PGID" ]; then
+  [ -z "$JG_CHECK_SIGNAL_PENDING" ] || exit 1
+  pgid=$(ps -o pgid= -p "$JG_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
+  if [ -n "$pgid" ] && [ "$pgid" != "$JG_ACTIVE_CHECK_PGID" ]; then
     jg_active_check_stop || true
     jg_check_output_cleanup
     return 1
   fi
-  wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || true
-  FM_ACTIVE_CHECK_PID=
+  wait "$JG_ACTIVE_CHECK_PID" 2>/dev/null || true
+  JG_ACTIVE_CHECK_PID=
   jg_active_check_stop || return 1
-  FM_CHECK_RESULT=$(cat "$FM_CHECK_OUTPUT" 2>/dev/null || true)
+  JG_CHECK_RESULT=$(cat "$JG_CHECK_OUTPUT" 2>/dev/null || true)
   jg_check_output_cleanup
 }
 
-FM_CAPTURE_OUTPUT=
+JG_CAPTURE_OUTPUT=
 WATCHER_CAPTURE=
 
 jg_capture_output_cleanup() {
-  [ -z "$FM_CAPTURE_OUTPUT" ] || rm -f -- "$FM_CAPTURE_OUTPUT"
-  FM_CAPTURE_OUTPUT=
+  [ -z "$JG_CAPTURE_OUTPUT" ] || rm -f -- "$JG_CAPTURE_OUTPUT"
+  JG_CAPTURE_OUTPUT=
 }
 
 # watcher_capture: jg_backend_capture into WATCHER_CAPTURE with its exit status.
@@ -2532,30 +2532,30 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
   local rc pgid
   jg_capture_output_cleanup
   WATCHER_CAPTURE=
-  FM_CAPTURE_OUTPUT=$(mktemp "$STATE/.jg-capture-output.XXXXXX") || return 1
-  FM_CHECK_SIGNAL_PENDING=
-  trap 'FM_CHECK_SIGNAL_PENDING=1' HUP INT TERM
+  JG_CAPTURE_OUTPUT=$(mktemp "$STATE/.jg-capture-output.XXXXXX") || return 1
+  JG_CHECK_SIGNAL_PENDING=
+  trap 'JG_CHECK_SIGNAL_PENDING=1' HUP INT TERM
   # The group's stderr is redirected before the fork: bash 3.2 on macOS can
   # print a harmless "child setpgid ... Operation not permitted" race from the
   # child before the command's own redirections apply.
   set -m
-  { jg_backend_capture "$@" < /dev/null > "$FM_CAPTURE_OUTPUT" & } 2>/dev/null
-  FM_ACTIVE_CHECK_PID=$!
-  FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
+  { jg_backend_capture "$@" < /dev/null > "$JG_CAPTURE_OUTPUT" & } 2>/dev/null
+  JG_ACTIVE_CHECK_PID=$!
+  JG_ACTIVE_CHECK_PGID=$JG_ACTIVE_CHECK_PID
   set +m
   watcher_stop_signals
-  [ -z "$FM_CHECK_SIGNAL_PENDING" ] || exit 1
-  pgid=$(ps -o pgid= -p "$FM_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
-  if [ -n "$pgid" ] && [ "$pgid" != "$FM_ACTIVE_CHECK_PGID" ]; then
+  [ -z "$JG_CHECK_SIGNAL_PENDING" ] || exit 1
+  pgid=$(ps -o pgid= -p "$JG_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
+  if [ -n "$pgid" ] && [ "$pgid" != "$JG_ACTIVE_CHECK_PGID" ]; then
     jg_active_check_stop || true
     jg_capture_output_cleanup
     return 1
   fi
-  wait "$FM_ACTIVE_CHECK_PID"
+  wait "$JG_ACTIVE_CHECK_PID"
   rc=$?
-  FM_ACTIVE_CHECK_PID=
+  JG_ACTIVE_CHECK_PID=
   jg_active_check_stop || { jg_capture_output_cleanup; return 1; }
-  WATCHER_CAPTURE=$(cat "$FM_CAPTURE_OUTPUT" 2>/dev/null || true)
+  WATCHER_CAPTURE=$(cat "$JG_CAPTURE_OUTPUT" 2>/dev/null || true)
   jg_capture_output_cleanup
   return "$rc"
 }
@@ -2572,7 +2572,7 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
 # no verb) are skipped. A 1 here is NOT "benign" on its own: a no-verb signal,
 # including a newly declared captain hold, still needs the authoritative working
 # proof or the eligible opt-in bare turn-end pane-churn proof before it is benign.
-# Also populates FM_SIGNAL_NEEDS_DECISION_FILES (space-separated status-file
+# Also populates JG_SIGNAL_NEEDS_DECISION_FILES (space-separated status-file
 # paths) with exactly the files whose newly classified span carries one of the
 # decision-owned classes defined by the status-span contract, so the caller can
 # route those - and only those - signal rows as main-only
@@ -2580,8 +2580,8 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
 # eligibility rules.
 signal_files_actionable() {  # <status-file> ...
   local f task record rest endpoint ident needs_decision rc found=1
-  FM_SIGNAL_SURFACE_ENDPOINTS=''
-  FM_SIGNAL_NEEDS_DECISION_FILES=''
+  JG_SIGNAL_SURFACE_ENDPOINTS=''
+  JG_SIGNAL_NEEDS_DECISION_FILES=''
   for f in "$@"; do
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
@@ -2600,9 +2600,9 @@ signal_files_actionable() {  # <status-file> ...
       continue
     fi
     endpoint=${record%%$'\t'*}; rest=${record#*$'\t'}; ident=${rest%%$'\t'*}
-    FM_SIGNAL_SURFACE_ENDPOINTS="${FM_SIGNAL_SURFACE_ENDPOINTS}${f}"$'\t'"${endpoint}"$'\t'"${ident}"$'\n'
+    JG_SIGNAL_SURFACE_ENDPOINTS="${JG_SIGNAL_SURFACE_ENDPOINTS}${f}"$'\t'"${endpoint}"$'\t'"${ident}"$'\n'
     if [ "$needs_decision" -eq 1 ]; then
-      FM_SIGNAL_NEEDS_DECISION_FILES="${FM_SIGNAL_NEEDS_DECISION_FILES} ${f}"
+      JG_SIGNAL_NEEDS_DECISION_FILES="${JG_SIGNAL_NEEDS_DECISION_FILES} ${f}"
     fi
     if [ "$rc" -eq 0 ] || [ "$needs_decision" -eq 1 ]; then
       found=0
@@ -2626,7 +2626,7 @@ mark_all_captain_relevant_surfaced() {
       mark_surfaced "$f" "$endpoint" "$ident" || rc=1
     fi
   done <<EOF
-$FM_HEARTBEAT_SURFACE_ENDPOINTS
+$JG_HEARTBEAT_SURFACE_ENDPOINTS
 EOF
   return "$rc"
 }
@@ -2646,7 +2646,7 @@ heartbeat_scan_finds_actionable() {
   # Same self-home exclusion as scan_signals: a remote mate's parent channel
   # must not come back through the heartbeat fail-safe backstop.
   exclude=$(status_scan_parent_channel_exclude "$STATE")
-  FM_HEARTBEAT_SURFACE_ENDPOINTS=''
+  JG_HEARTBEAT_SURFACE_ENDPOINTS=''
   for f in "$STATE"/*.status; do
     [ -e "$f" ] || [ -L "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
@@ -2658,12 +2658,12 @@ heartbeat_scan_finds_actionable() {
       sig=$(status_observed_signature "$f")
       marker=$(_hb_surfaced_path "$task")
       status_presentation_marker_reported_matches "$marker" "$sig" && continue
-      FM_HEARTBEAT_SURFACE_ENDPOINTS="${FM_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"ERROR"$'\t'"${sig}"$'\n'
+      JG_HEARTBEAT_SURFACE_ENDPOINTS="${JG_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"ERROR"$'\t'"${sig}"$'\n'
       found=0
       continue
     fi
     endpoint=${record%%$'\t'*}; rest=${record#*$'\t'}; ident=${rest%%$'\t'*}
-    FM_HEARTBEAT_SURFACE_ENDPOINTS="${FM_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"${endpoint}"$'\t'"${ident}"$'\n'
+    JG_HEARTBEAT_SURFACE_ENDPOINTS="${JG_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"${endpoint}"$'\t'"${ident}"$'\n'
     [ "$rc" -eq 0 ] && found=0
   done
   return "$found"
@@ -2674,7 +2674,7 @@ heartbeat_scan_finds_actionable() {
 # unreadable, or malformed file returns 1 and is never treated as a number, so
 # the caller falls back to the no-worker-working rule.
 lane_target_value() {
-  local path=$FM_HOME/config/lane-target raw
+  local path=$JG_HOME/config/lane-target raw
   [ -f "$path" ] && [ ! -L "$path" ] || return 1
   raw=$(awk 'NF { print }' "$path" 2>/dev/null) || return 1
   case "$raw" in ''|*"$'\n'"*) return 1 ;; esac
@@ -2696,7 +2696,7 @@ open_lane_count() {
   local check counted meta kind count=0
   check=${XDG_DATA_HOME:-$HOME/.local/share}/jg-fleet-flow/jg-flow-check.sh
   if [ -f "$check" ] && [ -x "$check" ] \
-    && counted=$(jg_run_timed "${FM_FLOW_CHECK_TIMEOUT_SECS:-10}" "$check" "$FM_HOME" --summary 2>/dev/null); then
+    && counted=$(jg_run_timed "${JG_FLOW_CHECK_TIMEOUT_SECS:-10}" "$check" "$JG_HOME" --summary 2>/dev/null); then
     counted=$(printf '%s\n' "$counted" | awk -F '\t' 'NF == 9 && NR == 1 { print $8 }')
     case "$counted" in
       ''|*[!0-9]*) ;;
@@ -2717,7 +2717,7 @@ open_lane_count() {
 # every heartbeat and never as a number.
 warn_invalid_lane_target_once() {
   local marker=$STATE/.ready-work-lane-target-invalid current
-  current=$(cat "$FM_HOME/config/lane-target" 2>/dev/null) || current=unreadable
+  current=$(cat "$JG_HOME/config/lane-target" 2>/dev/null) || current=unreadable
   [ "$(cat "$marker" 2>/dev/null)" = "$current" ] && return 0
   printf '%s' "$current" > "$marker" 2>/dev/null || true
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
@@ -2741,8 +2741,8 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$FM_HOME/.jg-secondmate-home" ] && [ ! -L "$FM_HOME/.jg-secondmate-home" ] || return 1
-  ready_out=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
+  [ -f "$JG_HOME/.jg-secondmate-home" ] && [ ! -L "$JG_HOME/.jg-secondmate-home" ] || return 1
+  ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
   ready_rc=$?
   READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
     | awk '/^ready\[[0-9]+\]/ { on = 1; next } on && /^  / { sub(/^  /, ""); split($0, f, ","); print f[1]; next } { on = 0 }' \
@@ -2761,7 +2761,7 @@ ready_work_waits_idle() {
     return 1
   fi
   target=$(lane_target_value) || target=
-  if [ -z "$target" ] && [ -f "$FM_HOME/config/lane-target" ]; then
+  if [ -z "$target" ] && [ -f "$JG_HOME/config/lane-target" ]; then
     warn_invalid_lane_target_once
   fi
   if [ -n "$target" ] && open=$(open_lane_count) && [ "$open" -lt "$target" ]; then
@@ -2800,7 +2800,7 @@ record_ready_work_surfaced() {
 # decision: for each ask it recorded that has not been defaulted yet, run
 # `ask-default decide` and let it apply the ask's safe default when the captain
 # is unreachable and the ask's clock has run out. Located like the other add-on
-# shims (FM_ADDONS_DIR, default $FM_HOME/projects/firstmate-addons); with the
+# shims (JG_ADDONS_DIR, default $JG_HOME/projects/firstmate-addons); with the
 # add-on absent this returns at once, writing nothing, and the loop is unchanged.
 # Runs once per CHECK_INTERVAL. The probe reads the away record: the captain is
 # reachable unless an away record (never quiet mode's) exists. Held, waiting, and
@@ -2808,14 +2808,14 @@ record_ready_work_surfaced() {
 # Sets ASK_DEFAULT_REASON and returns 0 when at least one ask was just defaulted.
 ask_default_tick() {
   local tool rec id out rc ids='' probe
-  tool="${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/ask-default/ask-default"
+  tool="${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/ask-default/ask-default"
   [ -x "$tool" ] || return 1
   [ "$(age_of "$STATE/.last-ask-default-check")" -ge "$CHECK_INTERVAL" ] || return 1
   touch "$STATE/.last-ask-default-check"
   # shellcheck disable=SC2016 # the probe's own command substitution runs inside decide
   probe=$(printf '[ "$(%q mode --path %q 2>/dev/null)" != away ]' \
     "$SCRIPT_DIR/jg-afk-contract.sh" "$STATE/.afk-contract")
-  for rec in "$FM_HOME/data/ask-default/asks"/*; do
+  for rec in "$JG_HOME/data/ask-default/asks"/*; do
     [ -f "$rec" ] || continue
     id=${rec##*/}
     # Skip the add-on's apply locks and its in-flight <id>.<pid> record staging.
@@ -2825,7 +2825,7 @@ ask_default_tick() {
     esac
     grep -q '^defaulted_at=' "$rec" && continue
     rc=0
-    out=$(FM_HOME="$FM_HOME" "$tool" decide "$id" --probe-cmd "$probe" 2>&1) || rc=$?
+    out=$(JG_HOME="$JG_HOME" "$tool" decide "$id" --probe-cmd "$probe" 2>&1) || rc=$?
     case "$rc" in
       0) case "$out" in *'decision: defaulted'*) ids="$ids $id" ;; esac ;;
       10|11|12) ;;
@@ -2890,7 +2890,7 @@ event_wait_or_sleep() {
     return
   fi
 
-  rec=$(FM_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1 jg_backend_wait_transition "$first_backend" "$first_session" "$POLL" "$STATE" "${windows[@]}")
+  rec=$(JG_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1 jg_backend_wait_transition "$first_backend" "$first_session" "$POLL" "$STATE" "${windows[@]}")
   rc=$?
   case "$rc" in
     0)
@@ -2920,7 +2920,7 @@ if [ "${BASH_SOURCE[0]}" != "$0" ]; then
   return 0
 fi
 
-# FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS is validated here, at arm time, and an
+# JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS is validated here, at arm time, and an
 # unusable value refuses to arm. This is deliberately NOT symmetry with the
 # tunables above, which this watcher only defaults and never validates. The
 # reason is specific: every supervision cycle runs `jg-procevent.sh reconcile`
@@ -2934,12 +2934,12 @@ fi
 # places. The refusal goes to stdout because bin/jg-watch-arm.sh relays the
 # child's stdout and recognises `watcher: FAILED` as the typed failure line.
 if ! jg_procevent_launch_confirm_seconds >/dev/null; then
-  echo "watcher: FAILED - FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $FM_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $FM_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
+  echo "watcher: FAILED - JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS must be whole seconds from $JG_PROCEVENT_LAUNCH_CONFIRM_MIN_SECONDS to $JG_PROCEVENT_LAUNCH_CONFIRM_MAX_SECONDS"
   exit 1
 fi
 
 watcher_process_table() {
-  local proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc} stat_path stat_line pid
+  local proc_root=${JG_PROC_ROOT_OVERRIDE:-/proc} stat_path stat_line pid
   local -a fields
   if [ -r "$proc_root/$$/stat" ]; then
     for stat_path in "$proc_root"/[0-9]*/stat; do
@@ -2976,8 +2976,8 @@ watcher_record_children() {
   local root=$1 identity=$2 ledger=$3 recorder child child_identity current descendants
   trap - EXIT HUP INT TERM
   jg_current_pid recorder || return 1
-  while jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$root" "$FM_HOME" \
-    && [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ]; do
+  while jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$root" "$JG_HOME" \
+    && [ "$JG_WATCHER_MATCHED_IDENTITY" = "$identity" ]; do
     descendants=$(watcher_descendants "$root" "$recorder") || return 1
     {
       for child in $descendants; do
@@ -3017,8 +3017,8 @@ evict_stalled_holder() {
 
 evict_stalled_holder_locked() {
   local pid=$1 i=0 identity descendants child child_identity recorded line
-  jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
-  identity=$FM_WATCHER_MATCHED_IDENTITY
+  jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$JG_HOME" || return 1
+  identity=$JG_WATCHER_MATCHED_IDENTITY
   descendants=$(watcher_descendants "$pid") || return 1
   recorded=$(awk '!seen[$0]++' "$WATCH_LOCK/children" 2>/dev/null || true)
   for child in $descendants; do
@@ -3026,8 +3026,8 @@ evict_stalled_holder_locked() {
     printf -v line '%s\t%s' "$child" "$child_identity"
     recorded="$recorded"$'\n'"$line"
   done
-  jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
-  [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
+  jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$JG_HOME" || return 1
+  [ "$JG_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
   kill -TERM "$pid" 2>/dev/null || return 1
   while [ "$i" -lt 50 ] && jg_pid_alive "$pid"; do
     sleep 0.1
@@ -3035,8 +3035,8 @@ evict_stalled_holder_locked() {
   done
   if jg_pid_alive "$pid"; then
     [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null)" = "$pid" ] || return 1
-    jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
-    [ "$FM_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
+    jg_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$JG_HOME" || return 1
+    [ "$JG_WATCHER_MATCHED_IDENTITY" = "$identity" ] || return 1
     [ "$(jg_watcher_progress_age "$STATE")" -ge "$WATCHER_STALL_BOUND" ] || return 1
     kill -KILL "$pid" || return 1
   fi
@@ -3046,22 +3046,22 @@ evict_stalled_holder_locked() {
 EVICTED_PID=
 EVICTED_BEAT_AGE=
 while ! jg_lock_try_acquire "$WATCH_LOCK"; do
-  if [ -n "${FM_LOCK_HELD_PID:-}" ]; then
+  if [ -n "${JG_LOCK_HELD_PID:-}" ]; then
     beat_age=$(jg_watcher_progress_age "$STATE")
     if [ "$beat_age" -ge "$WATCHER_STALE_GRACE" ]; then
       # One eviction per arm: the retry re-reads the lock and beacon, so a
       # holder that exited leaves a dead-pid lock the normal reclaim takes,
       # and a rival arm that won first reads as a fresh running watcher.
       if [ -z "$EVICTED_PID" ] && [ "$beat_age" -ge "$WATCHER_STALL_BOUND" ] \
-        && evict_stalled_holder "$FM_LOCK_HELD_PID"; then
-        EVICTED_PID=$FM_LOCK_HELD_PID
+        && evict_stalled_holder "$JG_LOCK_HELD_PID"; then
+        EVICTED_PID=$JG_LOCK_HELD_PID
         EVICTED_BEAT_AGE=$beat_age
         continue
       fi
-      echo "watcher: lock held by live pid $FM_LOCK_HELD_PID but heartbeat is stale for ${beat_age}s (>${WATCHER_STALE_GRACE}s); inspect or stop that watcher before re-arming." >&2
+      echo "watcher: lock held by live pid $JG_LOCK_HELD_PID but heartbeat is stale for ${beat_age}s (>${WATCHER_STALE_GRACE}s); inspect or stop that watcher before re-arming." >&2
       exit 1
     fi
-    echo "watcher: already running pid $FM_LOCK_HELD_PID"
+    echo "watcher: already running pid $JG_LOCK_HELD_PID"
   else
     echo "watcher: already running"
   fi
@@ -3071,11 +3071,11 @@ if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (beacon ${EVICTED_BEAT_AGE}s past hard bound ${WATCHER_STALL_BOUND}s)"
 fi
 WATCHER_RECOVERY_PENDING=0
-if [ -n "${FM_LOCK_RECOVERED_PID:-}" ]; then
+if [ -n "${JG_LOCK_RECOVERED_PID:-}" ]; then
   WATCHER_RECOVERY_PENDING=1
 fi
-if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" != 1 ] \
-  && [ "${FM_WATCH_FOREGROUND_CHECKPOINT:-0}" != 1 ]; then
+if [ "${JG_WATCH_HANDLING_SUCCESSOR:-0}" != 1 ] \
+  && [ "${JG_WATCH_FOREGROUND_CHECKPOINT:-0}" != 1 ]; then
   if ! jg_recovery_marker_reopen_announced "$WATCHER_DOWNTIME_MARKER"; then
     echo "watcher: recovery state could not be reopened safely; retaining stale lock evidence" >&2
     exit 1
@@ -3085,16 +3085,16 @@ if ! jg_recovery_marker_arm_check "$WATCHER_DOWNTIME_MARKER"; then
   echo "watcher: recovery state could not be consumed safely; retaining stale lock evidence" >&2
   exit 1
 fi
-if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
+if [ "${JG_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   WATCHER_RECOVERY_PENDING=0
-elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
+elif [ "$JG_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
 fi
 # Side-band ledger publication, detached from the poll loop.
 #
 # The poll loop owns the liveness beacon below, and jg-guard.sh reads that
 # beacon's freshness as proof that supervision is alive. Publication is a
-# side-band nicety bounded by FM_HOME_SUMMARY_TIMEOUT, but that bound is far
+# side-band nicety bounded by JG_HOME_SUMMARY_TIMEOUT, but that bound is far
 # larger than one poll and, in a home whose publication keeps failing, it is
 # paid on every poll - so running it inline puts up to a full publication
 # deadline between two beacon touches and can starve the guard's grace. Nothing
@@ -3115,7 +3115,7 @@ home_summary_refresh_detached() {
     wait "$HOME_SUMMARY_PID" 2>/dev/null || true
     HOME_SUMMARY_PID=
   fi
-  FM_HOME_SUMMARY_IF_IDLE=1 \
+  JG_HOME_SUMMARY_IF_IDLE=1 \
     "$SCRIPT_DIR/jg-home-summary-refresh.sh" --best-effort </dev/null >/dev/null 2>&1 &
   HOME_SUMMARY_PID=$!
 }
@@ -3142,7 +3142,7 @@ reconcile_requests_detached() {
     fi
     RECONCILE_REQUEST_PID=
   fi
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/jg-secondmate-reconcile.sh" process-requests </dev/null >/dev/null 2>&1 &
   RECONCILE_REQUEST_PID=$!
 }
@@ -3173,7 +3173,7 @@ watcher_cleanup() {
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
     owns_lock=1
     if [ "${WATCHER_RECOVERY_PENDING:-0}" -eq 1 ] \
-      && [ "${FM_WATCH_DELIVERED_REASON:-}" = "check: rearm-resurface" ]; then
+      && [ "${JG_WATCH_DELIVERED_REASON:-}" = "check: rearm-resurface" ]; then
       transition=release-lock-existing
     fi
   fi
@@ -3197,15 +3197,15 @@ watcher_stop_signals
 # substitution, so it matches the stored holder pid for the self-eviction check.
 WATCHER_PID=${BASHPID:-$$}
 rm -f "$STATE/.last-watcher-beat" || exit 1
-printf '%s\n' "$FM_HOME" > "$WATCH_LOCK/jg-home" || true
+printf '%s\n' "$JG_HOME" > "$WATCH_LOCK/jg-home" || true
 printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
-FM_WATCH_DELIVERY_PID=$WATCHER_PID
-FM_WATCH_DELIVERY_IDENTITY=$(jg_pid_identity "$WATCHER_PID" 2>/dev/null || true)
-printf '%s\n' "$FM_WATCH_DELIVERY_IDENTITY" > "$WATCH_LOCK/pid-identity" 2>/dev/null || true
+JG_WATCH_DELIVERY_PID=$WATCHER_PID
+JG_WATCH_DELIVERY_IDENTITY=$(jg_pid_identity "$WATCHER_PID" 2>/dev/null || true)
+printf '%s\n' "$JG_WATCH_DELIVERY_IDENTITY" > "$WATCH_LOCK/pid-identity" 2>/dev/null || true
 WATCH_OWNER_DIR=$(jg_lock_link_owner "$WATCH_LOCK") || exit 1
 : > "$WATCH_OWNER_DIR/children" || exit 1
-watcher_record_children "$WATCHER_PID" "$FM_WATCH_DELIVERY_IDENTITY" "$WATCH_OWNER_DIR/children" </dev/null >/dev/null 2>&1 &
+watcher_record_children "$WATCHER_PID" "$JG_WATCH_DELIVERY_IDENTITY" "$WATCH_OWNER_DIR/children" </dev/null >/dev/null 2>&1 &
 WATCH_CHILD_RECORDER_PID=$!
 if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure || triage_log "host memory sampler failed to start"; fi
 
@@ -3215,7 +3215,7 @@ if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure
 # between receipt publication and fixed-path removal.
 # Finish only identity-bound retirement receipts before any check can run.
 if ! jg_pr_poll_retirement_recover_all "$STATE" "$SCRIPT_DIR/jg-pr-poll.sh"; then
-  reason="check: rejected unauthenticated PR poll retirement receipts:$FM_PR_POLL_RETIREMENT_REJECTED"
+  reason="check: rejected unauthenticated PR poll retirement receipts:$JG_PR_POLL_RETIREMENT_REJECTED"
   jg_wake_append check pr-poll-retirement "$reason" || exit 1
   touch "$STATE/.last-check"
   wake "$reason"
@@ -3260,7 +3260,7 @@ resurface_after_downtime() {
   # Handling successors already have a predecessor-delivered wake on the way.
   # Re-announcing from this cycle is what turned a lost handshake into an
   # unbounded recovery loop; stay in the poll loop and supervise instead.
-  if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
+  if [ "${JG_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
     return 0
   fi
   if [ "$WATCHER_RECOVERY_PENDING" -ne 1 ]; then
@@ -3268,7 +3268,7 @@ resurface_after_downtime() {
       echo "watcher: recovery state could not be consumed safely" >&2
       exit 1
     fi
-    [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
+    [ "$JG_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
   # A process-event result carries richer adapter-owned wake context than the
   # generic recovery reason, so give that owner first refusal.
@@ -3298,10 +3298,10 @@ run_due_checks() {
       [ -e "$c" ] || continue
       is_pr_poll=0
       if [ "$(basename "$c")" = x-watch.check.sh ]; then
-        if fmx_poll_shim_valid "$c" "$FM_HOME" "$FM_ROOT" \
-          && [ -f "$FM_ROOT/bin/jg-x-poll.sh" ] && [ ! -L "$FM_ROOT/bin/jg-x-poll.sh" ]; then
-          FM_HOME="$FM_HOME" run_check_capture "$FM_ROOT/bin/jg-x-poll.sh" || exit 1
-          out=$FM_CHECK_RESULT
+        if fmx_poll_shim_valid "$c" "$JG_HOME" "$JG_ROOT" \
+          && [ -f "$JG_ROOT/bin/jg-x-poll.sh" ] && [ ! -L "$JG_ROOT/bin/jg-x-poll.sh" ]; then
+          JG_HOME="$JG_HOME" run_check_capture "$JG_ROOT/bin/jg-x-poll.sh" || exit 1
+          out=$JG_CHECK_RESULT
         else
           rejected_checks="$rejected_checks $c"
           continue
@@ -3312,11 +3312,11 @@ run_due_checks() {
           || { rerecord_device_shifted_pr_poll "$id" \
             && jg_pr_poll_snapshot_capture "$STATE" "$id" "$SCRIPT_DIR/jg-pr-poll.sh"; }; then
           is_pr_poll=1
-          provider=$FM_PR_POLL_SNAPSHOT_PROVIDER
-          url=$FM_PR_POLL_SNAPSHOT_URL
-          host=$FM_PR_POLL_SNAPSHOT_HOST
-          path=$FM_PR_POLL_SNAPSHOT_PATH
-          number=$FM_PR_POLL_SNAPSHOT_NUMBER
+          provider=$JG_PR_POLL_SNAPSHOT_PROVIDER
+          url=$JG_PR_POLL_SNAPSHOT_URL
+          host=$JG_PR_POLL_SNAPSHOT_HOST
+          path=$JG_PR_POLL_SNAPSHOT_PATH
+          number=$JG_PR_POLL_SNAPSHOT_NUMBER
           PR_POLL_CONTROL_LOCK="$STATE/.control-$id.lock"
           jg_lock_acquire_wait "$PR_POLL_CONTROL_LOCK" || exit 1
           if ! jg_pr_poll_snapshot_matches "$STATE" "$id" "$SCRIPT_DIR/jg-pr-poll.sh"; then
@@ -3326,11 +3326,11 @@ run_due_checks() {
           fi
           run_check_capture "$SCRIPT_DIR/jg-pr-poll.sh" --validated \
             "$provider" "$url" "$host" "$path" "$number" || exit 1
-          out=$FM_CHECK_RESULT
+          out=$JG_CHECK_RESULT
         elif jg_custom_check_snapshot_prepare "$STATE" "$id"; then
-          custom_snapshot=$FM_CUSTOM_CHECK_SNAPSHOT
+          custom_snapshot=$JG_CUSTOM_CHECK_SNAPSHOT
           run_check_capture "$custom_snapshot" || exit 1
-          out=$FM_CHECK_RESULT
+          out=$JG_CHECK_RESULT
           jg_custom_check_snapshot_cleanup
         else
           jg_custom_check_snapshot_cleanup
@@ -3375,10 +3375,10 @@ EOF
               "$provider" "$host" "$path" "$number"; then
             triage_log "no matching persisted merge authority for $id; recording an external merge outcome"
           fi
-          merge_authority=$FM_MERGE_AUTHORITY
-          merge_authority_record_identity=$FM_MERGE_AUTHORITY_RECORD_IDENTITY
+          merge_authority=$JG_MERGE_AUTHORITY
+          merge_authority_record_identity=$JG_MERGE_AUTHORITY_RECORD_IDENTITY
           merge_outcome_rc=0
-          jg_merge_outcome_report "$FM_HOME" "$STATE" "$id" "$url" poll \
+          jg_merge_outcome_report "$JG_HOME" "$STATE" "$id" "$url" poll \
             "$merge_authority" || merge_outcome_rc=$?
           if [ "$merge_outcome_rc" -ne 0 ]; then
             triage_log "merge outcome for $id could not be recorded (rc=$merge_outcome_rc)"
@@ -3394,7 +3394,7 @@ EOF
           retire_merged_pr_poll "$id"
           pr_poll_control_release || exit 1
           touch "$STATE/.last-check"
-          if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
+          if [ "$JG_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
           fi
@@ -3430,8 +3430,8 @@ while :; do
   # with no holder at all is read as the same teardown: only a fresh watcher
   # ever recreates the lock, and that case is the self-eviction below.
   # Scoped to this process alone: no other watcher is signalled.
-  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
-    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
+  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$JG_HOME" ]; then
+    echo "watcher: exiting - home no longer exists: $JG_HOME" >&2
     exit 1
   elif [ ! -d "$STATE" ]; then
     echo "watcher: exiting - state directory no longer exists: $STATE" >&2
@@ -3461,7 +3461,7 @@ while :; do
 
   # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
   # status lines before this cycle can exit on a wake. Off costs one file test.
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" capture || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-fleet-ledger.sh" capture || true
 
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
@@ -3505,7 +3505,7 @@ while :; do
   # so it stays ahead of signals: a constant signal stream must not stop a dead
   # source from being restarted.
   if [ -d "$STATE/procevent" ]; then
-    FM_HOME="$FM_HOME" "$SCRIPT_DIR/jg-procevent.sh" reconcile >/dev/null 2>&1 || true
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-procevent.sh" reconcile >/dev/null 2>&1 || true
   fi
 
   # The decision must read the wake queue as it stood at cycle start, because
@@ -3582,8 +3582,8 @@ EOF
     # checks are costly (a bounded no-mistakes call, then a pane capture), so the ||
     # ordering evaluates them ONLY for a non-afk signal with no captain-relevant
     # status span, and the capture only once the authoritative verdict comes up short.
-    FM_SIGNAL_SURFACE_ENDPOINTS=''
-    FM_SIGNAL_NEEDS_DECISION_FILES=''
+    JG_SIGNAL_SURFACE_ENDPOINTS=''
+    JG_SIGNAL_NEEDS_DECISION_FILES=''
     # shellcheck disable=SC2086  # $files is a space-separated status-path list (ids carry no spaces)
     signal_files_actionable $files
     signal_actionable=$?
@@ -3604,7 +3604,7 @@ EOF
         [ -n "$sf" ] || continue
         reportable_signal_path "$f" || continue
         file_reason="$reason"
-        case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
+        case " $JG_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
         jg_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
       done <<EOF
 $pending
@@ -3631,7 +3631,7 @@ EOF
         jg_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" || true
         mark_surfaced "$f" "$surface_end" "$surface_ident"
       done <<EOF
-$FM_SIGNAL_SURFACE_ENDPOINTS
+$JG_SIGNAL_SURFACE_ENDPOINTS
 EOF
       [ -n "$files" ] || continue
       signal_wake=$reason
@@ -3648,7 +3648,7 @@ EOF
         jg_wake_status_seen_commit "$STATE" "$f" "$surface_end" "$surface_ident" \
           || signal_commit_error=1
       done <<EOF
-$FM_SIGNAL_SURFACE_ENDPOINTS
+$JG_SIGNAL_SURFACE_ENDPOINTS
 EOF
       if [ "$signal_commit_error" -ne 0 ]; then
         while IFS=$(printf '\t') read -r sf sig f; do
@@ -3685,7 +3685,7 @@ EOF
   # This is mechanical and silent unless a durable terminal-outcome obligation
   # was created, so quiet cycles never wake firstmate or consume model tokens.
   inactive_out=
-  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  if inactive_out=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/jg-inactive-reconcile.sh" scan 2>/dev/null); then
     if [ -n "$inactive_out" ]; then
       wake "check: inactive-outcome"

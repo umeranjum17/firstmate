@@ -10,7 +10,7 @@
 # confirm budget is 3 retries x 0.4s - so jg-send used to exit 1 "not
 # submitted" for a message that landed and ran, inviting a duplicate resend.
 # jg-send now gives agy typed targets a longer default budget (20 retries,
-# ~8s at the default cadence); an explicit FM_SEND_RETRIES still wins and every
+# ~8s at the default cadence); an explicit JG_SEND_RETRIES still wins and every
 # other harness keeps the
 # shared 3-retry default. These tests pin that behavior hermetically (stubbed
 # tmux + sleep, no real agent): the fake tmux renders the busy footer only
@@ -21,7 +21,7 @@
 #      reaching that read.
 #   2. agy target, busy footer only at the 15th poll (the live-measured long
 #      brief latency): the default budget still reaches it and exits 0.
-#   3. agy target with an explicit FM_SEND_RETRIES=3: the operator knob wins
+#   3. agy target with an explicit JG_SEND_RETRIES=3: the operator knob wins
 #      and the send keeps the loud exit-1 verdict=unknown refusal.
 #   4. agy target whose busy footer never renders: no confirmation is
 #      fabricated - exit 1 verdict=unknown.
@@ -37,7 +37,7 @@ SEND="$ROOT/bin/jg-send.sh"
 TMP_ROOT=$(jg_test_tmproot jg-send-agy-confirm)
 
 # A fake tmux that models agy's late busy render, plus a fake sleep that
-# records every requested duration (one per line) into FM_SLEEP_LOG instead of
+# records every requested duration (one per line) into JG_SLEEP_LOG instead of
 # sleeping. The styled capture (-e) always shows agy's idle bare-`>` composer
 # (verdict `unknown`); the plain capture - the one jg_pane_busy_state polls -
 # shows the idle screen until its BUSY_AT-th call and the verified `esc to
@@ -82,7 +82,7 @@ SH
   chmod +x "$fb/tmux"
   cat > "$fb/sleep" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "${1:-}" >> "$FM_SLEEP_LOG"
+printf '%s\n' "${1:-}" >> "$JG_SLEEP_LOG"
 exit 0
 SH
   chmod +x "$fb/sleep"
@@ -91,9 +91,9 @@ SH
 
 # run_send <harness> <busy-at> <extra-env-assignments...>: build a fresh home
 # whose recorded task targets sess:win on the tmux backend with <harness> meta,
-# then run the real jg-send typed plane against the stubs. FM_SEND_SETTLE=0
+# then run the real jg-send typed plane against the stubs. JG_SEND_SETTLE=0
 # strips the post-submit pause so the sleep log holds only the popup settle
-# plus the 0.4 submit waits, keeping the poll arithmetic visible. FM_ROOT_OVERRIDE
+# plus the 0.4 submit waits, keeping the poll arithmetic visible. JG_ROOT_OVERRIDE
 # points at the case dir so jg-guard's tangle check stays silent. Emits
 # "rc <exit>" and leaves the send's stderr in $dir/err and the sleep log in
 # $dir/sleep.log for the caller to assert on.
@@ -105,8 +105,8 @@ run_send() {  # <harness> <busy-at> [env=val ...]
   log="$dir/sleep.log"; : > "$log"
   jg_write_meta "$dir/state/agyw.meta" "window=sess:win" "harness=$harness"
   (
-    export FM_GATE_REFUSE_BYPASS=1 FM_SEND_SETTLE=0
-    export PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_HOME="$dir" FM_SLEEP_LOG="$log"
+    export JG_GATE_REFUSE_BYPASS=1 JG_SEND_SETTLE=0
+    export PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$dir" JG_HOME="$dir" JG_SLEEP_LOG="$log"
     for a in "$@"; do eval "export $a"; done
     "$SEND" sess:win 'Append steer1 line to notes.md' 2>"$dir/err"
     printf 'rc %s\n' "$?"
@@ -130,14 +130,14 @@ waits=$(grep -c '^0\.4$' "$case_dir/sleep.log" || true)
 [ "$waits" = 5 ] || fail "agy typed send: expected the poll to reach the 5th busy read (5 x 0.4s: Enter wait + 4 poll waits), got $waits"
 pass "agy typed send: sleep log shows the confirm poll running to the late busy render"
 
-# agy with an explicit FM_SEND_RETRIES=3: the operator knob wins over the agy
+# agy with an explicit JG_SEND_RETRIES=3: the operator knob wins over the agy
 # default, the budget expires before the late footer, and the loud refusal
 # boundary is preserved.
-out=$(run_send agy 6 'FM_SEND_RETRIES=3')
+out=$(run_send agy 6 'JG_SEND_RETRIES=3')
 expect_code 1 "$(printf '%s' "$out" | sed -n 's/^rc //p')" \
-  "agy typed send honors an explicit FM_SEND_RETRIES=3"
-grep -q 'verdict=unknown' "$TMP_ROOT"/*/err || fail "agy typed send FM_SEND_RETRIES=3: expected verdict=unknown refusal"
-pass "agy typed send: explicit FM_SEND_RETRIES=3 keeps the exit-1 verdict=unknown refusal"
+  "agy typed send honors an explicit JG_SEND_RETRIES=3"
+grep -q 'verdict=unknown' "$TMP_ROOT"/*/err || fail "agy typed send JG_SEND_RETRIES=3: expected verdict=unknown refusal"
+pass "agy typed send: explicit JG_SEND_RETRIES=3 keeps the exit-1 verdict=unknown refusal"
 
 # agy whose busy footer never renders: the raised budget must time out into
 # the same loud refusal, never fabricate a confirmation.

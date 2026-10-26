@@ -9,7 +9,7 @@ def drop(text, name):
     m = re.search(r'^%s\(\) \{.*?^\}\n' % name, text, re.S | re.M)
     assert m, name
     return text[:m.start()] + text[m.end():]
-src = '[ ! -r "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-lib.sh" ] || . "${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-lib.sh"\n'
+src = '[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-lib.sh"\n'
 p = bin_ / 'jg-wake-lib.sh'
 p.write_text(drop(p.read_text(), 'jg_wake_withdraw'))
 p = bin_ / 'jg-wake-drain.sh'
@@ -31,5 +31,5 @@ t = t.replace('\nwhile :; do\n', '\n' + src + 'while :; do\n', 1)
 p.write_text(t)
 p = bin_ / 'jg-config-inherit-lib.sh'
 t = p.read_text().replace(' lane-target}"', '}"')
-t = re.sub(r'^(FM_INHERITABLE_CONFIG=.*\n)', r'\1[ ! -r "${FM_ADDONS_DIR:-${FM_HOME:-}/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-inherit.sh" ] || . "${FM_ADDONS_DIR:-${FM_HOME:-}/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-inherit.sh"\n', t, count=1, flags=re.M)
+t = re.sub(r'^(JG_INHERITABLE_CONFIG=.*\n)', r'\1[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-}/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-inherit.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-}/projects/firstmate-addons}/lead-wake/bin/jg-lead-wake-inherit.sh"\n', t, count=1, flags=re.M)
 p.write_text(t)

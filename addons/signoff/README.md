@@ -11,7 +11,7 @@ the keyed-answer intake, both owned by the Firstmate checkout.
 - Dormant until the fork dispatch hook lands. Nothing here runs the adapter yet:
   the fork still ships and dispatches its own copy.
 - The adapter resolves the runner, the intake and the libraries from the Firstmate
-  checkout (`FM_CODE_ROOT`, defaulting to `FM_HOME`), not from its own directory.
+  checkout (`JG_CODE_ROOT`, defaulting to `JG_HOME`), not from its own directory.
 
 ## Seam (for the hook slice)
 
@@ -35,6 +35,6 @@ The adapter reads deeper requests only and never consumes captain-hold answers.
 ## Tests
 
 `tests/jg-procevent-signoff.test.sh` sources `tests/lib.sh` from the Firstmate
-checkout and needs `FM_CODE_ROOT` set to it. It runs the adapter journey through
+checkout and needs `JG_CODE_ROOT` set to it. It runs the adapter journey through
 the real runner. The real-hold section is skipped when no beads-capable tasks-axi
 and bd are installed.

@@ -5,7 +5,7 @@
 # compatibility for pre-collapse decision identities.
 set -u
 # An installed task-priority add-on must not change unrelated cases.
-export FM_TASK_PRIORITY_CHECK=/nonexistent
+export JG_TASK_PRIORITY_CHECK=/nonexistent
 
 # shellcheck source=tests/lib.sh
 # shellcheck disable=SC1091
@@ -43,9 +43,9 @@ EOF
 run_lavish() {  # <home> <command args...>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent-lavish.sh" "$@"
 }
 
@@ -55,25 +55,25 @@ run_procevent() {  # <home> <command args...>
   local home=$1
   shift
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent.sh" "$@"
 }
 
 run_bearings() {  # <home> [extra args]
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_BEARINGS_NOW=2026-07-14T12:00:00Z \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_BEARINGS_NOW=2026-07-14T12:00:00Z \
     "$BEARINGS" --json "$@"
 }
 
 run_teardown() {  # <home> <id>
   local home=$1 id=$2
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id"
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id"
 }
 
 tasks_in() {  # <home> <tasks-axi args...>
@@ -86,8 +86,8 @@ run_captain() {  # <home> <command args...>
   local home=$1
   shift
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" "$@"
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" "$@"
 }
 
 # Completes <id>'s captain-call inventory through a separate held task, because
@@ -112,7 +112,7 @@ configure_merged_github() {  # <home>
   local home=$1
   cat > "$home/fakebin/gh" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
@@ -137,7 +137,7 @@ esac
 SH
   cat > "$home/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
+printf '%s\n' "$*" >> "$JG_TEST_GH_AXI_LOG"
 case "${1:-} ${2:-}" in
   "pr view") printf 'pull_request:\n  number: %s\n  state: merged\n' "${3:-}" ;;
 esac
@@ -150,10 +150,10 @@ SH
 run_pr_merge() {  # <home> <id> <url>
   local home=$1
   shift
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_TEST_GH_LOG="$home/gh.log" \
-    FM_TEST_GH_AXI_LOG="$home/gh-axi.log" "$ROOT/bin/jg-pr-merge.sh" "$@"
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_TEST_GH_LOG="$home/gh.log" \
+    JG_TEST_GH_AXI_LOG="$home/gh-axi.log" "$ROOT/bin/jg-pr-merge.sh" "$@"
 }
 
 wait_for_test_file() {  # <path> <pid>
@@ -171,27 +171,27 @@ install_reused_task_barriers() {  # <home>
   local home=$1
   cat > "$home/fakebin/perl" <<'SH'
 #!/usr/bin/env bash
-if [ "${FM_TEST_REUSE_TEARDOWN:-}" = 1 ] \
-    && [ ! -e "${FM_TEST_REUSE_TEARDOWN_ONCE:-}" ]; then
-  : > "$FM_TEST_REUSE_TEARDOWN_ONCE"
-  : > "$FM_TEST_REUSE_TEARDOWN_READY"
-  while [ ! -e "$FM_TEST_REUSE_TEARDOWN_RELEASE" ]; do
-    "$FM_TEST_REAL_SLEEP" 0.01
+if [ "${JG_TEST_REUSE_TEARDOWN:-}" = 1 ] \
+    && [ ! -e "${JG_TEST_REUSE_TEARDOWN_ONCE:-}" ]; then
+  : > "$JG_TEST_REUSE_TEARDOWN_ONCE"
+  : > "$JG_TEST_REUSE_TEARDOWN_READY"
+  while [ ! -e "$JG_TEST_REUSE_TEARDOWN_RELEASE" ]; do
+    "$JG_TEST_REAL_SLEEP" 0.01
   done
 fi
-exec "$FM_TEST_REAL_PERL" "$@"
+exec "$JG_TEST_REAL_PERL" "$@"
 SH
   cat > "$home/fakebin/sleep" <<'SH'
 #!/usr/bin/env bash
-if [ "${FM_TEST_REUSE_MERGE:-}" = 1 ] && [ "${1:-}" = 0.1 ] \
-    && [ ! -e "${FM_TEST_REUSE_MERGE_ONCE:-}" ]; then
-  : > "$FM_TEST_REUSE_MERGE_ONCE"
-  : > "$FM_TEST_REUSE_MERGE_READY"
-  while [ ! -e "$FM_TEST_REUSE_MERGE_RELEASE" ]; do
-    "$FM_TEST_REAL_SLEEP" 0.01
+if [ "${JG_TEST_REUSE_MERGE:-}" = 1 ] && [ "${1:-}" = 0.1 ] \
+    && [ ! -e "${JG_TEST_REUSE_MERGE_ONCE:-}" ]; then
+  : > "$JG_TEST_REUSE_MERGE_ONCE"
+  : > "$JG_TEST_REUSE_MERGE_READY"
+  while [ ! -e "$JG_TEST_REUSE_MERGE_RELEASE" ]; do
+    "$JG_TEST_REAL_SLEEP" 0.01
   done
 fi
-exec "$FM_TEST_REAL_SLEEP" "$@"
+exec "$JG_TEST_REAL_SLEEP" "$@"
 SH
   chmod +x "$home/fakebin/perl" "$home/fakebin/sleep"
 }
@@ -202,8 +202,8 @@ run_shim() {  # <home> <command args...>
   local home=$1
   shift
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-decision-hold.sh" "$@"
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-decision-hold.sh" "$@"
 }
 
 write_origin_meta() {  # <home> <id> [kind]
@@ -621,8 +621,8 @@ SH
   chmod +x "$fb/tasks-axi"
 
   PATH="$fb:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" --reason "captain must decide" >/dev/null \
     || fail "holding on a beads-configured home failed without a markdown backlog"
   assert_grep "hold $id" "$log" \
@@ -631,8 +631,8 @@ SH
   decision="$home/captain-decision.txt"
   printf 'Ship the gold-only plan.\n' > "$decision"
   PATH="$fb:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" answer "$id" --decision-file "$decision" >/dev/null \
     || fail "answering on a beads-configured home failed without a markdown backlog"
   assert_grep "update $id --body-file" "$log" \
@@ -650,7 +650,7 @@ signoff_addon_stub() {  # <addons-dir>
   mkdir -p "$1/signoff/bin"
   cat > "$1/signoff/bin/jg-procevent-signoff.sh" <<'SH'
 #!/usr/bin/env bash
-printf '%s|%s|%s|%s\n' "$1" "$2" "$FM_HOME" "$FM_CODE_ROOT" >> "$SIGNOFF_LOG"
+printf '%s|%s|%s|%s\n' "$1" "$2" "$JG_HOME" "$JG_CODE_ROOT" >> "$SIGNOFF_LOG"
 exit "$SIGNOFF_STATUS"
 SH
   chmod +x "$1/signoff/bin/jg-procevent-signoff.sh"
@@ -658,8 +658,8 @@ SH
 
 signoff_hold() {  # <home> <task-id> <addons-dir> <log> <stub-status>
   local home=$1 id=$2 addons=$3 log=$4 status=$5
-  env -u FM_CODE_ROOT PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_ADDONS_DIR="$addons" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+  env -u JG_CODE_ROOT PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_ADDONS_DIR="$addons" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     SIGNOFF_LOG="$log" SIGNOFF_STATUS="$status" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Route the card" \
     --reason "captain must decide" --repo sample
@@ -682,8 +682,8 @@ SH
   hold_with_check() {  # <check-path> <extra hold args...>
     local check=$1
     shift
-    env PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_TASK_PRIORITY_CHECK="$check" \
-      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    env PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_TASK_PRIORITY_CHECK="$check" \
+      JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
       "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Needs a priority" --reason "captain must decide" \
       --repo sample --until 2099-01-01 "$@"
   }
@@ -886,14 +886,14 @@ EOF
     fail "hold accepted a changed title on an existing task"
   fi
 
-  FM_STATE_OVERRIDE="$home/state" bash -c '
+  JG_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"
     jg_wake_status_mark_current "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$home/state" "$home/state/$id.status" \
     || fail "could not prime the announced decision baseline"
   run_captain "$home" complete "$id" sample-route-call >/dev/null \
     || fail "shared investigation completion gate failed"
-  FM_STATE_OVERRIDE="$home/state" bash -c '
+  JG_STATE_OVERRIDE="$home/state" bash -c '
     . "$1"; jg_wake_signal_seen_current "$2" "$3"
   ' _ "$ROOT/bin/jg-wake-lib.sh" "$home/state" "$home/state/$id.status" \
     || fail "captain-held bookkeeping closes re-woke their own home"
@@ -1013,7 +1013,7 @@ EOF
   tasks_in "$home" add sample-widget "Ship the sample widget" --kind ship --repo sample \
     --body-file "$home/widget-body.txt" >/dev/null \
     || fail "could not create the held work item"
-  FM_CAPTAIN_HOLD_NOW=2026-06-01T12:00:00Z run_captain "$home" hold sample-widget \
+  JG_CAPTAIN_HOLD_NOW=2026-06-01T12:00:00Z run_captain "$home" hold sample-widget \
     --reason "captain go needed before shipping" >/dev/null \
     || fail "could not hold the work item for the captain"
   printf 'Not urgent; ship it as planned.\n' > "$home/go.txt"
@@ -1056,12 +1056,12 @@ EOF
     "an empty-label release recorded the wrong close mode"
 
   # A NEW captain gate on the same task later takes a NEW answer.
-  FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-widget \
+  JG_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-widget \
     --reason "captain pricing call needed" >/dev/null \
     || fail "could not re-hold the released work item"
-  snap=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
+  snap=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "fleet snapshot failed after re-hold"
   printf '%s' "$snap" | jq -e '
     .backlog.records[] | select(.id == "sample-widget")
@@ -1112,13 +1112,13 @@ fi
 if [ "${1:-}" = hold ] && [ "${2:-}" = sample-old-call ]; then
   show=$("$REAL_TASKS_AXI" show "$2" --full) || exit 93
   printf '%s\n' "$show" | grep -F 'Captain hold set: 2026-07-14T12:00:00Z' >/dev/null || exit 94
-  : > "$FM_HOME/hold-observed-after-stamp"
+  : > "$JG_HOME/hold-observed-after-stamp"
 fi
 exec "$REAL_TASKS_AXI" "$@"
 EOF
   chmod +x "$home/fakebin/tasks-axi"
 
-  FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-old-call \
+  JG_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-old-call \
     --reason "captain route choice pending" >/dev/null \
     || fail "hold was published before its hold-set stamp"
   assert_present "$home/hold-observed-after-stamp" \
@@ -1128,7 +1128,7 @@ EOF
   assert_contains "$show" "Captain hold set: 2026-07-14T12:00:00Z" \
     "the visible captain hold lost its timestamp"
 
-  if FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-stamp-failure \
+  if JG_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-stamp-failure \
     --reason "captain route choice pending" > "$home/stamp-failure.out" 2> "$home/stamp-failure.err"; then
     fail "hold succeeded after its timestamp update failed"
   fi
@@ -1149,7 +1149,7 @@ test_interrupted_answer_preserves_hold_age() {
 
 ## Done
 EOF
-  FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-interrupted-call \
+  JG_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-interrupted-call \
     --reason "captain route choice pending" >/dev/null \
     || fail "could not hold the interrupted-answer fixture"
   printf 'Not urgent in the historical answer.\n' > "$home/interrupted-answer.txt"
@@ -1157,16 +1157,16 @@ EOF
   cat > "$home/fakebin/tasks-axi" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = done ] && [ "${2:-}" = sample-interrupted-call ] \
-  && [ ! -e "$FM_HOME/close-failed-once" ]; then
-  cp "$FM_HOME/data/backlog.md" "$FM_HOME/at-close/backlog.md" || exit 93
-  : > "$FM_HOME/close-failed-once"
+  && [ ! -e "$JG_HOME/close-failed-once" ]; then
+  cp "$JG_HOME/data/backlog.md" "$JG_HOME/at-close/backlog.md" || exit 93
+  : > "$JG_HOME/close-failed-once"
   exit 92
 fi
 if [ "${1:-}" = update ] && [ "${2:-}" = sample-interrupted-call ] \
-  && [ ! -e "$FM_HOME/normalize-failed-once" ]; then
+  && [ ! -e "$JG_HOME/normalize-failed-once" ]; then
   state=$("$REAL_TASKS_AXI" show "$2" --full | sed -n 's/^  state: //p' | head -1)
   if [ "$state" = done ]; then
-    : > "$FM_HOME/normalize-failed-once"
+    : > "$JG_HOME/normalize-failed-once"
     exit 94
   fi
 fi
@@ -1178,9 +1178,9 @@ EOF
     --decision-file "$home/interrupted-answer.txt" > "$home/answer.out" 2> "$home/answer.err"; then
     fail "the forced answer close failure reported success"
   fi
-  snap=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/at-close" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
+  snap=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/at-close" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "fleet snapshot failed at interrupted close boundary"
   printf '%s' "$snap" | jq -e '
     .backlog.records[] | select(.id == "sample-interrupted-call")
@@ -1224,10 +1224,10 @@ test_deferral_leaves_captains_call_until_due() {
 
 ## Done
 EOF
-  FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-existing-call \
+  JG_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold sample-existing-call \
     --reason "captain choice on existing work" >/dev/null \
     || fail "could not hold the existing task"
-  FM_CAPTAIN_HOLD_NOW=2026-07-20T12:00:00Z run_captain "$home" hold sample-existing-call \
+  JG_CAPTAIN_HOLD_NOW=2026-07-20T12:00:00Z run_captain "$home" hold sample-existing-call \
     --reason "captain choice on existing work" >/dev/null \
     || fail "could not repeat the existing task hold"
   run_captain "$home" hold sample-later-call --title "Revisit the sample plan" \
@@ -1241,9 +1241,9 @@ EOF
     fail "hold accepted a malformed --until date"
   fi
 
-  snap=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
+  snap=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_SNAPSHOT_NOW=2026-07-14T12:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "fleet snapshot failed"
   printf '%s' "$snap" | jq -e '
     ([.backlog.records[] | select(.id == "sample-later-call")][0]) as $later
@@ -1268,9 +1268,9 @@ EOF
 
   # On its date the call is due again - and still answerable even though
   # tasks-axi reports the expired hold as no longer held.
-  snap=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-    FM_PROJECTS_OVERRIDE="$home/projects" FM_SNAPSHOT_NOW=2026-08-01T12:00:00Z \
+  snap=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    JG_PROJECTS_OVERRIDE="$home/projects" JG_SNAPSHOT_NOW=2026-08-01T12:00:00Z \
     "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "fleet snapshot failed at the due date"
   printf '%s' "$snap" | jq -e '
     ([.backlog.records[] | select(.id == "sample-later-call")][0]) as $later
@@ -1810,14 +1810,14 @@ SH
   chmod +x "$home/adapter-root/bin/jg-procevent-fixturechan.sh"
   run_captain "$home" bind fixture-src >/dev/null \
     || fail "could not bind the fixture channel"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$home/adapter-root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$home/adapter-root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent.sh" register fixturechan fixture-src -- cat "$result" >/dev/null \
     || fail "could not register the fixture channel source"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$home/adapter-root" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$home/adapter-root" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
     "$ROOT/bin/jg-procevent.sh" start fixture-src >/dev/null 2>&1
   assert_absent "$home/state/procevent-inbox/fixture-src.1.handled" \
     "feeding a captain answer retired the notification firstmate still needs"
@@ -2141,10 +2141,10 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
     "the duplicate-note refusal did not name the retired request: $out"
 
   printf 'sample-active-call\n' \
-    | FM_CAPTAIN_HOLD_NOW=2026-09-07T06:00:00Z run_captain "$home" reconcile-requests \
+    | JG_CAPTAIN_HOLD_NOW=2026-09-07T06:00:00Z run_captain "$home" reconcile-requests \
         --source-id board-src --source "captured board result sequence 2" >/dev/null \
     || fail "could not create the second reconcile request"
-  FM_CAPTAIN_HOLD_NOW=2026-09-07T06:01:00Z run_captain "$home" reconcile note sample-active-call \
+  JG_CAPTAIN_HOLD_NOW=2026-09-07T06:01:00Z run_captain "$home" reconcile note sample-active-call \
     --note-file "$home/note.txt" >/dev/null \
     || fail "the second request with the same finding was not recorded"
   show=$(tasks_in "$home" show sample-active-call --full)
@@ -2182,18 +2182,18 @@ test_reconcile_outcomes_retry_partial_failures_once() {
   cat > "$home/fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = done ] && [ "${2:-}" = sample-reconcile-close-retry ] \
-  && [ ! -e "$FM_HOME/reconcile-close-failed" ]; then
-  : > "$FM_HOME/reconcile-close-failed"
+  && [ ! -e "$JG_HOME/reconcile-close-failed" ]; then
+  : > "$JG_HOME/reconcile-close-failed"
   exit 92
 fi
 if [ "${1:-}" = update ] && [ "${2:-}" = sample-reconcile-note-retry ]; then
   "$REAL_TASKS_AXI" "$@" || exit $?
-  : > "$FM_HOME/reconcile-note-updated"
+  : > "$JG_HOME/reconcile-note-updated"
   exit 0
 fi
 if [ "${1:-}" = show ] && [ "${2:-}" = sample-reconcile-note-retry ] \
-  && [ -e "$FM_HOME/reconcile-note-updated" ] && [ ! -e "$FM_HOME/reconcile-note-show-failed" ]; then
-  : > "$FM_HOME/reconcile-note-show-failed"
+  && [ -e "$JG_HOME/reconcile-note-updated" ] && [ ! -e "$JG_HOME/reconcile-note-show-failed" ]; then
+  : > "$JG_HOME/reconcile-note-show-failed"
   exit 93
 fi
 exec "$REAL_TASKS_AXI" "$@"
@@ -2549,7 +2549,7 @@ case "${1:-}" in
       esac
     done
     if [ "$literal" = 1 ]; then
-      printf '%s' "${1:-}" >> "$FM_SEND_LOG"
+      printf '%s' "${1:-}" >> "$JG_SEND_LOG"
     fi
     exit 0 ;;
   display-message)
@@ -2563,9 +2563,9 @@ SH
   chmod +x "$fb/tmux"
 
   : > "$home/send.log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$home" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_SEND_LOG="$home/send.log" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-send.sh" "$id" --resolve-key chat-choice "go with option A" >/dev/null 2>&1 \
     || fail "an answer to a transferred legacy decision was refused by the chat channel"
   # The answer rides jg-send's durable inbox plane: the record carries the
@@ -2577,9 +2577,9 @@ SH
   assert_contains "$show" "Answer: go with option A" "the chat-answered row lost the captain answer"
 
   : > "$home/send.log"
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$home" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_SEND_LOG="$home/send.log" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-send.sh" "$id" --resolve-key sample-chat-followup "take the second option" >/dev/null 2>&1 \
     || fail "an answer keyed by a task id was refused by the chat channel"
   show=$(tasks_in "$home" show sample-chat-followup --full)
@@ -2590,9 +2590,9 @@ SH
 
   : > "$home/send.log"
   set +e
-  env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
+  env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$home" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_SEND_LOG="$home/send.log" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-send.sh" "$id" --resolve-key sample-chat-reconcile reconcile >/dev/null 2>&1
   set -e
   show=$(tasks_in "$home" show sample-chat-reconcile --full)
@@ -2607,9 +2607,9 @@ SH
   run_captain "$home" answer sample-chat-reconcile --decision-file "$home/chat-reconcile.txt" >/dev/null \
     || fail "could not close the chat reconcile fixture normally"
 
-  if env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
+  if env PATH="$fb:$PATH" JG_ROOT_OVERRIDE="$home" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_SEND_LOG="$home/send.log" JG_SEND_SETTLE=0 \
     "$ROOT/bin/jg-send.sh" "$id" --resolve-key sample-chat-followup "again" \
     > "$home/closed-key.out" 2> "$home/closed-key.err"; then
     fail "a key already closed in both ledgers was accepted"
@@ -2640,8 +2640,8 @@ test_origin_slug_validation_precedes_path_construction() {
 run_drain() {  # <home>
   local home=$1
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-wake-drain.sh" 2>/dev/null
 }
 
@@ -2842,9 +2842,9 @@ test_teardown_never_closes_a_captain_held_task() {
   printf '# Sample forced path\n\nOne captain choice remains.\n' > "$home/data/$forced/report.md"
   run_captain "$home" hold "$forced" --reason "captain must choose the sample forced path" >/dev/null \
     || fail "could not hold the forced fixture for the captain"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$forced" --force \
     > "$home/forced.out" 2> "$home/forced.err" \
     || fail "forced cleanup failed: $(cat "$home/forced.err")"
   show=$(tasks_in "$home" show "$forced" --full) || fail "forced cleanup erased the captain-held row"
@@ -3013,8 +3013,8 @@ test_retained_row_artifacts_survive_captain_answers() {
   show=$(tasks_in "$home" show "$local_id" --full) || fail "the released local merge disappeared"
   assert_not_contains "$show" "hold_kind: captain" \
     "local merge approval retained its captain hold kind"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-merge-local.sh" "$local_id" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" "$ROOT/bin/jg-merge-local.sh" "$local_id" \
     > "$home/local-merge.out" 2> "$home/local-merge.err" \
     || fail "approved local merge failed: $(cat "$home/local-merge.err")"
   run_teardown "$home" "$local_id" > "$home/local-teardown.out" \
@@ -3156,9 +3156,9 @@ test_interrupted_cleanup_keeps_the_captain_call_recoverable() {
   interrupt_teardown_during_treehouse_return "$home"
 
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3173,15 +3173,15 @@ test_interrupted_cleanup_keeps_the_captain_call_recoverable() {
     "the deliverable was recorded before destructive cleanup succeeded"
 
   jg_fake_exit0 "$home/fakebin" treehouse
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+  bootstrap=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_BOOTSTRAP_NETWORK=skip \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1 || true)
   assert_present "$home/state/$id.meta" "startup discarded task ownership before cleanup retry"
   assert_present "$home/state/$id.backlog-close" "startup discarded the pending cleanup record"
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force 2>&1) \
+  bootstrap=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force 2>&1) \
     || fail "teardown retry failed: $bootstrap"
   assert_absent "$home/state/$id.meta" "teardown retry left the interrupted task record behind"
   assert_absent "$home/state/$id.backlog-close" "teardown retry left the pending record behind"
@@ -3214,9 +3214,9 @@ test_answer_before_cleanup_replay_preserves_the_retained_report() {
   interrupt_teardown_during_treehouse_return "$home"
 
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3228,15 +3228,15 @@ test_answer_before_cleanup_replay_preserves_the_retained_report() {
   run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
     || fail "the captain could not answer before cleanup replay"
   jg_fake_exit0 "$home/fakebin" treehouse
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+  bootstrap=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_BOOTSTRAP_NETWORK=skip \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1 || true)
   assert_present "$home/state/$id.meta" "startup discarded task ownership before cleanup retry"
   assert_present "$home/state/$id.backlog-close" "startup discarded the pending cleanup record"
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force 2>&1) \
+  bootstrap=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force 2>&1) \
     || fail "teardown retry failed: $bootstrap"
   assert_absent "$home/state/$id.meta" "teardown retry left the interrupted task record behind"
   assert_absent "$home/state/$id.backlog-close" "teardown retry left the pending record behind"
@@ -3281,9 +3281,9 @@ SH
   interrupt_teardown_during_treehouse_return "$home"
 
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3322,9 +3322,9 @@ test_unusable_pending_close_record_names_its_reason() {
   interrupt_teardown_during_treehouse_return "$home"
 
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3370,26 +3370,26 @@ EOF
     "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Relocated interrupted cleanup\n\nThe captain call remains open.\n' > "$data/$id/report.md"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" \
     --reason "captain must choose after relocated interrupted cleanup" >/dev/null \
     || fail "could not hold the relocated answer-before-replay fixture"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id-call" --title "Sibling captain call" \
     --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
     || fail "could not hold the sibling captain call"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" complete "$id" "$id-call" >/dev/null \
     || fail "completion gate failed for the relocated answer-before-replay fixture"
   interrupt_teardown_during_treehouse_return "$home"
 
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -3398,8 +3398,8 @@ EOF
     "the interrupted relocated cleanup lost its pending record"
 
   printf 'Proceed despite the reporting limitation.\n' > "$home/answer.txt"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" answer "$id" --decision-file "$home/answer.txt" \
     >/dev/null || fail "the unsupported relocated report wedged the captain's answer"
   show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
@@ -3408,14 +3408,14 @@ EOF
   assert_contains "$show" "held: no" "the relocated report kept the answered call held"
 
   jg_fake_exit0 "$home/fakebin" treehouse
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+  bootstrap=$(PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_BOOTSTRAP_NETWORK=skip \
     "$ROOT/bin/jg-bootstrap.sh" 2>&1 || true)
   assert_present "$home/state/$id.meta" "startup discarded task ownership before cleanup retry"
   assert_present "$home/state/$id.backlog-close" "startup discarded the pending cleanup record"
-  json=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_DATA_OVERRIDE="$data" \
-    FM_BEARINGS_NOW=2026-07-14T12:00:00Z "$BEARINGS" --json) \
+  json=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_DATA_OVERRIDE="$data" \
+    JG_BEARINGS_NOW=2026-07-14T12:00:00Z "$BEARINGS" --json) \
     || fail "Bearings failed after the relocated answer-before-replay lifecycle"
   printf '%s' "$json" | jq -e --arg id "$id" \
     '.landed | any(.id == $id) | not' >/dev/null \
@@ -3424,7 +3424,7 @@ EOF
 }
 
 # A home whose data directory is relocated keeps one backlog; the predicate and
-# the retention must address it the way teardown does, not FM_HOME/data.
+# the retention must address it the way teardown does, not JG_HOME/data.
 test_teardown_retains_captain_calls_in_a_relocated_backlog() {
   local home data id show
   home=$(make_home teardown-relocated-hold)
@@ -3447,24 +3447,24 @@ EOF
   write_origin_meta "$home" "$id"
   printf 'done: report complete\n' > "$home/state/$id.status"
   printf '# Relocated hold\n\nThe captain call remains open.\n' > "$data/$id/report.md"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" \
     --reason "captain must choose the relocated sample outcome" >/dev/null \
     || fail "could not hold the relocated work item"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id-call" --title "Sibling captain call" \
     --reason "captain must decide the sibling call" --repo sample --origin "$id" >/dev/null \
     || fail "could not hold the sibling captain call"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+  PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-captain-hold.sh" complete "$id" "$id-call" >/dev/null \
     || fail "completion gate failed for the relocated captain hold"
 
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" \
     > "$home/teardown.out" 2> "$home/teardown.err" \
     || fail "cleanup of the relocated captain hold failed: $(cat "$home/teardown.err")"
   show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
@@ -3629,9 +3629,9 @@ test_local_merge_entrypoint_refuses_a_captain_held_task() {
   # Without the entrypoint guard, this run fast-forwards main while the task
   # still carries the captain hold.
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$local_id" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$local_id" \
     > "$home/local.out" 2> "$home/local.err"
   rc=$?
   set -e
@@ -3697,9 +3697,9 @@ test_local_merge_entrypoint_separates_an_unreadable_record_from_an_absent_one() 
   # Unreadable authority record: refuse, and leave the default branch where it was.
   chmod 000 "$home/data/backlog.md"
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$id" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$id" \
     > "$home/missing-local.out" 2> "$home/missing-local.err"
   rc=$?
   set -e
@@ -3712,9 +3712,9 @@ test_local_merge_entrypoint_separates_an_unreadable_record_from_an_absent_one() 
 
   # No backlog at all: nothing can be held, so the landing proceeds.
   rm "$home/data/backlog.md"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$id" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-merge-local.sh" "$id" \
     > "$home/absent-local.out" 2> "$home/absent-local.err" \
     || fail "the local merge entrypoint refused a home carrying no backlog"
   after=$(git -C "$repo" rev-parse main)
@@ -3729,8 +3729,8 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
 
   pr_state="$home/missing-pr-state"
   set +e
-  jg_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$pr_state" \
+  jg_run_timed 2 env PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$pr_state" \
     "$ROOT/bin/jg-pr-merge.sh" sample-missing-pr-state \
     https://github.com/sample/sample/pull/41 \
     > "$home/missing-pr-state.out" 2> "$home/missing-pr-state.err"
@@ -3746,8 +3746,8 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
 
   local_state="$home/missing-local-state"
   set +e
-  jg_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$local_state" \
+  jg_run_timed 2 env PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$local_state" \
     "$ROOT/bin/jg-merge-local.sh" sample-missing-local-state \
     > "$home/missing-local-state.out" 2> "$home/missing-local-state.err"
   rc=$?
@@ -3762,8 +3762,8 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
 
   bad_id=sample/bad-local-id
   set +e
-  jg_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+  jg_run_timed 2 env PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     "$ROOT/bin/jg-merge-local.sh" "$bad_id" \
     > "$home/bad-local-id.out" 2> "$home/bad-local-id.err"
   rc=$?
@@ -3809,13 +3809,13 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   teardown_release="$home/reuse-teardown-release"
   merge_ready="$home/reuse-merge-ready"
   merge_release="$home/reuse-merge-release"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_TEST_REUSE_TEARDOWN=1 \
-    FM_TEST_REUSE_TEARDOWN_ONCE="$home/reuse-teardown-once" \
-    FM_TEST_REUSE_TEARDOWN_READY="$teardown_ready" \
-    FM_TEST_REUSE_TEARDOWN_RELEASE="$teardown_release" \
-    FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" JG_TEST_REUSE_TEARDOWN=1 \
+    JG_TEST_REUSE_TEARDOWN_ONCE="$home/reuse-teardown-once" \
+    JG_TEST_REUSE_TEARDOWN_READY="$teardown_ready" \
+    JG_TEST_REUSE_TEARDOWN_RELEASE="$teardown_release" \
+    JG_TEST_REAL_PERL="$real_perl" JG_TEST_REAL_SLEEP="$real_sleep" \
     "$TEARDOWN" "$id" --force > "$home/reuse-teardown.out" \
     2> "$home/reuse-teardown.err" &
   teardown_pid=$!
@@ -3825,9 +3825,9 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     fail "forced PR cleanup did not reach its task-locked synchronization point"
   fi
 
-  FM_TEST_REUSE_MERGE=1 FM_TEST_REUSE_MERGE_ONCE="$home/reuse-merge-once" \
-    FM_TEST_REUSE_MERGE_READY="$merge_ready" FM_TEST_REUSE_MERGE_RELEASE="$merge_release" \
-    FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+  JG_TEST_REUSE_MERGE=1 JG_TEST_REUSE_MERGE_ONCE="$home/reuse-merge-once" \
+    JG_TEST_REUSE_MERGE_READY="$merge_ready" JG_TEST_REUSE_MERGE_RELEASE="$merge_release" \
+    JG_TEST_REAL_PERL="$real_perl" JG_TEST_REAL_SLEEP="$real_sleep" \
     run_pr_merge "$home" "$id" "$pr" > "$home/reuse-merge.out" \
     2> "$home/reuse-merge.err" &
   merge_pid=$!
@@ -3899,13 +3899,13 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   local_teardown_release="$local_home/reuse-teardown-release"
   local_merge_ready="$local_home/reuse-merge-ready"
   local_merge_release="$local_home/reuse-merge-release"
-  PATH="$local_home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
-    FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
-    FM_CONFIG_OVERRIDE="$local_home/config" FM_TEST_REUSE_TEARDOWN=1 \
-    FM_TEST_REUSE_TEARDOWN_ONCE="$local_home/reuse-teardown-once" \
-    FM_TEST_REUSE_TEARDOWN_READY="$local_teardown_ready" \
-    FM_TEST_REUSE_TEARDOWN_RELEASE="$local_teardown_release" \
-    FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+  PATH="$local_home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$local_home" \
+    JG_STATE_OVERRIDE="$local_home/state" JG_DATA_OVERRIDE="$local_home/data" \
+    JG_CONFIG_OVERRIDE="$local_home/config" JG_TEST_REUSE_TEARDOWN=1 \
+    JG_TEST_REUSE_TEARDOWN_ONCE="$local_home/reuse-teardown-once" \
+    JG_TEST_REUSE_TEARDOWN_READY="$local_teardown_ready" \
+    JG_TEST_REUSE_TEARDOWN_RELEASE="$local_teardown_release" \
+    JG_TEST_REAL_PERL="$real_perl" JG_TEST_REAL_SLEEP="$real_sleep" \
     "$TEARDOWN" "$local_id" --force > "$local_home/reuse-teardown.out" \
     2> "$local_home/reuse-teardown.err" &
   local_teardown_pid=$!
@@ -3915,14 +3915,14 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     fail "forced local cleanup did not reach its task-locked synchronization point"
   fi
 
-  PATH="$local_home/fakebin:$PATH" FM_TEST_REUSE_MERGE=1 \
-    FM_TEST_REUSE_MERGE_ONCE="$local_home/reuse-merge-once" \
-    FM_TEST_REUSE_MERGE_READY="$local_merge_ready" \
-    FM_TEST_REUSE_MERGE_RELEASE="$local_merge_release" \
-    FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
-    FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
-    FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
-    FM_CONFIG_OVERRIDE="$local_home/config" \
+  PATH="$local_home/fakebin:$PATH" JG_TEST_REUSE_MERGE=1 \
+    JG_TEST_REUSE_MERGE_ONCE="$local_home/reuse-merge-once" \
+    JG_TEST_REUSE_MERGE_READY="$local_merge_ready" \
+    JG_TEST_REUSE_MERGE_RELEASE="$local_merge_release" \
+    JG_TEST_REAL_PERL="$real_perl" JG_TEST_REAL_SLEEP="$real_sleep" \
+    JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$local_home" \
+    JG_STATE_OVERRIDE="$local_home/state" JG_DATA_OVERRIDE="$local_home/data" \
+    JG_CONFIG_OVERRIDE="$local_home/config" \
     "$ROOT/bin/jg-merge-local.sh" "$local_id" > "$local_home/reuse-merge.out" \
     2> "$local_home/reuse-merge.err" &
   local_merge_pid=$!
@@ -4011,19 +4011,19 @@ test_merge_entrypoints_serialize_forced_teardown_before_task_reads() {
   release="$home/pr-metadata-read-release"
   cat > "$home/fakebin/grep" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = -qxF ] && [ "${2:-}" = "pr=${FM_TEST_RACE_PR_URL:-}" ] \
-    && [ "${3:-}" = "${FM_TEST_RACE_PR_META:-}" ]; then
-  "$FM_TEST_REAL_GREP" "$@" || exit $?
-  : > "$FM_TEST_RACE_READY"
-  while [ ! -e "$FM_TEST_RACE_RELEASE" ]; do sleep 0.01; done
+if [ "${1:-}" = -qxF ] && [ "${2:-}" = "pr=${JG_TEST_RACE_PR_URL:-}" ] \
+    && [ "${3:-}" = "${JG_TEST_RACE_PR_META:-}" ]; then
+  "$JG_TEST_REAL_GREP" "$@" || exit $?
+  : > "$JG_TEST_RACE_READY"
+  while [ ! -e "$JG_TEST_RACE_RELEASE" ]; do sleep 0.01; done
   exit 0
 fi
-exec "$FM_TEST_REAL_GREP" "$@"
+exec "$JG_TEST_REAL_GREP" "$@"
 SH
   chmod +x "$home/fakebin/grep"
-  FM_TEST_REAL_GREP="$real_grep" FM_TEST_RACE_PR_URL="$pr" \
-    FM_TEST_RACE_PR_META="$home/state/$id.meta" FM_TEST_RACE_READY="$ready" \
-    FM_TEST_RACE_RELEASE="$release" run_pr_merge "$home" "$id" "$pr" \
+  JG_TEST_REAL_GREP="$real_grep" JG_TEST_RACE_PR_URL="$pr" \
+    JG_TEST_RACE_PR_META="$home/state/$id.meta" JG_TEST_RACE_READY="$ready" \
+    JG_TEST_RACE_RELEASE="$release" run_pr_merge "$home" "$id" "$pr" \
     > "$home/race-pr.out" 2> "$home/race-pr.err" &
   merge_pid=$!
   i=0
@@ -4039,9 +4039,9 @@ SH
     fail "the PR merge did not reach the post-metadata synchronization point"
   fi
   set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/race-pr-teardown.out" 2> "$home/race-pr-teardown.err"
   teardown_rc=$?
   set -e
@@ -4090,22 +4090,22 @@ SH
   local_release="$local_home/local-validation-release"
   cat > "$local_home/fakebin/git" <<'SH'
 #!/usr/bin/env bash
-if [ "$*" = "-C ${FM_TEST_RACE_REPO:-} rev-parse --short main" ]; then
-  output=$("$FM_TEST_REAL_GIT" "$@") || exit $?
-  : > "$FM_TEST_RACE_READY"
-  while [ ! -e "$FM_TEST_RACE_RELEASE" ]; do sleep 0.01; done
+if [ "$*" = "-C ${JG_TEST_RACE_REPO:-} rev-parse --short main" ]; then
+  output=$("$JG_TEST_REAL_GIT" "$@") || exit $?
+  : > "$JG_TEST_RACE_READY"
+  while [ ! -e "$JG_TEST_RACE_RELEASE" ]; do sleep 0.01; done
   printf '%s\n' "$output"
   exit 0
 fi
-exec "$FM_TEST_REAL_GIT" "$@"
+exec "$JG_TEST_REAL_GIT" "$@"
 SH
   chmod +x "$local_home/fakebin/git"
   before=$(git -C "$local_repo" rev-parse main)
-  PATH="$local_home/fakebin:$PATH" FM_TEST_REAL_GIT="$real_git" \
-    FM_TEST_RACE_REPO="$local_repo" FM_TEST_RACE_READY="$local_ready" \
-    FM_TEST_RACE_RELEASE="$local_release" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_HOME="$local_home" FM_STATE_OVERRIDE="$local_home/state" \
-    FM_DATA_OVERRIDE="$local_home/data" FM_CONFIG_OVERRIDE="$local_home/config" \
+  PATH="$local_home/fakebin:$PATH" JG_TEST_REAL_GIT="$real_git" \
+    JG_TEST_RACE_REPO="$local_repo" JG_TEST_RACE_READY="$local_ready" \
+    JG_TEST_RACE_RELEASE="$local_release" JG_ROOT_OVERRIDE="$ROOT" \
+    JG_HOME="$local_home" JG_STATE_OVERRIDE="$local_home/state" \
+    JG_DATA_OVERRIDE="$local_home/data" JG_CONFIG_OVERRIDE="$local_home/config" \
     "$ROOT/bin/jg-merge-local.sh" "$local_id" \
     > "$local_home/race-local.out" 2> "$local_home/race-local.err" &
   local_pid=$!
@@ -4122,9 +4122,9 @@ SH
     fail "the local merge did not reach the post-validation synchronization point"
   fi
   set +e
-  PATH="$local_home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
-    FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
-    FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force \
+  PATH="$local_home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$local_home" \
+    JG_STATE_OVERRIDE="$local_home/state" JG_DATA_OVERRIDE="$local_home/data" \
+    JG_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force \
     > "$local_home/race-local-teardown.out" 2> "$local_home/race-local-teardown.err"
   local_teardown_rc=$?
   set -e
@@ -4178,9 +4178,9 @@ test_released_merge_passes_the_entrypoint_and_lands() {
     "the approved merge remained captain-held after its release"
   run_pr_merge "$home" "$id" "$pr" > "$home/merge.out" 2> "$home/merge.err" \
     || fail "the released merge was refused: $(cat "$home/merge.err")"
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err" \
     || fail "the released merge cleanup failed: $(cat "$home/teardown.err")"
   json=$(run_bearings "$home") || fail "Bearings failed after the released merge lifecycle"
@@ -4218,9 +4218,9 @@ SH
 
   set +e
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
-    TASKS_AXI_FAIL_SHOW_ID="$id" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
+    TASKS_AXI_FAIL_SHOW_ID="$id" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force \
     > "$home/teardown.out" 2> "$home/teardown.err"
   rc=$?
   set -e
@@ -4465,25 +4465,25 @@ test_hold_origins_precede_backend_holds() {
       fi
       cat > "$home/fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = show ] && [ "${2:-}" = origin-b ] && [ -f "$FM_HOME/fail-lookup" ]; then
-  : > "$FM_HOME/lookup-refused"
+if [ "${1:-}" = show ] && [ "${2:-}" = origin-b ] && [ -f "$JG_HOME/fail-lookup" ]; then
+  : > "$JG_HOME/lookup-refused"
   printf 'error: origin read failed\ncode: READ_FAILED\n' >&2
   exit 2
 fi
-if [ "${1:-}" = update ] && [ -f "$FM_HOME/fail-write" ]; then
+if [ "${1:-}" = update ] && [ -f "$JG_HOME/fail-write" ]; then
   previous=''
   for arg in "$@"; do
     if [ "$previous" = --body-file ] && grep -qx 'Captain hold origin: origin-b' "$arg"; then
-      : > "$FM_HOME/write-refused"
+      : > "$JG_HOME/write-refused"
       exit 9
     fi
     previous=$arg
   done
 fi
 if [ "${1:-}" = hold ] && [ "${2:-}" != --help ]; then
-  "$REAL_TASKS_AXI" show "$2" --full > "$FM_HOME/before-backend-hold" || exit $?
-  if [ -f "$FM_HOME/fail-hold" ]; then
-    : > "$FM_HOME/hold-refused"
+  "$REAL_TASKS_AXI" show "$2" --full > "$JG_HOME/before-backend-hold" || exit $?
+  if [ -f "$JG_HOME/fail-hold" ]; then
+    : > "$JG_HOME/hold-refused"
     exit 9
   fi
 fi
@@ -4608,7 +4608,7 @@ test_inventory_compares_backend_identities() {
     || fail "could not create the other origin"
   cat > "$home/fakebin/tasks-axi" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = show ] && [ "${2:-}" = o ] && [ -f "$FM_HOME/fail-identity" ]; then
+if [ "${1:-}" = show ] && [ "${2:-}" = o ] && [ -f "$JG_HOME/fail-identity" ]; then
   printf 'error: origin read failed\ncode: READ_FAILED\n' >&2
   exit 2
 fi
@@ -4713,7 +4713,7 @@ test_hold_reason_round_trips_awkward_characters() {
     tasks_in "$home" hold "$id" --reason "$malformed" --kind captain >/dev/null \
       || fail "could not store the historical literal reason"
     for verb in show view; do
-      out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" "$id" --full) \
+      out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" "$id" --full) \
         || fail "public $verb failed on historical literal $malformed"
       raw=$(tasks_in "$home" "$verb" "$id" --full)
       assert_equals "$raw" "$out" "public $verb changed historical literal $malformed"
@@ -4737,7 +4737,7 @@ test_hold_reason_round_trips_awkward_characters() {
     assert_contains "$stored" "(hold-kind: captain)" "the reason broke the hold-kind tag"
 
     for verb in show view; do
-      out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" "$id") \
+      out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" "$id") \
         || fail "public $verb failed for $id"
       shown=$(printf '%s\n' "$out" | sed -n 's/^  hold_reason: //p')
       printf '%s\n' "$shown" | jq -e --arg reason "$reason" '. == $reason' >/dev/null \
@@ -4745,7 +4745,7 @@ test_hold_reason_round_trips_awkward_characters() {
       assert_contains "$out" "  title: $quoted_title" "public $verb changed the title"
     done
     for fields in hold_reason,body body,hold_reason,hold_until; do
-      out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" list --fields "$fields") \
+      out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" list --fields "$fields") \
         || fail "public list failed with $fields"
       assert_contains "$out" "$quoted_reason" "public list changed the reason with $fields"
       assert_contains "$out" "$quoted_title" "public list changed the title with $fields"
@@ -4756,8 +4756,8 @@ test_hold_reason_round_trips_awkward_characters() {
         assert_contains "$out" "$malformed" "public list changed historical literal $malformed"
       done
     done
-    json=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-      FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    json=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+      JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
       "$ROOT/bin/jg-fleet-snapshot.sh" --json) || fail "fleet snapshot failed"
     printf '%s' "$json" | jq -e --arg id "$id" --arg reason "$reason" --arg title "$title" \
       '.backlog.records[] | select(.id == $id) | .hold_reason == $reason and .title == $title' >/dev/null \
@@ -4773,18 +4773,18 @@ test_hold_reason_round_trips_awkward_characters() {
     done
   done
 
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" show sample-legacy-call --full)
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" show sample-legacy-call --full)
   raw=$(tasks_in "$home" show sample-legacy-call --full)
   assert_equals "$raw" "$out" "public show changed legacy or unrelated fields"
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" list)
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" list)
   raw=$(tasks_in "$home" list)
   assert_equals "$raw" "$out" "public list changed output with no reason column"
   for verb in show list; do
-    out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" --help)
+    out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" "$verb" --help)
     raw=$(tasks_in "$home" "$verb" --help)
     assert_equals "$raw" "$out" "public $verb changed help output"
   done
-  out=$(FM_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" show nonexistent-call 2>&1)
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-tasks-axi.sh" show nonexistent-call 2>&1)
   rc=$?
   raw=$(tasks_in "$home" show nonexistent-call 2>&1)
   raw_rc=$?
@@ -4810,9 +4810,9 @@ SH
         chmod +x "$home/fakebin/tasks-axi"
         ;;
     esac
-    start=$(PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" FM_HOME="$home" \
-      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
-      FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/jg-session-start.sh" 2>&1 || true)
+    start=$(PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" JG_HOME="$home" \
+      JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+      JG_BOOTSTRAP_NETWORK=skip "$ROOT/bin/jg-session-start.sh" 2>&1 || true)
     assert_contains "$start" "$quoted_reason" "startup $mode changed the encoded reason"
     assert_contains "$start" 'Investigate literal %28' "startup $mode changed the title"
     assert_contains "$start" "$legacy" "startup $mode changed the legacy reason"
@@ -4826,8 +4826,8 @@ SH
     fi
   done
   rm "$home/fakebin/tasks-axi"
-  out=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+  out=$(PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
+    JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/jg-afk-return.sh" check 2>&1 || true)
   assert_contains "$out" "$quoted_reason" "return brief changed the encoded reason"
   assert_contains "$out" "$quoted_title" "return brief changed the title"

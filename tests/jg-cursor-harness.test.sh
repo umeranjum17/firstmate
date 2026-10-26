@@ -157,7 +157,7 @@ test_tmux_classifies_cursor_pane_without_inferring_dead() {
   local tree bin
   tree="$TMP_ROOT/tree5"; bin=$(make_cursor_tree "$tree")
   # shellcheck source=bin/backends/tmux.sh
-  ( FM_BACKEND_LIB_DIR="$ROOT/bin"; . "$ROOT/bin/backends/tmux.sh"
+  ( JG_BACKEND_LIB_DIR="$ROOT/bin"; . "$ROOT/bin/backends/tmux.sh"
     [ "$(jg_agent_process_classify_name node "$bin/cursor-agent")" = agent ] \
       || fail "a cursor pane reported as node must classify agent"
     [ "$(jg_agent_process_classify_name '' "$bin/cursor-agent")" = agent ] \
@@ -183,7 +183,7 @@ test_tmux_classifies_cursor_pane_without_inferring_dead() {
 # it, and the verdicts below would be about the runner rather than the ordering.
 test_cursor_marker_outranks_inherited_claudecode() {
   local out fakebin base_path
-  base_path=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+  base_path=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
   fakebin=$(jg_fakebin "$TMP_ROOT/marker-ordering")
   jg_fake_blind_ancestry "$fakebin"
   # This is the exact hazard: cursor does NOT clear an inherited CLAUDECODE, so

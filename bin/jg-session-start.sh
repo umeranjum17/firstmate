@@ -22,7 +22,7 @@
 # install <tools> after consent, /updatefirstmate, the afk daemon, existing
 # tests) still call them directly. The one seam this script needed -
 # bootstrap running its detect-only diagnostics without its six mutating
-# sweeps - is an opt-in FM_BOOTSTRAP_DETECT_ONLY=1 flag on jg-bootstrap.sh
+# sweeps - is an opt-in JG_BOOTSTRAP_DETECT_ONLY=1 flag on jg-bootstrap.sh
 # itself (default unset/0 = unchanged behavior), not a fork.
 #
 # ORDERING, and why LOCK now runs before BOOTSTRAP (the old AGENTS.md order
@@ -59,7 +59,7 @@
 #                       digest: read-only, always runs. The per-task reads
 #                       run serially, so with a wedged backend the stage's
 #                       ceiling is tasks x the per-read bound
-#                       (FM_SESSION_START_ENDPOINT_TIMEOUT, default 10s) and
+#                       (JG_SESSION_START_ENDPOINT_TIMEOUT, default 10s) and
 #                       can itself reach the digest's runtime bound.
 #   7. network checks - the result of the deferred network stage started back at
 #                       step 1, harvested WITHOUT waiting for it.
@@ -80,7 +80,7 @@
 # blocks session initialization, so anything it waits for is time the captain
 # waits before the first turn - and every external-network call it used to make
 # was individually unbounded. One unreachable remote secondmate could burn the
-# entire FM_SESSION_START_TIMEOUT and truncate the digest, so a slow network
+# entire JG_SESSION_START_TIMEOUT and truncate the digest, so a slow network
 # could cost the work queue itself.
 # So no step between here and the last line below makes an external-network
 # call. The five that did - `gh auth status`, secondmate liveness, secondmate
@@ -129,7 +129,7 @@
 # shared mutable state.
 #
 # The tradeoff this ordering accepts: a refused (read-only) session must not
-# go dark. So on refusal, bootstrap still runs (in FM_BOOTSTRAP_DETECT_ONLY=1
+# go dark. So on refusal, bootstrap still runs (in JG_BOOTSTRAP_DETECT_ONLY=1
 # mode) for its local read-only detect lines - missing tools, the worktree-tangle
 # check, the harness override, crew-dispatch validation, tasks-axi and quota-axi
 # tool checks, and tasks-axi availability - none of which mutate shared state
@@ -151,10 +151,10 @@
 #     sections 7 and 10 make actionable at startup, so they are never bounded
 #     away.
 #   - Only the plain queued (dispatchable-now) listing is bounded, by
-#     FM_SESSION_START_QUEUED_LIMIT, default 20. Anything it omits is disclosed
+#     JG_SESSION_START_QUEUED_LIMIT, default 20. Anything it omits is disclosed
 #     with an exact remainder count and the command that shows the rest, so a
 #     deep queue costs a counter rather than kilobytes.
-#     (This replaces FM_SESSION_START_BACKLOG_LIMIT, which bounded the whole
+#     (This replaces JG_SESSION_START_BACKLOG_LIMIT, which bounded the whole
 #     listing indiscriminately and so could drop a held or blocked row.)
 # When compatible tasks-axi is selected and available, the shared tasks-axi
 # backend probe remains the compatibility owner and this script asks
@@ -173,7 +173,7 @@
 # compatible tasks-axi is available, or `data/backlog.md` when the file body is
 # truly needed.
 #
-# STATUS TAILS: FM_SESSION_START_STATUS_TAIL bounds how many lines each task's
+# STATUS TAILS: JG_SESSION_START_STATUS_TAIL bounds how many lines each task's
 # tail prints, and bin/jg-line-cap-lib.sh bounds how long each of those lines
 # may be. Both bounds are safe because the section prints every task's full
 # status log path, and AGENTS.md section 8 treats a status line as a wake EVENT
@@ -186,9 +186,9 @@
 # first turn behind one hung subprocess. Every remaining step is local, but
 # local is not the same as bounded: tool version probes and the backlog
 # listing are unbounded subprocesses, while each per-task endpoint read runs
-# in its own crash-isolated child under FM_SESSION_START_ENDPOINT_TIMEOUT
+# in its own crash-isolated child under JG_SESSION_START_ENDPOINT_TIMEOUT
 # (default 10s). So the whole digest still runs as ONE bounded child of this
-# script (FM_SESSION_START_TIMEOUT, default 120s). The deferred network stage
+# script (JG_SESSION_START_TIMEOUT, default 120s). The deferred network stage
 # deliberately sits OUTSIDE that bound,
 # in its own process group under its own aggregate deadline, so a truncated
 # digest neither waits for it nor orphans it unbounded. The
@@ -198,7 +198,7 @@
 # or an unexpected child death, named with its exit status - naming the stage
 # that did not finish and the sections that were therefore never emitted, and
 # still exits 0. The child
-# records its progress in FM_SESSION_START_STAGE_FILE, which is also the flag
+# records its progress in JG_SESSION_START_STAGE_FILE, which is also the flag
 # that tells a child it is the child - the parent never recurses.
 # Hosts without timeout, gtimeout, or perl use the shared pure-Bash watchdog, so
 # the digest never runs without the same hard bound and process-group cleanup.
@@ -240,11 +240,11 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
-DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 COMPLETION_FILE="$STATE/.session-start-complete"
 AGENTS_BASELINE_FILE="$STATE/.session-start-agents-baseline"
 
@@ -283,8 +283,8 @@ done
 SESSION_START_STAGES='lock role bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step'
 
 stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
-  [ -n "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
-  printf '%s\n' "$1" > "$FM_SESSION_START_STAGE_FILE" 2>/dev/null || true
+  [ -n "${JG_SESSION_START_STAGE_FILE:-}" ] || return 0
+  printf '%s\n' "$1" > "$JG_SESSION_START_STAGE_FILE" 2>/dev/null || true
 }
 
 # shellcheck source=bin/jg-timeout-lib.sh
@@ -292,8 +292,8 @@ stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
 # shellcheck source=bin/jg-session-lock-lib.sh
 . "$SCRIPT_DIR/jg-session-lock-lib.sh"
 
-if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
-  SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
+if [ -z "${JG_SESSION_START_STAGE_FILE:-}" ]; then
+  SESSION_START_BUDGET=${JG_SESSION_START_TIMEOUT:-120}
   # A non-positive or non-numeric budget is not a budget (`timeout 0` disables
   # the deadline outright), so an unusable value falls back to the default
   # rather than silently removing the bound.
@@ -308,20 +308,20 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   if [ "$REEMIT" -eq 1 ]; then
     if [ -n "$SESSION_SOURCE" ]; then
       jg_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env JG_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
         "$SCRIPT_DIR/jg-session-start.sh" --reemit --source "$SESSION_SOURCE"
     else
       jg_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env JG_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
         "$SCRIPT_DIR/jg-session-start.sh" --reemit
     fi
   elif [ -n "$SESSION_SOURCE" ]; then
     jg_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env JG_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
       "$SCRIPT_DIR/jg-session-start.sh" --source "$SESSION_SOURCE"
   else
     jg_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env JG_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
       "$SCRIPT_DIR/jg-session-start.sh"
   fi
   SESSION_START_RC=$?
@@ -350,7 +350,7 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
     printf '●    %s\n' "${SESSION_START_PENDING% }"
     printf '●  Rerun bin/jg-session-start.sh now to finish taking the helm. If it truncates\n'
     if [ "$SESSION_START_RC" -eq 124 ]; then
-      printf '●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
+      printf '●  again, raise JG_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
       printf '●  cannot finish inside the bound is a fleet problem, not a reporting detail.\n'
     else
       printf '●  again, report the exit status and the stage - raising the runtime bound\n'
@@ -388,14 +388,14 @@ PRIMARY_HARNESS=$("$SCRIPT_DIR/jg-harness.sh" 2>/dev/null || printf unknown)
 # agent's environment.
 if jg_tasks_axi_compatible; then TASKS_AXI_COMPATIBLE=1; else TASKS_AXI_COMPATIBLE=0; fi
 
-STATUS_TAIL=${FM_SESSION_START_STATUS_TAIL:-5}
+STATUS_TAIL=${JG_SESSION_START_STATUS_TAIL:-5}
 case "$STATUS_TAIL" in ''|*[!0-9]*) STATUS_TAIL=5 ;; esac
-QUEUED_LIMIT=${FM_SESSION_START_QUEUED_LIMIT:-20}
+QUEUED_LIMIT=${JG_SESSION_START_QUEUED_LIMIT:-20}
 case "$QUEUED_LIMIT" in ''|*[!0-9]*|0) QUEUED_LIMIT=20 ;; esac
 # One per-task endpoint read may never outlive this bound: a hung backend CLI
 # becomes that task's endpoint: error line instead of the digest's whole
 # runtime budget.
-ENDPOINT_TIMEOUT=${FM_SESSION_START_ENDPOINT_TIMEOUT:-10}
+ENDPOINT_TIMEOUT=${JG_SESSION_START_ENDPOINT_TIMEOUT:-10}
 case "$ENDPOINT_TIMEOUT" in ''|*[!0-9]*) ENDPOINT_TIMEOUT=10 ;; esac
 [ "$ENDPOINT_TIMEOUT" -gt 0 ] 2>/dev/null || ENDPOINT_TIMEOUT=10
 BACKLOG_FIELDS=blocked_by,hold_kind,hold_reason
@@ -473,7 +473,7 @@ print_backlog_manual_compact() {
         printf "(shown %d in-flight, %d held or blocked queued, %d of %d other queued title line(s); %d done row(s) omitted)\n", \
           in_flight, gated, plain_shown, plain_total, done_total
         if (plain_total > plain_shown) {
-          printf "(%d more queued - raise FM_SESSION_START_QUEUED_LIMIT or read data/backlog.md for the rest)\n", plain_total - plain_shown
+          printf "(%d more queued - raise JG_SESSION_START_QUEUED_LIMIT or read data/backlog.md for the rest)\n", plain_total - plain_shown
         }
       }
     }
@@ -567,7 +567,7 @@ print_backlog_compact() {
 print_status_tail() {
   local status=$1 line
   printf 'status tail (last %s line(s), each capped at %s characters, wake-EVENT history, not current state; full log: %s):\n' \
-    "$STATUS_TAIL" "$FM_LINE_CAP_DEFAULT" "$status"
+    "$STATUS_TAIL" "$JG_LINE_CAP_DEFAULT" "$status"
   # A crewmate writes its own status lines, so their length is unbounded: one
   # observed line ran 865 characters. Cap each one the way the wake digest's
   # OPEN DECISIONS section does; the lede carries the state word and the key,
@@ -632,7 +632,7 @@ agents_baseline_drifted() {  # <rebuilding-session-pid>
   [ -f "$AGENTS_BASELINE_FILE" ] && [ ! -L "$AGENTS_BASELINE_FILE" ] || return 0
   baseline_pid=$(sed -n '1p' "$AGENTS_BASELINE_FILE" 2>/dev/null || true)
   baseline_hash=$(sed -n '2p' "$AGENTS_BASELINE_FILE" 2>/dev/null || true)
-  current_hash=$(hash_file_sha256 "$FM_ROOT/AGENTS.md" 2>/dev/null || true)
+  current_hash=$(hash_file_sha256 "$JG_ROOT/AGENTS.md" 2>/dev/null || true)
   [ -n "$current_hash" ] || return 0
   [ "$baseline_pid" = "$lock_pid" ] && [ "$baseline_hash" = "$current_hash" ] && return 1
   return 0
@@ -654,13 +654,13 @@ print_agents_refresh_if_required() {  # <rebuilding-session-pid>
   local lock_pid=$1
   agents_refresh_required "$lock_pid" || return 0
   section "CURRENT AGENTS.md - INSTRUCTION REFRESH"
-  if [ -f "$FM_ROOT/AGENTS.md" ]; then
+  if [ -f "$JG_ROOT/AGENTS.md" ]; then
     cat <<'EOF'
 The complete on-disk AGENTS.md below supersedes the instruction copy this session
 started with. Apply it as the current Firstmate instruction contract.
 
 EOF
-    cat "$FM_ROOT/AGENTS.md"
+    cat "$JG_ROOT/AGENTS.md"
   else
     printf 'The original AGENTS.md baseline no longer matches, but the current file is absent.\n'
   fi
@@ -668,11 +668,11 @@ EOF
 
 AGENTS_START_HASH=
 if [ "$REEMIT" -eq 0 ] && [ "$SESSION_SOURCE" = startup ]; then
-  AGENTS_START_HASH=$(hash_file_sha256 "$FM_ROOT/AGENTS.md" 2>/dev/null || true)
+  AGENTS_START_HASH=$(hash_file_sha256 "$JG_ROOT/AGENTS.md" 2>/dev/null || true)
 fi
 
 if [ "$REEMIT" -eq 1 ]; then
-  section "SESSION START (CONTEXT RE-EMIT) - $FM_HOME"
+  section "SESSION START (CONTEXT RE-EMIT) - $JG_HOME"
   printf 'This session already took the helm at its own startup and has only lost its\n'
   printf 'context. Lock ownership is re-verified and the durable records below are\n'
   printf 'reprinted, but the sweeps startup already reconciled - project clone refresh,\n'
@@ -680,7 +680,7 @@ if [ "$REEMIT" -eq 1 ]; then
   printf 'retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.\n'
   printf 'Queued wakes ARE still drained: they arrived after startup and are this turn work.\n'
 else
-  section "SESSION START - $FM_HOME"
+  section "SESSION START - $JG_HOME"
 fi
 # --- 1. lock -----------------------------------------------------------
 stage lock
@@ -714,7 +714,7 @@ print_agents_refresh_if_required "$REBUILDING_SESSION_PID"
 # Purely local resolution - no network, no gh call.
 stage role
 subsection "HOME ROLE"
-FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/jg-role.sh" report 2>/dev/null \
+JG_HOME="$JG_HOME" JG_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/jg-role.sh" report 2>/dev/null \
   || printf 'jg-role: unknown (bin/jg-role.sh report failed)\n'
 
 if [ "$READ_ONLY" -eq 0 ]; then
@@ -744,28 +744,28 @@ if [ "$READ_ONLY" -eq 0 ]; then
   # A full locked start resumes this home's own lanes that an agent-runtime
   # restart left idle or dead (bin/jg-sentinel.sh owns the rules). Detached in
   # its own process group for the same reasons as the network stage above. It
-  # reads FM_HOME's own state/, so a state override (a test) never reaches it.
-  if [ "$REEMIT" -eq 0 ] && [ "$STATE" = "$FM_HOME/state" ]; then
-    (set -m; FM_HOME="$FM_HOME" nohup "$SCRIPT_DIR/jg-sentinel.sh" reconcile >/dev/null 2>&1 </dev/null &) || true
+  # reads JG_HOME's own state/, so a state override (a test) never reaches it.
+  if [ "$REEMIT" -eq 0 ] && [ "$STATE" = "$JG_HOME/state" ]; then
+    (set -m; JG_HOME="$JG_HOME" nohup "$SCRIPT_DIR/jg-sentinel.sh" reconcile >/dev/null 2>&1 </dev/null &) || true
   fi
 fi
 
 # --- 2. bootstrap --------------------------------------------------------
-# FM_BOOTSTRAP_NETWORK=skip on every path: bootstrap's own network half is what
+# JG_BOOTSTRAP_NETWORK=skip on every path: bootstrap's own network half is what
 # the deferred stage above is running right now, and running it twice would both
 # re-block this digest and race the worker's sweeps against themselves.
 stage bootstrap
 subsection "BOOTSTRAP"
 if [ "$READ_ONLY" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
-    FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/jg-bootstrap.sh" 2>&1)
+  BOOT_OUT=$(JG_BOOTSTRAP_DETECT_ONLY=1 JG_BOOTSTRAP_NETWORK=skip \
+    JG_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/jg-bootstrap.sh" 2>&1)
 elif [ "$REEMIT" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_LOCKED=1 FM_BOOTSTRAP_NETWORK=skip \
-    FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/jg-bootstrap.sh" 2>&1)
+  BOOT_OUT=$(JG_BOOTSTRAP_DETECT_ONLY=1 JG_BOOTSTRAP_LOCKED=1 JG_BOOTSTRAP_NETWORK=skip \
+    JG_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/jg-bootstrap.sh" 2>&1)
 else
   BOOT_OUT=$(
     "$SCRIPT_DIR/jg-herdr-session-cleanup.sh" 2>&1 || true
-    FM_BOOTSTRAP_NETWORK=skip FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
+    JG_BOOTSTRAP_NETWORK=skip JG_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
       "$SCRIPT_DIR/jg-bootstrap.sh" 2>&1
   )
 fi
@@ -795,18 +795,18 @@ if [ "$READ_ONLY" -eq 1 ]; then
   QLEN=0
   [ -s "$STATE/.wake-queue" ] && QLEN=$(grep -c . "$STATE/.wake-queue" 2>/dev/null || printf '0')
   printf 'skipped (read-only session) - %s record(s) remain queued because this session lacks verified fleet-lock ownership.\n' "$QLEN"
-  GUARD_OUT=$(FM_GUARD_READ_ONLY=1 "$SCRIPT_DIR/jg-guard.sh" 2>&1)
+  GUARD_OUT=$(JG_GUARD_READ_ONLY=1 "$SCRIPT_DIR/jg-guard.sh" 2>&1)
   [ -n "$GUARD_OUT" ] && printf '%s\n' "$GUARD_OUT"
 else
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-branch-outcome.sh" seed-tail >/dev/null 2>&1 || true
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-branch-outcome.sh" seed-tail >/dev/null 2>&1 || true
   # Pi supervision-branch recovery, locked path only: clear leases whose
   # supervising session died, and surface outcomes the branch stored durably
   # that never reached main (docs/pi-supervision-branch.md). Gated to the
   # pi/pi-signed primary so a non-Pi home runs neither step - homes on any
   # other harness stay entirely untouched (captain-decided criterion).
   if [ "$PRIMARY_HARNESS" = pi ] || [ "$PRIMARY_HARNESS" = pi-signed ]; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-lease.sh" sweep 2>/dev/null || true
-    BRANCH_REPLAY_OUT=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-lease.sh" sweep 2>/dev/null || true
+    BRANCH_REPLAY_OUT=$(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
       "$SCRIPT_DIR/jg-branch-outcome.sh" startup-replay 2>&1) || BRANCH_REPLAY_OUT=
     if [ -n "$BRANCH_REPLAY_OUT" ]; then
       printf '%s\n' "$BRANCH_REPLAY_OUT"
@@ -829,8 +829,8 @@ X_MODE_PRESENT=0
 [ -f "$CONFIG/x-mode.env" ] && X_MODE_PRESENT=1
 
 if [ "$PRIMARY_HARNESS" = pi ] || [ "$PRIMARY_HARNESS" = pi-signed ]; then
-  PI_EXT="$FM_ROOT/.pi/extensions/jg-primary-pi-watch.ts"
-  PI_TURNEND_EXT="$FM_ROOT/.pi/extensions/jg-primary-turnend-guard.ts"
+  PI_EXT="$JG_ROOT/.pi/extensions/jg-primary-pi-watch.ts"
+  PI_TURNEND_EXT="$JG_ROOT/.pi/extensions/jg-primary-turnend-guard.ts"
   PI_WATCH_MARKER="$STATE/.pi-watch-extension-loaded"
   PI_TURNEND_MARKER="$STATE/.pi-turnend-extension-loaded"
   PI_LOCK="$STATE/.lock"
@@ -849,8 +849,8 @@ fi
 # config, or a build older than the tracked file. The markers carry the loaded
 # build plus the loading pid, exactly as the Pi ones do (bin/jg-wake-lib.sh).
 if [ "$PRIMARY_HARNESS" = omp ]; then
-  OMP_EXT="$FM_ROOT/.omp/extensions/jg-primary-omp-watch.ts"
-  OMP_TURNEND_EXT="$FM_ROOT/.omp/extensions/jg-primary-turnend-guard.ts"
+  OMP_EXT="$JG_ROOT/.omp/extensions/jg-primary-omp-watch.ts"
+  OMP_TURNEND_EXT="$JG_ROOT/.omp/extensions/jg-primary-turnend-guard.ts"
   OMP_WATCH_MARKER="$STATE/.omp-watch-extension-loaded"
   OMP_TURNEND_MARKER="$STATE/.omp-turnend-extension-loaded"
   OMP_LOCK="$STATE/.lock"
@@ -994,16 +994,16 @@ fi
 # here rather than from conversation memory. jg-public-followup-lib.sh owns both
 # gates: a home that never opted into the relay runs one [ -f ] test, prints no
 # subsection, and never reaches jg-public-followup.sh.
-if jg_pf_relay_active "$FM_HOME" \
+if jg_pf_relay_active "$JG_HOME" \
   && { jg_pf_has_registrations "$STATE" || jg_pf_has_events "$STATE"; }; then
   PUBLIC_FOLLOWUP=$("$SCRIPT_DIR/jg-public-followup.sh" pending 2>/dev/null) || PUBLIC_FOLLOWUP=
   if [ -n "$PUBLIC_FOLLOWUP" ]; then
     subsection "Public commitments"
     printf '%s\n' "$PUBLIC_FOLLOWUP"
     printf '\nEach line is a public loop this home still holds: a reply still owed, or an open loop with nothing owed.\n'
-    printf 'Reconcile terminal results with %s/bin/jg-public-followup.sh consume, then deliver a ready one with\n' "$FM_ROOT"
-    printf '%s/bin/jg-public-followup.sh deliver <id>. Hand a delivered loop on with rechain, or close it with\n' "$FM_ROOT"
-    printf '%s/bin/jg-public-followup.sh retire <id> --reason "...". Load fmx-respond for the procedure.\n' "$FM_ROOT"
+    printf 'Reconcile terminal results with %s/bin/jg-public-followup.sh consume, then deliver a ready one with\n' "$JG_ROOT"
+    printf '%s/bin/jg-public-followup.sh deliver <id>. Hand a delivered loop on with rechain, or close it with\n' "$JG_ROOT"
+    printf '%s/bin/jg-public-followup.sh retire <id> --reason "...". Load fmx-respond for the procedure.\n' "$JG_ROOT"
   fi
 fi
 

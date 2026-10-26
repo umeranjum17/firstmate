@@ -10,7 +10,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-jg_live_gate opt-in FM_HARNESS_ADAPTER_INSTRUCTION_EVAL curl jq
+jg_live_gate opt-in JG_HARNESS_ADAPTER_INSTRUCTION_EVAL curl jq
 
 ROUTER="$ROOT/.agents/skills/harness-adapters/SKILL.md"
 TMP_ROOT=$(jg_test_tmproot jg-harness-adapter-instructions)
@@ -21,8 +21,8 @@ RESPONSE_JSON="$TMP_ROOT/response.json"
 curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags > "$TMP_ROOT/tags.json" \
   || fail "local Ollama is unavailable at 127.0.0.1:11434; no remote provider fallback is allowed"
 
-MODEL=${FM_HARNESS_ADAPTER_LOCAL_MODEL:-}
-[ -n "$MODEL" ] || fail "FM_HARNESS_ADAPTER_LOCAL_MODEL must name an explicit local evaluator"
+MODEL=${JG_HARNESS_ADAPTER_LOCAL_MODEL:-}
+[ -n "$MODEL" ] || fail "JG_HARNESS_ADAPTER_LOCAL_MODEL must name an explicit local evaluator"
 jq -e --arg model "$MODEL" '.models | any(.name == $model)' "$TMP_ROOT/tags.json" >/dev/null \
   || fail "requested local Ollama model is unavailable: $MODEL"
 
@@ -79,7 +79,7 @@ PAYLOAD=$(jq -n \
   --arg model "$MODEL" \
   --rawfile prompt "$PROMPT_FILE" \
   '{model:$model,prompt:$prompt,stream:false,format:"json",options:{temperature:0,num_predict:4096}}')
-curl -fsS --max-time "${FM_HARNESS_ADAPTER_EVAL_TIMEOUT_SECONDS:-120}" \
+curl -fsS --max-time "${JG_HARNESS_ADAPTER_EVAL_TIMEOUT_SECONDS:-120}" \
   -H 'Content-Type: application/json' \
   -d "$PAYLOAD" http://127.0.0.1:11434/api/generate \
   | jq -er '.response | fromjson' > "$RESPONSE_JSON" \

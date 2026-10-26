@@ -4,7 +4,7 @@
 #
 # The defect this pins: bin/jg-bootstrap.sh's reconcile and close-replay sweeps
 # read the backlog backend once per item, and an unbounded read of a wedged
-# backend consumed the whole FM_SESSION_START_TIMEOUT. The digest was then
+# backend consumed the whole JG_SESSION_START_TIMEOUT. The digest was then
 # truncated before the wake queue, supervision instructions, fleet state, and
 # context sections printed, leaving a whole fleet unsupervised.
 #
@@ -21,7 +21,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(jg_test_tmproot jg-backlog-read-bound-tests)
 trap jg_test_cleanup EXIT
 
@@ -69,7 +69,7 @@ case "${1:-}" in
   add)
     # Recorded, never silent: creating a row that already exists is the damage a
     # timed-out read must never be spent on.
-    [ -z "${FM_TEST_TASKS_AXI_ADD_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_TEST_TASKS_AXI_ADD_LOG"
+    [ -z "${JG_TEST_TASKS_AXI_ADD_LOG:-}" ] || printf '%s\n' "$*" >> "$JG_TEST_TASKS_AXI_ADD_LOG"
     exit 0
     ;;
   list)
@@ -100,7 +100,7 @@ printf '# Backlog\n' > "$UNIT/data/backlog.md"
 # Three items, so "every skipped item is still named" is actually exercised
 # rather than inferred from a single skip.
 PROBE_OUT="$UNIT/probe.out"
-PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+PATH="$UNIT_FAKEBIN:$BASE_PATH" JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   bash -c '
     set -u
     . "$1/bin/jg-tasks-axi-lib.sh"
@@ -109,7 +109,7 @@ PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
       start=$(date +%s)
       jg_backlog_row_probe "$2" "$id" && printf "unexpected-success\n"
       printf "elapsed:%s=%s\n" "$id" "$(( $(date +%s) - start ))"
-      printf "error:%s=%s\n" "$id" "$FM_BACKLOG_ROW_ERROR"
+      printf "error:%s=%s\n" "$id" "$JG_BACKLOG_ROW_ERROR"
     done
   ' _ "$ROOT" "$UNIT/data" > "$PROBE_OUT" 2>&1
 
@@ -160,13 +160,13 @@ pass "after the first bound hit the sweep continues and names every remaining it
 # unbounded read this whole change exists to prevent.
 PADDED_OUT="$UNIT/padded.out"
 PADDED_START=$(date +%s)
-PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS=00 \
+PATH="$UNIT_FAKEBIN:$BASE_PATH" JG_BACKLOG_ROW_TIMEOUT_SECS=00 \
   bash -c '
     set -u
     . "$1/bin/jg-tasks-axi-lib.sh"
     . "$1/bin/jg-backlog-transition-lib.sh"
     jg_backlog_row_probe "$2" padded-zero && printf "unexpected-success\n"
-    printf "error=%s\n" "$FM_BACKLOG_ROW_ERROR"
+    printf "error=%s\n" "$JG_BACKLOG_ROW_ERROR"
   ' _ "$ROOT" "$UNIT/data" > "$PADDED_OUT" 2>&1
 PADDED_ELAPSED=$(elapsed_since "$PADDED_START")
 
@@ -195,10 +195,10 @@ printf '# Backlog\n' > "$CAPTAIN/data/backlog.md"
 ADD_LOG="$CAPTAIN/add.log"
 HOLD_OUT="$CAPTAIN/hold.out"
 HOLD_STATUS=0
-PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" FM_HOME="$CAPTAIN" \
-  FM_STATE_OVERRIDE="$CAPTAIN/state" FM_DATA_OVERRIDE="$CAPTAIN/data" \
-  FM_CONFIG_OVERRIDE="$CAPTAIN/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
-  FM_TEST_TASKS_AXI_ADD_LOG="$ADD_LOG" \
+PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" JG_HOME="$CAPTAIN" \
+  JG_STATE_OVERRIDE="$CAPTAIN/state" JG_DATA_OVERRIDE="$CAPTAIN/data" \
+  JG_CONFIG_OVERRIDE="$CAPTAIN/config" JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  JG_TEST_TASKS_AXI_ADD_LOG="$ADD_LOG" \
   "$ROOT/bin/jg-captain-hold.sh" hold wedged-hold --title 'Wedged hold' --reason 'backend wedged' \
   > "$HOLD_OUT" 2>&1 || HOLD_STATUS=$?
 
@@ -224,9 +224,9 @@ jg_write_meta "$CAPTAIN/state/wedged-origin.meta" \
 
 VERIFY_OUT="$CAPTAIN/verify.out"
 VERIFY_STATUS=0
-PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" FM_HOME="$CAPTAIN" \
-  FM_STATE_OVERRIDE="$CAPTAIN/state" FM_DATA_OVERRIDE="$CAPTAIN/data" \
-  FM_CONFIG_OVERRIDE="$CAPTAIN/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+PATH="$CAPTAIN_FAKEBIN:$BASE_PATH" JG_HOME="$CAPTAIN" \
+  JG_STATE_OVERRIDE="$CAPTAIN/state" JG_DATA_OVERRIDE="$CAPTAIN/data" \
+  JG_CONFIG_OVERRIDE="$CAPTAIN/config" JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   "$ROOT/bin/jg-captain-hold.sh" verify wedged-origin > "$VERIFY_OUT" 2>&1 || VERIFY_STATUS=$?
 
 [ "$VERIFY_STATUS" -ne 0 ] \
@@ -256,9 +256,9 @@ printf 'schema=jg-decision-binding.v1\norigin=wedged-origin\n' \
 REQ_OUT="$REQ/req.out"
 REQ_STATUS=0
 printf 'wedged-req\n' \
-  | PATH="$REQ_FAKEBIN:$BASE_PATH" FM_HOME="$REQ" \
-    FM_STATE_OVERRIDE="$REQ/state" FM_DATA_OVERRIDE="$REQ/data" \
-    FM_CONFIG_OVERRIDE="$REQ/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  | PATH="$REQ_FAKEBIN:$BASE_PATH" JG_HOME="$REQ" \
+    JG_STATE_OVERRIDE="$REQ/state" JG_DATA_OVERRIDE="$REQ/data" \
+    JG_CONFIG_OVERRIDE="$REQ/config" JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
     "$ROOT/bin/jg-captain-hold.sh" reconcile-requests --source-id probe --source 'test capture' \
     > "$REQ_OUT" 2>&1 || REQ_STATUS=$?
 
@@ -290,7 +290,7 @@ case "${1:-}" in
     [ -z "${2:-}" ] && { printf 'code: NOT_FOUND\n' >&2; exit 1; }
     # Only the prefixed migrated candidates wedge; the exact and legacy ids
     # answer NOT_FOUND promptly, the concrete path the prefix scan exists for.
-    case "$2" in $FM_TEST_PREFIXED_GLOB) sleep 300; exit 0 ;; esac
+    case "$2" in $JG_TEST_PREFIXED_GLOB) sleep 300; exit 0 ;; esac
     printf 'code: NOT_FOUND\n' >&2
     exit 1
     ;;
@@ -343,10 +343,10 @@ jg_write_meta "$MIG/state/wedged-origin.meta" \
 
 VERIFY_MIG_OUT="$MIG/verify.out"
 VERIFY_MIG_STATUS=0
-PATH="$MIG_FAKEBIN:$BASE_PATH" FM_HOME="$MIG" \
-  FM_STATE_OVERRIDE="$MIG/state" FM_DATA_OVERRIDE="$MIG/data" \
-  FM_CONFIG_OVERRIDE="$MIG/config" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
-  FM_TEST_PREFIXED_GLOB='bd-*' \
+PATH="$MIG_FAKEBIN:$BASE_PATH" JG_HOME="$MIG" \
+  JG_STATE_OVERRIDE="$MIG/state" JG_DATA_OVERRIDE="$MIG/data" \
+  JG_CONFIG_OVERRIDE="$MIG/config" JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  JG_TEST_PREFIXED_GLOB='bd-*' \
   "$ROOT/bin/jg-captain-hold.sh" verify wedged-origin > "$VERIFY_MIG_OUT" 2>&1 || VERIFY_MIG_STATUS=$?
 
 [ "$VERIFY_MIG_STATUS" -ne 0 ] \
@@ -391,9 +391,9 @@ exit 1
 SH
 chmod +x "$E2E_FAKEBIN/ps"
 jg_fake_exit0 "$E2E_FAKEBIN" tmux node chrome-devtools-axi gh treehouse
-jg_fake_version_tool "$E2E_FAKEBIN" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
-jg_fake_version_tool "$E2E_FAKEBIN" gh-axi FM_FAKE_GH_AXI_VERSION 0.1.29
-jg_fake_version_tool "$E2E_FAKEBIN" no-mistakes FM_FAKE_NO_MISTAKES_VERSION \
+jg_fake_version_tool "$E2E_FAKEBIN" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
+jg_fake_version_tool "$E2E_FAKEBIN" gh-axi JG_FAKE_GH_AXI_VERSION 0.1.29
+jg_fake_version_tool "$E2E_FAKEBIN" no-mistakes JG_FAKE_NO_MISTAKES_VERSION \
   'no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z'
 
 printf '# Backlog\n' > "$E2E_HOME/data/backlog.md"
@@ -408,9 +408,9 @@ jg_write_meta "$E2E_HOME/state/wedged-task.meta" \
 
 DIGEST="$E2E/digest.out"
 DIGEST_START=$(date +%s)
-env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
-  FM_HOME="$E2E_HOME" FM_ROOT_OVERRIDE="$E2E_ROOT" PATH="$E2E_FAKEBIN:$BASE_PATH" \
-  FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+env -u CLAUDECODE -u PI_CODING_AGENT -u JG_PI_HARNESS -u GROK_AGENT \
+  JG_HOME="$E2E_HOME" JG_ROOT_OVERRIDE="$E2E_ROOT" PATH="$E2E_FAKEBIN:$BASE_PATH" \
+  JG_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   "$ROOT/bin/jg-session-start.sh" > "$DIGEST" 2>&1 || true
 DIGEST_ELAPSED=$(elapsed_since "$DIGEST_START")
 
