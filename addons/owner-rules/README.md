@@ -39,8 +39,8 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
    A merge whose Checks block says `screen: none` still needs that sealed receipt for its text-only Evidence card (`merge-card screen-none`).
    The gate says so in one line at the top of its output: it takes the text-only card path, and no capture is demanded of it.
    A no-op without `config/owner-rules`. Needs the sibling `merge-card/` of this checkout.
-4. **Checks-lint PASS.** After the receipt, the gate reads `$JG_HOME/data/checks-gate.log` (never reruns lint) and refuses unless a
-   `pass` row names the PR url at the merge head (a local merge matches the report-file rows of its own task folder; they carry no head).
+4. **Checks-lint PASS.** After the receipt, the gate reads `$JG_HOME/data/checks-gate.log` (never reruns lint) and refuses unless the
+   newest row naming the PR url at the merge head is a `pass`, so a later fail takes the verdict back and a `card` row is not a verdict (a local merge matches the report-file rows of its own task folder; they carry no head).
    `screen: none` exempts the receipt only. PR merges also require a passed-proof Evidence card on the fleet board, configured by `JG_FLEET_BOARD`, then the one-line `$JG_HOME/config/fleet-board`, then the main home board (`${JG_MAIN_HOME:-$HOME/juggernaut}/config/fleet-board`); a screen-free PR with a sealed receipt gets a text-only card automatically. Local merges keep the existing receipt/lint behavior. Refusal:
    `owner-rules: no checks-lint PASS for <pr> at <head>; run JG_HOME=<home> <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh <pr-url> <home>/data/<id> then merge again`.
 - Test: `tests/owner-rules-gate.test.sh` covers receipt and lint refusals, verifies the Evidence-card hint is an executable absolute path, and scans gate/check scripts for bare add-on command hints. `tests/gate-contract.test.sh` uses installed `sign-off-axi` to post a merge-card-shaped Evidence card, then proves matching commits pass and mismatches refuse; it skips only when the CLI is absent.

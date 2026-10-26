@@ -437,3 +437,4 @@ addons/quota-axi-pool/tests/quota-axi-pool-recursion.test.sh  # inline FM_ alias
 tests/jg-tool-wiring.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
 bin/fm-ci-required.sh  # alias for bin/jg-ci-required.sh; called by live homes, panes and per-lane records
 bin/fm-ci-scope.sh  # alias for bin/jg-ci-scope.sh; called by live homes, panes and per-lane records
+tests/jg-backend.test.sh  # adapt_old_names rewrites the old words in a pre-rename baseline, so it must name them; deleted by slice S10

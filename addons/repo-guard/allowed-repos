@@ -1,0 +1,2 @@
+# Repositories a lane may write to: owner/repo, or owner/* for every repository under one owner. This file is the one place the list lives - add an entry here and repo-guard allows it.
+umeranjum17/*

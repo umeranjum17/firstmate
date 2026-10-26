@@ -160,6 +160,9 @@ jobs:
       # Fixture home, merge gate and patterns, a local bare repo standing in for GitHub and a stub gh: nothing real is touched.
       - name: Owner guard merge gate test
         run: bash owner-guard/tests/owner-guard-merge.test.sh
+      # Fixture fork clone, throwaway HOME and stub gh/gh-axi that only record argv: nothing real is touched.
+      - name: Repo guard test
+        run: bash repo-guard/tests/repo-guard.test.sh
       # Sentinel user install proves the uninstaller journey cannot escape its temporary HOME/XDG paths.
       - name: Owner guard uninstall isolation test
         run: bash owner-guard/tests/uninstall-isolation.test.sh
@@ -205,6 +208,9 @@ jobs:
       # Same-lane follow-up may reuse its own frames; cross-task reuse still fails.
       - name: Checks lint lane-task identity test
         run: bash merge-on-green/tests/checks-lint-lane-task.test.sh
+      # A lane that fixes its evidence list republishes PASS over its own stale FAIL (real receipt and acceptance).
+      - name: Checks lint superseding-receipt test
+        run: bash merge-on-green/tests/checks-lint-supersede-receipt.test.sh
       # A 305-file fixture above gh's 100-file list cap and 300-file diff cap; no real PRs are changed.
       - name: Checks lint big-PR size test
         run: bash merge-on-green/tests/checks-lint-big-pr.test.sh

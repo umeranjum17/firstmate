@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 1180" width="390" height="1180" role="img" aria-labelledby="hiw-title hiw-desc">
+  <title id="hiw-title">How Juggernaut works</title>
+  <desc id="hiw-desc">Six levels in one chain, stacked: the Captain sets the objective, Overwatch plans the work, Squad Leads own their Operators and are optional for small fleets, each Operator does one mission in an isolated work copy, the work moves through brief, isolated work copy, validation, pull request and merge, and the outcomes are a pull request, a merged change or a report with findings.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+    </marker>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1.2" cy="1.2" r="1.2" fill="var(--grid)"/>
+    </pattern>
+  </defs>
+  <style>
+    :root {
+      --bg: #f6f4ef; --box: #ffffff; --ink: #1b2430; --muted: #5d6877;
+      --line: #c7c1b5; --accent: #2b6f68; --accent-soft: #e2eeeb;
+      --amber: #9a6a21; --amber-soft: #f3e9d8; --grid: #dcd7cd;
+    }
+    text { font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: var(--ink); }
+    .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: 2.2px; fill: var(--muted); text-transform: uppercase; }
+    .title { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+    .lead { font-size: 18px; font-weight: 650; }
+    .op { font-size: 15px; font-weight: 650; }
+    .chiptext { font-size: 14px; font-weight: 600; }
+    .sub { font-size: 13px; fill: var(--muted); }
+    .chipsub { font-size: 10.5px; fill: var(--muted); }
+    .small { font-size: 11px; fill: var(--muted); }
+    .box { fill: var(--box); stroke: var(--line); stroke-width: 1.2; }
+    .soft { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+    .warm { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 1.2; }
+    .chip { fill: var(--box); stroke: var(--line); stroke-width: 1.1; }
+    .group { fill: none; stroke: var(--line); stroke-width: 1.1; stroke-dasharray: 4 6; }
+    .line { stroke: var(--line); stroke-width: 1.6; fill: none; }
+    .accentline { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+    .dash { stroke: var(--amber); stroke-width: 1.6; fill: none; stroke-dasharray: 5 5; }
+    .accentdot { fill: var(--accent); }
+  </style>
+  <style>
+    .lead { font-size: 21px; }
+    .chiptext { font-size: 15px; }
+    .sub { font-size: 13px; }
+    .chipsub { font-size: 12px; }
+    .tag { font-size: 10.5px; }
+  </style>
+  <rect width="390" height="1180" fill="var(--bg)"/>
+  <rect width="390" height="1180" fill="url(#grid)" opacity="0.55"/>
+  <text class="tag" x="20" y="26" text-anchor="start">Command</text>
+  <rect class="box" x="20" y="36" width="350" height="82" rx="12"/>
+  <text class="lead" x="195" y="66" text-anchor="middle">Captain</text>
+  <text class="chipsub" x="195" y="86" text-anchor="middle">The user.</text>
+  <text class="chipsub" x="195" y="105" text-anchor="middle">Sets the objective.</text>
+  <path class="accentline" d="M195 118 L195 140" marker-end="url(#arrow-accent)"/>
+  <rect class="soft" x="20" y="150" width="350" height="101" rx="12"/>
+  <text class="lead" x="195" y="180" text-anchor="middle">Overwatch</text>
+  <text class="chipsub" x="195" y="200" text-anchor="middle">One point of contact.</text>
+  <text class="chipsub" x="195" y="219" text-anchor="middle">Plans the work.</text>
+  <text class="chipsub" x="195" y="238" text-anchor="middle">Monitor wakes it on a real event.</text>
+  <path class="accentline" d="M195 251 L195 273" marker-end="url(#arrow-accent)"/>
+  <text class="tag" x="20" y="299" text-anchor="start">Squad Leads</text>
+  <rect class="box" x="20" y="309" width="350" height="101" rx="12"/>
+  <text class="lead" x="195" y="339" text-anchor="middle">Squad Leads</text>
+  <text class="chipsub" x="195" y="359" text-anchor="middle">One lead per project or domain.</text>
+  <text class="chipsub" x="195" y="378" text-anchor="middle">Each lead owns its Operators.</text>
+  <text class="chipsub" x="195" y="397" text-anchor="middle">Optional for small fleets.</text>
+  <path class="accentline" d="M195 410 L195 432" marker-end="url(#arrow-accent)"/>
+  <text class="tag" x="20" y="458" text-anchor="start">Operators</text>
+  <rect class="box" x="20" y="468" width="350" height="101" rx="12"/>
+  <text class="lead" x="195" y="498" text-anchor="middle">Operators</text>
+  <text class="chipsub" x="195" y="518" text-anchor="middle">One mission each.</text>
+  <text class="chipsub" x="195" y="537" text-anchor="middle">Isolated work copy.</text>
+  <text class="chipsub" x="195" y="556" text-anchor="middle">A Recon mission returns a report.</text>
+  <path class="accentline" d="M195 569 L195 591" marker-end="url(#arrow-accent)"/>
+  <text class="tag" x="20" y="617" text-anchor="start">Work</text>
+  <rect class="chip" x="20" y="627" width="350" height="52" rx="10"/>
+  <text class="chiptext" x="195" y="649" text-anchor="middle">Brief</text>
+  <text class="chipsub" x="195" y="665" text-anchor="middle">what you asked for</text>
+  <path class="accentline" d="M195 679 L195 695" marker-end="url(#arrow-accent)" stroke-width="1.6"/>
+  <rect class="chip" x="20" y="705" width="350" height="52" rx="10"/>
+  <text class="chiptext" x="195" y="727" text-anchor="middle">Isolated work copy</text>
+  <text class="chipsub" x="195" y="743" text-anchor="middle">one clean copy per mission</text>
+  <path class="accentline" d="M195 757 L195 773" marker-end="url(#arrow-accent)" stroke-width="1.6"/>
+  <rect class="chip" x="20" y="783" width="350" height="52" rx="10"/>
+  <text class="chiptext" x="195" y="805" text-anchor="middle">Validation</text>
+  <text class="chipsub" x="195" y="821" text-anchor="middle">tests, proof, a judge</text>
+  <path class="accentline" d="M195 835 L195 851" marker-end="url(#arrow-accent)" stroke-width="1.6"/>
+  <rect class="chip" x="20" y="861" width="350" height="52" rx="10"/>
+  <text class="chiptext" x="195" y="883" text-anchor="middle">Pull request</text>
+  <text class="chipsub" x="195" y="899" text-anchor="middle">the change and its proof</text>
+  <path class="accentline" d="M195 913 L195 929" marker-end="url(#arrow-accent)" stroke-width="1.6"/>
+  <rect class="chip" x="20" y="939" width="350" height="52" rx="10"/>
+  <text class="chiptext" x="195" y="961" text-anchor="middle">Merge</text>
+  <text class="chipsub" x="195" y="977" text-anchor="middle">only in your authority</text>
+  <path class="accentline" d="M195 991 L195 1013" marker-end="url(#arrow-accent)"/>
+  <text class="tag" x="20" y="1039" text-anchor="start">Outcomes</text>
+  <rect class="warm" x="20" y="1049" width="350" height="101" rx="12"/>
+  <text class="lead" x="195" y="1079" text-anchor="middle">Outcomes</text>
+  <text class="chipsub" x="195" y="1099" text-anchor="middle">A pull request, a merged change,</text>
+  <text class="chipsub" x="195" y="1118" text-anchor="middle">or a report with findings.</text>
+  <text class="chipsub" x="195" y="1137" text-anchor="middle">Objective secured: a verified result.</text>
+</svg>
