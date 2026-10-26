@@ -171,6 +171,15 @@ fi
 cd "$JG_BACKLOG_AXI_ROOT" || fail "cannot enter the backlog root $JG_BACKLOG_AXI_ROOT"
 
 tasks_axi() { tasks-axi "$@"; }
+
+# The typed public-followup schema in the pinned tasks-axi spells a squad-lead
+# work home with the pre-rename prefix, so this boundary translates in both
+# directions and the rest of the repository keeps one spelling (slice S5).
+_jg_taxi_sl_own="squad_lead:"
+_jg_taxi_sl_wire="$(jg_compat_legacy_of squad-lead):"
+jg_taxi_stream_from_wire() {
+  sed "s/${_jg_taxi_sl_wire}/${_jg_taxi_sl_own}/g"
+}
 # shellcheck source=bin/jg-captain-ask-lib.sh disable=SC1091
 . "$SCRIPT_DIR/jg-captain-ask-lib.sh"
 captain_guard() {  # <tasks-axi args>
@@ -231,11 +240,30 @@ case "${1:-}" in
     fi
     ;;
 esac
+# Public-followup values cross into tasks-axi's own schema; everything else passes
+# through untouched.
+case "${1:-}" in
+  public-followup|task)
+    case "${2:-}${1:-}" in
+      *public-followup*)
+        _jg_wire_args=()
+        for _jg_arg in ${ARGS[@]+"${ARGS[@]}"}; do
+          case "$_jg_arg" in
+            "$_jg_taxi_sl_own"*) _jg_wire_args+=("${_jg_taxi_sl_wire}${_jg_arg#"$_jg_taxi_sl_own"}") ;;
+            *) _jg_wire_args+=("$_jg_arg") ;;
+          esac
+        done
+        ARGS=(${_jg_wire_args[@]+"${_jg_wire_args[@]}"})
+        unset _jg_wire_args _jg_arg
+        ;;
+    esac
+    ;;
+esac
 captain_guard ${ARGS[@]+"${ARGS[@]}"}
 case "${1:-}" in
   show|view|list)
     set -o pipefail
-    tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream
+    tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
     exit $?
     ;;
 esac

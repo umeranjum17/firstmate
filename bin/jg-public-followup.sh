@@ -307,9 +307,13 @@ cmd_register() {
 
   # The relation must already be bound, so a registration can never describe a
   # binding tasks-axi does not have.
+  # tasks-axi stores the home id in its own pinned spelling, so the bound relation
+  # is compared after mapping that spelling back (slice S5).
   printf '%s' "$payload" | jq -e --arg r "$relation" --arg h "$work_home" --arg w "$work_id" \
-    '(.public_followup.work_relations // [])
-       | map(select(.relation_id == $r and .work_ref.home_id == $h and .work_ref.task_id == $w))
+    --arg wire "$JG_PF_SQUAD_LEAD_HOME_PREFIX" --arg own "$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT" \
+    'def own_id: if startswith($wire) then $own + ltrimstr($wire) else . end;
+     (.public_followup.work_relations // [])
+       | map(select(.relation_id == $r and (.work_ref.home_id | own_id) == $h and .work_ref.task_id == $w))
        | length > 0' >/dev/null 2>&1 \
     || die "obligation '$id' has no bound relation '$relation' for $work_home/$work_id; run bin/jg-tasks-axi.sh public-followup bind-work first" 1
 
@@ -1543,7 +1547,9 @@ cmd_rechain() {
       '{type:$t, required_deliverables:$keys, completion_policy:"all-required"}' \
       > "$expected_file"
   fi
-  jq -n --arg h "$work_home" --arg w "$work_id" \
+  # The relation document is typed data tasks-axi validates, so its home id uses
+  # that tool's pinned spelling (slice S5).
+  jq -n --arg h "$(jg_pf_tasks_axi_home_id "$work_home")" --arg w "$work_id" \
     '{relation_id:"rel-1", work_ref:{home_id:$h, task_id:$w},
       role:"fulfills", required:true, generation:1}' > "$relation_file"
 

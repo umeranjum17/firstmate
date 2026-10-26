@@ -383,8 +383,12 @@ DELIVERABLES_JSON=$(
   } | jq -Rsc 'split("\n") | .[:-1] | [range(0; length; 2) as $i | {key: .[$i], value: .[$i+1]}] | from_entries | to_entries | sort_by(.key) | from_entries'
 ) || die "could not encode deliverables" 1
 
+# The event id hashes the identity fields tasks-axi validates, so it is derived
+# from the same spelling that goes into the typed document (slice S5).
+SOURCE_HOME_WIRE=$(jg_pf_tasks_axi_home_id "$SOURCE_HOME") \
+  || die "could not derive the source home id" 1
 EVENT_ID=$(jg_pf_event_id \
-  "$OBLIGATION" "$RELATION" "$SOURCE_HOME" "$WORK_ID" "$GENERATION" "$OUTCOME" \
+  "$OBLIGATION" "$RELATION" "$SOURCE_HOME_WIRE" "$WORK_ID" "$GENERATION" "$OUTCOME" \
   "$DELIVERABLES_JSON") || die "sha256 (shasum or sha256sum) is required" 1
 # The derived id becomes a filename, so require the exact digest shape rather
 # than trusting whatever the hashing tool printed.
@@ -402,7 +406,7 @@ EVENT_JSON=$(jq -Sc -n \
   --arg relation_id "$RELATION" \
   --arg work_id "$WORK_ID" \
   --argjson generation "$GENERATION" \
-  --arg source_home_id "$SOURCE_HOME" \
+  --arg source_home_id "$SOURCE_HOME_WIRE" \
   --arg outcome_type "$OUTCOME" \
   --argjson deliverables "$DELIVERABLES_JSON" \
   --arg public_safe_outcome "$OUTCOME_TEXT" \

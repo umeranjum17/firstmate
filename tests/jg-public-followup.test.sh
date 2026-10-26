@@ -155,6 +155,15 @@ run_pf_sysbash() {  # <home> <args...>
     FMX_NOW_OVERRIDE="${FMX_NOW_OVERRIDE:-$PF_TEST_NOW}" /bin/bash "$PF" "$@"
 }
 
+# tasks-axi's pinned public-followup schema names a squad_lead home with the
+# pre-rename prefix, so the fixtures translate at that boundary exactly as
+# bin/jg-tasks-axi.sh does for production calls.
+taxi_home() {  # <home-id>
+  case "$1" in
+    squad_lead:*) printf 'secondmate:%s\n' "${1#squad_lead:}" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
 tasks_in() {  # <home> <tasks-axi args...>
   local home=$1
   shift
@@ -177,7 +186,7 @@ seed_commitment() {
   jq -n '{type:"pr-merged", project:"juggernaut",
           required_deliverables:["pr_url"], completion_policy:"all-required"}' \
     > "$home/expected.json"
-  jq -n --arg h "$work_home" --arg w "$work_id" \
+  jq -n --arg h "$(taxi_home "$work_home")" --arg w "$work_id" \
     '{relation_id:"rel-code", work_ref:{home_id:$h, task_id:$w},
       role:"fulfills", required:true, generation:1}' > "$home/relation.json"
 
@@ -219,7 +228,7 @@ seed_repro_commitment() {   # <home> <obligation> <request> <work-home> <work-id
   jq -n '{type:"report-ready", project:"juggernaut",
           required_deliverables:["report_path"], completion_policy:"all-required"}' \
     > "$home/expected.json"
-  jq -n --arg h "$work_home" --arg w "$work_id" \
+  jq -n --arg h "$(taxi_home "$work_home")" --arg w "$work_id" \
     '{relation_id:"rel-code", work_ref:{home_id:$h, task_id:$w},
       role:"fulfills", required:true, generation:1}' > "$home/relation.json"
   tasks_in "$home" public-followup add "$obligation" --request-context-file "$home/request.json" \
@@ -3216,7 +3225,7 @@ seed_typed_commitment() {
   jq -n --arg t "$expected" --argjson k "$keys" \
     '{type:$t, project:"juggernaut", required_deliverables:$k, completion_policy:"all-required"}' \
     > "$home/expected.json"
-  jq -n --arg h "$work_home" --arg w "$work_id" \
+  jq -n --arg h "$(taxi_home "$work_home")" --arg w "$work_id" \
     '{relation_id:"rel-code", work_ref:{home_id:$h, task_id:$w},
       role:"fulfills", required:true, generation:1}' > "$home/relation.json"
   tasks_in "$home" public-followup add "$obligation" --request-context-file "$home/request.json" \

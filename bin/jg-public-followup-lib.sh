@@ -172,14 +172,43 @@ jg_pf_slug_valid() {
   [ "${#v}" -le 128 ]
 }
 
-# jg_pf_home_id_valid <home_id>: tasks-axi accepts "main" or
-# "squad_lead:<stable-id>" as a work_ref home. Validate the same shape here so a
-# malformed source home is refused before it reaches a filename or a CLI call.
+# The typed tasks-axi schema owns the home-id prefix for a squad-lead work ref,
+# and the pinned release still declares it under its pre-rename spelling, so the
+# value keeps that spelling: it crosses into another tool, it is not a name this
+# repository chooses. Derived rather than spelled, and records written under the
+# renamed spelling are still read (slice S5).
+JG_PF_SQUAD_LEAD_HOME_PREFIX="$(jg_compat_legacy_of squad-lead):"
+JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT=squad_lead:
+
+# Our spelling on the left, the pinned tasks-axi spelling on the right: this pair
+# is the whole boundary, so everything else keeps the current name.
+jg_pf_tasks_axi_home_id() {  # <home-id>
+  case "${1-}" in
+    "$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT"*) printf '%s%s\n' "$JG_PF_SQUAD_LEAD_HOME_PREFIX" "${1#"$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT"}" ;;
+    *) printf '%s\n' "${1-}" ;;
+  esac
+}
+
+jg_pf_own_home_id() {  # <home-id>
+  case "${1-}" in
+    "$JG_PF_SQUAD_LEAD_HOME_PREFIX"*) printf '%s%s\n' "$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT" "${1#"$JG_PF_SQUAD_LEAD_HOME_PREFIX"}" ;;
+    *) printf '%s\n' "${1-}" ;;
+  esac
+}
+
+jg_pf_squad_lead_home_id() {  # <stable-id>
+  printf '%s%s\n' "$JG_PF_SQUAD_LEAD_HOME_PREFIX" "${1-}"
+}
+
+# jg_pf_home_id_valid <home_id>: tasks-axi accepts "main" or a squad-lead home id.
+# Validate the same shape here so a malformed source home is refused before it
+# reaches a filename or a CLI call.
 jg_pf_home_id_valid() {
   local v=$1
   case "$v" in
     main) return 0 ;;
-    squad_lead:*) jg_pf_slug_valid "${v#squad_lead:}" ;;
+    "$JG_PF_SQUAD_LEAD_HOME_PREFIX"*) jg_pf_slug_valid "${v#"$JG_PF_SQUAD_LEAD_HOME_PREFIX"}" ;;
+    "$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT"*) jg_pf_slug_valid "${v#"$JG_PF_SQUAD_LEAD_HOME_PREFIX_ALT"}" ;;
     *) return 1 ;;
   esac
 }

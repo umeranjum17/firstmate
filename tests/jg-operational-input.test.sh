@@ -31,7 +31,7 @@ set_age_secs() {  # <file> <age-seconds>
 test_current_generic_matrix() {
   local kind body encoded parsed stripped prefix_hex
   prefix_hex=$(printf '%s' "$JG_OPERATIONAL_PREFIX" | od -An -tx1 | tr -d ' \n')
-  [ "$prefix_hex" = e281a346495253544d4154455f4f503a20 ] \
+  [ "$prefix_hex" = e281a34a55474745524e4155545f4f503a20 ] \
     || fail "current operational prefix lost the landed U+2063 JUGGERNAUT_OP bytes: $prefix_hex"
 
   for kind in session-start watcher turn-end-guard away-supervisor launch-brief branch-outcome; do
