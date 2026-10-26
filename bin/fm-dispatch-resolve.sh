@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-dispatch-resolve.sh - resolve one concrete crewmate or scout dispatch
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #

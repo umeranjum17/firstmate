@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-install-treehouse.sh - install CI's pinned, verified Treehouse build.
 #
 # Used only by the required real-Herdr CI lane for E2E scripts that genuinely

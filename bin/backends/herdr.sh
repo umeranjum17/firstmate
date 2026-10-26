@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/herdr.sh - the verified herdr session-provider adapter.
 #
 # Design: data/fm-backend-design-d7/herdr-addendum.md ("Interface mapping",

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared, backend-neutral agent-state transition shape and supervision policy.
 #
 # This library owns TWO contracts, deliberately backend-independent so any

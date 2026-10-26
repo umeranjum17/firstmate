@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Present durable watcher wake records, retire rows no actor could ever consume,
 # optionally acknowledge handled records,
 # annotate every unread line for validated signal status keys, surface unread

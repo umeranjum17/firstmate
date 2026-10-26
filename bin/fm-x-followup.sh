@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Post a completion follow-up for an X-mode-linked task, up to three within a
 # 7-day window, and manage the link's counter.
 #

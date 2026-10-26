@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Enter away mode and run the sub-supervisor daemon in a harness-tracked
 # foreground process when one is not already alive.
 #

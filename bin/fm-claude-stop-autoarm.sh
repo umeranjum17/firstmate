@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Claude Stop-owned watcher auto-arm (asyncRewake hook).
 #
 # Registered in tracked .claude/settings.json as a Stop command hook with

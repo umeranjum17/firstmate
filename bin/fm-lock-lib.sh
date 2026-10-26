@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared "is this git lock file provably abandoned?" decision procedure.
 #
 # ONE owner for the staleness proof that fm-teardown.sh (a worktree index.lock)

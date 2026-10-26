@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # parsed fields are output globals for sourcing callers.
 # Shared parser for data/secondmates.md records.
 #

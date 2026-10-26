@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/tmux.sh - the tmux session-provider adapter.
 #
 # Reference backend (AGENTS.md section 8; data/fm-backend-design-d7). P1 moves

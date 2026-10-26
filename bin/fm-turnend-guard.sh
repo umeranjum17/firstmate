@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Turn-end guard for any firstmate PRIMARY session: the main home OR a
 # secondmate's own home. A secondmate runs its own primary firstmate session and
 # is guarded exactly like the main primary; only child crew/scout worktrees are

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Print the tail of a crewmate endpoint (bounded, for cheap diagnosis).
 # Usage: fm-peek.sh <target> [lines=40]
 #   <target> may be an exact task id, a legacy fm-<id> task label resolved

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor executable resolution and Cursor process identity.
 # Sourced by bin/fm-spawn.sh, bin/fm-harness.sh, bin/fm-busy-lib.sh, and
 # bin/backends/tmux.sh. This file is sourced by scripts and has no side effects

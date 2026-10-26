@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-secondmate-reconcile.sh - ask a secondmate to reconcile its own books, at
 # most once per home per cooldown window.
 #

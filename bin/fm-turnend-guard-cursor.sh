@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor `stop` hook adapter for a firstmate PRIMARY session: the park model.
 #
 # Registered in tracked .cursor/hooks.json. Cursor runs this hook SYNCHRONOUSLY

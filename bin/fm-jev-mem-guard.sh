@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-jev-mem-guard.sh - host memory guard; usage and contract: bin/fm-jev-mem-guard.py header.
 # Without python3 the host is not measurable here, which admits and records nothing.
 set -euo pipefail

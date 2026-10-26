@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Safe, home-scoped (re-)arm of the firstmate watcher, with honest verification.
 #
 # The watcher (bin/fm-watch.sh) blocks until it has an actionable wake to

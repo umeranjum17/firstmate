@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-project-capacity-lib.sh - how many workers a project admits at once on this
 # machine, and whether a fresh worker spawn still fits.
 #

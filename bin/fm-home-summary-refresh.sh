@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-home-summary-refresh.sh - publish this home's structured summary ledger.
 #
 # Usage: fm-home-summary-refresh.sh [--best-effort]

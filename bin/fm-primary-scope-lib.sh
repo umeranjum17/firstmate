@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared marker-or-plain-checkout predicate for tracked hooks that must act only
 # in a genuine firstmate primary home.
 # This file is sourced by hook entrypoints and has no side effects on source.

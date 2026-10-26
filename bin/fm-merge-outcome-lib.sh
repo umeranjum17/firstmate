@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared durable, supervisor-facing outcome publication for a confirmed merge.
 #
 # Both a merge performed by this home and a merge detected by its existing poll

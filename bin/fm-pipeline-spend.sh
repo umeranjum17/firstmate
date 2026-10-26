@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-pipeline-spend.sh - attribute a task's no-mistakes pipeline spend to the
 # task and keep it in Firstmate's own records.
 #

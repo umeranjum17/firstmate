@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Durable per-task scratch-directory record: state/<id>.scratch.
 # Usage: fm-scratch.sh register <task-id> <dir>   record one scratch directory
 #        fm-scratch.sh list <task-id>             print the recorded directories that are safe to reap

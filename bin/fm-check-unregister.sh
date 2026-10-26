@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Retire an intentional custom watcher check and its trust binding.
 # Usage: fm-check-unregister.sh <id>
 # Pass only the id. An unset FM_STATE_OVERRIDE selects FM_HOME/state; an

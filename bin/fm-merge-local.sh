@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Perform the approved local merge for a local-only ship task: fast-forward the
 # project's default branch to the crewmate's immutable ship branch recorded in
 # state/<task-id>.meta ("fm/<id>" for records created before that field existed).

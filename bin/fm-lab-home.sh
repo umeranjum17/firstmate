@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-lab-home.sh - mint a disposable firstmate "lab" home.
 #
 # A lab home is a throwaway FM_HOME that a no-mistakes GATE agent may drive

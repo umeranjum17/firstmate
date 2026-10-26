@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared "which harness delivered this hook payload?" predicate for the tracked
 # Claude-shaped hook entries.
 # This file is sourced by hook entrypoints and has no side effects on source.

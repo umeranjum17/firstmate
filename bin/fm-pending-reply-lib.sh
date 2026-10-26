@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-pending-reply-lib.sh - parent-owned secondmate missed-report guards.
 #
 # When the main firstmate delivers a reply-bearing marked from-firstmate request

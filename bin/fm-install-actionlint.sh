@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-install-actionlint.sh - install CI's pinned, verified actionlint build.
 #
 # Downloads the official GitHub release archive for the host OS/arch, verifies

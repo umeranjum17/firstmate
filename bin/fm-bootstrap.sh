@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Bootstrap detection, best-effort fleet refresh/prune, and installs.
 # Usage: fm-bootstrap.sh
 #          Detect: prints one line per actionable problem, or an explicit

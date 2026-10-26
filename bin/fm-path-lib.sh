@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-path-lib.sh - fork-free pathname helpers with no source-time side effects,
 # so read-only callers can load them without any library's state setup.
 #

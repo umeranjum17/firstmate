@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Session-open entry point for harnesses that RUN the digest instead of asking
 # the agent to. It is the one command those harnesses' session-open adapters
 # invoke, and it decides, from the session-open source, whether this open needs

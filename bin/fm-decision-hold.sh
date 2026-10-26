@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-decision-hold.sh - transitional compatibility shim over bin/fm-captain-hold.sh.
 #
 # The separate "decision" concept collapsed into the one primitive the captain

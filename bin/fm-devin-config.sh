@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Write a private Devin worker config, preserving user settings and hooks.
 # Usage: fm-devin-config.sh <state-dir> <task-id> <busy-gen> [<user-config>]
 # The default source is ~/.config/devin/config.json (Devin's --config default).

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Acquire or inspect the per-home firstmate session lock.
 #
 # Line 1 of state/.lock is the owning session's anchor pid, resolved by

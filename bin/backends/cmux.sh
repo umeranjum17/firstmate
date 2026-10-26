@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/cmux.sh - the cmux session-provider adapter (EXPERIMENTAL).
 #
 # Design: data/cmux-backend-feasibility-c7/report.md (adapter design sketch,

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Strip AI co-author trailers from a commit message, and
 # install that strip as a per-task git commit-msg hook for a fleet launch.
 #

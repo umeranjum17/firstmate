@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # PreToolUse guard against primary-session delegation outside the fleet.
 #
 # A firstmate primary that delegates through a harness's own delegation,

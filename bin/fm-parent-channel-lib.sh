@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-parent-channel-lib.sh - the one owner of a secondmate home's parent channel.
 #
 # WHY THIS EXISTS. A secondmate is a firstmate in its own home, and nobody reads

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor session-open adapter: the RUN tier transport for Cursor Agent CLI.
 #
 # Registered in tracked .cursor/hooks.json for Cursor's `sessionStart` step.

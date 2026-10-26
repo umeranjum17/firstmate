@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-exclude-tools-lib.sh - shared parsing and runtime-support checks for
 # config/crew-exclude-tools, sourced by bin/fm-spawn.sh and bin/fm-control.sh.
 #

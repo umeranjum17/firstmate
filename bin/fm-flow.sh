@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-flow.sh - thin shim for the fleet flow reader, which lives in firstmate-addons.
 #
 # The reader moved to the firstmate-addons repository (fleet-flow/bin/fm-flow.sh);

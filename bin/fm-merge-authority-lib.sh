@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Durable ownership of the authority under which a task's merge was accepted.
 #
 # The away-posture record (state/.afk-contract) is resolved only at the merge

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Backend-neutral harness-process identity.
 # Sourced by bin/backends/tmux.sh and bin/backends/herdr.sh. This file is
 # sourced by scripts and has no side effects on source.

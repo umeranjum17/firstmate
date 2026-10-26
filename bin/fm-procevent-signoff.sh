@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # sign-off adapter for the generic process-to-event runner: captain answers
 # given on a sign-off board come in, and captain holds go out as board cards.
 #

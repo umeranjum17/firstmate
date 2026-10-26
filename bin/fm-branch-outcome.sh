@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-branch-outcome.sh - the durable outcome store for the Pi supervision
 # branch (docs/pi-supervision-branch.md).
 #

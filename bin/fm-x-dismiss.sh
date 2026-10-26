@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Dismiss a pending X-mode mention at the relay WITHOUT replying to it.
 #
 # Usage: fm-x-dismiss.sh <request_id>

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-session-start.sh - one command for the whole session start.
 #
 # Collapses AGENTS.md sections 3 (bootstrap) and 5 (recovery) into ONE script

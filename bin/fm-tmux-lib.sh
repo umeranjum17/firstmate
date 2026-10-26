@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-tmux-lib.sh — shared tmux pane primitives for firstmate.
 #
 # ONE tmux source for delivery-busy detection, composer capture primitives,

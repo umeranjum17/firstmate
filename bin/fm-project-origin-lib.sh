@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Validate a project origin URL that one home hands to another.
 #
 # Firstmate supplies a project's origin instead of discovering it from a local

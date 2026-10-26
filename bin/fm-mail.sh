@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-mail.sh - general-purpose mail plane for reading and sending mail.
 #
 # Reads inbound mail over IMAP and sends mail over SMTP on demand. This is an

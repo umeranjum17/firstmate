@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-ticket.sh - record one task's ticket truth on the fleet board now.
 #
 # The board is the sign-off board named by config/fleet-board, whose tickets the

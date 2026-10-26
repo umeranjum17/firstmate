@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Hand already-identified, in-scope backlog items off from the main firstmate
 # backlog to a secondmate's own home backlog. Use this when a secondmate is
 # created (or whenever an existing queued item should become its domain's work)

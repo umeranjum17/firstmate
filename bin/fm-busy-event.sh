@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-busy-event.sh - the ONLY writer of the semantic busy-state contract
 # owned by bin/fm-busy-lib.sh (record format, gen binding, and classification
 # live there; this script owns mutation mechanics only).

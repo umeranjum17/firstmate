@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/orca.sh - the Orca terminal session-provider adapter.
 #
 # Orca owns both the task worktree and the terminal endpoint. Escape key support

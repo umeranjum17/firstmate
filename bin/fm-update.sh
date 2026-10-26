@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Self-update a running firstmate and its secondmates to the latest origin.
 #
 # Mechanical half of the /updatefirstmate skill. Fast-forwards the running

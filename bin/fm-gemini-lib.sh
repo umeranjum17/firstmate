@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Gemini process identity.
 # Sourced by bin/backends/tmux.sh. This file is sourced by scripts and has no
 # side effects on source.

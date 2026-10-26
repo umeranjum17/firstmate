@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # Probe/relaunch output globals are read by sourcing callers.
 # fm-secondmate-liveness-lib.sh - shared persistent-secondmate endpoint liveness
 # probing and recovery. bin/fm-bootstrap.sh owns the session-start sweep and

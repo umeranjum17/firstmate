@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-model-allowlist.sh - one allow-list per provider: view and edit it, refuse an
 # off-list pick with one line, and watch for a model that started anyway.
 #

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Report the blockers this command can see on one GitHub pull request.
 #
 # This is a one-shot, read-only command. It reads the current pull request,

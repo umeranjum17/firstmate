@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Generic process-to-event runner: supervise a registered long-polling child
 # outside the agent's foreground turn and turn completed results into normalized
 # durable wakes.

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Reap remote job workers whose code root no longer exists.
 #
 # Usage: fm-remote-job-reap-orphans.sh [--dry-run]

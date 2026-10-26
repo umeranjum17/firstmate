@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-role-lib.sh - the Firstmate home role and self-repository publication consent.
 #
 # Every Firstmate home runs as a user/operator by default: it may consume

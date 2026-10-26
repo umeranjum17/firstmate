@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Progress add-on for fm-watch.sh. The watcher supplies its state, timers and
 # classification helpers; fm-busy-lib.sh supplies worker-generation identity.
 

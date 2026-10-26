@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-startup-network.sh - the deferred startup stage of a session start.
 #
 # WHY THIS EXISTS. Every external-network call a session start makes used to run

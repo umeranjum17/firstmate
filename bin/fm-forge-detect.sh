@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Propose a clone's forge binding from its origin remote, for project-add intake.
 # Prints exactly one line to stdout:
 #   forge=gerrit evidence=<the protocol fact that suggests it>

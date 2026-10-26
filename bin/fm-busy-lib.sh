@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-busy-lib.sh - the ONE owner of firstmate's semantic busy-state contract.
 #
 # Design source: the captain-approved semantic busy-state redesign

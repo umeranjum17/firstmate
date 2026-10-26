@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-live-lab.sh - stand up, check, drive, and tear down one disposable live
 # supervision lab: a real lab main session on Claude or Pi, with the
 # supervision host (Claude) or branch (Pi) wired as a real home runs it,

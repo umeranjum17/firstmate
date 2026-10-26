@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-inbox.sh - the captain's out-of-band capture surface.
 #
 # Solves three DIFFERENT problems with three different mechanisms, because they

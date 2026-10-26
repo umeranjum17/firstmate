@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-public-followup-collect.sh - read and retire the typed terminal events a
 # worker in THIS home staged for an owning home on another machine.
 #

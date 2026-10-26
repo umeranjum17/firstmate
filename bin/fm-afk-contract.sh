@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-afk-contract.sh - the one owner of the away-posture record: its schema, the
 # captain's away words recorded verbatim, the read-back rendering, the entry
 # announcement, and the archive at return.

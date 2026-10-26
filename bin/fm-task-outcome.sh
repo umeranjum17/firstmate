@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-task-outcome.sh - append one durable task-outcome line to
 # <home>/data/metrics/task-outcomes.tsv for per-model fleet statistics.
 # Usage: fm-task-outcome.sh <task-id> [--force]

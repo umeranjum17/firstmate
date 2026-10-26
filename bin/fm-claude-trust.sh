@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Pre-register Claude Code's workspace trust for the directory a claude spawn is
 # about to launch into - the isolated task worktree of a ship or scout crewmate,
 # or the seeded home of a secondmate - so the agent reaches its brief or charter

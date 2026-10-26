@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared question-rule helpers: does a captain-facing reply end in a question,
 # and is that question already a board card? Sourced, no side effects.
 #

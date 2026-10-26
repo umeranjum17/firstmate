@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-fleet-snapshot.sh - structured fleet snapshot with observational caching.
 #
 # Output contract: `--json` prints one object with schema

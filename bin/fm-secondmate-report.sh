@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-secondmate-report.sh - optional helper to append a correlated parent report.
 #
 # A secondmate answering a marked from-firstmate request must report on the

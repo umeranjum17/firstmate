@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-gate-refuse-lib.sh - refuse no-mistakes gate lifecycle calls against the
 # real fleet while allowing marked disposable lab homes.
 #

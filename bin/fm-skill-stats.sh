@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-skill-stats.sh - thin shim for the fleet per-skill statistics reader, which lives in firstmate-addons.
 #
 # The reader moved to the firstmate-addons repository (fleet-stats/bin/fm-skill-stats.sh,

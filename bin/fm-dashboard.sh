@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-dashboard.sh - thin shim for the fleet dashboard, which lives in firstmate-addons.
 #
 # The dashboard moved to the firstmate-addons repository

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Post firstmate's composed answer back to the relay for a pending X-mode mention.
 #
 # Usage: fm-x-reply.sh <request_id> [--image <path>] <text>

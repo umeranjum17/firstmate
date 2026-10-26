@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-host-mirror.sh - the supervision host's dialog mirror: what the captain and
 # MAIN said in the captain's conversation, carried to the host's headless
 # engine session at the head of each attended wake, while an away wake carries

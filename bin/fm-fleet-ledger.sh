@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-fleet-ledger.sh - append records to the opt-in fleet activity ledger.
 #
 # docs/fleet-ledger.md owns the public record contract (file, events, fields,

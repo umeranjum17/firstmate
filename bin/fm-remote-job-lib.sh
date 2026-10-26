@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared remote fm-on job-worker protocol.
 #
 # Source this file from the fixed SSH entrypoint, the long-lived worker, or the

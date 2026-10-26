@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-public-followup-emit.sh - emit ONE structured terminal work result for work
 # bound to a public commitment, into the owning home's private event inbox.
 #

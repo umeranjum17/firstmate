@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-hold-reason-lib.sh - the one reversible encoding of a captain-hold reason.
 #
 # tasks-axi stores a hold reason as one markdown line inside a parenthesised tag,

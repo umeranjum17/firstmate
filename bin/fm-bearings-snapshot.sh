@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-bearings-snapshot.sh - compact, bounded, TOON-by-default bearings projection.
 #
 # A thin wrapper OVER the canonical bin/fm-fleet-snapshot.sh. It does not parse

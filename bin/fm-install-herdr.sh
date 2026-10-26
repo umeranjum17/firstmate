@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-install-herdr.sh - install CI's pinned, verified Herdr build.
 #
 # Single owner of the exact Herdr version, official release asset URL, and

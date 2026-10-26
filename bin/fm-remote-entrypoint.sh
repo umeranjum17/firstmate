@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Fixed remote entrypoint for bin/fm-on.sh.
 #
 # Install this tracked file as fm-remote-entrypoint.sh on the remote account's

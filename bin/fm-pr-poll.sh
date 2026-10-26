@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Static watcher program for a validated pull request, merge request, or Gerrit
 # change poll sidecar.
 # It emits exactly one merged line for a merged change and stays silent

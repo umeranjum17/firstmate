@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-branch-report.sh - the supervision branch's report surface off Pi: the
 # command twin of the Pi branch extension's fm_branch_report tool, for a
 # branch session run by the supervision host (docs/supervision-host.md).

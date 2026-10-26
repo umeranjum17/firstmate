@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # fm-lease.sh - claim, release, inspect, and sweep per-task supervision leases.
 #
 # The lease contract itself (file format, actors, staleness, guard semantics)
