@@ -159,7 +159,7 @@ test_fixture_snapshot_json() {
   out=$(PATH="$fakebin:$PATH" JG_HOME="$home" "$SNAPSHOT" --json)
   printf '%s' "$out" | jq -e . >/dev/null || fail "snapshot must be valid JSON"
   ids=$(printf '%s' "$out" | jq -r '.tasks | map(.id) | join(",")')
-  [ "$ids" = "cmux-task,scout-task,squad-lead-task,ship-task" ] \
+  [ "$ids" = "cmux-task,scout-task,ship-task,squad-lead-task" ] \
     || fail "task ordering must be stable by id, got $ids"
   printf '%s' "$out" | jq -e '
     .tasks[] | select(.id == "ship-task")
@@ -1022,7 +1022,7 @@ test_completed_scout_report_is_pointer_not_pending() {
     printf '%s' "$out" | jq -e --argjson single "$single" --argjson mate "$mate" '
       (.decisions_open | map({id,key}) | sort_by(.id,.key)) ==
         (([ ("ship-done","ship-failed","scout-done","scout-failed") as $id | $single[] | {id:$id,key:.} ]
-          + [ ("squad-lead-done","squad-lead-failed") as $id | $mate[] | {id:$id,key:.} ]) | sort_by(.id,.key))
+          + [ ("squad_lead-done","squad_lead-failed") as $id | $mate[] | {id:$id,key:.} ]) | sort_by(.id,.key))
     ' >/dev/null || fail "$phase home summary revived a completed decision or lost a current one: $out"
   done
   pass "a completed scout's stale decision surfaces as a report pointer, not pending"
