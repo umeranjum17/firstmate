@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Self-update a running juggernaut and its squad_leads to the latest origin.
 #
 # Mechanical half of the /updatejuggernaut skill. Fast-forwards the running
@@ -65,6 +63,8 @@
 # bytes; a failure there is swallowed rather than failing the update.
 #
 # Usage: jg-update.sh [--help]
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # PreToolUse guard against primary-session delegation outside the fleet.
 #
 # A juggernaut primary that delegates through a harness's own delegation,
@@ -52,6 +50,8 @@
 # Codex blocks on exit 2 and displays stderr.
 # Grok consumes the stdout decision object.
 # OpenCode and Pi consume exit 2 plus stderr.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 # Lowercase substrings that mark a tool name as delegation-shaped: it creates

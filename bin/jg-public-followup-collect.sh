@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-public-followup-collect.sh - read and retire the typed terminal events a
 # worker in THIS home staged for an owning home on another machine.
 #
@@ -39,6 +37,8 @@
 # to hand over - that one is named on stderr and left in place rather than
 # blocking every other staged result. Exit 2 on a usage or validation error, and
 # 1 when the outbox cannot be safely read or a retirement cannot be completed.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

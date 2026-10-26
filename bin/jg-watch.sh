@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Juggernaut watcher.
 # Classifies supervision wakes in bash. In normal mode it absorbs benign wakes
 # and keeps blocking; it queues and exits only for actionable wakes.
@@ -206,6 +204,8 @@
 # and exits 1, so a watcher whose temporary home or disposable checkout was
 # deleted stops itself instead of running on as an orphan. That check is scoped
 # to this process alone and never signals another watcher.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"

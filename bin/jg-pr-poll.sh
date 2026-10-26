@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Static watcher program for a validated pull request, merge request, or Gerrit
 # change poll sidecar.
 # It emits exactly one merged line for a merged change and stays silent
@@ -12,6 +10,8 @@
 # needs no extra tooling to follow GitHub or GitLab. The Gerrit and Forgejo
 # branches additionally need jq, which bin/jg-pr-check.sh refuses to arm those
 # watches without.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 LC_ALL=C
 export LC_ALL

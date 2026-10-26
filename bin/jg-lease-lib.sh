@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-lease-lib.sh - the per-task supervision lease contract (one owner).
 #
 # WHY. A supervision branch (docs/pi-supervision-branch.md) is a second LLM
@@ -98,6 +96,8 @@
 # bin/jg-pr-merge.sh, bin/jg-merge-local.sh, bin/jg-spawn.sh, and
 # bin/jg-lease.sh. Callers must have $STATE resolved before calling. No side
 # effects on source. set -u / set -e safe.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Distinct from usage errors (2), the gate refusal (3), and jg-send's
 # unconfirmed submit (3): recognizable as "the other supervision actor holds

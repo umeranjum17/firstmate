@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Safe, home-scoped (re-)arm of the juggernaut watcher, with honest verification.
 #
 # The watcher (bin/jg-watch.sh) blocks until it has an actionable wake to
@@ -99,6 +97,8 @@
 # state from a checkout that is about to be deleted. A marked stock-layout lab
 # home is disposable and permitted; ordinary tests use the sandbox bypass
 # exported by tests/lib.sh.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

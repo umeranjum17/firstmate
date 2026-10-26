@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/zellij.sh - the zellij session-provider adapter (EXPERIMENTAL).
 #
 # Design: data/jg-backend-design-d7/report.md ("Zellij Backend" section - the
@@ -106,6 +104,8 @@
 # Requires: zellij (CLI), jq (JSON parsing). Bootstrap detects these through
 # jg_backend_required_tools only when zellij is the resolved backend; this
 # adapter also gates them again before spawning.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 
 # JG_HOME fallback: every real caller already sets JG_HOME as a global before
 # sourcing jg-backend.sh (which sources this file); this exists only so this

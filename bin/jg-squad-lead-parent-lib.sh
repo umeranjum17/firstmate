@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # parsed fields are output globals for sourcing callers.
 # Parse the durable parent binding written into a seeded squad_lead home.
 #
@@ -14,6 +12,8 @@
 # route or schema, a NUL-bearing record, and a symlinked record fail closed.
 # Writers publish this record before .jg-squad-lead-home so that the identity
 # marker remains the seed-completion point.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_squad_lead_parent_record_parse() {
   local file=$1 line schema='' route='' parent_home='' parent_host=''

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-lab-home.sh - mint a disposable juggernaut "lab" home.
 #
 # A lab home is a throwaway JG_HOME that a no-mistakes GATE agent may drive
@@ -20,6 +18,8 @@
 # tmux-dir is the single owner of the short private socket directory: callers
 # use TMUX_TMPDIR=<printed-dir> and call teardown from their cleanup trap after
 # killing only the server addressed through that directory.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

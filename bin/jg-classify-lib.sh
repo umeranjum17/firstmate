@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared wake classifier: the common source of truth for captain-relevant status
 # tests, declared-external-wait vocabulary, and the working/paused absorb
 # classification that makes no-verb signal and stale-pane wakes safe to absorb.
@@ -45,6 +43,8 @@
 # crew_worktree_written_since reads the task's meta file and walks a bounded slice
 # of its worktree instead of a status file, so callers run it only at the moment
 # they would otherwise escalate.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Directory of this library, used to locate the sibling jg-crew-state.sh reader.
 # Resolved at source time from BASH_SOURCE so it works whether sourced by a

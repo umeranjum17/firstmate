@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Promote a scout task to a ship task in place: the operator keeps its window,
 # worktree, and loaded context; only the contract changes. Flips kind= to ship in
 # state/<task-id>.meta so jg-teardown.sh applies the full ship-task teardown protection
@@ -45,6 +43,8 @@
 # publish to juggernaut's own upstream repository; promotion applies the same
 # self-repository publication gate as bin/jg-spawn.sh (bin/jg-role-lib.sh), so
 # a promoted scout cannot gain authority a fresh ship spawn would be refused.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

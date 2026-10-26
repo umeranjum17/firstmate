@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/herdr.sh - the verified herdr session-provider adapter.
 #
 # Design: data/jg-backend-design-d7/herdr-addendum.md ("Interface mapping",
@@ -61,6 +59,8 @@
 # Requires: herdr (CLI + socket), jq (JSON parsing). Bootstrap detects these
 # through jg_backend_required_tools only when herdr is the resolved backend;
 # this adapter also gates them again before spawning.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 
 # JG_HOME fallback: every real caller (jg-spawn.sh, jg-peek.sh, jg-send.sh,
 # jg-teardown.sh, jg-watch.sh, jg-crew-state.sh) already sets JG_HOME as a

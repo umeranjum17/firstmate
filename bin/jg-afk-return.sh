@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-afk-return.sh - deterministic away-mode return: the return brief and the
 # catch-up gate.
 #
@@ -56,6 +54,8 @@
 # refusal branches by exit status so a reporting surface can keep refusing
 # during an active away window while still rendering the catch-up posture as
 # content; this file owns the gate format both branches read.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

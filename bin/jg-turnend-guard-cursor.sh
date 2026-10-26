@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor `stop` hook adapter for a juggernaut PRIMARY session: the park model.
 #
 # Registered in tracked .cursor/hooks.json. Cursor runs this hook SYNCHRONOUSLY
@@ -68,6 +66,8 @@
 # .cursor/hooks.json via pi-cursor-sdk does not dual-watch against
 # jg_watch_arm_pi. Cursor identity keeps parking despite a leaked
 # PI_CODING_AGENT. docs/turnend-guard.md owns the contract.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

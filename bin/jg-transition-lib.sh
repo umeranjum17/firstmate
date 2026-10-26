@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared, backend-neutral agent-state transition shape and supervision policy.
 #
 # This library owns TWO contracts, deliberately backend-independent so any
@@ -33,6 +31,8 @@
 # reader; the shape and the policy are shared. See bin/backends/herdr.sh
 # (jg_backend_herdr_wait_transition) for the herdr producer and bin/jg-watch.sh
 # (the watcher's event-wait splice) for the consumer.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Field separator for the normalized record. A literal TAB; every field is
 # scrubbed of TAB/newline by the producer so the record is exactly five fields.

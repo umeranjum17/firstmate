@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # shellcheck disable=SC2034 # Probe/relaunch output globals are read by sourcing callers.
 # jg-squad-lead-liveness-lib.sh - shared persistent-squad-lead endpoint liveness
 # probing and recovery. bin/jg-bootstrap.sh owns the session-start sweep and
@@ -52,6 +50,8 @@
 # The attempt ledger (.squad-lead-relaunch-<id>, one line per attempt plus one
 # per outcome) is both the durable relaunch record and the input to the
 # watcher's relaunch bound; teardown removes it.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 set -u
 

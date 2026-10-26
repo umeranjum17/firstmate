@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # sign-off adapter for the generic process-to-event runner: captain answers
 # given on a sign-off board come in, and captain holds go out as board cards.
 #
@@ -69,6 +67,8 @@
 # ponytail: one default board per machine; add a board option when a home needs its own.
 # sign-off-axi has no command to withdraw a card, so a hold answered through
 # another channel leaves its card waiting on the board.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

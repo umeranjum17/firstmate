@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Render the primary-harness supervision operating block for session start and
 # the short repair line used by guards and turn-end hooks. On a non-Pi primary
 # with a supervision protocol (claude, cursor, opencode, omp, grok, codex) whose
@@ -12,6 +10,8 @@
 # "{<harness>,...} " render only for the listed harnesses), and Grok's arm
 # command becomes the host; on a home that does not run it the output is
 # unchanged.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

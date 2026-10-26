@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-test-isolation-proof.sh - bounded concurrent isolation proofs for portable
 # behavior-test candidates and selected runner families.
 #
@@ -54,6 +52,8 @@
 # and missing prerequisite and cannot admit concurrency. A script that fails
 # only under concurrency must be removed from the candidate set and investigated;
 # this harness never retries a failure into green.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

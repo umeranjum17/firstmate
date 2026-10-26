@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared owner of the watcher's native push-transition escalation.
 #
 # The watcher and event-wait smoke tests source this library instead of loading
 # the whole watcher to obtain handle_push_transition. Its source list is limited
 # to the production boundaries the transition handler actually calls.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

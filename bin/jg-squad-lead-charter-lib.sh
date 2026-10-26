@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared extraction of squad_lead registry summary and scope from a charter.
 # Source only. JG_SQUAD_LEAD_CHARTER and JG_SQUAD_LEAD_SCOPE remain explicit
 # caller overrides; otherwise the named sections in the filled brief are used.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 normalize_registry_text() {
   awk '

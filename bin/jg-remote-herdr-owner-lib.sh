@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Who owns a Herdr session socket, and was that process born in the Aqua
 # login session?
 #
@@ -51,6 +49,8 @@
 #     Succeeds only for launchd and worker. `unknown` is deliberately not
 #     Aqua: a server that cannot prove its birth is treated like a foreign one,
 #     because leaving it in place silently reproduces the keychain failure.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_remote_herdr_socket_owner() { # <socket-path>
   local socket=$1 real pid='' line candidates='' candidate cmd

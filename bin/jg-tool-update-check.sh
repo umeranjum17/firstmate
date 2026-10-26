@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-tool-update-check.sh - report watched tooling that has an update available,
 # and tooling whose update is installed but not in effect.
 #
@@ -68,6 +66,8 @@
 # while a new finding that lands past the one-line cut is still news. A sweep
 # killed part way through leaves no record and is retried, instead of
 # suppressing its finding.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 # A watched git remote must never stop to ask for credentials; an unauthenticated

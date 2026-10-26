@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Watcher liveness and worktree-tangle guard, called by supervision scripts, by
 # jg-wake-drain.sh after it empties queued wakes, and by jg-session-start.sh in
 # read-only advisory mode whenever session-lock ownership was not verified.
@@ -47,6 +45,8 @@
 # is that host's normal gap), while the repair line names the primary's own arm
 # command, which under a supervision host's primary pin is the host itself or
 # the plain arm. Always exits 0: the guard warns, it never blocks.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

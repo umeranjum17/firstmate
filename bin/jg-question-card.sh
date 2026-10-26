@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-question-card.sh - post the board card for a question to the owner, then
 # print its key so the reply can cite it.
 #
@@ -27,6 +25,8 @@
 #
 # The board is the one sign-off-axi reads: the explicit --board file, else the
 # board sign-off-axi's own walk finds. Nothing here stores a private copy.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

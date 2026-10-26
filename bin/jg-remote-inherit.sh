@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Apply one primary-authoritative inherited item inside the selected remote home.
 #
 # Usage:
@@ -10,6 +8,8 @@
 # Only the inherited-material allowlist is writable or removable. Writes are
 # atomic ordinary-file replacements. data/captain-shared.md is read-only and is
 # quarantined before removal or before replacing bytes not last published here.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_HOME=${JG_HOME:?JG_HOME is required}

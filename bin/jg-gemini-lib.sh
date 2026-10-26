@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Gemini process identity.
 # Sourced by bin/backends/tmux.sh. This file is sourced by scripts and has no
 # side effects on source.
@@ -25,6 +23,8 @@
 # Detection of juggernaut's OWN harness uses these structural rules for the
 # ancestry fallback. The GEMINI_CLI=1 environment marker in bin/jg-harness.sh
 # remains the load-bearing path for the installed bundle shape on modern Node.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # True when path $1 carries Gemini's own structural evidence: the file is named
 # gemini, or it sits inside the published @google/gemini-cli package tree. A

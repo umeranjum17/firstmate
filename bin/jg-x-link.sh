@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Link a spawned task to the X-mode mention that triggered it, so juggernaut can
 # post up to THREE completion follow-ups when the task lands (within a 7-day window).
 #
@@ -45,6 +43,8 @@
 #
 # Both ids are relay/juggernaut slugs that compose a filename, so they are guarded
 # against path traversal even though they come from trusted callers.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

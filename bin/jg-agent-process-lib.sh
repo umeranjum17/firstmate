@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Backend-neutral harness-process identity.
 # Sourced by bin/backends/tmux.sh and bin/backends/herdr.sh. This file is
 # sourced by scripts and has no side effects on source.
@@ -14,6 +12,8 @@
 # docs/tmux-backend.md "Agent liveness probe" owns the empirical basis for the
 # names below, and tests/jg-tmux-agent-liveness.test.sh plus
 # tests/jg-harness-liveness-drift-live-e2e.test.sh keep them honest.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_AGENT_PROCESS_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_JG_AGENT_PROCESS_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _JG_AGENT_PROCESS_LIB_DIR=.

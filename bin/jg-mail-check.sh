@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-mail-check.sh - recurring received-mail poll as a standing watcher check.
 #
 # Usage:
@@ -44,6 +42,8 @@
 # inside that bound before the poll starts. A poll that does not finish is a
 # real condition, so the budget is enforced rather than assumed: a timed-out
 # poll reports one line naming the budget instead of leaving the check silent.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 

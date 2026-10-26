@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-squad-lead-reconcile.sh - ask a squad_lead to reconcile its own books, at
 # most once per home per cooldown window.
 #
@@ -85,6 +83,8 @@
 # Request prints `requested: <path>` or `not-needed`.
 # Process-requests prints `processed: <count> deferred: <count>` after work and
 # exits 1 when any request remains deferred; an empty queue is silent success.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

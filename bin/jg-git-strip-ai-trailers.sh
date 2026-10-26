@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Strip AI co-author trailers from a commit message, and
 # install that strip as a per-task git commit-msg hook for a fleet launch.
 #
@@ -66,6 +64,8 @@
 # managers therefore cannot install from inside fleet panes until a registered
 # project genuinely needs it. Whoever removes the directory restores the owner
 # write bit first.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 unset CDPATH
 

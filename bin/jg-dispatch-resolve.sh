@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-dispatch-resolve.sh - resolve one concrete operator or scout dispatch
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
@@ -70,6 +68,8 @@
 # Authority: this tool never replaces juggernaut's judgment, quota-array-dispatch,
 #   the captain-approval gate, or jg-spawn.sh validation; it publishes one
 #   inspectable answer plus every candidate's evidence, in code.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY:-}

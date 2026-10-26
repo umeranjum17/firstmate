@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
+# Tracked shell entrypoint for local and jg-on extension binding commands.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 . "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
-# Tracked shell entrypoint for local and jg-on extension binding commands.
 set -eu
 set -o pipefail
 

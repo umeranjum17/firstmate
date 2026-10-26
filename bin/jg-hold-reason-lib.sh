@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-hold-reason-lib.sh - the one reversible encoding of a captain-hold reason.
 #
 # tasks-axi stores a hold reason as one markdown line inside a parenthesised tag,
@@ -12,6 +10,8 @@
 # the hold-reason field, once, and keep line breaks in quoted output strings.
 #
 # Source this file; it defines functions only.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # jg_hold_reason_encode <reason>: print the storable form, no trailing newline.
 jg_hold_reason_encode() {

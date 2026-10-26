@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Detect the agent harness this process tree runs on.
 # Usage: jg-harness.sh                  print own harness: claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin|unknown
 #        jg-harness.sh crew             print the effective OPERATOR harness
@@ -68,6 +66,8 @@
 # no known harness refuses (exit 2, nothing on stdout) instead of resolving.
 # Outside the branch actor the pin is ignored, and the evidence-only ancestry
 # verbs never consult it.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-startup-network.sh - the deferred startup stage of a session start.
 #
 # WHY THIS EXISTS. Every external-network call a session start makes used to run
@@ -116,6 +114,8 @@
 # outlives the budget with its output discarded.
 # Hitting the bound is reported as an actionable NETWORK_CHECKS: line, never as
 # silence. bin/jg-timeout-lib.sh remains the single owner of bounded execution.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

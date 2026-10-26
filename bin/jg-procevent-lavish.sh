@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Lavish adapter for the generic process-to-event runner.
 #
 # Usage:
@@ -138,6 +136,8 @@
 # close that source-side handoff window. Never describe this path as
 # at-least-once, no-loss, or lossless. The only durability this proves is the
 # runner's own: output that reached the runner is stored before it is announced.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

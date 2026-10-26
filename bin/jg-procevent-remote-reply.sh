@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Remote-squad-lead reply adapter for the generic process-event runner.
 #
 # Usage:
@@ -71,6 +69,8 @@
 #     wrote (see WINDOW_CLOSED_EMPTY below)
 # Line framing and size bounding belong to bin/jg-remote-delta-read.sh, which
 # delivers only whole lines and breaks continuity on an over-long one.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

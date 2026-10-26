@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared remote jg-on job-worker protocol.
 #
 # Source this file from the fixed SSH entrypoint, the long-lived worker, or the
@@ -98,6 +96,8 @@
 # it to stop itself once its root is pruned, and
 # bin/jg-remote-job-reap-orphans.sh uses it to reap workers that were already
 # orphaned that way.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_REMOTE_JOB_LABEL=dev.juggernaut.remote-job
 JG_REMOTE_JOB_MAX_BYTES=${JG_REMOTE_JOB_MAX_BYTES:-1048576}

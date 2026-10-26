@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-lease.sh - claim, release, inspect, and sweep per-task supervision leases.
 #
 # The lease contract itself (file format, actors, staleness, guard semantics)
@@ -35,6 +33,8 @@
 # The default actor is $JG_SUPERVISION_ACTOR (else main); when --actor is
 # supplied for a mutation, it must name that calling actor. Exit codes: 0 ok,
 # 1 check-miss, 2 usage, 6 refused (other actor holds or actor mismatch).
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

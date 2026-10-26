@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Hand already-identified, in-scope backlog items off from the main juggernaut
 # backlog to a squad_lead's own home backlog. Use this when a squad_lead is
 # created (or whenever an existing queued item should become its domain's work)
@@ -80,6 +78,8 @@
 # completed remote handoff.
 # Usage: jg-backlog-handoff.sh <squad-lead-id> <item-key>...
 #        jg-backlog-handoff.sh --resume-pending
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

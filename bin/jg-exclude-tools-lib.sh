@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-exclude-tools-lib.sh - shared parsing and runtime-support checks for
 # config/crew-exclude-tools, sourced by bin/jg-spawn.sh and bin/jg-control.sh.
 #
@@ -8,6 +6,8 @@
 # operator contract; bin/jg-spawn.sh's header owns launch-flag mechanics.
 # Name verification belongs inside the worker's loaded-tool registry, never
 # in an out-of-band server connection from these launch-time checks.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # jg_exclude_tools_names <config-dir>: print the comma-joined names, empty when
 # the file is absent or lists nothing. Non-zero with the reason on stderr when

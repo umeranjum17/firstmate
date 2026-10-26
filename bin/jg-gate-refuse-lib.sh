@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-gate-refuse-lib.sh - refuse no-mistakes gate lifecycle calls against the
 # real fleet while allowing marked disposable lab homes.
 #
@@ -74,6 +72,8 @@
 # bin/jg-lab-home.sh, and the tests.
 # No side effects on source. set -u / set -e safe. The refusal is a hard exit,
 # not a return, because an unpermitted gate call cannot safely mutate the fleet.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # The exit code every refusal uses, distinct enough to recognize in a caller or
 # test as "the gate refusal fired" rather than an ordinary usage error.

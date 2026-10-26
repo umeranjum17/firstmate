@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Grok Stop-hook adapter for the juggernaut PRIMARY turn-end guard.
 #
 # The exact running Stop payload selects one path. A typed native capability
@@ -8,6 +6,8 @@
 # that Grok process. Field absence preserves the pre-native one-resume fallback.
 # Invalid or unreadable input starts neither path. Camel case has typed
 # precedence over the legacy snake-case spelling when both are present.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 PAYLOAD=$(cat 2>/dev/null || true)

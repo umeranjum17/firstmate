@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-branch-prompt.sh - emit the supervision branch's system prompt
 # (docs/pi-supervision-branch.md; the same bytes run off Pi under the
 # supervision host, docs/supervision-host.md) to stdout.
@@ -25,6 +23,8 @@
 # output across runs, environments, and fleet states.
 #
 # Usage: jg-branch-prompt.sh   (stdout is the complete system prompt)
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

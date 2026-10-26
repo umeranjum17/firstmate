@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Choose the first quota-eligible candidate from a ranked list.
 #
 # Usage:
@@ -49,6 +47,8 @@
 # its own Codex login, so an openai-codex candidate reads as unknown quota here
 # and is never selected on this host; its runway is disclosed uncertainty for
 # the agent-side gates, not measured headroom.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

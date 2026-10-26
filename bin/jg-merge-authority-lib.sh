@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Durable ownership of the authority under which a task's merge was accepted.
 #
 # The away-posture record (state/.afk-contract) is resolved only at the merge
@@ -38,6 +36,8 @@
 #
 # Sourced by those scripts and by tests. No side effects on source beyond its
 # sourced libraries.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_MERGE_AUTHORITY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-pr-lib.sh

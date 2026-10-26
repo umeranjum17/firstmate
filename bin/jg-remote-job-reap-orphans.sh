@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Reap remote job workers whose code root no longer exists.
 #
 # Usage: jg-remote-job-reap-orphans.sh [--dry-run]
@@ -33,6 +31,8 @@
 # Prints one line per reaped or surviving candidate and nothing when there is
 # nothing to do. Exits 0 unless the process scan itself could not run, so a
 # caller can sweep without risking its own outcome.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR=$(CDPATH='' cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)

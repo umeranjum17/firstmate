@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Acquire or inspect the per-home juggernaut session lock.
 #
 # Line 1 of state/.lock is the owning session's anchor pid, resolved by
@@ -27,6 +25,8 @@
 #                             A held lock is not proof the holder is consuming
 #                             wakes. Machine-readable lock fields live on
 #                             jg-inbox.sh ready, from the same inspect helper.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

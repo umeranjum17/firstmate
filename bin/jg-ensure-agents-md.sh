@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Ensure a project worktree follows the agent-memory file convention.
 # AGENTS.md is the real project-intrinsic knowledge file; CLAUDE.md is a
 # real regular file whose canonical content is the two-line @AGENTS.md pointer
@@ -30,6 +28,8 @@
 # and the pointer it creates are additions, and AGENTS.md section 6 bounds
 # operator edits of project memory files to correcting the wrong text only.
 # Usage: jg-ensure-agents-md.sh [repo-or-worktree-dir]
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 usage() {

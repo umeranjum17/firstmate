@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-skill-stats.sh - thin shim for the fleet per-skill statistics reader, which lives in juggernaut-addons.
 #
 # The reader moved to the juggernaut-addons repository (fleet-stats/bin/jg-skill-stats.sh,
 # importing jg_stats_lib from that same folder); this shim only resolves that
 # checkout and execs it with JG_BIN pointing at this fork's bin/, the same
 # contract as the jg-dashboard.sh shim.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

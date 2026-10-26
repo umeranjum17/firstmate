@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-backend.sh - runtime-backend selection, meta helpers, selector resolution,
 # and dispatch for juggernaut's session-provider abstraction.
 #
@@ -48,6 +46,8 @@
 # implementation that synthesizes those events; P1 only names that seam, it
 # does not change the loop's behavior. The pull primitives also stay available
 # on their own for on-demand reads (jg-peek.sh, jg-crew-state.sh).
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_BACKEND_SCRIPT=${BASH_SOURCE[0]:-$0}
 JG_BACKEND_LIB_DIR="$(cd "$(dirname "$JG_BACKEND_SCRIPT")" && pwd)"

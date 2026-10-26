@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Record a PR-ready task: store one validated canonical pr=<url> and the forge's
 # exact pr_head=<sha> when available, then atomically arm a static merge poll.
 # Refuses when bin/jg-dod-lib.sh will not accept the named head as reachable
@@ -27,6 +25,8 @@
 # The recorded pr= also frees the task's place in a declared project capacity
 # (bin/jg-project-capacity-lib.sh).
 # Usage: jg-pr-check.sh <task-id> <pr-url>
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

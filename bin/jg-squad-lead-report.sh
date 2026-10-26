@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-squad-lead-report.sh - optional helper to append a correlated parent report.
 #
 # A squad_lead answering a marked from-juggernaut request must report on the
@@ -27,6 +25,8 @@
 # An optional juggernaut-addons status-wait-check add-on (${JG_ADDONS_DIR:-<home>/projects/juggernaut-addons}/status-wait-check/status-wait-check)
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 CALLER_JG_HOME=${JG_HOME:-}

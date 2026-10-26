@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Install or remove Juggernaut's guarded Kimi crew turn-end hook.
 #
 # This command is the sole owner of the text-level edit to
@@ -17,6 +15,8 @@
 # Usage:
 #   jg-kimi-turnend-hook.sh install
 #   jg-kimi-turnend-hook.sh remove
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 case "${1:-}" in

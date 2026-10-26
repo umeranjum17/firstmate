@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-bearings-snapshot.sh - compact, bounded, TOON-by-default bearings projection.
 #
 # A thin wrapper OVER the canonical bin/jg-fleet-snapshot.sh. It does not parse
@@ -93,6 +91,8 @@
 #
 # Output contract: `jg-bearings.v1`. No locks or reports; the underlying snapshot's
 # parent-side remote-ledger cache refresh is the only default fleet-state mutation.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-herdr-ci-cleanup.sh - bounded cleanup of CI-owned Herdr lab sessions.
 #
 # Snapshot the session list before the real-Herdr suite, then at job end only
@@ -16,6 +14,8 @@
 # Usage:
 #   jg-herdr-ci-cleanup.sh snapshot <path>
 #   jg-herdr-ci-cleanup.sh teardown <snapshot-path>
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 die() {

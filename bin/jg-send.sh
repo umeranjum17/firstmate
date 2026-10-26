@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Steer a task by durable record: write the message into the task's steering
 # inbox and ring a constant doorbell line into its terminal, best-effort.
 # Usage: jg-send.sh <target> [--resolve-key <key>]... [--fire-and-forget <delivery-id>] <text...>
@@ -213,6 +211,8 @@
 # pane. The pause is typed-plane-only; the inbox plane, the shared submit core
 # (used by the away-mode daemon, which only needs "submitted"), and the --key
 # path do not pay it.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_SEND_ORIGINAL_ARGS=("$@")

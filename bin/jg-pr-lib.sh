@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared PR/MR record reads, validation, and atomic artifact helpers for merge
 # polling on the supported forges. Callers must validate task IDs and raw PR/MR
 # URLs before constructing task paths or performing any side effect.
@@ -21,6 +19,8 @@
 # after its durable wake is appended.
 # The receipt binds the terminal observation to the canonical registration and
 # lets a restart finish fixed-path removal without executing state-file bytes.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_PR_PROVIDER=
 JG_PR_URL=

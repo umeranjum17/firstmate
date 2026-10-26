@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared "which harness delivered this hook payload?" predicate for the tracked
 # Claude-shaped hook entries.
 # This file is sourced by hook entrypoints and has no side effects on source.
@@ -25,6 +23,8 @@
 # Fail direction: when the host cannot be determined (no payload, no jq), the
 # caller RUNS. A redundant run under Cursor wastes work; a skipped run under
 # Claude breaks the primary's supervision, which is the worse failure.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Return 0 when payload $1 was delivered by a foreign host whose own tracked
 # Juggernaut registration already covers this event.

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Restart squad leads onto the current instruction surface and launch-time
 # wiring, persisting their open records first.
 #
@@ -75,6 +73,8 @@
 # Exit status: 0 every named mate restarted; 3 at least one was nudged or left
 # unreached and every mate was still accounted for; 1 the input itself is
 # unusable; 2 invalid use.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

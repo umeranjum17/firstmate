@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared config resolution for the X-mode connector client (jg-x-poll.sh and
 # jg-x-reply.sh). X mode is opt-in: a user drops a non-empty FMX_PAIRING_TOKEN
 # into the juggernaut home's .env. FMX_ENV_FILE can point direct client calls at
@@ -50,6 +48,8 @@
 #   fmx_meta_followups_set <meta> <n> - rewrite just the follow-up counter
 #   fmx_meta_link_clear <meta> - remove the X-request link entirely
 # Callers must have JG_HOME set before calling fmx_load_config.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_X_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! command -v jg_backlog_atomic_transition >/dev/null 2>&1; then

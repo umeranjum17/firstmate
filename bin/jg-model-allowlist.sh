@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-model-allowlist.sh - one allow-list per provider: view and edit it, refuse an
 # off-list pick with one line, and watch for a model that started anyway.
 #
@@ -22,6 +20,8 @@
 # config/squad-lead-harness token. watch reports a model that started outside that
 # gate, once each; install registers it for the watcher and uninstall retires it.
 # Sourced, this file only defines functions.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 
 # jg_model_allowlist_file: the list path, read at call time so a caller's own

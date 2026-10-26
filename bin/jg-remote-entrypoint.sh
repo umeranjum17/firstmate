@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Fixed remote entrypoint for bin/jg-on.sh.
 #
 # Install this tracked file as jg-remote-entrypoint.sh on the remote account's
@@ -30,6 +28,8 @@
 # sshd exiting and reparenting this process - also cancels the job. The worker
 # then skips or stops the cancelled job instead of running it to completion for
 # nobody.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 PROTOCOL=1

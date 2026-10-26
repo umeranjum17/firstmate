@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Write a private Devin worker config, preserving user settings and hooks.
 # Usage: jg-devin-config.sh <state-dir> <task-id> <busy-gen> [<user-config>]
 # The default source is ~/.config/devin/config.json (Devin's --config default).
@@ -21,6 +19,8 @@
 # state to unknown after delivering that interrupt, never fabricating idle.
 # Turn-end touches follow a successful generation-bound apply; events
 # rejected as stale emit no notification.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 case "${1:-}" in
   -h|--help)

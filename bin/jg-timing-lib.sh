@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-timing-lib.sh - the single owner of the deferred network stage's elapsed-time
 # instrumentation.
 #
@@ -44,6 +42,8 @@
 # extra tab-separated records. Enforcing this here rather than at each call site
 # is what makes "this file cannot carry a credential or an argv" checkable in one
 # place.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 JG_TIMING_DETAIL_MAX=${JG_TIMING_DETAIL_MAX:-80}

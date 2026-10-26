@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-task-inbox-lib.sh - the per-task steering inbox: durable records plus a
 # constant doorbell.
 #
@@ -93,6 +91,8 @@
 #   JG_TASK_INBOX_GRACE_SECS   default 90; delivery-attempt grace and spacing
 #   JG_TASK_INBOX_RING_MAX     default 3; delivery attempts before escalation
 #   JG_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Both dependencies are canonical lint roots in their own right. Keep them as

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-project-capacity-lib.sh - how many workers a project admits at once on this
 # machine, and whether a fresh worker spawn still fits.
 #
@@ -72,6 +70,8 @@
 # Requires bin/jg-wake-lib.sh (root home, local homes, project lock path),
 # bin/jg-squad-lead-registry-lib.sh (which the local-homes walk reads), and
 # bin/jg-backend.sh (jg_meta_get) to be sourced first. No side effects on source.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Exit status of a spawn deferred because the project is at capacity: the
 # sysexits "temporary failure" code, so a caller can tell a deferral that leaves

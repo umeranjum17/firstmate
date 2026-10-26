@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Validate a project origin URL that one home hands to another.
 #
 # Juggernaut supplies a project's origin instead of discovering it from a local
@@ -40,6 +38,8 @@
 #   relative paths, which resolve against whatever directory git happens to
 #   be in on the other machine
 #   "/../" traversal inside a local or file: path
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 jg_project_origin_safe() { # <url>; 0 when the URL is an accepted clone URL
   local url=${1-} rest authority userpart hostpart port inner host path
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Turn-end guard for any juggernaut PRIMARY session: the main home OR a
 # squad_lead's own home. A squad_lead runs its own primary juggernaut session and
 # is guarded exactly like the main primary; only child crew/scout worktrees are
@@ -91,6 +89,8 @@
 #      re-block (budget_account_current_epoch owns that rule), so an inert
 #      hook that leaves the ledger frozen cannot hold the guard in an
 #      unbounded re-block loop below that override.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Scaffold a operator brief or persistent squad_lead charter at
 # data/<task-id>/brief.md under the active juggernaut home.
 # For ordinary tasks, the standard Setup/Rules/Definition-of-done contract is
@@ -145,6 +143,8 @@
 # a later scout promotion could not outrank), stops the scaffold before
 # anything is written. SquadLead charters never take it.
 # Refuses to overwrite an existing brief.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

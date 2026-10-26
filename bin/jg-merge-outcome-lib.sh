@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared durable, supervisor-facing outcome publication for a confirmed merge.
 #
 # Both a merge performed by this home and a merge detected by its existing poll
@@ -26,6 +24,8 @@
 #
 # Sourced by bin/jg-pr-merge.sh, bin/jg-watch.sh, and tests. No side effects on
 # source beyond its sourced libraries.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 _JG_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-pr-lib.sh

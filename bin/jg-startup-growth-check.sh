@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-startup-growth-check.sh - daily cheap growth check for startup memory and instruction surfaces.
 #
 # Usage:
@@ -48,6 +46,8 @@
 # `arm` writes state/startup-growth.check.sh and binds its bytes with
 # jg-check-register.sh so the existing watcher slow-check cadence invokes the
 # daily gate.  `disarm` removes the shim, trust binding, and report record.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-pipeline-spend.sh - attribute a task's no-mistakes pipeline spend to the
 # task and keep it in Juggernaut's own records.
 #
@@ -79,6 +77,8 @@
 # A tally is {invocations, exit: {<exit status>: count}, duration_ms,
 # input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens}, and
 # each token field is {total, unknown}.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-pending-reply-lib.sh - parent-owned squad_lead missed-report guards.
 #
 # When the main juggernaut delivers a reply-bearing marked from-juggernaut request
@@ -120,6 +118,8 @@
 #   JG_PENDING_REPLY_SEND_HOOK    optional command template for recovery delivery
 #                                 (tests); receives task_id and full message as args
 #   JG_PENDING_REPLY_NOW          optional fixed epoch for deterministic tests
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # This directive does double duty: it also binds _JG_PENDING_REPLY_LIB_DIR as
 # the bin/ source prefix so the deliberately undirected lazy sources below

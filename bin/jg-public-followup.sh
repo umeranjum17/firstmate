@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-public-followup.sh - the deterministic consumer and delivery owner for
 # public commitments made through the myjuggernaut relay (X and Discord).
 #
@@ -143,6 +141,8 @@
 # inspects local state alone.
 # JG_PF_RETRY_BACKOFF_SECS (default 900) sets the next-attempt time recorded with
 # a retryable delivery error.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Blocking, non-destructive delta read for a remote squad_lead append-only log.
 #
 # Usage:
@@ -27,6 +25,8 @@
 # unblock any queued command other than another reply long-poll, then publishes
 # that preemption as distinct exit 76. The bin/jg-remote-job-lib.sh header owns
 # that contract.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_HOME=${JG_HOME:?JG_HOME is required}

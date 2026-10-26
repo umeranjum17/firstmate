@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor executable resolution and Cursor process identity.
 # Sourced by bin/jg-spawn.sh, bin/jg-harness.sh, bin/jg-busy-lib.sh, and
 # bin/backends/tmux.sh. This file is sourced by scripts and has no side effects
@@ -40,6 +38,8 @@
 # bin/jg-composer-lib.sh, which every backend already delegates to; an
 # adapter-local composer normalizer would be the second copy that owner exists
 # to prevent.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Bounded probe budget in seconds. Cursor's --help is local and returns
 # immediately; the bound exists so a hung or interactive impostor cannot wedge

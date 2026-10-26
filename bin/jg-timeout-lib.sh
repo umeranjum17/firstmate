@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-timeout-lib.sh - the single owner of bounded command execution.
 #
 # Sourced, never executed. Provides one hard-bound runner so no caller has to
@@ -73,6 +71,8 @@
 # foreground process group; the perl fallback does it explicitly with setpgrp
 # plus a negative pid, and the bash fallback uses monitor mode to give the
 # bounded child its own process group before signaling its negative pid.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 jg_timeout_mechanism() {

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-fleet-view.sh - human renderer over jg-fleet-snapshot.sh.
 #
 # This command intentionally does not parse fleet state itself.
 # It shells out to jg-fleet-snapshot.sh --json and renders that stable
 # structured contract for humans.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

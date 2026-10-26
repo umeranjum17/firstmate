@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-supervision-host.sh - the supervision host: watcher-cycle ownership plus a
 # headless engine session that runs the supervision branch's contract beside a
 # non-Pi primary (docs/supervision-host.md owns the design).
@@ -175,6 +173,8 @@
 # JG_TEST_SUPERVISION_HOST_CLOCK names a file holding the park's elapsed
 # seconds, which the park and turn boundary checks read in place of SECONDS
 # only when JG_TEST_SEAM=1; tests/lib.sh arms the marker for isolated suites.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

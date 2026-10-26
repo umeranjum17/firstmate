@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Post juggernaut's composed answer back to the relay for a pending X-mode mention.
 #
 # Usage: jg-x-reply.sh <request_id> [--image <path>] <text>
@@ -91,6 +89,8 @@
 # --image, the dry-run record replaces image bytes with a compact image marker
 # {media_type,bytes,source_path}, not the base64 bytes. Dry-run needs neither a
 # token nor the relay.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

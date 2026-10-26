@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/tmux.sh - the tmux session-provider adapter.
 #
 # Reference backend (AGENTS.md section 8; data/jg-backend-design-d7). P1 moves
@@ -19,6 +17,8 @@
 # its submit core under the backend's naming convention rather than
 # duplicating it, so the two consumers cannot drift apart.
 # shellcheck source=bin/jg-tmux-lib.sh
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 . "$JG_BACKEND_LIB_DIR/jg-tmux-lib.sh"
 # shellcheck source=bin/jg-session-lock-lib.sh
 . "$JG_BACKEND_LIB_DIR/jg-session-lock-lib.sh"

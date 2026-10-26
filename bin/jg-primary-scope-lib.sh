@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared marker-or-plain-checkout predicate for tracked hooks that must act only
 # in a genuine juggernaut primary home.
 # This file is sourced by hook entrypoints and has no side effects on source.
 # jg_primary_root_matches is split out so a caller can confirm primary-home
 # identity before its gitignored state dir exists, such as to create it.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Return 0 when $1 carries a genuine squad-lead-home marker.
 jg_root_is_squad_lead_home() {

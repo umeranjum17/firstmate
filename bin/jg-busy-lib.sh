@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-busy-lib.sh - the ONE owner of juggernaut's semantic busy-state contract.
 #
 # Design source: the captain-approved semantic busy-state redesign
@@ -134,6 +132,8 @@
 # docs/verification/supervision.md owns the evidence for both probes.
 #
 # Sourcing: set -u and set -e safe; no subshell-unfriendly globals.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_BUSY_LIB_VERSION=v1
 

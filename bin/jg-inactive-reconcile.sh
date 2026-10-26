@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-inactive-reconcile.sh - bounded reconciliation of suspicious inactive terminal outcomes.
 #
 # Usage:
@@ -97,6 +95,8 @@
 #
 # The scan reads only durable local state and jg-crew-state.sh; it never invokes
 # gh, gh-axi, curl, jg-pr-check.sh, jg-pr-poll.sh, or a state *.check.sh.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 export LC_ALL=C
 

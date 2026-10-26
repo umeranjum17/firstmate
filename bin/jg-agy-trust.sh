@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Pre-register Antigravity CLI's workspace trust for the isolated task worktree
 # a ship/scout spawn is about to launch an agy operator into, so the worker
 # reaches its brief in the worktree instead of parking on the folder-trust
@@ -34,6 +32,8 @@
 # non-zero exit, never a warning and never a silent skip. Only the launching
 # user's own store is written, it must be a regular file this uid owns, every
 # unrelated key and entry is preserved, and the replacement is atomic.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 unset CDPATH \
   GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_INDEX_FILE \

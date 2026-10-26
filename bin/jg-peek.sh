@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Print the tail of a operator endpoint (bounded, for cheap diagnosis).
 # Usage: jg-peek.sh <target> [lines=40]
 #   <target> may be an exact task id, a legacy jg-<id> task label resolved
@@ -10,6 +8,8 @@
 # capture (jg-remote-squad-lead-control.sh), clamped to that command's
 # 100-line cap. An unreachable host or unreadable endpoint fails loudly naming
 # the host; the local backend adapters are never asked to read a remote target.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

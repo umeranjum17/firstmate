@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Cursor session-open adapter: the RUN tier transport for Cursor Agent CLI.
 #
 # Registered in tracked .cursor/hooks.json for Cursor's `sessionStart` step.
@@ -19,6 +17,8 @@
 # session initialization when a sessionStart hook exits 2 (index.js @ 4823085
 # maps it to `{continue:false}`), so a failed session start must reach the agent
 # as digest text it can act on, never as a refusal to open the session.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-branch-report.sh - the supervision branch's report surface off Pi: the
 # command twin of the Pi branch extension's jg_branch_report tool, for a
 # branch session run by the supervision host (docs/supervision-host.md).
@@ -44,6 +42,8 @@
 # or relayed as notes. An attended turn queues nothing: its captain rows reach
 # MAIN through the host's branch-outcome exit and the drain's BRANCH OUTCOMES
 # section (bin/jg-wake-drain.sh), and its routine rows stay in the store.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

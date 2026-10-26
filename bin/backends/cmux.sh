@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 # bin/backends/cmux.sh - the cmux session-provider adapter (EXPERIMENTAL).
 #
 # Design: data/cmux-backend-feasibility-c7/report.md (adapter design sketch,
@@ -104,6 +102,8 @@
 # see jg_backend_cmux_bin), jq (JSON parsing). Bootstrap detects these through
 # jg_backend_required_tools only when cmux is the resolved backend; this adapter
 # also gates them again before spawning.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/../jg-compat.sh"
 
 # JG_HOME fallback: every real caller already sets JG_HOME as a global before
 # sourcing jg-backend.sh (which sources this file); this exists only so this

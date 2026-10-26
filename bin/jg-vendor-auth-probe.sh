@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-vendor-auth-probe.sh - one hard-bounded, non-destructive authentication
 # probe of a named vendor CLI.
 #
@@ -63,6 +61,8 @@
 #                                  positive integer, otherwise the default 20 is
 #                                  used. Zero is rejected because `timeout 0` and
 #                                  `alarm 0` both mean "no deadline".
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 VERIFIED_GROK_VERSION=0.2.117

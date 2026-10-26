@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-task-outcome.sh - append one durable task-outcome line to
 # <home>/data/metrics/task-outcomes.tsv for per-model fleet statistics.
 # Usage: jg-task-outcome.sh <task-id> [--force]
@@ -28,6 +26,8 @@
 #            none, "failed" one whose last status verb was failed, "scout" a scout
 #            whose report is the product.
 #   pr       the recorded PR URL, else empty.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

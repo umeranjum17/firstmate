@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Durable per-task scratch-directory record: state/<id>.scratch.
 # Usage: jg-scratch.sh register <task-id> <dir>   record one scratch directory
 #        jg-scratch.sh list <task-id>             print the recorded directories that are safe to reap
@@ -17,6 +15,8 @@
 # failures fail the whole listing so teardown cannot act on a partial result.
 # The juggernaut home, repository, state and data directories, their ancestors
 # and descendants are ineligible. bin/jg-teardown.sh owns the removal itself.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

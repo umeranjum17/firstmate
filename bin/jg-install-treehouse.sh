@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-install-treehouse.sh - install CI's pinned, verified Treehouse build.
 #
 # Used only by the required real-Herdr CI lane for E2E scripts that genuinely
@@ -12,6 +10,8 @@
 #   jg-install-treehouse.sh <destination-directory>
 #
 # Pins Treehouse v2.0.1, the version exercised by the local real-Herdr suite.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 JG_TREEHOUSE_CI_VERSION=2.0.1

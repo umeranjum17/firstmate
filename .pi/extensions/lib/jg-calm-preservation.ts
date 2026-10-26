@@ -1,1 +1,1 @@
-../../../.claude/mods/firstmate-calm/lib/fm-calm-preservation.ts
+../../../.claude/mods/juggernaut-calm/lib/jg-calm-preservation.ts

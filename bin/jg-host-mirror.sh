@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-host-mirror.sh - the supervision host's dialog mirror: what the captain and
 # MAIN said in the captain's conversation, carried to the host's headless
 # engine session at the head of each attended wake, while an away wake carries
@@ -85,6 +83,8 @@
 # the mirror is missing, could not be read, or holds an invalid entry, and
 # otherwise 0, printing nothing and staging no cursor; verified exits 0 or 1
 # and prints nothing.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

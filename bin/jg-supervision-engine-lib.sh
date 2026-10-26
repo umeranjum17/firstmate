@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-supervision-engine-lib.sh - which headless engine runs the supervision
 # host's branch session, and how one engine turn runs (one owner of both).
 #
@@ -48,6 +46,8 @@
 # jg_supervision_host_primary reports when JG_TEST_SEAM=1 and its value is a
 # known harness token; otherwise detection remains real (tests/lib.sh arms
 # the marker for isolated suites).
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_SUPERVISION_ENGINES_VERIFIED='claude'
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-public-followup-emit.sh - emit ONE structured terminal work result for work
 # bound to a public commitment, into the owning home's private event inbox.
 #
@@ -95,6 +93,8 @@
 # every field against its own registration and tasks-axi before accepting the
 # event. A staged event is never posted, never read as a public reply, and never
 # consumed by the staging home's own reconciliation.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

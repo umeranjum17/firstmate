@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-supervise-daemon.sh — presence-gated sub-supervisor (closes #27's P2).
 #
 # Wraps bin/jg-watch.sh: runs it as a child, presents and classifies every
@@ -161,6 +159,8 @@
 #          SIGTERM/SIGINT shut down within ~1s, flush escalations, release the
 #          lock. A crashing jg-watch.sh is logged and restarted, never killing
 #          the daemon; a tight crash-restart spin is detected and backed off.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 JG_DAEMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

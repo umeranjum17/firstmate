@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Enumerate this home's registered squad_leads for an internal /stow cascade.
 # Usage: jg-stow-cascade.sh [--help]
 #
@@ -47,6 +45,8 @@
 # Exit status: 0 every home reported cleanly (or there were none); 3 at least
 # one home reported an exception and every home was still reported; 1 the
 # cascade input itself is unusable; 2 invalid use.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 usage() {

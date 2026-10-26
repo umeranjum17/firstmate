@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Retire an intentional custom watcher check and its trust binding.
 # Usage: jg-check-unregister.sh <id>
 # Pass only the id. An unset JG_STATE_OVERRIDE selects JG_HOME/state; an
@@ -8,6 +6,8 @@
 # not an existing non-symlink directory is refused before removal.
 # Each existing named artifact must be an ordinary single-link file on the
 # state directory's device; only <id>.check.sh and <id>.check-trust are removed.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

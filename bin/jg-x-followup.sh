@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Post a completion follow-up for an X-mode-linked task, up to three within a
 # 7-day window, and manage the link's counter.
 #
@@ -65,6 +63,8 @@
 # The window is FMX_FOLLOWUP_MAX_AGE_SECS (default 604800, 7 days). The cap is
 # FMX_FOLLOWUP_MAX_COUNT (default 3). FMX_NOW_OVERRIDE pins "now" for
 # deterministic tests. Meta read/write lives in jg-x-lib.sh.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

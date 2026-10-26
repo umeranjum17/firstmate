@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-mail.sh - general-purpose mail plane for reading and sending mail.
 #
 # Reads inbound mail over IMAP and sends mail over SMTP on demand. This is an
@@ -62,6 +60,8 @@
 # IMAP/SMTP work is delegated to bin/jg-mail.py (imaplib/smtplib, implicit TLS
 # on 993/465). STARTTLS and port 587 are not supported. BODY.PEEK is used on
 # read/poll so mail is never marked seen before juggernaut actually answers it.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 set -euo pipefail
 

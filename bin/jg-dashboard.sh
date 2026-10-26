@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-dashboard.sh - thin shim for the fleet dashboard, which lives in juggernaut-addons.
 #
 # The dashboard moved to the juggernaut-addons repository
 # (fleet-dashboard/jg-dashboard.sh plus its fleet-dashboard/jg-dashboard/ app);
 # this shim only resolves that checkout and execs it with JG_BIN pointing at
 # this fork's bin/, so the add-on runs the fork's helper scripts.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

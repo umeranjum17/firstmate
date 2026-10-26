@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared "is this git lock file provably abandoned?" decision procedure.
 #
 # ONE owner for the staleness proof that jg-teardown.sh (a worktree index.lock)
@@ -17,6 +15,8 @@
 # non-zero (NOT stale): fail safe, never remove a lock that cannot be proven dead.
 # Diagnostics print to stderr prefixed by ${JG_LOCK_LOG_PREFIX:-jg-lock} so each
 # caller's output stays recognizable.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 jg_lock_log() {
   echo "${JG_LOCK_LOG_PREFIX:-jg-lock}: $*" >&2

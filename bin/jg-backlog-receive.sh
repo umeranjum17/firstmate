@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Receive one delivered remote-squad-lead outbox into this home's backlog.
 #
 # Usage:
@@ -16,6 +14,8 @@
 # for its own backlog or delivered lock whose pid is dead and whose mtime is at
 # least 30 seconds old. No live or uncertain lock is touched. On confirmed
 # receipt the delivered scratch file is removed; no other path is deletable.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

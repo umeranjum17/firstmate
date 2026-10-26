@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Shared session-lock harness identity.
 #
 # ONE owner of the "which verified-harness process holds this home's session
@@ -14,6 +12,8 @@
 # signal ever fails open: no id, no sidecar, an untrusted id, or a different
 # recorded id leaves the ancestry verdict exactly as it was.
 # This file is sourced by scripts and has no side effects on source.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Cursor process identity is NOT expressible as a command-name pattern and is
 # deliberately not added to the tables below: Cursor's installed names are

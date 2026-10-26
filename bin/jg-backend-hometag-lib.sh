@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # bin/jg-backend-hometag-lib.sh - shared per-installation home-tag derivation
 # for session-provider backends whose container has ONE namespace shared by
 # every juggernaut home on the machine, with no native per-home split (cmux's
@@ -27,6 +25,8 @@
 # therefore its tag; titles created under the old tag simply stop matching -
 # an accepted limitation, no worse than the existing fact that a task's
 # recorded absolute worktree path does not survive a move either.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 JG_BACKEND_HOMETAG_SQUAD_LEAD_MARKER=".jg-squad-lead-home"
 

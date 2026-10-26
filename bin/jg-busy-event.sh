@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-busy-event.sh - the ONLY writer of the semantic busy-state contract
 # owned by bin/jg-busy-lib.sh (record format, gen binding, and classification
 # live there; this script owns mutation mechanics only).
@@ -40,6 +38,8 @@
 # Exit codes: 0 applied; 1 refused (stale gen, unarmed task, lock timeout,
 # invalid input); 2 usage. Adapter hook command lines append `|| true` so a
 # refusal never breaks the harness's own lifecycle.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 usage() {

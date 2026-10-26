@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-worker-account-lib.sh - the single owner of the opt-in per-home worker
 # account pin: which runners can be pinned, how a pin file is parsed and
 # resolved, the launch-time sign-in check under it, and the environment
@@ -54,6 +52,8 @@
 # the pin. Pi ranks a root's stored credentials above environment variables,
 # and the check refuses a provider the root has not stored, so a pinned Pi
 # launch unsets nothing.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jg-timeout-lib.sh"

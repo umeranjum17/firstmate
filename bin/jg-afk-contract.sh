@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-afk-contract.sh - the one owner of the away-posture record: its schema, the
 # captain's away words recorded verbatim, the read-back rendering, the entry
 # announcement, and the archive at return.
@@ -125,6 +123,8 @@
 # jg_afk_contract_mode, jg_afk_contract_away_present,
 # jg_afk_contract_archive_dir,
 # jg_afk_contract_lock_hold, jg_afk_contract_lock_release) without running main.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 JG_AFK_CONTRACT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

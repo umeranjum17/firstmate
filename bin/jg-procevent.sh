@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Generic process-to-event runner: supervise a registered long-polling child
 # outside the agent's foreground turn and turn completed results into normalized
 # durable wakes.
@@ -246,6 +244,8 @@
 # Durability boundary: see bin/jg-procevent-lib.sh. This runner proves capture
 # before publication and bounded re-announcement until handled, and nothing
 # about the source side of the handoff.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

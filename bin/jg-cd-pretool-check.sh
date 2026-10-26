@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Stable PreToolUse transport for the cd-guard command policy.
 #
 # A stray persistent top-level `cd projects/<clone>` in the PRIMARY juggernaut
@@ -40,6 +38,8 @@
 # Grok consumes the stdout decision object.
 # OpenCode and Pi consume exit 2 plus stderr.
 # Cursor consumes the stdout decision object.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 CMD=""

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Condition->action adapter for the generic process-to-event runner: register a
 # deterministic condition and a deterministic action once, let the runner's
 # blocking child poll the condition tokenlessly, fire the action at most once on
@@ -88,6 +86,8 @@
 # Ownership, durable capture, publication, restart recovery, and the handled
 # acknowledgement all belong to bin/jg-procevent.sh; this adapter owns only the
 # condition->action semantics above.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

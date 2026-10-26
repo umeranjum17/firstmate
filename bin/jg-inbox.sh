@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-inbox.sh - the captain's out-of-band capture surface.
 #
 # Solves three DIFFERENT problems with three different mechanisms, because they
@@ -103,6 +101,8 @@
 # bin/jg_voice_records.py owns the scope-controlled machine view the voice agent
 # reads, because the voice agent must be able to answer without record free text
 # ever reaching a model.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -euo pipefail
 
 # A non-interactive `ssh host jg-inbox.sh ...` does NOT get a login shell, so it

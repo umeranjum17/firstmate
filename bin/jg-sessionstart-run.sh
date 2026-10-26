@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Session-open entry point for harnesses that RUN the digest instead of asking
 # the agent to. It is the one command those harnesses' session-open adapters
 # invoke, and it decides, from the session-open source, whether this open needs
@@ -47,6 +45,8 @@
 # A fresh clone has no gitignored state dir yet; a root that otherwise
 # qualifies as primary gets one created here before the scope check runs, so
 # the first session takes the helm without a manual `mkdir state`.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

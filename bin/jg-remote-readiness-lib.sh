@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-remote-readiness-lib.sh - the remote second-mate readiness gate sequence.
 #
 # Source this file and call:
@@ -18,6 +16,8 @@
 # route and reconciles on the same host instead of treating it as a refusal.
 # JG_REMOTE_READINESS_OUT always holds the output of the last run, which carries
 # the check lines, the remaining human: gaps, and their exact operator actions.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # Consumed by the sourcing caller, so every assignment reads as unused here.
 # shellcheck disable=SC2034

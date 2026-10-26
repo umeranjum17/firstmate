@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-bearings-board.sh - build and arm the /bearings lavish fleet board.
 #
 # The board is the captain-facing interactive surface of /bearings lavish: the
@@ -88,6 +86,8 @@
 # containing "</script>" can never terminate the data block early.
 #
 # JG_BEARINGS_BOARD_TEMPLATE overrides the shipped template path (tests only).
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

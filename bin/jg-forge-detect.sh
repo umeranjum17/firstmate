@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # Propose a clone's forge binding from its origin remote, for project-add intake.
 # Prints exactly one line to stdout:
 #   forge=gerrit evidence=<the protocol fact that suggests it>
@@ -22,6 +20,8 @@
 # HTTPS remote carries neither fact, which is why the captain is asked rather
 # than told.
 # Usage: jg-forge-detect.sh <clone-dir>
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 DIR=${1:?usage: jg-forge-detect.sh <clone-dir>}

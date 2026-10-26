@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-decision-hold.sh - transitional compatibility shim over bin/jg-captain-hold.sh.
 #
 # The separate "decision" concept collapsed into the one primitive the captain
@@ -28,6 +26,8 @@
 #                                             task ids first and legacy identities second)
 #   bind <source> (<origin> | --any-origin) -> bind <source> [<origin>]
 #   unbind | binding <source>              -> unchanged
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

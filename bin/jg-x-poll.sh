@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # One short-poll of the relay connector for a pending X-mode mention.
 #
 # Inert by default: a HARD no-op (exit 0, no output) unless X mode is configured
@@ -39,6 +37,8 @@
 # Config (home .env, FMX_ENV_FILE, or env): FMX_PAIRING_TOKEN (required),
 # FMX_RELAY_URL (default https://myjuggernaut.io). Auth: Authorization: Bearer
 # <token>.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

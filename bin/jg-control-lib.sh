@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
-. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 # jg-control-lib.sh - the ONE executable owner of juggernaut's agent lifecycle
 # CONTROL-PLANE mechanics.
 #
@@ -45,6 +43,8 @@
 # its durable instruction. The relaunch-time exception is
 # jg_control_relaunch_resume_flag below: a reference the endpoint's runtime
 # bound as its status authority is returned to a replacement with that adapter.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+. "$(dirname "${BASH_SOURCE[0]}")/jg-compat.sh"
 
 # The complete control-plane verb allowlist, one per line.
 jg_control_verbs() {
