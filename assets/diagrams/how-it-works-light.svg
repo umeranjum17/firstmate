@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" role="img" aria-labelledby="hiw-title hiw-desc">
+  <title id="hiw-title">How Juggernaut works</title>
+  <desc id="hiw-desc">The Captain sets the objective. Overwatch is the one point of contact and coordinates Squad Leads. Squad Leads are persistent operators with their own homes. Operators do the work in isolated copies. A brief travels through an isolated work copy, validation, a pull request and a merge. Supervision watches the fleet, and the review board carries decisions, evidence and proof back to the Captain.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+    </marker>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1.2" cy="1.2" r="1.2" fill="var(--grid)"/>
+    </pattern>
+  </defs>
+  <style>
+    :root {
+      --bg: #f6f4ef; --box: #ffffff; --ink: #1b2430; --muted: #5d6877;
+      --line: #c7c1b5; --accent: #2b6f68; --accent-soft: #e2eeeb;
+      --amber: #9a6a21; --amber-soft: #f3e9d8; --grid: #dcd7cd;
+    }
+    text { font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: var(--ink); }
+    .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: 2.4px; fill: var(--muted); text-transform: uppercase; }
+    .title { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+    .sub { font-size: 13px; fill: var(--muted); }
+    .small { font-size: 11.5px; fill: var(--muted); }
+    .box { fill: var(--box); stroke: var(--line); stroke-width: 1.2; }
+    .soft { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+    .warm { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 1.2; }
+    .line { stroke: var(--line); stroke-width: 1.6; fill: none; }
+    .accentline { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+    .dash { stroke: var(--amber); stroke-width: 1.6; fill: none; stroke-dasharray: 5 5; }
+    .chip { fill: var(--box); stroke: var(--line); stroke-width: 1.1; }
+    .chiptext { font-size: 13px; font-weight: 600; }
+    .chipsub { font-size: 10.5px; fill: var(--muted); }
+    .accentdot { fill: var(--accent); }
+    .legend { font-size: 12px; fill: var(--muted); }
+    .desk { display: inline; }
+    .compact { display: none; }
+    @media (max-width: 640px) {
+      .desk { display: none; }
+      .compact { display: inline; }
+    }
+  </style>
+
+  <rect width="1200" height="900" fill="var(--bg)"/>
+  <rect width="1200" height="900" fill="url(#grid)" opacity="0.55"/>
+
+  <g class="desk">
+    <text class="tag" x="40" y="34">Command</text>
+
+    <rect class="box" x="460" y="52" width="280" height="80" rx="14"/>
+    <circle class="accentdot" cx="484" cy="76" r="4"/>
+    <text class="title" x="600" y="88" text-anchor="middle">Captain</text>
+    <text class="sub" x="600" y="110" text-anchor="middle">you · objectives and the important calls</text>
+
+    <path class="accentline" d="M600 132 L600 176" marker-end="url(#arrow-accent)"/>
+
+    <rect class="soft" x="390" y="180" width="420" height="92" rx="14"/>
+    <circle class="accentdot" cx="414" cy="204" r="4"/>
+    <text class="title" x="600" y="218" text-anchor="middle">Overwatch</text>
+    <text class="sub" x="600" y="240" text-anchor="middle">one point of contact · coordinates the squad</text>
+
+    <path class="dash" d="M810 226 C930 226 930 226 986 226" marker-end="url(#arrow)"/>
+    <rect class="warm" x="990" y="184" width="170" height="84" rx="14"/>
+    <text class="title" x="1075" y="216" text-anchor="middle" style="font-size:16px">Supervision</text>
+    <text class="small" x="1075" y="238" text-anchor="middle">watches the fleet</text>
+    <text class="small" x="1075" y="254" text-anchor="middle">wakes on a real event</text>
+
+    <path class="line" d="M600 272 L600 302 M220 302 L980 302 M220 302 L220 336 M600 302 L600 336 M980 302 L980 336" marker-end="url(#arrow)"/>
+    <text class="tag" x="40" y="326">Squad</text>
+
+    <rect class="box" x="80" y="340" width="280" height="92" rx="14"/>
+    <circle class="accentdot" cx="104" cy="364" r="4"/>
+    <text class="title" x="220" y="378" text-anchor="middle">Squad Lead</text>
+    <text class="sub" x="220" y="400" text-anchor="middle">own home · charter · persistent</text>
+
+    <rect class="box" x="460" y="340" width="280" height="92" rx="14"/>
+    <circle class="accentdot" cx="484" cy="364" r="4"/>
+    <text class="title" x="600" y="378" text-anchor="middle">Squad Lead</text>
+    <text class="sub" x="600" y="400" text-anchor="middle">own home · charter · persistent</text>
+
+    <rect class="box" x="840" y="340" width="280" height="92" rx="14"/>
+    <circle class="accentdot" cx="864" cy="364" r="4"/>
+    <text class="title" x="980" y="378" text-anchor="middle">Squad Lead</text>
+    <text class="sub" x="980" y="400" text-anchor="middle">own home · charter · persistent</text>
+
+    <path class="line" d="M220 432 L220 470 M600 432 L600 470 M980 432 L980 470 M100 470 L1100 470 M100 470 L100 506 M340 470 L340 506 M600 470 L600 506 M860 470 L860 506 M1100 470 L1100 506" marker-end="url(#arrow)"/>
+    <text class="tag" x="1140" y="492" text-anchor="end">Operators</text>
+
+    <rect class="box" x="36" y="510" width="210" height="86" rx="12"/>
+    <text class="title" x="141" y="542" text-anchor="middle" style="font-size:16px">Operator</text>
+    <text class="sub" x="141" y="563" text-anchor="middle">isolated work copy</text>
+    <text class="small" x="141" y="580" text-anchor="middle">builds the change</text>
+
+    <rect class="box" x="270" y="510" width="210" height="86" rx="12"/>
+    <text class="title" x="375" y="542" text-anchor="middle" style="font-size:16px">Operator</text>
+    <text class="sub" x="375" y="563" text-anchor="middle">isolated work copy</text>
+    <text class="small" x="375" y="580" text-anchor="middle">builds the change</text>
+
+    <rect class="box" x="504" y="510" width="210" height="86" rx="12"/>
+    <text class="title" x="609" y="542" text-anchor="middle" style="font-size:16px">Operator</text>
+    <text class="sub" x="609" y="563" text-anchor="middle">Recon</text>
+    <text class="small" x="609" y="580" text-anchor="middle">ends with findings</text>
+
+    <rect class="box" x="738" y="510" width="210" height="86" rx="12"/>
+    <text class="title" x="843" y="542" text-anchor="middle" style="font-size:16px">Operator</text>
+    <text class="sub" x="843" y="563" text-anchor="middle">isolated work copy</text>
+    <text class="small" x="843" y="580" text-anchor="middle">builds the change</text>
+
+    <rect class="box" x="972" y="510" width="210" height="86" rx="12"/>
+    <text class="title" x="1077" y="542" text-anchor="middle" style="font-size:16px">Operator</text>
+    <text class="sub" x="1077" y="563" text-anchor="middle">isolated work copy</text>
+    <text class="small" x="1077" y="580" text-anchor="middle">builds the change</text>
+
+    <text class="tag" x="40" y="632">Delivery path</text>
+    <rect class="chip" x="40" y="646" width="190" height="48" rx="10"/>
+    <text class="chiptext" x="135" y="668" text-anchor="middle">Brief</text>
+    <text class="chipsub" x="135" y="684" text-anchor="middle">what the Captain asked</text>
+
+    <rect class="chip" x="254" y="646" width="240" height="48" rx="10"/>
+    <text class="chiptext" x="374" y="668" text-anchor="middle">Isolated work copy</text>
+    <text class="chipsub" x="374" y="684" text-anchor="middle">one clean tree per mission</text>
+
+    <rect class="chip" x="518" y="646" width="190" height="48" rx="10"/>
+    <text class="chiptext" x="613" y="668" text-anchor="middle">Validation</text>
+    <text class="chipsub" x="613" y="684" text-anchor="middle">tests, proof, judge</text>
+
+    <rect class="chip" x="732" y="646" width="150" height="48" rx="10"/>
+    <text class="chiptext" x="807" y="668" text-anchor="middle">Pull request</text>
+    <text class="chipsub" x="807" y="684" text-anchor="middle">reviewed change</text>
+
+    <rect class="chip" x="906" y="646" width="160" height="48" rx="10"/>
+    <text class="chiptext" x="986" y="668" text-anchor="middle">Merge</text>
+    <text class="chipsub" x="986" y="684" text-anchor="middle">authorized delivery</text>
+
+    <path class="accentline" d="M230 670 L250 670 M494 670 L514 670 M708 670 L728 670 M882 670 L902 670" marker-end="url(#arrow-accent)"/>
+
+    <rect class="warm" x="40" y="738" width="520" height="86" rx="14"/>
+    <text class="title" x="60" y="770" style="font-size:16px">Review board</text>
+    <text class="small" x="60" y="792">Decisions, evidence and proof return to the Captain.</text>
+    <text class="small" x="60" y="808">The answer goes back to the Operator that asked.</text>
+    <path class="dash" d="M560 781 C620 781 620 730 640 710" marker-end="url(#arrow)"/>
+
+    <text class="legend" x="700" y="766">Captain — the user</text>
+    <text class="legend" x="700" y="790">Overwatch — one point of contact</text>
+    <text class="legend" x="700" y="814">Squad Lead — persistent operator, own home</text>
+    <text class="legend" x="700" y="838">Operator — worker or Recon</text>
+    <text class="legend" x="700" y="866" style="font-size:11px">Objective secured = a verified result. Mission complete = the agreed finish line.</text>
+  </g>
+
+  <g class="compact">
+    <text class="tag" x="60" y="40" style="font-size:34px;letter-spacing:3px">Command</text>
+    <rect class="box" x="60" y="54" width="1080" height="124" rx="18"/>
+    <circle class="accentdot" cx="96" cy="92" r="7"/>
+    <text x="600" y="112" text-anchor="middle" style="font-size:48px;font-weight:650">Captain</text>
+    <text class="sub" x="600" y="150" text-anchor="middle" style="font-size:34px">you · objectives and the important calls</text>
+
+    <path class="accentline" d="M600 178 L600 198" marker-end="url(#arrow-accent)" style="stroke-width:2.4"/>
+
+    <rect class="soft" x="60" y="202" width="1080" height="130" rx="18"/>
+    <circle class="accentdot" cx="96" cy="240" r="7"/>
+    <text x="600" y="262" text-anchor="middle" style="font-size:48px;font-weight:650">Overwatch</text>
+    <text class="sub" x="600" y="302" text-anchor="middle" style="font-size:34px">one point of contact · coordinates the squad</text>
+
+    <path class="accentline" d="M600 332 L600 364" marker-end="url(#arrow-accent)" style="stroke-width:2.4"/>
+
+    <rect class="box" x="60" y="368" width="1080" height="130" rx="18"/>
+    <circle class="accentdot" cx="96" cy="406" r="7"/>
+    <text x="600" y="428" text-anchor="middle" style="font-size:48px;font-weight:650">Squad Leads</text>
+    <text class="sub" x="600" y="468" text-anchor="middle" style="font-size:34px">own home · charter · persistent</text>
+
+    <path class="accentline" d="M600 498 L600 530" marker-end="url(#arrow-accent)" style="stroke-width:2.4"/>
+
+    <rect class="box" x="60" y="534" width="1080" height="130" rx="18"/>
+    <circle class="accentdot" cx="96" cy="572" r="7"/>
+    <text x="600" y="594" text-anchor="middle" style="font-size:48px;font-weight:650">Operators</text>
+    <text class="sub" x="600" y="634" text-anchor="middle" style="font-size:34px">work in isolated copies · Recon ends with findings</text>
+
+    <path class="accentline" d="M600 664 L600 696" marker-end="url(#arrow-accent)" style="stroke-width:2.4"/>
+
+    <rect class="soft" x="60" y="700" width="1080" height="112" rx="18"/>
+    <text x="600" y="738" text-anchor="middle" style="font-size:34px;font-weight:650">brief → isolated work copy → validation</text>
+    <text x="600" y="780" text-anchor="middle" style="font-size:34px;font-weight:650">→ pull request → merge</text>
+
+    <text class="sub" x="600" y="844" text-anchor="middle" style="font-size:30px">Supervision watches the fleet and wakes on a real event.</text>
+    <text class="sub" x="600" y="880" text-anchor="middle" style="font-size:30px">The review board carries decisions and evidence back to the Captain.</text>
+  </g>
+</svg>
