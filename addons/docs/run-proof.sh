@@ -17,7 +17,7 @@ for phase in before after; do
     for theme in light dark; do
       name="$phase-$width-$theme"
       chrome-devtools-axi emulate --viewport "${width}x${height}x1" --color-scheme "$theme" >/dev/null
-      chrome-devtools-axi open "https://github.com/umeranjum17/firstmate-addons/tree/$ref#readme" >/dev/null
+      chrome-devtools-axi open "https://github.com/umeranjum17/juggernaut/tree/$ref/addons#readme" >/dev/null
       # GitHub persists its site theme; apply the requested documented theme to the real page.
       chrome-devtools-axi eval "(() => { document.documentElement.setAttribute('data-color-mode', '$theme'); document.documentElement.setAttribute('data-light-theme','light'); document.documentElement.setAttribute('data-dark-theme','dark'); const a = document.querySelector('article.markdown-body'); scrollTo({top:scrollY+a.getBoundingClientRect().top-72,behavior:'instant'}); return document.title })()" > "$DONE_DONE_EVIDENCE_ROOT/$name-title.txt"
       chrome-devtools-axi eval '(() => { const a=document.querySelector("article.markdown-body"), top=a.getBoundingClientRect().top; if(Math.abs(top-72)>12) throw new Error("README framing moved: top="+top); return JSON.stringify({url:location.href,width:innerWidth,articleTop:top,theme:document.documentElement.getAttribute("data-color-mode"),text:a.innerText,scrollContainers:[...a.querySelectorAll("*")].filter(e=>e.scrollWidth>e.clientWidth+1&&getComputedStyle(e).overflowX==="auto").length}) })()' > "$DONE_DONE_EVIDENCE_ROOT/$name-page.txt"
@@ -29,7 +29,7 @@ done
 for theme in light dark; do
   name="choose-job-390-$theme"
   chrome-devtools-axi emulate --viewport "390x844x1" --color-scheme "$theme" >/dev/null
-  chrome-devtools-axi open "https://github.com/umeranjum17/firstmate-addons/tree/$head#readme" >/dev/null
+  chrome-devtools-axi open "https://github.com/umeranjum17/juggernaut/tree/$head/addons#readme" >/dev/null
   chrome-devtools-axi eval "(() => {
     document.documentElement.setAttribute('data-color-mode', '$theme');
     document.documentElement.setAttribute('data-light-theme','light');

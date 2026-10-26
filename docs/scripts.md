@@ -18,14 +18,14 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `fm-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
 | `fm-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
-| `fm-flow.sh`             | Shim for the firstmate-addons fleet-flow add-on: read fleet lifecycle and wait metrics as JSON ([reader reference](fleet-ledger.md#reading-lifecycle-metrics)) |
+| `fm-flow.sh`             | Shim for the fleet-flow add-on: read fleet lifecycle and wait metrics as JSON ([reader reference](fleet-ledger.md#reading-lifecycle-metrics)) |
 | `fm-task-outcome.sh`     | Append one durable per-task outcome row (models, timestamps, outcome, PR) at teardown ([per-model statistics](fleet-ledger.md#per-model-statistics)) |
-| `fm-model-stats.sh`      | Shim for the firstmate-addons fleet-stats add-on: read per-model merge rate, time-to-merge, first-pass and rework statistics as JSON ([per-model statistics](fleet-ledger.md#per-model-statistics)) |
-| `fm-skill-stats.sh`      | Shim for the firstmate-addons fleet-stats add-on: read per-skill fleet read counts as JSON ([skill statistics](fleet-ledger.md#skill-statistics)) |
+| `fm-model-stats.sh`      | Shim for the fleet-stats add-on: read per-model merge rate, time-to-merge, first-pass and rework statistics as JSON ([per-model statistics](fleet-ledger.md#per-model-statistics)) |
+| `fm-skill-stats.sh`      | Shim for the fleet-stats add-on: read per-skill fleet read counts as JSON ([skill statistics](fleet-ledger.md#skill-statistics)) |
 | `fm-ticket.sh`           | Record one task's ticket truth on the fleet board now: stage, state, delivered PR and target release ([tickets](../addons/tickets-sync/README.md#writing-a-ticket-at-the-moment-it-changes)) |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
-| `fm-dashboard.sh`        | Shim for the firstmate-addons fleet-dashboard add-on: build its data and reference pages, or serve its read-only fleet app |
+| `fm-dashboard.sh`        | Shim for the fleet-dashboard add-on: build its data and reference pages, or serve its read-only fleet app |
 | `fm-secondmate-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
 | `fm-update.sh`           | Guarded self-update of Juggernaut and local or remote secondmate homes, reconciling redundant divergence and classifying every live mate left on the target commit for restart or fallback nudge |
 | `fm-secondmate-restart.sh` | Persist open conversational work, then restart eligible second mates or report the fallback outcome |
@@ -98,11 +98,11 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-procevent-remote-reply.sh` | Relay the remote-secondmate status stream through non-destructive process-event deltas |
 | `fm-procevent-quota.sh`  | Wake Juggernaut when tracked quota drops below a threshold, is exhausted, or cannot be polled |
 | `fm-procevent-when.sh`   | Fire a trust-bound deterministic action at most once when its registered condition holds, then wake with the outcome |
-| `fm-procevent-signoff.sh` | Bring sign-off board answers to captain holds as keyed answers, and raise a board card for each new hold once a home arms it (the firstmate-addons signoff add-on raises it instead when installed) |
+| `fm-procevent-signoff.sh` | Bring sign-off board answers to captain holds as keyed answers, and raise a board card for each new hold once a home arms it (the signoff add-on raises it instead when installed) |
 | `fm-gate-refuse-lib.sh`  | Shared gate-context lifecycle boundary for real and lab homes                      |
 | `fm-watch-arm.sh`        | Verified home-scoped watcher arm wrapper with loud cycle endings and bounded lifecycle ledger |
 | `fm-watch-checkpoint.sh` | Run one bounded foreground watcher checkpoint for Codex-style supervision            |
-| `fm-watch.sh`            | Singleton-safe watcher: absorb benign wakes, detect stalled local-secondmate wake queues, hand recorded asks to the firstmate-addons ask-default add-on when installed, and exit on actionable ones |
+| `fm-watch.sh`            | Singleton-safe watcher: absorb benign wakes, detect stalled local-secondmate wake queues, hand recorded asks to the ask-default add-on when installed, and exit on actionable ones |
 | `fm-inactive-reconcile.sh` | Reconcile long-inactive direct operator terminal outcomes without forge access |
 | `fm-afk-contract.sh`     | Own the away-or-quiet record's posture, schema, entry, read-back, archive, and cross-subsystem authority lock |
 | `fm-afk-start.sh`        | Run the common sourceable away-mode daemon entry in the foreground                      |
