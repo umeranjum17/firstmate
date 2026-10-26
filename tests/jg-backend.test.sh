@@ -163,6 +163,25 @@ resolve_permissive_tmux_kill_ref() {
 # The teardown conformance case applies its explicitly historical tmux adapter
 # after this complete baseline has been materialized.
 
+# A baseline cut before the internal rename still carries the old script, variable
+# and role words. Giving it the new names keeps the comparison about behaviour:
+# the historical logic runs under the vocabulary the fixture drives it with. On a
+# baseline that already has the new names this changes nothing.
+adapt_old_names() {  # <dir-or-file>
+  local target=$1 f dir base new
+  grep -rIlE 'fm[-_]|FM_|secondmate|crewmate|firstmate' "$target" 2>/dev/null | while IFS= read -r f; do
+    sed -i -e 's/fm-/jg-/g; s/fm_/jg_/g; s/FM_/JG_/g' \
+      -e 's/secondmate-/squad-lead-/g; s/-secondmate/-squad-lead/g; s/secondmate/squad_lead/g; s/SECONDMATE/SQUAD_LEAD/g' \
+      -e 's/crewmate/operator/g; s/firstmate/juggernaut/g' "$f"
+  done
+  [ -d "$target" ] || return 0
+  find "$target" -depth -name '*fm-*' -o -depth -name '*secondmate*' | while IFS= read -r f; do
+    dir=${f%/*}; base=${f##*/}
+    new=$(printf '%s' "$base" | sed -e 's/fm-/jg-/g; s/secondmate/squad-lead/g')
+    mv -- "$f" "$dir/$new"
+  done
+}
+
 build_old_bin() {  # <name> -> echoes root dir (root/bin/<script> is the entry point)
   local name=$1 root archive base_ref
   root="$TMP_ROOT/$name"
@@ -174,6 +193,7 @@ build_old_bin() {  # <name> -> echoes root dir (root/bin/<script> is the entry p
   tar -xf "$archive" -C "$root" \
     || fail "old-bin shim: could not extract bin/ from $base_ref"
   rm -f "$archive"
+  adapt_old_names "$root/bin"
   printf '%s\n' "$root"
 }
 
@@ -1045,6 +1065,7 @@ test_teardown_conformance_old_vs_new() {
   old_bin=$(build_old_bin teardown-old)
   git -C "$ROOT" show "$old_tmux_ref:bin/backends/tmux.sh" > "$old_bin/bin/backends/tmux.sh" \
     || { BASE_REF=$saved_base_ref; fail "could not materialize historical tmux adapter from $old_tmux_ref"; }
+  adapt_old_names "$old_bin/bin/backends/tmux.sh"
   BASE_REF=$saved_base_ref
   proj="$TMP_ROOT/teardown-project"; wt="$TMP_ROOT/teardown-wt"
   id="teardownconform1"
