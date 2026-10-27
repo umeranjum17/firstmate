@@ -293,7 +293,7 @@ The built-in dashboard reads the fleet read-only and shows what is moving, what 
 | Tool | What it does and how to install it |
 | --- | --- |
 | **done-done** | Drives the real product, has a fresh judge check the capture, and writes a receipt tied to the commit.<br>`npm install -g done-done-axi@0.6.18` |
-| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.7.0 (0.8.0 once sign-off PR 303 releases)` |
+| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.8.0` |
 | **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record.<br>`npm i -g learn-from-mistakes-axi@0.10.0` |
 | **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick.<br>`npm install -g first-draft-axi@0.3.0` |
 | **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g --allow-remote=all https://github.com/umeranjum17/takeone/releases/latest/download/takeone.tgz (0.2.1)` |
