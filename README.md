@@ -120,6 +120,18 @@ The Overwatch detects and offers to install supported missing tools after you ap
 
 ### Install and launch
 
+One command on a clean machine installs the distro, our defaults and rules, and every tool we ship, at the versions [`toolchain.versions`](toolchain.versions) pins:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/umeranjum17/juggernaut/main/install.sh | bash
+```
+
+It clones into `~/juggernaut`, writes [`defaults/`](defaults) into that home once without touching a file that already exists, and installs the pinned tools into `~/.local/bin` so nothing needs sudo and nothing lands in a system prefix.
+It asks only for the logins only you can type: `gh auth login`, and your harness's own sign-in.
+A second run changes nothing.
+
+By hand the same thing is:
+
 ```sh
 gh auth login
 gh repo clone umeranjum17/juggernaut

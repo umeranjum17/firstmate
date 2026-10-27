@@ -297,6 +297,14 @@
       "audience": "public-product"
     },
     {
+      "path": "defaults/brief-include.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "defaults/owner-rules.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": "docs/agent-control.md",
       "audience": "maintainer-architecture"
     },

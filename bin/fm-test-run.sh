@@ -349,6 +349,7 @@ family_for_basename() {
       ;;
     fm-backlog-atomicity.test.sh|\
     fm-bootstrap.test.sh|fm-bootstrap-network-parallel.test.sh|fm-fleet-sync.test.sh|fm-gate-refuse.test.sh|fm-gotmp.test.sh|\
+    fm-one-install.test.sh|\
     fm-session-start.test.sh|fm-sessionstart-nudge.test.sh|fm-startup-network.test.sh|\
     fm-tangle-guard.test.sh|fm-update.test.sh)
       printf '%s\n' session-bootstrap
@@ -1517,6 +1518,12 @@ families_for_changed_path() {
     bin/fm-bootstrap.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-brief.test.sh"
+      ;;
+    install.sh|defaults/*|toolchain.versions|bin/fm-pin-lib.sh)
+      # The one entry command, the defaults it writes, and the pin table every
+      # install path reads. The table and its reader also set the floors
+      # bin/fm-bootstrap.sh enforces, so the bootstrap family comes too.
+      printf '%s\n' session-bootstrap
       ;;
     bin/fm-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap
