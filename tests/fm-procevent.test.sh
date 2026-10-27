@@ -17,11 +17,8 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-# Lavish's synchronous reply receipt is gated by the floor in toolchain.versions, so the
-# reply-refusal fixture below reports that pinned build rather than a version under the floor.
-# shellcheck source=bin/fm-pin-lib.sh
-. "$ROOT/bin/fm-pin-lib.sh"
-FM_FAKE_LAVISH_AXI_VERSION=$(fm_pin_version lavish-axi) || FM_FAKE_LAVISH_AXI_VERSION=0.1.93
+# The optional Lavish compatibility fixture uses the adapter's synchronous-reply minimum.
+FM_FAKE_LAVISH_AXI_VERSION=${FM_FAKE_LAVISH_AXI_VERSION:-0.1.80}
 export FM_FAKE_LAVISH_AXI_VERSION
 # The patch release one step below that floor, which is the legacy poll-reply case.
 LAVISH_AXI_BELOW_FLOOR=$(awk -F. '{ printf "%s.%s.%d", $1, $2, $3 - 1 }' <<<"$FM_FAKE_LAVISH_AXI_VERSION")
