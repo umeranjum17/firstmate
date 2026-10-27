@@ -2962,6 +2962,13 @@ test_superseded_host_leaves_the_owner_untouched() {
   pass "host: a host under a superseded auto-arm generation stands down without touching the owner"
 }
 
+# CI runs the two halves in separate serial jobs. Run with
+# FM_SUPERVISION_HOST_PART=all for the complete local suite.
+case "${FM_SUPERVISION_HOST_PART:-early}" in
+  early|late|all) ;;
+  *) fail "unknown supervision-host test part: $FM_SUPERVISION_HOST_PART" ;;
+esac
+if [ "${FM_SUPERVISION_HOST_PART:-early}" != late ]; then
 test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
 test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn
 test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails
@@ -3014,6 +3021,8 @@ test_away_wake_is_handled_on_the_engine_and_never_reaches_main
 test_away_turn_without_a_report_hands_the_wake_to_main
 test_return_during_an_engine_turn_hands_its_outcomes_to_main
 test_silent_outcomes_are_not_relayed_when_the_captain_returns
+fi
+if [ "${FM_SUPERVISION_HOST_PART:-early}" != early ]; then
 test_large_turn_relays_an_early_visible_outcome
 test_outcome_lookup_failure_is_not_treated_as_silence
 test_outcome_after_the_return_survives_a_host_killed_at_the_turn_end
@@ -3037,3 +3046,4 @@ test_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event
 test_unverified_engine_hands_every_away_wake_to_main
 test_host_outside_the_lock_owner_stands_down
 test_superseded_host_leaves_the_owner_untouched
+fi
