@@ -63,6 +63,10 @@ printf '%s\n' "$*" >>"$DD_LOG"
 case $1 in
   --version) case $MODE in older) echo 0.3.0 ;; *) echo 0.3.1 ;; esac; exit 0 ;;
 esac
+if [ "${1:-}" = doctor ] && [ "${2:-}" = --json ]; then
+  [ -n "${DD_EVIDENCE_ROOT:-}" ] && jq -n --arg root "$DD_EVIDENCE_ROOT" '{checks:[{check:"evidence_root",status:"ok",detail:"writable: \($root)/juggernaut"}]}'
+  exit 0
+fi
 if [ "${1:-}" = signoff ]; then # no run record; with SIGNOFF_POSTS (the post opt-in) it files into --board, else the nearest .sign-off/ board
   [ -n "${SIGNOFF_POSTS:-}" ] || exit 0
   b=$PWD/.sign-off/decisions.json
@@ -235,7 +239,7 @@ cat >"$work/bin/quota-axi" <<'STUB'
 printf '  codex,all_models,%s,unknown\n' "${CODEX_ROOM:-10}"
 STUB
 chmod +x "$work/bin/pi" "$work/bin/quota-axi"
-export DONE_DONE_HOME=$work/dd-config
+export DONE_DONE_HOME=$work/dd-config DD_EVIDENCE_ROOT=$work/evidence
 mkdir -p "$DONE_DONE_HOME"
 printf 'judge:\n  route: claude-code\n  model: claude-haiku-5-5\n' >"$DONE_DONE_HOME/config.yaml"
 
@@ -418,15 +422,45 @@ SO_CAPTURE=$work/card-failedrun
 export SO_CAPTURE
 run_check_and_post failedrun
 is "receipt: card carries the clean run" "$(jq -c .run "$work/card-receipt/card.json")" "$(jq -cn --arg c "$head_c" '{run_id:"20261020T000000Z-receipt0001", commit:$c, outcome:"a stopped worker moves to the next live route", repro:"see the merge note", proof:"done-done run 20261020T000000Z-receipt0001", evidence:"shot.png"}')"
+# A literal done-done 0.6.18 record is accepted from both roots, and the newest matching run wins.
+real_head=0afa012043bd651436ccc0a06d9ed7a0b95acfc9
+printf '{"items":[]}\n' >"$work/board.json"
+copy_real_run() { # copy_real_run <task-id> <directory>
+  mkdir -p "$2"
+  cp "$here/fixtures/done-done-0.6.18-run-record.json" "$2/20261027T011524Z-0afa0120-765b04.json"
+}
+checks receipt-local shot.png && printf 'screen: none\n' >>"$home/data/receipt-local/checks.md"
+copy_real_run receipt-local "$home/data/receipt-local/.done-done/runs"
+SO_CAPTURE=$work/card-receipt-local; export SO_CAPTURE
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" receipt-local "$wt" "$real_head" - >"$work/receipt-local.out" 2>&1
+is "0.6.18 local: real card post succeeds" "$?" 0
+is "0.6.18 local: card carries the captured run" "$(jq -r .run.run_id "$work/card-receipt-local/card.json")" 20261027T011524Z-0afa0120-765b04
+printf '{"items":[]}\n' >"$work/board.json"
+checks receipt-global shot.png && printf 'screen: none\n' >>"$home/data/receipt-global/checks.md"
+copy_real_run receipt-global "$DD_EVIDENCE_ROOT/juggernaut/.done-done/runs"
+SO_CAPTURE=$work/card-receipt-global; export SO_CAPTURE
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" receipt-global "$wt" "$real_head" - >"$work/receipt-global.out" 2>&1
+is "0.6.18 global: real card post succeeds" "$?" 0
+is "0.6.18 global: card carries the captured run" "$(jq -r .run.commit "$work/card-receipt-global/card.json")" "$real_head"
+printf '{"items":[]}\n' >"$work/board.json"
+checks receipt-newest shot.png && printf 'screen: none\n' >>"$home/data/receipt-newest/checks.md"
+copy_real_run receipt-newest "$home/data/receipt-newest/.done-done/runs"
+mkdir -p "$DD_EVIDENCE_ROOT/juggernaut/.done-done/runs"
+jq 'del(.commit) | .run_id="20261027T012000Z-0afa0120-abcdef" | .started_at="2026-10-27T01:20:00.000Z"' "$here/fixtures/done-done-0.6.18-run-record.json" >"$DD_EVIDENCE_ROOT/juggernaut/.done-done/runs/20261027T012000Z-0afa0120-abcdef.json"
+SO_CAPTURE=$work/card-receipt-newest; export SO_CAPTURE
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" receipt-newest "$wt" "$real_head" - >"$work/receipt-newest.out" 2>&1
+is "0.6.18 run-id match: real card post succeeds" "$?" 0
+is "0.6.18 lookup: newest matching record wins" "$(jq -r .run.run_id "$work/card-receipt-newest/card.json")" 20261027T012000Z-0afa0120-abcdef
+is "0.6.18 run-id match: card binds the full head" "$(jq -r .run.commit "$work/card-receipt-newest/card.json")" "$real_head"
 # Non-screen-free receipt cards retain the existing outcome text.
 # A sealed clean run in done-done's own evidence root (a throwaway DONE_DONE_HOME, the real done-done) is accepted
 # for its head with no task folder run; one at another head is refused.
 if command -v done-done >/dev/null; then
   git init -q "$home" # JG_HOME is a Juggernaut checkout; done-done answers from inside a repo
-  mkdir -p "$work/ddhome/evidence/app/.done-done/runs"
+  mkdir -p "$work/ddhome/evidence/juggernaut/.done-done/runs"
   jq -n --arg c "$head_c" '{schema:1, run_id:"20261020T000000Z-default0001", commit:$c, dirty:false, exit:0, files:[{path:"x/shot.png"}]}' \
-    >"$work/ddhome/evidence/app/.done-done/runs/20261020T000000Z-default0001.json"
-  dd_receipt() { DONE_DONE_HOME=$work/ddhome JG_HOME=$home "$here/../merge-card" receipt norun "$1" >/dev/null 2>&1; echo $?; }
+    >"$work/ddhome/evidence/juggernaut/.done-done/runs/20261020T000000Z-default0001.json"
+  dd_receipt() { DD_EVIDENCE_ROOT=$work/ddhome/evidence PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt norun "$1" >/dev/null 2>&1; echo $?; }
   is "default root: run at the head is accepted" "$(dd_receipt "$head_c")" 0
   is "default root: run at another head is refused" "$(dd_receipt otherhead)" 1
 else

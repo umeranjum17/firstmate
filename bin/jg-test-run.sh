@@ -881,7 +881,10 @@ tests/jg-subagent-pretool-check.test.sh 998
 tests/jg-supervision-events.test.sh 673
 tests/jg-supervision-host-attended-live-e2e.test.sh 49
 tests/jg-supervision-host-live-e2e.test.sh 75
-tests/jg-supervision-host.test.sh 789123
+# Provisional halves from the completed case timestamps in CI run 40453434558;
+# its unsplit script finished in 1774307ms but the shard timed out before an artifact.
+tests/jg-supervision-host.test.sh 800000
+tests/jg-supervision-host-late.test.sh 1000000
 tests/jg-tangle-guard.test.sh 8501
 tests/jg-task-delivery.test.sh 32789
 tests/jg-task-inbox.test.sh 31965
@@ -1443,6 +1446,10 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
       ;;
+    tests/jg-supervision-host.test.sh)
+      # The late half sources the same fixture and test definitions.
+      printf '%s\n' __script__:jg-supervision-host.test.sh __script__:jg-supervision-host-late.test.sh
+      ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__
@@ -1578,7 +1585,7 @@ families_for_changed_path() {
       printf '%s\n' __script__:jg-watch-recovery-loop.test.sh
       printf '%s\n' __script__:jg-wake-queue.test.sh
       printf '%s\n' __script__:jg-pi-primary-types.test.sh
-      printf '%s\n' __script__:jg-supervision-host.test.sh
+      printf '%s\n' __script__:jg-supervision-host.test.sh __script__:jg-supervision-host-late.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
       printf '%s\n' live-harness-optin

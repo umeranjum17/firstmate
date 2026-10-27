@@ -446,3 +446,4 @@ addons/model-gate/tests/model-gate.test.sh  # inline jg-compat env alias
 tests/jg-addons-dir.test.sh  # inline jg-compat env alias
 tests/jg-one-install.test.sh  # inline jg-compat env alias
 install.sh  # inline jg-compat env alias
+tests/jg-supervision-host-late.test.sh  # inline jg-compat env alias

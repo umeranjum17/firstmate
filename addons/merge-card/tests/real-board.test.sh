@@ -72,4 +72,12 @@ mkdir -p "$work/home/data/t/.done-done/runs"
 jq -n --arg c "$h3" '{schema:1,run_id:"20261022T000000Z-hookdash01",commit:$c,dirty:false,exit:0,files:[{path:"a.log"}]}' > "$work/home/data/t/.done-done/runs/20261022T000000Z-hookdash01.json"
 out=$(GH_HEAD=$h3 "$here/../merge-card" post --board "$board" t - - "$pr" 2>&1) || { echo "$out"; fails=$((fails + 1)); }
 is "hook head dash: the PR's card carries the run sealed at its head" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.key == "merge-o-r-pull-13") | .evidence.run_id')" 20261022T000000Z-hookdash01
+# A literal 0.6.18 record must post through merge-card and the real sign-off board.
+current_id=20261027T011524Z-0afa0120-765b04 current_head=0afa012043bd651436ccc0a06d9ed7a0b95acfc9
+mkdir -p "$work/home/data/t/.done-done/runs"
+cp "$here/fixtures/done-done-0.6.18-run-record.json" "$work/home/data/t/.done-done/runs/$current_id.json"
+jq -n '{verdict:"pass",check:{claim:"a user sees one card",evidence:["summary.txt"]}}' > "$work/home/data/t/merge-card.json"
+pr=https://github.com/o/r/pull/14
+out=$("$here/../merge-card" post --board "$board" t - "$current_head" "$pr" 2>&1) || { echo "$out"; fails=$((fails + 1)); }
+is "0.6.18: real board post carries the exact run" "$(sign-off-axi list "$board" --json --full | jq -r --arg key "merge-o-r-pull-14" '.decisions[] | select(.key == $key) | .evidence.run_id')" "$current_id"
 [ "$fails" -eq 0 ] && echo "real-board: all assertions held" || { echo "real-board: $fails failed"; exit 1; }
