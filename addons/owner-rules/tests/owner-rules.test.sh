@@ -7,7 +7,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
-[ -n "$FM" ] && [ -x "$FM/bin/fm-brief.sh" ] && grep -q fm_brief_inherit_shared "$FM/bin/fm-brief.sh" \
+[ -n "$FM" ] && [ -x "$FM/bin/fm-brief.sh" ] \
   || { echo "usage: $0 <firstmate-checkout with the brief-inherit seam>" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
@@ -52,6 +52,8 @@ cat > "$home/data/backlog.md" <<'BL'
   risk: because
 - [ ] fork-pr - [captain-ask] A fork change (repo: sample) (kind: ship)
   risk: fork-repo
+- [ ] bad-design - [captain-ask] Vague design flag (repo: sample) (kind: ship)
+  design: maybe
 ## Done
 - [x] with-ask-longer - Main9 something
 BL
@@ -59,6 +61,7 @@ BL
 brief() {
   local id=$1 out rc; shift
   out=$(FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/fm-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
+  printf '%s\n' "$out" >> "$work/emitted"
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
 ASK='owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this lane serves (add it to the backlog item for no-ask)'
@@ -107,14 +110,31 @@ printf '%s\n' "$tree" | grep -A8 '^Items with no valid parent:' | grep -qF '  cy
 "$addons/owner-rules/uninstall.sh" "$home" >/dev/null
 is "uninstalled: check is off again" "$(brief no-ask --mode direct-PR | tail -1)" "rc=0"
 
-# the leads skill quotes each real refusal line (with $id / $what in place of the runtime value)
-n=0
-while IFS= read -r q; do
-  n=$((n + 1))
-  refusal=${q%%; run *}
-  grep -qF -- "${refusal#owner-rules: }" "$addons/owner-rules/bin/fm-owner-rules-lib.sh" "$addons/owner-rules/bin/fm-owner-rules-gate.sh" \
-    && ok "skill quote matches the code: ${q:0:40}" || no "skill quote not in lib or gate: $q"
-done < <(grep '^owner-rules: ' "$addons/owner-rules/skill/SKILL.md")
-is "skill quotes all six refusals" "$n" "6"
+# The leads skill quotes each real refusal line (with $id, $what, ... standing in for the runtime value).
+# Provoke every refusal through the real brief and the installed merge gate, then require each quoted line to
+# match a line they actually emitted.
+"$addons/owner-rules/install.sh" "$home" >/dev/null
+brief bad-design --mode direct-PR >/dev/null
+mkdir -p "$work/bin" "$work/ship" "$work/data/fm-merge-on-green" "$home/data/lane/.done-done/runs"
+printf '#!/bin/sh\nexit 0\n' > "$work/bin/gh"; printf '#!/bin/sh\nexit 0\n' > "$work/data/fm-merge-on-green/checks-lint.sh"
+chmod +x "$work/bin/gh" "$work/data/fm-merge-on-green/checks-lint.sh"
+gate() { PATH=$work/bin:$PATH FM_HOME=$home FM_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane "$1" abc123 https://github.com/o/r/pull/9 2>&1 | tee -a "$work/emitted" >/dev/null; }
+gate "$work/ship"
+printf '{"schema":1,"exit":0,"dirty":false,"commit":"abc123","files":["a.png"],"run_id":"r1"}\n' > "$home/data/lane/.done-done/runs/r1.json"
+gate "$work/ship"
+unmatched=$(python3 - "$addons/owner-rules/skill/SKILL.md" "$work/emitted" <<'PY'
+import re, sys
+quotes = [l.rstrip("\n") for l in open(sys.argv[1]) if l.startswith("owner-rules: ")]
+emitted = open(sys.argv[2]).read().splitlines()
+print(len(quotes))
+for q in quotes:
+    pat = re.escape(q)
+    pat = re.sub(r"\\\$\{?\w+\}?|<[A-Za-z_]+>", ".+", pat)
+    if not any(re.match(pat, e) for e in emitted):
+        print("unmatched: " + q)
+PY
+)
+is "skill quotes all six refusals" "$(printf '%s\n' "$unmatched" | head -1)" "6"
+is "every refusal quoted in the skill is emitted by the brief or the gate" "$(printf '%s\n' "$unmatched" | tail -n +2)" ""
 
 [ "$fails" -eq 0 ] && echo "PASS owner-rules" || { echo "FAIL owner-rules: $fails"; exit 1; }

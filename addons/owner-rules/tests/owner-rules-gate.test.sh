@@ -33,7 +33,11 @@ STUB
 chmod +x "$work/bin/sign-off-axi"
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 # shellcheck disable=SC2119,SC2120
-gate() { PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?"; }
+gate() { # prints the gate's output and rc=; every output is also kept in $work/hints for the hint check below
+  local out
+  out=$(PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data FM_HOME=$home FM_FLEET_BOARD=${3:-$work/board.json} "$home/config/merge-gate" lane - "${1:-$head}" "${2:-$pr}" 2>&1; printf 'rc=%s\n' "$?")
+  printf '%s\n' "$out" | tee -a "$work/hints"
+}
 main=$work/main; mkdir -p "$main/config"
 gate_inherit() { env -u FM_FLEET_BOARD PATH="$work/bin:$PATH" FM_HOME="$home" FM_MAIN_HOME="$main" "$home/config/merge-gate" lane - "$head" "$pr" 2>&1; printf 'rc=%s\n' "$?"; }
 run=$home/data/lane/.done-done/runs/r1.json
@@ -80,13 +84,14 @@ card_refusal=$(gate)
 is "refusal: receipt and lint but missing board card" "$(printf '%s\n' "$card_refusal" | tail -1)" "rc=1"
 card_command=$(printf '%s\n' "$card_refusal" | sed -n 's|.*; post it with: FM_HOME=[^ ]* \(/[^ ]*\) post .*|\1|p')
 [ -n "$card_command" ] && [ -x "$card_command" ] && ok "card hint names an executable absolute path" || no "card hint command is not an executable absolute path: $card_command"
-# Guard gate/check script hints against bare add-on executables (a path is required in every home).
-if grep -REn --include='*.sh' --exclude-dir=tests 'run[[:space:]]+(FM_HOME=[^[:space:]]+[[:space:]]+)?(merge-card|fm-[[:alnum:]_-]+\.sh|checks-lint\.sh)([[:space:]]|$)' \
-  "$addons/owner-rules" "$addons/merge-card" "$addons/merge-on-green" "$addons/owner-guard" "$addons/read-guard" "$addons/delete-guard" "$addons/kill-guard"; then
-  no "bare add-on tool in gate/check hint"
+# Every command a refusal tells the operator to run must be a path: a bare add-on tool is not on PATH in every home.
+# Checked on the hints the gate emitted above (lint, board-card, and receipt refusals), not on source text.
+if grep -En '(^|[[:space:]])(merge-card|checks-lint\.sh|fm-[[:alnum:]_-]+\.sh)([[:space:]]|$)' "$work/hints"; then
+  no "a gate hint names a bare add-on tool"
 else
-  ok "gate/check hints do not name bare add-on tools"
+  ok "gate hints name add-on tools by path only"
 fi
+[ -s "$work/hints" ] && grep -q 'post it with' "$work/hints" && grep -q 'checks-lint PASS' "$work/hints" && ok "the hint check saw the card and lint hints" || no "the hint check saw no card or lint hint"
 # Main-home fallback, home precedence, then the three-source refusal.
 printf '%s\n' "$work/board.json" > "$main/config/fleet-board"
 jq --arg h "$head" '.items += [{kind:"evidence",key:"merge-umeranjum17-juggernaut-pull-9",run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
