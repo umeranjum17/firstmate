@@ -230,7 +230,7 @@ Juggernaut's skills live in two separate places with different audiences:
 
 ## Tools
 
-The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The board and the fleet dashboard are part of Juggernaut; the rest are separate packages. Each hook below does nothing until its tool is installed; your first session installs done-done and sign-off for you.
+The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The sign-off board is part of Juggernaut, and Lookout is the single fleet dashboard; the rest are separate packages. Each hook below does nothing until its tool is installed; your first session installs done-done and sign-off for you.
 
 Every screen below is a real capture from the tool's own current or most recent build, at desktop and phone width, in light and dark. The projects, names, and work shown are demo data. A terminal screen is the tool's own output.
 
@@ -275,16 +275,16 @@ Sign-off collects the questions, designs, reports, and proof that need a person,
   </picture>
 </p>
 
-### The fleet dashboard: see the whole board
+### The fleet dashboard: Lookout
 
-The built-in dashboard reads the fleet read-only and shows what is moving, what waits on you, and what the work is proving. It needs no separate install.
+Lookout is the only fleet dashboard. [`lookout-adapter`](addons/lookout-adapter/README.md) supplies its read-only fleet data. Run the pinned package with `npx --yes --package=lookout-axi@0.1.0 lookout serve`.
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/fleet-dashboard/dashboard-390-dark.png">
-    <source media="(max-width: 600px)" srcset="assets/tools/fleet-dashboard/dashboard-390-light.png">
-    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/fleet-dashboard/dashboard-1280-dark.png">
-    <img src="assets/tools/fleet-dashboard/dashboard-1280-light.png" width="880" alt="The fleet dashboard's Tickets view: work moving, questions waiting on the Captain, and the path from start to landed">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-390-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/tools/lookout/overview-390-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-1280-dark.png">
+    <img src="assets/tools/lookout/overview-1280-light.png" width="880" alt="Lookout Overview with its bundled sample fleet">
   </picture>
 </p>
 
@@ -299,7 +299,7 @@ The built-in dashboard reads the fleet read-only and shows what is moving, what 
 | **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g takeone-axi@0.4.0` |
 | **quota-axi** | Reports the quota windows your local agents can use, in one read, without routing or recommending anything.<br>`npx -y quota-axi@0.1.67` |
 | **BYOKit** | Gives your app the parts it needs to use a person's own AI plan and devices: sign-in, pairing, voice, usage.<br>`npm install @byokit/accounts@0.34.0 @byokit/realtime@0.3.3` |
-| **Lookout** | A read-only fleet dashboard: which agents need you, what limits capacity, and why work is waiting.<br>`npx -y lookout-axi@0.1.0 serve` |
+| **Lookout** | The read-only fleet dashboard: which agents need attention, what limits capacity, and why work is waiting.<br>`npx --yes --package=lookout-axi@0.1.0 lookout serve` |
 
 <p align="center">
   <picture>
@@ -361,15 +361,6 @@ The built-in dashboard reads the fleet read-only and shows what is moving, what 
     <source media="(max-width: 600px)" srcset="assets/tools/byokit/voice-390-light.png">
     <source media="(prefers-color-scheme: dark)" srcset="assets/tools/byokit/voice-1280-dark.png">
     <img src="assets/tools/byokit/voice-1280-light.png" width="880" alt="BYOKit: The BYOKit offline voice example after a turn">
-  </picture>
-</p>
-
-<p align="center">
-  <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-390-dark.png">
-    <source media="(max-width: 600px)" srcset="assets/tools/lookout/overview-390-light.png">
-    <source media="(prefers-color-scheme: dark)" srcset="assets/tools/lookout/overview-1280-dark.png">
-    <img src="assets/tools/lookout/overview-1280-light.png" width="880" alt="Lookout: Lookout Overview of the bundled sample fleet">
   </picture>
 </p>
 
