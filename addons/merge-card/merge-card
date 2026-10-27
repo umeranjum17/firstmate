@@ -48,9 +48,9 @@
 #     line `sign-off reply: <text>` gives the lead's outcome), once per card and PR, whatever happens to
 #     the evidence card. NOT_FOUND (nothing sent on the card) is done; a sign-off-axi older than 0.6.1
 #     skips with one line; any other failure is printed and the post goes on.
-#   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>
+#   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>, merge-card receipt-json <task-id> <head>
 #     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
-#     done-done run at <head>, there or in done-done's own evidence root (the card's passed-test receipt). Used by owner-rules' merge gate.
+#     done-done run at <head>, there or in done-done's own evidence root. receipt-json prints the normalized receipt used by owner-rules' local signature check.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # The done-done check runs as the pool's claude account when the home has one
 # (config/account-pool): the check's env carries that account's profile folder in
@@ -589,5 +589,11 @@ case ${1:-} in
   # For owner-rules' merge gate: exit 0 when the merge is exempt / has a sealed clean run at <head>.
   screen-none) [ -n "${FM_HOME:-}" ] && screen_none "${2:-}" "${3:--}"; exit $? ;;
   receipt) [ -n "${FM_HOME:-}" ] && [ -n "$(receipt_run "${2:-}" "${3:-}" /dev/null)" ]; exit $? ;;
-  *) die "usage: merge-card gate|check|post ... (see the header of $0)" ;;
+  receipt-json)
+    [ -n "${FM_HOME:-}" ] || exit 1
+    receipt=$(receipt_run "${2:-}" "${3:-}" /dev/null) || exit $?
+    [ -n "$receipt" ] || exit 1
+    printf '%s\n' "$receipt"
+    ;;
+  *) die "usage: merge-card gate|check|post|receipt|receipt-json ... (see the header of $0)" ;;
 esac
