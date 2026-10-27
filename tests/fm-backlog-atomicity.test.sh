@@ -1275,6 +1275,19 @@ test_dispatch_refuses_an_id_this_home_has_no_item_for() {
   pass "dispatch refuses, before creating anything, when the home has no item for the id"
 }
 
+test_secondmate_cannot_dispatch_an_operator_without_a_ticket() {
+  local case_dir id out rc=0
+  id=atomic-mate-dispatch-no-ticket-b16
+  case_dir=$(make_home mate-dispatch-no-ticket "$id")
+  printf '%s\n' mate-h1 > "$(home_of "$case_dir")/.fm-secondmate-home"
+
+  out=$(run_ship_spawn "$case_dir" "$id") || rc=$?
+  [ "$rc" -ne 0 ] || fail "secondmate dispatched an operator without a backlog ticket"
+  assert_contains "$out" "no backlog item in this home" "dispatch refusal did not name the missing ticket"
+  assert_absent "$(home_of "$case_dir")/state/$id.meta" "ticketless secondmate dispatch published a worker record"
+  pass "a secondmate cannot dispatch an operator until its own backlog has the ticket"
+}
+
 test_dispatch_reports_a_backlog_read_failure() {
   local case_dir id out rc=0
   id=atomic-dispatch-read-failure-b3
@@ -3064,6 +3077,7 @@ test_automatic_backend_refuses_incompatible_tasks_axi_before_mutation
 test_dispatch_refuses_an_unresolvable_data_directory
 test_completion_refuses_an_unresolvable_data_directory
 test_dispatch_refuses_an_id_this_home_has_no_item_for
+test_secondmate_cannot_dispatch_an_operator_without_a_ticket
 test_dispatch_reports_a_backlog_read_failure
 test_dispatch_refuses_a_closed_item
 test_dispatch_refuses_to_commit_without_a_published_record

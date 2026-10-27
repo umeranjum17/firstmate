@@ -737,15 +737,16 @@ test_watcher_busy_report_is_not_a_giveup() {
   # The turn ends. The instruction is delivered by the next ordinary check with
   # nobody touching the worker - this is the regression: a busy report used to
   # end delivery, so the record sat unread until a human interrupted.
-  busy_steer_check "$dir" "$(idle_capture "$dir")"
+  FM_ACK_RECORD="$rec" busy_steer_check "$dir" "$(idle_capture "$dir")"
   grep -qF 'Firstmate instruction waiting' "$dir/send.log" \
     || fail "the turn ended without delivering the deferred doorbell"$'\n'"$(cat "$dir/check.out")"
   [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" = "$wakes" ] \
     || fail "delivery at turn end added another wake"
   [ ! -e "$dir/state/t1.inbox/.busy-escalated" ] \
     || fail "the free pane kept the busy report marker"
-  [ -f "$rec" ] || fail "delivery consumed the record instead of leaving it for the worker"
-  pass "watcher: a busy-deferred instruction is delivered when the turn ends, without a human"
+  [ -f "$dir/state/t1.inbox/handled/001.msg" ] \
+    || fail "the worker did not acknowledge the delivered instruction"
+  pass "watcher: a busy-deferred instruction is delivered and acknowledged when the turn ends, without a human"
 }
 
 test_watcher_reports_held_composer_immediately() {

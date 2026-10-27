@@ -4,8 +4,8 @@
 #                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
 #   --dry-run    print every step and the unit; change nothing.
 #   --rollback   stop and remove the new unit, start the old one again (with --dry-run: print only).
-# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), FM_HOME (default ~/firstmate),
-# PORT (the old dashboard's port, default 4390), BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
+# Settings (environment): FM_HOME (default ~/firstmate), PORT (default 4390),
+# BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 mode=apply dry=no
@@ -23,7 +23,7 @@ Description=Firstmate fleet dashboard: Lookout on the adapter (tailnet only)
 After=tailscaled.service network-online.target
 
 [Service]
-Environment=FM_HOME=$FM_HOME LOOKOUT_DIR=$LOOKOUT_DIR PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=FM_HOME=$FM_HOME PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=$here/fleet-serve --bind $BIND --port $PORT
 Restart=always
 RestartSec=10
@@ -41,12 +41,10 @@ if [ "$mode" = rollback ] || [ "$mode" = rollback-dry ]; then
   run systemctl --user enable --now "$OLD"
   exit 0
 fi
-: "${LOOKOUT_DIR:?set LOOKOUT_DIR to the lookout clone}"
-[ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "install: $LOOKOUT_DIR has no bin/lookout.js" >&2; exit 1; }
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
 probe=fm-dashboard-lookout-probe
-run systemd-run --user --collect --unit "$probe" --setenv=FM_HOME="$FM_HOME" --setenv=LOOKOUT_DIR="$LOOKOUT_DIR" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
+run systemd-run --user --collect --unit "$probe" --setenv=FM_HOME="$FM_HOME" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
 if [ "$mode" = apply ]; then
   trap 'systemctl --user stop "$probe" 2>/dev/null || true' EXIT
   for _ in $(seq 100); do curl -fs "http://$BIND:$SPARE_PORT/api/fleet" -o /dev/null && break; sleep 0.3; done
