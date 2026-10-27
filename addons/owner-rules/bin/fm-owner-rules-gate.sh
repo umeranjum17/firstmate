@@ -1,17 +1,72 @@
 #!/usr/bin/env bash
-# fm-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|-> - the merge-gate half of owner-rules.
-# config/merge-gate runs this first, with the gate args and FM_HOME set. It refuses (exit 1, one line naming
-# the PR) a merge with no passed-proof receipt: no sealed clean done-done run at the merge head in the task's
-# folder, or no newest checks-lint `pass` row (data/checks-gate.log) for the PR at the merge head. A merge whose
-# Checks block declares `screen: none` opens with one line saying it takes the text-only Evidence card path, so
-# no capture is demanded of it, and it still needs that sealed receipt for the card. PR merges also require their
-# passed-proof Evidence card on the fleet board. Every refusal names the command that clears it. A no-op when
-# config/owner-rules is absent. Reuses merge-card's own checks.
+# fm-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|-> - local proof authorization and merge gate.
+# Run `init-key` once in the captain's home, then use `sign <task-id> <head> <pr-url|->` only after the passed-proof recipe succeeds.
+# The private key stays in the main home's config; the merge gate verifies its detached signature with the public key.
 set -u
-[ "$#" -eq 4 ] || { echo "usage: fm-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|->" >&2; exit 2; }
-[ -n "${FM_HOME:-}" ] && [ -e "$FM_HOME/config/owner-rules" ] || exit 0
+mode=gate
+case ${1:-} in sign|init-key) mode=$1; shift ;; esac
+if [ -z "${FM_HOME:-}" ] || [ ! -e "$FM_HOME/config/owner-rules" ]; then
+  [ "$mode" = gate ] && exit 0
+  echo "owner-rules: config/owner-rules is not enabled" >&2
+  exit 1
+fi
+command -v openssl >/dev/null 2>&1 || { echo "owner-rules: OpenSSL is required for local proof signatures" >&2; exit 1; }
+key_home=${FM_MAIN_HOME:-$FM_HOME}
+pub=$key_home/config/owner-rules-proof.pub
+private=$key_home/config/owner-rules-proof.key
+if [ "$mode" = init-key ]; then
+  [ "$#" -eq 0 ] || { echo "usage: fm-owner-rules-gate.sh init-key" >&2; exit 2; }
+  [ ! -e "$private" ] && [ ! -e "$pub" ] || { echo "owner-rules: local proof key already exists; it was not replaced" >&2; exit 1; }
+  tmp=$(mktemp -d "$key_home/config/.owner-proof-key.XXXXXX") || exit 1
+  if ! openssl genpkey -algorithm ED25519 -out "$tmp/private.pem" 2>/dev/null ||
+    ! openssl pkey -in "$tmp/private.pem" -pubout -out "$tmp/public.pem" 2>/dev/null ||
+    ! chmod 600 "$tmp/private.pem" || ! mv -- "$tmp/private.pem" "$private" || ! mv -- "$tmp/public.pem" "$pub"; then
+    rm -rf -- "$tmp"
+    echo "owner-rules: could not create the local proof key pair" >&2
+    exit 1
+  fi
+  rm -rf -- "$tmp"
+  echo "owner-rules: created the local proof key pair in $key_home/config"
+  exit 0
+fi
+if [ "$mode" = sign ]; then
+  [ "$#" -eq 3 ] || { echo "usage: fm-owner-rules-gate.sh sign <task-id> <head> <pr-url|->" >&2; exit 2; }
+else
+  [ "$#" -eq 4 ] || { echo "usage: fm-owner-rules-gate.sh <task-id> <worktree|-> <head|-> <pr-url|->" >&2; exit 2; }
+fi
+if [ "$mode" = sign ]; then id=$1; head=$2; pr=$3
+else id=$1; head=$3; pr=$4
+fi
+[[ $id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $head =~ ^[a-f0-9]{40,64}$ ]] || { echo "owner-rules: invalid task id or commit head" >&2; exit 1; }
+case $pr in *$'\n'*|*$'\r'*|*$'\t'*) echo "owner-rules: invalid proof scope" >&2; exit 1 ;; esac
 mc=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../merge-card" && pwd -P)/merge-card
-what=$4; [ "$4" != - ] || what="local merge $3"
+script=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/fm-owner-rules-gate.sh
+proof_dir=$FM_HOME/data/$id/proof-authorizations
+signature=$proof_dir/$head.sig
+proof_receipt() { "$mc" receipt-json "$id" "$head"; }
+proof_payload() {
+  local receipt=$1 hash
+  hash=$(printf '%s' "$receipt" | openssl dgst -sha256 | awk '{print $NF}') || return 1
+  printf 'firstmate-owner-proof-v1\ntask=%s\nhead=%s\npr=%s\nreceipt-sha256=%s\n' "$id" "$head" "$pr" "$hash"
+}
+if [ "$mode" = sign ]; then
+  [ -f "$private" ] && [ ! -L "$private" ] || { echo "owner-rules: local private key is missing; configure $private with the matching public key at $pub" >&2; exit 1; }
+  chmod go-rwx "$private" || { echo "owner-rules: cannot secure local private key permissions" >&2; exit 1; }
+  receipt=$(proof_receipt) || { echo "owner-rules: no sealed clean receipt to sign for $head" >&2; exit 1; }
+  [ -n "$receipt" ] || { echo "owner-rules: no sealed clean receipt to sign for $head" >&2; exit 1; }
+  mkdir -p "$proof_dir" || { echo "owner-rules: cannot create local proof record" >&2; exit 1; }
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/owner-proof.XXXXXX") || exit 1
+  proof_payload "$receipt" > "$tmp/payload" || { rm -rf -- "$tmp"; exit 1; }
+  out=$(mktemp "$proof_dir/.signature.XXXXXX") || { rm -rf -- "$tmp"; exit 1; }
+  if ! openssl pkeyutl -sign -rawin -inkey "$private" -in "$tmp/payload" -out "$out" 2>/dev/null; then
+    rm -f -- "$out"; rm -rf -- "$tmp"; echo "owner-rules: local signing failed" >&2; exit 1
+  fi
+  chmod 600 "$out" && mv -f -- "$out" "$signature" || { rm -f -- "$out"; rm -rf -- "$tmp"; exit 1; }
+  rm -rf -- "$tmp"
+  echo "owner-rules: signed the local receipt for $head"
+  exit 0
+fi
+what=$pr; [ "$pr" != - ] || what="local merge $head"
 none=0
 "$mc" screen-none "$1" "$4" && none=1
 # The top line: a screen-free merge is on the text-only card path, and no capture is asked for.
@@ -39,6 +94,20 @@ if [ "$3" != - ] && ! "$mc" receipt "$1" "$3"; then
     exit 1
   fi
 fi
+# The signature is local authorization for this exact task, PR scope, head, and receipt contents.
+receipt=$(proof_receipt) || receipt=''
+if [ -z "$receipt" ] || [ ! -f "$pub" ] || [ -L "$pub" ] || [ ! -f "$signature" ] || [ -L "$signature" ]; then
+  echo "owner-rules: no valid local proof signature for $what at $head; sign only after the passed-proof recipe succeeds: FM_HOME=$FM_HOME $script sign $id $head $pr"
+  exit 1
+fi
+payload=$(mktemp "${TMPDIR:-/tmp}/owner-proof-payload.XXXXXX") || exit 1
+proof_payload "$receipt" > "$payload" || { rm -f -- "$payload"; exit 1; }
+if ! openssl pkeyutl -verify -rawin -pubin -inkey "$pub" -in "$payload" -sigfile "$signature" >/dev/null 2>&1; then
+  rm -f -- "$payload"
+  echo "owner-rules: local proof signature is invalid for $what at $head; re-run the passed-proof recipe and sign the exact receipt"
+  exit 1
+fi
+rm -f -- "$payload"
 # Lint: the newest checks-gate row for this PR url at this head, from checks-lint (read, never rerun), must be a
 # `pass`: a later fail takes the verdict back, and a `card` row is not a verdict. A local merge's rows
 # name the report file and carry head `-`, so they match on the task's own folder instead.
