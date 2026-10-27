@@ -117,3 +117,29 @@ grep -q "install -g quota-axi@$quota_next" "$NPM_LOG" || fail "bootstrap install
 # rather than leaving a second copy in another directory for PATH order to choose between.
 [ "$("$bin/quota-axi" --version)" = "$quota_next" ] || fail "bootstrap installed quota-axi outside install.sh's prefix"
 pass "one changed row moves both install paths, install.sh and bin/fm-bootstrap.sh, into one prefix"
+
+# learn-from-mistakes account picker: a fresh machine gets the shared helper, an edited config keeps its own
+# value and other keys, and a second run changes nothing.
+lfm=$HOME/.learn-from-mistakes/config.yaml
+picker=$(awk '/^account_picker:/ { f = 1; next } f && /^ *- / { sub(/^ *- /, ""); print; exit }' "$lfm")
+[ "$picker" = "$ROOT/addons/account-pool/bin/fm-model-pool" ] || fail "fresh home: account_picker is '$picker'"
+[ -x "$picker" ] || fail "fresh home: account_picker names no executable helper"
+pass "a fresh machine gets the shared account picker"
+
+sum=$(cksum < "$lfm")
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "lfm second run exited nonzero"
+[ "$(cksum < "$lfm")" = "$sum" ] || fail "second run changed the lfm config"
+[ "$(grep -c '^account_picker:' "$lfm")" = 1 ] || fail "second run duplicated account_picker"
+pass "a second run leaves the lfm config unchanged"
+
+printf 'agent: claude\n# account_picker: commented, not a setting' > "$lfm"
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "merge run exited nonzero"
+grep -q '^agent: claude$' "$lfm" || fail "merge dropped an existing key"
+[ "$(grep -c '^account_picker:' "$lfm")" = 1 ] || fail "merge did not add the missing key once"
+grep -q '^# account_picker: commented, not a setting$' "$lfm" || fail "merge broke the last line with no newline"
+pass "a config missing the key gets only that key"
+
+printf 'account_picker:\n  - /my/own/picker\n' > "$lfm"
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "edited run exited nonzero"
+[ "$(cat "$lfm")" = "$(printf 'account_picker:\n  - /my/own/picker')" ] || fail "an edited account_picker was overwritten"
+pass "an edited account_picker is never overwritten"

@@ -10,6 +10,7 @@
 # Installs stay user-local, in ~/.local/bin, the same prefix bin/fm-bootstrap.sh installs into, so nothing
 # needs sudo, nothing touches a system prefix, and a tool installed here is the one a later bootstrap
 # install replaces rather than a second copy in another directory.
+# The one user-level default, learn-from-mistakes' account_picker, merges into ~/.learn-from-mistakes/config.yaml by key.
 # A second run changes nothing: a tool already at its pinned version and a defaults file that already
 # exists are reported and left alone. --dry-run prints the same plan and writes nothing.
 set -euo pipefail
@@ -85,6 +86,23 @@ for src in "$root"/defaults/*.md; do
   mkdir -p "$(dirname "$HOME_DIR/$rel")"
   cp "$src" "$HOME_DIR/$rel"
 done
+
+# 3b. learn-from-mistakes reads one user-level config, so its account picker merges in by key: a missing
+# key is appended, a key the user already set (any value) is left alone, so a second run changes nothing.
+lfm_cfg=$HOME/.learn-from-mistakes/config.yaml
+lfm_tpl=$root/defaults/learn-from-mistakes.yaml
+if [ -f "$lfm_tpl" ]; then
+  if [ -f "$lfm_cfg" ] && grep -q '^account_picker:' "$lfm_cfg"; then
+    say "defaults: kept the existing account_picker in $lfm_cfg"
+  else
+    say "defaults: wrote account_picker to $lfm_cfg"
+    if [ "$DRY" = no ]; then
+      mkdir -p "$(dirname "$lfm_cfg")"
+      [ ! -s "$lfm_cfg" ] || [ -z "$(tail -c 1 "$lfm_cfg")" ] || printf '\n' >> "$lfm_cfg"
+      sed "s|@ROOT@|$root|g" "$lfm_tpl" | grep -v '^#' >> "$lfm_cfg"
+    fi
+  fi
+fi
 
 # 4. Install every pinned tool: npm at exactly its row, curl-installed tools at or above their floor.
 changed=0
