@@ -25,7 +25,7 @@ is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; 
 
 home=$work/home; mkdir -p "$home/config" "$home/data/lane/.done-done/runs" "$work/bin" "$work/data/jg-merge-on-green"
 printf '#!/bin/sh\nexit 0\n' > "$work/data/jg-merge-on-green/checks-lint.sh"; chmod +x "$work/data/jg-merge-on-green/checks-lint.sh"
-pr=https://github.com/umeranjum17/juggernaut/pull/9 head=abc123
+pr=https://github.com/umeranjum17/juggernaut/pull/9 head=$(printf 'a%.0s' {1..40})
 # gh stub: the PR body is whatever is in $work/body.
 printf '#!/bin/sh\ncat "%s/body" 2>/dev/null\n' "$work" > "$work/bin/gh"; chmod +x "$work/bin/gh"
 # A previous gate that records it ran.
@@ -49,6 +49,9 @@ run=$home/data/lane/.done-done/runs/r1.json
 seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.png"],"run_id":"r1"}\n' "$1" > "$run"; }
 
 "$addons/owner-rules/install.sh" "$home" >/dev/null
+JG_HOME=$home "$addons/owner-rules/bin/jg-owner-rules-gate.sh" init-key >/dev/null
+cp "$home/config/owner-rules-proof.pub" "$main/config/owner-rules-proof.pub"
+sign_receipt() { JG_HOME=$home "$addons/owner-rules/bin/jg-owner-rules-gate.sh" sign lane "$head" "$pr" >/dev/null; }
 is "installed: previous gate moved aside" "$([ -x "$home/config/merge-gate.pre-owner-rules" ] && echo yes)" yes
 "$addons/owner-rules/install.sh" "$home" >/dev/null && ok "install is idempotent" || no "second install failed"
 
@@ -63,8 +66,20 @@ seal other; is "refusal: a run at a different head" "$(gate | tail -1)" "rc=1"
 seal "$head"; printf '{"schema":1,"exit":0,"dirty":true,"commit":"%s","files":["a"],"run_id":"r1"}\n' "$head" > "$run"
 is "refusal: a dirty run" "$(gate | tail -1)" "rc=1"
 seal "$head"
+unsigned=$(gate)
+[[ $unsigned == *"no valid local proof signature"* ]] && ok "refusal: hand-built PASS run without a local signature" || no "unsigned proof was accepted: $unsigned"
+sign_receipt
+printf 'forged signature\n' > "$home/data/lane/proof-authorizations/$head.sig"
+is "refusal: forged signature" "$(gate | grep -F 'local proof signature is invalid' | head -1)" "owner-rules: local proof signature is invalid for $pr at $head; re-run the passed-proof recipe and sign the exact receipt"
+sign_receipt
+wrong_scope=$(PATH=$work/bin:$PATH XDG_DATA_HOME=$work/data JG_HOME=$home JG_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane - "$head" 'https://github.com/umeranjum17/juggernaut/pull/10' 2>&1)
+[[ $wrong_scope == *"local proof signature is invalid"* ]] && ok "refusal: signature cannot be replayed to another PR" || no "signature replayed across PRs: $wrong_scope"
+printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["b.png"],"run_id":"r1"}\n' "$head" > "$run"
+is "refusal: changed receipt invalidates the signature" "$(gate | grep -F 'local proof signature is invalid' | head -1)" "owner-rules: local proof signature is invalid for $pr at $head; re-run the passed-proof recipe and sign the exact receipt"
+seal "$head"
+sign_receipt
 LINT="owner-rules: no checks-lint PASS for $pr at $head; run JG_HOME=$home $work/data/jg-merge-on-green/checks-lint.sh $pr $home/data/lane then merge again"
-is "refusal: receipt but no checks-lint row" "$(gate)" "$LINT
+is "refusal: signed receipt but no checks-lint row" "$(gate)" "$LINT
 rc=1"
 log=$home/data/checks-gate.log
 printf 't\t%s\tother\tpass\tok\nt\t%s\t%s\tfail\tno\n' "$pr" "$pr" "$head" > "$log"
@@ -101,11 +116,11 @@ jq --arg k "$cardkey-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,r
 is "pass: head-suffixed card matches" "$(gate | tail -1)" "rc=0"
 jq --arg k "merge-umeranjum17-juggernaut-pull-12-$head" --arg h "$head" '.items = [{kind:"evidence",key:$k,run:{commit:$h}}]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 is "refusal: similar pull-12 prefix does not match pull-1" "$(gate | tail -1)" "rc=1"
-for fields in '{"run":{"commit":"abc123"}}' '{"evidence":{"commit":"abc123"}}'; do
+for fields in "{\"run\":{\"commit\":\"$head\"}}" "{\"evidence\":{\"commit\":\"$head\"}}"; do
   jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
   is "pass: card commit field $fields" "$(gate | tail -1)" "rc=0"
 done
-for fields in '{}' '{"run":{"commit":"wrong"}}' '{"evidence":{"commit":"wrong"}}' '{"run":{"commit":"abc123"},"evidence":{"commit":"wrong"}}'; do
+for fields in '{}' '{"run":{"commit":"wrong"}}' '{"evidence":{"commit":"wrong"}}' "{\"run\":{\"commit\":\"$head\"},\"evidence\":{\"commit\":\"wrong\"}}"; do
   jq --argjson fields "$fields" --arg k "$cardkey" '.items = [{kind:"evidence",key:$k} + $fields]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
   is "refusal: invalid card commit fields $fields" "$(gate | tail -1)" "rc=1"
 done
@@ -114,15 +129,14 @@ rm -f "$run"; printf 'screen: none\noutcome: checks passed\nevidence: sealed rec
 printf '{"schema":1,"answers_only":false,"items":[]}\n' > "$work/board.json"
 is "refusal: screen: none without receipt refuses" "$(gate | tail -1)" "rc=1"
 seal other; is "refusal: screen: none with a sealed run at another head refuses" "$(gate | tail -1)" "rc=1"
-# A home the canary has not reached keeps today's behavior: a screen-free merge there still skips the receipt.
+# Canary rollout cannot skip the local signature, even for a screen-free merge with no receipt.
 printf '%s\n' "$work/not-this-home" > "$home/config/owner-rules-canary"
 skip_card=$(gate)
-is "screen: none on a non-canary home: the receipt stays skipped" "$skip_card" "owner-rules: $pr declares screen: none, so it takes the text-only Evidence card path; no capture is needed
-prev gate ran: lane - $head $pr
-rc=0"
+[[ $skip_card == *"no valid local proof signature"* ]] && ok "screen: none canary still refuses missing local authorization" || no "screen: none canary skipped signature: $skip_card"
 rm -f "$home/config/owner-rules-canary"
 seal "$head"
 printf '{"verdict":"pass","check":{"claim":"checks passed","evidence":[]}}\n' > "$home/data/lane/merge-card.json"
+sign_receipt
 jq -n '{schema:1,answers_only:false,items:[]}' > "$work/board.json"
 text_card=$(gate)
 is "pass: screen: none and receipt auto-posts text card" "$text_card" "owner-rules: $pr declares screen: none, so it takes the text-only Evidence card path; no capture is needed

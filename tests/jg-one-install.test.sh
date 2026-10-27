@@ -22,6 +22,12 @@ export HOME=$work/h XDG_DATA_HOME=$work/h/.local/share XDG_CONFIG_HOME=$work/h/.
 export NPM_LOG=$work/npm.log JG_PIN_FILE_OVERRIDE=$work/pins
 : > "$NPM_LOG"
 mkdir -p "$work/stub" "$HOME"
+cat > "$work/fake-byokit.mjs" <<'FAKE'
+export const machineStore = () => ({});
+export const osKeyringSeal = () => ({});
+export class Accounts { async list() { return [{ id: 'chatgpt.test', name: 'Test', provider: 'chatgpt', state: 'ready', billing: 'subscription' }]; } }
+FAKE
+export JG_BYOKIT_API_MODULE=$work/fake-byokit.mjs USER=fixture
 fail() { printf 'fail: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'ok: %s\n' "$*"; }
 pin() { awk -v t="$1" '$1 == t { v = $2; sub(/.*@/, "", v); print v }' "$JG_PIN_FILE_OVERRIDE"; }
@@ -79,7 +85,7 @@ done
 # A local edit to the table is what a bump does, so the journey runs against a copy of it.
 grep -E '^[^#]' "$ROOT/toolchain.versions" > "$JG_PIN_FILE_OVERRIDE"
 
-out=$(bash "$ROOT/install.sh" --home "$work/home" 2>&1) || fail "first run exited nonzero: $out"
+out=$(printf '1\n' | bash "$ROOT/install.sh" --home "$work/home" 2>&1) || fail "first run exited nonzero: $out"
 while read -r spec; do
   grep -q "install -g $spec" "$NPM_LOG" || fail "first run did not install $spec"
 done < <(awk 'NF == 2 && $2 ~ /@[0-9]/ { print $2 }' "$JG_PIN_FILE_OVERRIDE")
@@ -90,6 +96,7 @@ for tool in done-done sign-off-axi first-draft-axi lookout-axi byokit-accounts q
 done
 [ -f "$work/home/config/brief-include.md" ] || fail "defaults: no config/brief-include.md written"
 [ -f "$work/home/data/owner-rules.md" ] || fail "defaults: no data/owner-rules.md written"
+[ "$(jq -r '.account.provider' "$work/home/config/ai-engine.json")" = chatgpt ] || fail "installer did not save the selected BYOKit account"
 printf '%s\n' "$out" | grep -q 'needs you: gh auth login' || fail "no gh auth line for an unauthenticated gh"
 pass "one command installs the pinned set and writes the defaults"
 
@@ -125,3 +132,29 @@ grep -q "install -g quota-axi@$quota_next" "$NPM_LOG" || fail "bootstrap install
 # rather than leaving a second copy in another directory for PATH order to choose between.
 [ "$("$bin/quota-axi" --version)" = "$quota_next" ] || fail "bootstrap installed quota-axi outside install.sh's prefix"
 pass "one changed row moves both install paths, install.sh and bin/jg-bootstrap.sh, into one prefix"
+
+# learn-from-mistakes account picker: a fresh machine gets the shared helper, an edited config keeps its own
+# value and other keys, and a second run changes nothing.
+lfm=$HOME/.learn-from-mistakes/config.yaml
+picker=$(awk '/^account_picker:/ { f = 1; next } f && /^ *- / { sub(/^ *- /, ""); print; exit }' "$lfm")
+[ "$picker" = "$ROOT/addons/account-pool/bin/jg-model-pool" ] || fail "fresh home: account_picker is '$picker'"
+[ -x "$picker" ] || fail "fresh home: account_picker names no executable helper"
+pass "a fresh machine gets the shared account picker"
+
+sum=$(cksum < "$lfm")
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "lfm second run exited nonzero"
+[ "$(cksum < "$lfm")" = "$sum" ] || fail "second run changed the lfm config"
+[ "$(grep -c '^account_picker:' "$lfm")" = 1 ] || fail "second run duplicated account_picker"
+pass "a second run leaves the lfm config unchanged"
+
+printf 'agent: claude\n# account_picker: commented, not a setting' > "$lfm"
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "merge run exited nonzero"
+grep -q '^agent: claude$' "$lfm" || fail "merge dropped an existing key"
+[ "$(grep -c '^account_picker:' "$lfm")" = 1 ] || fail "merge did not add the missing key once"
+grep -q '^# account_picker: commented, not a setting$' "$lfm" || fail "merge broke the last line with no newline"
+pass "a config missing the key gets only that key"
+
+printf 'account_picker:\n  - /my/own/picker\n' > "$lfm"
+bash "$ROOT/install.sh" --home "$work/home" >/dev/null 2>&1 || fail "edited run exited nonzero"
+[ "$(cat "$lfm")" = "$(printf 'account_picker:\n  - /my/own/picker')" ] || fail "an edited account_picker was overwritten"
+pass "an edited account_picker is never overwritten"

@@ -368,7 +368,7 @@ family_for_basename() {
       ;;
     jg-backlog-atomicity.test.sh|\
     jg-bootstrap.test.sh|jg-bootstrap-network-parallel.test.sh|jg-fleet-sync.test.sh|jg-gate-refuse.test.sh|jg-gotmp.test.sh|\
-    jg-one-install.test.sh|\
+    jg-one-install.test.sh|jg-ai-engine.test.sh|\
     jg-session-start.test.sh|jg-sessionstart-nudge.test.sh|jg-startup-network.test.sh|\
     jg-tangle-guard.test.sh|jg-update.test.sh)
       printf '%s\n' session-bootstrap

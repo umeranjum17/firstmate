@@ -26,6 +26,7 @@ lavish-axi lavish-axi@0.1.93
 done-done done-done-axi@0.6.18
 sign-off-axi sign-off-axi@0.7.0
 first-draft-axi first-draft-axi@0.3.0
+# Lookout is the only supported fleet dashboard package.
 lookout-axi lookout-axi@0.1.0
 byokit-accounts @byokit/accounts@0.34.0
 takeone-axi takeone-axi@0.4.0

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# juggernaut-axi - bounded, read-only fleet facts for external tools (AXI style).
+#
+# Slice 1 of the approved design (data/juggernaut-axi/report.md): `status` and
+# `tickets`. Like bin/jg-bearings-snapshot.sh it projects the canonical JSON model
+# (jg-bearings-snapshot.sh / jg-fleet-snapshot.sh --json) and renders TOON at the
+# output boundary (bin/jg-toon-lib.sh); `--json` prints the same model.
+# Output contract: `juggernaut-axi.v1`; consumers ignore unknown fields.
+# It never writes state, never reads task transcripts, and states every omission.
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/jg-toon-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/jg-toon-lib.sh"
+
+VERSION=0.1.0
+TICKETS_MAX=100
+
+usage() {
+  cat <<'USAGE'
+usage: juggernaut-axi <command> [--json]
+       juggernaut-axi --help | --version
+
+commands:
+  status                 bounded current fleet projection
+  tickets [--state <queued|in_flight|done>] [--repo <name>] [--limit <n>]
+                         bounded backlog rows (default 50, at most 100)
+
+TOON by default; --json prints the same versioned model (juggernaut-axi.v1).
+Errors go to stderr with a nonzero exit. Omitted rows are counted in omitted[].
+USAGE
+}
+
+die() { echo "juggernaut-axi: $*" >&2; exit 2; }
+
+jq_or_die() {  # <what> <jq args...> - reads the model on stdin
+  local what=$1; shift
+  jq "$@" || { echo "juggernaut-axi: $what projection failed" >&2; exit 1; }
+}
+
+cmd_status() {
+  local snap
+  snap=$("$SCRIPT_DIR/jg-bearings-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
+  printf '%s\n' "$snap" | jq_or_die status '{
+    schema: "juggernaut-axi.v1", view: "status", home, generated,
+    counts: {in_flight: (.in_flight | length), decisions_open: (.decisions_open | length),
+             squad_leads: (.squad_leads | length), gates: (.gates | length)},
+    in_flight: [.in_flight[] | {id, kind, state, repo, name, doing}],
+    omitted: .omitted}'
+}
+
+cmd_tickets() {
+  local state="" repo="" limit=50
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --state) [ $# -ge 2 ] || die "--state needs a value"; state=$2; shift ;;
+      --repo) [ $# -ge 2 ] || die "--repo needs a value"; repo=$2; shift ;;
+      --limit) [ $# -ge 2 ] || die "--limit needs a value"; limit=$2; shift ;;
+      *) die "unknown tickets argument: $1" ;;
+    esac
+    shift
+  done
+  case "$state" in ''|queued|in_flight|done) ;; *) die "--state must be queued, in_flight, or done" ;; esac
+  case "$limit" in ''|*[!0-9]*|0) die "--limit must be a positive integer" ;; esac
+  [ "$limit" -le "$TICKETS_MAX" ] || limit=$TICKETS_MAX
+  local snap
+  snap=$("$SCRIPT_DIR/jg-fleet-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
+  printf '%s\n' "$snap" | jq_or_die tickets --arg state "$state" --arg repo "$repo" --argjson limit "$limit" '
+    [.backlog.records[] | select(.structured)
+     | select($state == "" or .state == $state) | select($repo == "" or .repo == $repo)] as $all
+    | {schema: "juggernaut-axi.v1", view: "tickets", home: (.jg_home | split("/") | .[-2:] | join("/")), generated,
+       count: ($all | length),
+       tickets: [$all[:$limit][] | {id, title, state, repo, kind, blocked_by: (.unresolved_blocker_ids | join(" "))}],
+       omitted: (if ($all | length) > $limit then [{surface: "tickets beyond limit", count: (($all | length) - $limit), reveal: "--limit <n> (at most 100)"}] else [] end)}'
+}
+
+case "${1:-}" in
+  -h|--help|help|"") usage; [ -n "${1:-}" ] || exit 2; exit 0 ;;
+  --version) echo "juggernaut-axi $VERSION"; exit 0 ;;
+esac
+CMD=$1; shift
+FORMAT=toon
+ARGS=()
+for a in "$@"; do
+  case "$a" in --json) FORMAT=json ;; *) ARGS+=("$a") ;; esac
+done
+case "$CMD" in
+  status|tickets) ;;
+  *) die "unknown command: $CMD (try --help)" ;;
+esac
+MODEL=$("cmd_$CMD" "${ARGS[@]+"${ARGS[@]}"}") || exit $?
+if [ "$FORMAT" = json ]; then
+  printf '%s\n' "$MODEL"
+else
+  printf '%s\n' "$MODEL" | jq -r "$JG_TOON_JQ" || { echo "juggernaut-axi: TOON rendering failed" >&2; exit 1; }
+fi

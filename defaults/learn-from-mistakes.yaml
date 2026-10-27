@@ -1,0 +1,5 @@
+# Account picker: the shared pool helper, so learn-from-mistakes picks a model account the way worker launches do.
+# install.sh merges this key into ~/.learn-from-mistakes/config.yaml when the key is missing and never rewrites a value you set.
+# @ROOT@ becomes the absolute path of this Juggernaut clone when it is installed.
+account_picker:
+  - @ROOT@/addons/account-pool/bin/jg-model-pool
