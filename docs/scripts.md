@@ -24,6 +24,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-skill-stats.sh`      | Shim for the fleet-stats add-on: read per-skill fleet read counts as JSON ([skill statistics](fleet-ledger.md#skill-statistics)) |
 | `fm-ticket.sh`           | Record one task's ticket truth on the fleet board now: stage, state, delivered PR and target release ([tickets](../addons/tickets-sync/README.md#writing-a-ticket-at-the-moment-it-changes)) |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
+| `juggernaut-axi`          | Read-only fleet facts for external tools: `status` and `tickets` as TOON or `--json` (`juggernaut-axi.v1`) |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
 | `fm-dashboard.sh`        | Shim for the fleet-dashboard add-on: build its data and reference pages, or serve its read-only fleet app |
 | `fm-secondmate-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
