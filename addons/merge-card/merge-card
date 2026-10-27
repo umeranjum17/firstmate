@@ -36,7 +36,7 @@
 #     After each filed card, `one-card-per-pr --apply` keeps one live card per PR on the board across
 #     filers: the newest valid proof stays and the rest are archived, never deleted.
 #     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
-#     task folder has a sealed clean done-done receipt; the same key makes repeated posts no-ops.
+#     task folder or done-done's evidence root has a sealed clean receipt; the same key makes repeated posts no-ops.
 #     No capture is demanded of it, and the gate says so in one line at the top of its own output.
 #     A claim that cites an evidence file the sealed run does not hold is not refused whole: one
 #     line names the run's own capture, and the claim is checked against that file instead (the
@@ -332,18 +332,28 @@ dd_root() {
   printf '%s' "${root/#\~/$HOME}"
 }
 
-# receipt_run <task-id> <head> <record>: the first sealed clean done-done run at <head>, from the task folder or
+# receipt_run <task-id> <head> <record>: the newest sealed clean done-done run at <head>, from the task folder or
 # done-done's default evidence root, else nothing.
 receipt_run() {
-  local claim evidence root ddruns=()
+  local claim evidence root file records=()
   root=$(dd_root)
-  [ -z "$root" ] || ddruns=("$root"/*/.done-done/runs/*.json)
+  for file in "$FM_HOME"/data/"$1"/.done-done/runs/*.json; do
+    [ -f "$file" ] && records+=("$file")
+  done
+  if [ -n "$root" ]; then
+    for file in "$root"/*/.done-done/runs/*.json; do
+      [ -f "$file" ] && records+=("$file")
+    done
+  fi
+  [ "${#records[@]}" -gt 0 ] || return 0
   claim=$(jq -r '.check.claim // empty' "$3" 2>/dev/null)
   evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3" 2>/dev/null)
   jq -cs --arg head "$2" --arg claim "$claim" --arg ev "$evidence" '
-    map(select(.schema == 1 and .exit == 0 and .dirty == false and .commit == $head and (.files | length) > 0 and (.run_id // "") != ""))
-    | .[0] // empty
-    | {run_id, commit, files: [.files[]? | if type == "object" then .path else . end], outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "$FM_HOME"/data/"$1"/.done-done/runs/*.json "${ddruns[@]}" 2>/dev/null
+    map(select(.schema == 1 and .exit == 0 and .dirty == false and
+      ((.commit == $head) or ((try (.run_id | capture("^[0-9]{8}T[0-9]{6}Z-(?<commit>[0-9a-f]{8})-[0-9a-f]+$").commit) catch "") == $head[0:8])) and
+      (.files | type) == "array" and (.files | length) > 0 and (.run_id | type) == "string" and .run_id != ""))
+    | sort_by(.started_at // "") | reverse | .[0] // empty
+    | {run_id, commit: $head, files: [.files[]? | if type == "object" then .path else . end], outcome: $claim, repro: "see the merge note", proof: "done-done run \(.run_id)", evidence: $ev}' "${records[@]}" 2>/dev/null
 }
 
 # screen_none <task-id> <pr-url|->: the merge's Checks block declares `screen: none`.

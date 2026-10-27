@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "run_id": "20261027T011524Z-0afa0120-765b04",
+  "journey": "voice-contract",
+  "command": "bash /tmp/seal156.sh",
+  "commit": "0afa012043bd651436ccc0a06d9ed7a0b95acfc9",
+  "tree": "ce0bbb66207df35bb3384c0a43be62763a0629e9",
+  "dirty": false,
+  "started_at": "2026-10-27T01:15:24.503Z",
+  "ended_at": "2026-10-27T01:15:24.936Z",
+  "exit": 0,
+  "files": [
+    {
+      "path": "20261027T011524Z-0afa0120-765b04/summary.txt",
+      "sha256": "a903c2949f4e41d80108076824479b58772428be05825a9cfdca6a3929b9033b",
+      "bytes": 77
+    },
+    {
+      "path": "20261027T011524Z-0afa0120-765b04/tail.txt",
+      "sha256": "7ccf6a8d3b9cc097b47c4f847609d2ecb2b69e1389bbf4ba94fc1e843608d724",
+      "bytes": 313
+    },
+    {
+      "path": "20261027T011524Z-0afa0120-765b04/voice-test.log",
+      "sha256": "7ccf6a8d3b9cc097b47c4f847609d2ecb2b69e1389bbf4ba94fc1e843608d724",
+      "bytes": 313
+    }
+  ],
+  "tool": "0.6.18",
+  "steps": {
+    "target": {
+      "version": "0.6.18"
+    },
+    "start": "the candidate checkout at commit 0afa012043bd651436ccc0a06d9ed7a0b95acfc9",
+    "steps": [
+      "run the voice contract suite",
+      "it proves the captain-facing sentence shape: bounded sentence length, approved simple words, no internal jargon, lists over paragraphs, outcome first, full PR URLs",
+      "the check uses no model call and no network"
+    ],
+    "result": "suite exit code 0"
+  }
+}

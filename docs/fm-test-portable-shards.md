@@ -21,8 +21,9 @@ A failed script's duration is excluded even when its lane uploaded an artifact.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
 
-`tests/fm-supervision-host.test.sh` uses 789123 ms from run 36669175457, after the merged [host runtime fix](https://github.com/kunchenguid/firstmate/pull/6179), rather than its pre-fix maximum of 1065298 ms.
-That post-fix value has only one sample in this baseline, so further green runs must establish its variance.
+The supervision-host suite now runs in early and late halves on separate serial runners, with the complete local suite available through `FM_SUPERVISION_HOST_PART=all bash tests/fm-supervision-host.test.sh`.
+The provisional 800000 ms early and 1000000 ms late weights come from case timestamps in [run 40453434558](https://github.com/umeranjum17/juggernaut/actions/runs/40453434558), where the unsplit host script finished in 1774307 ms but its shard hit the 30-minute job cap before an artifact.
+Refresh both weights from green timing artifacts before treating them as measured per-script maxima; the older unsplit 789123 ms sample from [run 36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457) no longer describes either half.
 The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
 The 2026-10-07 polytoken adapter tests carry provisional local measurements instead - 21090 ms for `tests/fm-polytoken-harness.test.sh` and the 103 ms live-guard skip for `tests/fm-polytoken-signals-live-e2e.test.sh`, both measured on the adapter-verification macOS host - until the next CI refresh replaces them with Ubuntu measurements, because they postdate the 2026-09-30 baseline.
 The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
