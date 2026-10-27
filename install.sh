@@ -139,6 +139,9 @@ say "needs you: sign in to your harness the way you normally do; the installer n
 if [ "$DRY" = yes ]; then
   say "dry run: nothing was installed or written"
 else
+  if [ ! -f "$HOME_DIR/config/ai-engine.json" ]; then
+    node "$root/bin/fm-ai-engine.mjs" setup
+  fi
   say "done: $changed install(s) in $NPM_CONFIG_PREFIX/bin; add it to PATH if it is not there already"
   say "launch with: cd $HOME_DIR && claude"
   say "other harnesses: grok --trust | pi | omp | codex | opencode | cursor-agent --trust"
