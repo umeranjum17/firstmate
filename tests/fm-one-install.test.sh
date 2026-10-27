@@ -14,6 +14,12 @@ export HOME=$work/h XDG_DATA_HOME=$work/h/.local/share XDG_CONFIG_HOME=$work/h/.
 export NPM_LOG=$work/npm.log FM_PIN_FILE_OVERRIDE=$work/pins
 : > "$NPM_LOG"
 mkdir -p "$work/stub" "$HOME"
+cat > "$work/fake-byokit.mjs" <<'FAKE'
+export const machineStore = () => ({});
+export const osKeyringSeal = () => ({});
+export class Accounts { async list() { return [{ id: 'chatgpt.test', name: 'Test', provider: 'chatgpt', state: 'ready', billing: 'subscription' }]; } }
+FAKE
+export FM_BYOKIT_API_MODULE=$work/fake-byokit.mjs USER=fixture
 fail() { printf 'fail: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'ok: %s\n' "$*"; }
 pin() { awk -v t="$1" '$1 == t { v = $2; sub(/.*@/, "", v); print v }' "$FM_PIN_FILE_OVERRIDE"; }
@@ -71,7 +77,7 @@ done
 # A local edit to the table is what a bump does, so the journey runs against a copy of it.
 grep -E '^[^#]' "$ROOT/toolchain.versions" > "$FM_PIN_FILE_OVERRIDE"
 
-out=$(bash "$ROOT/install.sh" --home "$work/home" 2>&1) || fail "first run exited nonzero: $out"
+out=$(printf '1\n' | bash "$ROOT/install.sh" --home "$work/home" 2>&1) || fail "first run exited nonzero: $out"
 while read -r spec; do
   grep -q "install -g $spec" "$NPM_LOG" || fail "first run did not install $spec"
 done < <(awk 'NF == 2 && $2 ~ /@[0-9]/ { print $2 }' "$FM_PIN_FILE_OVERRIDE")
@@ -82,6 +88,7 @@ for tool in done-done sign-off-axi first-draft-axi lookout-axi byokit-accounts q
 done
 [ -f "$work/home/config/brief-include.md" ] || fail "defaults: no config/brief-include.md written"
 [ -f "$work/home/data/owner-rules.md" ] || fail "defaults: no data/owner-rules.md written"
+[ "$(jq -r '.account.provider' "$work/home/config/ai-engine.json")" = chatgpt ] || fail "installer did not save the selected BYOKit account"
 printf '%s\n' "$out" | grep -q 'needs you: gh auth login' || fail "no gh auth line for an unauthenticated gh"
 pass "one command installs the pinned set and writes the defaults"
 
