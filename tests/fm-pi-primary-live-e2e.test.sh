@@ -140,7 +140,7 @@ run_ahoy_case() {
 
 run_ahoy_transcript_regressions() {
   mkdir -p "$PROJECT/.agents/skills/ahoy" "$PROJECT/.agents/skills/bearings"
-  cp "$ROOT/.agents/skills/ahoy/SKILL.md" "$PROJECT/.agents/skills/ahoy/SKILL.md"
+  cp "$ROOT/.agents/skills/debrief/SKILL.md" "$PROJECT/.agents/skills/ahoy/SKILL.md"
   # shellcheck disable=SC2016 # Backticks are literal prompt markup.
   printf '%s\n' \
     '---' \
@@ -182,7 +182,7 @@ run_native_ahoy_regressions() {
     "$ROOT/bin/fm-gate-refuse-lib.sh" \
     "$ROOT/bin/fm-operational-input.sh" \
     "$AHOY_PROJECT/bin/"
-  cp "$ROOT/.agents/skills/ahoy/SKILL.md" "$AHOY_PROJECT/.agents/skills/ahoy/SKILL.md"
+  cp "$ROOT/.agents/skills/debrief/SKILL.md" "$AHOY_PROJECT/.agents/skills/ahoy/SKILL.md"
   chmod +x "$AHOY_PROJECT/bin/fm-sessionstart-nudge.sh"
   # shellcheck disable=SC2016 # Variables expand in the generated script, not this test shell.
   printf '%s\n' \

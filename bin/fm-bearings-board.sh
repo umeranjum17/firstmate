@@ -2,7 +2,7 @@
 # fm-bearings-board.sh - build and arm the /bearings lavish fleet board.
 #
 # The board is the captain-facing interactive surface of /bearings lavish: the
-# shipped template (.agents/skills/bearings/assets/board-template.html) plus one
+# shipped template (.agents/skills/sitrep/assets/board-template.html) plus one
 # injected fm-bearings-board.v1 JSON payload. This script owns the mechanics so
 # the invoking agent's per-run work stays "compose the JSON, run build" - the
 # agent never authors board UI at invocation time.
@@ -92,7 +92,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-$FM_ROOT}"
 
-TEMPLATE="${FM_BEARINGS_BOARD_TEMPLATE:-$SCRIPT_DIR/../.agents/skills/bearings/assets/board-template.html}"
+TEMPLATE="${FM_BEARINGS_BOARD_TEMPLATE:-$SCRIPT_DIR/../.agents/skills/sitrep/assets/board-template.html}"
 PLACEHOLDER='__FM_BEARINGS_BOARD_DATA__'
 BOARD_SCHEMA=fm-bearings-board.v1
 
