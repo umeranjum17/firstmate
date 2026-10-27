@@ -192,12 +192,14 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-composer-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-addons-dir-lib.sh
+. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
-# Account-pool hook (firstmate-addons/account-pool): a no-op when the add-on is absent.
-_fm_ap=${FM_ADDONS_DIR:-${FM_HOME:-$SCRIPT_DIR/..}/projects/firstmate-addons}/account-pool/bin/fm-account-pool-lib.sh
+# Account-pool hook (addons/account-pool): a no-op when the add-on is absent.
+_fm_ap=$(fm_addon_path "${FM_HOME:-$SCRIPT_DIR/..}" account-pool/bin/fm-account-pool-lib.sh)
 if [ -r "$_fm_ap" ]; then
   # shellcheck source=/dev/null
   . "$_fm_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_fm_ap" >&2; exit 1; }

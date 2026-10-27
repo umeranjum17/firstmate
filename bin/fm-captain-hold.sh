@@ -237,6 +237,9 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 
+# shellcheck source=bin/fm-addons-dir-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-classify-lib.sh"
@@ -1054,7 +1057,7 @@ command_hold() {
     release_task_control_lock
     if [ -f "$STATE/procevent/signoff.source" ]; then
       signoff_script=$SCRIPT_DIR/fm-procevent-signoff.sh
-      addon_signoff=${FM_ADDONS_DIR:-$FM_HOME/projects/firstmate-addons}/signoff/bin/fm-procevent-signoff.sh
+      addon_signoff=$(fm_addon_path "$FM_HOME" signoff/bin/fm-procevent-signoff.sh)
       [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
       FM_HOME=$FM_HOME FM_CODE_ROOT=${FM_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }

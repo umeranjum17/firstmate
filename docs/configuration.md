@@ -165,7 +165,7 @@ This preference is local to each Juggernaut home and is not part of Squad Lead i
 
 A home can limit any provider to a list of allowed models, so an off-list pick is refused instead of launched.
 The list is one JSON file, `config/model-allow-list.json`, one key per provider: `{"codex": ["gpt-5.6-sol"], "ollama-cloud": ["deepseek-v4.1-flash"]}`.
-It is the same file the `firstmate-addons` `model-gate` reads, so a home that already limits Ollama keeps that limit here too.
+It is the same file the `model-gate` add-on reads, so a home that already limits Ollama keeps that limit here too.
 A provider the file does not name is not limited, so the file only ever constrains a limit the captain wrote down.
 The key is the segment before the `/` of a qualified model id (`openai-codex`, `ollama-cloud`), and the harness name for a bare model id, which is how the harnesses that take one name their family (`claude`, `codex`, `cursor`).
 A `<provider>/` prefix is stripped before matching, and a model matches a listed entry when it is that entry or a pinned tag of it, so a listed `deepseek-v4.1-flash` also allows `deepseek-v4.1-flash:1017`.
@@ -1100,7 +1100,7 @@ Pins are not inherited into Squad Lead homes: a local Squad Lead agent launches 
 A remote Squad Lead is launched on its host from its own home's configuration, so create the file in that remote home.
 
 [`bin/fm-worker-account-lib.sh`](../bin/fm-worker-account-lib.sh) owns parsing, the sign-in check, and the full list of credentials a Claude launch unsets; [runtime backend verification](verification/runtime-backends.md#worker-account-pin-sign-in-check) records the check against the real runners.
-The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the firstmate-addons `account-pool` add-on, not this fork.
+The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the `account-pool` add-on, not this fork.
 
 ## Lavish server address (config/lavish-axi-host)
 
@@ -1135,7 +1135,7 @@ The optional local, gitignored `config/launch-env-hook` is an executable that ad
 When the file exists and is executable, the pane runs `config/launch-env-hook <out-file>` from the launch directory (the worktree for ship and Recon) right before the worker starts, then sources `<out-file>`, which must hold one plain `export` statement.
 It runs before the AI-trailer step in "Commit attribution", so `GIT_CONFIG_*` entries it appends after the inherited `GIT_CONFIG_COUNT` come before the trailer `core.hooksPath` entry.
 A nonzero exit, or an export the pane shell cannot source, stops the launch before the worker runs; an absent file changes nothing, and a present but non-executable file prints a warning at spawn and the launch proceeds without it.
-The hook's content is home-local policy, for example the firstmate-addons `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the invocation mechanics.
+The hook's content is home-local policy, for example the `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the invocation mechanics.
 
 ## Home brief include (config/brief-include.md)
 
@@ -2233,7 +2233,7 @@ The `signoff` adapter (`bin/fm-procevent-signoff.sh`) connects captain holds to 
 Armed, it binds itself to the keyed-answer intake above and registers one source whose child waits in `sign-off-axi wait` without waking Juggernaut.
 Arming is per home: a Squad Lead home arms itself, and a hold recorded in a home that is not armed raises no card.
 An answer saved on the board for a task this home still holds for the captain is captured, woken as an ordinary `check` wake, and fed to `bin/fm-captain-hold.sh answers`, so the person never copies the answer across by hand.
-While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hold; when the firstmate-addons `signoff` add-on is installed (under `FM_ADDONS_DIR`, else `projects/firstmate-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
+While armed, `bin/fm-captain-hold.sh hold` also raises a board card for that hold; when the `signoff` add-on is installed (resolved by `bin/fm-addons-dir-lib.sh`: `FM_ADDONS_DIR`, else the in-repo `addons/`, else the pre-fold clone at `projects/firstmate-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `FM_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.

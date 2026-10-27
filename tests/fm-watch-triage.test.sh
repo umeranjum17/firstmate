@@ -27,6 +27,11 @@ DRAIN="$ROOT/bin/fm-wake-drain.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-watch-triage-tests)
 
+# Stock-watcher subject: the deferred lookup prefers this checkout's own addons/, which must not decide assertions.
+FM_ADDONS_DIR="$TMP_ROOT/no-addons"
+mkdir -p "$FM_ADDONS_DIR"
+export FM_ADDONS_DIR
+
 # A drain whose acknowledgement is missing is re-presented for a few attempts -
 # a loaded machine can hold the queue lock or settle the stopped watcher's
 # downtime marker past one presentation - and every missed attempt prints its

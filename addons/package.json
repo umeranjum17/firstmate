@@ -10,10 +10,10 @@
     "shell",
     "guardrails"
   ],
-  "homepage": "https://github.com/umeranjum17/firstmate-addons#readme",
+  "homepage": "https://github.com/umeranjum17/juggernaut/tree/main/addons#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/umeranjum17/firstmate-addons.git"
+    "url": "git+https://github.com/umeranjum17/juggernaut.git"
   },
   "license": "MIT"
 }

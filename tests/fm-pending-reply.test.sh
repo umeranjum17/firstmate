@@ -1248,7 +1248,10 @@ test_helper_blocked_wait_hook_is_optional() {
   home=$(setup_parent wait-hook)
   state="$home/state"
   sm_home=$(bind_local_mate "$home" hibit)
-  env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
+  # A home with no add-ons at all: the in-repo addons/ would otherwise supply the hook, so pin an empty
+  # directory, which is the documented way to opt a home out of every add-on.
+  mkdir -p "$home/no-addons"
+  FM_ADDONS_DIR="$home/no-addons" FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' \
     || fail "missing add-on hook should be a no-op"
   addons="$home/addons"
   hook="$addons/status-wait-check/status-wait-check"
@@ -1296,15 +1299,28 @@ echo "default-path add-on refused wait" >&2
 exit 1
 EOF
   chmod +x "$hook"
+  # The in-repo addons/ wins over the pre-fold clone, so the clone's refusal message must NOT appear and
+  # the in-repo rule must refuse the blocked wait instead.
   if out=$(env -u FM_ADDONS_DIR FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
-    fail "default-path add-on should refuse blocked report"
+    fail "the in-repo blocked-wait rule should refuse the report"
   else
     rc=$?
   fi
-  [ "$rc" -eq 2 ] || fail "default-path refusal should exit 2"
-  assert_contains "$out" 'default-path add-on refused wait' "default-path refusal message was lost"
-  [ ! -e "$state/hibit.status" ] || fail "default-path refused report must not reach the parent status file"
-  pass "blocked-wait hook is found at the default add-on path"
+  [ "$rc" -eq 2 ] || fail "in-repo refusal should exit 2"
+  assert_contains "$out" 'use paused:' "the in-repo blocked-wait rule did not speak"
+  case "$out" in
+    *'default-path add-on refused wait'*) fail "the pre-fold clone ran while the in-repo add-ons existed" ;;
+  esac
+  [ ! -e "$state/hibit.status" ] || fail "refused report must not reach the parent status file"
+  # The same clone answers through the chain when it is the only add-ons directory.
+  if out=$(FM_ADDONS_DIR="$sm_home/projects/firstmate-addons" FM_HOME="$sm_home" "$REPORT" blocked abcdef0123456789 'waiting for CI' 2>&1); then
+    fail "the clone's hook should refuse the report when it is the resolved add-ons directory"
+  else
+    rc=$?
+  fi
+  [ "$rc" -eq 2 ] || fail "clone-hook refusal should exit 2"
+  assert_contains "$out" 'default-path add-on refused wait' "the clone's hook never ran"
+  pass "blocked-wait hook resolves the in-repo add-ons first and the clone when it is the only copy"
 }
 
 test_busy_idle_observation_via_backend_abstraction() {

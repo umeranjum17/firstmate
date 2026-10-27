@@ -46,6 +46,19 @@ fi
 MG=$FMH/config/merge-gate
 MGPREV=$MG.pre-owner-guard
 ours_gate() { [ -f "$MG" ] && grep -qxF "$MGMARK" "$MG"; }
+# 0 when the guard already runs from this gate, directly or through the chained prev= links another add-on
+# wrote. Chaining a gate that already reaches us would close a loop between the two copies - the merge gate
+# would then exec itself forever - so a repeat install keeps the chain instead of re-chaining it.
+gate_runs_guard() { # gate_runs_guard <gate file>
+  local file=$1 depth=0 prev
+  while [ -e "$file" ] && [ "$depth" -lt 8 ]; do
+    grep -qF "$DEST/owner-guard" "$file" 2>/dev/null && return 0
+    prev=$(sed -n 's/^prev=//p' "$file" 2>/dev/null | head -1)
+    [ -n "$prev" ] || return 1
+    file=$prev depth=$((depth + 1))
+  done
+  return 1
+}
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 # The hooks run under whatever PATH git's caller has, so the installed copies
 # carry absolute paths resolved here, at install time: a ref update under a
@@ -78,7 +91,10 @@ install_global() { # Write one wrapper per hook name; adopt the global hooksPath
 
 install_merge_gate() { # Chain the home's previous gate behind the guard's merge scan.
   if present "$MG" && ! ours_gate; then
-    if present "$MGPREV" && cmp -s "$MG" "$MGPREV"; then
+    if gate_runs_guard "$MG"; then
+      echo "kept: $MG already runs the owner-details merge scan behind another add-on's chain"
+      return 0
+    elif present "$MGPREV" && cmp -s "$MG" "$MGPREV"; then
       rm -f "$MG" # the same gate rewritten over ours: it is already chained
     elif present "$MGPREV"; then
       echo "error: $MG is not ours and differs from $MGPREV; move one aside and rerun" >&2

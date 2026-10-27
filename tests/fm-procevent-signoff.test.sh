@@ -25,6 +25,10 @@ mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
 FAKEBIN="$TMP_ROOT/fakebin"
+# Subject is this repo's own adapter: fm-captain-hold prefers the signoff add-on, which this checkout ships.
+FM_ADDONS_DIR="$TMP_ROOT/no-addons"
+mkdir -p "$FM_ADDONS_DIR"
+export FM_ADDONS_DIR
 FM_HOME_DIR="$TMP_ROOT/fmhome"
 mkdir -p "$FAKEBIN" "$FM_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \

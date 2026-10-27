@@ -31,8 +31,6 @@ journeys:
     command: bash pipeline-quota-failover/run-live-proof.sh
   fleet-dashboard-wait-reasons:
     command: bash fleet-dashboard/run-proof.sh
-  claude-quota-pool:
-    command: bash claude-quota/tests/claude-quota.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   claude-accounts-quota:
     command: bash claude-accounts/run-proof.sh
   claude-accounts-pick:
@@ -68,8 +66,6 @@ journeys:
     command: bash quota-axi-pool/run-proof.sh
   guards-pool-accounts:
     command: bash read-guard/run-pool-proof.sh
-  codex-guard-live:
-    command: bash codex-guard/run-proof.sh
   kill-guard-device:
     command: bash kill-guard/run-device-proof.sh
   kill-guard-main-live:

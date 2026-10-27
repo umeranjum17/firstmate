@@ -777,10 +777,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "addons/codex-guard/README.md",
-      "audience": "operator-current"
-    },
-    {
       "path": "addons/docs/addons-reference.md",
       "audience": "operator-current"
     },
@@ -825,14 +821,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "addons/local-qwen-tuning/PROVENANCE.md",
-      "audience": "maintainer-architecture"
-    },
-    {
-      "path": "addons/local-qwen-tuning/README.md",
-      "audience": "operator-current"
-    },
-    {
       "path": "addons/lookout-adapter/README.md",
       "audience": "operator-current"
     },
@@ -842,6 +830,10 @@
     },
     {
       "path": "addons/merge-on-green/README.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "addons/model-gate/README.md",
       "audience": "operator-current"
     },
     {
