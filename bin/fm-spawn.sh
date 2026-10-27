@@ -4776,13 +4776,12 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
 fi
 
-# Re-assert the durable task copy after either treehouse acquisition or endpoint
-# adoption. This also updates Herdr's restored pane shell before any harness is
-# started, so a later host restart inherits the task worktree rather than the
-# tab's original project directory.
-spawn_enter_recorded_worktree
-spawn_assert_agent_worktree
+# Relaunch must restore the durable task copy after endpoint adoption. This also
+# updates Herdr's restored pane shell before any harness starts, so a later host
+# restart inherits the task worktree rather than the tab's original directory.
 if [ "$RELAUNCH" -eq 1 ]; then
+  spawn_enter_recorded_worktree
+  spawn_assert_agent_worktree
   if [ "$KIND" = secondmate ]; then
     role_marker=$(cat "$WT/.fm-secondmate-home" 2>/dev/null || true)
     [ "$role_marker" = "$ID" ] || {
