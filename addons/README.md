@@ -34,7 +34,7 @@ Git and Bash are required; the install uses a systemd user service.
 | Watch host memory before every heavy job | A memory gate waits for headroom before starting work. |
 | Check whether ready work has stopped moving | Fleet-stall alerts on idle leads and workers waiting on them. |
 | Watch allowed pull requests until checks finish | Merge-on-green checks CI and proof receipts before merging. |
-| Scan separate task status files | The dashboard groups lanes, stuck work, waiting tasks, and queue reasons. |
+| Scan separate task status files | Lookout shows moving work, waiting tasks, and queue reasons from read-only fleet data. |
 
 Install each add-on independently and remove it independently.
 Choose the job you need first; the reference lists the full catalog and dependencies.
@@ -68,7 +68,7 @@ bash \
   "$FM_HOME"
 ```
 
-**Understand the fleet** — [Flow check](fleet-flow/install.sh); also dashboard, metrics, and ticket sync.
+**Understand the fleet** — [Flow check](fleet-flow/install.sh); also the [Lookout dashboard](lookout-adapter/README.md), metrics, and ticket sync.
 
 ```sh
 bash addons/fleet-flow/install.sh
