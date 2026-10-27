@@ -79,6 +79,9 @@ case "${1:-}" in
       esac
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
+        "cd -- '"*) cwd=${payload#cd -- \'}; cwd=${cwd%\'}; printf '%s\n' "$cwd" > "$D/cwd" ;;
+      esac
+      case "$payload" in
         /exit|/quit)
           printf 'zsh' > "$D/command"
           [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
@@ -90,6 +93,13 @@ case "${1:-}" in
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
+      case "$payload" in
+        "cd -- '"*)
+          if [ -z "${FM_FAKE_CWD_CHANGE_FAIL:-}" ]; then
+            cwd=${payload#cd -- \'}; cwd=${cwd%\'}; printf '%s\n' "$cwd" > "$D/cwd"
+          fi
+          ;;
+      esac
       case "$payload" in
         'export GOTMPDIR='*)
           if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
@@ -372,6 +382,35 @@ SH
   chmod +x "$dir/fakebin/tasks-axi"
 }
 
+# add_secondmate_task <case-dir> <id>: a seeded secondmate home with a real
+# charter, used to exercise the public relaunch path from a drifted pane cwd.
+add_secondmate_task() {
+  local dir=$1 id=$2 home
+  home="$dir/secondmate-home"
+  fm_git_worktree "$dir/proj" "$home" "secondmate-$id"
+  mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects" \
+    "$dir/home/data/$id"
+  printf '%s\n' "$id" > "$home/.fm-secondmate-home"
+  printf '# Squad Lead charter\n' > "$home/data/charter.md"
+  cp "$ROOT/AGENTS.md" "$home/AGENTS.md"
+  mkdir -p "$home/bin"
+  {
+    echo "window=fmses:fm-$id"
+    echo "endpoint_task_id=$id"
+    echo "worktree=$home"
+    echo "home=$home"
+    echo "project=$home"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "model=default"
+    echo "effort=default"
+  } > "$dir/home/state/$id.meta"
+  printf '%s\n' "fm-$id" > "$dir/fake/windows"
+  printf '%s' fmses > "$dir/fake/session-name"
+  printf '%s' "$dir/home/state/$id.inbox" > "$dir/fake/cwd"
+  TASK_TMPS+=("$home")
+}
+
 # --- 1. same-harness relaunch -----------------------------------------------
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
@@ -398,6 +437,22 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
   assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
+}
+
+test_secondmate_relaunch_restores_home_cwd_and_keeps_role() {
+  local dir out rc home
+  dir=$(new_case secondmate-cwd sm-relaunch)
+  add_secondmate_task "$dir" sm-relaunch
+  home="$dir/secondmate-home"
+  out=$(run_control "$dir" sm-relaunch relaunch --note "recover the secondmate identity"); rc=$?
+  expect_code 0 "$rc" "secondmate relaunch should succeed"$'\n'"$out"
+  [ "$(cat "$dir/fake/cwd")" = "$home" ] \
+    || fail "secondmate relaunch left its pane in the parent inbox instead of its canonical home"
+  [ "$(meta_field "$dir" sm-relaunch kind)" = secondmate ] \
+    || fail "secondmate relaunch changed the recorded role"
+  assert_grep "$home/data/charter.md" "$dir/fake/literal" \
+    "secondmate relaunch did not launch from its own charter"
+  pass "fm-control relaunch: restores the secondmate home cwd and preserves its role"
 }
 
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text() {
@@ -1635,27 +1690,20 @@ test_checkpoint_refuses_uninspectable_head_and_status() {
 
 # --- 5. failure after the agent is stopped -----------------------------------
 
-test_launch_failure_keeps_the_prior_record_and_reports_it() {
-  local dir out rc before
+test_launch_restores_drifted_cwd_before_relaunching() {
+  local dir out rc
   dir=$(new_case rollback rl13)
   add_ship_task "$dir" rl13 claude
-  before=$(cat "$dir/home/state/rl13.meta")
-  # The endpoint's shell is not in the recorded worktree, so the launch owner
-  # refuses AFTER the previous agent has already been stopped.
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  out=$(run_control "$dir" rl13 relaunch --harness codex --note "carry this forward"); rc=$?
-  expect_code 1 "$rc" "a failed launch should fail closed"$'\n'"$out"
-  assert_contains "$out" "no agent is running" "the failure should say no agent is running"
-  assert_contains "$out" "$dir/wt" "the failure should say where the work is preserved"
-  [ "$(cat "$dir/home/state/rl13.meta")" = "$before" ] \
-    || fail "a failed launch must keep the prior durable record"
-  [ "$(journal_field "$dir" rl13 phase)" = "failed:launching" ] \
-    || fail "the journal should record the failed phase, got '$(journal_field "$dir" rl13 phase)'"
-  [ "$(journal_field "$dir" rl13 rollback)" = "prior-record-kept" ] \
-    || fail "the journal should record what the rollback did"
+  out=$(run_control "$dir" rl13 relaunch --note "carry this forward"); rc=$?
+  expect_code 0 "$rc" "relaunch should restore a drifted endpoint before starting the replacement"$'\n'"$out"
+  [ "$(cat "$dir/fake/cwd")" = "$dir/wt" ] || fail "relaunch did not restore the canonical task working directory"
+  [ "$(meta_field "$dir" rl13 kind)" = ship ] || fail "relaunch changed the recorded worker role"
+  assert_grep "Your steering inbox is \`$dir/home/state/rl13.inbox\`" "$dir/home/data/rl13/launch-brief.md" \
+    "relaunch did not retain the task's worker role"
   assert_grep "carry this forward" "$dir/home/data/rl13/brief.md" \
-    "the progress note must survive so a later recovery still has it"
-  pass "fm-control relaunch: a launch failure after the stop keeps the prior record and reports the real state"
+    "the progress note must reach the replacement worker"
+  pass "fm-control relaunch: a drifted endpoint returns to the canonical task directory before starting"
 }
 
 test_prepublication_failure_keeps_concurrent_durable_metadata() {
@@ -1663,7 +1711,7 @@ test_prepublication_failure_keeps_concurrent_durable_metadata() {
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
+  FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" FM_FAKE_CWD_CHANGE_FAIL=1 \
     run_control "$dir" rl30 relaunch --harness codex --note "preserve concurrent metadata" \
       > "$dir/control.out" &
   control_pid=$!
@@ -2241,17 +2289,18 @@ test_spawn_relaunch_refuses_an_unrecorded_task() {
   pass "fm-spawn --relaunch: an unrecorded task is refused"
 }
 
-test_spawn_relaunch_refuses_a_pane_outside_the_worktree() {
+test_spawn_relaunch_restores_a_pane_outside_the_worktree() {
   local dir out rc
   dir=$(new_case wrongcwd rl18)
   add_ship_task "$dir" rl18 claude
   printf 'zsh' > "$dir/fake/command"
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
   out=$(run_spawn "$dir" rl18 --relaunch --harness claude); rc=$?
-  expect_code 1 "$rc" "a pane outside the worktree should refuse"
-  assert_contains "$out" "not its recorded worktree" "the refusal should name the wrong location"
-  [ ! -s "$dir/fake/keys" ] || fail "a refused tmux relaunch must send nothing to the pane"
-  pass "fm-spawn --relaunch: refuses to start a replacement outside the copy holding its work"
+  expect_code 0 "$rc" "a pane outside the worktree should return before replacement launch"$'\n'"$out"
+  [ "$(cat "$dir/fake/cwd")" = "$dir/wt" ] || fail "direct relaunch did not restore the canonical worktree"
+  assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" \
+    "direct relaunch did not start the recorded worker"
+  pass "fm-spawn --relaunch: restores a drifted pane before starting the replacement"
 }
 
 # --- 7. reclaiming a task whose endpoint is gone ----------------------------
@@ -2862,6 +2911,7 @@ SH
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
+test_secondmate_relaunch_restores_home_cwd_and_keeps_role
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_pending_refusal_names_the_harness_clear_key
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
@@ -2914,7 +2964,7 @@ test_missing_worktree_refuses_before_stopping_anything
 test_missing_instructions_refuse_before_stopping_anything
 test_checkpoint_refusal_leaves_the_record_byte_identical
 test_checkpoint_refuses_uninspectable_head_and_status
-test_launch_failure_keeps_the_prior_record_and_reports_it
+test_launch_restores_drifted_cwd_before_relaunching
 test_prepublication_failure_keeps_concurrent_durable_metadata
 test_post_publication_launch_failure_keeps_the_new_record
 test_stop_transport_failure_reconciles_a_dead_agent
@@ -2935,7 +2985,7 @@ test_spawn_relaunch_refuses_a_pending_authoritative_close
 test_spawn_relaunch_refuses_contradicting_flags
 test_spawn_relaunch_refuses_an_unrecorded_task
 test_spawn_relaunch_refuses_a_missing_stored_model
-test_spawn_relaunch_refuses_a_pane_outside_the_worktree
+test_spawn_relaunch_restores_a_pane_outside_the_worktree
 test_tmux_refuses_a_window_missing_from_its_session
 test_tmux_refuses_a_session_that_cannot_be_found
 test_tmux_refuses_when_the_server_is_gone
