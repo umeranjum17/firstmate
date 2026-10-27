@@ -30,6 +30,7 @@
 #   jg-inbox.sh status
 #   jg-inbox.sh ask  <question>...
 #   jg-inbox.sh list
+#   jg-inbox.sh asks
 #   jg-inbox.sh drain [--ack <id>...]
 #
 # `note --request-id` is the idempotent capture path: a repeat of the same
@@ -38,6 +39,11 @@
 # retry are distinguishable. The binding is recorded before announcement, so a
 # crash between save and wake still replays the original note. Without
 # --request-id the historical one-note-per-call behaviour is unchanged.
+# A note whose first body line starts with `[captain-ask]` also creates a
+# `[captain-ask]` backlog ticket with the complete note as its body before the
+# wake is announced; its deterministic id is `captain-ask-<note-id>`. `asks`
+# lists pending and handled captain-ask notes with that ticket and its current
+# backlog state.
 # `announce` repairs the wake for an already-saved note without creating another.
 # A note already acknowledged (in handled/) gets no wake from `announce` or a
 # request-id replay; both report it as acknowledged and exit 0.
@@ -385,9 +391,27 @@ announce_note() {  # <id> <summary>
   return "$status"
 }
 
+captain_ask_ticket_id() { printf 'captain-ask-%s' "$1"; }
+
+ensure_captain_ask_ticket() {  # <note-id> <note-body>
+  local id=$1 body=$2 first title ticket show
+  first=${body%%$'\n'*}
+  case "$first" in '[captain-ask]'*) ;; *) return 0 ;; esac
+  need tasks-axi
+  ticket=$(captain_ask_ticket_id "$id")
+  if show=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SELF_DIR/jg-tasks-axi.sh" show "$ticket" --full 2>/dev/null); then
+    return 0
+  fi
+  title=$first
+  JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SELF_DIR/jg-tasks-axi.sh" add "$ticket" "$title" \
+    --kind captain --priority 0 --body "$body" >/dev/null || die "captain ask note $id is saved but its ticket $ticket could not be created"
+}
+
 finish_note_result() {  # <outcome> <id> <request-id> <json> <strict-exit> <summary>
   local outcome=$1 id=$2 request_id=$3 json=$4 strict=$5 summary=$6
   local announced=0 acknowledged=0 path="$INBOX/$id.note" rc=0
+  [ -f "$INBOX/handled/$id.note" ] && path="$INBOX/handled/$id.note"
+  ensure_captain_ask_ticket "$id" "$(read_note_body "$path")"
   announce_note "$id" "$summary" || rc=$?
   case "$rc" in
     0) announced=1 ;;
@@ -519,6 +543,24 @@ cmd_note() {
     body="$*"
   fi
   queue_note text "$body" "" "$request_id" "$json"
+}
+
+cmd_asks() {
+  local path id body first ticket show state
+  [ "$#" -eq 0 ] || die "usage: jg-inbox.sh asks"
+  printf 'ticket\tstate\tnote\task\n'
+  for path in "$INBOX"/*.note "$INBOX/handled"/*.note; do
+    [ -f "$path" ] || continue
+    body=$(read_note_body "$path")
+    first=${body%%$'\n'*}
+    case "$first" in '[captain-ask]'*) ;; *) continue ;; esac
+    id=${path##*/}; id=${id%.note}
+    ticket=$(captain_ask_ticket_id "$id")
+    show=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$SELF_DIR/jg-tasks-axi.sh" show "$ticket" --full 2>/dev/null) || die "captain ask note $id has no readable ticket $ticket"
+    state=$(printf '%s\n' "$show" | sed -n 's/^  state: //p' | head -1)
+    [ -n "$state" ] || die "captain ask ticket $ticket has no readable state"
+    printf '%s\t%s\t%s\t%s\n' "$ticket" "$state" "$id" "$first"
+  done
 }
 
 cmd_announce() {
@@ -1169,6 +1211,7 @@ case "${1:-}" in
   status)   shift; cmd_status ;;
   ask)      shift; cmd_ask "$@" ;;
   list)     shift; cmd_list ;;
+  asks)     shift; cmd_asks "$@" ;;
   drain)    shift; cmd_drain "$@" ;;
   ''|-h|--help|help)
     # The whole header block, found rather than counted: everything after the

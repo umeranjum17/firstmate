@@ -296,7 +296,7 @@ The built-in dashboard reads the fleet read-only and shows what is moving, what 
 | **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.7.0 (0.8.0 once sign-off PR 303 releases)` |
 | **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record.<br>`npm i -g learn-from-mistakes-axi@0.10.0` |
 | **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick.<br>`npm install -g first-draft-axi@0.3.0` |
-| **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g --allow-remote=all https://github.com/umeranjum17/takeone/releases/latest/download/takeone.tgz (0.2.1)` |
+| **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g takeone-axi@0.4.0` |
 | **quota-axi** | Reports the quota windows your local agents can use, in one read, without routing or recommending anything.<br>`npx -y quota-axi@0.1.67` |
 | **BYOKit** | Gives your app the parts it needs to use a person's own AI plan and devices: sign-in, pairing, voice, usage.<br>`npm install @byokit/accounts@0.34.0 @byokit/realtime@0.3.3` |
 | **Lookout** | A read-only fleet dashboard: which agents need you, what limits capacity, and why work is waiting.<br>`npx -y lookout-axi@0.1.0 serve` |

@@ -447,3 +447,5 @@ tests/jg-addons-dir.test.sh  # inline jg-compat env alias
 tests/jg-one-install.test.sh  # inline jg-compat env alias
 install.sh  # inline jg-compat env alias
 tests/jg-supervision-host-late.test.sh  # inline jg-compat env alias
+bin/jg-migrate.sh  # the migrator names the old spellings it rewrites; they are its data
+tests/jg-migrate.test.sh  # fixtures in the old spellings the migrator rewrites
