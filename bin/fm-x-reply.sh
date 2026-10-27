@@ -15,7 +15,7 @@
 #
 # The --text-file / stdin forms exist so a caller never has to inline reply text
 # (which may be influenced by a public mention) into a shell command, where shell
-# expansion or quote-breakage could bite. fmx-respond uses them; the positional
+# expansion or quote-breakage could bite. relay-respond uses them; the positional
 # <text> form is kept for back-compat and tests. Argument parsing is strict so a
 # mistyped flag can never become the posted text: an unknown dash-leading
 # argument, a dash-leading request_id, an option value that starts with '-', or a

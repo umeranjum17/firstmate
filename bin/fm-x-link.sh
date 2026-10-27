@@ -27,7 +27,7 @@
 # relay lookup by request_id. If either axis remains missing, the link is still
 # recorded but a loud warning is printed and follow-ups fail closed.
 #
-# This is a separate step the fmx-respond skill runs AFTER fm-spawn.sh, so it
+# This is a separate step the relay-respond skill runs AFTER fm-spawn.sh, so it
 # never changes fm-spawn's interface. The follow-up itself - detection, the
 # window/cap check, the post, and clearing the link - is owned by
 # fm-x-followup.sh on the task's captain-relevant wakes. The meta read/write

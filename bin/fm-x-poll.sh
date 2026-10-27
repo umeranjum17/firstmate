@@ -29,7 +29,7 @@
 # directory presence test plus a signature compare, with no tasks-axi call and no
 # backlog scan. A home with no pending terminal results pays nothing for it.
 # The full object is stashed verbatim, so every conversation-context field the
-# relay includes is preserved for fmx-respond to handle with continuity; the
+# relay includes is preserved for relay-respond to handle with continuity; the
 # Relay section of docs/configuration.md owns that payload's wire contract. The
 # durable context record lets a delayed follow-up recover the ORIGINAL
 # platform/budget even after this inbox file is drained.
@@ -154,7 +154,7 @@ REQ=$(jq -r '.request_id // empty' "$BODY_FILE" 2>/dev/null) || exit 0
 [ -n "$REQ" ] || { clear_error; exit 0; }
 
 # A pending mention only reaches the agent when it has non-empty text.
-# Semantic worthiness is decided by fmx-respond, so acknowledgments can still be
+# Semantic worthiness is decided by relay-respond, so acknowledgments can still be
 # stashed here and deliberately skipped there.
 # Empty/absent/null text must not stash an inbox file or wake a public X flow for
 # nothing - stay inert (exit 0).
@@ -167,7 +167,7 @@ case "$REQ" in
   ''|.*|*[!A-Za-z0-9._-]*) clear_error; exit 0 ;;
 esac
 
-# The offer marker outlives the inbox file, which fmx-respond removes after a
+# The offer marker outlives the inbox file, which relay-respond removes after a
 # successful answer or dismiss. Checking it before the inbox stash keeps both a
 # still-pending request and the relay's brief post-answer re-offer silent without
 # recreating a drained inbox. The startup prune above bounds marker retention.
