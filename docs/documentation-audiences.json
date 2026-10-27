@@ -109,11 +109,11 @@
   ],
   "surfaces": [
     {
-      "path": ".agents/skills/afk/SKILL.md",
+      "path": ".agents/skills/watchover/SKILL.md",
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/ahoy/SKILL.md",
+      "path": ".agents/skills/debrief/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -121,7 +121,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/bearings/SKILL.md",
+      "path": ".agents/skills/sitrep/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -241,7 +241,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/quiet/SKILL.md",
+      "path": ".agents/skills/radio-silence/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -253,7 +253,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/stow/SKILL.md",
+      "path": ".agents/skills/intel/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -261,7 +261,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/updatefirstmate/SKILL.md",
+      "path": ".agents/skills/resupply/SKILL.md",
       "audience": "agent-runtime"
     },
     {
