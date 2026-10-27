@@ -72,6 +72,37 @@ list_out=$(run_inbox "$home" list) || fail "list should succeed"
 assert_contains "$list_out" "hello from the terminal" "list should show the body"
 pass "plain note, list, and wake stay on the historical human path"
 
+# A captain ask note must create a backlog ticket before firstmate is woken.
+home=$(make_home captain-ask)
+cat > "$home/.tasks.toml" <<'EOF'
+backend = "markdown"
+
+[markdown]
+path = "data/backlog.md"
+EOF
+printf '%s\n' '# Backlog' '' '## In flight' '' '## Queued' '' '## Done' > "$home/data/backlog.md"
+ask_body=$'[captain-ask] Keep the dashboard ticketed\nPreserve this original ask body.'
+ask_out=$(run_inbox "$home" note --request-id ask-ticket-1 --json "$ask_body") || fail "captain ask note should create its ticket and queue"
+ask_id=$(printf '%s' "$ask_out" | json_get id)
+ask_ticket="captain-ask-$ask_id"
+ask_show=$(FM_HOME="$home" FM_DATA_OVERRIDE="$home/data" "$ROOT/bin/fm-tasks-axi.sh" show "$ask_ticket" --full) || fail "captain ask ticket is missing"
+assert_contains "$ask_show" '[captain-ask] Keep the dashboard ticketed' "ticket title should retain the captain-ask tag and request"
+assert_contains "$ask_show" 'Preserve this original ask body.' "ticket should preserve the full original ask"
+asks_out=$(run_inbox "$home" asks) || fail "captain ask listing should succeed"
+assert_contains "$asks_out" "$ask_ticket" "captain ask listing omitted its ticket"
+assert_contains "$asks_out" $'\tqueued\t' "captain ask listing omitted its ticket state"
+assert_contains "$asks_out" "$ask_id" "captain ask listing omitted its source note"
+replay_out=$(run_inbox "$home" note --request-id ask-ticket-1 --json "$ask_body") || fail "captain ask retry should replay the existing ticket"
+assert_equals "$ask_id" "$(printf '%s' "$replay_out" | json_get id)" "captain ask retry changed its note id"
+run_inbox "$home" drain --ack "$ask_id" >/dev/null || fail "captain ask acknowledgement failed"
+asks_out=$(run_inbox "$home" asks) || fail "captain ask listing should include handled asks"
+assert_contains "$asks_out" "$ask_ticket" "handled captain ask disappeared from listing"
+plain_out=$(run_inbox "$home" note 'ordinary note, not an ask') || fail "ordinary note should remain supported"
+assert_contains "$plain_out" 'queued ' "ordinary note should still be queued"
+asks_out=$(run_inbox "$home" asks) || fail "captain ask listing should succeed after an ordinary note"
+[ "$(printf '%s\n' "$asks_out" | grep -cF "$ask_ticket")" -eq 1 ] || fail "ordinary note appeared as a captain ask or the ask duplicated"
+pass "a [captain-ask] note immediately creates a ticket, preserves its body, and is listed with ticket and state"
+
 # A saved note whose wake fails still exits 1 for callers that omit the new flags.
 isolated="$TMP_ROOT/isolated"
 mkdir -p "$isolated/bin"

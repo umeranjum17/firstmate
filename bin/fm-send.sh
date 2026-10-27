@@ -800,6 +800,15 @@ else
     echo "error: a text steer requires a nonempty message; nothing was sent (an empty marked request would deliver only marker and correlation bytes and leave the parent waiting on a reply to nothing)" >&2
     exit 1
   fi
+  order_route_tag=''
+  if [[ "$MESSAGE" =~ (^|[[:space:]])\[(order|route)\]([[:space:]]|$) ]]; then
+    order_route_tag=${BASH_REMATCH[2]}
+  fi
+  if [ -n "$order_route_tag" ] &&
+    ! [[ "$MESSAGE" =~ (^|[[:space:]])ticket=[A-Za-z0-9._-]+([[:space:]]|$) ]]; then
+    echo "error: [$order_route_tag] steer needs a ticket=<task-id> token; add one before sending (for example: [$order_route_tag] ticket=TASK-ID your instruction)" >&2
+    exit 1
+  fi
   if [ "$TARGET_BACKEND" = remote ]; then
     FM_SEND_REMOTE_BUDGET=${FM_SEND_REMOTE_BUDGET:-30}
     case "$FM_SEND_REMOTE_BUDGET" in

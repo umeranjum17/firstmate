@@ -2535,6 +2535,7 @@ The spoken interface in [`docs/voice-relay.md`](voice-relay.md) and the model-ba
 Each is one line in a local, gitignored `config/` file, with an environment variable that overrides it for a single run, and a missing required value refuses with the path to write rather than falling back to a value that belongs to another home.
 
 That configuration is the whole opt-in: an unconfigured home cannot start the relay and cannot run `fm-inbox.sh say` or `ask`, while `note`, `announce`, `reply`, `receipts`, `ready`, `status`, `list` and `drain` need no configuration at all because they make no model call.
+A `[captain-ask]` note also needs the home's configured task backlog so it can create its ticket; `fm-inbox.sh asks` lists those notes with their ticket and current state.
 The voice handover depends on `note`, so it keeps working in a home that has configured nothing.
 
 | File | Environment | Holds |

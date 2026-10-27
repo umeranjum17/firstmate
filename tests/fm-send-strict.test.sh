@@ -231,6 +231,27 @@ test_key_send_exit_status_follows_delivery() {
   pass "fm-send --key: exit status follows delivery, and an undelivered key never reports success"
 }
 
+test_order_steer_requires_ticket_before_delivery() {
+  local dir fb home err log rc
+  dir="$TMP_ROOT/order-ticket"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home orderticket); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
+  fm_write_meta "$home/state/lead.meta" "window=sess:fm-lead" "kind=ship"
+
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" lead '[order] please do this' >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "an [order] steer without a ticket should fail"
+  assert_contains "$(cat "$err")" 'ticket=<task-id>' "refusal should show the ticket token syntax"
+  assert_contains "$(cat "$err")" '[order] ticket=TASK-ID' "refusal should show an actionable example"
+  [ ! -s "$log" ] || fail "unticketed order reached the worker"
+
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" lead '[answer] this is not an order' >/dev/null 2>"$err" || fail "an answer steer should not require a ticket"
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" lead '[route] ticket=work-42 do the requested work' >/dev/null 2>"$err" || fail "a ticketed route steer should succeed"
+  pass "fm-send refuses unticketed orders before delivery while leaving answers unchanged and allowing ticketed routes"
+}
+
+test_order_steer_requires_ticket_before_delivery
 test_exact_lane_id_send_still_works
 test_key_send_exit_status_follows_delivery
 test_unset_fm_home_fails
