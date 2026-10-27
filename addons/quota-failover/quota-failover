@@ -69,7 +69,7 @@ STALL=${QUOTA_FAILOVER_STALL_SECS:-240}
 TEST_SECS=${QUOTA_FAILOVER_TEST_SECS:-90}
 PROBE_SECS=${QUOTA_FAILOVER_PROBE_SECS:-900}
 RETEST=${QUOTA_FAILOVER_RETEST_SECS:-1800}
-LIMIT_RE='(usage|rate|quota|weekly|monthly|daily|hour|session) limit (has been )?reached|hit your (usage )?limit|rate[ _-]?limit(ed|_error| exceeded)|quota (exceeded|exhausted)|exceeded your (current )?quota|insufficient[ _-]quota|too many requests|retrying in [0-9]+h'
+LIMIT_RE='(usage|rate|quota|weekly|monthly|daily|hour|session) limit (has been )?reached|hit your (usage )?limit|rate[ _-]?limit(ed|_error| exceeded)|quota (exceeded|exhausted)|exceeded your (current )?quota|insufficient[ _-]quota|too many requests|retrying in [0-9]+h|(^|[^0-9])400([^0-9]|$)[^[:cntrl:]]{0,80}insufficient[ _-]credits'
 # Screen text is untrusted (it can include files or diffs). Only Claude's own
 # usage-limit banner is a screen signal; route removal still needs a live probe.
 SCREEN_LIMIT_RE="You've hit your usage limit for your plan"

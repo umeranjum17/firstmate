@@ -85,6 +85,8 @@ date +%s >"$JG_HOME/state/$id.status"
 case $* in
   *step-5-preview-free*) [ "${OC_STEP5:-dead}" = dead ] || { echo PONG; exit 0; } ;;
   *gpt-5.6-luna*) [ "${OC_LUNA:-dead}" = dead ] || { echo PONG; exit 0; } ;;
+  *credit-exhausted*) [ "${OC_CREDIT:-dead}" = dead ] || { echo PONG; exit 0; }; echo 'HTTP 400: insufficient credits'; exit 1 ;;
+  *invalid-request*) echo 'HTTP 400: invalid request'; exit 1 ;;
   *) echo PONG; exit 0 ;;
 esac
 echo 'ERROR: 429 Upstream request failed: Rate limit exceeded'
@@ -280,6 +282,31 @@ count "pass8: it is read on that account's profile folder" "$home/state/claude-p
 is "pass8: an account limit leaves the claude route in dispatch" \
   "$(jq -r '[.[].model | select(startswith("claude"))] | join(",")' "$dead")" ""
 
+
+# A concrete credit exhaustion on HTTP 400 removes the route and moves the
+# stopped worker to a permitted live route; ordinary 400s do not.
+printf '[]\n' >"$dead"
+printf '{"rules":[{"when":"credits","use":[{"harness":"opencode","model":"opencode-go/credit-exhausted"},{"harness":"opencode","model":"opencode-go/mimo-v2.6-flash"}]}],"default":[] }\n' >"$disp"
+printf 'endpoint_task_id=credit\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=operator\nspawn_gen=s0.credit\n' >"$home/state/credit.meta"
+run
+has "pass16: insufficient credits on HTTP 400 moves the stopped worker" "$ctl" \
+  '^credit relaunch --harness opencode --model opencode-go/mimo-v2.6-flash '
+has "pass16: insufficient-credit route leaves dispatch" "$dead" 'credit-exhausted'
+printf '{"rules":[{"when":"invalid request","use":[{"harness":"opencode","model":"opencode-go/invalid-request"},{"harness":"opencode","model":"opencode-go/mimo-v2.6-flash"}]}],"default":[]}\n' >"$disp"
+printf 'endpoint_task_id=invalid400\nharness=opencode\nmodel=opencode-go/invalid-request\nkind=operator\nspawn_gen=s0.invalid400\n' >"$home/state/invalid400.meta"
+run
+is "pass16: ordinary invalid-request 400 keeps its route out of the dead list" \
+  "$(jq -r 'any(.[]; .model == "opencode-go/invalid-request")' "$dead")" false
+is "pass16: ordinary invalid-request 400 leaves its route in dispatch" \
+  "$(jq -r '.rules[0].use[0].model' "$disp")" opencode-go/invalid-request
+
+# Without a permitted fallback, keep the worker stopped and record its wait.
+printf '{"rules":[{"when":"credits","use":[{"harness":"opencode","model":"opencode-go/credit-exhausted"}]}],"default":[] }\n' >"$disp"
+printf 'endpoint_task_id=credit-wait\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=operator\nspawn_gen=s0.credit-wait\n' >"$home/state/credit-wait.meta"
+run
+has "pass17: no fallback records a durable wait" "$log" \
+  'credit-wait: stopped on opencode opencode-go/credit-exhausted .* no live route in crew-dispatch, left waiting'
+count "pass17: no fallback does not relaunch" "$ctl" '^credit-wait relaunch ' 0
 
 # Wrapper/file text is not Claude's limit banner and must not remove its route.
 printf '[]\n' >"$dead"

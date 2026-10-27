@@ -57,6 +57,10 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *"# PR identity: copy or abstain"*"copied verbatim from the task's \`done [at=<epoch>]: PR <url>\` status line or its \`pr=\` metadata field"*"Never assemble an owner, repository, host, or number"*"report the identifier you do have"*) ;;
     *) fail "branch prompt lost the copy-or-abstain PR identity rule" ;;
   esac
+  case "$out_a" in
+    *"For a merge, name the task's authorized lead as the merge owner; never say that MAIN decides the merge."*"With standing merge authority, the lead merges through the normal gate after all requirements pass; escalate only a genuine owner review, red CI, missing proof, security, or destructive hold."*) ;;
+    *) fail "branch prompt lost the authorized merge-owner wording or genuine-hold rule" ;;
+  esac
   # The 2026-09-22 away window: every landed exemption worker was left sitting
   # because the prompt granted landed-task cleanup without ever naming the
   # moment or the command, so the stale wake ended in the recovery playbook's

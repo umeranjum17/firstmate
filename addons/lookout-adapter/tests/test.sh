@@ -10,60 +10,66 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=${!_jg_old}"
 done
 unset _jg_old _jg_new 2>/dev/null || true
-
+# Integration: map durable fleet-flow output to Lookout's public adapter interface.
 set -eu
-here="$(cd "$(dirname "$0")/.." && pwd)"
-t="$(mktemp -d)"; trap 'kill "${srv:-}" 2>/dev/null || true; rm -rf -- "$t"' EXIT
-mkdir -p "$t/home/state/dashboard" "$t/home/data" "$t/main2/state" "$t/proc"
-now=1792852545
-printf 'MemTotal: 1000 kB\nMemAvailable: 400 kB\n' > "$t/proc/meminfo"; echo '0.50 0.4 0.3 1/2 3' > "$t/proc/loadavg"
-echo "- alpha - Owns alpha. (home: $t/main2; scope: x)" > "$t/home/data/squad_leads.md"
-printf 'model=claude-sonnet-5-5\nharness=claude\naccount=pa_fixture\napi_key=SECRET-VALUE-123\n' > "$t/main2/state/a-one.meta"
-cat > "$t/home/state/dashboard/data.json" <<J
-{"cutoff":$now,"build_time":"2026-10-24T18:35:45+04:00","machine":{"pressure":50},"machine_limits":{"memory_pressure":40,"emulators":2,"gradle":2},
- "metrics":{"emulators":{"value":1},"gradle_builds":{"value":0}},
- "homes":[{"home":"main","plan":4,"lead_state":"","summary_generated_epoch":$((now-60))},{"home":"alpha","plan":2,"lead_state":"Lead is working","summary_generated_epoch":$((now-2000))}],
- "agents":[{"role":"worker","home":"alpha","name":"a-one","status":"working"},{"role":"worker","home":"alpha","name":"a-two","status":"done"},{"role":"lead","home":"alpha","name":"alpha","status":"idle"}],
- "quota_accounts":[{"name":"Codex","windows":[{"label":"week","used":60,"reset":"2026-10-29T21:59:59+04:00","runout":"2026-10-25T11:03:03+04:00"}]}],
- "claude_accounts":[{"name":"acct-b","five_hour":{"left":59,"resets_at":"2026-10-24T18:30:00+00:00"},"seven_day":{"left":15,"resets_at":"2026-10-29T07:00:00+00:00"}}],
- "lane_history":[{"at":$((now-3600)),"lanes":5,"stuck":1}],"devices":[{"name":"Phone X1","tone":"ok","holder":null},{"name":"Emulator e1","tone":"ok","holder":"alpha"}]}
-J
-cat > "$t/home/state/dashboard/board.json" <<J
-{"homes":[{"id":"alpha","name":"Alpha"}],"tickets":[{"id":"alpha/a-one","project":"alpha-app"}],
- "cards":[{"id":"alpha/a-one","home":"alpha","title":"First lane\n... (truncated)","stage":"ci","state":"waiting","since":$((now-100)),"started":$((now-900)),"pr":"https://github.com/o/r/pull/1","wait":"CI"},
-          {"id":"alpha/a-two","home":"alpha","title":"Second","stage":"building","state":"blocked","since":$((now-50)),"started":null,"pr":null,"wait":null},
-          {"id":"alpha/finished","home":"alpha","title":"Awaiting merge","stage":"merge","state":"finished","since":$now,"pr":null},
-          {"id":"alpha/backlog-item","home":"alpha","title":"Ready item","stage":"queued","state":"queued","since":$now,"pr":null},
-          {"id":"ghost/x","home":"ghost","title":"Unknown home","stage":"queued","state":"queued","since":$now,"pr":null}],
- "flow":{"lanes":[{"home":"alpha","task":"a-one","display_title":"Merged one","pr":"https://github.com/o/r/pull/1","times":{"merged":$((now-7200)),"dispatched":$((now-9000))}},
-                  {"home":"alpha","task":"old","pr":"https://github.com/o/r/pull/0","times":{"merged":$((now-40*86400))}}]}}
-J
+here=$(cd "$(dirname "$0")/.." && pwd)
+t=$(mktemp -d)
+trap 'kill "${srv:-}" "${fleet:-}" 2>/dev/null || true; rm -rf -- "$t"' EXIT
+mkdir -p "$t/home/state" "$t/home/data" "$t/alpha/state" "$t/alpha/data" "$t/proc"
+now=$(date +%s)
+printf 'MemTotal: 1000 kB\nMemAvailable: 400 kB\n' > "$t/proc/meminfo"
+printf '0.50 0.4 0.3 1/2 3\n' > "$t/proc/loadavg"
+printf '%s\n' "- alpha - Alpha (home: $t/alpha; scope: app)" > "$t/home/data/squad_leads.md"
+printf 'kind=ship\nmodel=claude-haiku-5-5\nharness=claude\naccount=fixture\napi_key=SECRET\npr=https://github.com/o/r/pull/1\n' > "$t/alpha/state/a-one.meta"
+printf 'kind=ship\nmodel=claude-haiku-5-5\nharness=claude\naccount=fixture\napi_key=SECRET\npr=https://github.com/o/r/pull/1\n' > "$t/home/state/a-one.meta"
+printf 'working [at=%s]: building\n' "$((now-60))" > "$t/home/state/a-one.status"
+printf '## Queued\n' > "$t/home/data/backlog.md"
+printf 'kind=ship\npr=https://github.com/o/r/pull/2\n' > "$t/alpha/state/old.meta"
+cat > "$t/flow.json" <<JSON
+{"schema":"jg-flow.v1","at":$now,"homes":["main","alpha"],"lanes":[
+ {"home":"alpha","task":"a-one","open":true,"stage":"working","kind":"ship","project":"alpha-app","reason":"building","seconds_in_stage":5,"open_waits":[{"reason":"building"}],"times":{"dispatched":$((now-60)),"working":$((now-50)),"merged":null}},
+ {"home":"alpha","task":"old","open":false,"stage":"done","kind":"ship","project":"alpha-app","times":{"dispatched":$((now-7200)),"merged":$((now-3600))}}]}
+JSON
 out="$t/fleet.json"
-"$here/lookout-juggernaut" --home "$t/home" --no-build --proc "$t/proc" > "$out"
-python3 - "$out" <<'P'
+"$here/lookout-juggernaut" --home "$t/home" --proc "$t/proc" --flow-json "$t/flow.json" > "$out"
+python3 - "$out" <<'PY'
 import json, sys
-d = json.load(open(sys.argv[1])); raw = open(sys.argv[1]).read()
-assert 'SECRET' not in raw, 'a .meta secret reached the document'
+raw = open(sys.argv[1]).read()
+d = json.loads(raw)
+assert 'SECRET' not in raw
 assert d['schema'] == 'lookout.fleet.v1'
-h = d['hosts'][0]; assert h['mem_pct'] == 60.0 and h['gate'] == {'state': 'closed', 'limit_pct': 40} and h['jobs'][0] == {'kind': 'emulator', 'running': 1, 'limit': 2}, h
-assert [x['supervision']['state'] for x in d['homes']] == ['ok', 'stale'], d['homes']
-assert [l['stage'] for l in d['lanes']] == ['review', 'working', 'done'] and [l['stuck'] for l in d['lanes']] == [False, True, False], d['lanes']  # a finished lane holds no worker
-assert d['lanes'][0]['title'] == 'First lane' and d['lanes'][0]['project'] == 'alpha-app' and d['lanes'][0]['waiting_on'] == 'CI'
-w = d['workers']; assert len(w) == 2 and w[0]['account'] == 'pa_fixture' and w[0]['agent'] == 'claude' and w[1]['state'] == 'exited', w
-assert {(q['account'], q['window']) for q in d['quota']} == {('Codex', 'week'), ('acct-b', '5h'), ('acct-b', 'week')}
-assert [m['title'] for m in d['merges']] == ['Merged one'] and d['merges'][0]['lane'] == 'alpha/a-one', d['merges']
-assert len(d['history']) == 1 and [x['state'] for x in d['devices']] == ['free', 'busy'], d['devices']
-P
-if [ -n "${LOOKOUT_DIR:-}" ] && command -v node >/dev/null; then
-  node --input-type=module -e "import { validateFleet } from '$LOOKOUT_DIR/lib/contract.js'; import fs from 'node:fs'; const p = validateFleet(JSON.parse(fs.readFileSync('$out', 'utf8'))); if (p.length) { console.error(p.join('\n')); process.exit(1) }"
-  echo "contract: valid"
-else echo "contract: skipped (set LOOKOUT_DIR to a lookout clone)"; fi
-"$here/lookout-juggernaut" --home "$t/home" --no-build --proc "$t/proc" --serve --port 0 --every 1 > "$t/serve.log" & srv=$!
+assert [h['id'] for h in d['homes']] == ['main', 'alpha']
+assert d['homes'][1]['name'] == 'Alpha'
+lane = d['lanes'][0]
+assert (lane['id'], lane['stage'], lane['project'], lane['waiting_on'], lane['pr_url']) == (
+    'alpha/a-one', 'working', 'alpha-app', 'building', 'https://github.com/o/r/pull/1')
+assert d['workers'][0]['model'] == 'claude-haiku-5-5'
+assert d['merges'][0]['repo'] == 'o/r' and d['merges'][0]['lane'] == 'alpha/old'
+PY
+npx --yes lookout-axi@0.1.0 check --adapter "$out"
+printf '\n' > "$t/home/data/squad_leads.md"
+JG_HOME="$t/home" JG_BIN="$(cd "$here/../.." && pwd)/bin" LOOKOUT_PROC="$t/proc" "$here/lookout-juggernaut" > "$t/from-home.json"
+npx --yes lookout-axi@0.1.0 check --adapter "$t/from-home.json"
+python3 - "$t/from-home.json" <<'PY'
+import json, sys
+fleet = json.load(open(sys.argv[1]))
+assert [lane['id'] for lane in fleet['lanes']] == ['main/a-one'], fleet['lanes']
+assert fleet['lanes'][0]['stage'] == 'working'
+assert 'SECRET' not in open(sys.argv[1]).read()
+PY
+"$here/lookout-juggernaut" --home "$t/home" --proc "$t/proc" --flow-json "$t/flow.json" --serve --port 0 > "$t/serve.log" & srv=$!
 for _ in $(seq 50); do grep -q serving "$t/serve.log" && break; sleep 0.1; done
-url="$(sed 's/.*serving //' "$t/serve.log")"
-first="$(curl -fsS "$url")"
-python3 -c 'import json,sys; assert json.loads(sys.argv[1])["name"] == "Juggernaut fleet"' "$first"
-rm "$t/home/state/dashboard/data.json"; sleep 2.5  # the rebuild fails now: the last good snapshot is still served, at once, unchanged
-[ "$(curl -fsS -m 2 "$url")" = "$first" ]
+url=$(sed 's/.*serving //' "$t/serve.log")
+curl -fsS "$url" > "$t/served.json"
+npx --yes lookout-axi@0.1.0 check --adapter "$t/served.json"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "${url%fleet.json}nope")" = 404 ]
-echo "lookout-juggernaut: PASS"
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+JG_HOME="$t/home" JG_BIN="$(cd "$here/../.." && pwd)/bin" LOOKOUT_PROC="$t/proc" \
+  "$here/fleet-serve" --bind 127.0.0.1 --port "$port" > "$t/service.log" 2>&1 & fleet=$!
+for _ in $(seq 100); do curl -fsS "http://127.0.0.1:$port/api/fleet" > "$t/service.json" && break; sleep 0.2; done
+python3 - "$t/service.json" <<'PY'
+import json, sys
+fleet = json.load(open(sys.argv[1]))['fleet']
+assert fleet['name'] == 'Juggernaut fleet' and len(fleet['lanes']) == 1, fleet
+PY
+echo 'lookout-juggernaut: PASS'

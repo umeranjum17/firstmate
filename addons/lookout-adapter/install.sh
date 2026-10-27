@@ -4,8 +4,8 @@
 #                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
 #   --dry-run    print every step and the unit; change nothing.
 #   --rollback   stop and remove the new unit, start the old one again (with --dry-run: print only).
-# Settings (environment): LOOKOUT_DIR (required: the lookout clone, until lookout-axi is published), JG_HOME (default ~/juggernaut),
-# PORT (the old dashboard's port, default 4390), BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
+# Settings (environment): JG_HOME (default ~/juggernaut), PORT (default 4390),
+# BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
@@ -32,7 +32,7 @@ Description=Juggernaut fleet dashboard: Lookout on the adapter (tailnet only)
 After=tailscaled.service network-online.target
 
 [Service]
-Environment=JG_HOME=$JG_HOME LOOKOUT_DIR=$LOOKOUT_DIR PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=JG_HOME=$JG_HOME PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=$here/fleet-serve --bind $BIND --port $PORT
 Restart=always
 RestartSec=10
@@ -50,12 +50,10 @@ if [ "$mode" = rollback ] || [ "$mode" = rollback-dry ]; then
   run systemctl --user enable --now "$OLD"
   exit 0
 fi
-: "${LOOKOUT_DIR:?set LOOKOUT_DIR to the lookout clone}"
-[ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "install: $LOOKOUT_DIR has no bin/lookout.js" >&2; exit 1; }
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
 probe=jg-dashboard-lookout-probe
-run systemd-run --user --collect --unit "$probe" --setenv=JG_HOME="$JG_HOME" --setenv=LOOKOUT_DIR="$LOOKOUT_DIR" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
+run systemd-run --user --collect --unit "$probe" --setenv=JG_HOME="$JG_HOME" "$here/fleet-serve" --bind "$BIND" --port "$SPARE_PORT"
 if [ "$mode" = apply ]; then
   trap 'systemctl --user stop "$probe" 2>/dev/null || true' EXIT
   for _ in $(seq 100); do curl -fs "http://$BIND:$SPARE_PORT/api/fleet" -o /dev/null && break; sleep 0.3; done
