@@ -178,7 +178,8 @@ adapt_old_names() {  # <dir-or-file>
   find "$target" -depth -name '*fm-*' -o -depth -name '*secondmate*' | while IFS= read -r f; do
     dir=${f%/*}; base=${f##*/}
     new=$(printf '%s' "$base" | sed -e 's/fm-/jg-/g; s/secondmate/squad-lead/g')
-    mv -- "$f" "$dir/$new"
+    # a tree already on the new names carries old-path shims; the real script is already there
+    if [ -e "$dir/$new" ]; then rm -f -- "$f"; else mv -- "$f" "$dir/$new"; fi
   done
 }
 
