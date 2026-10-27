@@ -75,7 +75,7 @@ out=$(bash "$ROOT/install.sh" --home "$work/home" 2>&1) || fail "first run exite
 while read -r spec; do
   grep -q "install -g $spec" "$NPM_LOG" || fail "first run did not install $spec"
 done < <(awk 'NF == 2 && $2 ~ /@[0-9]/ { print $2 }' "$FM_PIN_FILE_OVERRIDE")
-for tool in done-done sign-off-axi first-draft-axi lookout-axi byokit-accounts quota-axi; do
+for tool in done-done sign-off-axi first-draft-axi lookout-axi byokit-accounts quota-axi takeone-axi; do
   want=$(pin "$tool")
   got=$("$bin/$tool" --version) || fail "no $tool installed"
   [ "$got" = "$want" ] || fail "$tool is $got, pin table says $want"
