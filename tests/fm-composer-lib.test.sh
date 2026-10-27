@@ -977,7 +977,7 @@ test_matrix_pi_wave_art_and_notice_embedded_rule() {
   capture+=$'▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄\n'
   capture+=$'                                           ◿│◣\n'
   capture+=$'\n'
-  capture+=$' Captain, shipshape.\n'
+  capture+=$' Captain, standing by.\n'
   capture+=$'\n'
   capture+=$'                              ◿│◣\n'
   capture+=$'                          ◿│◣\n'
