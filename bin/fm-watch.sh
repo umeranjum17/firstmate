@@ -84,7 +84,11 @@
 #                          tool process.
 #   stale: <window> (unread firstmate instruction: ...)
 #                          the steering-inbox ladder spent its delivery-attempt
-#                          budget on an idle pane without an acknowledgement
+#                          budget on an idle pane without an acknowledgement, or
+#                          the pane read busy through the busy-deferral bound. The
+#                          busy form is a report only: the message stays owed and
+#                          its doorbell rings on the first non-busy poll, so it
+#                          needs no interrupt
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
@@ -597,6 +601,24 @@ window_key() {  # <window>
   printf '%s' "${key//./_}"
 }
 
+# Emit the one deferral report for <record> and mark it reported. Both
+# deferral reasons (a turn still running, a composer holding other text) use
+# this single wake, and neither one ends delivery.
+inbox_steer_defer_report() {  # <window> <task> <record> <kind> <sentence>
+  local w=$1 task=$2 rec=$3 reason
+  if [ ! -d "${rec%/*}" ] || [ ! -f "$rec" ]; then
+    fm_task_inbox_due_action "$STATE" "$task" >/dev/null || true
+    return 0
+  fi
+  reason="stale: $w (unread firstmate instruction: $rec stays unhandled - $5; no doorbell was typed, and it lands as soon as that clears, so no interrupt is needed unless the worker is wedged)"
+  fm_wake_append stale "$w" "$reason" || exit 1
+  if ! fm_task_inbox_record_deferral_reported "$STATE" "$task" "$rec" "$4"; then
+    echo "error: stale wake was queued for $task but its deferral report marker could not be written" >&2
+    exit 1
+  fi
+  wake "$reason"
+}
+
 inbox_steer_escalate_unavailable() {  # <window> <task> <record>
   local w=$1 task=$2 rec=$3 reason
   reason="stale: $w (unread firstmate instruction: $rec is unhandled and the worker's agent has exited or its endpoint is missing, so the doorbell was not typed; recover the worker)"
@@ -620,7 +642,7 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # Runs for secondmates too: their pane-staleness exemption is about quiet panes
 # being healthy, while an unacknowledged instruction can still be a stuck steer.
 inbox_steer_check() {  # <window> <task>
-  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state
+  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state decision
   # Parked-home guard (firstmate-addons/parked-homes): a parked home gets no
   # doorbell ring, re-ring or unread-instruction escalation. No-op without
   # the add-on checkout.
@@ -655,15 +677,23 @@ inbox_steer_check() {  # <window> <task>
   tail40=$WATCHER_CAPTURE
   if window_is_busy "$w" "$tail40"; then
     [ "$verb" != retry ] || return 0
-    if ! count=$(fm_task_inbox_record_busy "$STATE" "$task" "$rec"); then
-      [ -f "$rec" ] || return 0
-      reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be written while $rec stays unhandled; inspect the inbox directory)"
-    elif [ "$count" -ge "$(fm_task_inbox_busy_max)" ]; then
-      reason="stale: $w (unread firstmate instruction: stuck-busy after $count consecutive busy-deferred due doorbells; $rec stays unhandled and no doorbell was typed; inspect the worker)"
-    else
-      return 0
-    fi
-    verb=escalate
+    # The turn really is still running, so nothing may be typed at it. The
+    # deferral only defers: it reports the unread instruction once and keeps the
+    # message owed, so the ordinary ladder below rings the doorbell on the first
+    # non-busy poll once the turn ends - no interrupt, no relaunch.
+    decision=$(fm_task_inbox_defer "$STATE" "$task" "$rec")
+    case "$decision" in
+      quiet) return 0 ;;
+      escalate)
+        reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be written while $rec stays unhandled; inspect the inbox directory)"
+        verb=escalate
+        ;;
+      *)
+        inbox_steer_defer_report "$w" "$task" "$rec" busy \
+          "stuck-busy after ${decision#report } consecutive busy-deferred due doorbells, with the pane reading busy for a turn still running"
+        return 0
+        ;;
+    esac
   elif [ "$verb" != retry ] && ! fm_task_inbox_clear_busy "$STATE" "$task"; then
     reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be reset after a non-busy check; inspect the inbox directory)"
     verb=escalate
@@ -674,6 +704,20 @@ inbox_steer_check() {  # <window> <task>
       fm_task_inbox_ring "$backend" "$w" "$rec" "$(window_label "$w")" || ring_rc=$?
       if [ "$ring_rc" -eq 3 ]; then
         inbox_steer_escalate_unavailable "$w" "$task" "$rec"
+        return 0
+      fi
+      if [ "$ring_rc" -eq 1 ]; then
+        # The composer provably holds other text, so the Enter was withheld on
+        # purpose. That is a deferral, not a spent attempt: the record stays
+        # owed and the one-keypress fix is reported at once instead of the
+        # delivery budget being spent toward a silent give-up.
+        if fm_task_inbox_deferral_reported "$STATE" "$task" "$rec" held; then
+          triage_log "steer-inbox delivery held: $task ${rec##*/} (already reported)"
+          return 0
+        fi
+        triage_log "steer-inbox delivery held: $task ${rec##*/}${FM_TASK_INBOX_RING_REASON:+ reason=$FM_TASK_INBOX_RING_REASON}"
+        inbox_steer_defer_report "$w" "$task" "$rec" held \
+          "the worker's composer holds other pending text, so submitting the doorbell could submit that text - submit it with 'fm-send.sh $task --key Enter' or clear the composer"
         return 0
       fi
       if ! fm_task_inbox_record_ring "$STATE" "$task" "$rec"; then
