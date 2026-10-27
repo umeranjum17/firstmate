@@ -101,6 +101,8 @@ check expect 0 'sleep 30'
 check expect 0 'sleep 60'
 check expect 0 'sleep 1m'
 check expect 2 'sleep 120' "$FMH" supervisor-poll-in-turn
+check expect 2 'sleep 280; no-mistakes axi status' "$FMH" supervisor-poll-in-turn
+check expect 2 'sleep 240' "$FMH" supervisor-poll-in-turn
 check expect 2 'sleep 1m30s' "$FMH" supervisor-poll-in-turn
 check expect 2 'sleep "$WAIT"' "$FMH" supervisor-poll-in-turn
 check expect 2 "$(printf 'sle\\\nep 120')" "$FMH" supervisor-poll-in-turn
