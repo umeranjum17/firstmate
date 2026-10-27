@@ -5,19 +5,17 @@
   lookout-firstmate --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
                                                          snapshot at once, rebuilt in the background every --every seconds
 
-The data is the fleet dashboard builder's own output (fleet-dashboard/fm-dashboard.sh build), reused as is: state/dashboard/
-data.json and board.json under FM_HOME. A build older than 2 minutes is rebuilt first (it writes only under state/dashboard)
-unless --no-build. Homes, their state files and every other source are only read; only whitelisted fields are copied, so no
-key, token or account secret reaches the document. FM_HOME defaults to the current directory's Firstmate home.
+The document comes from the read-only fleet-flow reader and registered home records. Only whitelisted metadata fields are copied,
+so no key, token or account secret reaches the document. FM_HOME defaults to the current directory's Firstmate home.
 """
 import json, os, re, socket, subprocess, sys, threading, time, argparse
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.realpath(__file__))
-STAGES = {'queued': 'queued', 'building': 'working', 'review': 'review', 'test': 'review', 'ci': 'review', 'merge': 'merging', 'landed': 'done'}
+STAGES = {'queued': 'queued', 'working': 'working', 'resolved': 'working', 'done': 'done', 'building': 'working', 'review': 'review', 'test': 'review', 'ci': 'review', 'merge': 'merging', 'landed': 'done'}
 WORKER_STATES = {'working': 'working', 'idle': 'idle', 'done': 'exited'}
-META_KEYS = ('model', 'harness', 'account')  # the only fields read from a lane's .meta
+META_KEYS = ('model', 'harness', 'account', 'pr')  # the only fields read from a lane's .meta
 
 
 def iso(t):
@@ -31,15 +29,16 @@ def load(path):
         return json.load(f)
 
 
-def refresh(home, force_build):
-    data = os.path.join(home, 'state/dashboard/data.json')
-    if force_build and (not os.path.exists(data) or time.time() - os.path.getmtime(data) > 120):
-        env = dict(os.environ, FM_HOME=home)
-        env.setdefault('FM_BIN', os.path.join(home, 'bin'))
-        r = subprocess.run([os.path.join(HERE, '../fleet-dashboard/fm-dashboard.sh'), 'build'], env=env, capture_output=True, text=True, timeout=240)
-        if r.returncode:
-            raise RuntimeError('dashboard build failed: ' + (r.stderr.strip().splitlines() or ['no output'])[-1])
-    return load(data), load(os.path.join(home, 'state/dashboard/board.json'))
+def refresh(home, force_build, flow_json=None):
+    if flow_json:
+        return load(flow_json)
+    env = dict(os.environ, FM_HOME=home)
+    env.setdefault('FM_BIN', os.path.join(home, 'bin'))
+    reader = os.path.join(HERE, '../fleet-flow/bin/fm-flow.sh')
+    result = subprocess.run(['bash', reader, '--json'], env=env, capture_output=True, text=True, timeout=240)
+    if result.returncode:
+        raise RuntimeError('fm-flow failed: ' + (result.stderr.strip() or result.stdout.strip())[-500:])
+    return json.loads(result.stdout)
 
 
 def home_dirs(home):
@@ -81,69 +80,60 @@ def host_doc(data, now, proc):
     return host | {'jobs': jobs}
 
 
-def quota_docs(data, now):
-    out = []
-    for q in data.get('quota_accounts', []):
-        for w in q.get('windows', []):
-            if w.get('reset') and w.get('used') is not None:
-                runway = None if not w.get('runout') else round(max(0, (datetime.fromisoformat(w['runout']).timestamp() - now) / 3600), 1)
-                out.append({'account': q['name'], 'provider': q['name'], 'window': w['label'], 'used_pct': w['used'], 'resets_at': iso(w['reset']), 'runway_hours': runway})
-    for a in data.get('claude_accounts', []):
-        for key, label in (('five_hour', '5h'), ('seven_day', 'week')):
-            w = a.get(key) or {}
-            if w.get('resets_at') and w.get('left') is not None:
-                out.append({'account': a['name'], 'provider': 'Claude', 'window': label, 'used_pct': 100 - w['left'], 'resets_at': iso(w['resets_at']), 'runway_hours': None})
-    return out
+def home_names(home):
+    names = {'main': 'Main'}
+    try:
+        for line in open(os.path.join(home, 'data/secondmates.md')):
+            match = re.match(r'- (\S+) - ([^(]+) \(.*home:', line)
+            if match:
+                names[match[1]] = match[2].strip()
+    except OSError:
+        pass
+    return names
 
 
-def build_fleet(home, build=True, proc='/proc'):
-    data, board = refresh(home, build)
-    now = data['cutoff']
+def build_fleet(home, build=True, proc='/proc', flow_json=None):
+    data = refresh(home, build, flow_json)
+    now = data['at']
     dirs = home_dirs(home)
-    host = host_doc(data, now, proc)
-    names = {h['id']: h['name'] for h in board.get('homes', [])}
-    projects = {t['id']: t.get('project') for t in board.get('tickets', [])}
-    homes = []
-    for h in data.get('homes', []):
-        age = now - (h.get('summary_generated_epoch') or 0)
-        homes.append({'id': h['home'], 'name': names.get(h['home'], h['home']), 'host': host['id'], 'lane_cap': max(1, int(h.get('plan') or 1)),
-                      'supervision': {'state': 'ok' if age <= 900 else 'stale' if age <= 3600 else 'down',
-                                      'last_beat_at': iso(h.get('summary_generated_epoch') or now), **({'note': h['lead_state']} if h.get('lead_state') else {})}})
-    known = {h['id'] for h in homes}
-    lanes, cards = [], {}
-    for c in board.get('cards', []):
-        if c['home'] not in known or c['id'] in cards or c['stage'] == 'queued':  # a ready backlog item holds no lane
+    host = host_doc({}, now, proc)
+    names = home_names(home)
+    homes = [{'id': name, 'name': names.get(name, name), 'host': host['id'], 'lane_cap': 1,
+              'supervision': {'state': 'ok', 'last_beat_at': iso(now)}} for name in data['homes']]
+    lanes, workers, merges = [], [], []
+    for row in data['lanes']:
+        lane_id = row['home'] + '/' + row['task']
+        meta = lane_meta(dirs, row['home'], row['task'])
+        merged = row.get('times', {}).get('merged')
+        if merged and now - merged < 30 * 86400:
+            repo = re.match(r'https://github.com/([^/]+/[^/]+)/pull/', meta.get('pr', ''))
+            merges.append({'at': iso(merged), 'repo': repo[1] if repo else row.get('project') or row['home'],
+                           'title': row['task'], 'outcome': 'merged', 'checks': 'pass', 'home': row['home'], 'lane': lane_id,
+                           **({'pr_url': meta['pr']} if meta.get('pr') else {}),
+                           **({'started_at': iso(row['times']['dispatched'])} if row['times'].get('dispatched') else {})})
+        if not row.get('open') and not merged:
             continue
-        lane = {'id': c['id'], 'home': c['home'], 'title': c['title'].split('\n')[0], 'project': projects.get(c['id']) or c['home'], 'stage': 'done' if c['state'] == 'finished' else STAGES.get(c['stage'], 'queued'),
-                'stuck': c['state'] == 'blocked', 'started_at': iso(c.get('started') or c['since']), 'updated_at': iso(c['since'])}
-        if c.get('pr'):
-            lane['pr_url'] = c['pr']
-        if c.get('wait') and lane['stage'] != 'done':
-            lane['waiting_on'] = str(c['wait'])
-        cards[c['id']] = c
+        state = row.get('stage')
+        waits = row.get('open_waits') or []
+        started = row.get('times', {}).get('dispatched') or row.get('times', {}).get('working') or now
+        updated = now - row['seconds_in_stage'] if isinstance(row.get('seconds_in_stage'), int) else now
+        lane = {'id': lane_id, 'home': row['home'], 'title': row['task'], 'project': row.get('project') or row['home'],
+                'stage': STAGES.get(state, 'review'), 'stuck': state in ('blocked', 'needs-decision'),
+                'started_at': iso(started), 'updated_at': iso(updated)}
+        if meta.get('pr'):
+            lane['pr_url'] = meta['pr']
+        reason = next((wait.get('reason') for wait in waits if wait.get('reason')), row.get('reason'))
+        if reason and (waits or state in ('blocked', 'needs-decision', 'paused')):
+            lane['waiting_on'] = str(reason)
         lanes.append(lane)
-    workers = []
-    for a in data.get('agents', []):
-        c = cards.get('%s/%s' % (a.get('home'), a.get('name')))
-        if a.get('role') != 'worker' or not c:
-            continue
-        meta = lane_meta(dirs, a['home'], a['name'])
-        workers.append({'id': a['home'] + '/' + a['name'], 'lane': c['id'], 'agent': meta.get('harness') or c.get('tool') or 'unknown', 'model': meta.get('model') or c.get('model_name') or 'unknown',
-                        'account': meta.get('account') or 'unknown', 'state': WORKER_STATES.get(a['status'], 'waiting'),
-                        'started_at': iso(c.get('started') or c['since']), 'last_activity_at': iso(c['since'])})
-    merges = []
-    for l in board.get('flow', {}).get('lanes', []):
-        t = l.get('times') or {}
-        m = re.match(r'https://[^/]+/([^/]+/[^/]+)/(?:pull|merge_requests)/', l.get('pr') or '')
-        if t.get('merged') and m and now - t['merged'] < 30 * 86400 and l['home'] in known:
-            lid = l['home'] + '/' + l['task']
-            merges.append({'at': iso(t['merged']), 'repo': m.group(1), 'title': (l.get('display_title') or l['task']).split('\n')[0], 'outcome': 'merged', 'checks': 'pass', 'pr_url': l['pr'], 'home': l['home'],
-                           **({'lane': lid} if lid in cards else {}), **({'started_at': iso(t['dispatched'])} if t.get('dispatched') else {})})
-    history = [{'at': iso(s['at']), 'lanes': s['lanes'], 'stuck': s['stuck']} for s in data.get('lane_history', []) if now - s['at'] < 8 * 86400]
-    devices = [{'id': re.sub(r'\W+', '-', d['name'].lower()).strip('-'), 'name': d['name'], 'kind': 'phone' if d['name'].startswith('Phone') else 'emulator', 'host': host['id'],
-                'state': 'busy' if d.get('holder') else 'free' if d.get('tone') == 'ok' else 'offline'} for d in data.get('devices', [])]
-    return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Firstmate fleet', 'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers,
-            'quota': quota_docs(data, now), 'merges': merges, 'releases': [], 'incidents': [], 'history': history, 'devices': devices}
+        if row.get('kind') in ('ship', 'scout') and any(meta.get(key) for key in ('harness', 'model', 'account')):
+            workers.append({'id': lane_id, 'lane': lane_id, 'agent': meta.get('harness', 'unknown'),
+                            'model': meta.get('model', 'unknown'), 'account': meta.get('account', 'unknown'),
+                            'state': 'working' if state in ('working', 'resolved') else 'waiting' if waits else 'idle',
+                            'started_at': iso(started), 'last_activity_at': iso(updated)})
+    return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Firstmate fleet',
+            'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers, 'quota': [],
+            'merges': merges, 'releases': [], 'incidents': []}
 
 
 def main(argv):
@@ -151,13 +141,14 @@ def main(argv):
     p.add_argument('--home', default=os.environ.get('FM_HOME') or os.getcwd())
     p.add_argument('--no-build', action='store_true')
     p.add_argument('--proc', default=os.environ.get('LOOKOUT_PROC', '/proc'))
+    p.add_argument('--flow-json', help='use a saved fm-flow document instead of running the reader')
     p.add_argument('--serve', action='store_true')
     p.add_argument('--port', type=int, default=4391)
     p.add_argument('--bind', default='127.0.0.1')
     p.add_argument('--every', type=int, default=30)
     p.add_argument('--cold-wait', type=int, default=120)
     a = p.parse_args(argv)
-    make = lambda: build_fleet(a.home, not a.no_build, a.proc)
+    make = lambda: build_fleet(a.home, not a.no_build, a.proc, a.flow_json)
     if not a.serve:
         json.dump(make(), sys.stdout, indent=1)
         print()
