@@ -785,9 +785,9 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
 
 - When the host-memory add-on is installed, each watcher loads its `host-memory/bin/fm-host-memory-lib.sh` lifecycle functions and supervises one independent sampler per home.
   The sampler records every 10 seconds by default (`FM_HOST_MEMORY_SECS`) into `state/host-memory.tsv`, even during slow recovery or custom checks.
-  The dashboard shows the last hour's peak sustained pressure and current swap.
+  Lookout does not currently show host-memory readings.
   The home-scoped `state/.host-memory-sampler.pid` records PID and process identity; the watcher restarts a dead sampler and stops only the exact recorded PID after verifying its identity, script, home, and state.
-- At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which the dashboard raises for 15 minutes for local homes only.
+- At the wait or alert level, local `bin/fm-spawn.sh` launches and `bin/fm-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which remains in local state and is not shown by Lookout.
   A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
   The replacement launch checks admission again after the old agent stops, so pressure rising between those checks can still prevent replacement; this is not a memory reservation.
   Retry once pressure eases; admission does not automatically retry a queued spawn.

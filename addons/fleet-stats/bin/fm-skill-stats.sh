@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-skill-stats.sh - per-skill fleet statistics for the dashboard's Skills view.
+# fm-skill-stats.sh - per-skill fleet statistics reader.
 # Usage: FM_HOME=<home> fm-skill-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads
@@ -16,7 +16,7 @@
 #   zero_read_w7, zero_read_w30  known skills with no reads in that window, only for
 #                 windows the coverage spans and while no remote home is registered
 #   coverage      whether skills.tsv was present, its row/day/skill/home counts
-#   limitations   human-readable coverage notices (the dashboard shows the count)
+#   limitations   human-readable coverage notices
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 - "$SCRIPT_DIR" "${FM_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'

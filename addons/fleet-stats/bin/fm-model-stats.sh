@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-model-stats.sh - per-model fleet statistics for the dashboard's Models view.
+# fm-model-stats.sh - per-model fleet statistics reader.
 # Usage: FM_HOME=<home> fm-model-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads this home,
@@ -15,7 +15,7 @@
 #   models[w]    one entry per model over the window, largest finished first
 #   coverage     which sources were present, how many task rows each supplied, and
 #                whether any sampled task contributed
-#   limitations  human-readable coverage notices (the dashboard shows the count)
+#   limitations  human-readable coverage notices
 #
 # A task is attributed to the model it ended on; a task whose history names more
 # than one model also counts as a switch. Merge rate is merged ship tasks over

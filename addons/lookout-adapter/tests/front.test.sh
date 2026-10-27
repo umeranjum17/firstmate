@@ -25,6 +25,9 @@ for want in 'ExecStart=.*fleet-serve --bind 192.0.2.1 --port 4390' 'systemd-run.
   grep -q -- "$want" <<<"$dry" || { echo "dry run lacks: $want" >&2; exit 1; }
 done
 [ ! -e "$t/cfg" ] || { echo "dry run wrote a file" >&2; exit 1; }
-rb="$(BIND=192.0.2.1 XDG_CONFIG_HOME="$t/cfg" "$here/install.sh" --rollback --dry-run)"
-grep -q 'enable --now fm-dashboard.service' <<<"$rb" && grep -q 'disable --now fm-dashboard-lookout.service' <<<"$rb"
+if BIND=192.0.2.1 XDG_CONFIG_HOME="$t/cfg" "$here/install.sh" --rollback --dry-run >"$t/rollback.log" 2>&1; then
+  echo 'legacy dashboard rollback must be refused' >&2
+  exit 1
+fi
+grep -q 'usage: install.sh \[--dry-run\]' "$t/rollback.log"
 echo "lookout-front and install.sh: PASS"

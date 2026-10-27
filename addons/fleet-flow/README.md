@@ -1,12 +1,11 @@
 # fleet-flow
 
-The read-only fleet flow reader — the lifecycle, queue, bottleneck and capacity
-JSON reader the dashboard consumes as its `fm-flow.v1` observation — moved out
-of the Firstmate fork into this add-on repository. The fork's `bin/fm-flow.sh`
-is a thin shim that resolves this checkout (`FM_ADDONS_DIR`, default
-`$FM_HOME/projects/firstmate-addons`) and execs `fleet-flow/bin/fm-flow.sh`
-with `FM_BIN` pointing at the fork's `bin/`; the served dashboard reaches the
-reader only through that shim.
+The read-only fleet flow reader emits lifecycle, queue, bottleneck and capacity
+JSON. The Lookout adapter consumes this output directly as its `fm-flow.v1`
+input. The reader moved out of the Firstmate fork into this add-on repository.
+The fork's `bin/fm-flow.sh` is a thin shim that resolves this checkout
+(`FM_ADDONS_DIR`, default `$FM_HOME/projects/firstmate-addons`) and execs
+`fleet-flow/bin/fm-flow.sh` with `FM_BIN` pointing at the fork's `bin/`.
 
 ## Layout
 

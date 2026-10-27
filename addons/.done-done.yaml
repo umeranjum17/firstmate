@@ -29,8 +29,6 @@ journeys:
     command: bash pipeline-quota-failover/run-proof.sh
   pipeline-route-live:
     command: bash pipeline-quota-failover/run-live-proof.sh
-  fleet-dashboard-wait-reasons:
-    command: bash fleet-dashboard/run-proof.sh
   claude-accounts-quota:
     command: bash claude-accounts/run-proof.sh
   claude-accounts-pick:
@@ -47,9 +45,6 @@ journeys:
     command: bash lookout-adapter/run-service-proof.sh
   wait-timers-identity:
     command: bash wait-timers/run-proof.sh
-  core:
-    command: bash fleet-dashboard/run-core-proof.sh
-    core: true
   merge-card-real-board:
     command: bash merge-card/tests/real-board.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   merge-card-clean-clone:
