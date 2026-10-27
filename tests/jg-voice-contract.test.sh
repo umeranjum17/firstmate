@@ -22,7 +22,7 @@ MAX_SENTENCE_WORDS=20
 # The internal terms a captain would never read in a plain outcome, kept short
 # on purpose: this is a floor against jargon creeping into the examples, not a
 # full mirror of the contract's translation list.
-BANNED_INTERNAL_TERMS='worktree|teardown|harness|backend|operator|fail-closed|fail-open|validation-state'
+BANNED_INTERNAL_TERMS='worktree|teardown|harness|backend|crewmate|fail-closed|fail-open|validation-state'
 
 hits=$(cd "$ROOT" && git grep -I -n -F -e "$RETIRED" -- . || true)
 [ -z "$hits" ] || fail "retired voice phrase is still tracked: $hits"
