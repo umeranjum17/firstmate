@@ -25,6 +25,10 @@ mkdir -p "$ROOTCOPY"
 cp -R "$ROOT/bin" "$ROOTCOPY/bin"
 
 FAKEBIN="$TMP_ROOT/fakebin"
+# Subject is this repo's own adapter: jg-captain-hold prefers the signoff add-on, which this checkout ships.
+JG_ADDONS_DIR="$TMP_ROOT/no-addons"
+mkdir -p "$JG_ADDONS_DIR"
+export JG_ADDONS_DIR
 JG_HOME_DIR="$TMP_ROOT/fmhome"
 mkdir -p "$FAKEBIN" "$JG_HOME_DIR/state"
 export SIGNOFF_BOARD="$TMP_ROOT/board.json" HOLD_FILE="$TMP_ROOT/hold" \

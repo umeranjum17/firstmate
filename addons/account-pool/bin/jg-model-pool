@@ -17,6 +17,9 @@ type jg_run_timed >/dev/null 2>&1 || jg_run_timed() { shift; "$@"; }
 FLOOR=${JG_MODEL_POOL_FLOOR:-${JG_ACCOUNT_POOL_REST_FLOOR:-15}}
 LAUNCH_FLOOR=${JG_CLAUDE_ACCOUNTS_LOW:-5}
 REGISTRY=${JG_CLAUDE_ACCOUNTS_REGISTRY:-${HOME}/.muxr/plans/accounts-v1.json}
+# A provider limit from the model-gate add-on holds here too: its list is the one owner, and a route it refuses is
+# never emitted. Not installed (or not on PATH) means no limit, so this add-on stays usable on its own.
+MODEL_GATE=${JG_MODEL_GATE:-jg-model-gate}
 
 # Built-in normal-work fallovers after every eligible Claude account is under the floor.
 # selection ids are stable route:* keys; billing is plan unless a route record enables credits.
@@ -160,7 +163,12 @@ emit_claude() {
 }
 
 emit_route() {
-  local route=$1
+  local route=$1 rp rm err
+  rp=$(jq -r .provider <<<"$route") rm=$(jq -r .model <<<"$route")
+  if command -v "$MODEL_GATE" >/dev/null 2>&1 && ! err=$("$MODEL_GATE" check "$rp" "$rm" 2>&1); then
+    log "model-gate refuse provider=$rp model=$rm: $err"
+    return 1
+  fi
   if jq -e '
     def on: . == true or . == 1 or . == "true" or . == "1" or . == "yes";
     (.usage_credits | on) or (.extra_usage | on) or (.overage | on)

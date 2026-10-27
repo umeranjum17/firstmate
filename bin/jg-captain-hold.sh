@@ -256,6 +256,9 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 
+# shellcheck source=bin/jg-addons-dir-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/jg-classify-lib.sh"
@@ -1073,7 +1076,7 @@ command_hold() {
     release_task_control_lock
     if [ -f "$STATE/procevent/signoff.source" ]; then
       signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
-      addon_signoff=${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/signoff/bin/jg-procevent-signoff.sh
+      addon_signoff=$(jg_addon_path "$JG_HOME" signoff/bin/jg-procevent-signoff.sh)
       [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
       JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }

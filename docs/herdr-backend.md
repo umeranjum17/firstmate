@@ -768,7 +768,7 @@ The watcher maps the pane back to the task and skips these (the optional wait-ti
 ### Polling fallback
 
 The push path only shortens latency.
-The optional juggernaut-addons wait-timers add-on owns the independent recorded-pane polling timers and owner routing.
+The optional `wait-timers` add-on owns the independent recorded-pane polling timers and owner routing.
 Polling runs every cycle and remains the permanent fallback when any of these is unavailable:
 
 - Protocol 16.

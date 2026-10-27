@@ -57,6 +57,7 @@ cp "$ROOT/bin/jg-remote-job-lib.sh" "$ROOT/bin/jg-remote-job-worker.sh" \
   "$ROOT/bin/jg-classify-lib.sh" "$ROOT/bin/jg-timeout-lib.sh" \
   "$ROOT/bin/jg-ff-lib.sh" "$ROOT/bin/jg-squad-lead-registry-lib.sh" \
   "$ROOT/bin/jg-lock-lib.sh" "$ROOT/bin/jg-parked-homes-lib.sh" \
+  "$ROOT/bin/jg-addons-dir-lib.sh" \
   "$REMOTE_ROOT/bin/"
 mkdir -p "$REMOTE_ROOT/bin/backends"
 cp "$ROOT/bin/backends/herdr.sh" "$REMOTE_ROOT/bin/backends/herdr.sh"

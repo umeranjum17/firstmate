@@ -736,10 +736,12 @@ jg_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/jg-project-capacity-lib.sh"
 # shellcheck source=bin/jg-worker-account-lib.sh
 . "$SCRIPT_DIR/jg-worker-account-lib.sh"
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$SCRIPT_DIR/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-model-allowlist.sh
 . "$SCRIPT_DIR/jg-model-allowlist.sh"
-# Account-pool hook (juggernaut-addons/account-pool): a no-op when the add-on is absent.
-_jg_ap=${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/juggernaut-addons}/account-pool/bin/jg-account-pool-lib.sh
+# Account-pool hook (addons/account-pool): a no-op when the add-on is absent.
+_jg_ap=$(jg_addon_path "${JG_HOME:-$SCRIPT_DIR/..}" account-pool/bin/jg-account-pool-lib.sh)
 if [ -r "$_jg_ap" ]; then
   # shellcheck source=/dev/null
   . "$_jg_ap" || { printf 'error: the account-pool add-on at %s failed to load; fix or remove it\n' "$_jg_ap" >&2; exit 1; }

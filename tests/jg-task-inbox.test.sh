@@ -20,7 +20,9 @@
 #      acknowledgement resets the ladder for the next message.
 #   5. A real jg-watch.sh subprocess re-rings the doorbell for an unhandled
 #      aged message on an idle pane WITHOUT waking juggernaut, waits on a busy
-#      pane, stays silent on a healthy/empty inbox, surfaces unwritable ladder
+#      pane (reporting the unread instruction once at the deferral bound and
+#      still delivering it when the turn ends), stays silent on a healthy/empty
+#      inbox, surfaces unwritable ladder
 #      bookkeeping only while its record remains unhandled, and emits exactly
 #      one stale wake once the ring budget is spent.
 #   6. Dead panes: the doorbell line is a shell no-op when executed by a bare
@@ -715,6 +717,61 @@ busy_case() {
   printf '%s' "$dir"
 }
 
+test_watcher_busy_report_is_not_a_giveup() {
+  local dir rec wakes
+  dir=$(busy_case busy-turn-end)
+  rec="$dir/state/t1.inbox/001.msg"
+  # A turn that stays running defers the doorbell; at the bound it reports the
+  # unread instruction exactly once and still types nothing at the pane.
+  busy_steer_check "$dir"
+  busy_steer_check "$dir"
+  grep -q 'stuck-busy after 2 consecutive' "$dir/state/.wake-queue" \
+    || fail "busy deferral never surfaced the unread instruction"
+  wakes=$(wc -l < "$dir/state/.wake-queue" | tr -d ' '); wakes=${wakes:-0}
+  busy_steer_check "$dir"
+  busy_steer_check "$dir"
+  [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" = "$wakes" ] \
+    || fail "the busy report repeated while the turn ran"
+  [ ! -s "$dir/send.log" ] || fail "the watcher typed into a running turn"
+  [ -f "$rec" ] || fail "the busy report dropped the instruction"
+  # The turn ends. The instruction is delivered by the next ordinary check with
+  # nobody touching the worker - this is the regression: a busy report used to
+  # end delivery, so the record sat unread until a human interrupted.
+  busy_steer_check "$dir" "$(idle_capture "$dir")"
+  grep -qF 'Juggernaut instruction waiting' "$dir/send.log" \
+    || fail "the turn ended without delivering the deferred doorbell"$'\n'"$(cat "$dir/check.out")"
+  [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" = "$wakes" ] \
+    || fail "delivery at turn end added another wake"
+  [ ! -e "$dir/state/t1.inbox/.busy-escalated" ] \
+    || fail "the free pane kept the busy report marker"
+  [ -f "$rec" ] || fail "delivery consumed the record instead of leaving it for the worker"
+  pass "watcher: a busy-deferred instruction is delivered when the turn ends, without a human"
+}
+
+test_watcher_reports_held_composer_immediately() {
+  local dir wakes
+  dir=$(busy_case held-composer)
+  # A draft in the composer that is not our doorbell: the ring must withhold
+  # its Enter, report the one-keypress recovery at once, and keep the message
+  # owed instead of spending the delivery budget on a silent give-up.
+  printf '╭──────────────────╮\n│ captain draft    │\n╰──────────────────╯\n' > "$dir/draft.capture"
+  busy_steer_check "$dir" "$dir/draft.capture"
+  grep -q 'composer holds other pending text' "$dir/state/.wake-queue" \
+    || fail "a held composer did not report its actionable state"$'\n'"$(cat "$dir/state/.wake-queue" 2>/dev/null)"
+  [ ! -s "$dir/send.log" ] || fail "the watcher typed into a composer holding other text"
+  [ -f "$dir/state/t1.inbox/001.msg" ] || fail "the held composer dropped the instruction"
+  [ ! -e "$dir/state/t1.inbox/.escalated" ] || fail "a held composer ended delivery"
+  wakes=$(wc -l < "$dir/state/.wake-queue" | tr -d ' '); wakes=${wakes:-0}
+  busy_steer_check "$dir" "$dir/draft.capture"
+  [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" = "$wakes" ] \
+    || fail "the held-composer report repeated"
+  # The composer clears: the same check delivers, with nobody touching it.
+  busy_steer_check "$dir" "$(idle_capture "$dir")"
+  grep -qF 'Juggernaut instruction waiting' "$dir/send.log" \
+    || fail "a cleared composer did not deliver the held doorbell"
+  pass "watcher: a doorbell held behind other composer text reports once and lands when the composer clears"
+}
+
 test_watcher_waits_on_busy_pane() {
   local dir wakes
   dir=$(busy_case busywait)
@@ -793,8 +850,17 @@ test_watcher_successor_busy_reset_failure_surfaces() {
     [ "$(wc -l < "$dir/state/.wake-queue" 2>/dev/null | tr -d ' ')" = 1 ] \
       || fail "$mode successor must surface once, including check $check"
   done
-  [ "$(cat "$dir/state/t1.inbox/.escalated")" = "${rec##*/}" ] \
-    || fail "reset failure did not mark the successor as escalated"
+  if [ "$mode" = busy ]; then
+    # A busy report is deduped, never terminal: the successor is still owed its
+    # doorbell and only the report marker names it.
+    [ "$(cat "$dir/state/t1.inbox/.busy-escalated" 2>/dev/null)" = "${rec##*/}" ] \
+      || fail "busy successor was not marked as already reported"
+    [ ! -e "$dir/state/t1.inbox/.escalated" ] \
+      || fail "busy successor ended its own delivery"
+  else
+    [ "$(cat "$dir/state/t1.inbox/.escalated")" = "${rec##*/}" ] \
+      || fail "reset failure did not mark the successor as escalated"
+  fi
   case "$mode" in
     idle)
       grep -q 'steering-inbox busy bookkeeping unwritable' "$dir/state/.wake-queue" || fail "successor lost the reset failure reason"
@@ -909,7 +975,7 @@ test_watcher_successor_escalation_stays_quiet() {
 }
 
 test_watcher_nonbusy_attempt_resets_busy_streak() {
-  local mode=$1 dir capture send_fail=0
+  local mode=$1 dir capture send_fail=0 wakes
   dir=$(busy_case "busy-reset-$mode")
   busy_steer_check "$dir"
   [ ! -s "$dir/state/.wake-queue" ] || fail "$mode first busy check escalated"
@@ -922,20 +988,38 @@ test_watcher_nonbusy_attempt_resets_busy_streak() {
   esac
   JG_FAKE_TMUX_SEND_FAIL="$send_fail" busy_steer_check "$dir" "$capture"
   case "$mode" in
-    protected) [ ! -s "$dir/send.log" ] || fail "protected composer was typed into" ;;
-    failed) grep -q '^send failed$' "$dir/send.log" || fail "delivery failure was not exercised" ;;
+    protected)
+      # Withholding the Enter is a deferral, not an attempt: the state is
+      # reported once and the delivery budget is untouched.
+      [ ! -s "$dir/send.log" ] || fail "protected composer was typed into"
+      grep -q 'composer holds other pending text' "$dir/state/.wake-queue" \
+        || fail "protected composer did not report its actionable state"
+      [ ! -e "$dir/state/t1.inbox/.ring-state" ] \
+        || fail "protected composer spent the ordinary attempt budget"
+      ;;
+    failed)
+      grep -q '^send failed$' "$dir/send.log" || fail "delivery failure was not exercised"
+      [ "$(cut -f2 "$dir/state/t1.inbox/.ring-state")" = 1 ] \
+        || fail "$mode delivery did not consume one ordinary attempt"
+      ;;
   esac
-  [ "$(cut -f2 "$dir/state/t1.inbox/.ring-state")" = 1 ] \
-    || fail "$mode delivery did not consume one ordinary attempt"
+  wakes=$(wc -l < "$dir/state/.wake-queue" 2>/dev/null | tr -d ' '); wakes=${wakes:-0}
   busy_steer_check "$dir"
-  [ ! -s "$dir/state/.wake-queue" ] || fail "$mode non-busy delivery did not reset the busy streak"
   busy_steer_check "$dir"
-  grep -q 'stuck-busy after 2 consecutive' "$dir/state/.wake-queue" \
-    || fail "$mode fresh busy streak did not escalate at the bound"
-  [ "$(cut -f2 "$dir/state/t1.inbox/.ring-state")" = 1 ] \
-    || fail "$mode busy checks changed the ordinary attempt ladder"
+  grep -q 'stuck-busy after [0-9]* consecutive' "$dir/state/.wake-queue" \
+    || fail "$mode fresh busy streak did not report at the bound"
+  case "$mode" in
+    failed)
+      [ "$(cut -f2 "$dir/state/t1.inbox/.ring-state")" = 1 ] \
+        || fail "$mode busy checks changed the ordinary attempt ladder" ;;
+    protected)
+      [ ! -e "$dir/state/t1.inbox/.ring-state" ] \
+        || fail "$mode busy checks changed the ordinary attempt ladder" ;;
+  esac
+  [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -gt "$wakes" ] \
+    || fail "$mode busy streak queued no report"
   [ -f "$dir/state/t1.inbox/001.msg" ] || fail "$mode lost the unhandled instruction"
-  pass "watcher: a non-busy $mode delivery breaks the busy streak and preserves the attempt ladder"
+  pass "watcher: a non-busy $mode outcome breaks the busy streak and preserves the attempt ladder"
 }
 
 test_watcher_quiet_on_healthy_inbox() {
@@ -1197,6 +1281,8 @@ test_fire_and_forget_retry_is_owed_once
 test_fire_and_forget_retry_is_quiet_without_the_flag
 test_ring_ladder_policy
 test_watcher_rerings_idle_pane_quietly
+test_watcher_busy_report_is_not_a_giveup
+test_watcher_reports_held_composer_immediately
 test_watcher_waits_on_busy_pane
 test_watcher_busy_budget_resets_on_ring_and_ack
 test_watcher_busy_bookkeeping_failure_surfaces

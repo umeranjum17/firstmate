@@ -28,7 +28,12 @@
 #   <task>.inbox/.seq.lock     serializes sequence allocation across writers
 #                              (the session and the away daemon)
 #   <task>.inbox/.ring-state   watcher re-ring ladder: "<msg>\t<count>\t<epoch>"
-#   <task>.inbox/.busy-state   consecutive busy deferrals: "<msg>\t<count>"
+#   <task>.inbox/.busy-state   consecutive deferrals: "<msg>\t<count>" (a turn
+#                              still running, or a composer holding other text)
+#   <task>.inbox/.busy-escalated  oldest message already reported as deferred by
+#                              a running turn; NOT a delivery terminal
+#   <task>.inbox/.held-escalated  oldest message already reported as held behind
+#                              other composer text; NOT a delivery terminal
 #   <task>.inbox/.escalated    oldest-message name already surfaced as stale,
 #                              so later polls suppress another escalation
 #   <task>.inbox/.retry-ring   name of a fire-and-forget record still owed its
@@ -55,9 +60,14 @@
 # JG_TASK_INBOX_RING_MAX attempts without an acknowledgement it escalates. The
 # caller owns the busy and recovery-grade endpoint checks: due actions deferred
 # by a busy pane consume a separate durable consecutive-poll budget,
-# JG_TASK_INBOX_BUSY_MAX. At that bound the same escalation path surfaces a
-# stuck-busy reason without typing. A non-busy due check or acknowledgement resets
-# this budget. Fire-and-forget retries remain outside escalation. A positively
+# JG_TASK_INBOX_BUSY_MAX. At that bound the caller surfaces a stuck-busy reason
+# WITHOUT typing, and that report is not a give-up: a busy pane is a turn still
+# running, so the deferral keeps the message owed and the doorbell rings on the
+# first non-busy poll. A composer that provably holds other text is the same
+# kind of deferral, reported at once because one key press clears it, and it
+# never spends the delivery budget either. A non-busy due check or
+# acknowledgement resets this budget.
+# Fire-and-forget retries remain outside escalation. A positively
 # dead or missing endpoint skips delivery and the ladder and escalates directly.
 # This library owns the schedule, durable budgets, and escalation marker.
 # If delivery-attempt or busy-deferral bookkeeping fails while the record remains unhandled,
@@ -90,7 +100,8 @@
 # Tunables (env):
 #   JG_TASK_INBOX_GRACE_SECS   default 90; delivery-attempt grace and spacing
 #   JG_TASK_INBOX_RING_MAX     default 3; delivery attempts before escalation
-#   JG_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
+#   JG_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before
+#                              the one stuck-busy report (delivery stays owed)
 
 _JG_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Both dependencies are canonical lint roots in their own right. Keep them as
@@ -147,10 +158,56 @@ jg_task_inbox_record_busy() {  # <state-dir> <task-id> <record-path>
   printf '%s' "$count"
 }
 
+# Reset the busy budget and its report dedupe together: once the pane is free
+# the record is ordinary ladder work again, so a later busy stretch on the same
+# message earns its own report rather than inheriting silence.
 jg_task_inbox_clear_busy() {  # <state-dir> <task-id>
   local dir
   dir=$(jg_task_inbox_dir "$1" "$2")
-  rm -f "$dir/.busy-state" 2>/dev/null
+  rm -f "$dir/.busy-state" "$dir/.busy-escalated" 2>/dev/null
+}
+
+# One busy-poll deferral of an unread record. Prints exactly one of:
+#   quiet             still inside the deferral budget (or already reported)
+#   report <count>    the bound is reached: the caller surfaces it once
+#   escalate          the deferral bookkeeping cannot be written
+# A deferral is NEVER a delivery give-up - the record stays owed, and
+# jg_task_inbox_clear_busy re-arms the ladder the moment the pane is free.
+jg_task_inbox_defer() {  # <state-dir> <task-id> <record-path>
+  local count
+  if ! count=$(jg_task_inbox_record_busy "$1" "$2" "$3"); then
+    [ -f "$3" ] || { printf 'quiet'; return 0; }
+    printf 'escalate'
+    return 0
+  fi
+  if [ "$count" -lt "$(jg_task_inbox_busy_max)" ] \
+    || jg_task_inbox_deferral_reported "$1" "$2" "$3" busy; then
+    printf 'quiet'
+    return 0
+  fi
+  printf 'report %s' "$count"
+}
+
+# Whether this record's deferral report of <kind> was already surfaced, so
+# later deferral polls stay quiet. <kind> is busy (a turn still running) or
+# held (the composer provably holds other text).
+jg_task_inbox_deferral_reported() {  # <state-dir> <task-id> <record-path> <kind>
+  local dir
+  dir=$(jg_task_inbox_dir "$1" "$2")
+  [ "$(cat "$dir/.$4-escalated" 2>/dev/null)" = "${3##*/}" ]
+}
+
+# Mark a deferral report as surfaced. Deliberately NOT
+# jg_task_inbox_record_escalated: the message is still owed its doorbell, and
+# only the report is deduped.
+jg_task_inbox_record_deferral_reported() {  # <state-dir> <task-id> <record-path> <kind>
+  local dir
+  dir=$(jg_task_inbox_dir "$1" "$2")
+  [ -d "$dir" ] || return 0
+  if ! { printf '%s\n' "${3##*/}" > "$dir/.$4-escalated"; } 2>/dev/null; then
+    [ -d "$dir" ] || return 0
+    return 1
+  fi
 }
 
 jg_task_inbox_dir() {  # <state-dir> <task-id>
@@ -467,7 +524,8 @@ jg_task_inbox_due_action() {  # <state-dir> <task-id>
   local dir oldest base now grace max ladder rec_base count last
   dir=$(jg_task_inbox_dir "$1" "$2")
   if ! oldest=$(jg_task_inbox_oldest_unhandled "$1" "$2"); then
-    rm -f "$dir/.ring-state" "$dir/.escalated" "$dir/.busy-state" 2>/dev/null || true
+    rm -f "$dir/.ring-state" "$dir/.escalated" "$dir/.busy-state" \
+      "$dir/.busy-escalated" "$dir/.held-escalated" 2>/dev/null || true
     # The one retry ring exists only while config/wait-no-turns is present.
     # Absent, a mark is left untouched and the inbox stays quiet, as before.
     if [ -e "${JG_CONFIG_OVERRIDE:-${JG_HOME:-}/config}/wait-no-turns" ]; then

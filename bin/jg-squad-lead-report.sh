@@ -22,7 +22,8 @@
 #   jg-squad-lead-report.sh done abcdef0123456789 "audit clean"
 #   jg-squad-lead-report.sh --doc done abcdef0123456789 data/x/report.md "see report"
 #
-# An optional juggernaut-addons status-wait-check add-on (${JG_ADDONS_DIR:-<home>/projects/juggernaut-addons}/status-wait-check/status-wait-check)
+# An optional addons/status-wait-check add-on (resolved through bin/jg-addons-dir-lib.sh: the in-repo
+# addons/ first, then the pre-fold clone at <home>/projects/juggernaut-addons)
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
@@ -48,6 +49,8 @@ set -eu
 
 CALLER_JG_HOME=${JG_HOME:-}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$SCRIPT_DIR/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-pending-reply-lib.sh
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 # shellcheck source=bin/jg-parent-channel-lib.sh
@@ -57,7 +60,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   || { echo "error: the question rule needs $SCRIPT_DIR/jg-question-lib.sh beside this script" >&2; exit 1; }
 
 jg_squad_lead_report_status_blocked_wait() {  # <verb> <text>
-  local hook="${JG_ADDONS_DIR:-${CALLER_JG_HOME}/projects/juggernaut-addons}/status-wait-check/status-wait-check"
+  local hook
+  hook=$(jg_addons_dir "$CALLER_JG_HOME")/status-wait-check/status-wait-check
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?

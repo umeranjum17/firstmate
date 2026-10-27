@@ -165,7 +165,7 @@ This preference is local to each Juggernaut home and is not part of Squad Lead i
 
 A home can limit any provider to a list of allowed models, so an off-list pick is refused instead of launched.
 The list is one JSON file, `config/model-allow-list.json`, one key per provider: `{"codex": ["gpt-5.6-sol"], "ollama-cloud": ["deepseek-v4.1-flash"]}`.
-It is the same file the `juggernaut-addons` `model-gate` reads, so a home that already limits Ollama keeps that limit here too.
+It is the same file the `model-gate` add-on reads, so a home that already limits Ollama keeps that limit here too.
 A provider the file does not name is not limited, so the file only ever constrains a limit the captain wrote down.
 The key is the segment before the `/` of a qualified model id (`openai-codex`, `ollama-cloud`), and the harness name for a bare model id, which is how the harnesses that take one name their family (`claude`, `codex`, `cursor`).
 A `<provider>/` prefix is stripped before matching, and a model matches a listed entry when it is that entry or a pinned tag of it, so a listed `deepseek-v4.1-flash` also allows `deepseek-v4.1-flash:1017`.
@@ -1100,7 +1100,7 @@ Pins are not inherited into Squad Lead homes: a local Squad Lead agent launches 
 A remote Squad Lead is launched on its host from its own home's configuration, so create the file in that remote home.
 
 [`bin/jg-worker-account-lib.sh`](../bin/jg-worker-account-lib.sh) owns parsing, the sign-in check, and the full list of credentials a Claude launch unsets; [runtime backend verification](verification/runtime-backends.md#worker-account-pin-sign-in-check) records the check against the real runners.
-The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the juggernaut-addons `account-pool` add-on, not this fork.
+The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the `account-pool` add-on, not this fork.
 
 ## Lavish server address (config/lavish-axi-host)
 
@@ -1135,7 +1135,7 @@ The optional local, gitignored `config/launch-env-hook` is an executable that ad
 When the file exists and is executable, the pane runs `config/launch-env-hook <out-file>` from the launch directory (the worktree for ship and Recon) right before the worker starts, then sources `<out-file>`, which must hold one plain `export` statement.
 It runs before the AI-trailer step in "Commit attribution", so `GIT_CONFIG_*` entries it appends after the inherited `GIT_CONFIG_COUNT` come before the trailer `core.hooksPath` entry.
 A nonzero exit, or an export the pane shell cannot source, stops the launch before the worker runs; an absent file changes nothing, and a present but non-executable file prints a warning at spawn and the launch proceeds without it.
-The hook's content is home-local policy, for example the juggernaut-addons `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the invocation mechanics.
+The hook's content is home-local policy, for example the `git-identity` add-on, which pins a lane's git identity and pre-push identity check; [`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the invocation mechanics.
 
 ## Home brief include (config/brief-include.md)
 
@@ -1521,6 +1521,7 @@ Every home requires:
 The two companion tools install at the exact published npm version their `toolchain.versions` rows name, never from git, and that row is their floor too.
 This section is the single owner of that universal toolchain list; backend guides' prerequisites point here and add only their backend-specific tools.
 [`toolchain.versions`](../toolchain.versions) is the single owner of the exact version of every tool the toolchain installs, and every floor these checks enforce derives from its rows; its header owns the bump ritual.
+[`install.sh`](../install.sh) is the one command for a clean machine: it clones this repo into a home, writes [`defaults/`](../defaults) into the home once without overwriting an existing file, and installs those pins into `~/.local/bin`, the same prefix [`bin/jg-bootstrap.sh`](../bin/jg-bootstrap.sh) installs into, so no install needs sudo and no tool ends up installed twice in two directories.
 
 In that list, no-mistakes runs the validation pipeline, gh-axi and chrome-devtools-axi cover GitHub and browser operations, and tasks-axi plus quota-axi back backlog mutations and quota-aware array dispatch.
 Lavish is a presentation-only dependency for visual decisions and reports; nonvisual work can proceed with plain text when it is unavailable.
@@ -2233,7 +2234,7 @@ The `signoff` adapter (`bin/jg-procevent-signoff.sh`) connects captain holds to 
 Armed, it binds itself to the keyed-answer intake above and registers one source whose child waits in `sign-off-axi wait` without waking Juggernaut.
 Arming is per home: a Squad Lead home arms itself, and a hold recorded in a home that is not armed raises no card.
 An answer saved on the board for a task this home still holds for the captain is captured, woken as an ordinary `check` wake, and fed to `bin/jg-captain-hold.sh answers`, so the person never copies the answer across by hand.
-While armed, `bin/jg-captain-hold.sh hold` also raises a board card for that hold; when the juggernaut-addons `signoff` add-on is installed (under `JG_ADDONS_DIR`, else `projects/juggernaut-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
+While armed, `bin/jg-captain-hold.sh hold` also raises a board card for that hold; when the `signoff` add-on is installed (resolved by `bin/jg-addons-dir-lib.sh`: `JG_ADDONS_DIR`, else the in-repo `addons/`, else the pre-fold clone at `projects/juggernaut-addons`), the card goes through that add-on's script instead of this adapter, and the card rules below describe this adapter. Its title is the reason's last `?` sentence, or its first sentence when it has no `?`, with leading `[tag]`, `Captain hold:`, `Captain:` and `Say yes or no:` prefixes dropped, cut to 12 words and ending in one `?` (built from the task title only when nothing remains); its why is the whole reason followed by `Answer yes or no. The hold stays open until you answer.`, the reason cut so the whole why stays within 200 characters; its outcomes are yes or no. A card that cannot be raised makes `hold` exit non-zero with the sign-off-axi error on stderr while the hold stays recorded; a task held again whose card is already answered reuses that card, a task held again with a changed question keeps its existing card and exits zero, and a dated deferral gets no card.
 Each hold occurrence gets its own card, so a task held again after an answered card gets a new live one.
 The adapter needs `sign-off-axi` on PATH: `arm` refuses without it, and the card attempt prints an install hint.
 Board keys carry a digest of this home's `JG_HOME` and the hold's stamp, so the machine's one shared board never delivers another home's answer or an earlier card's answer to this one.
@@ -2609,7 +2610,7 @@ JG_INACTIVE_RECONCILE_BUDGET_SECS=10  # 1..30-second scan deadline; wedged-scan 
 JG_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls, custom checks, Relay dispatch, or ask-default decide ticks)
 JG_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 JG_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
-JG_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before a stuck-busy stale wake; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/jg-task-inbox-lib.sh
+JG_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before one stuck-busy stale wake reports the wait; delivery stays owed and rings on the first non-busy poll, so the wake is a status report, never a give-up; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/jg-task-inbox-lib.sh
 JG_CHECK_TIMEOUT=30     # seconds allowed per slow check script
 JG_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5..25, cut to fit JG_CHECK_TIMEOUT
 JG_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding Juggernaut

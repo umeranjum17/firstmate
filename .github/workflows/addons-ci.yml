@@ -39,11 +39,11 @@ jobs:
         run: bash receipts/tests/receipts-hook-e2e.sh
       - name: Lead-wake hook journeys
         run: bash lead-wake/tests/lead-wake-e2e.sh
-      # An add-on script is a shell script under a top-level add-on directory,
-      # either one level down (`merge-card/merge-card`, `fleet-dashboard/jg-dashboard.sh`)
-      # or two levels down in its `bin/` and `tests/` subdirectories
-      # (`fleet-flow/bin/jg-flow.sh`, `fleet-flow/tests/jg-flow.test.sh`), so a new
-      # add-on in either shape needs no edit here and a non-script file is left alone.
+      # An add-on script is the catalog's own `install-all.sh`, or a shell script under a
+      # top-level add-on directory, either one level down (`merge-card/merge-card`,
+      # `fleet-dashboard/jg-dashboard.sh`) or two levels down in its `bin/` and `tests/`
+      # subdirectories (`fleet-flow/bin/jg-flow.sh`, `fleet-flow/tests/jg-flow.test.sh`),
+      # so a new add-on in either shape needs no edit here and a non-script file is left alone.
       # The runner image ships shellcheck, so nothing is downloaded at run time.
       - name: ShellCheck add-on scripts
         run: |
@@ -64,7 +64,7 @@ jobs:
           # to the fork and may not be edited, so exactly those two codes are
           # exempt for those files. Every other check stays on at every severity.
           found=0
-          for f in ./*/* ./*/*/*; do
+          for f in ./*.sh ./*/* ./*/*/*; do
             [ -f "$f" ] || continue
             head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
             found=$((found + 1))
@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           found=0
-          for f in ./*/* ./*/*/*; do
+          for f in ./*.sh ./*/* ./*/*/*; do
             [ -f "$f" ] || continue
             head -n 1 "$f" | grep -Eq '^#!.*\b(bash|sh)\b' || continue
             found=$((found + 1))
@@ -118,9 +118,6 @@ jobs:
         run: |
           bash quota-failover/tests/quota-failover-e2e.sh
           bash quota-failover/tests/install.test.sh
-      # Quota JSON fixtures, a throwaway home and HOME, and a stub register: nothing real is touched.
-      - name: Claude quota check test
-        run: bash claude-quota/tests/claude-quota.test.sh
       # Fixture fork home with stub callers and a throwaway HOME: nothing real is touched.
       - name: Fleet contract check test
         run: bash fleet-contract-check/tests/fleet-contract-check.test.sh
@@ -138,16 +135,18 @@ jobs:
       # Fixture Main and lead homes with stub jg-tasks-axi.sh and jg-crew-state.sh: lane slots and dry.
       - name: Home flow check test
         run: bash fleet-flow/tests/jg-flow-check.test.sh
-      # Stub upstream on 127.0.0.1 only: never reaches Z.AI.
-      - name: GLM queue test
-        run: bash glm-queue/tests/glm-queue.test.sh
       # The real guard installers in a throwaway HOME; commands run the way Codex runs them: nothing real is touched.
       - name: Kill guard Main allowance and CLI journeys
         run: |
           node kill-guard/tests/main-allowance.test.mjs
           bash kill-guard/tests/kill-guard.test.sh --guard-only
-      - name: Codex guard test
-        run: bash codex-guard/tests/codex-guard.test.sh
+      # Fixture throwaway HOME, XDG and home with a stub opencode and a stub fleet check: nothing real is touched.
+      - name: Model gate test
+        run: bash model-gate/tests/model-gate.test.sh
+      # Throwaway home, HOME and XDG paths, and the fixture's own git configuration: the two add-on pairs
+      # that share a hook file install three times over and must settle instead of refusing.
+      - name: Install-all re-install journey
+        run: bash tests/install-all.test.sh
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
       - name: Git identity test
         run: bash git-identity/tests/git-identity.test.sh

@@ -84,7 +84,11 @@
 #                          tool process.
 #   stale: <window> (unread juggernaut instruction: ...)
 #                          the steering-inbox ladder spent its delivery-attempt
-#                          budget on an idle pane without an acknowledgement
+#                          budget on an idle pane without an acknowledgement, or
+#                          the pane read busy through the busy-deferral bound. The
+#                          busy form is a report only: the message stays owed and
+#                          its doorbell rings on the first non-busy poll, so it
+#                          needs no interrupt
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
@@ -278,9 +282,13 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-busy-lib.sh"
 # shellcheck source=bin/jg-watch-progress-lib.sh
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
+# Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$SCRIPT_DIR/jg-addons-dir-lib.sh"
 # Optional alerts add-on: defines jg_model_outage_tick.
+_jg_alerts_lib=$(jg_addon_path "$JG_HOME" alerts/bin/jg-model-outage-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/alerts/bin/jg-model-outage-lib.sh"
+[ ! -r "$_jg_alerts_lib" ] || . "$_jg_alerts_lib"
 # Parked-home reader (juggernaut-addons/parked-homes): the shared predicate
 # every parked-home guard in the watcher calls. The shim answers not parked
 # when the add-on is absent (stock behavior).
@@ -305,10 +313,11 @@ WATCH_HOME_EXISTED=0
 # supervision recovers a positively dead or missing mate through the identical
 # guarded path. The watcher contributes only the cadence, the relaunch bound,
 # and wake emission (squad_lead_liveness_tick below).
+_jg_wait_timers_lib=$(jg_addon_path "$JG_HOME" wait-timers/bin/jg-wait-timers-lib.sh)
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
-[ ! -r "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "$_jg_wait_timers_lib" ] || . "$_jg_wait_timers_lib"
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/jg-watch.sh"
@@ -611,6 +620,24 @@ window_key() {  # <window>
   printf '%s' "${key//./_}"
 }
 
+# Emit the one deferral report for <record> and mark it reported. Both
+# deferral reasons (a turn still running, a composer holding other text) use
+# this single wake, and neither one ends delivery.
+inbox_steer_defer_report() {  # <window> <task> <record> <kind> <sentence>
+  local w=$1 task=$2 rec=$3 reason
+  if [ ! -d "${rec%/*}" ] || [ ! -f "$rec" ]; then
+    jg_task_inbox_due_action "$STATE" "$task" >/dev/null || true
+    return 0
+  fi
+  reason="stale: $w (unread juggernaut instruction: $rec stays unhandled - $5; no doorbell was typed, and it lands as soon as that clears, so no interrupt is needed unless the worker is wedged)"
+  jg_wake_append stale "$w" "$reason" || exit 1
+  if ! jg_task_inbox_record_deferral_reported "$STATE" "$task" "$rec" "$4"; then
+    echo "error: stale wake was queued for $task but its deferral report marker could not be written" >&2
+    exit 1
+  fi
+  wake "$reason"
+}
+
 inbox_steer_escalate_unavailable() {  # <window> <task> <record>
   local w=$1 task=$2 rec=$3 reason
   reason="stale: $w (unread juggernaut instruction: $rec is unhandled and the worker's agent has exited or its endpoint is missing, so the doorbell was not typed; recover the worker)"
@@ -634,7 +661,7 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # Runs for squad_leads too: their pane-staleness exemption is about quiet panes
 # being healthy, while an unacknowledged instruction can still be a stuck steer.
 inbox_steer_check() {  # <window> <task>
-  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state
+  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state decision
   # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
   # doorbell ring, re-ring or unread-instruction escalation. No-op without
   # the add-on checkout.
@@ -669,15 +696,23 @@ inbox_steer_check() {  # <window> <task>
   tail40=$WATCHER_CAPTURE
   if window_is_busy "$w" "$tail40"; then
     [ "$verb" != retry ] || return 0
-    if ! count=$(jg_task_inbox_record_busy "$STATE" "$task" "$rec"); then
-      [ -f "$rec" ] || return 0
-      reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be written while $rec stays unhandled; inspect the inbox directory)"
-    elif [ "$count" -ge "$(jg_task_inbox_busy_max)" ]; then
-      reason="stale: $w (unread juggernaut instruction: stuck-busy after $count consecutive busy-deferred due doorbells; $rec stays unhandled and no doorbell was typed; inspect the worker)"
-    else
-      return 0
-    fi
-    verb=escalate
+    # The turn really is still running, so nothing may be typed at it. The
+    # deferral only defers: it reports the unread instruction once and keeps the
+    # message owed, so the ordinary ladder below rings the doorbell on the first
+    # non-busy poll once the turn ends - no interrupt, no relaunch.
+    decision=$(jg_task_inbox_defer "$STATE" "$task" "$rec")
+    case "$decision" in
+      quiet) return 0 ;;
+      escalate)
+        reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be written while $rec stays unhandled; inspect the inbox directory)"
+        verb=escalate
+        ;;
+      *)
+        inbox_steer_defer_report "$w" "$task" "$rec" busy \
+          "stuck-busy after ${decision#report } consecutive busy-deferred due doorbells, with the pane reading busy for a turn still running"
+        return 0
+        ;;
+    esac
   elif [ "$verb" != retry ] && ! jg_task_inbox_clear_busy "$STATE" "$task"; then
     reason="stale: $w (steering-inbox busy bookkeeping unwritable: ${rec%/*}/.busy-state cannot be reset after a non-busy check; inspect the inbox directory)"
     verb=escalate
@@ -688,6 +723,20 @@ inbox_steer_check() {  # <window> <task>
       jg_task_inbox_ring "$backend" "$w" "$rec" "$(window_label "$w")" || ring_rc=$?
       if [ "$ring_rc" -eq 3 ]; then
         inbox_steer_escalate_unavailable "$w" "$task" "$rec"
+        return 0
+      fi
+      if [ "$ring_rc" -eq 1 ]; then
+        # The composer provably holds other text, so the Enter was withheld on
+        # purpose. That is a deferral, not a spent attempt: the record stays
+        # owed and the one-keypress fix is reported at once instead of the
+        # delivery budget being spent toward a silent give-up.
+        if jg_task_inbox_deferral_reported "$STATE" "$task" "$rec" held; then
+          triage_log "steer-inbox delivery held: $task ${rec##*/} (already reported)"
+          return 0
+        fi
+        triage_log "steer-inbox delivery held: $task ${rec##*/}${JG_TASK_INBOX_RING_REASON:+ reason=$JG_TASK_INBOX_RING_REASON}"
+        inbox_steer_defer_report "$w" "$task" "$rec" held \
+          "the worker's composer holds other pending text, so submitting the doorbell could submit that text - submit it with 'jg-send.sh $task --key Enter' or clear the composer"
         return 0
       fi
       if ! jg_task_inbox_record_ring "$STATE" "$task" "$rec"; then
@@ -1195,7 +1244,7 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-jg_host_memory_lib="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/host-memory/bin/jg-host-memory-lib.sh"
+jg_host_memory_lib=$(jg_addon_path "$JG_HOME" host-memory/bin/jg-host-memory-lib.sh)
 # shellcheck disable=SC1090,SC1091 # The optional add-on source is installed outside this repository.
 if [ -f "$jg_host_memory_lib" ]; then . "$jg_host_memory_lib"; fi
 
@@ -2813,11 +2862,12 @@ record_ready_work_surfaced() {
   printf '%s\t%s\n' "$now" "$READY_WORK_IDS" > "$STATE/.ready-work-surfaced"
 }
 
-# Thin hook for the juggernaut-addons ask-default add-on, which owns every
+# Thin hook for the ask-default add-on, which owns every
 # decision: for each ask it recorded that has not been defaulted yet, run
 # `ask-default decide` and let it apply the ask's safe default when the captain
 # is unreachable and the ask's clock has run out. Located like the other add-on
-# shims (JG_ADDONS_DIR, default $JG_HOME/projects/juggernaut-addons); with the
+# shims (JG_ADDONS_DIR, else the in-repo addons/, else the pre-fold clone at
+# $JG_HOME/projects/juggernaut-addons); with the
 # add-on absent this returns at once, writing nothing, and the loop is unchanged.
 # Runs once per CHECK_INTERVAL. The probe reads the away record: the captain is
 # reachable unless an away record (never quiet mode's) exists. Held, waiting, and
@@ -2825,7 +2875,7 @@ record_ready_work_surfaced() {
 # Sets ASK_DEFAULT_REASON and returns 0 when at least one ask was just defaulted.
 ask_default_tick() {
   local tool rec id out rc ids='' probe
-  tool="${JG_ADDONS_DIR:-$JG_HOME/projects/juggernaut-addons}/ask-default/ask-default"
+  tool=$(jg_addon_path "$JG_HOME" ask-default/ask-default)
   [ -x "$tool" ] || return 1
   [ "$(age_of "$STATE/.last-ask-default-check")" -ge "$CHECK_INTERVAL" ] || return 1
   touch "$STATE/.last-ask-default-check"

@@ -2816,10 +2816,21 @@ A real Claude worker opened an `AskUserQuestion` panel, and Juggernaut's `UserPr
 Four due inbox checks using the original `origin/main` watcher at `1f3e769616fdf9f31f85f4c3e6a9f71606634238` against that live pane each read `busy=yes` and added zero wakes.
 With `JG_TASK_INBOX_GRACE_SECS=0 JG_TASK_INBOX_BUSY_MAX=2`, two distinct processes sourcing the fixed watcher and calling `inbox_steer_check` against the same pane produced one wake containing `stuck-busy after 2 consecutive busy-deferred due doorbells`.
 A third check left exactly one wake total; the question panel remained open and the instruction remained unhandled.
+That unhandled ending was the pre-fix terminal behaviour: the reporting wake also closed the ladder, so no later poll could ring even after the pane freed. The `2026-10-26` proof below replaces that outcome.
 Lab teardown completed with exit `0`, including the default-session tripwire.
 The zero grace accelerates only the experiment; the normal grace remains unchanged.
 Without Juggernaut's hooks, Herdr reported the question panel as `blocked`, which did not classify as busy; that is a different path and does not establish this regression.
 
+### 2026-10-26 live Pi proof: the busy report no longer cancels delivery
+
+Verified at `2026-10-26T21:52:14Z` on branch `fm/busy-stuck-rootcause` (base `2b2bb5e5`) with a real Pi `1.0.0` worker in a private tmux server, wired to the same `pi-ext` busy contract `bin/jg-spawn.sh` generates (`agent_start` to `busy`, `agent_settled` to `idle`, both through `bin/jg-busy-event.sh apply --source pi-ext`).
+The task's `live-proof/` artifacts hold the rerunnable script and the full transcript.
+
+- The worker was made genuinely busy by its own turn (`state=busy source=pi-ext event=agent-start`), and the steer record was written the way `bin/jg-send.sh` writes it, so only the watcher's ladder could ring.
+- Three due checks while busy each read the pane busy, typed no doorbell (the `tmux send-keys` log held zero `Juggernaut instruction waiting` lines), advanced the deferral count through `1`, `2`, `3`, and produced exactly one `stuck-busy after 2 consecutive busy-deferred due doorbells` wake, now worded as a status report that says delivery lands when the pane frees.
+- When the turn ended the idle record arrived (`state=idle source=pi-ext event=agent-settled`), the deferral count cleared, and the next check typed the doorbell once; the worker read the record, ran what it asked for, and moved `001.msg` into `handled/` with no interrupt and no relaunch.
+- Portable regressions: `test_watcher_busy_report_is_not_a_giveup` pins deferral-then-delivery across the turn boundary, and `test_watcher_reports_held_composer_immediately` pins the composer-held deferral whose Enter the delivery path withholds.
+
 This live proof covers the watcher and queue boundary; it does not establish live daemon-consumer delivery.
 `bin/jg-test-run.sh tests/jg-daemon.test.sh` exercises that consumer routing separately with portable regressions for busy escalation and busy-bookkeeping failures in away and quiet mode.
-Repeat the hooked-worker check above before publication if watcher or task-inbox busy code changes; `bin/jg-test-run.sh tests/jg-task-inbox.test.sh` refreshes the portable ladder regressions.
+Repeat the hooked-worker check above, or the Pi script in the `busy-stuck-rootcause` live-proof artifacts, before publication if watcher or task-inbox busy code changes; `bin/jg-test-run.sh tests/jg-task-inbox.test.sh` refreshes the portable ladder regressions.

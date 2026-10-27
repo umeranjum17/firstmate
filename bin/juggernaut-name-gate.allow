@@ -438,3 +438,11 @@ tests/jg-tool-wiring.test.sh  # inline FM_ alias (slice S4); deleted by slice S1
 bin/fm-ci-required.sh  # alias for bin/jg-ci-required.sh; called by live homes, panes and per-lane records
 bin/fm-ci-scope.sh  # alias for bin/jg-ci-scope.sh; called by live homes, panes and per-lane records
 tests/jg-backend.test.sh  # adapt_old_names rewrites the old words in a pre-rename baseline, so it must name them; deleted by slice S10
+bin/fm-addons-dir-lib.sh  # alias for bin/jg-addons-dir-lib.sh
+addons/install-all.sh  # inline jg-compat env alias
+addons/model-gate/bin/jg-model-gate-lib.sh  # inline jg-compat env alias
+addons/model-gate/install.sh  # inline jg-compat env alias
+addons/model-gate/tests/model-gate.test.sh  # inline jg-compat env alias
+tests/jg-addons-dir.test.sh  # inline jg-compat env alias
+tests/jg-one-install.test.sh  # inline jg-compat env alias
+install.sh  # inline jg-compat env alias

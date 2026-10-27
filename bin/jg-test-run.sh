@@ -302,7 +302,7 @@ cpu_count() {
 # lands in `unclassified` and stays serial until someone proves it.
 family_for_basename() {
   case "$1" in
-    jg-arm-pretool-check.test.sh|jg-ask-user-authority.test.sh|\
+    jg-addons-dir.test.sh|jg-arm-pretool-check.test.sh|jg-ask-user-authority.test.sh|\
     jg-bearings-board.test.sh|\
     jg-brief.test.sh|jg-dod-lib.test.sh|jg-vendor-auth-probe.test.sh|\
     jg-calm-pi-extension.test.sh|jg-cd-pretool-check.test.sh|\
@@ -368,6 +368,7 @@ family_for_basename() {
       ;;
     jg-backlog-atomicity.test.sh|\
     jg-bootstrap.test.sh|jg-bootstrap-network-parallel.test.sh|jg-fleet-sync.test.sh|jg-gate-refuse.test.sh|jg-gotmp.test.sh|\
+    jg-one-install.test.sh|\
     jg-session-start.test.sh|jg-sessionstart-nudge.test.sh|jg-startup-network.test.sh|\
     jg-tangle-guard.test.sh|jg-update.test.sh)
       printf '%s\n' session-bootstrap
@@ -709,6 +710,7 @@ list_portable_serial() {
 # balance rather than coverage. That doc owns the refresh procedure.
 portable_serial_weight_hints() {
   cat <<'EOF'
+tests/jg-addons-dir.test.sh 240
 tests/jg-afk-contract.test.sh 11101
 tests/jg-afk-inject-e2e.test.sh 41958
 tests/jg-afk-pi-herdr-return-e2e.test.sh 52
@@ -1535,6 +1537,12 @@ families_for_changed_path() {
     bin/jg-bootstrap.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:jg-brief.test.sh"
+      ;;
+    install.sh|defaults/*|toolchain.versions|bin/jg-pin-lib.sh)
+      # The one entry command, the defaults it writes, and the pin table every
+      # install path reads. The table and its reader also set the floors
+      # bin/jg-bootstrap.sh enforces, so the bootstrap family comes too.
+      printf '%s\n' session-bootstrap
       ;;
     bin/jg-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap

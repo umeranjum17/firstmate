@@ -1231,9 +1231,9 @@ test_split_thread_lib() {
   . "$ROOT/bin/jg-x-lib.sh"
   local out n last rejoin maxlen txt
   # A reply that fits one tweet stays a single, UNNUMBERED chunk.
-  out=$(printf 'Aye, all shipshape.' | fmx_split_thread 280 25)
+  out=$(printf 'Aye, all clear.' | fmx_split_thread 280 25)
   [ "$(printf '%s' "$out" | jq 'length')" = "1" ] || fail "short reply must be one chunk"
-  [ "$(printf '%s' "$out" | jq -r '.[0]')" = "Aye, all shipshape." ] || fail "short reply must be verbatim and unnumbered"
+  [ "$(printf '%s' "$out" | jq -r '.[0]')" = "Aye, all clear." ] || fail "short reply must be verbatim and unnumbered"
   # A long reply splits on word boundaries; every chunk within the limit; lossless.
   txt="alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november"
   out=$(printf '%s' "$txt" | fmx_split_thread 30 25)

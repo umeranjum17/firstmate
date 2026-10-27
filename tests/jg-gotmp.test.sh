@@ -100,6 +100,8 @@ SH
   # Receiver-wake retirement sources the pending-reply library, which in turn
   # requires the marker helper even for this ordinary-task teardown fixture.
   ln -s "$ROOT/bin/jg-pending-reply-lib.sh" "$fake/bin/jg-pending-reply-lib.sh"
+  # The parked-homes shim resolves the add-on directory through the shared resolver.
+  ln -s "$ROOT/bin/jg-addons-dir-lib.sh" "$fake/bin/jg-addons-dir-lib.sh"
   ln -s "$ROOT/bin/jg-parked-homes-lib.sh" "$fake/bin/jg-parked-homes-lib.sh"
   ln -s "$ROOT/bin/jg-marker-lib.sh" "$fake/bin/jg-marker-lib.sh"
   ln -s "$ROOT/bin/jg-operational-input.sh" "$fake/bin/jg-operational-input.sh"
@@ -211,6 +213,8 @@ SH
   ln -s "$ROOT/bin/jg-squad-lead-registry-lib.sh" "$fake/bin/jg-squad-lead-registry-lib.sh"
   ln -s "$ROOT/bin/jg-squad-lead-parent-lib.sh" "$fake/bin/jg-squad-lead-parent-lib.sh"
   ln -s "$ROOT/bin/jg-pending-reply-lib.sh" "$fake/bin/jg-pending-reply-lib.sh"
+  # The parked-homes shim resolves the add-on directory through the shared resolver.
+  ln -s "$ROOT/bin/jg-addons-dir-lib.sh" "$fake/bin/jg-addons-dir-lib.sh"
   ln -s "$ROOT/bin/jg-parked-homes-lib.sh" "$fake/bin/jg-parked-homes-lib.sh"
   ln -s "$ROOT/bin/jg-marker-lib.sh" "$fake/bin/jg-marker-lib.sh"
   ln -s "$ROOT/bin/jg-operational-input.sh" "$fake/bin/jg-operational-input.sh"

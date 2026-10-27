@@ -178,6 +178,8 @@ case "${1:-}" in
   -h|--help) usage; exit 0 ;;
 esac
 
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$SCRIPT_DIR/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-marker-lib.sh
 . "$SCRIPT_DIR/jg-marker-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
@@ -427,7 +429,7 @@ if [ "$KIND" != squad_lead ] && { [ -e "$BRIEF_INCLUDE_FILE" ] || [ -L "$BRIEF_I
   [ -n "$(printf '%s' "$BRIEF_INCLUDE_BODY" | tr -d '[:space:]')" ] || BRIEF_INCLUDE_BODY=
 fi
 
-_bi="${JG_ADDONS_DIR:-${JG_HOME:-$SCRIPT_DIR/..}/projects/juggernaut-addons}/brief-inherit/bin/jg-brief-inherit-lib.sh"
+_bi=$(jg_addon_path "${JG_HOME:-$SCRIPT_DIR/..}" brief-inherit/bin/jg-brief-inherit-lib.sh)
 # shellcheck disable=SC1090 # The optional add-on source is installed outside this repository.
 [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }
 

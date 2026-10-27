@@ -119,6 +119,8 @@
 # It takes the same optional trailing forge argument, because the rule that keeps
 # a worker off a remote is exactly the rule that changes when the forge does.
 
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-pr-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
@@ -135,11 +137,13 @@
 # shellcheck source=bin/jg-merge-gate-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-merge-gate-lib.sh"
 # Optional merge-card add-on: defines the same two hooks for homes that install it.
+# Optional merge-card add-on: defines jg_dod_merge_gate and jg_merge_post_hook.
+_jg_dod_addons=$(jg_addons_dir "${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "$_jg_dod_addons/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "$_jg_dod_addons/merge-card/bin/jg-merge-hooks-lib.sh"
 # Optional receipts add-on: defines jg_dod_receipt_accept and the jg_receipts_* helpers.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/receipts/bin/jg-receipts-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/projects/juggernaut-addons}/receipts/bin/jg-receipts-lib.sh"
+[ ! -r "$_jg_dod_addons/receipts/bin/jg-receipts-lib.sh" ] || . "$_jg_dod_addons/receipts/bin/jg-receipts-lib.sh"
 
 jg_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3

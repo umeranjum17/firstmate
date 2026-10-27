@@ -26,6 +26,8 @@
 # source beyond its sourced libraries.
 
 _JG_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/jg-addons-dir-lib.sh
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-addons-dir-lib.sh"
 # shellcheck source=bin/jg-pr-lib.sh
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-parent-channel-lib.sh
@@ -124,7 +126,7 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-merge-gate-lib.sh"
 # Optional merge-card add-on: defines the same two hooks for homes that install it.
 # shellcheck source=/dev/null
-[ ! -r "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "${JG_ADDONS_DIR:-${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}/projects/juggernaut-addons}/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh"
 
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
