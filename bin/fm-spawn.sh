@@ -4776,12 +4776,14 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
 fi
 
-# Relaunch must restore the durable task copy after endpoint adoption. This also
-# updates Herdr's restored pane shell before any harness starts, so a later host
-# restart inherits the task worktree rather than the tab's original directory.
-if [ "$RELAUNCH" -eq 1 ]; then
+# Fresh ships/scouts and all relaunches must enter and verify the durable task
+# copy before launch. Fresh secondmate homes already use their own launch path.
+# Updating Herdr's pane shell here also preserves the cwd across host restarts.
+if [ "$RELAUNCH" -eq 1 ] || [ "$KIND" != secondmate ]; then
   spawn_enter_recorded_worktree
   spawn_assert_agent_worktree
+fi
+if [ "$RELAUNCH" -eq 1 ]; then
   if [ "$KIND" = secondmate ]; then
     role_marker=$(cat "$WT/.fm-secondmate-home" 2>/dev/null || true)
     [ "$role_marker" = "$ID" ] || {
