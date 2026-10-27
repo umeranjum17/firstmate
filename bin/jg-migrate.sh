@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
-# Migrate one Juggernaut home from Firstmate names to Juggernaut names.
+# Migrate the explicitly supported legacy fields in one Juggernaut home.
 set -euo pipefail
 exec python3 - "$@" <<'PY'
 import argparse
 import os
 import pathlib
+import re
 import shutil
 import sys
 import tarfile
 import tempfile
 
-REPLACEMENTS = (
-    (b'FIRSTMATE_OP:', b'JUGGERNAUT_OP:'),
-    (b'FIRSTMATE', b'JUGGERNAUT'),
-    (b'firstmate-addons', b'juggernaut-addons'),
-    (b'firstmate', b'juggernaut'),
-    (b'secondmate', b'squad-lead'),
-    (b'crewmate', b'operator'),
-    (b'second mate', b'Squad Lead'),
-    (b'first mate', b'Overwatch'),
-    (b'FM_', b'JG_'),
-    (b'fm-', b'jg-'),
-    (b'fm_', b'jg_'),
-    (b'.fm-', b'.jg-'),
+# Each rule names one record path and one field. Unlisted legacy data is unknown.
+RULES = (
+    (re.compile(r"state/model-gate\.check-trust"), re.compile(rb"^fm-custom-check-v1$", re.M), b"jg-custom-check-v1"),
+    (re.compile(r"config/crew"), re.compile(rb"^(FM_MODEL=)([^\r\n]*)$", re.M), rb"JG_MODEL=\2"),
+    (re.compile(r"state/[^/]+\.status"), re.compile(rb"^fm-open-decision:" , re.M), b"jg-open-decision:"),
+    (re.compile(r"data/records"), re.compile(rb"^projects/firstmate-addons$", re.M), b"projects/juggernaut-addons"),
 )
+LEGACY = re.compile(rb"FIRSTMATE_OP:|FIRSTMATE|firstmate-addons|firstmate|secondmate|crewmate|second mate|first mate|FM_|fm-|fm_")
+KNOWN_NONRECORDS = (re.compile(r"state/model-gate\.check\.sh"),)
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--home', required=True, help='the single home to migrate')
@@ -44,6 +40,20 @@ mig = home / 'state/.jg-migration'
 journal = mig / f'{a.slice}.journal'
 
 
+def transform(path, raw):
+    rel = path.relative_to(home).as_posix()
+    supported = [(pattern, field, replacement) for pattern, field, replacement in RULES if pattern.fullmatch(rel)]
+    updated = raw
+    if not supported and any(pattern.fullmatch(rel) for pattern in KNOWN_NONRECORDS):
+        return updated
+    if supported:
+        _, field, replacement = supported[0]
+        updated = field.sub(replacement, updated)
+    if LEGACY.search(updated):
+        raise ValueError(f'unclassified legacy content: {rel}')
+    return updated
+
+
 def files():
     found = []
     for part in ('config', 'state', 'data'):
@@ -52,43 +62,24 @@ def files():
             dirs[:] = sorted(d for d in dirs if d != '.jg-migration')
             for name in sorted(names):
                 path = pathlib.Path(root) / name
+                rel = path.relative_to(home).as_posix()
                 if path.is_symlink():
-                    target = os.readlink(path).encode()
-                    if any(old in target for old, _ in REPLACEMENTS):
-                        raise ValueError(f'unclassifiable symbolic link: {path.relative_to(home)}')
+                    if LEGACY.search(os.readlink(path).encode()):
+                        raise ValueError(f'unclassified legacy symbolic link: {rel}')
                     continue
                 if not path.is_file():
-                    raise ValueError(f'unclassifiable record: {path.relative_to(home)}')
+                    raise ValueError(f'unclassifiable record: {rel}')
                 raw = path.read_bytes()
                 try:
                     raw.decode('utf-8')
                 except UnicodeDecodeError:
-                    if any(old in raw for old, _ in REPLACEMENTS):
-                        raise ValueError(f'unclassifiable binary record: {path.relative_to(home)}')
+                    if LEGACY.search(raw):
+                        raise ValueError(f'unclassified legacy binary record: {rel}')
                     continue
-                updated = raw
-                for old, new in REPLACEMENTS:
-                    updated = updated.replace(old, new)
+                updated = transform(path, raw)
                 if updated != raw:
                     found.append((path, raw, updated))
     return found
-
-
-def digest_tree():
-    import hashlib
-    h = hashlib.sha256()
-    for part in ('config', 'state', 'data'):
-        for root, dirs, names in os.walk(home / part, followlinks=False):
-            dirs[:] = sorted(d for d in dirs if d != '.jg-migration')
-            for name in sorted(names):
-                path = pathlib.Path(root) / name
-                rel = str(path.relative_to(home)).encode()
-                h.update(rel + b'\0')
-                if path.is_symlink():
-                    h.update(b'L' + os.readlink(path).encode())
-                else:
-                    h.update(b'F' + path.read_bytes())
-    return h.hexdigest()
 
 try:
     changes = files()
@@ -98,7 +89,7 @@ except (OSError, ValueError) as e:
 
 if a.check:
     for path, _, _ in changes:
-        print(f'{path.relative_to(home)}')
+        print(path.relative_to(home))
     if not changes:
         print('no rewrites required')
     sys.exit(0)
@@ -140,6 +131,10 @@ if a.rollback:
         sys.exit(1)
     with tarfile.open(journal, 'r:gz') as archive:
         archive.extractall(home, filter='data')
-    shutil.rmtree(mig)
+    journal.unlink()
+    try:
+        mig.rmdir()
+    except OSError:
+        pass
     print('rollback restored the journaled home')
 PY
