@@ -3,11 +3,10 @@
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
 done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
+unset _jg_old _jg_new 2>/dev/null || true
 # Install model-gate for one juggernaut home, or take it away with --remove: the gate on PATH, the allow-list, the
 # opencode per-provider whitelist (so an off-list model is not even pickable there) and the fleet check that restores
 # that whitelist and warns when an off-list model was used anyway. Idempotent; the allow-list file is never overwritten

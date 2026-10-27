@@ -3,11 +3,10 @@
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   _jg_new="JG_${_jg_old#FM_}"
-  eval "[ -n \"\${$_jg_new+set}\" ]" && continue
-  eval "_jg_val=\${_jg_old}"
-  export "$_jg_new=$_jg_val"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
 done
-unset _jg_old _jg_new _jg_val 2>/dev/null || true
+unset _jg_old _jg_new 2>/dev/null || true
 # The add-on lookup chain in bin/jg-addons-dir-lib.sh: JG_ADDONS_DIR, then the in-repo addons/, then
 # the pre-fold clone at <home>/projects/juggernaut-addons. A live home has to keep working before,
 # during and after the move, so both orders are proved through a real consumer, not just resolved.
