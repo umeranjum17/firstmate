@@ -181,6 +181,7 @@ jobs_running_under() {  # <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <behavior
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[1],
+  "github.event.pull_request.draft" => "",
   "vars.JG_CI_SKIP_PUSH" => ARGV[2],
   "vars.JG_CI_SKIP_MACOS" => ARGV[3],
   "needs.invariants.outputs.behavior" => ARGV[4],
@@ -388,6 +389,7 @@ job_runs_under() {  # <job> <event> <JG_CI_SKIP_PUSH> <JG_CI_SKIP_MACOS> <needs 
   ruby -ryaml -e "$EXPRESSION_RUBY" -e '
 context = {
   "github.event_name" => ARGV[2],
+  "github.event.pull_request.draft" => "",
   "vars.JG_CI_SKIP_PUSH" => ARGV[3],
   "vars.JG_CI_SKIP_MACOS" => ARGV[4],
   "needs.status" => ARGV[5],

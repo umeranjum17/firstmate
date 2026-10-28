@@ -6,6 +6,7 @@ on:
   # Any base branch rather than only main, so a pull request stacked on another
   # feature branch is verified too instead of reporting no checks at all.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -27,6 +28,10 @@ concurrency:
 # tiers and their rationale; tests/jg-ci-workflow.test.sh guards this workflow.
 # Each job comment identifies the tier implemented by its executable value.
 
+# Draft pull requests skip every job (invariants and the required gate carry the
+# check; the other jobs follow through `needs`) and run on ready_for_review.
+# `edited` is deliberately not a trigger: no check reads the pull request body.
+#
 # Path scope: a documentation, media, or license change runs only the fast
 # invariants job. bin/jg-ci-scope.sh owns that allowlist and the default that
 # anything it cannot classify needs the whole suite, and `CI required` is the one
@@ -478,7 +483,7 @@ jobs:
   invariants:
     name: Repo invariants
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
+    if: ${{ !github.event.pull_request.draft && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
     # Fast tier: the invariant checks are seconds-long file comparisons, and the
     # complete-regression partition proof, so a cheap change still runs both.
     timeout-minutes: 5
@@ -497,12 +502,14 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: |
           set -eu
-          # A main push and an unreadable diff both keep the full suite.
+          # An unreadable diff keeps the full suite. A main push runs only
+          # the invariants: every change already passed the full suite on its
+          # pull request, so main repeats just the cheap repo-wide checks.
           if [ "$EVENT_NAME" = pull_request ]; then
             changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
             printf '%s\n' "$changed" | bin/jg-ci-scope.sh >>"$GITHUB_OUTPUT"
           else
-            bin/jg-ci-scope.sh --full >>"$GITHUB_OUTPUT"
+            echo behavior=false >>"$GITHUB_OUTPUT"
           fi
       # The one lint a documentation-only change gets. ShellCheck is absent for
       # a cheap change: no cheap path is a shell or workflow file.
@@ -547,7 +554,7 @@ jobs:
     timeout-minutes: 30
     needs: [invariants, lint, tests-portable-parallel-1, tests-portable-parallel-2,
             tests-portable-serial, tests-herdr, macos-stock-bash]
-    if: ${{ always() && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
+    if: ${{ always() && !github.event.pull_request.draft && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
     steps:
       - uses: actions/checkout@v6
       - name: Refuse a change whose needed lanes did not run
