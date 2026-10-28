@@ -2708,7 +2708,7 @@ crew_worktree_written_since() {  # <id> <state> <anchor-file>
   [ -f "$anchor" ] || return 1
   wt=$(grep '^worktree=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
   [ -n "$wt" ] && [ -d "$wt" ] || return 1
-  kind=$(grep '^kind=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
+  kind=$(jg_compat_kind "$(grep '^kind=' "$state/$id.meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)")
   [ "$kind" != squad_lead ] || return 1
   if [ -e "$(jg_compat_marker "$wt")" ] || [ -L "$(jg_compat_marker "$wt")" ]; then
     return 1
@@ -2789,7 +2789,7 @@ signal_crew_provably_working() {  # <file> ...
     [ -n "$task" ] || continue
     case "$base" in
       *.status)
-        if [ "$(grep '^kind=' "$dir/$task.meta" 2>/dev/null | tail -1 | cut -d= -f2-)" = squad_lead ]; then
+        if [ "$(jg_compat_kind "$(grep '^kind=' "$dir/$task.meta" 2>/dev/null | tail -1 | cut -d= -f2-)")" = squad_lead ]; then
           _jg_squad_lead_status_new_lines_routine "$f" "$dir" || return 1
         fi
         ;;
@@ -2828,6 +2828,9 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d

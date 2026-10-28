@@ -64,13 +64,13 @@
 
 # jg_role_file <config-dir>
 jg_role_file() {
-  printf '%s/juggernaut-role\n' "${1%/}"
+  jg_compat_pick "${1%/}/juggernaut-role"
 }
 
 # jg_role_inherit_receipt <config-dir> - receipt written by the inheritance
 # machinery (remote receiver, or the local route's own bookkeeping).
 jg_role_inherit_receipt() {
-  printf '%s/.jg-inherit-juggernaut-role.generation\n' "${1%/}"
+  jg_compat_pick "${1%/}/.jg-inherit-juggernaut-role.generation"
 }
 
 # jg_role_scope_valid <scope> - 0 when <scope> is <host>/<owner>/<repo>
@@ -548,6 +548,9 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d

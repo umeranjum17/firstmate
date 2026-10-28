@@ -94,7 +94,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -575,7 +578,7 @@ wake_squad_lead_receiver() { # <squad-lead-id> <correlation-id>
     printf 'error: handed off work to squad_lead %s, but no live receiver endpoint is recorded; the destination backlog is durable and the receiver was not woken\n' "$id" >&2
     return 1
   fi
-  [ "$(grep '^kind=' "$meta" | cut -d= -f2-)" = squad_lead ] || {
+  [ "$(jg_compat_kind "$(grep '^kind=' "$meta" | cut -d= -f2-)")" = squad_lead ] || {
     printf 'error: squad_lead %s has non-squad-lead endpoint metadata; backlog is durable but the receiver was not woken\n' "$id" >&2
     return 1
   }

@@ -79,7 +79,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -88,7 +91,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
-SQUAD_LEADS_MD="$JG_HOME/data/squad_leads.md"
+SQUAD_LEADS_MD="$(jg_compat_pick "$JG_HOME/data/squad_leads.md")"
 # shellcheck source=bin/jg-ff-lib.sh
 . "$SCRIPT_DIR/jg-ff-lib.sh"
 # shellcheck source=bin/jg-squad-lead-restart-lib.sh
@@ -231,7 +234,7 @@ if [ -f "$SQUAD_LEADS_MD" ]; then
             else
               echo "remote squad_lead $id: updated on $SQUAD_LEAD_REGISTRY_HOST ($remote_commit)"
             fi
-            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=squad_lead' "$STATE/$id.meta"; then
+            if [ -f "$STATE/$id.meta" ] && jg_compat_meta_is_squad_lead "$STATE/$id.meta"; then
               claim_settled_squad_lead "$id"
             fi
             ;;
@@ -239,7 +242,7 @@ if [ -f "$SQUAD_LEADS_MD" ]; then
             echo "remote squad_lead $id: already current on $SQUAD_LEAD_REGISTRY_HOST (${remote_result#current: })"
             # Already on the target commit is a SUCCESSFUL update of that home,
             # so it earns the same restart as one that had to advance.
-            if [ -f "$STATE/$id.meta" ] && grep -qx 'kind=squad_lead' "$STATE/$id.meta"; then
+            if [ -f "$STATE/$id.meta" ] && jg_compat_meta_is_squad_lead "$STATE/$id.meta"; then
               claim_settled_squad_lead "$id"
             fi
             ;;

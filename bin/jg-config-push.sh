@@ -30,7 +30,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -83,7 +86,7 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
-SQUAD_LEADS_MD="$DATA/squad_leads.md"
+SQUAD_LEADS_MD="$(jg_compat_pick "$DATA/squad_leads.md")"
 
 "$SCRIPT_DIR/jg-guard.sh" || true
 

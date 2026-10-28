@@ -82,7 +82,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -475,7 +478,8 @@ resolve_crew() {
 # first non-empty, non-comment line. An absent/blank global default is empty;
 # an unreadable or malformed per-mate pin refuses, naming its file.
 squad_lead_line() {
-  local line file="$CONFIG/squad-lead-harness" pinned=0
+  local line file pinned=0
+  file=$(jg_compat_pick "$CONFIG/squad-lead-harness")
   if [ -n "$SQUAD_LEAD_ID" ]; then
     case "$SQUAD_LEAD_ID" in
       ''|.*|*[!a-zA-Z0-9._-]*) echo "error: invalid squad_lead id '$SQUAD_LEAD_ID'" >&2; return 1 ;;
@@ -485,7 +489,7 @@ squad_lead_line() {
       pinned=1
       [ -f "$file" ] && [ -r "$file" ] || { echo "error: unreadable squad_lead pin $file" >&2; return 1; }
     else
-      file="$CONFIG/squad-lead-harness"
+      file=$(jg_compat_pick "$CONFIG/squad-lead-harness")
     fi
   fi
   [ -f "$file" ] || return 0

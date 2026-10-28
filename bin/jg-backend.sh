@@ -62,7 +62,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 
@@ -359,6 +362,8 @@ jg_meta_get() {  # <meta-file> <key>
       "$key="*) value=${line#*=} ;;
     esac
   done < "$meta" 2>/dev/null || true
+  # compat (slice S1; deleted by S10): a record written before the rename names this kind with its old word.
+  [ "$key" != kind ] || value=$(jg_compat_kind "$value")
   printf '%s' "$value"
 }
 

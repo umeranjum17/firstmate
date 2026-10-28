@@ -25,7 +25,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -54,7 +57,7 @@ GENERATION=$2
 case "$ID" in ''|*[!A-Za-z0-9._-]*) die "invalid squad_lead id: $ID" ;; esac
 case "$GENERATION" in ''|*[!0-9]*) die "generation must be a positive integer" ;; esac
 [ "${#GENERATION}" -le 18 ] && [ "$GENERATION" -ge 1 ] || die "generation is outside the supported range"
-REMOTE=$(squad_lead_registry_field "$DATA/squad_leads.md" "$ID" remote 2>/dev/null || true)
+REMOTE=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$ID" remote 2>/dev/null || true)
 [ "$REMOTE" = 1 ] || die "squad_lead $ID is not a remote route"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-remote-inherit-push.XXXXXX") || die "cannot create inheritance staging directory"
 trap 'rm -rf -- "$TMP"' EXIT

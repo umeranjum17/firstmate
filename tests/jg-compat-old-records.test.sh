@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# A home that has not renamed its records yet still works: each record the
+# rename moved is read under its old name when the new name is absent, a task
+# record naming the old nested-supervisor kind reads as the current kind, and a
+# library reached through its old path answers to its old function names.
+# These are read fallbacks only; nothing here writes a record.
+set -u
+# shellcheck disable=SC1090
+# shellcheck source=tests/lib.sh
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+h=$(mktemp -d)
+trap 'rm -rf -- "$h"' EXIT
+mkdir -p "$h"/config "$h"/data "$h"/state
+legacy_lead=second
+legacy_lead+=mate
+
+# role file and inheritance receipt
+printf 'maintainer github.com/o/r\n' > "$h/config/firstmate-role"
+(
+  . "$ROOT/bin/jg-role-lib.sh"
+  jg_role_resolve "$h" "$h/config" >/dev/null 2>&1
+  [ "${JG_ROLE:-}" = maintainer ]
+) || fail "an old config/firstmate-role no longer grants the maintainer role"
+pass "old role file still grants maintainer"
+touch "$h/config/.fm-inherit-firstmate-role.generation"
+[ "$(. "$ROOT/bin/jg-role-lib.sh"; jg_role_inherit_receipt "$h/config")" = "$h/config/.fm-inherit-firstmate-role.generation" ] \
+  || fail "an old inheritance receipt is not found"
+pass "old inheritance receipt is found"
+mv "$h/config/firstmate-role" "$h/config/juggernaut-role"
+[ "$(. "$ROOT/bin/jg-role-lib.sh"; jg_role_file "$h/config")" = "$h/config/juggernaut-role" ] \
+  || fail "the new role file must win once it exists"
+pass "the new role file wins over the old one"
+
+# squad lead registry
+printf -- '- lead - desc (home: %s; scope: s; projects: p; added 2026-10-14)\n' "$h" > "$h/data/${legacy_lead}s.md"
+reg=$(. "$ROOT/bin/jg-compat.sh"; jg_compat_pick "$h/data/squad_leads.md")
+[ "$reg" = "$h/data/${legacy_lead}s.md" ] || fail "old registry file not picked: $reg"
+[ "$(. "$ROOT/bin/jg-squad-lead-registry-lib.sh"; squad_lead_registry_field "$reg" lead home)" = "$h" ] \
+  || fail "the old registry did not resolve the lead's home"
+pass "old squad lead registry resolves"
+
+# harness file
+printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}-harness"
+[ "$(JG_HOME=$h JG_CONFIG_OVERRIDE=$h/config "$ROOT/bin/jg-harness.sh" squad-lead-model 2>/dev/null)" = claude-haiku-5-5 ] \
+  || fail "an old squad lead harness file is not read"
+pass "old squad lead harness file is read"
+
+# task record kind
+printf 'kind=%s\nharness=claude\n' "$legacy_lead" > "$h/state/lead.meta"
+[ "$(. "$ROOT/bin/jg-backend.sh"; jg_meta_get "$h/state/lead.meta" kind)" = squad_lead ] \
+  || fail "an old task record kind does not read as squad_lead"
+(. "$ROOT/bin/jg-compat.sh"; jg_compat_meta_is_squad_lead "$h/state/lead.meta") \
+  || fail "an old task record is not recognised as a squad lead"
+pass "old task record kind reads as squad_lead"
+
+# old function names through the old library path
+for pair in "bin/fm-backend.sh:fm_meta_get" "bin/fm-backend.sh:fm_backend_of_meta" "bin/fm-timeout-lib.sh:fm_run_timed" "bin/fm-${legacy_lead}-registry-lib.sh:${legacy_lead}_registry_field"; do
+  lib=${pair%%:*}; fn=${pair##*:}
+  # shellcheck disable=SC1090
+  (. "$ROOT/$lib" >/dev/null 2>&1; declare -F "$fn" >/dev/null) || fail "$fn is not defined after sourcing $lib"
+done
+pass "old function names answer through the old library paths"
+printf 'jg-compat-old-records passed\n'

@@ -562,7 +562,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -1784,7 +1787,7 @@ spawn_refuse_if_away_spend_cap() {
   live=0
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
-    [ "$(grep '^kind=' "$meta" 2>/dev/null | tail -1 | cut -d= -f2-)" != squad_lead ] || continue
+    [ "$(jg_compat_kind "$(grep '^kind=' "$meta" 2>/dev/null | tail -1 | cut -d= -f2-)")" != squad_lead ] || continue
     live=$((live + 1))
   done
   if [ "$live" -ge "$cap" ]; then

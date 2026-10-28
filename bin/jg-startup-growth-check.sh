@@ -62,7 +62,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -311,7 +314,7 @@ run_check() {
   stat_surface tracked bin/jg-bootstrap.sh "$JG_ROOT/bin/jg-bootstrap.sh" no
   stat_surface tracked bin/jg-supervision-instructions.sh "$JG_ROOT/bin/jg-supervision-instructions.sh" no
   stat_surface printed-memory data/projects.md "$DATA_DIR/projects.md" yes
-  stat_surface printed-memory data/squad_leads.md "$DATA_DIR/squad_leads.md" yes
+  stat_surface printed-memory data/squad_leads.md "$(jg_compat_pick "$DATA_DIR/squad_leads.md")" yes
   stat_surface memory data/captain.md "$DATA_DIR/captain.md" yes
   stat_surface memory data/captain-shared.md "$DATA_DIR/captain-shared.md" yes
   stat_surface memory data/learnings.md "$DATA_DIR/learnings.md" yes

@@ -131,6 +131,58 @@ jg_compat_legacy_product() {  # <text>
   printf '%s\n' "${1//JUGGERNAUT/$legacy}"
 }
 
+# A record the pre-rename code wrote under its old file name. Prints <path>
+# when it exists, else the same path with the old spelling when that exists,
+# else <path> (so a new write lands under the new name). The old spelling is
+# derived: jg- becomes fm-, squad-lead becomes its old word, squad_leads its
+# old plural, and the product word its old token.
+jg_compat_pick() {  # <path>
+  local path=${1-} dir base old
+  if [ -e "$path" ] || [ -L "$path" ]; then printf '%s\n' "$path"; return 0; fi
+  dir=${path%/*}; base=${path##*/}
+  [ "$dir" != "$path" ] || dir=.
+  old=${base/#.jg-/.fm-}; old=${old/#jg-/fm-}
+  old=${old//squad-lead/secondmate}; old=${old//squad_leads/secondmates}
+  old=${old//juggernaut/firstmate}
+  if [ "$old" != "$base" ] && { [ -e "$dir/$old" ] || [ -L "$dir/$old" ]; }; then
+    printf '%s\n' "$dir/$old"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
+# A task record written before the rename names a nested supervisor's kind
+# with the old word. Prints the current kind for either spelling.
+jg_compat_kind() {  # <kind value>
+  case "${1-}" in
+    secondmate) printf 'squad_lead\n' ;;
+    *) printf '%s\n' "${1-}" ;;
+  esac
+}
+
+# 0 when <meta-file> records a nested supervisor under either spelling.
+jg_compat_meta_is_squad_lead() {  # <meta-file>
+  grep -qE '^kind=(squad_lead|secondmate)$' "${1-}" 2>/dev/null
+}
+
+# Old function names for a library reached through its old path. The add-ons
+# source the old library path and call the old function names (fm_* for jg_*,
+# the old nested-supervisor word for squad_lead_*). A shim that loads a library
+# calls this once afterwards; a name already defined is left alone.
+jg_compat_function_aliases() {
+  local fn old
+  for fn in $(compgen -A function); do
+    case "$fn" in
+      jg_compat_*) continue ;;
+      jg_*) old=fm_${fn#jg_} ;;
+      squad_lead_*) old=secondmate_${fn#squad_lead_} ;;
+      *) continue ;;
+    esac
+    declare -F "$old" >/dev/null 2>&1 && continue
+    eval "$old() { $fn \"\$@\"; }"
+  done
+}
+
 # The XDG claims root for process-event sources: prefer the directory a home
 # already uses, so a claim registered before the rename is still found and the
 # same source is never armed twice under two roots.

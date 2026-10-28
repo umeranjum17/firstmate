@@ -41,7 +41,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -88,7 +91,7 @@ fi
 # to a task inside the mate's own home, which records and watches it there;
 # arming a merge watch here would queue the mate itself for teardown as landed
 # work once that pull request merges.
-KIND=$(grep '^kind=' "$META" | tail -1 | cut -d= -f2- || true)
+KIND=$(jg_compat_kind "$(grep '^kind=' "$META" | tail -1 | cut -d= -f2- || true)")
 if [ "$KIND" = squad_lead ]; then
   echo "error: $ID is a squad_lead, not a delivery lane - $URL was reported on its status channel but belongs to a task in the mate's own home, which arms its own merge watch" >&2
   exit 1

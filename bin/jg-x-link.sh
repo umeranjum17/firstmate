@@ -59,7 +59,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -159,7 +162,8 @@ esac
 ROUTE_MATCHES=
 ROUTE_REGISTERED=0
 scan_squad_lead_routes() { # <task-id>
-  local id=$1 reg="$DATA/squad_leads.md" line home marker
+  local id=$1 reg line home marker
+  reg=$(jg_compat_pick "$DATA/squad_leads.md")
   [ -f "$reg" ] && [ ! -L "$reg" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in '- '*) ;; *) continue ;; esac

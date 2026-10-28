@@ -188,7 +188,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -452,7 +455,7 @@ squad_lead_sync() {
     local meta id
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
-      grep -q '^kind=squad_lead' "$meta" 2>/dev/null || continue
+      jg_compat_meta_is_squad_lead "$meta" || continue
       id=$(basename "$meta" .meta)
       echo "SQUAD_LEAD_SYNC: squad_lead $id: skipped: primary default-branch commit cannot be resolved"
     done
@@ -542,7 +545,7 @@ squad_lead_sync() {
         continue
       }
       meta_home=$(jg_meta_get "$meta" home)
-      [ -n "$meta_home" ] || meta_home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" home || true)
+      [ -n "$meta_home" ] || meta_home=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$id" home || true)
       if ! validate_squad_lead_home "$id" "$meta_home"; then
         echo "NUDGE_SQUAD_LEADS: squad_lead $id: send failed: retry target home unsafe: $VALIDATION_ERROR"
         continue
@@ -569,7 +572,7 @@ squad_lead_sync() {
   local tmp line
   squad_lead_retry_pending_nudges
   tmp=$(mktemp "${TMPDIR:-/tmp}/jg-squad-lead-sync.XXXXXX" 2>/dev/null) || return 0
-  sweep_live_squad_lead_metas "$STATE" "$primary_head" yes "$DATA/squad_leads.md" >"$tmp"
+  sweep_live_squad_lead_metas "$STATE" "$primary_head" yes "$(jg_compat_pick "$DATA/squad_leads.md")" >"$tmp"
   while IFS= read -r line; do
     case "$line" in
       squad_lead\ *': skipped:'*) echo "SQUAD_LEAD_SYNC: $line" ;;
@@ -654,7 +657,7 @@ squad_lead_sync() {
     fi
     rm -f "$report"
     jg_lock_release "$home_lock" || true
-  done < <(live_squad_lead_meta_records "$STATE" "$DATA/squad_leads.md")
+  done < <(live_squad_lead_meta_records "$STATE" "$(jg_compat_pick "$DATA/squad_leads.md")")
 
   # One remote squad_lead's convergence, split out of the loop so each host is
   # individually timed; every `return` here was a `continue` and still means
@@ -744,7 +747,7 @@ squad_lead_sync() {
     else
       squad_lead_sync_remote_one_timed "$id" "$_home" "$remote_host"
     fi
-  done < <(live_squad_lead_meta_records "$STATE" "$DATA/squad_leads.md")
+  done < <(live_squad_lead_meta_records "$STATE" "$(jg_compat_pick "$DATA/squad_leads.md")")
   [ "$parallel" -eq 0 ] || bootstrap_parallel_finish
   return 0
 }
@@ -780,7 +783,7 @@ squad_lead_liveness_sweep() {
   fi
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
-    grep -q '^kind=squad_lead$' "$meta" 2>/dev/null || continue
+    jg_compat_meta_is_squad_lead "$meta" || continue
     # Identity for the timing record is read here, in the loop, so the per-meta
     # body below keeps its single-exit-per-outcome shape.
     id=$(basename "$meta" .meta)

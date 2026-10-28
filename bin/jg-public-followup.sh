@@ -157,7 +157,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -402,8 +405,8 @@ brief_emit_target() {
     printf '%s\n--home %s\n' "$JG_ROOT/bin/jg-public-followup-emit.sh" "$JG_HOME"
     return 0
   fi
-  root=$(squad_lead_registry_field "$DATA/squad_leads.md" "$sid" root 2>/dev/null) || root=
-  home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$sid" home 2>/dev/null) || home=
+  root=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$sid" root 2>/dev/null) || root=
+  home=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$sid" home 2>/dev/null) || home=
   case "$root" in /*) ;; *) return 1 ;; esac
   case "$home" in /*) ;; *) return 1 ;; esac
   case "$root$home" in *[!A-Za-z0-9/._+@:-]*) return 1 ;; esac
@@ -989,8 +992,8 @@ public_followup_squad_lead_home() {
   jg_pf_home_id_valid "squad_lead:$id" || return 1
   meta_home=$(fmx_meta_get "$STATE/$id.meta" home)
   registry_home=
-  if [ -f "$DATA/squad_leads.md" ] && [ ! -L "$DATA/squad_leads.md" ]; then
-    registry_home=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" home || true)
+  if [ -f "$(jg_compat_pick "$DATA/squad_leads.md")" ] && [ ! -L "$(jg_compat_pick "$DATA/squad_leads.md")" ]; then
+    registry_home=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$id" home || true)
   fi
   if [ -n "$meta_home" ] && [ -n "$registry_home" ] && [ "$meta_home" != "$registry_home" ]; then
     return 2
@@ -1019,8 +1022,8 @@ public_followup_squad_lead_home() {
 public_followup_route_is_remote() {
   local id=$1 remote
   jg_pf_home_id_valid "squad_lead:$id" || return 1
-  [ -f "$DATA/squad_leads.md" ] && [ ! -L "$DATA/squad_leads.md" ] || return 1
-  remote=$(squad_lead_registry_field "$DATA/squad_leads.md" "$id" remote 2>/dev/null) || return 1
+  [ -f "$(jg_compat_pick "$DATA/squad_leads.md")" ] && [ ! -L "$(jg_compat_pick "$DATA/squad_leads.md")" ] || return 1
+  remote=$(squad_lead_registry_field "$(jg_compat_pick "$DATA/squad_leads.md")" "$id" remote 2>/dev/null) || return 1
   [ "$remote" = 1 ]
 }
 

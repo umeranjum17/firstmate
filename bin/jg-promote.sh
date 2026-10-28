@@ -59,7 +59,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -eu
@@ -448,7 +451,7 @@ promote_resolve_primary_home() {
   meta_home=$(fmx_meta_get "$parent_meta" home)
   meta_home=$(CDPATH='' cd -- "$meta_home" 2>/dev/null && pwd -P) || return 1
   [ "$meta_home" = "$child" ] || return 1
-  registry="$parent/data/squad_leads.md"
+  registry="$(jg_compat_pick "$parent/data/squad_leads.md")"
   squad_lead_registry_validate_bindings "$registry" squad_lead_registry_path_key \
     "$mate_id" "$child" || return 1
   printf '%s\n' "$parent"

@@ -251,7 +251,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -1051,7 +1054,7 @@ fi
 stage context
 section "CONTEXT"
 print_file_or_absent "$DATA/projects.md" "data/projects.md"
-print_file_or_absent "$DATA/squad_leads.md" "data/squad_leads.md"
+print_file_or_absent "$(jg_compat_pick "$DATA/squad_leads.md")" "data/squad_leads.md"
 print_file_or_absent "$DATA/captain.md" "data/captain.md"
 print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in squad_lead homes)"
 print_file_or_absent "$DATA/learnings.md" "data/learnings.md"

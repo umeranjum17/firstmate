@@ -70,7 +70,10 @@ else
     jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
     jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
     jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
-    jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
 fi
 unset _jg_d
 set -u
@@ -541,7 +544,7 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
     task=$(basename "$meta"); task=${task%.meta}
     # A squad_lead is a persistent worker, never landed work: its teardown is
     # retirement, which is never an ordinary cleanup this section may offer.
-    [ "$(grep '^kind=' "$meta" | tail -1 | cut -d= -f2- || true)" = squad_lead ] && continue
+    [ "$(jg_compat_kind "$(grep '^kind=' "$meta" | tail -1 | cut -d= -f2- || true)")" = squad_lead ] && continue
     jg_pr_metadata_identity_parse "$meta" || continue
     jg_pr_poll_merge_already_notified "$STATE" "$task" \
       "$JG_PR_META_PROVIDER" "$JG_PR_META_HOST" "$JG_PR_META_PATH" "$JG_PR_META_NUMBER" \

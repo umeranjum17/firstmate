@@ -358,7 +358,7 @@ live_squad_lead_meta_records() {
   [ -d "$state" ] || return 0
   for meta in "$state"/*.meta; do
     [ -f "$meta" ] || continue
-    grep -q '^kind=squad_lead$' "$meta" 2>/dev/null || continue
+    jg_compat_meta_is_squad_lead "$meta" || continue
     id=$(basename "$meta" .meta)
     home=$(grep '^home=' "$meta" 2>/dev/null | tail -1 | cut -d= -f2- || true)
     if [ -z "$home" ] && [ -n "$registry" ]; then

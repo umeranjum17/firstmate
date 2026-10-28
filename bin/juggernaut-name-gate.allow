@@ -54,7 +54,6 @@ bin/fm-control-lib.sh  # alias for bin/jg-control-lib.sh; called by live homes, 
 bin/fm-control.sh  # alias for bin/jg-control.sh; called by live homes, panes and per-lane records
 bin/fm-crew-state.sh  # alias for bin/jg-crew-state.sh; called by live homes, panes and per-lane records
 bin/fm-cursor-lib.sh  # alias for bin/jg-cursor-lib.sh; called by live homes, panes and per-lane records
-bin/fm-dashboard.sh  # alias for bin/jg-dashboard.sh; called by live homes, panes and per-lane records
 bin/fm-decision-hold.sh  # alias for bin/jg-decision-hold.sh; called by live homes, panes and per-lane records
 bin/fm-devin-config.sh  # alias for bin/jg-devin-config.sh; called by live homes, panes and per-lane records
 bin/fm-dispatch-resolve.sh  # alias for bin/jg-dispatch-resolve.sh; called by live homes, panes and per-lane records
@@ -277,13 +276,6 @@ addons/claude-accounts/run-proof.sh  # inline jg-compat env alias
 addons/claude-accounts/tests/claude-accounts-pick.test.sh  # inline jg-compat env alias
 addons/claude-accounts/tests/claude-accounts-timer.test.sh  # inline jg-compat env alias
 addons/claude-accounts/tests/claude-accounts.test.sh  # inline jg-compat env alias
-addons/claude-quota/claude-quota.check.sh  # inline jg-compat env alias
-addons/claude-quota/install.sh  # inline jg-compat env alias
-addons/claude-quota/tests/claude-quota-uninstall.test.sh  # inline jg-compat env alias
-addons/claude-quota/tests/claude-quota.test.sh  # inline jg-compat env alias
-addons/claude-quota/uninstall.sh  # inline jg-compat env alias
-addons/codex-guard/run-proof.sh  # inline jg-compat env alias
-addons/codex-guard/tests/codex-guard.test.sh  # inline jg-compat env alias
 addons/delete-guard/guard.mjs  # inline jg-compat env alias
 addons/delete-guard/install.sh  # inline jg-compat env alias
 addons/delete-guard/tests/delete-guard.test.sh  # inline jg-compat env alias
@@ -293,12 +285,6 @@ addons/engage-route/bin/jg-engage-route.sh  # inline jg-compat env alias
 addons/engage-route/tests/jg-engage-route.test.sh  # inline jg-compat env alias
 addons/fleet-contract-check/run-proof.sh  # inline jg-compat env alias
 addons/fleet-contract-check/tests/fleet-contract-check.test.sh  # inline jg-compat env alias
-addons/fleet-dashboard/jg-dashboard.sh  # inline jg-compat env alias
-addons/fleet-dashboard/run-core-proof.sh  # inline jg-compat env alias
-addons/fleet-dashboard/run-proof.sh  # inline jg-compat env alias
-addons/fleet-dashboard/tests/jg-dashboard-partial-backlog.test.sh  # inline jg-compat env alias
-addons/fleet-dashboard/tests/jg-dashboard.test.sh  # inline jg-compat env alias
-addons/fleet-dashboard/tests/run-fork-suite.sh  # inline jg-compat env alias
 addons/fleet-flow/bin/jg-flow.sh  # inline jg-compat env alias
 addons/fleet-flow/tests/jg-flow-check.test.sh  # inline jg-compat env alias
 addons/fleet-flow/tests/jg-flow.test.sh  # inline jg-compat env alias
@@ -341,7 +327,6 @@ addons/limit-prompt-move/install.sh  # inline jg-compat env alias
 addons/limit-prompt-move/run-live-proof.sh  # inline jg-compat env alias
 addons/limit-prompt-move/tests/limit-prompt-move-e2e.sh  # inline jg-compat env alias
 addons/limit-prompt-move/uninstall.sh  # inline jg-compat env alias
-addons/local-qwen-tuning/bench.py  # inline jg-compat env alias
 addons/lookout-adapter/install.sh  # inline jg-compat env alias
 addons/lookout-adapter/run-proof.sh  # inline jg-compat env alias
 addons/lookout-adapter/run-service-proof.sh  # inline jg-compat env alias
@@ -452,3 +437,12 @@ tests/jg-migrate.test.sh  # fixtures in the old spellings the migrator rewrites
 tests/jg-ai-engine.test.sh  # inline jg-compat env alias
 tests/juggernaut-axi.test.sh  # inline jg-compat env alias
 addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env alias
+.agents/skills/updatefirstmate/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/secondmate-provisioning/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/stuck-crewmate-recovery/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/firstmate-coding-guidelines/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/firstmate-self-repo/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/firstmate-orca/SKILL.md  # old skill name kept as an alias stub until S10
+.agents/skills/firstmate-codexapp/SKILL.md  # old skill name kept as an alias stub until S10
+tests/jg-skill-rename-aliases.test.sh  # names the old skill spellings it proves still alias
+tests/jg-compat-old-records.test.sh  # builds old-name records to prove the read fallbacks; deleted by S10

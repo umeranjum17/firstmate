@@ -11,6 +11,7 @@ _jg_alias_new="$_jg_alias_dir/jg-afk-return.sh"
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
   # shellcheck source=/dev/null
   . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
 else
   exec "$_jg_alias_new" "$@"
 fi
