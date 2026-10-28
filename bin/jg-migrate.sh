@@ -20,6 +20,17 @@ RULES = (
 )
 LEGACY = re.compile(rb"FIRSTMATE_OP:|FIRSTMATE|firstmate-addons|firstmate|secondmate|crewmate|second mate|first mate|FM_|fm-|fm_")
 KNOWN_NONRECORDS = (re.compile(r"state/model-gate\.check\.sh"),)
+# An old script path, environment name, function name, add-ons path or operational-input marker
+# still resolves through the compatibility layer, so it needs no rewrite.
+COMPAT_RESOLVED = re.compile(rb"\bbin/fm-[a-z0-9-]+\.sh|\bfm-[a-z0-9-]+\.sh|\bFM_[A-Z0-9_]+|\bfm_[a-z0-9_]+|FIRSTMATE_OP:|firstmate-addons")
+# Free text and per-task records: a legacy word here is prose or history, never a name the code reads.
+FREE_TEXT = (
+    re.compile(r"data/.*\.(md|txt|log|hashes|json)"),
+    re.compile(r"data/[^/]+/.*"),
+    re.compile(r"config/.*\.md"),
+    re.compile(r"state/.*\.(log|out|err|txt|md|json)"),
+    re.compile(r"state/\.[^/]*branch-outcome-index"),
+)
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--home', required=True, help='the single home to migrate')
@@ -49,13 +60,16 @@ def transform(path, raw):
     if supported:
         _, field, replacement = supported[0]
         updated = field.sub(replacement, updated)
-    if LEGACY.search(updated):
+    if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
+        return updated
+    if LEGACY.search(COMPAT_RESOLVED.sub(b"", updated)):
         raise ValueError(f'unclassified legacy content: {rel}')
     return updated
 
 
 def files():
     found = []
+    unknown = []
     for part in ('config', 'state', 'data'):
         base = home / part
         for root, dirs, names in os.walk(base, followlinks=False):
@@ -65,20 +79,27 @@ def files():
                 rel = path.relative_to(home).as_posix()
                 if path.is_symlink():
                     if LEGACY.search(os.readlink(path).encode()):
-                        raise ValueError(f'unclassified legacy symbolic link: {rel}')
+                        unknown.append(f'unclassified legacy symbolic link: {rel}')
                     continue
                 if not path.is_file():
-                    raise ValueError(f'unclassifiable record: {rel}')
+                    unknown.append(f'unclassifiable record: {rel}')
+                    continue
                 raw = path.read_bytes()
                 try:
                     raw.decode('utf-8')
                 except UnicodeDecodeError:
                     if LEGACY.search(raw):
-                        raise ValueError(f'unclassified legacy binary record: {rel}')
+                        unknown.append(f'unclassified legacy binary record: {rel}')
                     continue
-                updated = transform(path, raw)
+                try:
+                    updated = transform(path, raw)
+                except ValueError as e:
+                    unknown.append(str(e))
+                    continue
                 if updated != raw:
                     found.append((path, raw, updated))
+    if unknown:
+        raise ValueError('\nunknown: '.join(unknown))
     return found
 
 try:
