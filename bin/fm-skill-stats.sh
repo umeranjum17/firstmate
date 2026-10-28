@@ -4,7 +4,7 @@
 # The reader is the fleet-stats add-on (fleet-stats/bin/fm-skill-stats.sh, importing
 # fm_stats_lib from that same folder); this shim only resolves the add-ons
 # directory and execs it with FM_BIN pointing at this fork's bin/, the same
-# contract as the fm-dashboard.sh shim.
+# contract as the fleet add-on shims.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

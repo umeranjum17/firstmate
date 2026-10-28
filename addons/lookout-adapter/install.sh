@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# install.sh [--dry-run] [--rollback]: replace the old fleet dashboard (fm-dashboard.service) with Lookout on its address.
-#   (default)    start the new unit's command on a spare port, check it with curl, then swap: stop the old unit and start the new
-#                one on the old address. The old unit's files are never edited, so the swap is undone by --rollback.
+# install.sh [--dry-run]: replace the legacy dashboard service with Lookout.
+#   (default)    start the new command on a spare port, check it with curl, then stop the old unit and start the new one.
 #   --dry-run    print every step and the unit; change nothing.
-#   --rollback   stop and remove the new unit, start the old one again (with --dry-run: print only).
+# The legacy dashboard is removed, so installation cannot roll back to it.
 # Settings (environment): FM_HOME (default ~/firstmate), PORT (default 4390),
 # BIND (default: this host's tailnet address), SPARE_PORT (default 4395).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-mode=apply dry=no
-for arg in "$@"; do case $arg in --dry-run) dry=yes ;; --rollback) mode=rollback ;; *) echo "usage: install.sh [--dry-run] [--rollback]" >&2; exit 2 ;; esac; done
-[ "$dry" = no ] || { [ "$mode" = rollback ] && mode=rollback-dry || mode=dry; }
+mode=apply
+for arg in "$@"; do case $arg in --dry-run) mode=dry ;; *) echo "usage: install.sh [--dry-run]" >&2; exit 2 ;; esac; done
 FM_HOME=${FM_HOME:-$HOME/firstmate} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
 OLD=fm-dashboard.service NEW=fm-dashboard-lookout.service
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
@@ -34,13 +32,6 @@ WantedBy=default.target
 U
 }
 
-if [ "$mode" = rollback ] || [ "$mode" = rollback-dry ]; then
-  run systemctl --user disable --now "$NEW"
-  run rm -f -- "$unit_dir/$NEW"
-  run systemctl --user daemon-reload
-  run systemctl --user enable --now "$OLD"
-  exit 0
-fi
 echo "== unit $unit_dir/$NEW"; unit
 echo "== 1. spare port: the unit's own command on $BIND:$SPARE_PORT, checked before anything is stopped"
 probe=fm-dashboard-lookout-probe
@@ -59,4 +50,4 @@ if [ "$mode" = apply ]; then mkdir -p "$unit_dir"; unit > "$unit_dir/$NEW"; else
 run systemctl --user daemon-reload
 run systemctl --user disable --now "$OLD"
 run systemctl --user enable --now "$NEW"
-echo "== rollback: $here/install.sh --rollback"
+echo "== legacy dashboard rollback is unavailable"

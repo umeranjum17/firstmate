@@ -56,7 +56,7 @@ is "missing registry: named error" "$rc|${out%%:*}" "1|error"
 mkdir -p "$w/home/state/claude-accounts-rested"
 printf '%s\n' "$(($(date +%s) + 3600))" > "$w/home/state/claude-accounts-rested/found-claude"
 run
-is "quota view exposes an active rest for the dashboard" "$(jq -r '.accounts[0].rested_until > now' "$f")" true
+is "quota reader exposes an active rest for dispatch" "$(jq -r '.accounts[0].rested_until > now' "$f")" true
 touch "$w/full"; run
 is "100/100 headroom is never displayed as rested" "$(jq -r 'all(.accounts[]; .rested_until == null)' "$f")" true
 mv "$w/full" "$w/full-used"

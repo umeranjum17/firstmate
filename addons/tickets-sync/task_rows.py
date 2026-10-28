@@ -1,4 +1,4 @@
-"""Shared tasks-axi tabular reader for the dashboard and ticket publisher."""
+"""Read tasks-axi tabular output for the ticket publisher."""
 import json
 import re
 

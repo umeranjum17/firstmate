@@ -111,11 +111,6 @@ for entry in "${plan[@]}"; do
     bash "$script" "$home" || printf 'install-all: %s wiring incomplete (see the lines above; it changes nothing)\n' "$name"
     continue
   fi
-  # Lookout replaces the dashboard service and needs its own clone; without it there is nothing to point at.
-  if [ "$name" = lookout-adapter ] && [ -z "${LOOKOUT_DIR:-}" ]; then
-    printf '\n== %s: skipped, set LOOKOUT_DIR to the Lookout clone to install it\n' "$name"
-    continue
-  fi
   [ "$dry" = 0 ] || args=(--dry-run "${args[@]}")
   printf '\n== %s: bash %s/install.sh%s\n' "$name" "$name" "${args[*]:+ ${args[*]}}"
   if [ "$dry" = 1 ] && [ "$dryable" = 0 ]; then

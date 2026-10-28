@@ -20,7 +20,7 @@ import shutil
 import tomllib
 import xml.etree.ElementTree as xml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'fleet-dashboard'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from task_rows import toon_rows
 from lane import progress as lane_progress
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
@@ -38,8 +38,8 @@ def rows(args, env, cwd=None):
         raise RuntimeError('tasks-axi returned an unreadable or capped task list')
     return result
 
-ICONS = Path(__file__).resolve().parents[1] / 'fleet-dashboard/fm-dashboard/icons'
-ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}  # the dashboard's own project-to-image names
+ICONS = Path(__file__).resolve().parent / 'icons'
+ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}
 
 def icon_problem(image):
     if image.suffix == '.svg':
@@ -52,7 +52,7 @@ def icon_problem(image):
     return None if r.returncode == 0 and kind in ('PNG', 'JPEG', 'WEBP') and all(int(n) > 0 for n in size.split()) else 'not a readable ' + image.suffix[1:] + ' image'
 
 def register_icon(board, project, registry):
-    """Registers the dashboard's local image for a project; returns a skip reason or None."""
+    """Register a local project image; return a skip reason or None."""
     found = sorted(ICONS.glob(ALIAS.get(project.lower(), project.lower()) + '.*'))
     if not found: return 'no local image'
     image = found[0]

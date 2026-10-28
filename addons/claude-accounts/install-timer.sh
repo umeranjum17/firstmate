@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Firstmate home, so the
-# dashboard's Claude accounts card and state/claude-accounts.json stay fresh. Copies the reader to
+# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Firstmate home, so
+# state/claude-accounts.json stays fresh for dispatch. Copies the reader to
 # ${XDG_DATA_HOME:-~/.local/share}/fm-claude-accounts/, writes fm-claude-accounts-quota.service and .timer under
 # ~/.config/systemd/user/ (the unit carries the installer's PATH so quota-axi and jq resolve), and enables the timer only when a file changed. Reads quota only; touches no login folder.
 # Usage: install-timer.sh [--dry-run] <fm-home>      (--dry-run writes nothing)       Undo: uninstall-timer.sh

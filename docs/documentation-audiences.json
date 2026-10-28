@@ -717,14 +717,6 @@
       "audience": "agent-runtime"
     },
     {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-dashboard-live-core.md",
-      "audience": "agent-runtime"
-    },
-    {
-      "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-dashboard-wait-reasons.md",
-      "audience": "agent-runtime"
-    },
-    {
       "path": "addons/.agents/skills/done-done-verify-firstmate-addons/features/fleet-flow-lane-cap.md",
       "audience": "agent-runtime"
     },
@@ -818,10 +810,6 @@
     },
     {
       "path": "addons/fleet-contract-check/README.md",
-      "audience": "operator-current"
-    },
-    {
-      "path": "addons/fleet-dashboard/README.md",
       "audience": "operator-current"
     },
     {
