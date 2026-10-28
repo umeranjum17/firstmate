@@ -1,4 +1,4 @@
-// Fleet kill guard for pi (installed by firstmate-addons kill-guard/install.sh).
+// Fleet kill guard for pi (installed by juggernaut-addons kill-guard/install.sh).
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { guard } from "__GUARD__";
 

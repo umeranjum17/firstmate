@@ -2,13 +2,22 @@
 # E2E: the 1,000-line gate measures a PR past gh's 100-file view cap and its 300-file diff cap.
 # gh pr view still lists only 100 files and gh pr diff still refuses >300 files here; the gate must read
 # every pull-files page and learn the diff from the compare API, never from a refusal (no network).
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
-LINT=$ROOT/merge-on-green/fm-checks-lint.sh
+LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/bin" "$d/home" "$d/xdg" "$d/fm/state" "$d/fm/data/evidence"
-export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" FM_HOME=$d/fm BIGPR_LOG=$d/gh.log
+export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" JG_HOME=$d/fm BIGPR_LOG=$d/gh.log
 printf '## Checks\noutcome: big import fixture\nrepro: n/a: no bug\nproof: no verify skill - bash fixture\nevidence: not proven: fixture\n' > "$d/body.txt"
 printf '%s\n' '## Checks' 'outcome: big import fixture' 'repro: n/a: no bug' 'proof: no verify skill - bash fixture' 'evidence: not proven: fixture' '' 'moved-from: owner/src@ref1 addons/=' > "$d/body-move.txt"
 

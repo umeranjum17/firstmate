@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Remove what install.sh added to one Firstmate home, and nothing else: the install
+# Remove what install.sh added to one Juggernaut home, and nothing else: the install
 # record and the launcher once nothing can still name it. The home hook gets its saved
 # content back in place, keeping its file, mode and links; a hook that was gone when
 # install ran, or that install never wrote and has since been edited, is left alone,
 # and the launcher is kept whenever the home's board command may still name it.
-# Usage: uninstall.sh [--dry-run] <fm-home>
+# Usage: uninstall.sh [--dry-run] <jg-home>
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -d "$1" ] || { echo "usage: uninstall.sh [--dry-run] <fm-home>" >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -d "$1" ] || { echo "usage: uninstall.sh [--dry-run] <jg-home>" >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 RECORD="$FMH/state/bearings-board-thin.install"
 [ -f "$RECORD" ] || { echo "nothing installed in $FMH"; exit 0; }

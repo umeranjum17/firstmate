@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# fm-jev-mem-guard.sh - host memory guard; usage and contract: bin/fm-jev-mem-guard.py header.
-# Without python3 the host is not measurable here, which admits and records nothing.
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-command -v python3 >/dev/null 2>&1 || { printf 'UNKNOWN\thost memory is not measurable here (python3 is not installed)\n'; exit 0; }
-exec python3 "$SCRIPT_DIR/fm-jev-mem-guard.py" "$@"
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
+set -u
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-jev-mem-guard.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
+fi

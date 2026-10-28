@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# Push declared inherited local material to live squad_lead homes.
+# Usage: jg-config-push.sh [--help]
+#
+# Mid-session convergence for inherited local material such as
+# config/crew-dispatch.json, config/backend, or data/captain-shared.md updates.
+# This discovers live squad_lead homes from state/*.meta, backfills
+# home= from data/squad_leads.md for older meta records, and reuses the same
+# propagation machinery as bootstrap, but deliberately does not
+# fast-forward tracked files.
+# After a successful per-home propagation that changes any allowlisted config/*
+# item, local routes receive the generation-specific literal-content pointer from
+# jg-config-inherit-lib.sh. Remote routes receive one durable marked reread nudge
+# through their SSH route. Unchanged config and data/captain-shared.md-only
+# updates send no reread unless a previous send failure is pending for that home.
+# Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  eval 'jg_compat_legacy_of() { printf "%s\n" "${1-}"; }
+    jg_compat_legacy_product() { printf "%s\n" "${1-}"; }
+    jg_compat_record_ok() { [ "${1-}" = "${2-}" ]; }
+    jg_compat_label_ok() { [ -n "${1-}" ] && [ "${1-}" = "${2-}" ]; }
+    jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
+    jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
+    jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
+fi
+unset _jg_d
+set -u
+
+usage() {
+  cat <<'EOF'
+Usage: jg-config-push.sh [--help]
+
+Push the primary juggernaut home's declared inherited local material into each
+live squad_lead home.
+
+This is local-material-only:
+  - does not fast-forward tracked files
+  - after successful config/* changes, sends a local literal-content pointer or
+    one durable marked remote reread nudge
+    (no message when config is unchanged unless a previous send failure is pending)
+  - reports each live home and each inheritable item as pushed, unchanged,
+    skipped, or error
+  - exits non-zero for real propagation errors or reread-send failures
+
+Live homes come from state/*.meta records with kind=squad_lead.
+data/squad_leads.md is only a fallback for missing home= fields in older or
+incomplete meta records.
+
+Environment overrides follow the rest of juggernaut:
+  JG_HOME            active juggernaut home
+  JG_ROOT_OVERRIDE  juggernaut repo root
+  JG_STATE_OVERRIDE state dir
+  JG_DATA_OVERRIDE  data dir
+  JG_CONFIG_OVERRIDE config dir
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "usage: jg-config-push.sh [--help]" >&2
+    exit 2
+    ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
+CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
+STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
+DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
+SQUAD_LEADS_MD="$(jg_compat_pick "$DATA/squad_leads.md")"
+
+"$SCRIPT_DIR/jg-guard.sh" || true
+
+# shellcheck source=bin/jg-ff-lib.sh
+. "$SCRIPT_DIR/jg-ff-lib.sh"
+# shellcheck source=bin/jg-backend.sh
+. "$SCRIPT_DIR/jg-backend.sh"
+# shellcheck source=bin/jg-wake-lib.sh
+. "$SCRIPT_DIR/jg-wake-lib.sh"
+# shellcheck source=bin/jg-config-inherit-lib.sh
+. "$SCRIPT_DIR/jg-config-inherit-lib.sh"
+# shellcheck source=bin/jg-squad-lead-nudge-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-nudge-lib.sh"
+# Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
+# config push. The shim answers not parked when the add-on is absent (stock behavior).
+# shellcheck source=bin/jg-parked-homes-lib.sh
+. "$SCRIPT_DIR/jg-parked-homes-lib.sh"
+
+print_item_report() {
+  local report=$1 item status reason
+  while IFS=$'\t' read -r item status reason; do
+    [ -n "$item" ] || continue
+    if [ -n "$reason" ]; then
+      printf '  %s: %s - %s\n' "$item" "$status" "$reason"
+    else
+      printf '  %s: %s\n' "$item" "$status"
+    fi
+  done < "$report"
+}
+
+records=$(mktemp "${TMPDIR:-/tmp}/jg-config-push-records.XXXXXX" 2>/dev/null) || exit 1
+reports=""
+# shellcheck disable=SC2317,SC2329 # Invoked by trap handlers below.
+cleanup() {
+  local report_file
+  rm -f "$records"
+  for report_file in $reports; do
+    rm -f "$report_file"
+  done
+}
+trap cleanup EXIT
+
+live_squad_lead_meta_records "$STATE" "$SQUAD_LEADS_MD" > "$records"
+if [ ! -s "$records" ]; then
+  echo "config-push: no live squad_lead homes found"
+  exit 0
+fi
+
+echo "config-push: $JG_HOME -> live squad_lead homes"
+
+seen_homes=""
+errors=0
+while IFS='|' read -r id home _window meta; do
+  [ -n "$id" ] || continue
+  if [ -z "$home" ]; then
+    printf 'squad_lead %s: skipped - no home= in %s and no registry home\n' "$id" "$meta"
+    continue
+  fi
+  # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
+  # config push and no reread nudge. One line names the skip. No-op without
+  # the add-on checkout.
+  jg_parked_skip_meta "$meta" "$id" config-push && continue
+  remote_host=$(jg_meta_get "$meta" remote_host)
+  if [ -n "$remote_host" ]; then
+    printf 'squad_lead %s (%s:%s):\n' "$id" "$remote_host" "$home"
+    remote_lock=$(jg_remote_inherit_transaction_lock_path "$STATE" "$id" 2>/dev/null || true)
+    if [ -z "$remote_lock" ] || ! jg_lock_acquire_wait "$remote_lock"; then
+      echo "  config-reread: transaction lock failed"
+      errors=1
+      continue
+    fi
+    remote_generation=$(jg_remote_inherit_generation_next "$STATE" "$id" 2>/dev/null || true)
+    if [ -z "$remote_generation" ]; then
+      echo "  config-reread: generation publication failed"
+      errors=1
+      jg_lock_release "$remote_lock" || true
+      continue
+    fi
+    remote_marker=$(jg_squad_lead_nudge_marker_path "$STATE" "$id" 2>/dev/null || true)
+    remote_pending=0
+    if [ -f "$remote_marker" ] && [ "$(jg_meta_get "$remote_marker" remote)" = 1 ]; then remote_pending=1; fi
+    if ! jg_squad_lead_nudge_write "$STATE" "$id" "$home" "" remote \
+      "$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
+      echo "  config-reread: retry marker failed"
+      errors=1
+      jg_lock_release "$remote_lock" || true
+      continue
+    fi
+    if remote_out=$(JG_CONFIG_INHERIT_LIVE=1 \
+      "$SCRIPT_DIR/jg-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
+      printf '%s\n' "$remote_out" | sed 's/^/  /'
+      remote_nudge=0
+      if printf '%s\n' "$remote_out" | grep -Eq '^(pushed|removed):'; then remote_nudge=1; fi
+      [ "$remote_pending" -eq 0 ] || remote_nudge=1
+      if [ "$remote_nudge" -eq 1 ]; then
+        if JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" JG_STATE_OVERRIDE="$STATE" \
+          "$SCRIPT_DIR/jg-send.sh" "jg-$id" "$JG_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
+          rm -f -- "$remote_marker"
+          echo "  config-reread: sent"
+        else
+          echo "  config-reread: send failed; retry retained"
+          errors=1
+        fi
+      else
+        rm -f -- "$remote_marker"
+      fi
+    else
+      [ -z "$remote_out" ] || printf '%s\n' "$remote_out" | sed 's/^/  /'
+      errors=1
+    fi
+    jg_lock_release "$remote_lock" || true
+    continue
+  fi
+  if ! validate_squad_lead_home "$id" "$home"; then
+    printf 'squad_lead %s (%s): skipped - unsafe home: %s\n' "$id" "$home" "$VALIDATION_ERROR"
+    continue
+  fi
+  home_real="$VALIDATED_HOME"
+  case " $seen_homes " in
+    *" $home_real "*)
+      printf 'squad_lead %s (%s): skipped - already processed for another live meta\n' "$id" "$home_real"
+      continue
+      ;;
+  esac
+  seen_homes="$seen_homes $home_real"
+
+  printf 'squad_lead %s (%s):\n' "$id" "$home_real"
+  dirty=$(dirty_status "$home_real" yes || true)
+  if [ -n "$dirty" ]; then
+    echo "  home: dirty working tree - local-material push continuing"
+  fi
+
+  mkdir -p "$home_real/state" || {
+    echo "  config-reread: error - could not create state directory"
+    errors=1
+    continue
+  }
+  home_lock=$(jg_config_inherit_lock_path "$home_real") || {
+    echo "  config-reread: error - could not resolve per-home lock"
+    errors=1
+    continue
+  }
+  jg_lock_acquire_wait "$home_lock" || {
+    echo "  config-reread: error - could not acquire per-home lock"
+    errors=1
+    continue
+  }
+  if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
+    jg_config_reread_retry_pending "$id" "$home_real" || true
+    if jg_config_reread_retry_queue_is_full "$JG_HOME" "$id"; then
+      echo "  config-reread: error - retry instruction queue is full"
+      errors=1
+      jg_lock_release "$home_lock" || true
+      continue
+    fi
+  fi
+
+  report=$(mktemp "${TMPDIR:-/tmp}/jg-config-push-report.XXXXXX" 2>/dev/null) || {
+    echo "  home: error - could not create report file"
+    errors=1
+    jg_lock_release "$home_lock" || true
+    continue
+  }
+  reports="$reports $report"
+  if JG_CONFIG_INHERIT_REPORT="$report" JG_CONFIG_INHERIT_LIVE=1 \
+    propagate_squad_lead_inheritance "$JG_HOME" "$home_real" "$CONFIG" "$DATA"; then
+    :
+  else
+    errors=1
+  fi
+  print_item_report "$report"
+  reread_pending=0
+  if jg_config_reread_has_pending "$home_real" || jg_config_reread_has_staged "$JG_HOME" "$id"; then
+    reread_pending=1
+  fi
+  if reread_out=$(JG_HOME="$JG_HOME" JG_ROOT_OVERRIDE="$JG_ROOT" \
+    JG_STATE_OVERRIDE="$STATE" \
+    jg_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
+    if [ -n "$(jg_config_reread_changed_items "$report")" ] || [ "$reread_pending" -eq 1 ]; then
+      printf '  config-reread: sent\n'
+    fi
+    [ -z "$reread_out" ] || printf '%s\n' "$reread_out"
+  else
+    errors=1
+    if [ -n "$reread_out" ]; then
+      printf '%s\n' "$reread_out"
+    else
+      printf '  config-reread: send failed\n'
+    fi
+  fi
+  jg_lock_release "$home_lock" || true
+done < "$records"
+
+[ "$errors" -eq 0 ] || exit 1
+exit 0

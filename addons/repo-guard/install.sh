@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install repo-guard: the gh and gh-axi shims that refuse a write to a repository outside allowed-repos, and the git pre-push extension that refuses a push to one. Idempotent.
 # Usage: install.sh [--dry-run | --uninstall]
-# The allow-list is ${XDG_DATA_HOME:-~/.local/share}/fm-repo-guard/allowed-repos: copied once and never overwritten, so an extended list survives a rerun.
+# The allow-list is ${XDG_DATA_HOME:-~/.local/share}/jg-repo-guard/allowed-repos: copied once and never overwritten, so an extended list survives a rerun.
 # An installed gh or gh-axi is usually a symlink into a package, so its real binary runs in place from a recorded path; only the PATH entry becomes the shim, and --uninstall puts it back.
 set -euo pipefail
 usage() { echo 'usage: install.sh [--dry-run | --uninstall]' >&2; exit 2; }
@@ -15,10 +15,10 @@ esac
 [ "$#" -le 1 ] || usage
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 DATA=${XDG_DATA_HOME:-$HOME/.local/share}
-DEST=$DATA/fm-repo-guard
+DEST=$DATA/jg-repo-guard
 GUARD=$DEST/repo-guard
 ALLOW=$DEST/allowed-repos
-HOOK=$DATA/fm-git-identity/hooks.d/pre-push/repo-guard
+HOOK=$DATA/jg-git-identity/hooks.d/pre-push/repo-guard
 TOOLS='gh-axi gh'
 realfile() { printf '%s' "$DEST/$1.real"; }      # where the real binary's path is recorded
 movedfile() { printf '%s' "$DEST/$1.real.bin"; } # the binary itself, when it was a plain file
@@ -35,13 +35,13 @@ if [ "$UN" = 1 ]; then
     fi
   done
   for f in "$GUARD" "$HOOK" "$(realfile gh-axi)" "$(realfile gh)"; do echo "remove: $f"; [ "$DRY" = 1 ] || rm -f -- "$f"; done
-  [ "$DRY" = 1 ] || rmdir "$DATA/fm-git-identity/hooks.d/pre-push" 2>/dev/null || true
+  [ "$DRY" = 1 ] || rmdir "$DATA/jg-git-identity/hooks.d/pre-push" 2>/dev/null || true
   [ "$DRY" = 0 ] || echo 'dry run: nothing written'
   echo "kept: $ALLOW (an extended allow-list is never dropped)"
   exit 0
 fi
 
-[ "$DRY" = 1 ] || mkdir -p "$DEST" "$DATA/fm-git-identity/hooks.d/pre-push"
+[ "$DRY" = 1 ] || mkdir -p "$DEST" "$DATA/jg-git-identity/hooks.d/pre-push"
 for tool in $TOOLS; do
   target=$(command -v "$tool" || true)
   [ -n "$target" ] || { echo "note: no $tool on PATH; it stays unguarded until one is installed and this runs again"; continue; }

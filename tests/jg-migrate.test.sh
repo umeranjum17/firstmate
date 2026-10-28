@@ -23,12 +23,31 @@ if bash "$root/bin/jg-migrate.sh" --home "$home" --verify; then
   echo 'verify accepted rolled-back legacy records' >&2
   exit 1
 fi
+mkdir -p "$home/data/task-one"
+printf 'the firstmate asked a secondmate\n' > "$home/data/note.md"
+printf 'the crewmate said fm-x\n' > "$home/data/task-one/report.txt"
+printf 'bin/fm-send.sh FM_HOME=x\n' > "$home/config/post-merge"
+bash "$root/bin/jg-migrate.sh" --home "$home" --check > "$scratch/classified" 2>&1 \
+  || { echo 'check stopped on free text or a compat-resolved name' >&2; exit 1; }
+mkdir -p "$home/state/terminal-outcomes" "$home/state/t1.inbox" "$home/state/decision-bindings"
+printf 'schema=fm-terminal-outcome.v1\n' > "$home/state/terminal-outcomes/t1.reported"
+printf 'worker agent managed by firstmate\n' > "$home/state/t1.inbox/001.msg"
+printf 'cd /home/x/.treehouse/firstmate-abc/4/firstmate/projects/p\n' > "$home/state/t1.meta"
+printf 'merged a secondmate fix; bin/fm-lint.sh ran\n' > "$home/state/t1.status"
+printf 'a firstmate hook\n' > "$home/state/t1.pr-poll-registration"
+printf 'kind=secondmate\nwindow=fm-demo\n' > "$home/state/t2.meta"
+printf 'exec /x/firstmate-1/bin/run\n' > "$home/config/launch-env-hook"
+bash "$root/bin/jg-migrate.sh" --home "$home" --check > "$scratch/classified2" 2>&1 \
+  || { echo 'check stopped on per-task records, host paths or status prose' >&2; cat "$scratch/classified2" >&2; exit 1; }
 printf 'fm-unknown: value\n' > "$home/state/unknown.status"
+printf 'fm-also-unknown: value\n' > "$home/state/unknown2.status"
 if bash "$root/bin/jg-migrate.sh" --home "$home" --check > "$scratch/unknown" 2>&1; then
   echo 'check accepted an unclassified record' >&2
   exit 1
 else
   code=$?
   [ "$code" = 3 ] || { echo "unknown record exit was $code, not 3" >&2; exit 1; }
+  grep -q 'state/unknown.status' "$scratch/unknown" || { echo 'check did not list unknown.status' >&2; exit 1; }
+  grep -q 'state/unknown2.status' "$scratch/unknown" || { echo 'check stopped before unknown2.status' >&2; exit 1; }
 fi
 printf 'jg-migrate integration passed\n'

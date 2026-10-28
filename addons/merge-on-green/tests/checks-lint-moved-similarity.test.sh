@@ -2,13 +2,22 @@
 # E2E: a file git resolves as a rename at 50% similarity or more counts as moved, not added, so a
 # history-preserving import lands; added lines past that similarity budget still count as new code
 # (no network: stub gh answers the PR, its pages, its diff and the moved file's previous content).
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
-LINT=$ROOT/merge-on-green/fm-checks-lint.sh
+LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/bin" "$d/home" "$d/xdg" "$d/fm/state" "$d/fm/data/evidence"
-export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" FM_HOME=$d/fm
+export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d PATH="$d/bin:$PATH" JG_HOME=$d/fm
 printf '## Checks\noutcome: move fixture\nrepro: n/a: no bug\nproof: no verify skill - bash fixture\nevidence: not proven: fixture\n' > "$d/body.txt"
 printf '%s\n' '## Checks' 'outcome: move fixture' 'repro: n/a: no bug' 'proof: no verify skill - bash fixture' 'evidence: not proven: fixture' '' 'moved-from: owner/src@ref1 addons/=' > "$d/body-move.txt"
 

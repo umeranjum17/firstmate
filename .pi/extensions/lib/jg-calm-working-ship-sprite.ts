@@ -1,0 +1,1 @@
+../../../.claude/mods/juggernaut-calm/lib/jg-calm-working-ship-sprite.ts

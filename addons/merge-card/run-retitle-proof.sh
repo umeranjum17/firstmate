@@ -14,7 +14,7 @@ mkdir -p "$fixture/.sign-off"
 board=$fixture/.sign-off/decisions.json
 message=$fixture/legacy-card.json
 jq -n '{contract:1,kind:"evidence",schema:1,key:"merge-acme-retitle-demo-pull-17",title:"Internal change passed its checks",about:"Seeded legacy card",link:"https://github.com/acme/retitle-demo/pull/17",run:{run_id:"20261023T000000Z-retitle01",commit:"0123456789012345678901234567890123456789",outcome:"The fixture title changes",repro:"Run the fixture journey",proof:"done-done run merge-card-retitle",evidence:"seeded fixture"}}' >"$message"
-sign-off-axi post "$board" --kind evidence --from "$message" --filer firstmate-merge >/dev/null
+sign-off-axi post "$board" --kind evidence --from "$message" --filer juggernaut-merge >/dev/null
 
 dry=$(bash "$(dirname "$0")/retitle-old-cards" "$board")
 [[ "$dry" == *'retitle-demo #17: internal change passed its checks'* ]]

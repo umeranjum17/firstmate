@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fm-owner-guard global hook template (install.sh stamps one copy per hook
+# jg-owner-guard global hook template (install.sh stamps one copy per hook
 # name, replacing __NAME__, its first line with the absolute bash path, and
 # __CAT__, __MKTEMP__ and __RM__ with absolute tool paths). Runs the owner-details guard first (__NAME__
 # runs it only for pre-commit and pre-push), then chains the previous global

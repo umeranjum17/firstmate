@@ -42,7 +42,7 @@
 set -eu
 
 # Whole-tree scope: the old product name and the old script prefix.
-BASE_PATTERN='firstmate|fm-'
+BASE_PATTERN='firstmate|secondmate|fm[-_]'
 # Role vocabulary and the old task-id form, counted separately in both scopes.
 ROLE_PATTERN='first mate|first-mate|crewmate|scout|second mate|second-mate|fm-task[0-9]+'
 # Prose scan for --visible, as one POSIX ERE (case-insensitive, matched on a
@@ -56,7 +56,8 @@ VISIBLE_PATH_RE='^(README|AGENTS|CONTRIBUTING|VISION|GROK_BOT|CLAUDE)\.md$|^(doc
 # one line per alias as it ships, for example:
 #   "bin/fm-update.sh"   # alias; called by live home state/juggernaut-rename; drop when no home calls it
 ALLOWED_FILES=(
-  "bin/juggernaut-name-gate.sh" # this gate: it must name what it forbids
+  "bin/juggernaut-name-gate.sh"    # this gate: it must name what it forbids
+  "bin/juggernaut-name-gate.allow" # the alias list: each line names the old path it keeps alive
   "BACKLOG.md"                  # archival record of the two retired repositories, called by nothing: its preserved branch and pull request links must keep their historical names; drop this entry when the last item and branch listed in it is closed
 )
 
@@ -107,6 +108,14 @@ prepare_allow() {
   : >"$work/exempt-lines"
   local entry allow_path allow_re
   for entry in ${ALLOWED_FILES[@]+"${ALLOWED_FILES[@]}"}; do printf '%s\n' "$entry" >>"$work/allowed-files"; done
+  # bin/juggernaut-name-gate.allow: one exact tracked path per line (first word),
+  # then the caller that still uses it and the slice that deletes it.
+  if [ -f bin/juggernaut-name-gate.allow ]; then
+    while IFS= read -r entry; do
+      case "$entry" in '' | '#'*) continue ;; esac
+      printf '%s\n' "${entry%%[[:space:]]*}" >>"$work/allowed-files"
+    done <bin/juggernaut-name-gate.allow
+  fi
   for entry in ${ALLOWED_LINES[@]+"${ALLOWED_LINES[@]}"}; do
     allow_path=${entry%%|*}
     allow_re=${entry#*|}

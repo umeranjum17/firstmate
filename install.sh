@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
 # install.sh - Juggernaut's one command for a clean machine.
 #
 #   curl -fsSL https://raw.githubusercontent.com/umeranjum17/juggernaut/main/install.sh | bash
@@ -6,8 +14,8 @@
 #
 # It clones this repo into the home, writes our defaults and rules into the home once, installs every
 # tool at the exact version in toolchain.versions (npm builds exactly, and the two curl-installed tools
-# through bin/fm-bootstrap.sh's own installer), and names the logins only you can type.
-# Installs stay user-local, in ~/.local/bin, the same prefix bin/fm-bootstrap.sh installs into, so nothing
+# through bin/jg-bootstrap.sh's own installer), and names the logins only you can type.
+# Installs stay user-local, in ~/.local/bin, the same prefix bin/jg-bootstrap.sh installs into, so nothing
 # needs sudo, nothing touches a system prefix, and a tool installed here is the one a later bootstrap
 # install replaces rather than a second copy in another directory.
 # The one user-level default, learn-from-mistakes' account_picker, merges into ~/.learn-from-mistakes/config.yaml by key.
@@ -15,7 +23,7 @@
 # exists are reported and left alone. --dry-run prints the same plan and writes nothing.
 set -euo pipefail
 
-REPO_URL=${FM_INSTALL_REPO:-https://github.com/umeranjum17/juggernaut}
+REPO_URL=${JG_INSTALL_REPO:-https://github.com/umeranjum17/juggernaut}
 HOME_DIR='' DRY=no
 while [ $# -gt 0 ]; do
   case $1 in
@@ -30,8 +38,8 @@ say() { printf '%s\n' "$*"; }
 
 # 1. Land the repo. Piped from curl there is no clone yet, so clone once and continue from it.
 here=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd -P || true)
-if [ ! -f "${here:-/nonexistent}/bin/fm-pin-lib.sh" ]; then
-  if [ -f "$HOME_DIR/bin/fm-pin-lib.sh" ]; then
+if [ ! -f "${here:-/nonexistent}/bin/jg-pin-lib.sh" ]; then
+  if [ -f "$HOME_DIR/bin/jg-pin-lib.sh" ]; then
     say "repo: reusing the clone at $HOME_DIR"
   else
     say "repo: cloning $REPO_URL into $HOME_DIR"
@@ -43,8 +51,8 @@ if [ ! -f "${here:-/nonexistent}/bin/fm-pin-lib.sh" ]; then
 fi
 
 root=$here
-export FM_HOME=$HOME_DIR
-# The same default prefix bin/fm-bootstrap.sh installs into, so one tool never ends up installed twice in
+export JG_HOME=$HOME_DIR
+# The same default prefix bin/jg-bootstrap.sh installs into, so one tool never ends up installed twice in
 # two directories with PATH deciding which version runs. The directory is created and put on PATH before
 # any install, because the two curl-installed tools write to a system prefix with sudo unless they find
 # ~/.local/bin on PATH - which is how a clean machine ends up asking for a password this command promises
@@ -52,8 +60,8 @@ export FM_HOME=$HOME_DIR
 export NPM_CONFIG_PREFIX=${NPM_CONFIG_PREFIX:-$HOME/.local}
 mkdir -p "$NPM_CONFIG_PREFIX/bin"
 export PATH=$NPM_CONFIG_PREFIX/bin:$PATH
-# shellcheck source=bin/fm-pin-lib.sh disable=SC1091
-. "$root/bin/fm-pin-lib.sh"
+# shellcheck source=bin/jg-pin-lib.sh disable=SC1091
+. "$root/bin/jg-pin-lib.sh"
 say "home: $HOME_DIR"
 
 # 2. Prerequisites only the user's own package manager can supply.
@@ -65,7 +73,7 @@ if [ -n "$missing" ]; then
 fi
 
 # 3. Our defaults and rules, written once into a new home and never over another copy.
-# This runs before the installs below, not after: installing done-done makes bin/fm-bootstrap.sh wire
+# This runs before the installs below, not after: installing done-done makes bin/jg-bootstrap.sh wire
 # its own managed block into config/brief-include.md, and a file that already exists is one this step
 # leaves alone, so writing afterwards would silently drop our rules from every fresh home.
 # A template's name is its destination inside the home, spelled out here because the home's own
@@ -89,17 +97,17 @@ done
 
 # 3b. learn-from-mistakes reads one user-level config, so its account picker merges in by key: a missing
 # key is appended, a key the user already set (any value) is left alone, so a second run changes nothing.
-lfm_cfg=$HOME/.learn-from-mistakes/config.yaml
-lfm_tpl=$root/defaults/learn-from-mistakes.yaml
-if [ -f "$lfm_tpl" ]; then
-  if [ -f "$lfm_cfg" ] && grep -q '^account_picker:' "$lfm_cfg"; then
-    say "defaults: kept the existing account_picker in $lfm_cfg"
+ljg_cfg=$HOME/.learn-from-mistakes/config.yaml
+ljg_tpl=$root/defaults/learn-from-mistakes.yaml
+if [ -f "$ljg_tpl" ]; then
+  if [ -f "$ljg_cfg" ] && grep -q '^account_picker:' "$ljg_cfg"; then
+    say "defaults: kept the existing account_picker in $ljg_cfg"
   else
-    say "defaults: wrote account_picker to $lfm_cfg"
+    say "defaults: wrote account_picker to $ljg_cfg"
     if [ "$DRY" = no ]; then
-      mkdir -p "$(dirname "$lfm_cfg")"
-      [ ! -s "$lfm_cfg" ] || [ -z "$(tail -c 1 "$lfm_cfg")" ] || printf '\n' >> "$lfm_cfg"
-      sed "s|@ROOT@|$root|g" "$lfm_tpl" | grep -v '^#' >> "$lfm_cfg"
+      mkdir -p "$(dirname "$ljg_cfg")"
+      [ ! -s "$ljg_cfg" ] || [ -z "$(tail -c 1 "$ljg_cfg")" ] || printf '\n' >> "$ljg_cfg"
+      sed "s|@ROOT@|$root|g" "$ljg_tpl" | grep -v '^#' >> "$ljg_cfg"
     fi
   fi
 fi
@@ -109,8 +117,8 @@ changed=0
 while read -r tool spec _; do
   case "$tool" in ''|'#'*) continue ;; esac
   [ -n "${spec:-}" ] || continue
-  want=$(fm_pin_version "$tool")
-  have=$(bash "$root/bin/fm-bootstrap.sh" version "$tool" 2>/dev/null || true)
+  want=$(jg_pin_version "$tool")
+  have=$(bash "$root/bin/jg-bootstrap.sh" version "$tool" 2>/dev/null || true)
   if [ "$want" = not-yet-published ]; then
     say "$tool: skipped, not published as a versioned artifact yet"
     continue
@@ -119,7 +127,7 @@ while read -r tool spec _; do
     say "$tool: have $want"
     continue
   fi
-  if ! fm_pin_npm "$tool" >/dev/null 2>&1 && [ -n "$have" ] \
+  if ! jg_pin_npm "$tool" >/dev/null 2>&1 && [ -n "$have" ] \
      && [ "$(printf '%s\n%s\n' "$have" "$want" | sort -V | head -n 1)" = "$want" ]; then
     say "$tool: have $have (at least the $want floor)"
     continue
@@ -128,9 +136,9 @@ while read -r tool spec _; do
     say "$tool: would install the pinned $want (had ${have:-none})"
     continue
   fi
-  bash "$root/bin/fm-bootstrap.sh" install "$tool"
+  bash "$root/bin/jg-bootstrap.sh" install "$tool"
   changed=$((changed + 1))
-done < "$(fm_pin_file)"
+done < "$(jg_pin_file)"
 
 # 5. Only the user can type these; this installer never holds or copies a login.
 gh auth status >/dev/null 2>&1 || say "needs you: gh auth login   (GitHub access for projects and pull requests)"
@@ -140,7 +148,7 @@ if [ "$DRY" = yes ]; then
   say "dry run: nothing was installed or written"
 else
   if [ ! -f "$HOME_DIR/config/ai-engine.json" ]; then
-    node "$root/bin/fm-ai-engine.mjs" setup
+    node "$root/bin/jg-ai-engine.mjs" setup
   fi
   say "done: $changed install(s) in $NPM_CONFIG_PREFIX/bin; add it to PATH if it is not there already"
   say "launch with: cd $HOME_DIR && claude"

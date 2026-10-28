@@ -6,7 +6,7 @@ Drop-in pi wrapper for the no-mistakes pipeline agent. It runs the real pi and m
 
 Without an account pool the default chain is one route, `claude-bridge/claude-haiku-5-5`: Claude Haiku through claude-bridge. A call pinned to a model outside the chain does not run that model, it runs the chain. `PI_QUOTA_FAILOVER_CHAIN` overrides the chain, and `PI_QUOTA_FAILOVER_PRINT_CHAIN=1` prints it: the chain is the fleet's one route list, and `route-change` reads it from here.
 
-With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/firstmate/config/account-pool` when it exists), the route comes from `fm-model-pool` pick/next (see `account-pool/README.md`): the eligible Claude account with the greatest runway above the 15% eligibility floor runs as `claude-bridge/claude-haiku-5-5` on that account's folder (credential variables shed). A limit calls `next`, which rests that account when the pool allows and advances; when every Claude account is under the floor the helper order is Codex Sol, then DeepSeek Goat, then Cursor auto. An account limit never marks the whole Claude route dead. When the helper refuses, the call ends with the terminal `quota exhausted` line and never falls back to the default login.
+With an account pool (`PI_QUOTA_FAILOVER_ACCOUNT_POOL`, default `~/juggernaut/config/account-pool` when it exists), the route comes from `jg-model-pool` pick/next (see `account-pool/README.md`): the eligible Claude account with the greatest runway above the 15% eligibility floor runs as `claude-bridge/claude-haiku-5-5` on that account's folder (credential variables shed). A limit calls `next`, which rests that account when the pool allows and advances; when every Claude account is under the floor the helper order is Codex Sol, then DeepSeek Goat, then Cursor auto. An account limit never marks the whole Claude route dead. When the helper refuses, the call ends with the terminal `quota exhausted` line and never falls back to the default login.
 
 An `openrouter/*` route takes the deepseek idle limit (`PI_QUOTA_FAILOVER_DEEPSEEK_IDLE_SECS`, default 300), not the generic one (default 120), because the floor route answers on the same clock as direct DeepSeek.
 
@@ -25,7 +25,7 @@ An answer that is not parseable JSON is treated as not exhausted, without a log 
 
 ## Moving the pipeline agent and route
 
-`switch.sh` moves the no-mistakes pipeline agent, and every pipeline step with it, to one accepted agent and one model. It edits only two keys by name (`agent`, `agent_config.<agent>.model`), leaves every other key, value and comment alone, writes a timestamped backup first and keeps the backup's version when the model does not answer PONG. With neither `--agent` nor `--model`, it asks `fm-model-pool` pick for the route (same floors and Sol/Goat/Cursor order) and maps the harness onto an accepted agent; explicit flags keep a pin. `--dry-run` prints the planned edit and writes nothing; `--restore-latest` puts the last backup back. Never hand-edit the live config except through this script.
+`switch.sh` moves the no-mistakes pipeline agent, and every pipeline step with it, to one accepted agent and one model. It edits only two keys by name (`agent`, `agent_config.<agent>.model`), leaves every other key, value and comment alone, writes a timestamped backup first and keeps the backup's version when the model does not answer PONG. With neither `--agent` nor `--model`, it asks `jg-model-pool` pick for the route (same floors and Sol/Goat/Cursor order) and maps the harness onto an accepted agent; explicit flags keep a pin. `--dry-run` prints the planned edit and writes nothing; `--restore-latest` puts the last backup back. Never hand-edit the live config except through this script.
 
 ## Idle watchdog
 
@@ -44,13 +44,13 @@ header 1.0 s after pi starts, `agent_start` 82 ms later; measured 2026-10-18).
 
 Every call runs `pi -ne` plus `-e <path>` for each extension pi would load here, except `pi-hermes-memory` (dropped by its
 package source, `npm:pi-hermes-memory`, because its `session_start` sync ran before `agent_start`). The set is read at
-call time from `pi list` (user packages and their manifests), the user extensions dir (`fm-rm-guard` and
-`fm-literal-delete` load there), the settings `extensions` array and pi's built-ins, minus any `-builtin:<name>` in the
+call time from `pi list` (user packages and their manifests), the user extensions dir (`jg-rm-guard` and
+`jg-literal-delete` load there), the settings `extensions` array and pi's built-ins, minus any `-builtin:<name>` in the
 settings. If the list cannot be read, pi runs as before and one log line says why.
 
 Not included: project-level `.pi/extensions/`. pi loads those only for a trusted project, and `pi list` reports user
-packages only, so a pipeline call run from a trusted checkout that has them loses them under `-ne`. The firstmate
-checkout does (`fm-calm`, `fm-branch-supervision`).
+packages only, so a pipeline call run from a trusted checkout that has them loses them under `-ne`. The juggernaut
+checkout does (`jg-calm`, `jg-branch-supervision`).
 
 ## Route failures and credit probe
 

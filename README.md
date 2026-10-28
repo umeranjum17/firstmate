@@ -61,12 +61,12 @@ An agent distro is a portable directory of instructions, skills, tooling, polici
 
 ### Boundaries
 
-- **Self-repo boundary** — a home runs as a Juggernaut user/operator by default; publishing to Juggernaut's own repository needs the `config/firstmate-role` maintainer opt-in or per-mission Captain consent ([schema](docs/configuration.md#juggernaut-role-configfirstmate-role)).
+- **Self-repo boundary** — a home runs as a Juggernaut user/operator by default; publishing to Juggernaut's own repository needs the `config/juggernaut-role` maintainer opt-in or per-mission Captain consent ([schema](docs/configuration.md#juggernaut-role-configjuggernaut-role)).
 - **Strict project boundary** — the Overwatch is read-only over your projects except the narrow, Captain-approved operations in [hard rule 1](AGENTS.md#1-identity-and-prime-directives), including fleet sync's guarded safe branch pruning; operators make every other change behind the merge authority.
 
 ### Scale and reach
 
-- **Optional Squad Leads** — opt in to persistent Squad Leads in isolated Juggernaut homes with their own `FM_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
+- **Optional Squad Leads** — opt in to persistent Squad Leads in isolated Juggernaut homes with their own `JG_HOME`, state, projects, and session lock, locally or on an SSH-reachable host, with guarded updates and recovery.
 - **Optional Relay** — opt in with one local `.env` pairing token so Juggernaut can answer public X and Discord mentions through the same lifecycle as chat, acknowledge spawned work, and post up to three public-safe follow-ups within seven days; dry-run previews would-be replies locally.
 
 Full detail on every feature lives in [docs/architecture.md](docs/architecture.md).
@@ -77,10 +77,10 @@ Full detail on every feature lives in [docs/architecture.md](docs/architecture.m
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.svg">
-    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.svg">
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.svg">
-    <img src="assets/diagrams/how-it-works-light.svg" width="100%" alt="The chain of command: Captain to Overwatch to Squad Leads to Operators to Work to Outcomes. Each Squad Lead owns its Operators, and Squad Leads are optional for small fleets.">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.png">
+    <img src="assets/diagrams/how-it-works-light.png" width="100%" alt="Chain of command: the Captain sets the objective, Overwatch plans the work and keeps watch, optional Squad Leads own a project and its Operators, Operators each run one mission in an isolated work copy, and the work moves from brief to work copy, validation, pull request and merge. Outcomes are a pull request, a merged change or a report, ending in objective secured.">
   </picture>
 </p>
 
@@ -144,8 +144,8 @@ Then launch one of the co-primary harnesses; `AGENTS.md` takes over from there:
 |---|---|
 | **Claude Code** | `claude` |
 | **Grok** | `grok --trust` |
-| **Pi** | `pi` — or `FM_PI_HARNESS=pi-signed pi-signed` when the signed wrapper is installed |
-| **Oh My Pi** | `omp` — or `FM_OMP_HARNESS=omp omp` from inside a Claude Code pane |
+| **Pi** | `pi` — or `JG_PI_HARNESS=pi-signed pi-signed` when the signed wrapper is installed |
+| **Oh My Pi** | `omp` — or `JG_OMP_HARNESS=omp omp` from inside a Claude Code pane |
 
 Codex, OpenCode, and Cursor Agent CLI are also verified primaries. See the harness notes below.
 
@@ -202,20 +202,20 @@ Setup guides for tmux (the default) and every other supported runtime are linked
 
 ## Built-in skills
 
-Juggernaut ships these user-invocable built-in skills. Claude and Grok use the slash form shown here; Codex uses the same names with `$`, such as `$afk`.
+Juggernaut ships these user-invocable built-in skills. Claude and Grok use the slash form shown here; Codex uses the same names with `$`, such as `$watchover`.
 
-- **`/afk`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/watchover/SKILL.md) for the posture and return contract.
-- **`/quiet`** — keep routine wakes off main while you stay and chat; `/quiet off` ends it.
-- **`/ahoy`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
-- **`/bearings`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.
-- **`/updatefirstmate`** — guardedly update Juggernaut and its Squad Leads, then restart live mates on the target commit.
-- **`/stow`** — sweep the session for uncaptured durable knowledge and report what is safe to reset.
+- **`/watchover`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/watchover/SKILL.md) for the posture and return contract.
+- **`/radio-silence`** — keep routine wakes off main while you stay and chat; `/radio-silence off` ends it.
+- **`/debrief`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
+- **`/sitrep`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.
+- **`/resupply`** — guardedly update Juggernaut and its Squad Leads, then restart live mates on the target commit.
+- **`/intel`** — sweep the session for uncaptured durable knowledge and report what is safe to reset.
 
 Bearings invocation examples:
 
-- `/bearings` returns the four-section sitrep in chat only.
-- `/bearings file` writes today's dated `data/status-report-<YYYY-MM-DD>.md`.
-- `/bearings file include PRs` adds live PR enrichment.
+- `/sitrep` returns the four-section sitrep in chat only.
+- `/sitrep file` writes today's dated `data/status-report-<YYYY-MM-DD>.md`.
+- `/sitrep file include PRs` adds live PR enrichment.
 
 Agent-only reference skills live under `.agents/skills/` and are loaded by Juggernaut at the trigger points named in [`AGENTS.md`](AGENTS.md).
 
@@ -241,13 +241,13 @@ Every screen below is a real capture from the tool's own current or most recent 
 # done-done and sign-off: installed, wired, and kept up to date by the first session
 
 # learn-from-mistakes
-npx skills add umeranjum17/learn-from-mistakes --skill lfm-retro
+npx skills add umeranjum17/learn-from-mistakes --skill ljg-retro
 ```
 
 - `config/brief-include.md` is appended to every ship and recon brief, so every operator proves its change with done-done ([details](docs/configuration.md#home-brief-include-configbrief-includemd)).
 - `config/merge-gate` refuses a merge that done-done has not proven, whether or not any add-on is installed ([details](docs/configuration.md#home-merge-gate-configmerge-gate)). The gate runs `done-done check` against the mission's PR, or its `data/<task-id>/checks.md` when there is no PR, with the default-branch rules, then `receipt --verify <head>`. A nonzero exit refuses the merge and shows its output. Run `git fetch origin` first, since the gate reads local origin refs.
 
-**sign-off** raises a card on the sign-off board for every mission held in a home where it is armed. Your first session installs the pinned `sign-off-axi` package and its skill, and tells you in one line that the home still needs arming. Run `bin/fm-procevent-signoff.sh arm` once in a home; arm each Squad Lead home the same way, and your click comes back to Juggernaut as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)). Open the board with `sign-off-axi open`, and turn the link off with `bin/fm-procevent-signoff.sh retire`.
+**sign-off** raises a card on the sign-off board for every mission held in a home where it is armed. Your first session installs the pinned `sign-off-axi` package and its skill, and tells you in one line that the home still needs arming. Run `bin/jg-procevent-signoff.sh arm` once in a home; arm each Squad Lead home the same way, and your click comes back to Juggernaut as the answer to that hold ([details](docs/configuration.md#process-to-event-sources-stateprocevent)). Open the board with `sign-off-axi open`, and turn the link off with `bin/jg-procevent-signoff.sh retire`.
 
 **learn-from-mistakes** needs no Juggernaut hook. Point it at the records your fleet already keeps, such as a defect log or failed pipeline steps, and it counts the causes that keep coming back and proposes changes that cite the real records.
 
@@ -293,7 +293,7 @@ Lookout is the only fleet dashboard. [`lookout-adapter`](addons/lookout-adapter/
 | Tool | What it does and how to install it |
 | --- | --- |
 | **done-done** | Drives the real product, has a fresh judge check the capture, and writes a receipt tied to the commit.<br>`npm install -g done-done-axi@0.6.18` |
-| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.8.0` |
+| **sign-off** | Collects questions, designs, reports, and proof on one board; the answer is saved for the agent.<br>`npm install -g sign-off-axi@0.7.0 (0.8.0 once sign-off PR 303 releases)` |
 | **learn-from-mistakes** | Finds the causes that keep coming back in your records, with counts, evidence, and fixes that cite the record.<br>`npm i -g learn-from-mistakes-axi@0.10.0` |
 | **first-draft** | Makes several HTML design directions, lets you compare them at desktop and phone width, and keeps the one you pick.<br>`npm install -g first-draft-axi@0.3.0` |
 | **TakeOne** | Turns a raw screen recording into a framed, paced demo video on your machine.<br>`npm install -g takeone-axi@0.4.0` |
@@ -378,9 +378,9 @@ Two notes on what the screens show:
 ### Architecture and configuration
 
 - [docs/architecture.md](docs/architecture.md) — maintainer architecture for the squad, supervision, worktrees, Squad Leads, and project modes.
-- [docs/configuration.md](docs/configuration.md) — environment variables, `FM_HOME`, runtime backend selection, optional Relay and its X and Discord setup steps, trusted external process-event adapter setup, the files you set, and harness support.
+- [docs/configuration.md](docs/configuration.md) — environment variables, `JG_HOME`, runtime backend selection, optional Relay and its X and Discord setup steps, trusted external process-event adapter setup, the files you set, and harness support.
 - [docs/extension-bindings.md](docs/extension-bindings.md) — maintainer architecture for the narrow trusted external `process-event-adapter/1` package, binding, handshake, and evidence boundary.
-- [docs/remote-secondmates.md](docs/remote-secondmates.md) — current setup, routing, transfer, recovery, and safety behavior for whole-home remote Squad Leads.
+- [docs/remote-squad-leads.md](docs/remote-squad-leads.md) — current setup, routing, transfer, recovery, and safety behavior for whole-home remote Squad Leads.
 - [docs/calm.md](docs/calm.md) — current `/calm` behavior on Pi and Claude Code and its supported presentation limits.
 - [docs/voice-relay.md](docs/voice-relay.md) — the optional spoken interface: setup on both machines, measured round-trip cost, what a spoken answer may read, and what this build does not do yet.
 - [docs/fleet-ledger.md](docs/fleet-ledger.md) — the opt-in activity ledger outside tools can read to follow a home's missions, and its record contract.
@@ -417,6 +417,6 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the wor
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Juggernaut is a fork of [Firstmate](https://github.com/kunchenguid/firstmate) by Kun Chen; the original MIT copyright and licence notice are preserved in [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Juggernaut is a fork of [Juggernaut](https://github.com/kunchenguid/juggernaut) by Kun Chen; the original MIT copyright and licence notice are preserved in [LICENSE](LICENSE).
 
 

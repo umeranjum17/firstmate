@@ -1,0 +1,139 @@
+// A faithful port of bin/jg-operational-input.sh's `classify` command.
+//
+// bin/jg-operational-input.sh is the single owner of the Juggernaut operational-input
+// protocol; this module mirrors only its classification so the Claude Code mod can
+// recognize operational user rows inside a render hook, where no host process may be
+// spawned per row. tests/jg-calm-claude-mod.test.sh deterministically runs both over
+// the full envelope and near-miss contract and is this port's drift guard, so a change
+// to the canonical shell owner must land here in the same change. Never widen this
+// beyond what the owner recognizes.
+//
+// Current generic wire form:
+//   U+2063 JUGGERNAUT_OP: v1 <kind>: <body>
+// plus the established `[jg-from-juggernaut]` U+2063 routing carrier, and the narrow
+// pre-protocol shapes the owner keeps only for persisted transcripts.
+//
+// It also mirrors the owner's record-backed doorbell parse and record classification
+// (`jg_operational_doorbell_path`, `jg_operational_record_kind`), which the `doorbell-kind`
+// command composes: a harness that strips U+2063 from submitted prompts receives a plain
+// ASCII doorbell naming a record that holds the envelope. The file read stays with the
+// caller, so this module remains pure.
+
+const OPERATIONAL_MARK = "\u2063";
+const OPERATIONAL_PREFIX = `${OPERATIONAL_MARK}JUGGERNAUT_OP: `;
+const OPERATIONAL_VERSION = "v1";
+const OPERATIONAL_HEADER_PREFIX = `${OPERATIONAL_PREFIX}${OPERATIONAL_VERSION} `;
+// Compatibility (slice S5): a supervisor and its worker can be on opposite sides
+// of the update, so the marker's product token is matched by shape rather than by
+// one spelling. Writers still emit the current one above.
+const OPERATIONAL_PREFIX_PATTERN = new RegExp(`^${OPERATIONAL_MARK}[A-Z][A-Z_]*_OP: `);
+const OPERATIONAL_HEADER_PATTERN = new RegExp(
+  `^${OPERATIONAL_MARK}[A-Z][A-Z_]*_OP: ${OPERATIONAL_VERSION} `,
+);
+
+/** The kinds the owner's `JG_OPERATIONAL_KINDS` names, in its order. */
+export const JUGGERNAUT_OPERATIONAL_GENERIC_KINDS = [
+  "session-start",
+  "watcher",
+  "turn-end-guard",
+  "away-supervisor",
+  "launch-brief",
+  "branch-outcome",
+] as const;
+
+const FROMFIRST_LABEL = "[jg-from-juggernaut]";
+const FROMFIRST_MARK = `${FROMFIRST_LABEL}${OPERATIONAL_MARK}`;
+
+// Historical payload literals, isolated exactly as the owner isolates them: they exist
+// only for persisted pre-protocol transcripts.
+const LEGACY_SESSIONSTART =
+  "Run `bin/jg-session-start.sh` now, exactly once, before executing any other instructions.";
+const LEGACY_WATCHER_PREFIX = "JUGGERNAUT WATCHER WAKE: ";
+const LEGACY_WATCHER_SUFFIX =
+  "\n\nRun bin/jg-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.";
+const LEGACY_TURNEND_PREFIX =
+  "TURN WOULD END BLIND - supervision is off. The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n";
+const LEGACY_AWAY_PREFIX = `${OPERATIONAL_MARK}Supervisor escalate (`;
+
+function isCurrentKind(kind: string): boolean {
+  return (JUGGERNAUT_OPERATIONAL_GENERIC_KINDS as readonly string[]).includes(kind);
+}
+
+/** `jg_operational_generic_kind`: the kind of a current generic envelope, else undefined. */
+function genericKind(message: string): string | undefined {
+  const header = OPERATIONAL_HEADER_PATTERN.exec(message);
+  if (header === null) return undefined;
+  const remainder = message.slice(header[0].length);
+  const separator = remainder.indexOf(": ");
+  if (separator < 0) return undefined;
+  const kind = remainder.slice(0, separator);
+  if (!isCurrentKind(kind)) return undefined;
+  const body = remainder.slice(separator + 2);
+  return body === "" ? undefined : kind;
+}
+
+/** `jg_operational_input_kind`: a current input's kind, generic or from-juggernaut. */
+export function juggernautOperationalInputKind(message: string): string | undefined {
+  const generic = genericKind(message);
+  if (generic !== undefined) return generic;
+  if (message.startsWith(FROMFIRST_MARK) && message.length > FROMFIRST_MARK.length) {
+    return "from-juggernaut";
+  }
+  return undefined;
+}
+
+/** `jg_legacy_operational_input_kind`: the narrow pre-protocol shapes, in the owner's order. */
+export function juggernautLegacyOperationalInputKind(message: string): string | undefined {
+  // PR 899 landed an untyped JUGGERNAUT_OP prefix whose subtype cannot be recovered
+  // without body prose, so it is explicitly generic.
+  const prefix = OPERATIONAL_PREFIX_PATTERN.exec(message);
+  if (prefix !== null && message.length > prefix[0].length) {
+    return "legacy-operational";
+  }
+  if (message === LEGACY_SESSIONSTART) return "session-start";
+  if (message.startsWith(LEGACY_AWAY_PREFIX)) return "away-supervisor";
+  if (
+    message.startsWith(LEGACY_WATCHER_PREFIX) &&
+    message.endsWith(LEGACY_WATCHER_SUFFIX) &&
+    message.length > LEGACY_WATCHER_PREFIX.length + LEGACY_WATCHER_SUFFIX.length
+  ) {
+    return "watcher";
+  }
+  if (message.startsWith(LEGACY_TURNEND_PREFIX) && message.length > LEGACY_TURNEND_PREFIX.length) {
+    return "turn-end-guard";
+  }
+  return undefined;
+}
+
+/** `jg_operational_input_classify`: current kinds first, then the legacy shapes. */
+export function classifyJuggernautOperationalText(message: string): string | undefined {
+  return juggernautOperationalInputKind(message) ?? juggernautLegacyOperationalInputKind(message);
+}
+
+const RECORD_DIRNAME = "operational-inbox";
+const DOORBELL_PREFIX = ": Juggernaut operational input waiting: read '";
+const DOORBELL_SUFFIX = "' and handle its contents as Juggernaut operational input.";
+
+/** `jg_operational_doorbell_path`: the record path a well-formed doorbell names. */
+export function juggernautOperationalDoorbellPath(message: string): string | undefined {
+  if (
+    message.length < DOORBELL_PREFIX.length + DOORBELL_SUFFIX.length ||
+    !message.startsWith(DOORBELL_PREFIX) ||
+    !message.endsWith(DOORBELL_SUFFIX)
+  ) {
+    return undefined;
+  }
+  const path = message.slice(DOORBELL_PREFIX.length, message.length - DOORBELL_SUFFIX.length);
+  if (!path.startsWith("/") || path.includes("'") || !/^[\x20-\x7e]*$/.test(path)) return undefined;
+  const cut = path.lastIndexOf("/");
+  const directory = path.slice(0, cut);
+  if (directory.slice(directory.lastIndexOf("/") + 1) !== RECORD_DIRNAME) return undefined;
+  const name = path.slice(cut + 1);
+  if (!name.endsWith(".msg") || !/^[0-9a-z-]+$/.test(name.slice(0, -".msg".length))) return undefined;
+  return path;
+}
+
+/** `jg_operational_record_kind` over a record's content: its current generic kind. */
+export function juggernautOperationalRecordKind(content: string): string | undefined {
+  return genericKind(content);
+}

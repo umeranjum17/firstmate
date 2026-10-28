@@ -9,13 +9,13 @@ metadata:
   internal: true
 ---
 
-# updatefirstmate
+# updatejuggernaut
 
 Self-update Juggernaut in place.
 Juggernaut is its own repo, behind the same no-mistakes gate as any project, so new tracked material (`AGENTS.md`, `bin/`, `.agents/skills/`, and public `skills/`) reaches `main` and then sits there until each running Juggernaut pulls it.
 Only `AGENTS.md`, `bin/`, and `.agents/skills/` are a running Juggernaut instruction surface; public `skills/` is installer-facing and is not loaded by Juggernaut.
 This skill performs that pull for the running main Juggernaut and every Squad Lead, without disturbing any in-flight work.
-Updating is consumption, not publication: it only pulls from upstream, so every home runs it regardless of role, and the Juggernaut repository publication boundary (`firstmate-self-repo`) never applies to it.
+Updating is consumption, not publication: it only pulls from upstream, so every home runs it regardless of role, and the Juggernaut repository publication boundary (`juggernaut-self-repo`) never applies to it.
 
 Pulling the files is only half of it.
 A running agent holds `AGENTS.md` and every skill it has already loaded frozen from the moment it launched, and no verified harness offers a reload, so new bytes on disk change nothing for it until it starts a fresh conversation.
@@ -26,13 +26,13 @@ That is why **every live Squad Lead is restarted after a successful update, incl
 Launch-time wiring is not derivable from a file diff, so an unchanged tracked surface is not evidence the running agent is already on the current behavior.
 The only live mates that do not restart are the ones whose home the update pass had to skip, and the ones whose runtime cannot prove a restart; the updater keeps both cases honest and neither is reported as a reload.
 
-**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/fm-secondmate-restart.sh <fm-id>...` once with every live Squad Lead ID, not only the ones that release named; later updates follow the normal flow below.
+**One-time rollout note:** the update that carries this change is still executed by the previous release, which restarts only the mates whose `AGENTS.md` or `.agents/skills/` moved on that pass. After it completes, run `bin/jg-squad-lead-restart.sh <jg-id>...` once with every live Squad Lead ID, not only the ones that release named; later updates follow the normal flow below.
 
 The primary update is fast-forward only, while each Squad Lead uses the same guarded convergence path plus one narrow recovery for squash-merged local history.
 For a remote route, it updates the configured Juggernaut code root on that host from its own origin, then guardedly fast-forwards the persistent home to that code-root commit.
 It never forces, never creates a merge commit, and never stashes.
 A clean Squad Lead divergence advances with `reset --keep` only when a three-way tree proof shows its complete local result is already present at the target, which recognizes squash-merged contributions without discarding unique content.
-Every other dirty, diverged, offline, or wrong-branch target is skipped and reported, and a genuine divergence leaves a durable `state/.secondmate-update-reconcile/<id>.pending` record that future bootstrap and update passes surface until convergence clears it.
+Every other dirty, diverged, offline, or wrong-branch target is skipped and reported, and a genuine divergence leaves a durable `state/.squad-lead-update-reconcile/<id>.pending` record that future bootstrap and update passes surface until convergence clears it.
 A tracked-files fast-forward leaves the gitignored operational dirs (data/, state/, config/, projects/, .no-mistakes/) untouched, so a Squad Lead's in-flight work is never disrupted.
 This touches only the Juggernaut repo and its own worktrees, never anything under `projects/`.
 
@@ -40,30 +40,30 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
 
 1. **Run the updater:**
    ```sh
-   bin/fm-update.sh
+   bin/jg-update.sh
    ```
    It fast-forwards this Juggernaut repo's default branch from origin, then updates every registered local or remote Squad Lead home through its placement-specific guarded path.
    It prints one status line per target (`updated <old>..<new>` / `reconciled redundant divergence <old>..<new>` / `already current` / `skipped: <reason>`), followed by three action lines that tell you exactly what to do next:
-   - `reread-firstmate: yes|no`
-   - `restart-secondmates: fm-<id>...|none`
-   - `nudge-secondmates: fm-<id>...|none`
+   - `reread-juggernaut: yes|no`
+   - `restart-squad-leads: jg-<id>...|none`
+   - `nudge-squad-leads: jg-<id>...|none`
 
    The two Squad Lead sets are disjoint and the script owns the split; do not re-derive it.
-   `restart-secondmates:` carries every live mate the pass left on the latest commit, whether it advanced or was already there.
+   `restart-squad-leads:` carries every live mate the pass left on the latest commit, whether it advanced or was already there.
    A mate reaches neither set only because its home was skipped, because it has no live endpoint recorded here, or because its endpoint was positively classified as dead or missing.
    A skipped genuine divergence still requires attention through its durable reconciliation record; the other two cases need no update action from you.
 
 2. **Re-read AGENTS.md if your own instructions changed.**
-   When the updater printed `reread-firstmate: yes`, the tracked instruction surface (`AGENTS.md`, `bin/`, or `.agents/skills/`) just advanced under you.
+   When the updater printed `reread-juggernaut: yes`, the tracked instruction surface (`AGENTS.md`, `bin/`, or `.agents/skills/`) just advanced under you.
    **Read `AGENTS.md` now** (CLAUDE.md is a real `@AGENTS.md` pointer to it) to refresh your operating instructions before doing anything else, so you are acting on the new instructions rather than the stale ones you were started with.
-   When it printed `reread-firstmate: no`, nothing changed for you - skip the re-read.
+   When it printed `reread-juggernaut: no`, nothing changed for you - skip the re-read.
 
 3. **Restart every Squad Lead the updater named.**
-   Pass the whole `restart-secondmates:` list to one command (skip this step entirely when it says `none`):
+   Pass the whole `restart-squad-leads:` list to one command (skip this step entirely when it says `none`):
    ```sh
-   FM_HOME=<this-firstmate-home> bin/fm-secondmate-restart.sh <fm-id>...
+   JG_HOME=<this-juggernaut-home> bin/jg-squad-lead-restart.sh <jg-id>...
    ```
-   Include `FM_HOME=<this-juggernaut-home>` unless `FM_HOME` is already set to the active Juggernaut home.
+   Include `JG_HOME=<this-juggernaut-home>` unless `JG_HOME` is already set to the active Juggernaut home.
    This is automatic and needs no per-mate confirmation from the captain.
    Local and remote mates go in the same list; the command owns the transport, the profile each replacement runs on, and the wait.
 
@@ -79,9 +79,9 @@ This touches only the Juggernaut repo and its own worktrees, never anything unde
    - `unreached: <id>: <reason>` - no safe running outcome could be confirmed, including an ambiguous relaunch result.
 
 4. **Send the re-read message to the rest.**
-   For every target on the `nudge-secondmates:` line (do nothing when it says `none`), send the one-line re-read steer:
+   For every target on the `nudge-squad-leads:` line (do nothing when it says `none`), send the one-line re-read steer:
    ```sh
-   FM_HOME=<this-firstmate-home> bin/fm-send.sh <id> 'firstmate was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
+   JG_HOME=<this-juggernaut-home> bin/jg-send.sh <id> 'juggernaut was updated to the latest - please re-read your AGENTS.md to pick up the new instructions.'
    ```
    These are the mates that are on the latest bytes but could not be restarted provably, so the steer is the most this pass can honestly do for them.
    It is a gentle steer, not an interruption: the mate already got a safe tracked-files fast-forward, and the steer never forces, tears down, or discards its work.

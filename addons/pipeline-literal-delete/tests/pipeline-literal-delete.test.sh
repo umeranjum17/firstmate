@@ -5,8 +5,17 @@
 # SessionStart hook command exactly as settings.json names it), the rerun changes nothing, and a
 # blocked $VAR delete prints the delete-guard literal-path hint.
 # Usage: pipeline-literal-delete.test.sh
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
-unset FM_TASK_ID FM_TASK_INBOX FM_HOME
+unset JG_TASK_ID JG_TASK_INBOX JG_HOME
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 REPO=$(cd "$ADDON/.." && pwd -P)
 T=$(mktemp -d)
@@ -19,16 +28,16 @@ inst() { env -u XDG_DATA_HOME HOME="$T/home" "$ADDON/install.sh" "$@"; }
 
 inst --dry-run > "$T/dry.out"
 grep -q 'dry run: nothing written' "$T/dry.out" && ok "dry run reports nothing written" || no "dry run output: $(cat "$T/dry.out")"
-[ ! -e "$T/home/.local/share/fm-pipeline-literal-delete/rule.txt" ] && ok "dry run writes nothing" || no "dry run wrote files"
+[ ! -e "$T/home/.local/share/jg-pipeline-literal-delete/rule.txt" ] && ok "dry run writes nothing" || no "dry run wrote files"
 inst > "$T/install.out" && inst > "$T/reinstall.out"
 [ "$(grep -c '^unchanged: ' "$T/reinstall.out")" -eq 4 ] && ok "rerun changes nothing" || no "rerun not idempotent: $(cat "$T/reinstall.out")"
 ls "$T/home/.claude/settings.json.bak-pipeline-literal-delete-"* >/dev/null 2>&1 && ok "backup made" || no "no backup"
 jq -e '.model == "keep-me" and ([.hooks.PreToolUse[].hooks[].command] | index("other-hook") == 0)' "$T/home/.claude/settings.json" >/dev/null && ok "claude settings merged, existing settings kept" || no "claude settings merge"
 
-RULE=$T/home/.local/share/fm-pipeline-literal-delete/rule.txt
+RULE=$T/home/.local/share/jg-pipeline-literal-delete/rule.txt
 grep -qF 'Never delete a $VAR set in an earlier command' "$RULE" && ok "rule text installed" || no "rule text wrong"
 grep -qF 'a delete-guard block is final' "$RULE" && ok "rule names the final block" || no "rule missing the final-block line"
-grep -qF "$RULE" "$T/home/.pi/agent/extensions/fm-literal-delete.ts" && ok "pi extension reads the installed rule" || no "pi extension rule path"
+grep -qF "$RULE" "$T/home/.pi/agent/extensions/jg-literal-delete.ts" && ok "pi extension reads the installed rule" || no "pi extension rule path"
 
 # claude surface: run the SessionStart hook command exactly as settings.json names it.
 CMD=$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$T/home/.claude/settings.json")
@@ -48,7 +57,7 @@ if (!r || typeof r.systemPrompt !== "string" || !r.systemPrompt.startsWith("BASE
 }
 console.log(r.systemPrompt);
 EOF
-OUT=$(node "$T/driver.mjs" "$T/home/.pi/agent/extensions/fm-literal-delete.ts")
+OUT=$(node "$T/driver.mjs" "$T/home/.pi/agent/extensions/jg-literal-delete.ts")
 echo "$OUT" | grep -qF '## Fleet delete rule' && echo "$OUT" | grep -qF 'Never delete a $VAR set in an earlier command' && ok "pi system prompt carries the rule" || no "pi system prompt: $OUT"
 
 # the delete-guard block message names the literal-path form for a $VAR set in an earlier command.

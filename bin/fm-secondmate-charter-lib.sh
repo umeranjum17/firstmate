@@ -1,44 +1,17 @@
 #!/usr/bin/env bash
-# Shared extraction of secondmate registry summary and scope from a charter.
-# Source only. FM_SECONDMATE_CHARTER and FM_SECONDMATE_SCOPE remain explicit
-# caller overrides; otherwise the named sections in the filled brief are used.
-
-normalize_registry_text() {
-  awk '
-    {
-      gsub(/[;()]/, " ")
-      gsub(/[[:space:]]+/, " ")
-      sub(/^ /, "")
-      sub(/ $/, "")
-      if ($0 != "") out = out (out == "" ? "" : " ") $0
-    }
-    END { print out }
-  '
-}
-
-brief_section_text() {
-  local brief=$1 heading=$2
-  awk -v heading="# $heading" '
-    $0 == heading { in_section=1; next }
-    in_section && /^# / { exit }
-    in_section { print }
-  ' "$brief"
-}
-
-registry_summary_for_brief() {
-  local brief=$1
-  if [ -n "${FM_SECONDMATE_CHARTER:-}" ]; then
-    printf '%s\n' "$FM_SECONDMATE_CHARTER" | normalize_registry_text
-  else
-    brief_section_text "$brief" "Charter" | normalize_registry_text
-  fi
-}
-
-registry_scope_for_brief() {
-  local brief=$1
-  if [ -n "${FM_SECONDMATE_SCOPE:-}" ]; then
-    printf '%s\n' "$FM_SECONDMATE_SCOPE" | normalize_registry_text
-  else
-    brief_section_text "$brief" "Routing scope" | normalize_registry_text
-  fi
-}
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
+set -u
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-squad-lead-charter-lib.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
+fi

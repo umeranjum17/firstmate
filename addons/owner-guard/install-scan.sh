@@ -1,25 +1,34 @@
 #!/usr/bin/env bash
 # Install or update the owner-details daily scan: copy scan-check to
-# ${XDG_DATA_HOME:-~/.local/share}/fm-owner-guard-scan/scan-check, write the
+# ${XDG_DATA_HOME:-~/.local/share}/jg-owner-guard-scan/scan-check, write the
 # home's state/owner-details-scan.check.sh as a one-line shim that execs it
 # (mode 700, the old file kept as .bak-owner-guard-scan-<stamp> when it
-# differs), and register the check with the home's bin/fm-check-register.sh.
+# differs), and register the check with the home's bin/jg-check-register.sh.
 # Idempotent. Usage: install-scan.sh [--dry-run] [<home>] (the home defaults
-# to FM_HOME, else FM_MAIN_HOME, else ~/firstmate)
+# to JG_HOME, else JG_MAIN_HOME, else ~/juggernaut)
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 dry=0 uninstall=0
 if [ "${1:-}" = --dry-run ]; then dry=1; shift; fi
 if [ "${1:-}" = --uninstall ]; then uninstall=1; shift; fi
 [ "$#" -le 1 ] || { echo 'usage: install-scan.sh [--dry-run] [--uninstall] [<home>]' >&2; exit 2; }
-FMH=${1:-${FM_HOME:-${FM_MAIN_HOME:-$HOME/firstmate}}}
+FMH=${1:-${JG_HOME:-${JG_MAIN_HOME:-$HOME/juggernaut}}}
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/scan-check
-dest=${XDG_DATA_HOME:-$HOME/.local/share}/fm-owner-guard-scan/scan-check
+dest=${XDG_DATA_HOME:-$HOME/.local/share}/jg-owner-guard-scan/scan-check
 check=$FMH/state/owner-details-scan.check.sh
 shim=$(printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$dest")
 if [ "$uninstall" = 1 ]; then
   [ "$(cat "$check" 2>/dev/null || true)" = "$shim" ] || { echo 'not installed: scan shim is not ours'; exit 0; }
   [ "$dry" = 1 ] || {
-    env -u FM_STATE_OVERRIDE "$FMH/bin/fm-check-unregister.sh" owner-details-scan
+    env -u JG_STATE_OVERRIDE "$FMH/bin/jg-check-unregister.sh" owner-details-scan
     backup=$(find "${check%/*}" -maxdepth 1 -type f -name "$(basename "$check").bak-owner-guard-scan-*" -printf '%T@ %p\n' | sort -rn | head -n 1 | cut -d' ' -f2-)
     if [ -n "$backup" ]; then mv -- "$backup" "$check"; else rm -f -- "$check"; fi
     rm -f -- "$dest"
@@ -40,7 +49,7 @@ if [ "$(cat "$check" 2>/dev/null)" != "$shim" ]; then
   printf '%s\n' "$shim" > "$check"
 fi
 chmod 700 "$check"
-if [ -x "$FMH/bin/fm-check-register.sh" ]; then
-  env -u FM_STATE_OVERRIDE "$FMH/bin/fm-check-register.sh" owner-details-scan
+if [ -x "$FMH/bin/jg-check-register.sh" ]; then
+  env -u JG_STATE_OVERRIDE "$FMH/bin/jg-check-register.sh" owner-details-scan
 fi
 echo "installed $dest; $check execs it"

@@ -3,7 +3,7 @@
 Juggernaut can propagate a W3C [`traceparent`](https://www.w3.org/TR/trace-context/) to every agent it spawns so an external observer can identify each task as exactly one trace and correlate everything that task runs under that one identity.
 The trace boundary is the task: a persistent Squad Lead is routing infrastructure with its own agent identity, never a shared trace root for the unrelated tasks routed through it.
 The capability is default-off, source-owned, vendor-neutral, and deliberately narrow.
-This document is the rationale and current-behavior guide; `docs/configuration.md` owns the configuration schema, `bin/fm-trace-context-lib.sh`'s header owns the exact mechanics, and [`verification/trace-context.md`](verification/trace-context.md) records the repeatable test evidence.
+This document is the rationale and current-behavior guide; `docs/configuration.md` owns the configuration schema, `bin/jg-trace-context-lib.sh`'s header owns the exact mechanics, and [`verification/trace-context.md`](verification/trace-context.md) records the repeatable test evidence.
 
 ## Why this is a source change at all
 
@@ -25,17 +25,17 @@ This feature parents no SDK span by itself.
 Because the injected carrier and the recorded carrier are the same string, an observer that reads the metadata reconstructs exactly the identity the child received.
 The injection sits at the unconditional pre-launch export site, so it covers ship and Recon spawns across `claude`, `codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy`, and `devin`, plus Squad Lead spawns across that same set except the deliberately operator-only `gemini`, `muse`, `rovo`, `agy`, and `devin` adapters.
 This is the same coverage `GOTMPDIR` already has and requires no trace-specific `launch_template()` behavior.
-Ship and Recon spawns reach that site on every spawn backend (`tmux`, `herdr`, `zellij`, `orca`, `cmux`); a Squad Lead reaches it on every backend that accepts a Squad Lead spawn (`tmux`, `herdr`, `zellij`), because `bin/fm-spawn.sh` rejects a Squad Lead on `orca` and `cmux`.
+Ship and Recon spawns reach that site on every spawn backend (`tmux`, `herdr`, `zellij`, `orca`, `cmux`); a Squad Lead reaches it on every backend that accepts a Squad Lead spawn (`tmux`, `herdr`, `zellij`), because `bin/jg-spawn.sh` rejects a Squad Lead on `orca` and `cmux`.
 
 ### Remote Squad Lead routes
 
-A Squad Lead on a [remote route](remote-secondmates.md) never reaches that export site in the parent's own process: the parent hands the launch to the configured host, which runs its own `bin/fm-spawn.sh` there.
+A Squad Lead on a [remote route](remote-squad-leads.md) never reaches that export site in the parent's own process: the parent hands the launch to the configured host, which runs its own `bin/jg-spawn.sh` there.
 The identity is still the parent's, because the parent home holds the task metadata an observer reads.
 The parent therefore resolves the carrier against that task's own metadata under its own frozen decision - reused verbatim on relaunch, freshly rooted otherwise, never adopting the parent process's ambient `TRACEPARENT` - and passes it to the remote host, which exports it at the same unconditional pre-launch site and returns the carrier its endpoint actually holds.
 The parent records that returned value, so an already-alive remote endpoint that was not relaunched reports the identity its agent really received rather than one the parent merely intended.
 The remote host validates the delivered carrier as a strict W3C value before it can reach any pane, and a disabled parent passes nothing, leaving the remote launch identical to the untraced one.
 If the endpoint is already alive, no new launch or injection occurs; the parent still records any carrier that endpoint reports, even when the parent's current decision is `off`, so its metadata does not deny the running agent's actual identity.
-The enablement decision travels with it exactly as on the local path: the remote home inherits `config/trace-context` as declared inherited material and the new Squad Lead process receives the parent's frozen `FM_TRACE_CONTEXT=on|off` snapshot.
+The enablement decision travels with it exactly as on the local path: the remote home inherits `config/trace-context` as declared inherited material and the new Squad Lead process receives the parent's frozen `JG_TRACE_CONTEXT=on|off` snapshot.
 
 ## Root and recovery semantics
 
@@ -54,13 +54,13 @@ An actual disabled relaunch regenerates the task meta without `traceparent=`, so
 
 ### Enablement is home-session-scoped
 
-Each locked `bin/fm-session-start.sh` run resolves that home's `config/trace-context` plus `FM_TRACE_CONTEXT` exactly once into session-scoped effective state.
+Each locked `bin/jg-session-start.sh` run resolves that home's `config/trace-context` plus `JG_TRACE_CONTEXT` exactly once into session-scoped effective state.
 The decision is atomically published through a same-directory temporary file and bound to the current session lock, so a failed publication cannot reactivate a stale `on` record from an earlier session.
 Every spawn from that home reads only the frozen `on` or `off` decision.
 Later config or environment edits are ignored until that home starts a new session.
 Missing, stale, unreadable, invalid, or unsuccessfully published effective state defaults safely to `off`.
 
-When the primary launches a Squad Lead, local or remote, it propagates `config/trace-context` into the Squad Lead home and passes the primary session's frozen decision as a non-empty `FM_TRACE_CONTEXT=on|off` launch override.
+When the primary launches a Squad Lead, local or remote, it propagates `config/trace-context` into the Squad Lead home and passes the primary session's frozen decision as a non-empty `JG_TRACE_CONTEXT=on|off` launch override.
 The Squad Lead resolves that inherited override when its own home session starts.
 That flag is session-scoped enablement rather than durable configuration, so it is transferred at the launch convergence point - where the frozen decision is handed over with it - and left untouched by live convergence into an already-running home, on local and remote routes alike.
 What propagates is the enablement decision, never trace identity: a Squad Lead launched while enabled receives its own task carrier from the primary - the Squad Lead agent's identity, reused verbatim when the Squad Lead itself is relaunched - and each worker it spawns roots its own per-task trace.
@@ -88,7 +88,7 @@ This is a deliberate, source-owned choice:
 ## Safety
 
 - **Default-off.**
-  With no `config/trace-context` and no `FM_TRACE_CONTEXT`, a fresh spawn or actual relaunch injects nothing and writes no `traceparent=` line, so the generated meta and the launch environment are unchanged.
+  With no `config/trace-context` and no `JG_TRACE_CONTEXT`, a fresh spawn or actual relaunch injects nothing and writes no `traceparent=` line, so the generated meta and the launch environment are unchanged.
   Reusing an already-alive remote endpoint records any carrier that endpoint reports without injecting a new one.
   A locked session start makes the one config-file check, and each spawn sources one extra library and reads the frozen effective-state file, so the process is not literally byte-for-byte identical, but nothing an agent, an observer, or the task meta can see differs.
 - **What is and is not exposed.**

@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
-# Install model-gate for one firstmate home, or take it away with --remove: the gate on PATH, the allow-list, the
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+# Install model-gate for one juggernaut home, or take it away with --remove: the gate on PATH, the allow-list, the
 # opencode per-provider whitelist (so an off-list model is not even pickable there) and the fleet check that restores
 # that whitelist and warns when an off-list model was used anyway. Idempotent; the allow-list file is never overwritten
-# and never deleted. Usage: install.sh [--dry-run] [--remove]   (FM_HOME names the home that runs the check)
+# and never deleted. Usage: install.sh [--dry-run] [--remove]   (JG_HOME names the home that runs the check)
 set -euo pipefail
 dry=0 remove=0
 for a in "$@"; do case $a in --dry-run) dry=1 ;; --remove) remove=1 ;; *) echo 'usage: install.sh [--dry-run] [--remove]' >&2; exit 2 ;; esac; done
-FM_HOME=${FM_HOME:?set FM_HOME to the firstmate home that runs the check}
-src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/bin/fm-model-gate
-share=${XDG_DATA_HOME:-$HOME/.local/share}/fm-model-gate
-bin=$share/fm-model-gate
-link=$HOME/.local/bin/fm-model-gate
-list=${FM_MODEL_GATE_LIST:-$FM_HOME/config/model-allow-list.json}
-check=$FM_HOME/state/model-gate.check.sh
+JG_HOME=${JG_HOME:?set JG_HOME to the juggernaut home that runs the check}
+src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/bin/jg-model-gate
+share=${XDG_DATA_HOME:-$HOME/.local/share}/jg-model-gate
+bin=$share/jg-model-gate
+link=$HOME/.local/bin/jg-model-gate
+list=${JG_MODEL_GATE_LIST:-$JG_HOME/config/model-allow-list.json}
+check=$JG_HOME/state/model-gate.check.sh
 say() { printf '%s %s\n' "$1" "$2"; }
 
 if [ "$remove" = 1 ]; then
   "$src" opencode --remove
-  if [ -e "$check" ] && [ -x "$FM_HOME/bin/fm-check-unregister.sh" ]; then
-    [ "$dry" = 1 ] && say would-run "fm-check-unregister.sh model-gate" \
-      || env -u FM_STATE_OVERRIDE FM_HOME="$FM_HOME" "$FM_HOME/bin/fm-check-unregister.sh" model-gate || true
+  if [ -e "$check" ] && [ -x "$JG_HOME/bin/jg-check-unregister.sh" ]; then
+    [ "$dry" = 1 ] && say would-run "jg-check-unregister.sh model-gate" \
+      || env -u JG_STATE_OVERRIDE JG_HOME="$JG_HOME" "$JG_HOME/bin/jg-check-unregister.sh" model-gate || true
   fi
   for f in "$check" "$link"; do
     [ -e "$f" ] || continue
@@ -43,8 +51,8 @@ if [ -e "$list" ]; then say unchanged "$list"; else
 fi
 if [ "$dry" = 1 ]; then "$src" opencode --dry-run; else "$src" opencode; fi
 if [ "$dry" = 1 ]; then say would-install "$check"; else
-  mkdir -p "$FM_HOME/state"
+  mkdir -p "$JG_HOME/state"
   install -m 700 "$src" "$check"
   say installed "$check"
-  [ ! -x "$FM_HOME/bin/fm-check-register.sh" ] || "$FM_HOME/bin/fm-check-register.sh" model-gate
+  [ ! -x "$JG_HOME/bin/jg-check-register.sh" ] || "$JG_HOME/bin/jg-check-register.sh" model-gate
 fi

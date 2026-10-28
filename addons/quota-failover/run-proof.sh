@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
@@ -6,25 +15,25 @@ tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 home=$tmp/home; stub=$tmp/bin
 mkdir -p "$home/state" "$home/config" "$home/bin" "$stub"
-cat >"$home/bin/fm-stub-lib.sh" <<'LIB'
-fm_meta_get() { sed -n "s|^$2=||p" "$1" | tail -n 1; }
-fm_backend_of_meta() { echo fixture; }
-fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
-fm_backend_visible_capture() { [ ! -f "$FM_HOME/state/$2.screen" ] || cat "$FM_HOME/state/$2.screen"; return 0; }
-fm_busy_classify_meta() { echo 'idle no-busy-record'; }
-fm_busy_record_read() { echo ''; }
-FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
-fm_quota_single_provider_for_harness() { return 1; }
-fm_parent_channel_report() { :; }
-fm_run_timed() { shift; "$@"; }
+cat >"$home/bin/jg-stub-lib.sh" <<'LIB'
+jg_meta_get() { sed -n "s|^$2=||p" "$1" | tail -n 1; }
+jg_backend_of_meta() { echo fixture; }
+jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
+jg_backend_visible_capture() { [ ! -f "$JG_HOME/state/$2.screen" ] || cat "$JG_HOME/state/$2.screen"; return 0; }
+jg_busy_classify_meta() { echo 'idle no-busy-record'; }
+jg_busy_record_read() { echo ''; }
+JG_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_single_provider_for_harness() { return 1; }
+jg_parent_channel_report() { :; }
+jg_run_timed() { shift; "$@"; }
 LIB
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do ln -s fm-stub-lib.sh "$home/bin/$lib"; done
-cat >"$home/bin/fm-control.sh" <<'CONTROL'
+for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do ln -s jg-stub-lib.sh "$home/bin/$lib"; done
+cat >"$home/bin/jg-control.sh" <<'CONTROL'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/control.log"
+printf '%s\n' "$*" >>"$JG_HOME/state/control.log"
 CONTROL
-cat >"$home/bin/fm-crew-state.sh" <<'CREW'
+cat >"$home/bin/jg-crew-state.sh" <<'CREW'
 #!/usr/bin/env bash
 echo 'state: working · source: fixture'
 CREW
@@ -37,11 +46,11 @@ cat >"$stub/claude" <<'CLAUDE'
 if [ "${CLAUDE_LIMIT:-}" = yes ]; then echo "You've hit your usage limit for your plan; try again in 3h"; exit 1; fi
 echo PONG
 CLAUDE
-chmod +x "$home/bin/fm-control.sh" "$home/bin/fm-crew-state.sh" "$stub/quota-axi" "$stub/claude"
+chmod +x "$home/bin/jg-control.sh" "$home/bin/jg-crew-state.sh" "$stub/quota-axi" "$stub/claude"
 cat >"$home/config/crew-dispatch.json" <<'DISPATCH'
 {"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}
 DISPATCH
-printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
+printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=operator\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
 printf 'quota exhausted' >"$home/state/cw.screen"
 : >"$home/state/quota-failover.log"
 export PATH="$stub:$PATH" QUOTA_FAILOVER_TEST_SECS=1 QUOTA_FAILOVER_PROBE_SECS=0 QUOTA_FAILOVER_RETEST_SECS=0 QUOTA_FAILOVER_STALL_SECS=0

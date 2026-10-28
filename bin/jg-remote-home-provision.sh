@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# Provision the JG_HOME selected by the fixed remote entrypoint.
+#
+# Usage:
+#   jg-remote-home-provision.sh < manifest
+#
+# Manifest schema jg-remote-home-provision.v1 carries a base64 charter, the
+# base64 parent SSH alias, and one base64 project record per line. Each project
+# record's origin is the URL the parent resolved and named, so this host clones
+# from it and re-validates it through bin/jg-project-origin-lib.sh instead of
+# trusting the sender. The remote code root is cloned into a private staging
+# directory beside the absent home and installed by rename once complete, so
+# cleanup of the public home cannot remove a live clone's destination. Project
+# origins are cloned on this host, the project registry and charter are
+# published, the durable .jg-squad-lead-parent record names this home's route to its parent as
+# "remote" - read by bin/jg-teardown.sh's cleanup gate so a delegated public
+# reply promise, which the subsystem can only carry on the parent's own
+# filesystem, is never mistaken for one this child could hold - and the
+# .jg-squad-lead-home marker commits the complete seed last.
+# A newly created home is removed on failure. An existing matching seeded home
+# is converged only through guarded ordinary-file updates and new project clones.
+# jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+_jg_d=${BASH_SOURCE[0]%/*}
+[ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
+if [ -r "$_jg_d/jg-compat.sh" ]; then
+  # shellcheck source=bin/jg-compat.sh
+  . "$_jg_d/jg-compat.sh"
+else
+  # A copy of this script with no compat file beside it (a test fixture) has no
+  # legacy record to read, so every legacy reader answers "nothing legacy here".
+  eval 'jg_compat_legacy_of() { printf "%s\n" "${1-}"; }
+    jg_compat_legacy_product() { printf "%s\n" "${1-}"; }
+    jg_compat_record_ok() { [ "${1-}" = "${2-}" ]; }
+    jg_compat_label_ok() { [ -n "${1-}" ] && [ "${1-}" = "${2-}" ]; }
+    jg_compat_marker_ok() { [ "${1-}" = JUGGERNAUT_OP ]; }
+    jg_compat_marker() { printf "%s\n" "${1-}/.jg-squad-lead-home"; }
+    jg_compat_parent_marker() { printf "%s\n" "${1-}/.jg-squad-lead-parent"; }
+    jg_compat_claims_root() { printf "%s\n" "${1-}"; }
+    jg_compat_pick() { printf "%s\n" "${1-}"; }
+    jg_compat_kind() { printf "%s\n" "${1-}"; }
+    jg_compat_meta_is_squad_lead() { grep -q "^kind=squad_lead\$" "${1-}" 2>/dev/null; }'
+fi
+unset _jg_d
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JG_ROOT="${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+JG_HOME=${JG_HOME:?JG_HOME is required}
+MAX_MANIFEST_BYTES=1048576
+
+# shellcheck source=bin/jg-project-origin-lib.sh
+. "$SCRIPT_DIR/jg-project-origin-lib.sh"
+
+die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+base64_decode_to() {
+  if printf '%s' "$1" | base64 --decode > "$2" 2>/dev/null; then return 0; fi
+  if printf '%s' "$1" | base64 -D > "$2" 2>/dev/null; then return 0; fi
+  return 1
+}
+
+manifest_value() { # <file> <key>
+  local count
+  count=$(grep -c "^$2=" "$1" 2>/dev/null || true)
+  [ "$count" -eq 1 ] || return 1
+  grep "^$2=" "$1" | cut -d= -f2-
+}
+
+safe_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac; }
+
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/jg-remote-provision.XXXXXX") || die "cannot create provisioning state"
+CREATED_HOME=0
+CREATED_BACKLOG=0
+EXISTING_HOME=0
+PUBLISHED=0
+PROVISION_LOCK=
+PROVISION_LOCK_HELD=0
+STAGE_HOME=
+CREATED_PROJECTS="$TMP/created-projects"
+: > "$CREATED_PROJECTS"
+release_provision_lock() {
+  if [ "$PROVISION_LOCK_HELD" -eq 1 ]; then
+    jg_lock_release "$PROVISION_LOCK"
+    PROVISION_LOCK_HELD=0
+  fi
+}
+restore_owned_file() { # <relative-path>
+  local rel=$1 dest="$JG_HOME/$1" backup="$TMP/before/$1"
+  if [ -f "$backup.present" ]; then
+    mkdir -p "$(dirname "$dest")" || return 1
+    cp -p -- "$backup" "$dest.tmp.rollback.$$" || return 1
+    mv -f -- "$dest.tmp.rollback.$$" "$dest"
+  else
+    rm -f -- "$dest"
+  fi
+}
+rollback() {
+  local status=$? project
+  if [ "$status" -ne 0 ] && [ "$PUBLISHED" -eq 0 ]; then
+    [ -z "$STAGE_HOME" ] || rm -rf -- "$STAGE_HOME"
+    if [ "$CREATED_HOME" -eq 1 ]; then
+      rm -rf -- "$JG_HOME"
+    elif [ "$EXISTING_HOME" -eq 1 ]; then
+      while IFS= read -r project; do
+        [ -n "$project" ] && rm -rf -- "$JG_HOME/projects/$project"
+      done < "$CREATED_PROJECTS"
+      restore_owned_file data/charter.md || true
+      restore_owned_file data/projects.md || true
+      restore_owned_file .jg-squad-lead-home || true
+      restore_owned_file .jg-squad-lead-parent || true
+      [ "$CREATED_BACKLOG" -eq 0 ] || rm -f -- "$JG_HOME/data/backlog.md"
+    fi
+  fi
+  release_provision_lock
+  rm -rf -- "$TMP"
+  exit "$status"
+}
+trap rollback EXIT
+trap 'exit 1' HUP INT TERM
+head -c "$((MAX_MANIFEST_BYTES + 1))" > "$TMP/manifest" || die "cannot read provisioning manifest"
+MANIFEST_BYTES=$(LC_ALL=C wc -c < "$TMP/manifest" | tr -d ' ')
+[ "$MANIFEST_BYTES" -le "$MAX_MANIFEST_BYTES" ] || die "provisioning manifest exceeds its byte bound"
+SCHEMA=$(manifest_value "$TMP/manifest" schema || true)
+[ "$SCHEMA" = jg-remote-home-provision.v1 ] || die "incompatible provisioning manifest"
+ID_B64=$(manifest_value "$TMP/manifest" id_b64 || true)
+CHARTER_B64=$(manifest_value "$TMP/manifest" charter_b64 || true)
+# Optional so a manifest sent by a not-yet-updated parent (predating this
+# field) still provisions; the durable parent record below simply omits the
+# host in that case rather than refusing the whole seed.
+PARENT_HOST_B64=$(manifest_value "$TMP/manifest" parent_host_b64 || true)
+COUNT=$(manifest_value "$TMP/manifest" project_count || true)
+base64_decode_to "$ID_B64" "$TMP/id" || die "manifest id is not valid base64"
+base64_decode_to "$CHARTER_B64" "$TMP/charter" || die "manifest charter is not valid base64"
+PARENT_HOST=
+if [ -n "$PARENT_HOST_B64" ]; then
+  base64_decode_to "$PARENT_HOST_B64" "$TMP/parent-host" || die "manifest parent host is not valid base64"
+  PARENT_HOST=$(cat "$TMP/parent-host")
+fi
+ID=$(cat "$TMP/id")
+safe_id "$ID" || die "manifest carries an unsafe squad_lead id"
+case "$COUNT" in ''|*[!0-9]*) die "manifest project count is invalid" ;; esac
+[ -s "$TMP/charter" ] || die "manifest charter is empty"
+[ -z "$(LC_ALL=C tr -cd '\000' < "$TMP/charter")" ] || die "manifest charter contains NUL bytes"
+RECORDS=$(grep -c '^project=' "$TMP/manifest" 2>/dev/null || true)
+[ "$RECORDS" -eq "$COUNT" ] || die "manifest project count does not match its records"
+
+HOME_PARENT=$(dirname "$JG_HOME")
+HOME_PARENT_REAL=$(CDPATH='' cd -- "$HOME_PARENT" 2>/dev/null && pwd -P) \
+  || die "remote home parent is unavailable"
+[ "$HOME_PARENT_REAL" = "$HOME_PARENT" ] || die "remote home parent is not canonical"
+PROVISION_LOCK_STATE="$HOME_PARENT/.juggernaut-provision-locks"
+if [ -e "$PROVISION_LOCK_STATE" ] || [ -L "$PROVISION_LOCK_STATE" ]; then
+  [ -d "$PROVISION_LOCK_STATE" ] && [ ! -L "$PROVISION_LOCK_STATE" ] \
+    || die "remote provisioning lock root is unsafe"
+else
+  mkdir "$PROVISION_LOCK_STATE" 2>/dev/null || true
+  [ -d "$PROVISION_LOCK_STATE" ] && [ ! -L "$PROVISION_LOCK_STATE" ] \
+    || die "cannot create remote provisioning lock root"
+fi
+if command -v shasum >/dev/null 2>&1; then
+  HOME_LOCK_KEY=$(printf '%s' "$JG_HOME" | shasum -a 256 | awk '{print $1}')
+elif command -v sha256sum >/dev/null 2>&1; then
+  HOME_LOCK_KEY=$(printf '%s' "$JG_HOME" | sha256sum | awk '{print $1}')
+else
+  die "no SHA-256 tool is available for provisioning serialization"
+fi
+JG_STATE_OVERRIDE="$PROVISION_LOCK_STATE"
+# shellcheck source=bin/jg-wake-lib.sh
+. "$SCRIPT_DIR/jg-wake-lib.sh"
+PROVISION_LOCK="$STATE/.remote-home-provision-$HOME_LOCK_KEY.lock"
+jg_lock_acquire_wait "$PROVISION_LOCK"
+PROVISION_LOCK_HELD=1
+
+if [ -e "$JG_HOME" ] || [ -L "$JG_HOME" ]; then
+  [ -d "$JG_HOME" ] && [ ! -L "$JG_HOME" ] || die "remote home exists but is not a safe directory"
+  [ -f "$JG_HOME/AGENTS.md" ] && [ ! -L "$JG_HOME/AGENTS.md" ] \
+    && [ -d "$JG_HOME/bin" ] && [ ! -L "$JG_HOME/bin" ] || die "existing remote home is not a safe Juggernaut checkout"
+  for operational_dir in data state config projects; do
+    operational_path="$JG_HOME/$operational_dir"
+    if [ -e "$operational_path" ] || [ -L "$operational_path" ]; then
+      [ -d "$operational_path" ] && [ ! -L "$operational_path" ] \
+        || die "remote home has unsafe operational directory: $operational_dir"
+    fi
+  done
+  mkdir -p "$TMP/before/data"
+  for rel in data/charter.md data/projects.md .jg-squad-lead-home .jg-squad-lead-parent; do
+    existing="$JG_HOME/$rel"
+    if [ -e "$existing" ] || [ -L "$existing" ]; then
+      [ -f "$existing" ] && [ ! -L "$existing" ] || die "existing remote home has unsafe owned file: $rel"
+      mkdir -p "$(dirname "$TMP/before/$rel")"
+      cp -p -- "$existing" "$TMP/before/$rel" || die "cannot snapshot existing remote home file: $rel"
+      : > "$TMP/before/$rel.present"
+    fi
+  done
+  EXISTING_HOME=1
+  if [ -f "$(jg_compat_marker "$JG_HOME")" ]; then
+    [ "$(cat "$(jg_compat_marker "$JG_HOME")")" = "$ID" ] || die "existing remote home belongs to another squad_lead"
+  elif find "$JG_HOME/data" "$JG_HOME/state" "$JG_HOME/projects" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+    die "unmarked existing remote home contains operational data"
+  fi
+else
+  # Clone into a staging path this attempt owns, then publish by rename: a
+  # competing cleanup or rollback aimed at the absent public home cannot
+  # remove a directory a live clone is still writing. Verify the sentinel
+  # after mv: if the destination appeared meanwhile, mv may nest our stage
+  # inside it instead of publishing, so rollback must remove only that stage.
+  STAGE_HOME=$(mktemp -d "$HOME_PARENT/.jg-home-provisioning.XXXXXX") \
+    || die "cannot create remote home staging directory"
+  # A local clone copies loose objects into the new repo. Git 2.55 on the CI
+  # image does that copy before the destination shard directory exists, so the
+  # clone dies intermittently with "failed to copy file to .../objects/xx/hash".
+  # --no-local uses the normal transport and writes a pack instead.
+  git clone --no-local --quiet -- "$JG_ROOT" "$STAGE_HOME" || die "could not clone the remote Juggernaut home"
+  STAGE_SENTINEL="${STAGE_HOME##*/}.owner"
+  : > "$STAGE_HOME/$STAGE_SENTINEL" || die "cannot mark the remote home staging directory"
+  mv -- "$STAGE_HOME" "$JG_HOME" || die "cannot install the remote home"
+  if [ ! -f "$JG_HOME/$STAGE_SENTINEL" ] || [ -L "$JG_HOME/$STAGE_SENTINEL" ]; then
+    STAGE_HOME="$JG_HOME/${STAGE_HOME##*/}"
+    die "remote home appeared while it was being provisioned"
+  fi
+  STAGE_HOME=
+  CREATED_HOME=1
+  rm -f -- "$JG_HOME/$STAGE_SENTINEL" || die "cannot clear the remote home staging sentinel"
+fi
+for operational_dir in data state config projects; do
+  operational_path="$JG_HOME/$operational_dir"
+  if [ -e "$operational_path" ] || [ -L "$operational_path" ]; then
+    [ -d "$operational_path" ] && [ ! -L "$operational_path" ] \
+      || die "remote home has unsafe operational directory: $operational_dir"
+  else
+    mkdir "$operational_path" || die "cannot create remote operational directory: $operational_dir"
+  fi
+done
+if [ -e "$JG_HOME/data/backlog.md" ] || [ -L "$JG_HOME/data/backlog.md" ]; then
+  [ -f "$JG_HOME/data/backlog.md" ] && [ ! -L "$JG_HOME/data/backlog.md" ] \
+    || die "remote backlog is not a safe regular file"
+else
+  printf '## In flight\n\n## Queued\n\n## Done\n' > "$JG_HOME/data/backlog.md"
+  CREATED_BACKLOG=1
+fi
+
+PROJECT_REG="$TMP/projects.md"
+: > "$PROJECT_REG"
+while IFS= read -r record; do
+  [ -n "$record" ] || continue
+  encoded=${record#project=}
+  old_ifs=$IFS
+  IFS='|'
+  read -r NAME_B64 ORIGIN_B64 REGISTRY_B64 MODE_B64 <<EOF
+$encoded
+EOF
+  IFS=$old_ifs
+  for field in NAME_B64 ORIGIN_B64 REGISTRY_B64 MODE_B64; do
+    eval "value=\${$field}"
+    [ -n "$value" ] || die "project manifest record is incomplete"
+  done
+  base64_decode_to "$NAME_B64" "$TMP/name" || die "project name is not valid base64"
+  base64_decode_to "$ORIGIN_B64" "$TMP/origin" || die "project origin is not valid base64"
+  base64_decode_to "$REGISTRY_B64" "$TMP/registry" || die "project registry line is not valid base64"
+  base64_decode_to "$MODE_B64" "$TMP/mode" || die "project mode is not valid base64"
+  NAME=$(cat "$TMP/name")
+  ORIGIN=$(cat "$TMP/origin")
+  REGISTRY_LINE=$(cat "$TMP/registry")
+  MODE=$(cat "$TMP/mode")
+  safe_id "$NAME" || die "project name is unsafe: $NAME"
+  [ -n "$ORIGIN" ] || die "project $NAME has no origin"
+  jg_project_origin_safe "$ORIGIN" || die "project $NAME origin is not an accepted clone URL: $ORIGIN"
+  case "$MODE" in no-mistakes|direct-PR) ;; *) die "project $NAME has unsupported remote mode: $MODE" ;; esac
+  case "$REGISTRY_LINE" in "- $NAME "*) ;; *) die "project $NAME registry line is malformed" ;; esac
+  DEST="$JG_HOME/projects/$NAME"
+  if [ -e "$DEST" ] || [ -L "$DEST" ]; then
+    [ -d "$DEST" ] && [ ! -L "$DEST" ] && [ -d "$DEST/.git" ] \
+      || die "project destination exists but is not a safe clone: $DEST"
+    EXISTING_ORIGIN=$(git -C "$DEST" remote get-url origin 2>/dev/null || true)
+    [ "$EXISTING_ORIGIN" = "$ORIGIN" ] || die "project $NAME origin differs from the requested route"
+  else
+    printf '%s\n' "$NAME" >> "$CREATED_PROJECTS"
+    git clone --no-local --quiet -- "$ORIGIN" "$DEST" || die "could not clone project $NAME on the remote host"
+    if [ "$MODE" = no-mistakes ]; then
+      command -v no-mistakes >/dev/null 2>&1 || die "no-mistakes is unavailable for project $NAME"
+      (cd "$DEST" && no-mistakes init >/dev/null && no-mistakes doctor >/dev/null) \
+        || die "no-mistakes initialization failed for project $NAME"
+    fi
+  fi
+  printf '%s\n' "$REGISTRY_LINE" >> "$PROJECT_REG"
+done < <(grep '^project=' "$TMP/manifest")
+
+cp "$TMP/charter" "$JG_HOME/data/charter.md.tmp.$$"
+chmod 600 "$JG_HOME/data/charter.md.tmp.$$"
+mv -f -- "$JG_HOME/data/charter.md.tmp.$$" "$JG_HOME/data/charter.md"
+cp "$PROJECT_REG" "$JG_HOME/data/projects.md.tmp.$$"
+mv -f -- "$JG_HOME/data/projects.md.tmp.$$" "$JG_HOME/data/projects.md"
+{
+  printf 'schema=jg-squad-lead-parent.v1\n'
+  printf 'route=remote\n'
+  [ -z "$PARENT_HOST" ] || printf 'parent_host=%s\n' "$PARENT_HOST"
+} > "$JG_HOME/.jg-squad-lead-parent.tmp.$$"
+mv -f -- "$JG_HOME/.jg-squad-lead-parent.tmp.$$" "$(jg_compat_parent_marker "$JG_HOME")"
+printf '%s\n' "$ID" > "$JG_HOME/.jg-squad-lead-home.tmp.$$"
+mv -f -- "$JG_HOME/.jg-squad-lead-home.tmp.$$" "$(jg_compat_marker "$JG_HOME")"
+PUBLISHED=1
+release_provision_lock
+trap - EXIT
+rm -rf -- "$TMP"
+printf 'provisioned: %s projects=%s\n' "$JG_HOME" "$COUNT"

@@ -6,15 +6,24 @@
 # after that prints nothing; a clean-only set prints nothing. The raw patterns
 # never reach stdout. Also drives install-scan.sh (dry-run plus a real install).
 # Usage: owner-guard/tests/scan-e2e.sh
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)
 trap 'chmod -R u+w -- "$d"; rm -rf -- "$d"' EXIT
 export HOME=$d/home TMPDIR=$d GIT_CONFIG_NOSYSTEM=1
-unset FM_HOME
+unset JG_HOME
 FM=$d/fm
 mkdir -p "$HOME" "$FM/config" "$FM/state" "$FM/data" "$FM/bin"
-export FM_MAIN_HOME=$FM
+export JG_MAIN_HOME=$FM
 fails=0
 check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want: %s\n  got:  %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
@@ -80,25 +89,25 @@ out=$("$SRC/install-scan.sh" --dry-run "$FM")
 has "install dry-run prints the plan" "$out" "dry-run"
 check "dry-run writes nothing" "$(test -e "$FM/state/owner-details-scan.check.sh" && echo yes || echo no)" no
 printf '#!/bin/sh\necho prior scan\n' >"$FM/state/owner-details-scan.check.sh"
-cat >"$FM/bin/fm-check-register.sh" <<EOF
+cat >"$FM/bin/jg-check-register.sh" <<EOF
 #!/usr/bin/env bash
 printf 'registered: %s\n' "\$1" >>"$d/registered.log"
 EOF
-cat >"$FM/bin/fm-check-unregister.sh" <<EOF
+cat >"$FM/bin/jg-check-unregister.sh" <<EOF
 #!/usr/bin/env bash
 printf 'unregistered: %s\\n' "\$1" >>"$d/unregistered.log"
 EOF
-chmod +x "$FM/bin/fm-check-register.sh" "$FM/bin/fm-check-unregister.sh"
+chmod +x "$FM/bin/jg-check-register.sh" "$FM/bin/jg-check-unregister.sh"
 export XDG_DATA_HOME=$d/data
 "$SRC/install-scan.sh" "$FM" >/dev/null
 check "install writes the shim" "$(test -x "$FM/state/owner-details-scan.check.sh" && echo yes || echo no)" yes
 check "install keeps the previous shim backup" "$(find "$FM/state" -name 'owner-details-scan.check.sh.bak-owner-guard-scan-*' | wc -l)" 1
 check "install registers the check" "$(cat "$d/registered.log")" "registered: owner-details-scan"
-check "installed check is executable" "$(test -x "$d/data/fm-owner-guard-scan/scan-check" && echo yes || echo no)" yes
+check "installed check is executable" "$(test -x "$d/data/jg-owner-guard-scan/scan-check" && echo yes || echo no)" yes
 "$SRC/uninstall.sh" "$FM" >/dev/null
 check "owner uninstall restores previous scan shim" "$(cat "$FM/state/owner-details-scan.check.sh")" "$(printf '#!/bin/sh\necho prior scan')"
 check "owner uninstall consumes its backup" "$(find "$FM/state" -name 'owner-details-scan.check.sh.bak-owner-guard-scan-*' | wc -l)" 0
-check "owner uninstall removes scan executable" "$(test -e "$d/data/fm-owner-guard-scan/scan-check" && echo yes || echo no)" no
+check "owner uninstall removes scan executable" "$(test -e "$d/data/jg-owner-guard-scan/scan-check" && echo yes || echo no)" no
 "$SRC/uninstall.sh" "$FM" >/dev/null
 check "second owner uninstall is a no-op" "$(cat "$FM/state/owner-details-scan.check.sh")" "$(printf '#!/bin/sh\necho prior scan')"
 

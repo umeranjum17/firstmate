@@ -1,7 +1,7 @@
 # Captain-hold lifecycle mechanism
 
 This document explains how a captain call is held, answered, reconciled, shown, and verified.
-It is for maintainers changing `bin/fm-captain-hold.sh` or any surface that reads or closes a captain hold.
+It is for maintainers changing `bin/jg-captain-hold.sh` or any surface that reads or closes a captain hold.
 
 The normative policy is owned by `.agents/skills/captain-hold-lifecycle/SKILL.md` and is not restated here.
 This document records the deterministic mechanism, structured surfaces, compatibility contract, and privacy-safe regression evidence.
@@ -24,7 +24,7 @@ This document records the deterministic mechanism, structured surfaces, compatib
 
 A decision is not a separate thing in this system.
 It is an ordinary backlog task held for the captain, and the task id is the identity every surface and channel uses.
-`bin/fm-captain-hold.sh` is the only lifecycle command layered on that primitive.
+`bin/jg-captain-hold.sh` is the only lifecycle command layered on that primitive.
 The command addresses the active home's configured data directory.
 As a result, the existing backlog remains the only durable work database, and a Squad Lead-owned captain call stays in the Squad Lead home.
 It never reads report bodies, review artifacts, terminal output, or chat.
@@ -66,7 +66,7 @@ Repeat and edge cases:
 - Before the backend hold runs, `--origin` records the origin the call is held for on its own `Captain hold origin:` body line, which `complete` and `verify` check using backend identities rather than alias spellings.
   If that write fails, the backend hold is not attempted.
 - The reason may contain parentheses, semicolons, quotes, and line breaks.
-  [`bin/fm-hold-reason-lib.sh`](../bin/fm-hold-reason-lib.sh) owns the storage encoding and compatibility rules; [`bin/fm-tasks-axi.sh --help`](../bin/fm-tasks-axi.sh) owns the public read commands and output contract.
+  [`bin/jg-hold-reason-lib.sh`](../bin/jg-hold-reason-lib.sh) owns the storage encoding and compatibility rules; [`bin/jg-tasks-axi.sh --help`](../bin/jg-tasks-axi.sh) owns the public read commands and output contract.
 
 ### Answering a call (`answer`)
 
@@ -116,7 +116,7 @@ An entry with no recorded origin, such as a hold made before origins were record
 
 With a non-empty inventory, `complete` appends a `captain-held [key=<key>]` transfer event for every still-open keyed status decision.
 The event names the reviewed inventory.
-`bin/fm-classify-lib.sh` recognizes it as closing the live status copy without claiming that the captain has answered it.
+`bin/jg-classify-lib.sh` recognizes it as closing the live status copy without claiming that the captain has answered it.
 
 ### Checking before Recon teardown (`verify`)
 
@@ -135,7 +135,7 @@ The `--force` path remains the explicit captain-approved discard escape hatch.
 The policy prefers holding the very work item a question gates.
 So the backlog row a finished task's cleanup is about to close is routinely the captain's own call.
 
-`bin/fm-teardown.sh` therefore asks the read-only `open` subcommand before its automatic close:
+`bin/jg-teardown.sh` therefore asks the read-only `open` subcommand before its automatic close:
 
 | `open` exit | Meaning | What teardown does |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The refusal names the record and the validation reason, so the captain can repai
 
 `--force` does not lift the deferral, because it authorizes discarding unlanded work, never the captain's question.
 Only `answer` with the captain's words or evidence-backed `reconcile close` resolves the call, by either closing the question or releasing the gated work.
-`bin/fm-backlog-transition-lib.sh` owns the transition and its record, and `bin/fm-captain-hold.sh --help` owns the predicate's contract.
+`bin/jg-backlog-transition-lib.sh` owns the transition and its record, and `bin/jg-captain-hold.sh --help` owns the predicate's contract.
 
 ## Answer-time resolution
 
@@ -224,20 +224,20 @@ An unbound source feeds nothing, so the path is opt-in per source.
 
 Two channels feed that one intake today, and both are ordinary callers rather than special cases.
 
-`bin/fm-send.sh --resolve-key` is the chat channel:
+`bin/jg-send.sh --resolve-key` is the chat channel:
 
 - For a key the status log still owns, that script's header owns the status-log close.
 - A key the status log no longer owns is resolved to a still-open captain-held task and fed as one keyed line.
   The script tries the key as a task id first, then the legacy derived identity.
 
-`bin/fm-procevent.sh` is the captured-result channel:
+`bin/jg-procevent.sh` is the captured-result channel:
 
-- After capture, the runner passes a bound built-in source's result to `bin/fm-procevent-<adapter>.sh answers <result-file>`.
-- The runner pipes whatever that prints into the intake, and acknowledges the result only when the intake exits 0 or 3 (`bin/fm-procevent.sh` owns that rule).
+- After capture, the runner passes a bound built-in source's result to `bin/jg-procevent-<adapter>.sh answers <result-file>`.
+- The runner pipes whatever that prints into the intake, and acknowledges the result only when the intake exits 0 or 3 (`bin/jg-procevent.sh` owns that rule).
 - Any built-in adapter with an `answers` command therefore works.
 - The runner names no adapter, parses no result, and carries no decision rule.
 
-`bin/fm-procevent-lavish.sh answers` is one such built-in adapter command.
+`bin/jg-procevent-lavish.sh answers` is one such built-in adapter command.
 It reads only rows tagged `choice` and relays a card's declared close mode.
 It can never let freeform captain prose forge a task id or a mode.
 
@@ -262,14 +262,14 @@ A reconcile value delivered through chat or any ordinary keyed-answer caller the
 ### How a board selection creates a request
 
 Board request creation uses a separate captured-source seam.
-The board emits `fm-bearings-answer.v1` context with the slug-shaped selected option and the freeform note in separate fields.
+The board emits `jg-bearings-answer.v1` context with the slug-shaped selected option and the freeform note in separate fields.
 Annotating Reconcile therefore cannot turn it into an ordinary answer value.
 
 The Lavish adapter splits each capture between two commands:
 
 | Command | What it emits |
 | --- | --- |
-| `bin/fm-procevent-lavish.sh answers` | An exact non-reconcile selection, or a bare note when no option was selected. |
+| `bin/jg-procevent-lavish.sh answers` | An exact non-reconcile selection, or a bare note when no option was selected. |
 | `reconciles` | Only task ids whose structured selection is Reconcile, carrying their notes as request provenance. |
 
 Current rows require the versioned shape and the `choice` tag.
@@ -313,11 +313,11 @@ No path here closes a captain call without either the captain's words through `a
 
 ## Card hygiene: a landed subject is not a live call
 
-`bin/fm-bearings-board.sh build` cross-checks every `decision` card before it publishes and drops stale subjects rather than trusting the composed inventory alone.
+`bin/jg-bearings-board.sh build` cross-checks every `decision` card before it publishes and drops stale subjects rather than trusting the composed inventory alone.
 
 Three checks run, all on exact identity and none on prose:
 
-- The card's key is the captain-held task id, so `bin/fm-captain-hold.sh open --distinguish-absent` is asked whether that task is still an open captain call.
+- The card's key is the captain-held task id, so `bin/jg-captain-hold.sh open --distinguish-absent` is asked whether that task is still an open captain call.
   - Exit 1 means the task is present but closed, or no longer held for the captain, and drops the card.
   - Exit 2 means the answer could not be established, and keeps the card.
   - Exit 3 means the task is absent from the main backlog, which includes a home carrying no backlog file at all, and keeps the card.
@@ -348,7 +348,7 @@ For a main-home call, the reconcile option is the recovery path for whatever sti
 
 ### Fleet snapshot buckets
 
-`bin/fm-fleet-snapshot.sh` parses canonical tasks-axi `(hold: ...)`, `(hold-kind: ...)`, and `(hold-until: ...)` metadata alongside existing backlog fields.
+`bin/jg-fleet-snapshot.sh` parses canonical tasks-axi `(hold: ...)`, `(hold-kind: ...)`, and `(hold-until: ...)` metadata alongside existing backlog fields.
 It resolves every repeated `blocked-by:` edge against structured Done records and keeps missing blockers unresolved.
 It then assigns every captain hold exactly one `hold_bucket`.
 The bucket is decided only from structured fields: `hold_kind`, `state`, `hold_until`, `unresolved_blocker_ids`, and the machine-written hold-set timestamp.
@@ -361,7 +361,7 @@ The first matching row in this order decides the bucket:
 | --- | --- | --- |
 | 1 | `blocked` | Any blocker is unresolved. |
 | 2 | `dated` | `hold_until` is in the future. |
-| 3 | `aged` | An undated hold's hold-set timestamp is at least `FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS` old (default 14, floored elapsed days). |
+| 3 | `aged` | An undated hold's hold-set timestamp is at least `JG_SNAPSHOT_UNDATED_HOLD_AGE_DAYS` old (default 14, floored elapsed days). |
 | 4 | `live` | None of the above. |
 
 No captain hold can fall through them and none can match two, which is what keeps a hold from vanishing from every view.
@@ -376,7 +376,7 @@ It preserves every captain hold in the bounded queued inventory of the owning ho
 
 ### Bearings placement
 
-`bin/fm-bearings-snapshot.sh` places each captain hold by its `hold_bucket` and inspects no prose of its own.
+`bin/jg-bearings-snapshot.sh` places each captain hold by its `hold_bucket` and inspects no prose of its own.
 
 | `hold_bucket` | Where the hold appears |
 | --- | --- |
@@ -393,14 +393,14 @@ Three accepted limits remain deliberate:
 
 - A remote or Squad Lead hold retains the producer home's age and aging decision from the summary's capture time and threshold rather than being recomputed by the parent.
 - A rare concurrent answer-close and re-hold race can leave the newly re-held task without its age basis.
-- Cross-home summaries remain bounded by `FM_SNAPSHOT_SECONDMATE_DECISIONS` and `FM_SNAPSHOT_SECONDMATE_QUEUED`.
+- Cross-home summaries remain bounded by `JG_SNAPSHOT_SQUAD_LEAD_DECISIONS` and `JG_SNAPSHOT_SQUAD_LEAD_QUEUED`.
   A remote deferred hold beyond those bounds is not exported, so it can be neither gated nor revealed.
 
 Re-holding through the wrapper with `--until` remains the durable fix rather than relying on the projection safety net.
 
 ### Recently Landed notes
 
-[`bin/fm-landed-lib.sh`](../bin/fm-landed-lib.sh) owns Recently Landed's shared selection and artifact-display compatibility rules.
+[`bin/jg-landed-lib.sh`](../bin/jg-landed-lib.sh) owns Recently Landed's shared selection and artifact-display compatibility rules.
 A local-only landing's note is written by `tasks-axi done --note` as the last of the row's indented body lines rather than into the row title.
 The snapshot therefore reads that final line as the note as well as parsing the title, and the landing is published carrying its recorded note.
 A body that carries a captain resolution record is the captain's own prose and is never mined for that note, so a decision worded `local main` does not become a delivery artifact.
@@ -418,7 +418,7 @@ The away-posture restriction on queued merges and its residual limits are owned 
 ## Record divergence
 
 A captain call can have two records, and closing one does not close the other.
-The status-log fold is the open-decision set `bin/fm-classify-lib.sh` reads from a task's status log, where a keyed `needs-decision` or `blocked` line opens a decision.
+The status-log fold is the open-decision set `bin/jg-classify-lib.sh` reads from a task's status log, where a keyed `needs-decision` or `blocked` line opens a decision.
 A `resolved [key=...]` line closes the status-log fold.
 The structured captain-held task closes only through `answer`.
 
@@ -427,8 +427,8 @@ The fold went quiet, the durable record kept saying the captain owed an answer, 
 
 ### What the guard reports
 
-`bin/fm-captain-hold.sh diverged` is the read-only report of that state.
-`bin/fm-wake-drain.sh` prints it as a bounded `RECORD DIVERGENCE` section beside OPEN DECISIONS on every drain.
+`bin/jg-captain-hold.sh diverged` is the read-only report of that state.
+`bin/jg-wake-drain.sh` prints it as a bounded `RECORD DIVERGENCE` section beside OPEN DECISIONS on every drain.
 
 It flags exactly one condition, where all of these hold:
 
@@ -444,7 +444,7 @@ A captain call closed wrongly leaves review entirely, so both reconciliation dir
 Three states are deliberately not divergence:
 
 - A `captain-held [key=...]` close is the verified transfer `complete` writes, so the structured row staying open behind it is correct.
-  `bin/fm-classify-lib.sh`'s `status_key_closing_verb` is what keeps the two closing verbs distinguishable.
+  `bin/jg-classify-lib.sh`'s `status_key_closing_verb` is what keeps the two closing verbs distinguishable.
 - A still-open keyed status decision belongs to the OPEN DECISIONS fold.
 - The absence of a routed work item is legitimate rather than incomplete.
   When the decision is the deliverable, there is nothing to route, so routed work is no part of the test.
@@ -459,7 +459,7 @@ If tasks-axi is unavailable or its listing cannot be parsed, the guard cannot re
 ## Compatibility with pre-collapse installs
 
 The collapse is the change that made a decision an ordinary captain-held task whose key is its task id.
-Older installs created derived `<origin>-decision-<key>` identities through the retired `bin/fm-decision-hold.sh`.
+Older installs created derived `<origin>-decision-<key>` identities through the retired `bin/jg-decision-hold.sh`.
 Those rows are already plain task ids, so they render, answer, verify, and close through the collapsed surfaces with no data migration.
 
 Three legacy inputs are resolved in place:
@@ -471,7 +471,7 @@ Three legacy inputs are resolved in place:
 ### Legacy ids on the Beads backend
 
 On the Beads backend, an attested legacy markdown id that resolves to no task is accepted through the row the markdown-to-beads hold migration produced.
-That row is found by the authoritative evidence first: a row whose notes carry the marker line `migrated from data/backlog.md id <legacy id>`, either alone or followed by ` on <date>` as fm-hold-migration wrote it on 2026-09-04.
+That row is found by the authoritative evidence first: a row whose notes carry the marker line `migrated from data/backlog.md id <legacy id>`, either alone or followed by ` on <date>` as jg-hold-migration wrote it on 2026-09-04.
 
 Only when no row carries that marker line is the legacy id tried under the configured beads prefix.
 That name-only guess is accepted solely for a single row still held for the captain.
@@ -480,16 +480,16 @@ Because that acceptance rests on a name rather than on evidence, `complete` name
 
 A markdown home keeps its legacy rows verbatim, so its resolution is unchanged.
 
-### The `fm-decision-hold.sh` shim
+### The `jg-decision-hold.sh` shim
 
-`bin/fm-decision-hold.sh` itself remains for one release as a thin command-mapping shim over `bin/fm-captain-hold.sh`.
+`bin/jg-decision-hold.sh` itself remains for one release as a thin command-mapping shim over `bin/jg-captain-hold.sh`.
 In-flight work briefed before the collapse therefore keeps working, and the shim's header owns the exact mapping.
 The shim recognizes an exact replay of a pre-collapse routed resolution by its historical answer digest and routed ids.
 It then finishes any still-recorded dependency-edge cleanup without rewriting the old decision text.
 
 ## Verification record
 
-The focused end-to-end regression suite is `tests/fm-captain-hold-lifecycle.test.sh`, using only synthetic identities and decision text.
+The focused end-to-end regression suite is `tests/jg-captain-hold-lifecycle.test.sh`, using only synthetic identities and decision text.
 It proves the behaviors below.
 The suite does not test the accepted merge-to-cleanup re-hold window or asynchronous queued-forge landing because those events occur after the locally serialized merge command has returned.
 
@@ -525,7 +525,7 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
 - Non-forced Recon teardown always requires the durable inventory verification.
-- The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call. The backlog wrapper's own `[captain-ask]` refusal reads the same record through `answered` ([`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh) owns it).
+- The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call. The backlog wrapper's own `[captain-ask]` refusal reads the same record through `answered` ([`bin/jg-tasks-axi.sh`](../bin/jg-tasks-axi.sh) owns it).
 
 ### Answers, stamps, and deferral
 
@@ -607,7 +607,7 @@ The captured-source coverage proves:
 
 ### Board suite
 
-The board's half is pinned in `tests/fm-bearings-board.test.sh`:
+The board's half is pinned in `tests/jg-bearings-board.test.sh`:
 
 - Every published decision card carries exactly one reconcile option.
 - Authored options reserve that value across every card type.
@@ -619,12 +619,12 @@ The board's half is pinned in `tests/fm-bearings-board.test.sh`:
 - A rebuild of an already-armed board with no live listener starts one.
 
 That suite drives its Lavish session through a protocol-shaped stub.
-`tests/fm-bearings-board-lavish-live-e2e.test.sh` is the default-on capability guard for the installed provider, and [`verification/process-event-sources.md`](verification/process-event-sources.md) owns the version-scoped evidence.
-[`verification/process-event-sources.md`](verification/process-event-sources.md) owns the process-event ownership and reclamation evidence exercised by `tests/fm-procevent.test.sh`.
+`tests/jg-bearings-board-lavish-live-e2e.test.sh` is the default-on capability guard for the installed provider, and [`verification/process-event-sources.md`](verification/process-event-sources.md) owns the version-scoped evidence.
+[`verification/process-event-sources.md`](verification/process-event-sources.md) owns the process-event ownership and reclamation evidence exercised by `tests/jg-procevent.test.sh`.
 
 ### Classifier and projection suites
 
-`tests/fm-classify-decision-key.test.sh` pins `status_key_closing_verb` itself.
+`tests/jg-classify-decision-key.test.sh` pins `status_key_closing_verb` itself.
 It separates a resolution from the durable-transfer close and from a still-open key.
 It reports the last real transition across re-openings and both key positions, and treats a prose mention as no transition.
 
@@ -632,16 +632,16 @@ Projection regressions live in two suites:
 
 | Suite | What it covers |
 | --- | --- |
-| `tests/fm-fleet-snapshot-view.test.sh` | The total structured-only bucket classifier, hold-until parsing, kind-independent captain actionability, undated-hold aging, and title stripping. |
-| `tests/fm-bearings-snapshot.test.sh` | Default and expanded decision-bucket membership, deferral explanations, blocker-overflow disclosure, working-hold dual surfaces, remote-summary schema invalidation, exact leading-kind inference, artifact-kind mismatch and answered-question exclusion, kind-bearing and kindless local-only landings publishing their recorded note, and Recon report precedence over competing pull-request links. |
+| `tests/jg-fleet-snapshot-view.test.sh` | The total structured-only bucket classifier, hold-until parsing, kind-independent captain actionability, undated-hold aging, and title stripping. |
+| `tests/jg-bearings-snapshot.test.sh` | Default and expanded decision-bucket membership, deferral explanations, blocker-overflow disclosure, working-hold dual surfaces, remote-summary schema invalidation, exact leading-kind inference, artifact-kind mismatch and answered-question exclusion, kind-bearing and kindless local-only landings publishing their recorded note, and Recon report precedence over competing pull-request links. |
 
 ### Refreshing this record
 
 The exact commands and their summarized outputs are recorded in the shipping PR's evidence.
 To refresh this record, run:
 
-- The four suites above: `tests/fm-captain-hold-lifecycle.test.sh`, `tests/fm-classify-decision-key.test.sh`, `tests/fm-fleet-snapshot-view.test.sh`, and `tests/fm-bearings-snapshot.test.sh`.
-- `tests/fm-send-resolve-key.test.sh`, `tests/fm-bearings-board.test.sh`, and `tests/fm-procevent.test.sh`.
-- `bin/fm-lint.sh`.
+- The four suites above: `tests/jg-captain-hold-lifecycle.test.sh`, `tests/jg-classify-decision-key.test.sh`, `tests/jg-fleet-snapshot-view.test.sh`, and `tests/jg-bearings-snapshot.test.sh`.
+- `tests/jg-send-resolve-key.test.sh`, `tests/jg-bearings-board.test.sh`, and `tests/jg-procevent.test.sh`.
+- `bin/jg-lint.sh`.
 
-After a lavish-axi upgrade, run `FM_BEARINGS_LAVISH_LIVE=1 tests/fm-bearings-board-lavish-live-e2e.test.sh`.
+After a lavish-axi upgrade, run `JG_BEARINGS_LAVISH_LIVE=1 tests/jg-bearings-board-lavish-live-e2e.test.sh`.

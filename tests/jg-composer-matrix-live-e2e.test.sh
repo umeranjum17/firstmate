@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# tests/jg-composer-matrix-live-e2e.test.sh - the live composer-matrix guard
+# (live-harness-optin family; task jg-composer-thin-adapter-refactor-r1).
+#
+# The shared composer classifier's shape catalogue (bin/jg-composer-lib.sh) is
+# built entirely from vendor-rendered signals, so per
+# .agents/skills/juggernaut-coding-guidelines it must be proven against the
+# REAL harnesses: a stub can only confirm the assumption already written into
+# the stub. This guard launches every INSTALLED verified harness idle in an
+# isolated tmux server and requires the real jg_tmux_composer_state to reach
+# `empty`, failing loudly with the harness name and version. It also proves:
+#   - the strict blank-row posture live: a plain shell pane with a blank
+#     cursor row must classify unknown and defer injection;
+#   - the zellij false-positive regression live (when zellij is installed): a
+#     pane whose content changes for reasons unrelated to submission must NOT
+#     report a delivered send, and a real claude-in-zellij `dump-screen
+#     --ansi` capture must classify empty through the zellij thin adapter;
+#   - the CURSORLESS read of the same real idle pane, which is the read every
+#     non-tmux backend performs and the one a vendor's own footer rows can
+#     break: a harness that renders a statusLine or mode hint below its
+#     composer must never make an idle composer read `pending`, because that
+#     verdict is what skips a steer's doorbell fleet-wide.
+#
+# Run explicitly with JG_COMPOSER_MATRIX_LIVE=1. No prompt is ever submitted
+# to any harness, so no model tokens are spent. An absent harness is reported
+# explicitly and skipped; a run that verified nothing fails rather than
+# passing vacuously. Refresh docs/verification/runtime-backends.md ("Composer
+# classification matrix") from this guard's output after any harness upgrade.
+#
+# Folder trust: harnesses are launched with the repo root as cwd, which the
+# operator's machine has normally already trusted; a trust dialog is a real
+# unreadable-composer state and correctly fails that harness's check.
+set -u
+
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+jg_live_gate opt-in JG_COMPOSER_MATRIX_LIVE tmux
+
+SOCKET="jg-cmx-live-$$"
+SESSION="cmxlive"
+ZELLIJ_SESSION="jg-cmx-live-zj-$$"
+CHECKED=0
+FAILED=0
+
+fail() { printf 'not ok - %s\n' "$1" >&2; cleanup; exit 1; }
+pass() { printf 'ok - %s\n' "$1"; }
+note() { printf '# %s\n' "$1"; }
+
+cleanup() {
+  tmux -L "$SOCKET" kill-server 2>/dev/null || true
+  [ -z "${ZJ_BG:-}" ] || kill "$ZJ_BG" 2>/dev/null || true
+  if command -v zellij >/dev/null 2>&1; then
+    zellij delete-session --force "$ZELLIJ_SESSION" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+# The library under test, driven against the private socket through a PATH
+# shim so its bare `tmux` calls stay isolated from any live fleet.
+SHIM_DIR=$(mktemp -d "${TMPDIR:-/tmp}/jg-cmx-live.XXXXXX")
+REAL_TMUX=$(command -v tmux)
+cat > "$SHIM_DIR/tmux" <<SH
+#!/usr/bin/env bash
+exec "$REAL_TMUX" -L "$SOCKET" "\$@"
+SH
+chmod +x "$SHIM_DIR/tmux"
+PATH="$SHIM_DIR:$PATH"
+# shellcheck source=/dev/null
+. "$ROOT/bin/jg-tmux-lib.sh"
+
+tmux -L "$SOCKET" new-session -d -s "$SESSION" -x 220 -y 50 -c "$ROOT"
+
+harness_version() {  # <binary>
+  "$1" --version 2>/dev/null | head -1 || printf 'version-unknown'
+}
+
+check_harness_idle_empty() {  # <name> <launch-cmd...>
+  local name=$1 win="hx-$1" verdict='' i=0 budget=${JG_COMPOSER_MATRIX_LIVE_POLLS:-45} version dismissed=0 startup_screen
+  shift
+  version=$(harness_version "$1")
+  tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win" -c "$ROOT" -- "$@" \
+    || fail "$name ($version): could not launch in the isolated tmux server"
+  while [ "$i" -lt "$budget" ]; do
+    verdict=$(jg_tmux_composer_state "$SESSION:$win")
+    [ "$verdict" = empty ] && break
+    i=$((i + 1))
+    # A fresh harness may park on a vendor update-available modal (observed
+    # live: codex 0.146.0 and opencode 1.14.46), which the strict classifier
+    # correctly refuses to call a composer. Dismiss it once, mid-budget, with
+    # a single Escape - the one key that submits nothing anywhere and is how
+    # the audit declined the same prompts. Never Enter: on codex's dialog
+    # Enter would RUN the upgrade.
+    if [ "$dismissed" -eq 0 ] && [ "$i" -ge $((budget / 3)) ]; then
+      # Trust prompts also accept Escape, but there it exits the harness and
+      # erases the actionable failure surface. Preserve those prompts; only
+      # dismiss a non-trust startup modal.
+      startup_screen=$(tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$win" 2>/dev/null || true)
+      if ! printf '%s\n' "$startup_screen" | grep -qi 'trust'; then
+        tmux -L "$SOCKET" send-keys -t "$SESSION:$win" Escape 2>/dev/null || true
+      fi
+      dismissed=1
+    fi
+    sleep 1
+  done
+  if [ "$verdict" != empty ]; then
+    printf '# %s pane tail at failure:\n' "$name" >&2
+    tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$win" 2>/dev/null \
+      | grep '[^[:space:]]' | tail -8 | sed 's/^/#   /' >&2
+    FAILED=1
+    printf 'not ok - %s (%s): idle composer never classified empty (last verdict: %s)\n' \
+      "$name" "$version" "${verdict:-unreadable}" >&2
+  else
+    CHECKED=$((CHECKED + 1))
+    pass "$name ($version): real idle composer classifies empty"
+    check_harness_idle_cursorless "$name" "$version" "$SESSION:$win"
+  fi
+  tmux -L "$SOCKET" kill-window -t "$SESSION:$win" 2>/dev/null || true
+}
+
+# The same proven-idle pane read the way every cursorless backend reads it
+# (herdr, zellij, cmux, orca): no #{cursor_y} to anchor the shape, so the
+# bottom-most shape on the screen wins. A vendor footer drawn BELOW the
+# composer - a statusLine, a permission-mode hint - lives exactly where that
+# rule looks, and a footer row opening with an agent prompt glyph used to be
+# selected as a composer holding typed text, skipping every doorbell to that
+# worker (live regression, claude 2.x on herdr 0.8.0, 2026-09-20).
+# `pending` is the one verdict that blocks a steer, so that is what this
+# refuses; `unknown` stays legitimate for a shape only identity can prove.
+check_harness_idle_cursorless() {  # <name> <version> <target>
+  local name=$1 version=$2 target=$3 pane caps verdict identity
+  pane=$(jg_tmux_composer_capture "$target") || {
+    FAILED=1
+    printf 'not ok - %s (%s): cursorless re-read could not capture the proven-idle pane\n' \
+      "$name" "$version" >&2
+    return 0
+  }
+  caps=$(printf 'styled=1\ncursor=0\nidentity=1\nrows=0')
+  verdict=$(jg_composer_classify_screen "$caps" "$pane")
+  if [ "$verdict" = need-identity ]; then
+    if ! identity=$(jg_tmux_composer_identity "$target") || [ -z "$identity" ]; then
+      identity='probe-absent'
+    fi
+    verdict=$(jg_composer_classify_screen "$caps" "$pane" '' "$identity")
+    [ "$verdict" != need-identity ] || verdict=unknown
+  fi
+  if [ "$verdict" = pending ]; then
+    printf '# %s cursorless pane tail:\n' "$name" >&2
+    tmux -L "$SOCKET" capture-pane -p -t "$target" 2>/dev/null \
+      | grep '[^[:space:]]' | tail -8 | sed 's/^/#   /' >&2
+    FAILED=1
+    printf 'not ok - %s (%s): a proven-idle composer read cursorless as pending; every steer to this harness would skip its doorbell\n' \
+      "$name" "$version" >&2
+  else
+    CHECKED=$((CHECKED + 1))
+    pass "$name ($version): the same idle pane read cursorless is not pending (verdict: $verdict)"
+  fi
+}
+
+# --- 1. Every installed verified harness must reach a proven-empty composer --
+for h in claude codex opencode pi grok kimi muse; do
+  if command -v "$h" >/dev/null 2>&1; then
+    check_harness_idle_empty "$h" "$h"
+  else
+    note "harness absent, not verified here: $h"
+  fi
+done
+
+# --- 1b. The WRAPPED OpenCode status footer, live ---------------------------
+# A long worktree path (the fleet norm) wraps the right-aligned status row at
+# the pane width: the cost cell truncates to a bare `$` abutting the palette
+# hint and the trailing `commands` wraps beside the directory's continuation
+# fragment (jg-opencode-composer-err, 2026-10-09). The pre-fix pattern matched
+# NEITHER row, so an idle, empty composer read `unknown` and jg-control refused
+# every OpenCode worker. Launch opencode in a narrow window at a long cwd and
+# require its idle composer to read `empty` cursorless.
+if command -v opencode >/dev/null 2>&1; then
+  wrap_root=$(mktemp -d "${TMPDIR:-/tmp}/jg-cmx-wrap.XXXXXX")
+  wrap_cwd="$wrap_root/a-really-quite-long-opencode-project-directory-name"
+  mkdir -p "$wrap_cwd"
+  wrap_win=wrap-opencode
+  wrap_version=$(harness_version opencode)
+  tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$wrap_win" -c "$wrap_cwd" -- opencode \
+    || fail "opencode ($wrap_version): wrapped-footer check could not launch"
+  tmux -L "$SOCKET" resize-window -t "$SESSION:$wrap_win" -x 90 -y 45 2>/dev/null || true
+  wrap_verdict=''; wrap_i=0; wrap_budget=${JG_COMPOSER_MATRIX_LIVE_POLLS:-45}; wrap_dismissed=0
+  while [ "$wrap_i" -lt "$wrap_budget" ]; do
+    wrap_verdict=$(jg_tmux_composer_state "$SESSION:$wrap_win")
+    [ "$wrap_verdict" = empty ] && break
+    wrap_i=$((wrap_i + 1))
+    if [ "$wrap_dismissed" -eq 0 ] && [ "$wrap_i" -ge $((wrap_budget / 3)) ]; then
+      wrap_screen=$(tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$wrap_win" 2>/dev/null || true)
+      if ! printf '%s\n' "$wrap_screen" | grep -qi 'trust'; then
+        tmux -L "$SOCKET" send-keys -t "$SESSION:$wrap_win" Escape 2>/dev/null || true
+      fi
+      wrap_dismissed=1
+    fi
+    sleep 1
+  done
+  if [ "$wrap_verdict" = empty ]; then
+    CHECKED=$((CHECKED + 1))
+    pass "opencode ($wrap_version): wrapped status footer idle composer classifies empty"
+    check_harness_idle_cursorless "opencode-wrap" "$wrap_version" "$SESSION:$wrap_win"
+  else
+    printf '# opencode wrapped-footer pane tail at failure:\n' >&2
+    tmux -L "$SOCKET" capture-pane -p -t "$SESSION:$wrap_win" 2>/dev/null \
+      | grep '[^[:space:]]' | tail -8 | sed 's/^/#   /' >&2
+    FAILED=1
+    printf 'not ok - opencode (%s): wrapped status footer idle composer never classified empty (last verdict: %s)\n' \
+      "$wrap_version" "${wrap_verdict:-unreadable}" >&2
+  fi
+  tmux -L "$SOCKET" kill-window -t "$SESSION:$wrap_win" 2>/dev/null || true
+  rm -rf "$wrap_root"
+else
+  note "harness absent, not verified here: opencode (wrapped-footer check not exercised)"
+fi
+
+# --- 2. The strict blank-row posture, live ----------------------------------
+# A plain shell pane parked on a blank line between two rules (the audit's
+# sleep-pane counterexample): the permissive rule read this empty; strict must
+# defer.
+tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n strictblank -c "$ROOT" \
+  -- bash -c 'printf "────────────────────────\n\n"; printf "\033[A"; exec sleep 300'
+sleep 1
+verdict=$(jg_tmux_composer_state "$SESSION:strictblank")
+if [ "$verdict" = unknown ]; then
+  if jg_pane_input_pending "$SESSION:strictblank"; then
+    CHECKED=$((CHECKED + 1))
+    pass "strict posture live: a blank shell row classifies unknown and injection defers"
+  else
+    FAILED=1
+    printf 'not ok - strict posture live: pane_input_pending did not defer on an unknown verdict\n' >&2
+  fi
+else
+  FAILED=1
+  printf 'not ok - strict posture live: blank shell row classified %s, expected unknown\n' "${verdict:-unreadable}" >&2
+fi
+tmux -L "$SOCKET" kill-window -t "$SESSION:strictblank" 2>/dev/null || true
+
+# --- 3. zellij: real classifier + the false-positive regression -------------
+if command -v zellij >/dev/null 2>&1; then
+  zj_version=$(zellij --version 2>/dev/null | head -1)
+  [ -n "$zj_version" ] || zj_version='version-unknown'
+  export JG_ROOT_OVERRIDE="$ROOT"
+  # shellcheck source=/dev/null
+  . "$ROOT/bin/jg-backend.sh"
+  jg_backend_source zellij 2>/dev/null \
+    || fail "zellij ($zj_version): adapter source failed"
+
+  zellij delete-session --force "$ZELLIJ_SESSION" >/dev/null 2>&1 || true
+  zellij --session "$ZELLIJ_SESSION" options --default-shell bash >/dev/null 2>&1 &
+  ZJ_BG=$!
+  i=0
+  while [ "$i" -lt 10 ] && ! jg_backend_zellij_session_exists "$ZELLIJ_SESSION"; do
+    i=$((i + 1))
+    sleep 0.5
+  done
+  jg_backend_zellij_session_exists "$ZELLIJ_SESSION" \
+    || fail "zellij ($zj_version): probe session setup failed"
+  panes=$(jg_backend_zellij_cli "$ZELLIJ_SESSION" action list-panes --json 2>/dev/null) \
+    || fail "zellij ($zj_version): pane discovery command failed"
+  pane_id=$(printf '%s' "$panes" | jq -r '.[]? | select(.is_plugin == false) | .id' 2>/dev/null | head -1)
+  case "$pane_id" in
+    ''|*[!0-9]*) fail "zellij ($zj_version): pane discovery returned no terminal pane" ;;
+  esac
+  target="$ZELLIJ_SESSION:$pane_id"
+
+  jg_backend_zellij_send_literal "$target" 'while sleep 1; do date; done' \
+    || fail "zellij ($zj_version): clock probe setup write failed"
+  jg_backend_zellij_send_key "$target" Enter \
+    || fail "zellij ($zj_version): clock probe setup submit failed"
+  sleep 2
+  probe='# audit-probe-never-submitted'
+  jg_backend_zellij_send_literal "$target" "$probe" \
+    || fail "zellij ($zj_version): false-positive probe write failed"
+  sleep 0.5
+  probe_capture=$(jg_backend_zellij_capture "$target" 40 2>/dev/null) \
+    || fail "zellij ($zj_version): false-positive probe capture failed"
+  case "$probe_capture" in
+    *"$probe"*) ;;
+    *) fail "zellij ($zj_version): false-positive probe text was not visible after typing" ;;
+  esac
+  verdict=$(jg_composer_submit_retry_core jg_backend_zellij_send_key jg_backend_zellij_composer_state \
+    "$target" 2 0.5 2>/dev/null)
+  case "$verdict" in
+    pending|unknown)
+      CHECKED=$((CHECKED + 1))
+      pass "zellij ($zj_version): unrelated pane change never confirms delivery (verdict: $verdict)"
+      ;;
+    send-failed)
+      FAILED=1
+      printf 'not ok - zellij (%s): false-positive probe text was not typed (send-failed)\n' "$zj_version" >&2
+      ;;
+    *)
+      FAILED=1
+      printf 'not ok - zellij (%s): false-positive probe returned unexpected verdict %s (expected pending or unknown)\n' \
+        "$zj_version" "${verdict:-none}" >&2
+      ;;
+  esac
+  kill "$ZJ_BG" 2>/dev/null || true
+  ZJ_BG=
+  zellij delete-session --force "$ZELLIJ_SESSION" >/dev/null 2>&1 || true
+else
+  note "harness absent, not verified here: zellij (false-positive regression not exercised)"
+fi
+
+# --- refuse a vacuous pass ---------------------------------------------------
+[ "$FAILED" -eq 0 ] || fail "live composer-matrix guard observed failures above"
+[ "$CHECKED" -gt 0 ] || fail "live composer-matrix guard verified nothing (no harness installed?); refusing a vacuous pass"
+pass "live composer-matrix guard verified $CHECKED live surface(s)"

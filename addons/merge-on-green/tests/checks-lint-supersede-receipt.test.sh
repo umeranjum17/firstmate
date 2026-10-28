@@ -4,10 +4,10 @@
 # a local report file in place of a PR (no gh, no network). A run that still fails must keep reading FAIL.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P) # addons/
-LINT=$ROOT/merge-on-green/fm-checks-lint.sh
+LINT=$ROOT/merge-on-green/jg-checks-lint.sh
 d=$(mktemp -d)
 trap 'rm -rf -- "$d"' EXIT
-export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d FM_HOME=$d/fm FM_ADDONS_DIR=$ROOT
+export HOME=$d/home XDG_DATA_HOME=$d/xdg TMPDIR=$d JG_HOME=$d/fm JG_ADDONS_DIR=$ROOT
 mkdir -p "$HOME" "$XDG_DATA_HOME" "$d/fm/bin" "$d/fm/state" "$d/fm/data/lane-x/evidence" "$d/wt"
 fails=0
 bad() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
@@ -29,15 +29,15 @@ report() {
 }
 lint() { # lint <evidence line>: run the lane's lint, print its output and return its status
   report "$1"
-  FM_HOME=$FM_HOME "$LINT" "$d/fm/data/lane-x/report.md" "$d/fm/data/lane-x" 2>&1
+  JG_HOME=$JG_HOME "$LINT" "$d/fm/data/lane-x/report.md" "$d/fm/data/lane-x" 2>&1
 }
 verdict_of() { jq -r '.verdict // "none"' "$d/fm/state/lane-x.run-receipt.json" 2>/dev/null || echo none; }
 merges() { # the merge path's own acceptance of the lane's receipt for this candidate: 0 only for a PASS at this head
   (
     set -u
     # shellcheck source=/dev/null
-    . "$d/fm/bin/fm-dod-lib.sh"
-    fm_dod_receipt_accept "$d/fm/state" lane-x "$d/fm/state/lane-x.meta" "$head"
+    . "$d/fm/bin/jg-dod-lib.sh"
+    jg_dod_receipt_accept "$d/fm/state" lane-x "$d/fm/state/lane-x.meta" "$head"
   )
 }
 newest() { awk -F'\t' '{ if ($4 == "pass") p = 1; last = $4 } END { printf "%s/%s", (p ? "pass" : "none"), last }' "$d/fm/data/checks-gate.log"; }

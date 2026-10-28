@@ -1,5 +1,5 @@
 ---
-name: firstmate-addons-owner-rules
+name: juggernaut-addons-owner-rules
 description: >-
   Use before writing a lane brief or merging a lane, and when a brief or merge is refused with an "owner-rules:" line.
   States the brief-time owner, hierarchy and risk rules and the one-step fix for each refusal.
@@ -12,7 +12,7 @@ Brief-time owner, hierarchy and risk rules are enforced by the fleet, not by pro
 
 ## Rule 00: every lane names the owner ask it serves
 
-The backlog item for the lane id (`data/backlog.md`) must have a title starting `[captain-ask]`, or its title or body must name a `MainNNN` order. Ship and scout lanes both need one; secondmate charters do not.
+The backlog item for the lane id (`data/backlog.md`) must have a title starting `[captain-ask]`, or its title or body must name a `MainNNN` order. Ship and scout lanes both need one; squad lead charters do not.
 
 Refusal at brief time (`$id` is the task id):
 
@@ -26,7 +26,7 @@ Fix: retitle the item `[captain-ask] ...` or add the `MainNNN` order to its body
 
 Every non-scout lane item whose title does not start `[captain-ask]` needs one `parent:` body line naming an existing backlog item, or the exact value `upkeep` for true upkeep.
 The named item may be an epic or a ticket under an epic; owner ask items are epic roots.
-Secondmate charters and scouts are exempt from this hierarchy check.
+Squad Lead charters and scouts are exempt from this hierarchy check.
 
 Refusal at brief time (`$id` is the task id):
 
@@ -35,11 +35,11 @@ owner-rules: no valid parent: add parent: <backlog item id> or parent: upkeep to
 ```
 
 Fix: add `parent: <backlog item id>` or `parent: upkeep` to the item's body, then brief again.
-Run `bin/fm-owner-rules-tree.sh <backlog-file>` to inspect parent chains and invalid parent references.
+Run `bin/jg-owner-rules-tree.sh <backlog-file>` to inspect parent chains and invalid parent references.
 
 ## Rule 13: direct-PR plus a done-done check is the default route
 
-`--mode no-mistakes` is only for an npm/store release, sign-in/keys/payment/security code, a data migration, a large change (new subsystem or about 400+ changed lines), shared protocol/crypto, or any PR to the Firstmate fork (umeranjum17/firstmate), whose required check "PR must be raised via no-mistakes" demands it. Everything else ships direct-PR, and the real user journey is checked (the done-done check) with its evidence on the sign-off Evidence tab.
+`--mode no-mistakes` is only for an npm/store release, sign-in/keys/payment/security code, a data migration, a large change (new subsystem or about 400+ changed lines), shared protocol/crypto, or any PR to the Juggernaut fork (umeranjum17/juggernaut), whose required check "PR must be raised via no-mistakes" demands it. Everything else ships direct-PR, and the real user journey is checked (the done-done check) with its evidence on the sign-off Evidence tab.
 
 Refusal at brief time for `--mode no-mistakes`:
 
@@ -64,7 +64,7 @@ The gate opens with one line saying so.
 Refusal (`$src` is the PR URL, `$3` the merge head) when checks-lint has no PASS row for the PR head in `data/checks-gate.log`:
 
 ```
-owner-rules: no checks-lint PASS for $src at $3; run FM_HOME=$FM_HOME <XDG_DATA_HOME>/fm-merge-on-green/checks-lint.sh $src $FM_HOME/data/<id> then merge again
+owner-rules: no checks-lint PASS for $src at $3; run JG_HOME=$JG_HOME <XDG_DATA_HOME>/jg-merge-on-green/checks-lint.sh $src $JG_HOME/data/<id> then merge again
 ```
 
 Fix: run that command (it logs the row), then merge again.
@@ -93,7 +93,7 @@ Fix: make the item's line exactly `design: required` or `design: none`, then bri
 No add-on installs skills, so link this folder into the home's skills by hand:
 
 ```
-ln -s <firstmate-addons>/owner-rules/skill <fm-home>/.agents/skills/firstmate-addons-owner-rules
+ln -s <juggernaut-addons>/owner-rules/skill <jg-home>/.agents/skills/juggernaut-addons-owner-rules
 ```
 
-`owner-rules/install.sh <fm-home>` turns the refusals on; the skill is only the reading for the leads.
+`owner-rules/install.sh <jg-home>` turns the refusals on; the skill is only the reading for the leads.

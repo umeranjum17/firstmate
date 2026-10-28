@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
 # install-all.sh - the one entry point that installs every add-on in this catalog for one fleet home.
 #
-# Usage: install-all.sh [--dry-run] <fm-home>        (FM_HOME may name the home instead)
+# Usage: install-all.sh [--dry-run] <jg-home>        (JG_HOME may name the home instead)
 #
 # Each add-on keeps its own installer and its own contract: this script only runs them in a working order with the
 # argument shape each documents, and names the add-ons that have no installer instead of inventing one. --dry-run
@@ -12,7 +20,7 @@ set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 dry=0
-home=${FM_HOME:-}
+home=${JG_HOME:-}
 for a in "$@"; do
   case $a in
     --dry-run) dry=1 ;;
@@ -28,23 +36,23 @@ for a in "$@"; do
   esac
 done
 if [ -z "$home" ]; then
-  printf 'install-all: name the home: install-all.sh [--dry-run] <fm-home> (or set FM_HOME)\n' >&2
+  printf 'install-all: name the home: install-all.sh [--dry-run] <jg-home> (or set JG_HOME)\n' >&2
   exit 2
 fi
 if [ ! -d "$home" ]; then
   printf 'install-all: no such home directory: %s\n' "$home" >&2
   exit 2
 fi
-export FM_HOME=$home
+export JG_HOME=$home
 
 # name:kind, in a working order: route-change reads pipeline-quota-failover's wrapper, guards precede anything that
 # chains to them, and the account pool precedes the checks that read it.
 #   plain       install.sh [--dry-run]
-#   home        install.sh [--dry-run] <fm-home>
-#   env         FM_HOME=<fm-home> install.sh [--dry-run]
-#   all         install.sh [--dry-run] --all <fm-home>   (the home and every active local secondmate home it lists)
+#   home        install.sh [--dry-run] <jg-home>
+#   env         JG_HOME=<jg-home> install.sh [--dry-run]
+#   all         install.sh [--dry-run] --all <jg-home>   (the home and every active local squad_lead home it lists)
 #   home-nodry, all-nodry   the same without --dry-run support: printed, not run, under --dry-run
-#   verify      install.sh <fm-home> is that add-on's wiring check, not an install: its incomplete report is printed
+#   verify      install.sh <jg-home> is that add-on's wiring check, not an install: its incomplete report is printed
 #               and never fails this run
 plan=(
   kill-guard:plain

@@ -6,6 +6,15 @@
 # a temp HOME), old-key log-only when the file is rotated (no wake even on count
 # jumps), clean-scan reset, and that canary values never reach output or files.
 # Never touches the real OpenRouter key file; never makes a network call.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 bin=${KEY_IN_ENV_BIN:-$here/../key-in-env-check}
@@ -26,14 +35,14 @@ canary=CANARY-$$-$RANDOM-sk-or-v1-deadbeef
 rotated=ROTATED-$$-$RANDOM-sk-or-v1-beefdead
 # Isolated HOME so the check reads only the fixture key file, never the real one.
 export HOME=$work/userhome
-mkdir -p "$HOME/.config/openrouter" "$work/pool/1/firstmate/state" "$work/wt-a" "$work/wt-b"
+mkdir -p "$HOME/.config/openrouter" "$work/pool/1/juggernaut/state" "$work/wt-a" "$work/wt-b"
 printf '%s\n' "$canary" >"$HOME/.config/openrouter/api_key"
-home=$work/pool/1/firstmate
+home=$work/pool/1/juggernaut
 printf 'worktree=%s\nendpoint_task_id=task-a\n' "$work/wt-a" > "$home/state/task-a.meta"
-export FM_HOME=$home FM_KEY_HOMES=$home
+export JG_HOME=$home JG_KEY_HOMES=$home
 
 # Fixture trees run under setsid with an empty environment so nothing real (the live fleet's
-# keys, the test shell's own parents) is picked up; FM_KEY_TREES scopes the scan to them.
+# keys, the test shell's own parents) is picked up; JG_KEY_TREES scopes the scan to them.
 # tree A: a parent holding the key that runs a child worker in the task worktree (key inherited).
 # tree B: a worker with no key.
 root() { # root <pidfile> <cwd> <env assignment or -> <exec command...>
@@ -48,7 +57,7 @@ root() { # root <pidfile> <cwd> <env assignment or -> <exec command...>
 root "$work/a.pid" "$work/wt-a" "OPENROUTER_API_KEY=$canary" bash -c 'for _ in $(seq 49); do sleep 300 & done; wait'
 root "$work/b.pid" "$work/wt-b" - sleep 300
 sleep 1
-export FM_KEY_TREES=${pids[0]},${pids[1]}
+export JG_KEY_TREES=${pids[0]},${pids[1]}
 child=$(pgrep -P "${pids[0]}" sleep | head -n 1)
 
 run() { "$bin" >"$work/out" 2>"$work/err"; }
@@ -73,20 +82,20 @@ run
 # A 10% process increase is quiet, even though the individual process set changed.
 # shellcheck disable=SC2016 # the loop runs in the fixture process shell
 root "$work/c.pid" "$work/wt-b" "OPENROUTER_API_KEY=$canary" bash -c 'for _ in $(seq 4); do sleep 300 & done; wait'
-export FM_KEY_TREES=$FM_KEY_TREES,${pids[2]}
+export JG_KEY_TREES=$JG_KEY_TREES,${pids[2]}
 run
 [ ! -s "$work/out" ] && ok "exact 10% process increase stays silent" || no "10% process increase woke"
 
 # A 26% increase over the last alerted count wakes, even with the same key name.
 # shellcheck disable=SC2016 # the loop runs in the fixture process shell
 root "$work/d.pid" "$work/wt-b" "OPENROUTER_API_KEY=$canary" bash -c 'for _ in $(seq 7); do sleep 300 & done; wait'
-export FM_KEY_TREES=$FM_KEY_TREES,${pids[3]}
+export JG_KEY_TREES=$JG_KEY_TREES,${pids[3]}
 run
 grep -q "key-in-env: " "$work/out" && ok "exact 26% process increase wakes" || no "26% process increase stayed silent"
 
 # Forced current key: a newly appearing key name while the env value still matches the file wakes once.
 root "$work/e.pid" "$work/wt-b" "ANTHROPIC_API_KEY=$canary" sleep 302
-export FM_KEY_TREES=$FM_KEY_TREES,${pids[4]}
+export JG_KEY_TREES=$JG_KEY_TREES,${pids[4]}
 run
 grep -q "key-in-env: " "$work/out" && ok "forced current: new key name wakes" || no "forced current: new key name stayed silent"
 
@@ -100,14 +109,14 @@ if grep -q "key revoked" "$work/out" 2>/dev/null; then no "forced old key: revok
 # Count growth while the env still holds the old key must not wake Main.
 # shellcheck disable=SC2016 # the loop runs in the fixture process shell
 root "$work/f.pid" "$work/wt-b" "OPENROUTER_API_KEY=$canary" bash -c 'for _ in $(seq 40); do sleep 300 & done; wait'
-export FM_KEY_TREES=$FM_KEY_TREES,${pids[5]}
+export JG_KEY_TREES=$JG_KEY_TREES,${pids[5]}
 run
 [ ! -s "$work/out" ] && ok "forced old key: count jump stays silent" || no "forced old key: count jump woke"
 
 # a custom pattern list narrows the match
-FM_KEY_PATTERNS='NOTHING_*' run
+JG_KEY_PATTERNS='NOTHING_*' run
 [ ! -s "$inc" ] && ok "custom pattern list empties the match" || no "custom patterns ignored"
-unset FM_KEY_PATTERNS
+unset JG_KEY_PATTERNS
 
 # A clean scan ends the active finding; restore the file to the env canary so a return wakes.
 printf '%s\n' "$canary" >"$HOME/.config/openrouter/api_key"
