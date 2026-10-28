@@ -51,6 +51,8 @@ export FM_GATE_REFUSE_BYPASS=1
 # FM_TEST_HARNESS harness pin). Normal primary launches do not arm it, so a
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
+# A host-installed task-priority add-on must not change what test fixtures can add.
+export FM_TASK_PRIORITY_CHECK=/nonexistent
 
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
