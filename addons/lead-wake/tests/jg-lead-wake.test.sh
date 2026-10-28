@@ -16,7 +16,7 @@ set -u
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=/dev/null
 . "$here/wake-helpers.sh"
-# shellcheck source=addons/lead-wake/tests/lead-wake-harness.sh
+# shellcheck source=/dev/null
 . "$here/lead-wake-harness.sh"
 # shellcheck disable=SC2034 # WATCH and TMP_ROOT are read by the borrowed fork harness.
 WATCH="$ROOT/bin/jg-watch.sh" DRAIN="$ROOT/bin/jg-wake-drain.sh" TASKS="$ROOT/bin/jg-tasks-axi.sh" TMP_ROOT=$(jg_test_tmproot jg-lead-wake-tests)
