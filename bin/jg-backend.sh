@@ -386,6 +386,23 @@ jg_backend_target_of_meta() {  # <meta-file>
   [ -n "$window" ] && printf '%s' "$window"
 }
 
+# jg_meta_exited_on_purpose: succeeds when <meta-file>'s task has a
+# `jg-control.sh exit` record (state/<id>.exit, an epoch) newer than its
+# spawn_gen epoch, so the agent was stopped deliberately and no spawn or
+# relaunch has superseded that. The record keeps its window= for relaunch and
+# teardown; the watcher uses this to skip a stopped lane's endpoint, which may
+# be dead, instead of treating it as stale on every arm.
+jg_meta_exited_on_purpose() {  # <meta-file>
+  local meta=$1 exited spawn
+  exited=$(head -n 1 "${meta%.meta}.exit" 2>/dev/null)
+  case "$exited" in ''|*[!0-9]*) return 1 ;; esac
+  spawn=$(jg_meta_get "$meta" spawn_gen)
+  spawn=${spawn#s}
+  spawn=${spawn%%.*}
+  case "$spawn" in ''|*[!0-9]*) spawn=0 ;; esac
+  [ "$exited" -gt "$spawn" ]
+}
+
 # jg_backend_validate_task_endpoint: validate a task cleanup record entirely
 # from its durable metadata before any runtime command or cleanup mutation.
 # The validation binds the exact task id, selected backend, target, project,

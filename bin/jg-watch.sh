@@ -986,6 +986,10 @@ recorded_windows() {
   local meta w seen=
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
+    # A lane stopped by a verified `jg-control.sh exit` keeps its window= for
+    # relaunch and teardown, but its endpoint may be dead; watching it would
+    # emit stale on every arm and keep supervision from holding the lock.
+    ! jg_meta_exited_on_purpose "$meta" || continue
     w=$(jg_backend_target_of_meta "$meta")
     [ -n "$w" ] || continue
     case "$seen" in

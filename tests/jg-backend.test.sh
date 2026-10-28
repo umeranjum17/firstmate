@@ -614,6 +614,23 @@ test_backend_validate_spawn_accepts_orca() {
   pass "jg_backend_validate_spawn: all implemented lifecycle backends are spawn-supported"
 }
 
+test_meta_exited_on_purpose() {
+  local dir="$TMP_ROOT/exited" meta before
+  mkdir -p "$dir"
+  meta="$dir/t1.meta"
+  printf 'window=default:w2YN:pP\nworktree=/wt\nbranch=fm/t1\nmode=direct-PR\nyolo=off\nspawn_gen=s1000.1.2\n' > "$meta"
+  before=$(cat "$meta")
+  jg_meta_exited_on_purpose "$meta" && fail "a task with no exit record is not stopped on purpose"
+  printf '1500\n' > "$dir/t1.exit"
+  jg_meta_exited_on_purpose "$meta" || fail "an exit record newer than the spawn must mark the lane stopped on purpose"
+  [ "$(cat "$meta")" = "$before" ] || fail "reading the exit record must leave the task record intact"
+  sed -i 's/^spawn_gen=.*/spawn_gen=s2000.9.9/' "$meta"
+  jg_meta_exited_on_purpose "$meta" && fail "a relaunch newer than the exit record must make the lane watched again"
+  printf 'junk\n' > "$dir/t1.exit"
+  jg_meta_exited_on_purpose "$meta" && fail "an unreadable exit record must not hide a lane"
+  pass "jg_meta_exited_on_purpose: an exit newer than the spawn skips the lane, a relaunch or bad record does not"
+}
+
 test_meta_get_and_backend_of_meta() {
   local meta=$TMP_ROOT/meta-get.meta edge=$TMP_ROOT/meta-get-edge.meta
   jg_write_meta "$meta" "window=juggernaut:jg-x1" "harness=claude"
@@ -1251,6 +1268,7 @@ test_backend_source_shell_portable
 test_backend_source_requires_adapter_file
 test_backend_validate_spawn_accepts_orca
 test_meta_get_and_backend_of_meta
+test_meta_exited_on_purpose
 test_resolve_selector_three_forms
 test_backend_of_selector_matches_explicit_target_meta
 test_send_tmux_contract
