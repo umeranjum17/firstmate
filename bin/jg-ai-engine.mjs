@@ -17,7 +17,8 @@ async function loadApi() {
   const root = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim();
   const require = createRequire(join(root, 'package.json'));
   const accountsUrl = require.resolve('@byokit/accounts');
-  const secretsUrl = require.resolve('@byokit/secrets');
+  // secrets is a dependency of accounts, so on a clean install it sits inside accounts' own node_modules, not the global root.
+  const secretsUrl = createRequire(accountsUrl).resolve('@byokit/secrets');
   return {
     ...(await import(accountsUrl)),
     ...(await import(secretsUrl)),
