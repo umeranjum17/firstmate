@@ -167,9 +167,9 @@ repair_line() {
   fi
   if [ "$AFK" -eq 1 ]; then
     if [ "$AFK_MODE" = quiet ]; then
-      printf '%s\n' 'Quiet mode owns watcher supervision; load /quiet and ensure the daemon is running instead of starting normal supervision directly.'
+      printf '%s\n' 'Quiet mode owns watcher supervision; load /radio-silence and ensure the daemon is running instead of starting normal supervision directly.'
     else
-      printf '%s\n' 'Away mode owns watcher supervision; load /afk and ensure the daemon is running instead of starting normal supervision directly.'
+      printf '%s\n' 'Away mode owns watcher supervision; load /watchover and ensure the daemon is running instead of starting normal supervision directly.'
     fi
     return 0
   fi
@@ -256,9 +256,9 @@ else
 fi
 if [ "$AFK" -eq 1 ]; then
   if [ "$AFK_MODE" = quiet ]; then
-    printf '%s\n' '- Quiet mode: active; load /quiet and keep normal harness supervision paused while the daemon owns the watcher. Ordinary captain chat does NOT exit it - only an explicit /quiet off does.'
+    printf '%s\n' '- Quiet mode: active; load /radio-silence and keep normal harness supervision paused while the daemon owns the watcher. Ordinary captain chat does NOT exit it - only an explicit /radio-silence off does.'
   else
-    printf '%s\n' '- Away mode: active; load /afk and keep normal harness supervision paused while the daemon owns the watcher.'
+    printf '%s\n' '- Away mode: active; load /watchover and keep normal harness supervision paused while the daemon owns the watcher.'
   fi
 else
   printf '%s\n' '- Away/quiet mode: inactive.'

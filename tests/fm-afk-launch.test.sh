@@ -62,7 +62,7 @@ enter_posture() {  # <home>
 }
 
 # ---------------------------------------------------------------------------
-# UNIT 0: /afk is itself the go. `enter` writes the away-posture record in the
+# UNIT 0: /watchover is itself the go. `enter` writes the away-posture record in the
 # same call, with no separate confirmation, and prints the announcement and the
 # read-back after the record exists; on Pi the entry ends there, and every
 # daemon path requires that record.
@@ -434,7 +434,7 @@ unit_mode_refresh_preserves_quiet() {
   rm -rf "$st"
 }
 
-# A live quiet daemon must follow the record when /afk turns it into away;
+# A live quiet daemon must follow the record when /watchover turns it into away;
 # a refresh before that entry must not silently turn quiet into away.
 unit_mode_quiet_daemon_to_away() {
   local command st sleep_pid lock mode rc
@@ -466,16 +466,16 @@ unit_mode_quiet_daemon_to_away() {
     rc=$?
     mode=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)
     if [ "$rc" -ne 0 ] || [ "$mode" != away ]; then
-      fail "$command: /afk did not convert the live quiet record to away (rc=$rc, record=$mode)"
+      fail "$command: /watchover did not convert the live quiet record to away (rc=$rc, record=$mode)"
     fi
     FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
       FM_SUPERVISOR_BACKEND=tmux "$LAUNCH" "$command" >/dev/null 2>&1
     rc=$?
     if [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk")" = away ] \
       && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ]; then
-      pass "$command: /afk over a running quiet daemon refreshes the flag to away"
+      pass "$command: /watchover over a running quiet daemon refreshes the flag to away"
     else
-      fail "$command: /afk record and daemon flag disagree after refresh (rc=$rc)"
+      fail "$command: /watchover record and daemon flag disagree after refresh (rc=$rc)"
     fi
     kill "$sleep_pid" 2>/dev/null || true
     wait "$sleep_pid" 2>/dev/null || true
@@ -1039,7 +1039,7 @@ unit_supervision_host_other_harnesses_run_no_away_daemon() {
   rm -rf "$st"
 }
 
-# An opted-in Claude home for the /quiet units: the verified engine (a stub),
+# An opted-in Claude home for the /radio-silence units: the verified engine (a stub),
 # this shell as the main session's lock holder, and a valid dialog mirror, so
 # the attended supervision host runs. quiet_in <home> runs a command there.
 QUIET_MIRROR='{"seq":1,"key":"k","tag":"captain","text":"watch the fleet"}'
@@ -1067,7 +1067,7 @@ quiet_in() {  # <home> <command...>
 # Daemon-backed quiet mode (no supervision host) writes the record through the
 # same entry, and the captain is present: the entry the main session reads must
 # not say hold-for-return, the live finding where a present captain's requested
-# local landing was held until /quiet off. A later /afk makes the record away.
+# local landing was held until /radio-silence off. A later /watchover makes the record away.
 unit_daemon_quiet_entry_holds_nothing_for_a_return() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-quiet-entry.XXXXXX")
@@ -1089,14 +1089,14 @@ unit_daemon_quiet_entry_holds_nothing_for_a_return() {
   if [ "$rc" -eq 0 ] \
     && [ "$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" mode)" = away ] \
     && printf '%s' "$out" | grep -F 'hold-for-return only' >/dev/null; then
-    pass "quiet entry: a later /afk entry turns the quiet record into the away posture, which holds for the return"
+    pass "quiet entry: a later /watchover entry turns the quiet record into the away posture, which holds for the return"
   else
-    fail "quiet entry: /afk over quiet mode did not record away (rc=$rc): $out"
+    fail "quiet entry: /watchover over quiet mode did not record away (rc=$rc): $out"
   fi
   rm -rf "$st"
 }
 
-# /quiet where the attended supervision host runs is a statement: quiet-check
+# /radio-silence where the attended supervision host runs is a statement: quiet-check
 # says quiet mode needs nothing, or that the session is paused while its
 # broken-session latch holds, and a quiet enter writes nothing. Without the
 # opt-in, or on Pi, quiet-check says nothing and quiet mode is the daemon's.
@@ -1126,7 +1126,7 @@ unit_supervision_host_quiet_statement() {
     fail "a quiet enter where the attended host runs must write no record that would park a present captain (rc=$rc): $out"
   fi
   [ ! -e "$st/state/.host-mirror-cursor.next" ] || fail "quiet-check must stage no mirror cursor"
-  pass "supervision host: /quiet is a statement where the attended host runs, and a quiet enter writes nothing there"
+  pass "supervision host: /radio-silence is a statement where the attended host runs, and a quiet enter writes nothing there"
 
   # The host's broken-session latch, as the host persists it after two engine
   # errors, under the engine library's own latch key.
@@ -1153,7 +1153,7 @@ unit_supervision_host_quiet_statement() {
 # Where the home opted in but the attended host lacks a part, quiet-check names
 # it and quiet mode enters through the daemon. The quiet enter records its
 # mode, so the daemon start needs no FM_AFK_MODE, while an explicit away start
-# is refused in away wording; a later /quiet refreshes the running quiet daemon.
+# is refused in away wording; a later /radio-silence refreshes the running quiet daemon.
 unit_supervision_host_quiet_fallback() {
   local st out rc bad
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-quiet-fallback.XXXXXX")
@@ -1203,7 +1203,7 @@ unit_supervision_host_quiet_fallback() {
   [ "$rc" -eq 0 ] && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
     || fail "a start with no FM_AFK_MODE must take quiet from the entry's record, over a stale flag (rc=$rc): $out"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
-  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check while the quiet daemon runs must send a later /quiet to its refresh silently (rc=$rc): $out"
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "quiet-check while the quiet daemon runs must send a later /radio-silence to its refresh silently (rc=$rc): $out"
   out=$(quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter); rc=$?
   [ "$rc" -eq 0 ] && [ "$(quiet_in "$st" "$CONTRACT" field mode)" = quiet ] \
     || fail "a quiet refresh must keep the quiet daemon's record (rc=$rc): $out"
@@ -1212,7 +1212,7 @@ unit_supervision_host_quiet_fallback() {
   rm -rf "$st"
 }
 
-# /afk then /quiet on an opted-in Claude home: the away record parks main, so
+# /watchover then /radio-silence on an opted-in Claude home: the away record parks main, so
 # quiet-check and a quiet enter refuse and name it, whatever state/.afk says,
 # until the return archives it. Covered with the attended host ready, and over
 # a quiet daemon that fell back because the dialog mirror was missing.
@@ -1231,12 +1231,12 @@ unit_supervision_host_quiet_after_afk() {
 
   out=$(quiet_in "$st" "$LAUNCH" enter --words "back after lunch"); rc=$?
   [ "$rc" -eq 0 ] && [ -f "$st/state/.afk-contract" ] && [ ! -e "$st/state/.afk" ] \
-    || fail "/afk on an opted-in claude home must write the away record and no daemon flag (rc=$rc): $out"
+    || fail "/watchover on an opted-in claude home must write the away record and no daemon flag (rc=$rc): $out"
   refuses_under_away_record "ready host"
   quiet_in "$st" "$LAUNCH" stop >/dev/null || fail "the return's stop must archive the away record"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   quiet_expect 0 'Quiet mode needs nothing on this home' "quiet-check after the return must say quiet mode needs nothing"
-  pass "supervision host: /quiet under a live away record refuses and names it until the return"
+  pass "supervision host: /radio-silence under a live away record refuses and names it until the return"
 
   rm -f "$st/state/.host-mirror.jsonl"
   quiet_in "$st" env FM_AFK_MODE=quiet "$LAUNCH" enter --words "stay quiet" >/dev/null \
@@ -1244,13 +1244,13 @@ unit_supervision_host_quiet_after_afk() {
     || fail "a quiet entry without the dialog mirror must prepare the quiet daemon"
   out=$(quiet_in "$st" "$LAUNCH" enter --words "back after lunch"); rc=$?
   [ "$rc" -eq 0 ] && [ -z "$(quiet_in "$st" "$CONTRACT" field mode)" ] && [ "$(head -n 1 "$st/state/.afk")" = quiet ] \
-    || fail "/afk over the quiet daemon must record away words and leave the quiet flag (rc=$rc): $out"
+    || fail "/watchover over the quiet daemon must record away words and leave the quiet flag (rc=$rc): $out"
   refuses_under_away_record "over a quiet daemon"
   quiet_in "$st" "$LAUNCH" stop >/dev/null || fail "the return's stop must stop the quiet daemon and archive the record"
   [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-contract" ] || fail "the return must leave no flag or record"
   out=$(quiet_in "$st" "$LAUNCH" quiet-check); rc=$?
   quiet_expect 1 'the dialog mirror is missing or could not be read' "quiet-check after the return must again send quiet mode to the daemon"
-  pass "supervision host: /quiet under a live away record over a fallback quiet daemon refuses until the return"
+  pass "supervision host: /radio-silence under a live away record over a fallback quiet daemon refuses until the return"
   rm -rf "$st"
 }
 

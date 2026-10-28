@@ -6,7 +6,7 @@
 # record its exact id, tear it down by that exact id, and reconcile a leaked one
 # after a crash.
 #
-# ENTRY (the posture record). `/afk [words]` is itself the captain's go, because
+# ENTRY (the posture record). `/watchover [words]` is itself the captain's go, because
 # the captain who typed it may not look at the screen again: `enter` records the
 # away words verbatim straight into state/.afk-contract in the same turn, with no
 # separate confirmation step, then prints the entry announcement (hold-for-return
@@ -42,8 +42,8 @@
 # host lacks one of those parts, `quiet-check` names it and quiet mode enters
 # through the daemon as it does without the host. A quiet `enter` records its
 # mode, so `start` and `start-native` launch the quiet daemon without
-# FM_AFK_MODE; a running quiet daemon is refreshed by a later `/quiet` and runs
-# until `/quiet off`. A quiet `start` or `start-native` that fails while no
+# FM_AFK_MODE; a running quiet daemon is refreshed by a later `/radio-silence` and runs
+# until `/radio-silence off`. A quiet `start` or `start-native` that fails while no
 # daemon runs ends quiet mode as `stop` does, so no quiet record outlives its
 # daemon to park a present captain's main.
 # `stop` (the return, driven by bin/fm-afk-return.sh) shuts the daemon down,
@@ -91,7 +91,7 @@
 #   fm-afk-launch.sh reconcile Close a recorded-but-dead daemon terminal by exact
 #                              id and drop the record (recovery after a crash).
 #   fm-afk-launch.sh quiet-check
-#                              Whether /quiet needs anything here (QUIET MODE
+#                              Whether /radio-silence needs anything here (QUIET MODE
 #                              above): exit 0 with one line when it needs
 #                              nothing; exit 1 when quiet mode enters through
 #                              `enter` and the daemon, with one line naming why
@@ -251,7 +251,7 @@ fm_afk_launch_requested_mode() {
   fi
 }
 
-# Whether /quiet needs anything here (the header's QUIET MODE): 0 when it needs
+# Whether /radio-silence needs anything here (the header's QUIET MODE): 0 when it needs
 # nothing; 2 while an away record is live on a home that runs the host;
 # otherwise 1, with FM_AFK_LAUNCH_QUIET_WHY naming what the attended host
 # lacks on a home that runs it, or empty where quiet mode is the daemon's as
@@ -284,7 +284,7 @@ fm_afk_launch_quiet_check() {
   fm_afk_launch_quiet_needs_nothing
   rc=$?
   if [ "$rc" -eq 2 ]; then
-    printf 'Quiet mode starts nothing on this home while its away record (state/.afk-contract) is live: the captain has returned, so run the /afk return (bin/fm-afk-return.sh), pass its catch-up gate, then run quiet-check again.\n'
+    printf 'Quiet mode starts nothing on this home while its away record (state/.afk-contract) is live: the captain has returned, so run the /watchover return (bin/fm-afk-return.sh), pass its catch-up gate, then run quiet-check again.\n'
     return 2
   fi
   if [ "$rc" -ne 0 ]; then
@@ -375,7 +375,7 @@ fm_afk_launch_enter() {
         fm_afk_launch_log "quiet mode writes no away-posture record on this home, whose attended supervision host already is quiet mode; run bin/fm-afk-launch.sh quiet-check"
         return 3 ;;
       2)
-        fm_afk_launch_log "quiet mode refuses while this home's away record (state/.afk-contract) is live; run the /afk return (bin/fm-afk-return.sh) and pass its catch-up gate, then run bin/fm-afk-launch.sh quiet-check"
+        fm_afk_launch_log "quiet mode refuses while this home's away record (state/.afk-contract) is live; run the /watchover return (bin/fm-afk-return.sh) and pass its catch-up gate, then run bin/fm-afk-launch.sh quiet-check"
         return 3 ;;
     esac
   fi
@@ -407,7 +407,7 @@ fm_afk_launch_record_write() {  # <backend> <target> <extra>
 }
 
 fm_afk_launch_flag_write() {
-  # Use the explicit request or the record's mode, so /afk over a quiet
+  # Use the explicit request or the record's mode, so /watchover over a quiet
   # record switches a running daemon's flag to away on refresh.
   fm_afk_flag_write "$FM_AFK_LAUNCH_STATE" "$(fm_afk_launch_requested_mode)"
 }
@@ -911,7 +911,7 @@ fm_afk_launch_main() {
   case "${1:-start}" in
     enter) shift; fm_afk_launch_enter "$@" ;;
     propose|confirm)
-      fm_afk_launch_log "'$1' was retired with the wait-for-go gate: /afk is itself the go, so run 'enter' to write the record in the same turn"
+      fm_afk_launch_log "'$1' was retired with the wait-for-go gate: /watchover is itself the go, so run 'enter' to write the record in the same turn"
       (exit 2) ;;
     start) fm_afk_launch_start || fm_afk_launch_quiet_rollback $? ;;
     start-native) fm_afk_launch_start_native || fm_afk_launch_quiet_rollback $? ;;

@@ -503,7 +503,7 @@ fm_afk_daemon_owns_supervision() {
 # legacy bare-epoch-timestamp content written before mode existed, all read
 # as "away". Only an exact first-line "quiet" ever reads as "quiet" -
 # kunchenguid/firstmate#2356's standing captain-present quiet mode, entered
-# only through /quiet and exited only through an explicit /quiet off
+# only through /radio-silence and exited only through an explicit /radio-silence off
 # (AGENTS.md section 8's away-mode stub).
 fm_afk_mode() {
   local state=$1 mode

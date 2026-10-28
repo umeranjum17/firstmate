@@ -4,7 +4,7 @@
 #
 # Usage: fm-secondmate-restart.sh <secondmate-id>... [--help]
 #
-# This is the executable half of /updatefirstmate's reload step. A running agent
+# This is the executable half of /resupply's reload step. A running agent
 # holds AGENTS.md and every skill it has loaded frozen from launch, and no
 # verified harness offers a reload, so a re-read steer cannot replace either -
 # it appends a second copy of the mate's own job description with no defined
@@ -23,7 +23,7 @@
 #      open work it holds only in conversation - a task for each unfiled open
 #      record, including a captain call it formed but never registered, and a
 #      status correction for each task whose recorded state is now stale. That is
-#      the /stow skill's "Open-record persistence" contract and nothing else from
+#      the /intel skill's "Open-record persistence" contract and nothing else from
 #      it: no memory, learnings, or captain-preference sweep, which would make
 #      every instruction update cost far more than the reload it is paying for.
 #      All requests go out before any restart, so a slow mate delays only its own
@@ -114,7 +114,7 @@ for arg in "$@"; do
   case "$arg" in
     -*) echo "error: unexpected argument '$arg'" >&2; usage >&2; exit 2 ;;
   esac
-  # /updatefirstmate's action line names each mate by its fm-<id> selector; the
+  # /resupply's action line names each mate by its fm-<id> selector; the
   # bare id is equally acceptable so a hand-run stays natural.
   id=${arg#fm-}
   case "$id" in ''|*[!A-Za-z0-9._-]*) echo "error: invalid second mate id: $arg" >&2; exit 2 ;; esac

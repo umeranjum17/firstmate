@@ -9,7 +9,7 @@
 #      correlated answer lands on the parent channel, and a mate that never
 #      answers keeps its agent and gets the re-read message instead.
 #   2. The order is persist THEN restart, observable in what reaches the pane.
-#   3. The persist request is the task-subset of /stow: it asks for open records
+#   3. The persist request is the task-subset of /intel: it asks for open records
 #      and task status, and explicitly not for the memory, learnings, or
 #      captain-preference sweeps.
 #   4. Every unsafe case says what is known: pre-restart capability and persist
@@ -187,7 +187,7 @@ add_local_mate() {
 }
 
 # add_repo_backed_mate <case-dir> <id> [harness] [backend-line]
-# Like add_local_mate, but the world is the one /updatefirstmate actually runs
+# Like add_local_mate, but the world is the one /resupply actually runs
 # against: a bare origin, a firstmate repo clone on its default branch, and the
 # mate's home as a DETACHED worktree of that repo already sitting on origin's tip.
 # That "already current" home is the shape the old classifier skipped entirely.
@@ -235,7 +235,7 @@ add_repo_backed_mate() {  # <case-dir> <id> [harness] [backend]
   printf '%s' "$smhome" > "$dir/fake/cwd"
 }
 
-# run_update_in_case <case-dir>: the real /updatefirstmate mechanics over that world.
+# run_update_in_case <case-dir>: the real /resupply mechanics over that world.
 run_update_in_case() {
   local dir=$1
   env PATH="$dir/fakebin:$PATH" FM_FAKE_DIR="$dir/fake" \
@@ -261,7 +261,7 @@ run_restart() {  # <case-dir> <args...>
     "$RESTART" "$@" 2>&1
 }
 
-# --- T1: the persist request is the task subset of /stow, and it gates --------
+# --- T1: the persist request is the task subset of /intel, and it gates --------
 test_persist_gates_and_asks_only_for_open_records() {
   local dir out rc request
   dir=$(new_case gate)
@@ -281,7 +281,7 @@ test_persist_gates_and_asks_only_for_open_records() {
   grep -h '^phase=' "$dir/home/state/pending-replies"/* | grep -q '^phase=awaiting_report$' \
     || fail "the timed-out persist expectation was closed instead of left to recovery"
 
-  # The request the mate actually received is the open-record half of /stow only.
+  # The request the mate actually received is the open-record half of /intel only.
   request=$(cat "$dir/home/state/sm1.inbox"/*.msg)
   assert_contains "$request" "Open-record persistence" "the request must reuse stow's open-record contract"
   assert_contains "$request" "file a task for each open record" "the request must ask for the unfiled open records"

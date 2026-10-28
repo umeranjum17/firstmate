@@ -1,9 +1,9 @@
-# Startup-memory `/stow` verification
+# Startup-memory `/intel` verification
 
 Audience: maintainer verification.
 
 This record supports the active guarantee that Juggernaut can discover and JIT-load a user-owned local skill excluded through the clone's `.git/info/exclude`.
-The internal [`stow` skill](../../.agents/skills/intel/SKILL.md) owns tiering, curation, archival, offload, and completion-receipt behavior.
+The internal [`intel` skill](../../.agents/skills/intel/SKILL.md) owns tiering, curation, archival, offload, and completion-receipt behavior.
 [`docs/configuration.md`](../configuration.md) owns the current operator-facing startup-memory setting and estimate.
 
 ## Git-excluded local skill discovery and loading
