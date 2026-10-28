@@ -230,7 +230,7 @@ Juggernaut's skills live in two separate places with different audiences:
 
 ## Tools
 
-The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The sign-off board is part of Juggernaut, and Lookout is the single fleet dashboard; the rest are separate packages. Each hook below does nothing until its tool is installed; your first session installs done-done and sign-off for you.
+The squad ships with a small toolbelt. Every tool works on its own, and every hook into Juggernaut is optional. The sign-off board is part of Juggernaut, and Lookout is the single fleet dashboard; the rest are separate packages. Each hook below does nothing until its tool is installed; your first session detects and installs the pinned published `done-done-axi` and `sign-off-axi` packages, then wires their skills and hooks once.
 
 Every screen below is a real capture from the tool's own current or most recent build, at desktop and phone width, in light and dark. The projects, names, and work shown are demo data. A terminal screen is the tool's own output.
 
