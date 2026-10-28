@@ -25,6 +25,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-ticket.sh`           | Record one task's ticket truth on the fleet board now: stage, state, delivered PR and target release ([tickets](../addons/tickets-sync/README.md#writing-a-ticket-at-the-moment-it-changes)) |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
 | `juggernaut-axi`          | Read-only fleet facts for external tools: `status`, `tickets`, `decisions`, and `messages` as TOON, plus the guarded writes `answer`, `message`, and `ticket` or `--json` (`juggernaut-axi.v1`) |
+| `juggernaut-axi-serve.py` | `juggernaut-axi serve`: opt-in loopback read-only HTTP API (bearer token in `config/juggernaut-axi-token`, rate limited) |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/sitrep lavish` fleet board                  |
 | `fm-secondmate-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
 | `fm-update.sh`           | Guarded self-update of Juggernaut and local or remote Squad Lead homes, reconciling redundant divergence and classifying every live mate left on the target commit for restart or fallback nudge |
