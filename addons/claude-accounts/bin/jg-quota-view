@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# jg-quota-view - the one quota view of every registered Claude and Codex account, as JSON on stdout.
+# Dispatch (quota-axi-pool --json), the dashboard (lookout-juggernaut) and the fleet pulse all read this
+# and nothing else, so they cannot disagree about headroom.
+# Reads <home>/state/<provider>-accounts.json (written by claude-accounts-quota.sh) and the muxr registry
+# (names, and which login is Main's own). Opens nothing inside a login folder.
+# Main's own login is the registry account marked found (the ambient login). It is reserved: it is listed
+# under .reserved, never under .workers, and never counts toward .best.
+# Usage: jg-quota-view          Env: JG_HOME (required), JG_CLAUDE_ACCOUNTS_REGISTRY
+# Output: {generated_at, providers:{claude|codex:{best, workers[], reserved}}}; a row is
+#   {id,name,left,five_hour,five_hour_resets_at,seven_day,resets_at,stale,problem}; left is the tighter window, 0-100 or null.
+set -euo pipefail
+JG_HOME=${JG_HOME:?set JG_HOME to the Juggernaut home}
+REGISTRY=${JG_CLAUDE_ACCOUNTS_REGISTRY:-$HOME/.muxr/plans/accounts-v1.json}
+STATE=$(sed -n 's/^state=//p' "$JG_HOME/config/account-pool" 2>/dev/null | head -n 1) || STATE=
+case "$STATE" in /*) ;; *) STATE=$JG_HOME/state ;; esac
+reg=/dev/null; [ -r "$REGISTRY" ] && reg=$REGISTRY
+args=()
+for p in claude codex; do
+  # The newer of the home's reading and the pool state's reading, as claude-accounts-pick ranks them.
+  f=$JG_HOME/state/$p-accounts.json
+  [ "$STATE/$p-accounts.json" -nt "$f" ] && f=$STATE/$p-accounts.json
+  [ -r "$f" ] || f=/dev/null
+  args+=(--slurpfile "$p" "$f")
+done
+jq -nc --slurpfile reg "$reg" "${args[@]}" '
+  def row($meta): {id, name: (($meta.name | select(. != null and . != "")) // .name), left: ([.five_hour.left, .seven_day.left] | map(select(. != null)) | if length == 0 then null else min end),
+    five_hour: .five_hour.left, five_hour_resets_at: .five_hour.resets_at, seven_day: .seven_day.left, resets_at: (.seven_day.resets_at // .five_hour.resets_at),
+    stale: (.stale == true), problem, main: ($meta.found == true)};
+  def provider($p; $r):
+    [($r[0].accounts // [])[] | . as $x | (([($reg[0].accounts // [])[] | select(.provider == $p and .id == $x.id)] | first) // {}) as $meta | row($meta)] as $rows
+    | {workers: [$rows[] | select(.main | not) | del(.main)], reserved: ([$rows[] | select(.main) | del(.main)] | first // null)}
+    | . + {best: ([.workers[] | select(.left != null and .left > 0)] | sort_by(-.left) | first // null)};
+  {generated_at: (now | floor), providers: {claude: provider("claude"; $claude), codex: provider("codex"; $codex)}}'
