@@ -40,6 +40,17 @@ mv "$h/config/firstmate-role" "$h/config/juggernaut-role"
   || fail "the new role file must win once it exists"
 pass "the new role file wins over the old one"
 
+# backlog transition lib: an old caller reads its output variable under set -u
+printf 'spawn_gen=g1\n' > "$h/state/t.meta"
+(
+  set -u
+  # shellcheck disable=SC1090
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  fm_backlog_meta_spawn_gen "$h/state/t.meta" "$h/state" >/dev/null 2>&1
+  [ "$FM_BACKLOG_META_SPAWN_GEN" = g1 ]
+) || fail "an old caller cannot read FM_BACKLOG_META_SPAWN_GEN after the old transition function"
+pass "the old transition lib answers in its old variables"
+
 # squad lead registry
 printf -- '- lead - desc (home: %s; scope: s; projects: p; added 2026-10-14)\n' "$h" > "$h/data/${legacy_lead}s.md"
 reg=$(. "$ROOT/bin/jg-compat.sh"; jg_compat_pick "$h/data/squad_leads.md")
