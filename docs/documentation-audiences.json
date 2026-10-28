@@ -209,6 +209,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/juggernaut-evals/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/juggernaut-orca/SKILL.md",
       "audience": "agent-runtime"
     },
