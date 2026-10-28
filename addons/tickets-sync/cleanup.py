@@ -27,6 +27,20 @@ def find_source(words, home):
     return None
 
 
+def raise_ask_card(it, words, board, run):
+    """Raise the ask card the board's Asked block quotes: title is his words cut to sign-off's 12-word cap, body is the full quote. True when raised; the same key twice is a no-op, so a rerun adds no card."""
+    key = f"ask-{it['tid']}"
+    try:
+        run(['sign-off-axi', 'raise', str(board), '--key', key, '--ask-ref', key, '--ticket', it['tid'],
+             '--title', ' '.join(words.split()[:12]).rstrip('.,;:!?') + '?',
+             '--about', f'The captain said: "{words}"',
+             '--why', 'The captain asked for this and no ask card carried his words.',
+             '--outcome', 'yes=Main keeps working on it.', '--outcome', 'no=Main closes the ticket.',
+             '--recommend', 'yes', '--recommend-reason', 'He asked for it.', '--default', 'yes'])
+    except (RuntimeError, OSError): return False
+    return True
+
+
 def findings(items, today):
     """items: dicts of name, row, event (epoch or None), parked. Returns (kind, label, detail) tuples, one per ticket."""
     out, seen, listed = [], {}, set()
@@ -61,6 +75,7 @@ def daily(items, today, state, board, home, run, carded, cards=None):
         row = it['row']
         if row['state'] == 'done' or not captain_origin(row): continue
         label, (words, at, src) = f"{it['name']}/{row['id']}", quote(row)
+        if it['tid'] not in carded and words and raise_ask_card(it, words, board, run): carded = carded | {it['tid']}
         if it['tid'] not in carded: found.append(('no-ask-card', label, 'no ask card names this ticket, so the board open view shows none of his words'))
         if not words: found.append(('no-quote', label, 'captain ticket carries no quoted words')); continue
         if at and src: continue
