@@ -399,6 +399,12 @@ jobs:
           done < "$shell_inventory"
           [ "$parse_fail" -eq 0 ] || { echo "::error::stock macOS Bash 3.2 parse sweep failed"; exit 1; }
 
+          command -v npm >/dev/null || { echo "::error::npm is required to install tasks-axi"; exit 1; }
+          npm install -g tasks-axi@0.2.6 >/dev/null
+          PATH="$(npm prefix -g)/bin:$PATH"
+          export PATH
+          command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regression"; exit 1; }
+
           # The full public-followup suite is not a stock-bash snapshot; run only
           # the empty-lock register regression under real /bin/bash 3.2.
           pf_output=$(JG_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32 \
