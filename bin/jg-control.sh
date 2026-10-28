@@ -42,6 +42,9 @@
 #              decision; its endpoint is closed instead and the outcome is
 #              `endpoint-gone`. Postcondition:
 #              the backend's recovery-grade classifier reports the agent gone.
+#              A verified exit also records state/<id>.exit; the watcher skips a
+#              lane whose exit is newer than its spawn, so a dead endpoint cannot
+#              emit stale on every arm. The task record keeps window= for relaunch.
 #              Already-stopped is success (idempotent). An endpoint that reads
 #              `missing` is put through the control plane's per-backend absence
 #              proof (jg_control_endpoint_absence_verdict) before anything is
