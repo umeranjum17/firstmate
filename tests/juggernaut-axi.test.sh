@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior test for bin/juggernaut-axi (slices 1-2): status, tickets, decisions, messages, TOON by
+# Behavior test for bin/juggernaut-axi (slices 1-3): status, tickets, decisions, messages, answer, message, ticket, TOON by
 # default with --json parity, the juggernaut-axi.v1 contract, bounds with disclosed
 # omissions, and refusal of unknown commands and bad arguments.
 set -u
@@ -67,8 +67,23 @@ assert_equals 1 "$("$AXI" messages ship-task --limit 1 --json | jq -r '.omitted[
 "$AXI" messages guessed-task >/dev/null 2>&1 && fail "unknown task must be refused"
 "$AXI" messages ../state >/dev/null 2>&1 && fail "path-like task id must be refused"
 
+# Writes: each goes through its guarded path and claims only what the record confirms.
+printf 'window=x:y\nworktree=/tmp\nproject=firstmate\nharness=claude\nkind=ship\nmode=direct-PR\n' > "$HOME_DIR/state/ship-task.meta"
+sent=$("$AXI" message ship-task "please rebase" --json 2>/dev/null) || fail "message failed"
+assert_equals true "$(jq -r .ok <<<"$sent")" "message reports ok"
+assert_contains "$(cat "$HOME_DIR"/state/ship-task.inbox/*.msg)" "please rebase" "message landed in the durable inbox"
+"$AXI" message ship-task "/exit" >/dev/null 2>&1 && fail "terminal-bound text must be refused"
+"$AXI" message guessed-task hi >/dev/null 2>&1 && fail "message to an unknown task must be refused"
+tk=$("$AXI" ticket "Probe ticket" --repo firstmate --priority 2 --json 2>/dev/null) || fail "ticket failed"
+assert_equals queued "$(jq -r '.ticket.state' <<<"$tk")" "ticket is queued, never started"
+"$AXI" ticket "x" --kind captain >/dev/null 2>&1 && fail "unlisted ticket kind must be refused"
+ans=$("$AXI" answer other-gate "Take A" --json 2>/dev/null) || fail "answer failed"
+assert_equals true "$(jq -r .confirmed <<<"$ans")" "answer confirmed by the durable record"
+assert_equals 0 "$("$AXI" decisions --json | jq -r .count)" "answered decision is no longer open"
+"$AXI" answer done-a "x" >/dev/null 2>&1 && fail "answering a non-decision must be refused"
+
 "$AXI" bogus >/dev/null 2>&1 && fail "unknown command must fail"
 "$AXI" tickets --state nope >/dev/null 2>&1 && fail "bad --state must fail"
 "$AXI" tickets --limit 0 >/dev/null 2>&1 && fail "bad --limit must fail"
 assert_contains "$("$AXI" --version)" "juggernaut-axi" "--version prints"
-pass "juggernaut-axi status, tickets, decisions, messages"
+pass "juggernaut-axi status, tickets, decisions, messages, writes"
