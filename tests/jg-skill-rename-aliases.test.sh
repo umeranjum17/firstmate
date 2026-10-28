@@ -10,7 +10,7 @@ set -u
 
 SKILLS="$ROOT/.agents/skills"
 PAIRS="afk:watchover quiet:radio-silence ahoy:debrief bearings:sitrep updatejuggernaut:resupply stow:intel"
-AGENT_PAIRS="fmx-respond:relay-respond away-quiet-supervision:watchover-supervision"
+AGENT_PAIRS="fmx-respond:relay-respond away-quiet-supervision:watchover-supervision updatefirstmate:resupply secondmate-provisioning:squad-lead-provisioning stuck-crewmate-recovery:stuck-operator-recovery firstmate-coding-guidelines:juggernaut-coding-guidelines firstmate-self-repo:juggernaut-self-repo firstmate-orca:juggernaut-orca firstmate-codexapp:juggernaut-codexapp"
 
 skill_name() { sed -n '0,/^name: /s/^name: //p' "$1/SKILL.md"; }
 
