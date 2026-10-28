@@ -29,6 +29,11 @@ journeys:
     command: bash journeys/worker-no-ask-tool.sh
   watcher-exit-beacon:
     command: bash journeys/watcher-exit-beacon.sh
+  evals-old-names:
+    command: bash journeys/evals/old-names-resolve.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+  evals-fresh-home:
+    command: bash journeys/evals/fresh-home.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+    timeout: 15m
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
