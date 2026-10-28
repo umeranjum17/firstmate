@@ -10,6 +10,9 @@ failed=0
 # scratch_home: a throwaway HOME for the run; the caller removes it with rm_scratch.
 # It lives on disk, not in /tmp: a real install is hundreds of megabytes and /tmp is memory.
 scratch_home() {
+  # mise shims (node, gh, ...) read their versions from the real HOME; a scratch HOME would send them to GitHub.
+  export MISE_CONFIG_DIR=${MISE_CONFIG_DIR:-$HOME/.config/mise} MISE_DATA_DIR=${MISE_DATA_DIR:-$HOME/.local/share/mise} \
+    MISE_CACHE_DIR=${MISE_CACHE_DIR:-$HOME/.cache/mise}
   mkdir -p "${JG_EVAL_SCRATCH:=$HOME/.cache/juggernaut-evals}"
   SCRATCH=$(mktemp -d "$JG_EVAL_SCRATCH/run.XXXXXX")
   export HOME=$SCRATCH TMPDIR=$SCRATCH/tmp XDG_DATA_HOME=$SCRATCH/.local/share XDG_CONFIG_HOME=$SCRATCH/.config XDG_CACHE_HOME=$SCRATCH/.cache
