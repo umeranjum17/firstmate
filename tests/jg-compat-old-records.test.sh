@@ -47,6 +47,13 @@ reg=$(. "$ROOT/bin/jg-compat.sh"; jg_compat_pick "$h/data/squad_leads.md")
 [ "$(. "$ROOT/bin/jg-squad-lead-registry-lib.sh"; squad_lead_registry_field "$reg" lead home)" = "$h" ] \
   || fail "the old registry did not resolve the lead's home"
 pass "old squad lead registry resolves"
+mv "$h/data/${legacy_lead}s.md" "$h/data/squad_leads.md"
+(
+  # shellcheck disable=SC1090
+  . "$ROOT/bin/fm-${legacy_lead}-registry-lib.sh"
+  [ "$("${legacy_lead}_registry_field" "$h/data/${legacy_lead}s.md" lead home)" = "$h" ]
+) || fail "an old caller naming the renamed-away registry file got nothing"
+pass "an old caller naming the old registry file still resolves after the file is renamed"
 
 # harness file
 printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}-harness"
