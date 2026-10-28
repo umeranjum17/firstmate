@@ -77,6 +77,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-backend-hometag-lib.sh` | Shared per-installation home-tag derivation for zellij tab and cmux workspace titles |
 | `jg-composer-lib.sh`     | Single fleet-wide owner of composer shapes, capability-aware screen classification, and verdicts |
 | `jg-agent-process-lib.sh` | Backend-neutral harness-process name classifier shared by the tmux and herdr adapters |
+| `juggernaut-axi-serve.py` | `juggernaut-axi serve`: opt-in loopback read-only HTTP API (bearer token in `config/juggernaut-axi-token`, rate limited) |
 | `backends/tmux.sh`       | Verified tmux session-provider adapter                                               |
 | `backends/herdr.sh`      | Herdr session-provider adapter with its own required CI lane                         |
 | `backends/zellij.sh`     | Experimental zellij session-provider adapter                                         |

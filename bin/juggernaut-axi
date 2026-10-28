@@ -47,6 +47,10 @@ commands:
   ticket <title> [--repo <name>] [--kind <ship|scout|docs>] [--priority <0-3>]
                          queue a new ticket (never starts work)
 
+  serve [--port <n>] [--reads-per-minute <n>]
+                         opt-in loopback (127.0.0.1) read-only HTTP API; needs an
+                         owner-only token in config/juggernaut-axi-token
+
 TOON by default; --json prints the same versioned model (juggernaut-axi.v1).
 Errors go to stderr with a nonzero exit. Omitted rows are counted in omitted[].
 USAGE
@@ -218,6 +222,7 @@ cmd_ticket() {
 case "${1:-}" in
   -h|--help|help|"") usage; [ -n "${1:-}" ] || exit 2; exit 0 ;;
   --version) echo "juggernaut-axi $VERSION"; exit 0 ;;
+  serve) shift; JUGGERNAUT_AXI_HOME=${JG_HOME:-$HOME_ROOT} exec python3 "$SCRIPT_DIR/juggernaut-axi-serve.py" "$@" ;;
 esac
 CMD=$1; shift
 FORMAT=toon
