@@ -52,8 +52,8 @@ def findings(items, today):
     return out
 
 
-def daily(items, today, state, board, home, run):
-    """Once a UTC day: back-fill missing quote parts, raise one keep/remove card, return the one board line."""
+def daily(items, today, state, board, home, run, carded):
+    """Once a UTC day (carded: ids of tickets an ask card names): back-fill missing quote parts, raise one keep/remove card, return the one board line."""
     day = state / 'cleanup.day'
     if day.exists() and day.read_text() == today.isoformat(): return None
     found, filled = [], 0
@@ -61,6 +61,7 @@ def daily(items, today, state, board, home, run):
         row = it['row']
         if row['state'] == 'done' or not captain_origin(row): continue
         label, (words, at, src) = f"{it['name']}/{row['id']}", quote(row)
+        if it['tid'] not in carded: found.append(('no-ask-card', label, 'no ask card names this ticket, so the board open view shows none of his words'))
         if not words: found.append(('no-quote', label, 'captain ticket carries no quoted words')); continue
         if at and src: continue
         hit = find_source(words, it['source'])

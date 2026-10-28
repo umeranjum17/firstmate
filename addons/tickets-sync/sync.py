@@ -257,10 +257,11 @@ def sync():
                 if item not in parents:
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
-                if all(i['name'] != name or i['row']['id'] != item for i in items): items.append(dict(name=name, row=r, event=event, parked=name in parked, source=source))
+                if all(i['name'] != name or i['row']['id'] != item for i in items): items.append(dict(tid=tid, name=name, row=r, event=event, parked=name in parked, source=source))
                 publish(tid, desired)
         if options.cleanup:
-            line = cleanup.daily(items, dt.datetime.now(dt.timezone.utc).date(), state, board, home, run)
+            carded = {d['ticket'] for d in json.loads(run(['sign-off-axi', 'list', str(board), '--json'])).get('decisions', []) if d.get('ticket')}
+            line = cleanup.daily(items, dt.datetime.now(dt.timezone.utc).date(), state, board, home, run, carded)
             if line: print(line)
             return
         if options.check:
