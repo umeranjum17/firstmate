@@ -26,7 +26,7 @@ printf '[markdown]\npath="data/backlog.md"\narchive="data/done-archive.md"\ndone
 cp "$JG_HOME/.tasks.toml" "$work/parked/.tasks.toml"
 (cd "$JG_HOME"; tasks-axi add parent '[captain-ask] P1 Parent: Umer release' --repo alpha --priority 1 --body 'type: captain-ask: "Umer telescope focus should be simple"' >/dev/null
  tasks-axi 'done' parent --no-prune >/dev/null
- tasks-axi add long "Umer 🚢 $(printf 'long title %.0s' {1..30})" --repo alpha --priority 1 --body $'release: next\nhttps://github.com/example/alpha/pull/123\nhttps://github.com/example/alpha/pull/456' >/dev/null
+ tasks-axi add long "Umer 🚢 $(printf 'long title %.0s' {1..30})" --repo alpha --priority 1 --body $'release: v1\nhttps://github.com/example/alpha/pull/123\nhttps://github.com/example/alpha/pull/456' >/dev/null
  tasks-axi start long >/dev/null
  tasks-axi add upkeep 'Umer maintenance' --repo alpha --priority 2 --body 'parent: upkeep' >/dev/null
  tasks-axi add held 'Umer paused item' --repo alpha --priority 1 --body 'parent: missing' >/dev/null
@@ -35,7 +35,7 @@ cp "$JG_HOME/.tasks.toml" "$work/parked/.tasks.toml"
  tasks-axi add take 'Umer takes' --repo takeone --priority 2 >/dev/null
  tasks-axi add inferred 'Umer telescope focus regression' --repo alpha --priority 1 >/dev/null
  tasks-axi add internal 'Umer internal maintenance' --repo herdr --priority 2 --body 'parent: upkeep' >/dev/null
- tasks-axi add child '[captain-ask] P0 Umer settings' --repo alpha --priority 0 --body "$(printf 'Umer notes %.0s' {1..80})"$'\nrelease: next\nparent: parent' >/dev/null)
+ tasks-axi add child '[captain-ask] P0 Umer settings' --repo alpha --priority 0 --body "$(printf 'Umer notes %.0s' {1..80})"$'\nrelease: v1\nparent: parent' >/dev/null)
 sed -i "/^- \[x\] parent /s/$(date +%F)/2000-01-01/g" "$JG_HOME/data/backlog.md"
 (cd "$work/parked"; tasks-axi add parent 'Umer paused project' --repo beta --priority 2 >/dev/null)
 printf '\n## Done\n- [x] recent - Umer shipped feature (repo: alpha) (done %s)\n- [x] old - Umer historical work (repo: alpha) (done 2000-01-01)\n' "$(date +%F)" >> "$JG_HOME/data/backlog.md"
@@ -70,7 +70,7 @@ ticket_id() { printf 'jg-%s\n' "$(printf '%s' "$1" | sha256sum | cut -c1-32)"; }
 child=$(ticket_id main/child) parent=$(ticket_id main/parent) parked=$(ticket_id parked/parent)
 sign-off-axi ticket "$work/board.json" --json > "$work/first.json" || { cat "$work/first.json"; exit 1; }
 jq -e '.tickets | all(.[]; (.title | length) <= 160) and all(.[]; (.title | startswith("Needs a parent")) | not)'  "$work/first.json"
-jq -e --arg id "$child" --arg parent "$parent" '.tickets[] | select(.id == $id) | .parent == $parent and .priority == "P0" and .asked == false and .title == "Umer settings" and .release == "next"' "$work/first.json"
+jq -e --arg id "$child" --arg parent "$parent" '.tickets[] | select(.id == $id) | .parent == $parent and .priority == "P0" and .asked == false and .title == "Umer settings" and .release == "v1"' "$work/first.json"
 jq -e --arg id "$parked" '.tickets[] | select(.id == $id) | .hold == true' "$work/first.json"
 jq -e --arg id "$(ticket_id main/held)" '[.tickets[] | select(.id == $id and .hold == true)] | length == 1' "$work/first.json"
 upkeep=$(ticket_id fleet/:upkeep)
@@ -180,3 +180,24 @@ sign-off-axi ticket "$work/board.json" --id jg-history-fixture --state "done" >/
 "$JG_HOME/state/tickets-sync.check.sh" >/dev/null
 test -z "$("$JG_HOME/state/tickets-stale.check.sh")"
 echo 'PASS: the stale check flags a contradicting and an orphaned ticket, writes nothing, and silences a settled board'
+
+# The daily clean-up flags what needs a keep/remove call, back-fills a captain quote's
+# date and source from the steer record, raises one card and prints one line a day.
+(cd "$JG_HOME"; tasks-axi add ask3 '[captain-ask] P2 Umer ask three' --repo alpha --priority 2 --body 'type: captain-ask: "Umer wants the board to show quotes always"' >/dev/null
+ tasks-axi add dupa 'Umer duplicate thing' --repo alpha --priority 2 >/dev/null
+ tasks-axi add dupb 'Umer duplicate thing.' --repo alpha --priority 2 >/dev/null
+ tasks-axi add old 'Umer quiet urgent work' --repo alpha --priority 1 >/dev/null
+ tasks-axi start old >/dev/null)
+printf 'working [at=1700000000]: started\n' > "$JG_HOME/state/old.status"
+mkdir -p "$JG_HOME/state/lane.inbox"
+printf 'schema=jg-task-inbox.v1\nat=2026-10-28T10:00:00Z\n--\nCaptain: Umer wants the board to show quotes always\n' > "$JG_HOME/state/lane.inbox/001.msg"
+"$JG_HOME/state/tickets-sync.check.sh" >/dev/null
+printf '#!/usr/bin/env bash\nexport JG_HOME=%q\nexec python3 %q --cleanup 2>&1\n' "$JG_HOME" "$XDG_DATA_HOME/jg-tickets-sync/tickets-sync/sync.py" > "$work/cleanup.sh"
+out=$(bash "$work/cleanup.sh")
+grep -q '^tickets-cleanup: flagged .*duplicate.*no-quote.*stale' <<<"$out"
+grep -q '1 quotes back-filled' <<<"$out"
+grep -q "quoted-at: 2026-10-28" <(cd "$JG_HOME"; tasks-axi show ask3 --full)
+grep -q "source: $JG_HOME/state/lane.inbox/001.msg" <(cd "$JG_HOME"; tasks-axi show ask3 --full)
+sign-off-axi list "$work/board.json" --json | grep -q "ticket-cleanup-$(date -u +%F)"
+test -z "$(bash "$work/cleanup.sh")"
+echo 'PASS: the daily clean-up flags, back-fills a quote from the steer record, raises one card and runs once a day'

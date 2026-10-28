@@ -23,6 +23,7 @@ import xml.etree.ElementTree as xml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from task_rows import toon_rows
 from lane import progress as lane_progress
+import cleanup
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for _jg_old, _jg_val in list(os.environ.items()):
@@ -79,11 +80,13 @@ def sync():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--audit', action='store_true')
     parser.add_argument('--check', action='store_true', help='print board tickets that disagree with their work; write nothing')
+    parser.add_argument('--cleanup', action='store_true', help='once a day, flag tickets that need a keep/remove call and back-fill captain quotes')
     parser.add_argument('--reconcile', action='store_true', help='read every home without the watcher time budget')
     parser.add_argument('--close', metavar='HOME/ITEM', help='record an authorized cancellation or supersession on the board only')
     parser.add_argument('--reason', choices=['superseded', 'cancelled'])
     options = parser.parse_args()
     if bool(options.close) != bool(options.reason): parser.error('--close and --reason are required together')
+    if options.cleanup: options.check = options.reconcile = True  # reads like --check, without the watcher budget
     started = time.monotonic()
     budget = float(os.environ.get('JG_TICKETS_SYNC_BUDGET_SECS', '20'))
     home = Path(os.environ['JG_HOME']).resolve()
@@ -119,6 +122,7 @@ def sync():
         if resume.get('home') in homes: ordered = ordered[list(homes).index(resume['home']):]
         existing = {t['id']: t for t in json.loads(run(['sign-off-axi', 'ticket', str(board), '--json']))['tickets']}
         changed = 0
+        items = []
         registry = {p['name'].lower(): p.get('icon', {}).get('sha256') for p in json.loads(run(['sign-off-axi', 'project', str(board), '--json'])).get('projects', [])}
         skip_file = state / 'icons-skipped.json'
         skipped = json.loads(skip_file.read_text()) if skip_file.exists() else {}
@@ -130,6 +134,7 @@ def sync():
             nonlocal changed
             seen.add(tid)
             if options.check:
+                if options.cleanup: return
                 # A leaf's state is the one its PR and backlog item derive; a grouping row's is its own.
                 if 'stage' in desired and (existing.get(tid, {}).get('state') or '') != desired['state']:
                     board_state = existing.get(tid, {}).get('state') or 'no state'
@@ -248,11 +253,16 @@ def sync():
                 if parent in tasks and ticket_id(name, parent) not in ledger:
                     required.add(parent); ids.append(parent)
                 parent_id = ticket_id(name, parent) if parent in tasks else '' if root_ask else upkeep_id
-                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=(field('release') or 'later')[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
+                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=field('release')[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
                 if item not in parents:
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
+                if all(i['name'] != name or i['row']['id'] != item for i in items): items.append(dict(name=name, row=r, event=event, parked=name in parked, source=source))
                 publish(tid, desired)
+        if options.cleanup:
+            line = cleanup.daily(items, dt.datetime.now(dt.timezone.utc).date(), state, board, home, run)
+            if line: print(line)
+            return
         if options.check:
             for tid, old in existing.items():
                 if tid.startswith('jg-') and tid not in seen and (old.get('state') or '') != 'done':
