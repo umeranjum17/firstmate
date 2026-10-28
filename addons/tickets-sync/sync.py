@@ -122,6 +122,14 @@ def sync():
         ordered = list(homes.items())
         if resume.get('home') in homes: ordered = ordered[list(homes).index(resume['home']):]
         existing = {t['id']: t for t in json.loads(run(['sign-off-axi', 'ticket', str(board), '--json']))['tickets']}
+        # One open ticket per piece of work is the board's own rule, so the sync must not fight it: a source item whose
+        # work the board already tracks under another id is left alone instead of failing the whole pass as a twin.
+        def work_key(t):
+            return ((t.get('project') or '').lower(), t.get('parent') or '', ' '.join((t.get('title') or '').split()).lower())
+        tracked = {}
+        for t in existing.values():
+            if t.get('state') != 'done' and t.get('stage') != 'done':
+                tracked.setdefault(work_key(t), []).append(t['id'])
         changed = 0
         items = []
         registry = {p['name'].lower(): p.get('icon', {}).get('sha256') for p in json.loads(run(['sign-off-axi', 'project', str(board), '--json'])).get('projects', [])}
@@ -131,7 +139,7 @@ def sync():
         def save(path, value):
             temp = path.with_suffix('.tmp'); temp.write_text(json.dumps(value)); temp.replace(path)
         seen = set()
-        def publish(tid, desired):
+        def publish(tid, desired, derived=()):
             nonlocal changed
             seen.add(tid)
             if options.check:
@@ -143,8 +151,18 @@ def sync():
                 return
             digest = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
             old = existing.get(tid, {})
+            def settled(key, value):
+                stored = old.get({'pr': 'prs', 'last-event-at': 'last_event_at'}.get(key, key))
+                # The board stores an absent field as null, and derives a grouping row's roll-up.
+                if stored is None: stored = [] if key == 'pr' else ''
+                if key == 'pr': value = [value] if value else []
+                elif key in ('hold', 'asked'): value = value == 'yes'
+                return key in derived or stored == value
             # Board wins over ledger: a prior digest can drift after a partial write.
-            matched = all((old.get('prs', []) == ([v] if v else []) if k == 'pr' else old.get('last_event_at', '') == v if k == 'last-event-at' else old.get(k, '') == (v == 'yes' if k in ('hold', 'asked') else v)) for k, v in desired.items())
+            matched = all(settled(k, v) for k, v in desired.items())
+            if not matched and any(o != tid for o in tracked.get(work_key(desired), [])):
+                ledger[tid] = digest; save(ledger_file, ledger)
+                return
             if matched:
                 if ledger.get(tid) != digest: ledger[tid] = digest; save(ledger_file, ledger)
                 return
@@ -164,10 +182,10 @@ def sync():
             if name not in homes or not sep or not item: raise RuntimeError('--close requires a registered HOME/ITEM')
 
         upkeep_id = ticket_id('fleet', ':upkeep')
-        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued'))
+        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued'), ('progress',))
         for tid, old in existing.items():
             if tid.startswith('jg-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
-                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done'))
+                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done'), ('progress',))
             elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
                 publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
         for name, source in ordered:
@@ -235,6 +253,11 @@ def sync():
                     m = re.search(r'^\s*' + key + r':\s*(.+)$', body, re.M | re.I)
                     return m[1].strip() if m else ''
                 held = name in parked or r.get('held') == 'yes' or r.get('hold_kind') == 'parked'
+                # A release names what ships. A body word about timing (or "none") is not a release: send none, so a board
+                # rule that refuses a when-word never fails a pass and no placeholder is stored on a ticket.
+                release_value = field('release')
+                if re.fullmatch(r'(?i)(later|soon|now|next|someday|eventually|asap|urgent|tbd|tba|backlog|never|none)', release_value.strip()):
+                    release_value = ''
                 progress, done, pr, stage, event = lane_progress(source, item, r, prs, run)
                 save(pr_file, prs)
                 done = done or f'{name}/{item}' in closures or existing.get(tid, {}).get('state') == 'done'
@@ -254,12 +277,12 @@ def sync():
                 if parent in tasks and ticket_id(name, parent) not in ledger:
                     required.add(parent); ids.append(parent)
                 parent_id = ticket_id(name, parent) if parent in tasks else '' if root_ask else upkeep_id
-                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=field('release')[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
+                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=release_value[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
                 if item not in parents:
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
                 if all(i['name'] != name or i['row']['id'] != item for i in items): items.append(dict(tid=tid, name=name, row=r, event=event, parked=name in parked, source=source))
-                publish(tid, desired)
+                publish(tid, desired, ('progress',) if item in parents else ())
         if options.cleanup:
             carded = {d['ticket'] for d in json.loads(run(['sign-off-axi', 'list', str(board), '--json'])).get('decisions', []) if d.get('ticket')}
             def cards():
