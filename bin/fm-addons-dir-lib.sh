@@ -1,29 +1,17 @@
 #!/usr/bin/env bash
-# fm-addons-dir-lib.sh - the one owner of where a checkout finds its add-ons.
-#
-# The add-ons live in this repository's tracked `addons/`. A home that predates that fold still carries the
-# clone at `<home>/projects/firstmate-addons`, so resolution is a chain, never one path:
-#   1. `FM_ADDONS_DIR` when set: the operator override, and what every test fixture pins.
-#   2. the in-repo `addons/` beside this checkout (this library's own parent directory).
-#   3. the pre-fold clone, with `<home>` the caller's home argument, else `FM_HOME`, else this checkout.
-# That order keeps a live home working before, during and after the move; callers pass the home they mean,
-# because a secondmate home resolves its own base.
-#
-# Sourced, not executed:  . "$SCRIPT_DIR/fm-addons-dir-lib.sh"; dir=$(fm_addons_dir "$FM_HOME")
-
-_FM_ADDONS_LIB_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-
-fm_addons_dir() { # fm_addons_dir [home]: print the add-ons directory this checkout should use.
-  if [ -n "${FM_ADDONS_DIR:-}" ]; then
-    printf '%s\n' "$FM_ADDONS_DIR"
-  elif [ -d "$_FM_ADDONS_LIB_ROOT/addons" ]; then
-    printf '%s\n' "$_FM_ADDONS_LIB_ROOT/addons"
-  else
-    printf '%s\n' "${1:-${FM_HOME:-$_FM_ADDONS_LIB_ROOT}}/projects/firstmate-addons"
-  fi
-}
-
-fm_addon_path() { # fm_addon_path [home] <path inside the add-ons directory>: print one add-on file's path.
-  local home=$1 path=$2
-  printf '%s/%s\n' "$(fm_addons_dir "$home")" "$path"
-}
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
+set -u
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-addons-dir-lib.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
+fi

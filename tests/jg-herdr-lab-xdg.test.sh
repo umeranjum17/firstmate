@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# Behavior tests for bin/jg-herdr-lab.sh --isolated-xdg using a stateful fake
+# Herdr client that links plugins through XDG_CONFIG_HOME.
+set -u
+
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+REAL_HOME="$HOME"
+TMP_ROOT=$(jg_test_tmproot jg-herdr-lab-xdg)
+FAKEBIN=$(jg_fakebin "$TMP_ROOT")
+FAKE_HOME="$TMP_ROOT/fake-home"
+FAKE_STATE="$TMP_ROOT/herdr-state"
+FAKE_LOG="$TMP_ROOT/herdr.log"
+TRIPWIRES="$TMP_ROOT/tripwires"
+mkdir -p "$FAKE_STATE" "$FAKE_HOME"
+: > "$FAKE_LOG"
+cleanup() {
+  local pointer base name
+  for pointer in "$TRIPWIRES"/*.xdg-root; do
+    [ -f "$pointer" ] || continue
+    name=${pointer##*/}
+    name=${name%.xdg-root}
+    base=$(JG_HERDR_LAB_STATE_DIR="$TRIPWIRES" bash -c '. "$1"; jg_herdr_lab_xdg_base "$2"' _ "$ROOT/bin/jg-herdr-lab.sh" "$name") || continue
+    rm -rf "$base"
+  done
+  jg_test_cleanup
+}
+trap cleanup EXIT
+
+cat > "$FAKEBIN/herdr" <<'SH'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >> "$JG_FAKE_HERDR_LOG"
+state=$JG_FAKE_HERDR_STATE
+# Herdr reads --session only as an option, so it must end the arguments or
+# sit immediately before the first -- delimiter.
+last=
+for arg in "$@"; do
+  [ "$arg" != -- ] || break
+  previous=$last
+  last=$arg
+done
+[ "${previous:-}" = --session ] || { echo "fake herdr: missing --session before any -- delimiter" >&2; exit 90; }
+session=$last
+lab_state=absent
+[ ! -f "$state/$session" ] || lab_state=$(cat "$state/$session")
+
+case "$1 ${2:-}" in
+  "session list")
+    # Like real Herdr, which derives the default session's socket from the
+    # config dir, the live default reads running only under the real XDG
+    # tree; under any other XDG tree it reads not-running.
+    real_config=${JG_FAKE_HERDR_REAL_CONFIG:-$HOME/.config}
+    current_config=${XDG_CONFIG_HOME:-$HOME/.config}
+    default_running=false
+    [ "$current_config" = "$real_config" ] && default_running=true
+    if [ "$lab_state" = absent ] || [ "$lab_state" = deleted ]; then
+      jq -nc --argjson running "$default_running" '{sessions:[{default:true,name:"default",running:$running,socket_path:"/tmp/fake-default.sock"}]}'
+    else
+      running=false
+      [ "$lab_state" = running ] && running=true
+      jq -nc --arg name "$session" --argjson running "$running" --argjson default_running "$default_running" \
+        '{sessions:[{default:true,name:"default",running:$default_running,socket_path:"/tmp/fake-default.sock"},{default:false,name:$name,running:$running,socket_path:("/tmp/" + $name + ".sock")}]}'
+    fi
+    ;;
+  "server --session")
+    printf '%s\n' running > "$state/$session"
+    ;;
+  "status --json")
+    if [ "$lab_state" = running ]; then
+      printf '%s\n' '{"server":{"running":true}}'
+    else
+      printf '%s\n' '{"server":{"running":false}}'
+    fi
+    ;;
+  "plugin link")
+    plugdir="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/plugins"
+    mkdir -p "$plugdir"
+    printf '%s\n' "$3" > "$plugdir/$(basename "$3").link"
+    printf 'HOME=%s\n' "$HOME" >> "$JG_FAKE_HERDR_LOG"
+    printf 'XDG_CONFIG_HOME=%s\n' "${XDG_CONFIG_HOME:-<unset>}" >> "$JG_FAKE_HERDR_LOG"
+    printf 'XDG_DATA_HOME=%s\n' "${XDG_DATA_HOME:-<unset>}" >> "$JG_FAKE_HERDR_LOG"
+    printf 'XDG_STATE_HOME=%s\n' "${XDG_STATE_HOME:-<unset>}" >> "$JG_FAKE_HERDR_LOG"
+    printf '%s\n' '{"ok":true}'
+    ;;
+  "session stop")
+    [ "$3" = "$session" ] || exit 91
+    printf '%s\n' stopped > "$state/$session"
+    ;;
+  "session delete")
+    [ "$3" = "$session" ] || exit 92
+    printf '%s\n' deleted > "$state/$session"
+    ;;
+  *)
+    printf '%s\n' '{"ok":true}'
+    ;;
+esac
+SH
+chmod +x "$FAKEBIN/herdr"
+
+lab_cli() {
+  PATH="$FAKEBIN:$PATH" HOME="$FAKE_HOME" \
+    JG_FAKE_HERDR_STATE="$FAKE_STATE" \
+    JG_FAKE_HERDR_LOG="$FAKE_LOG" \
+    JG_FAKE_HERDR_REAL_CONFIG="${JG_FAKE_HERDR_REAL_CONFIG:-}" \
+    JG_HERDR_LAB_STATE_DIR="$TRIPWIRES" \
+    bash "$ROOT/bin/jg-herdr-lab.sh" "$@"
+}
+
+test_isolated_lab_links_inside_lab_only() {
+  local name="jg-lab-xdg-$$" base token="jg-xdg-proof-$$"
+  local plugin_src="$TMP_ROOT/fake-plugin-$token"
+  mkdir -p "$plugin_src"
+
+  (unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+    lab_cli --isolated-xdg provision "$name") || fail "isolated provision failed"
+  base=$(<"$TRIPWIRES/$name.xdg-root")
+  for sub in config data state; do
+    [ -d "$base/$sub" ] || fail "isolated provision did not create $base/$sub"
+  done
+
+  (unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+    lab_cli --isolated-xdg run "$name" plugin link "$plugin_src" >/dev/null) \
+    || fail "isolated plugin link failed"
+  assert_present "$base/config/herdr/plugins/fake-plugin-$token.link" \
+    "isolated plugin link did not land under the lab XDG tree"
+  [ "$(cat "$base/config/herdr/plugins/fake-plugin-$token.link")" = "$plugin_src" ] \
+    || fail "isolated plugin link recorded the wrong source"
+  assert_contains "$(grep -m1 '^XDG_CONFIG_HOME=' "$FAKE_LOG")" "$base/config" \
+    "fake Herdr did not see the lab XDG_CONFIG_HOME"
+  assert_contains "$(grep -m1 '^XDG_DATA_HOME=' "$FAKE_LOG")" "$base/data" \
+    "fake Herdr did not see the lab XDG_DATA_HOME"
+  assert_contains "$(grep -m1 '^XDG_STATE_HOME=' "$FAKE_LOG")" "$base/state" \
+    "fake Herdr did not see the lab XDG_STATE_HOME"
+
+  # The live tree is constantly rewritten by the running Herdr session, so a
+  # whole-tree byte comparison would chase live activity. The targeted proof
+  # instead: nothing linked in the lab exists anywhere under the live tree.
+  [ -z "$(find "$REAL_HOME/.config/herdr" -name "*${token}*" 2>/dev/null)" ] \
+    || fail "a lab-linked plugin name leaked into the live Herdr tree"
+  grep -rF -q --exclude-dir=sessions "$token" "$REAL_HOME/.config/herdr" 2>/dev/null \
+    && fail "lab plugin content leaked into the live Herdr registry"
+
+  (unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+    lab_cli --isolated-xdg teardown "$name") || fail "isolated teardown failed"
+  assert_absent "$TRIPWIRES/$name.fleet-state.json" "isolated teardown left its tripwire behind"
+  assert_absent "$base" "isolated teardown left its XDG tree behind"
+  pass "jg-herdr-lab: --isolated-xdg links plugins inside the lab and leaves the live Herdr registry untouched"
+}
+
+test_default_behavior_isolates_caller_xdg() {
+  local name="jg-lab-xdg-default-$$" plugin_src="$TMP_ROOT/fake-plugin-default" base
+  local sentinel="$FAKE_HOME/sentinel"
+  mkdir -p "$plugin_src" "$sentinel/config" "$sentinel/data" "$sentinel/state"
+  : > "$FAKE_LOG"
+  # The sentinel is this test's live tree, so the default reads running there.
+  export JG_FAKE_HERDR_REAL_CONFIG="$sentinel/config"
+  XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
+    lab_cli provision "$name" || fail "default provision failed"
+  base=$(<"$TRIPWIRES/$name.xdg-root")
+  assert_present "$base/home" "default provision did not create disposable HOME"
+
+  XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
+    lab_cli run "$name" plugin link "$plugin_src" >/dev/null || fail "default plugin link failed"
+  assert_present "$base/config/herdr/plugins/fake-plugin-default.link" \
+    "default plugin link did not use isolated XDG_CONFIG_HOME"
+  assert_absent "$sentinel/config/herdr/plugins/fake-plugin-default.link" \
+    "default plugin link touched caller XDG_CONFIG_HOME"
+  assert_contains "$(grep -m1 '^HOME=' "$FAKE_LOG")" "$base/home" "default run inherited caller HOME"
+  assert_contains "$(grep -m1 '^XDG_CONFIG_HOME=' "$FAKE_LOG")" "$base/config" \
+    "default run inherited caller XDG environment"
+
+  XDG_CONFIG_HOME="$sentinel/config" XDG_DATA_HOME="$sentinel/data" XDG_STATE_HOME="$sentinel/state" \
+    lab_cli teardown "$name" || fail "default teardown failed"
+  assert_absent "$base" "default teardown retained disposable directories"
+  assert_absent "$TRIPWIRES/$name.xdg-root" "default teardown retained scratch pointer"
+  unset JG_FAKE_HERDR_REAL_CONFIG
+  pass "jg-herdr-lab: without the flag runtime HOME and XDG are disposable"
+}
+
+test_help_names_the_flag() {
+  local help
+  help=$(lab_cli --help) || fail "--help failed"
+  assert_contains "$help" "--isolated-xdg" "--help does not document the isolated-XDG flag"
+  pass "jg-herdr-lab: --help documents --isolated-xdg"
+}
+
+test_isolated_provision_observes_live_default() {
+  local name="jg-lab-xdg-live-$$"
+  local live="$TMP_ROOT/live-home"
+  mkdir -p "$live/config" "$live/data" "$live/state"
+  # The live default session exists only under the real XDG tree; the lab
+  # XDG tree starts empty. Provision must snapshot fleet state with the
+  # caller environment, or the tripwire refuses every time.
+  export JG_FAKE_HERDR_REAL_CONFIG="$live/config"
+  XDG_CONFIG_HOME="$live/config" XDG_DATA_HOME="$live/data" XDG_STATE_HOME="$live/state" \
+    lab_cli --isolated-xdg provision "$name" \
+    || fail "isolated provision did not observe the live default session"
+  XDG_CONFIG_HOME="$live/config" XDG_DATA_HOME="$live/data" XDG_STATE_HOME="$live/state" \
+    lab_cli --isolated-xdg teardown "$name" || fail "isolated teardown failed"
+  assert_absent "$TRIPWIRES/$name.fleet-state.json" "teardown left its tripwire behind"
+  unset JG_FAKE_HERDR_REAL_CONFIG
+  pass "jg-herdr-lab: --isolated-xdg snapshots fleet state with the caller XDG so the live default is observed"
+}
+
+test_explicit_fleet_home_preserves_private_runtime() {
+  local name="jg-lab-home-$$" fleet="$TMP_ROOT/fleet-home" plugin="$TMP_ROOT/home-plugin" out
+  mkdir -p "$fleet" "$plugin"
+  export JG_FAKE_HERDR_REAL_CONFIG="$fleet/.config"
+  if out=$(lab_cli --isolated-xdg provision "$name" 2>&1); then
+    fail "private HOME falsely observed the fleet"
+  fi
+  assert_contains "$out" "exactly one running default" "wrong private-HOME refusal"
+  : > "$FAKE_LOG"
+  export JG_HERDR_LAB_FLEET_HOME="$fleet"
+  XDG_CONFIG_HOME="$TMP_ROOT/wrong-config" lab_cli --isolated-xdg provision "$name" \
+    || fail "explicit fleet HOME did not observe actual default"
+  lab_cli --isolated-xdg run "$name" plugin link "$plugin" >/dev/null || fail "private runtime failed"
+  assert_contains "$(cat "$FAKE_LOG")" "HOME=$(<"$TRIPWIRES/$name.xdg-root")/home" "runtime inherited caller HOME"
+  assert_present "$(<"$TRIPWIRES/$name.xdg-root")/config/herdr/plugins/home-plugin.link" "runtime adopted fleet XDG"
+  assert_absent "$fleet/.config/herdr/plugins/home-plugin.link" "runtime wrote fleet plugin registry"
+  lab_cli --isolated-xdg stop "$name" || fail "guarded stop failed"
+  local other="$TMP_ROOT/other-fleet"
+  mkdir -p "$other"
+  if out=$(JG_HERDR_LAB_FLEET_HOME="$other" lab_cli --isolated-xdg teardown "$name" 2>&1); then
+    fail "unverifiable default accepted during teardown"
+  fi
+  assert_present "$TRIPWIRES/$name.fleet-state.json" "failed tripwire lost ownership"
+  lab_cli --isolated-xdg teardown "$name" || fail "unchanged-default teardown failed"
+  assert_absent "$TRIPWIRES/$name.fleet-state.json" "teardown retained tripwire"
+  unset JG_HERDR_LAB_FLEET_HOME JG_FAKE_HERDR_REAL_CONFIG
+  pass "jg-herdr-lab: explicit fleet HOME observes default without adopting runtime context"
+}
+
+test_invalid_fleet_home_refuses() {
+  local value name out
+  for value in '' relative "$TMP_ROOT/missing-home"; do
+    name="jg-lab-invalid-home-$$"
+    : > "$FAKE_LOG"
+    if out=$(JG_HERDR_LAB_FLEET_HOME="$value" lab_cli --isolated-xdg provision "$name" 2>&1); then
+      fail "invalid fleet HOME provision succeeded"
+    fi
+    assert_contains "$out" "cannot read Herdr sessions for the fleet-state tripwire" "invalid fleet context did not refuse before provisioning"
+    if rg -q '^server |^session stop |^session delete ' "$FAKE_LOG"; then
+      fail "invalid fleet HOME reached lifecycle mutation"
+    fi
+    assert_absent "$TRIPWIRES/$name.fleet-state.json" "invalid context retained ownership"
+  done
+  pass "jg-herdr-lab: empty, relative and missing fleet HOME refuse before lifecycle mutation"
+}
+
+test_isolated_lab_links_inside_lab_only
+test_default_behavior_isolates_caller_xdg
+test_help_names_the_flag
+test_isolated_provision_observes_live_default
+
+test_explicit_fleet_home_preserves_private_runtime
+test_invalid_fleet_home_refuses

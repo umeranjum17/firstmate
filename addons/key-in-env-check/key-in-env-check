@@ -2,7 +2,7 @@
 """Wake Main when a running fleet process carries a provider API key in its environment.
 
 Read-only on /proc: /proc/<pid>/environ is split on NUL and only the variable
-NAMES are kept for matching (matched against FM_KEY_PATTERNS, the home's
+NAMES are kept for matching (matched against JG_KEY_PATTERNS, the home's
 config/key-in-env-patterns, or DEFAULT). Values are never printed, logged,
 written, or sent on the network. A value is read transiently only to hash it
 (sha256) against ~/.config/openrouter/api_key when OPENROUTER_API_KEY is among
@@ -15,21 +15,21 @@ the topmost ancestor holding the same variable.
 Output: state/key-in-env.incidents, one TSV line per process (pid, home, task,
 variables, topmost parent), rewritten each run. The alert baseline is
 state/.key-in-env.alerted.json. Nothing is killed, signalled or changed.
-Fixture knobs: FM_KEY_HOMES (colon list of home dirs), FM_KEY_TREES (comma list
-of pids: scan only them and their descendants), FM_PROC.
+Fixture knobs: JG_KEY_HOMES (colon list of home dirs), JG_KEY_TREES (comma list
+of pids: scan only them and their descendants), JG_PROC.
 """
 import fnmatch, hashlib, json, os, re, sys
 
 PROVIDERS = "OPENROUTER ANTHROPIC OPENAI MINIMAX GOOGLE GEMINI XAI MOONSHOT ZAI DEEPSEEK MISTRAL GROQ COHERE TOGETHER FIREWORKS".split()
 DEFAULT = ["*_API_KEY", "*_API_TOKEN"] + [f"{p}_*{s}" for p in PROVIDERS for s in ("KEY", "TOKEN", "SECRET")]
 
-PROC = os.environ.get("FM_PROC", "/proc")
-HOME = os.environ.get("FM_HOME") or os.path.expanduser("~/firstmate")
+PROC = os.environ.get("JG_PROC", "/proc")
+HOME = os.environ.get("JG_HOME") or os.path.expanduser("~/juggernaut")
 STATE = os.path.join(HOME, "state")
 OPENROUTER_KEY_FILE = os.path.join(os.path.expanduser("~"), ".config", "openrouter", "api_key")
 
 def patterns():
-    raw = os.environ.get("FM_KEY_PATTERNS")
+    raw = os.environ.get("JG_KEY_PATTERNS")
     if raw is None:
         try:
             raw = open(os.path.join(HOME, "config", "key-in-env-patterns")).read()
@@ -93,11 +93,11 @@ def stat_of(pid):
     return int(s[r + 2:].split()[1]), s[l + 1:r]
 
 def homes():
-    dirs = os.environ.get("FM_KEY_HOMES")
+    dirs = os.environ.get("JG_KEY_HOMES")
     if dirs is None:
         base = os.path.expanduser("~/.treehouse")
-        dirs = ":".join([HOME, os.path.expanduser("~/firstmate")] + sorted(
-            os.path.join(base, a, b, "firstmate") for a in os.listdir(base) if os.path.isdir(os.path.join(base, a))
+        dirs = ":".join([HOME, os.path.expanduser("~/juggernaut")] + sorted(
+            os.path.join(base, a, b, "juggernaut") for a in os.listdir(base) if os.path.isdir(os.path.join(base, a))
             for b in os.listdir(os.path.join(base, a))))
     out = {}
     for d in dirs.split(":"):
@@ -110,7 +110,7 @@ def task_map(hs):
     m = []
     for real, d in hs.items():
         parts = real.split(os.sep)
-        label = "main" if real == os.path.realpath(os.path.expanduser("~/firstmate")) else "/".join(parts[-3:-1])
+        label = "main" if real == os.path.realpath(os.path.expanduser("~/juggernaut")) else "/".join(parts[-3:-1])
         m.append((real, label, "-"))
         sd = os.path.join(d, "state")
         for f in os.listdir(sd):
@@ -155,7 +155,7 @@ def main():
         if hit:
             names[pid] = hit
     tmap = task_map(homes())
-    trees = {int(t) for t in os.environ.get("FM_KEY_TREES", "").split(",") if t}
+    trees = {int(t) for t in os.environ.get("JG_KEY_TREES", "").split(",") if t}
     rows = []
     for pid in sorted(names):
         if pid == me:

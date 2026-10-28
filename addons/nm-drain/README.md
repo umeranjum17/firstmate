@@ -8,9 +8,9 @@ It replaces three overlapping one-shot checks (`nm-quiet`, `nm-update` and `nm-u
 
 ## Use
 
-`nm-drain.sh <command> <fm-home>`, run by Main:
+`nm-drain.sh <command> <jg-home>`, run by Main:
 
-- `start` records the drain start in `<fm-home>/state/.nm-drain`.
+- `start` records the drain start in `<jg-home>/state/.nm-drain`.
 - `status` prints the drain, the installed no-mistakes version and target, and each active run with its current step.
   It is read-only.
 - `go` refuses while any run is active.
@@ -18,7 +18,7 @@ It replaces three overlapping one-shot checks (`nm-quiet`, `nm-update` and `nm-u
   If the update left the old daemon running, `go` runs `no-mistakes daemon restart`, whose own guard refuses while a run is active.
   It never passes `--force`.
   It also refuses when the cached latest release is not the approved target (`NM_DRAIN_TARGET`, default `v1.84.0`).
-  It logs to `<fm-home>/state/.nm-drain.log`.
+  It logs to `<jg-home>/state/.nm-drain.log`.
 - `stop` ends the drain.
 - `check` is the watcher check.
   With no drain it prints nothing.
@@ -33,12 +33,12 @@ The state database is read only from a backup copy, which is deleted right after
 
 ## Install
 
-`nm-drain/install.sh [--dry-run] <main-fm-home>` copies `nm-drain.sh` to `${XDG_DATA_HOME:-~/.local/share}/fm-nm-drain/`.
-It writes the shim `state/0-nm-drain.check.sh`, registers it with `bin/fm-check-register.sh`, and retires the three old checks with `bin/fm-check-unregister.sh`.
+`nm-drain/install.sh [--dry-run] <main-jg-home>` copies `nm-drain.sh` to `${XDG_DATA_HOME:-~/.local/share}/jg-nm-drain/`.
+It writes the shim `state/0-nm-drain.check.sh`, registers it with `bin/jg-check-register.sh`, and retires the three old checks with `bin/jg-check-unregister.sh`.
 `--dry-run` prints those steps and writes nothing.
 The `0-` id sorts the check first, because a check that wakes ends the watcher's sweep, so a check that wakes on every sweep starves every check after it.
 
 ## Test
 
-`nm-drain/tests/nm-drain.test.sh` drives the CLI, the check and `install.sh` end to end, both as `--dry-run` and as a real install that must register and retire the old checks even with `FM_STATE_OVERRIDE` exported empty.
+`nm-drain/tests/nm-drain.test.sh` drives the CLI, the check and `install.sh` end to end, both as `--dry-run` and as a real install that must register and retire the old checks even with `JG_STATE_OVERRIDE` exported empty.
 It uses a throwaway home, HOME and state database, with a fake `no-mistakes` first on `PATH` that records every call and fails on `--force`.

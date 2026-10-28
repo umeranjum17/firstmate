@@ -58,7 +58,7 @@ while IFS= read -r card; do
     {contract:1,kind:"evidence",schema:1,key:$key,title:$title,about:$card.about,run:$card.evidence}
     + if ($card.link // "") == "" then {} else {link:$card.link} end
   ' >"$message" || die "could not build replacement for $key"
-  sign-off-axi post "$board" --kind evidence --from "$message" --filer firstmate-merge || die "could not post replacement for $key"
+  sign-off-axi post "$board" --kind evidence --from "$message" --filer juggernaut-merge || die "could not post replacement for $key"
   sign-off-axi dismiss "$key" "$board" || die "replacement posted but could not archive $key; rerun --apply to finish"
   rm -f -- "$message"
   trap - EXIT

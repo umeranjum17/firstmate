@@ -7,7 +7,7 @@ set -u -o pipefail
 unset CDPATH
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 ALLOW=${REPO_GUARD_ALLOW:-$HERE/allowed-repos}
-DATA=${XDG_DATA_HOME:-$HOME/.local/share}/fm-repo-guard # holds <tool>.real, the real binary's path
+DATA=${XDG_DATA_HOME:-$HOME/.local/share}/jg-repo-guard # holds <tool>.real, the real binary's path
 entries() { sed 's/[[:space:]]*$//' "$ALLOW" 2>/dev/null | grep -v '^[[:space:]]*\(#\|$\)'; }
 
 write_command() { # <group> <verb>

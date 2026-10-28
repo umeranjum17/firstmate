@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
-# claude-accounts-pick: drive the account-pool add-on's own fm_account_pool_select (what fm-spawn calls)
+# claude-accounts-pick: drive the account-pool add-on's own jg_account_pool_select (what jg-spawn calls)
 # with config/account-pool pointing at the chooser, a fixture muxr registry and a stub quota-axi whose
 # readings change per case. New workers spread by runway and skip an account when it runs low.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
@@ -27,8 +36,8 @@ is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2]
 pick() { # [tool] [want]: sets out and rc from the pool pick
   rm -f "$w/pool/account-assignments.json" # Independent election for each existing case.
   # shellcheck disable=SC2016
-  out=$(env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
-    FM_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'fm_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/fm-account-pool-lib.sh"; shift; fm_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/config" "${2:-}" 2>&1); rc=$?
+  out=$(env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
+    JG_CLAUDE_ACCOUNTS_FRESH=0 CODEX_HOME="$w/other" bash -c 'jg_run_timed() { shift; "$@"; }; . "$1/account-pool/bin/jg-account-pool-lib.sh"; shift; jg_account_pool_select "$@"' _ "$addons" "${1:-claude}" "$w/home/config" "${2:-}" 2>&1); rc=$?
 }
 q() { echo "$2" > "$w/$1.q"; }
 
@@ -50,7 +59,7 @@ pick codex; is "other tools keep their ambient default" "$rc|$(cut -f1,3 <<<"$ou
 # then picks again; the rested account is skipped, an explicit id is honoured, and nothing falls back to paid use.
 pool="$addons/claude-accounts/bin/claude-accounts-pick"
 A1=pa_536c925c8580938938 A2=pa_2f1d0a9b7c3e5d4a61
-cmd() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=0 FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS="${FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS:-300}" "$pool" "$@" 2>&1; }
+cmd() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" JG_CLAUDE_ACCOUNTS_FRESH=0 JG_ACCOUNT_POOL_ASSIGNMENT_SECONDS="${JG_ACCOUNT_POOL_ASSIGNMENT_SECONDS:-300}" "$pool" "$@" 2>&1; }
 q a1 "63 34"; q a2 "100 69"
 is "status names the tool of a pa_ account" "$(cmd status $A1 --json --state "$w/pool" | jq -r .tool)" claude
 is "status refuses an unknown id" "$(cmd status pa_nope --json --state "$w/pool" >/dev/null; echo $?)" 1
@@ -65,8 +74,8 @@ q a1 "0 34"; cmd rest $A1 --json --state "$w/pool" >/dev/null; q a1 "63 34"; pic
 cmd unrest $A1 --json --state "$w/pool" >/dev/null; cmd unrest $A2 --json --state "$w/pool" >/dev/null
 pick claude $A2; is "an explicit pa_ id resolves once unrested" "$rc|$(cut -f1 <<<"$out")" "0|$A2"
 
-# A quota-reader failure never refuses a launch. Each case drives the picker the way fm-spawn does,
-# with the reader unable to answer: no FM_HOME at all, a reader that cannot run, a reading nobody has
+# A quota-reader failure never refuses a launch. Each case drives the picker the way jg-spawn does,
+# with the reader unable to answer: no JG_HOME at all, a reader that cannot run, a reading nobody has
 # refreshed, and a reading so old the 5h window is meaningless. The roster is the registry, so the
 # pick still answers, and it says where its numbers came from and how old they are.
 reading() { # age_s five1 seven1 five2 seven2 [problem2]: the pool's own last good reading
@@ -78,15 +87,15 @@ reading() { # age_s five1 seven1 five2 seven2 [problem2]: the pool's own last go
       {id: $b, name: "Two", folder: $f2, five_hour: {left: $h2}, seven_day: {left: $d2}, read_at: $at, problem: (if $p2 == "null" then null else $p2 end), stale: ($p2 != "null")}]}' \
     > "$w/pool/claude-accounts.json"
 }
-cmd_nohome() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" FM_CLAUDE_ACCOUNTS_FRESH=0 FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS="${FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS:-300}" "$pool" "$@" 2>&1; }
+cmd_nohome() { env -i PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" QDIR="$w" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" JG_CLAUDE_ACCOUNTS_FRESH=0 JG_ACCOUNT_POOL_ASSIGNMENT_SECONDS="${JG_ACCOUNT_POOL_ASSIGNMENT_SECONDS:-300}" "$pool" "$@" 2>&1; }
 rm -f "$w/home/state/claude-accounts.json"
 reading 600 90 95 99 1
 out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
-is "FM_HOME unset: the pick answers from the pool's own reading" "$rc|$(jq -r '[.id, .read.source] | join(" ")' <<<"$out")" "0|$A1 reading"
+is "JG_HOME unset: the pick answers from the pool's own reading" "$rc|$(jq -r '[.id, .read.source] | join(" ")' <<<"$out")" "0|$A1 reading"
 is "the answer carries the age of the reading it used" "$(jq -r '.read.at > 0 and .read.age >= 0' <<<"$out")" true
 reading 0 90 95 99 1
 out=$(cmd_nohome pick claude --json --state "$w/pool"); rc=$?
-is "a reader that cannot run, with no FM_HOME, still answers" "$rc|$(jq -r .ok <<<"$out")" "0|true"
+is "a reader that cannot run, with no JG_HOME, still answers" "$rc|$(jq -r .ok <<<"$out")" "0|true"
 is "...and names the account with the most 7-day runway" "$(jq -r .id <<<"$out")" "$A1"
 # A reading nobody has refreshed in two hours: the 5h window is worth nothing, the 7-day side is not.
 reading 7200 4 95 99 1
@@ -168,13 +177,13 @@ mkdir "$w/concurrent"
 for ((i=0; i<12; i++)); do cmd_nohome pick codex --json --state "$w/pool" > "$w/concurrent/$i" & done
 wait
 is "concurrent launches share the counter without lost assignments" "$(jq -r .id "$w/concurrent/"* | sort | uniq -c | awk '{print $1}' | paste -sd:)" "9:3"
-out=$(FM_ACCOUNT_POOL_ASSIGNMENT_SECONDS=0 cmd_nohome pick codex --json --state "$w/pool")
+out=$(JG_ACCOUNT_POOL_ASSIGNMENT_SECONDS=0 cmd_nohome pick codex --json --state "$w/pool")
 is "expired assignments reset the winner to the most headroom" "$(jq -r .id <<<"$out")" c1
 
-# Floor wording: launch admission (5%) stays distinct from verified-rest / fm-model-pool eligibility (15%).
-is "launch admission default stays 5" "${FM_CLAUDE_ACCOUNTS_LOW:-5}" 5
-is "rest/eligibility floor default stays 15" "${FM_ACCOUNT_POOL_REST_FLOOR:-15}" 15
-is "fm-model-pool exists for tool rotation above the rest floor" "$([ -x "$addons/account-pool/bin/fm-model-pool" ] && echo yes)" yes
+# Floor wording: launch admission (5%) stays distinct from verified-rest / jg-model-pool eligibility (15%).
+is "launch admission default stays 5" "${JG_CLAUDE_ACCOUNTS_LOW:-5}" 5
+is "rest/eligibility floor default stays 15" "${JG_ACCOUNT_POOL_REST_FLOOR:-15}" 15
+is "jg-model-pool exists for tool rotation above the rest floor" "$([ -x "$addons/account-pool/bin/jg-model-pool" ] && echo yes)" yes
 
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all passed"

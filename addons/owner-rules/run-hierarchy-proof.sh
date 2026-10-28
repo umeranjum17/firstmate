@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Drive the hierarchy rule through the fork's real fm-brief.sh and record the done-done journey.
+# Drive the hierarchy rule through the fork's real jg-brief.sh and record the done-done journey.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-fork=${FM_TEST_FORK:-}
-[ -n "$fork" ] && [ -x "$fork/bin/fm-brief.sh" ] \
-  || { echo "owner-rules hierarchy proof: set FM_TEST_FORK to a Firstmate checkout with the brief-inherit seam" >&2; exit 1; }
+fork=${JG_TEST_FORK:-}
+[ -n "$fork" ] && [ -x "$fork/bin/jg-brief.sh" ] \
+  || { echo "owner-rules hierarchy proof: set JG_TEST_FORK to a Juggernaut checkout with the brief-inherit seam" >&2; exit 1; }
 [ -n "${DONE_DONE_EVIDENCE_ROOT:-}" ] && [ -n "${DONE_DONE_RUN_ID:-}" ] \
   || { echo "owner-rules hierarchy proof: run through done-done" >&2; exit 1; }
 target=$(git -C "$repo" rev-parse --short HEAD)

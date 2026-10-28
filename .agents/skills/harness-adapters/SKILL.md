@@ -25,29 +25,29 @@ Operational paths keep the context named by their owner: `config/` and active-ho
 ## Non-negotiable safety
 
 Never dispatch an operator or Squad Lead on an unverified adapter.
-If `config/crew-harness` or `config/secondmate-harness` names one, tell the captain under `../../../AGENTS.md` section 9 that the requested worker runtime is not verified, use Juggernaut's own verified runtime for current work, and ask only whether to verify the requested runtime for future work.
+If `config/crew-harness` or `config/squad-lead-harness` names one, tell the captain under `../../../AGENTS.md` section 9 that the requested worker runtime is not verified, use Juggernaut's own verified runtime for current work, and ask only whether to verify the requested runtime for future work.
 Do not pause current work for that choice.
 
 On `unknown`, ask the captain instead of guessing.
 A current captain override beats detection, while a per-task override governs only that dispatch.
 For recovery and control, use the exact `harness=` in `state/<id>.meta`; never infer it from a model or provider.
 
-Deliver lifecycle actions only through `../../../bin/fm-control.sh <task-id> interrupt|exit|relaunch`.
-Never type an interrupt key or exit command through `fm-send`, where routing-marked lifecycle text becomes chat.
+Deliver lifecycle actions only through `../../../bin/jg-control.sh <task-id> interrupt|exit|relaunch`.
+Never type an interrupt key or exit command through `jg-send`, where routing-marked lifecycle text becomes chat.
 Trust handling is complete only when inspection proves the target started processing its instructions; delivery success alone is not proof.
 Muse, Gemini, AGY, and Devin are verified only for operator and Recon work, never a Squad Lead or primary.
 
 ## Detection
 
-`../../../bin/fm-harness.sh` prints Juggernaut's own harness from verified environment markers and process ancestry, and owns how they combine.
+`../../../bin/jg-harness.sh` prints Juggernaut's own harness from verified environment markers and process ancestry, and owns how they combine.
 A marker names its harness, but a structural ancestor of a different harness outranks it, because a marker is ordinary environment state a child or a multiplexer can retain while ancestry is what proves who owns the process tree.
-Only `FM_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_AGENT=true` selects Pi-signed; shared unmarked launcher ancestry remains Pi.
-omp publishes no marker of its own; `FM_OMP_HARNESS=omp` is Juggernaut's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
-`../../../bin/fm-spawn.sh` owns worker marker establishment, while the README launch command owns the signed-primary boundary.
-`../../../bin/fm-harness.sh crew` resolves `config/crew-harness`, where absent or `default` means Juggernaut's own harness.
-`../../../bin/fm-harness.sh secondmate <id>` resolves the mate-specific profile under [`configuration`](../../../docs/configuration.md#choose-the-squad-lead-harness).
-`../../../bin/fm-spawn.sh` re-resolves on every spawn, and an explicit per-spawn argument wins for that spawn.
-A new adapter's verified marker and command name must land in `../../../bin/fm-harness.sh`.
+Only `JG_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_AGENT=true` selects Pi-signed; shared unmarked launcher ancestry remains Pi.
+omp publishes no marker of its own; `JG_OMP_HARNESS=omp` is Juggernaut's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
+`../../../bin/jg-spawn.sh` owns worker marker establishment, while the README launch command owns the signed-primary boundary.
+`../../../bin/jg-harness.sh crew` resolves `config/crew-harness`, where absent or `default` means Juggernaut's own harness.
+`../../../bin/jg-harness.sh squad lead <id>` resolves the mate-specific profile under [`configuration`](../../../docs/configuration.md#choose-the-squad-lead-harness).
+`../../../bin/jg-spawn.sh` re-resolves on every spawn, and an explicit per-spawn argument wins for that spawn.
+A new adapter's verified marker and command name must land in `../../../bin/jg-harness.sh`.
 
 ## Operation-to-reference matrix
 
@@ -72,8 +72,8 @@ A new tool remains undispatchable until the `verify` plan, its harness entry, ev
     "recovery": {
       "default": ["references/common/control-and-recovery.md"],
       "replacement-profile": ["references/common/control-and-recovery.md", "references/common/dispatch.md", "references/common/model-and-effort.md"],
-      "secondmate": ["references/common/control-and-recovery.md", "references/common/primary-hooks.md"],
-      "replacement-secondmate": ["references/common/control-and-recovery.md", "references/common/dispatch.md", "references/common/model-and-effort.md", "references/common/primary-hooks.md"]
+      "squad lead": ["references/common/control-and-recovery.md", "references/common/primary-hooks.md"],
+      "replacement-squad-lead": ["references/common/control-and-recovery.md", "references/common/dispatch.md", "references/common/model-and-effort.md", "references/common/primary-hooks.md"]
     },
     "primary": {"default": ["references/common/primary-hooks.md"]},
     "model-effort": {

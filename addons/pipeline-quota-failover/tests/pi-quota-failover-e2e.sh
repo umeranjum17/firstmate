@@ -382,7 +382,7 @@ if [ "$(grep -c 'quota-error' "$log")" = 1 ]; then ok "requested model attempted
 #    bound lets pi start anyway with one log line.
 cat >"$stub/gate" <<'GATE'
 #!/bin/sh
-[ $# -eq 0 ] && echo "gate ran" >>"$GATE_LOG" && echo "fm-mem-gate: waiting" && sleep "${GATE_SLEEP:-0}"
+[ $# -eq 0 ] && echo "gate ran" >>"$GATE_LOG" && echo "jg-mem-gate: waiting" && sleep "${GATE_SLEEP:-0}"
 GATE
 chmod +x "$stub/gate"
 export GATE_LOG=$work/gate.log
@@ -390,7 +390,7 @@ OUT=$(printf '%s' "$prompt" | PI_QUOTA_FAILOVER_GATE="$stub/gate" "$wrapper" --m
 is "gated call exits 0" "$?" "0"
 is "gate ran once, with no command" "$(cat "$work/gate.log" 2>/dev/null)" "gate ran"
 out_has "gated prompt reached pi" "PONG"
-out_count "gate output kept off the stream" "fm-mem-gate" 0
+out_count "gate output kept off the stream" "jg-mem-gate" 0
 OUT=$(printf '%s' "$prompt" | GATE_SLEEP=5 PI_QUOTA_FAILOVER_GATE="$stub/gate" PI_QUOTA_FAILOVER_GATE_SECS=1 "$wrapper" --model muse-spark-1.3-contributor --mode json --no-session 2>"$work/err7b")
 is "bounded gate wait still runs pi" "$?" "0"
 out_has "pi answered after the bound" "PONG"
@@ -586,8 +586,8 @@ printf '%s\n' '{"pi":{"extensions":["./src/index.ts"]}}' >"$pkgs/pi-hermes-memor
 printf '%s\n' '{"pi":{"extensions":["./src/index.ts"]}}' >"$pkgs/pi-claude-bridge/package.json"
 printf '%s\n' '{"pi":{"extensions":["./dist"]}}' >"$pkgs/pi-web-access/package.json"
 for f in "$pkgs/pi-hermes-memory/src/index.ts" "$pkgs/pi-claude-bridge/src/index.ts" "$pkgs/pi-web-access/dist/index.js" \
-  "$pkgs/pi-plain/extensions/a.ts" "$home/.pi/agent/extensions/fm-rm-guard.ts" "$home/.pi/agent/extensions/fm-literal-delete.ts" \
-  "$home/.pi/agent/extensions/fm-rm-guard.ts.bak-x"; do echo '// stub' >"$f"; done
+  "$pkgs/pi-plain/extensions/a.ts" "$home/.pi/agent/extensions/jg-rm-guard.ts" "$home/.pi/agent/extensions/jg-literal-delete.ts" \
+  "$home/.pi/agent/extensions/jg-rm-guard.ts.bak-x"; do echo '// stub' >"$f"; done
 printf 'User packages:\n  npm:pi-hermes-memory\n    %s\n  npm:pi-claude-bridge\n    %s\n  npm:pi-web-access\n    %s\n  npm:pi-plain\n    %s\n' \
   "$pkgs/pi-hermes-memory" "$pkgs/pi-claude-bridge" "$pkgs/pi-web-access" "$pkgs/pi-plain" >"$work/pi-list.txt"
 export STUB_PI_LIST=$work/pi-list.txt
@@ -597,8 +597,8 @@ has_arg() { case " $(sed -n 1p "$STUB_ARGV") " in *" $1 "*) ok "$2" ;; *) no "$2
 OUT=$(printf '%s' "$prompt" | "$wrapper" --model zai/glm-5.3-flash --mode json --no-session 2>"$work/err10")
 is "extension run exits 0" "$?" "0"
 case $(sed -n 1p "$STUB_ARGV") in "-ne "*) ok "pi runs with -ne" ;; *) no "pi argv lacks -ne first" ;; esac
-has_arg "-e $home/.pi/agent/extensions/fm-rm-guard.ts" "fm-rm-guard loads"
-has_arg "-e $home/.pi/agent/extensions/fm-literal-delete.ts" "fm-literal-delete loads"
+has_arg "-e $home/.pi/agent/extensions/jg-rm-guard.ts" "jg-rm-guard loads"
+has_arg "-e $home/.pi/agent/extensions/jg-literal-delete.ts" "jg-literal-delete loads"
 has_arg "-e $pkgs/pi-claude-bridge/src/index.ts" "a package's manifest entry loads"
 has_arg "-e $pkgs/pi-web-access/dist/index.js" "a manifest directory loads its index"
 has_arg "-e $pkgs/pi-plain/extensions/a.ts" "a package without a manifest loads its extensions dir"
@@ -625,7 +625,7 @@ is "unreadable list: one log line per call" "$(grep -c 'extension list unreadabl
 out_has "unreadable list: call still answers" '"model":"openai-codex/gpt-6-luna"'
 
 unset STUB_PI_LIST
-rm -f -- "$home/.pi/agent/extensions/fm-rm-guard.ts" "$home/.pi/agent/extensions/fm-literal-delete.ts" "$home/.pi/agent/extensions/fm-rm-guard.ts.bak-x"
+rm -f -- "$home/.pi/agent/extensions/jg-rm-guard.ts" "$home/.pi/agent/extensions/jg-literal-delete.ts" "$home/.pi/agent/extensions/jg-rm-guard.ts.bak-x"
 
 # 8. install.sh: key-level config edit in a throwaway config, never printing it.
 cfg=$work/config.yaml

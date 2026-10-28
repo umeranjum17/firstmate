@@ -1,6 +1,6 @@
-// Fleet pipeline rule: literal-path recursive deletes (installed by firstmate-addons pipeline-literal-delete/install.sh).
+// Fleet pipeline rule: literal-path recursive deletes (installed by juggernaut-addons pipeline-literal-delete/install.sh).
 // Pipeline gate agents run pi with project context files disabled, but user-level extensions still load,
-// so this reaches every pi session - review, test, document, lint steps - in every firstmate home.
+// so this reaches every pi session - review, test, document, lint steps - in every juggernaut home.
 import { readFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 

@@ -2,8 +2,8 @@
 
 <h1><picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg">
-  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="Firstmate add-ons logo">
-</picture> Firstmate add-ons</h1>
+  <img src="docs/media/logo-light.svg" width="40" height="40" align="top" alt="Juggernaut add-ons logo">
+</picture> Juggernaut add-ons</h1>
 
 **Keep your coding-agent fleet moving through stalled tasks, depleted quota, and destructive commands.**
 
@@ -42,7 +42,7 @@ Choose the job you need first; the reference lists the full catalog and dependen
 ## Choose your job
 
 Run these from the repository root.
-For home-specific installers, export `FM_HOME` pointing to your existing Firstmate home: the directory containing its `bin/`, `config/`, and `state/`.
+For home-specific installers, export `JG_HOME` pointing to your existing Juggernaut home: the directory containing its `bin/`, `config/`, and `state/`.
 Each job names one starting add-on.
 
 **Protect the machine** — [Memory gate](host-memory/install.sh); also delete, kill, and read guards.
@@ -51,7 +51,7 @@ Each job names one starting add-on.
 bash addons/host-memory/install.sh
 ```
 
-Every add-on with an installer at once, from `addons/`: `bash install-all.sh [--dry-run] "$FM_HOME"`; running it again over the same home succeeds and changes nothing.
+Every add-on with an installer at once, from `addons/`: `bash install-all.sh [--dry-run] "$JG_HOME"`; running it again over the same home succeeds and changes nothing.
 The [reference](docs/addons-reference.md#install) owns that entry point.
 
 **Keep work moving** — [Stall alerts](docs/addons-reference.md#fleet-stall); also quota recovery and account routing.
@@ -65,7 +65,7 @@ bash addons/fleet-stall/install.sh
 ```sh
 bash \
   addons/merge-on-green/install.sh \
-  "$FM_HOME"
+  "$JG_HOME"
 ```
 
 **Understand the fleet** — [Flow check](fleet-flow/install.sh); also the [Lookout dashboard](lookout-adapter/README.md), metrics, and ticket sync.
@@ -81,16 +81,16 @@ The [reference](docs/addons-reference.md) covers hooks, platform requirements, r
 ## Proof you can inspect
 
 The [pull-request CI workflow](../.github/workflows/addons-ci.yml) runs shell checks and executable integration journeys against disposable homes.
-For example, [the memory-gate journey](host-memory/tests/fm-mem-gate.test.sh) exercises waiting and release under changing memory readings without starting a heavy job.
+For example, [the memory-gate journey](host-memory/tests/jg-mem-gate.test.sh) exercises waiting and release under changing memory readings without starting a heavy job.
 The [Lookout Overview hero journey](docs/capture-lookout-hero.sh) captures phone and desktop views from a live Lookout (or from lookout-adapter into a Lookout clone).
 
 ## Setup and limits
 
-Install from the GitHub clone; add-on installers are under `addons/`, and `bash addons/install-all.sh [--dry-run] "$FM_HOME"` runs every one of them from that directory.
+Install from the GitHub clone; add-on installers are under `addons/`, and `bash addons/install-all.sh [--dry-run] "$JG_HOME"` runs every one of them from that directory.
 Some add-ons need fork-side hooks or remain dormant copies; check [FORK-EXIT.md](FORK-EXIT.md) before choosing one.
 Installers can change hooks, configuration, or user services; read the selected add-on's setup before applying it.
 
 - [Full catalog, installation, checks, and removal](docs/addons-reference.md)
 - [Fork dependencies and exit paths](FORK-EXIT.md)
 - [Product direction](VISION.md)
-- [Contributor verification journeys](.agents/skills/done-done-verify-firstmate-addons/SKILL.md)
+- [Contributor verification journeys](.agents/skills/done-done-verify-juggernaut-addons/SKILL.md)

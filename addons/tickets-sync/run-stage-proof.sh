@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 # Sync a stuck leaf onto a task-owned sign-off board and capture stage + stuck Nh on Tickets.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 : "${DONE_DONE_EVIDENCE_ROOT:?done-done must provide its run evidence folder}"
 command -v sign-off-axi >/dev/null || { echo 'sign-off-axi is required' >&2; exit 1; }
@@ -11,26 +20,26 @@ esac
 real_home=${HOME:-/home/you}
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 # The add-on lives under <fork>/addons here, so the fork that owns bin/ is one level up.
-fork=${FM_TEST_FORK:-${FM_MAIN_HOME:-$(cd "$repo/.." && pwd -P)}}
+fork=${JG_TEST_FORK:-${JG_MAIN_HOME:-$(cd "$repo/.." && pwd -P)}}
 evidence=$DONE_DONE_EVIDENCE_ROOT
 work=$(mktemp -d "$evidence/stage-board.XXXXXX")
 export HOME=$work/user XDG_DATA_HOME=$work/xdg SIGN_OFF_HOME=$work/signoff
-export FM_HOME=$work/main TMPDIR=$work/tmp
-mkdir -p "$HOME" "$FM_HOME"/{data,config,state,projects/alpha} "$TMPDIR"
-ln -s "$fork/bin" "$FM_HOME/bin"
+export JG_HOME=$work/main TMPDIR=$work/tmp
+mkdir -p "$HOME" "$JG_HOME"/{data,config,state,projects/alpha} "$TMPDIR"
+ln -s "$fork/bin" "$JG_HOME/bin"
 printf '{"schema":2,"items":[]}\n' > "$work/board.json"
-printf '%s\n' "$work/board.json" > "$FM_HOME/config/fleet-board"
-printf '[markdown]\npath="data/backlog.md"\narchive="data/done-archive.md"\ndone_keep=0\n' > "$FM_HOME/.tasks.toml"
-(cd "$FM_HOME"; tasks-axi add stuck 'Umer stuck telescope focus' --repo alpha --priority 1 --body $'release: next\nparent: upkeep' >/dev/null
+printf '%s\n' "$work/board.json" > "$JG_HOME/config/fleet-board"
+printf '[markdown]\npath="data/backlog.md"\narchive="data/done-archive.md"\ndone_keep=0\n' > "$JG_HOME/.tasks.toml"
+(cd "$JG_HOME"; tasks-axi add stuck 'Umer stuck telescope focus' --repo alpha --priority 1 --body $'release: next\nparent: upkeep' >/dev/null
  tasks-axi start stuck >/dev/null)
-git init -q "$FM_HOME/projects/alpha"
-git -C "$FM_HOME/projects/alpha" remote add origin https://github.com/example/ownvoice.git
+git init -q "$JG_HOME/projects/alpha"
+git -C "$JG_HOME/projects/alpha" remote add origin https://github.com/example/ownvoice.git
 # More than six hours ago so the board draws stuck Nh.
 old=$(( $(date +%s) - 8 * 3600 ))
-printf 'working [at=%s]: building Umer stuck telescope focus\n' "$old" > "$FM_HOME/state/stuck.status"
+printf 'working [at=%s]: building Umer stuck telescope focus\n' "$old" > "$JG_HOME/state/stuck.status"
 bash "$repo/tickets-sync/install.sh"
-"$FM_HOME/state/tickets-sync.check.sh" | tee "$evidence/sync.out"
-tid=$(printf 'fm-%s' "$(printf '%s' main/stuck | sha256sum | cut -c1-32)")
+"$JG_HOME/state/tickets-sync.check.sh" | tee "$evidence/sync.out"
+tid=$(printf 'jg-%s' "$(printf '%s' main/stuck | sha256sum | cut -c1-32)")
 sign-off-axi ticket "$work/board.json" --id "$tid" --json | tee "$evidence/ticket.json" | jq -e --argjson old "$old" \
   '.ticket.stage == "building" and .ticket.last_event_at == $old and .ticket.progress == 30' >/dev/null
 # serve stays in the foreground; run it in the background and stop by board path.
@@ -63,6 +72,6 @@ for theme in light dark; do
 done
 stat -c '%n %s' "$evidence"/tickets-390-*.png | tee "$evidence/shots.ls"
 jq -n --arg version "$ver" --arg url "$url" --argjson old "$old" \
-  '{target:{version:$version,board:$url},start:"A disposable Firstmate home has one in-flight leaf whose status stamp is eight hours old.",steps:["Install this checkout'\''s tickets-sync into a throwaway XDG and run the watcher check.","Confirm the ticket JSON carries stage building and last_event_at equal to the status stamp.","Serve the board with sign-off-axi and open the leaf ticket at 390px in light and dark."],result:"Each ticket capture shows the stage word building and a stuck Nh note for the Umer stuck telescope focus leaf."}' \
+  '{target:{version:$version,board:$url},start:"A disposable Juggernaut home has one in-flight leaf whose status stamp is eight hours old.",steps:["Install this checkout'\''s tickets-sync into a throwaway XDG and run the watcher check.","Confirm the ticket JSON carries stage building and last_event_at equal to the status stamp.","Serve the board with sign-off-axi and open the leaf ticket at 390px in light and dark."],result:"Each ticket capture shows the stage word building and a stuck Nh note for the Umer stuck telescope focus leaf."}' \
   > "$evidence/steps.json"
 printf 'PASS: tickets stage publish shows building and stuck on the real sign-off Tickets tab\n'

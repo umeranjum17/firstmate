@@ -2,8 +2,17 @@
 # Capture Lookout Overview for the README hero with real lane/merge history.
 # Either:
 #   LOOKOUT_URL=http://host:4390  (already-running Lookout with a live fleet), or
-#   FM_HOME + LOOKOUT_DIR         (serve lookout-adapter into a Lookout clone).
+#   JG_HOME + LOOKOUT_DIR         (serve lookout-adapter into a Lookout clone).
 # Always requires DONE_DONE_EVIDENCE_ROOT. Refuses Sample fleet and empty history.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -Eeuo pipefail
 : "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
@@ -25,12 +34,12 @@ free_port() { python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",
 if [ -n "${LOOKOUT_URL:-}" ]; then
   base=${LOOKOUT_URL%/}
 else
-  : "${FM_HOME:?set FM_HOME or LOOKOUT_URL}" "${LOOKOUT_DIR:?set LOOKOUT_DIR or LOOKOUT_URL}"
-  adapter=$root/lookout-adapter/lookout-firstmate
+  : "${JG_HOME:?set JG_HOME or LOOKOUT_URL}" "${LOOKOUT_DIR:?set LOOKOUT_DIR or LOOKOUT_URL}"
+  adapter=$root/lookout-adapter/lookout-juggernaut
   [ -x "$adapter" ] || { echo "capture-lookout-hero: missing $adapter" >&2; exit 1; }
   [ -f "$LOOKOUT_DIR/bin/lookout.js" ] || { echo "capture-lookout-hero: LOOKOUT_DIR has no bin/lookout.js: $LOOKOUT_DIR" >&2; exit 1; }
   ap=$(free_port); lp=$(free_port)
-  "$adapter" --home "$FM_HOME" --serve --port "$ap" >"$tmp/adapter.log" 2>&1 & pids+=("$!")
+  "$adapter" --home "$JG_HOME" --serve --port "$ap" >"$tmp/adapter.log" 2>&1 & pids+=("$!")
   (cd "$LOOKOUT_DIR" && exec node bin/lookout.js serve --adapter "http://127.0.0.1:$ap/fleet.json" --port "$lp" >"$tmp/lookout.log" 2>&1) & pids+=("$!")
   base="http://127.0.0.1:$lp"
 fi
@@ -79,7 +88,7 @@ python3 - "$(git -C "$root" rev-parse HEAD)" "${LOOKOUT_URL:-local-serve}" >"$DO
 import json, sys
 print(json.dumps({
     "target": {"version": sys.argv[1]},
-    "start": f"Lookout Overview at {sys.argv[2]} with a live Firstmate fleet (real history and merges).",
+    "start": f"Lookout Overview at {sys.argv[2]} with a live Juggernaut fleet (real history and merges).",
     "steps": [
         "Open Lookout Overview in light and dark at 390 and 1280.",
         "Confirm the fleet is not Sample fleet and lane history is present.",

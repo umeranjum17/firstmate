@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
 # Recursion guard: a quota read can never recurse through its own wrapper.
 #
 # The cycle this pins down, seen on a real machine as ~750 `quota-axi` processes and a load of 16:
 #   quota-axi (the quota-axi-pool wrapper on PATH)
-#     -> fm-model-pool pick -> claude-accounts-pick -> claude-accounts-quota.sh
+#     -> jg-model-pool pick -> claude-accounts-pick -> claude-accounts-quota.sh
 #       -> `quota-axi` (the wrapper again) -> and round it goes.
 # Both halves are fixed here. The reader must ask the real upstream, and the wrapper must refuse to
 # delegate a call that is already inside one. Either half alone would hide the other in this test, so
@@ -17,11 +24,11 @@ addons=$(cd "$here/../.." && pwd) || exit 1
 reader=$addons/claude-accounts/bin/claude-accounts-quota.sh
 w=$(mktemp -d "${TMPDIR:-/tmp}/quota-axi-pool-recursion-test.XXXXXX") || exit 1
 trap 'rm -rf -- "$w"' EXIT
-# The wrapper installed the way install.sh installs it: a copy in fm-quota-axi-pool/, symlinked into
+# The wrapper installed the way install.sh installs it: a copy in jg-quota-axi-pool/, symlinked into
 # a PATH dir as `quota-axi`. A bare copy under another name is not the shape anything ships.
-install -d "$w/data/fm-quota-axi-pool" "$w/bin" "$w/real" "$w/home/config" "$w/home/state" "$w/acct"
-install -m 755 "$addons/quota-axi-pool/bin/quota-axi-pool" "$w/data/fm-quota-axi-pool/quota-axi-pool"
-ln -sfn "$w/data/fm-quota-axi-pool/quota-axi-pool" "$w/bin/quota-axi"
+install -d "$w/data/jg-quota-axi-pool" "$w/bin" "$w/real" "$w/home/config" "$w/home/state" "$w/acct"
+install -m 755 "$addons/quota-axi-pool/bin/quota-axi-pool" "$w/data/jg-quota-axi-pool/quota-axi-pool"
+ln -sfn "$w/data/jg-quota-axi-pool/quota-axi-pool" "$w/bin/quota-axi"
 printf '%s\n' "$w/real/quota-axi" >"$w/upstream"
 : >"$w/log-upstream"; : >"$w/log-pool"
 fails=0
@@ -35,11 +42,11 @@ printf '%s\n' "\$*" >>"$w/log-upstream"
 printf '%s\n' '{"providers":[{"provider":"claude","state":{"status":"fresh","stale":false},"windows":[{"id":"five_hour","percentRemaining":80},{"id":"seven_day","percentRemaining":80}]}]}'
 SH
 chmod +x "$w/real/quota-axi"
-# Stands in for fm-model-pool: records that the wrapper delegated (and at what depth) and exits, so a
+# Stands in for jg-model-pool: records that the wrapper delegated (and at what depth) and exits, so a
 # wrapper that wrongly delegates fails this test instead of starting the real cycle on this machine.
 cat >"$w/bin/fake-pool" <<SH
 #!/usr/bin/env bash
-printf 'depth=%s\n' "\${FM_QUOTA_AXI_POOL_DEPTH:-unset}" >>"$w/log-pool"
+printf 'depth=%s\n' "\${JG_QUOTA_AXI_POOL_DEPTH:-unset}" >>"$w/log-pool"
 exit 1
 SH
 chmod +x "$w/bin/fake-pool"
@@ -52,9 +59,9 @@ printf 'command=%s\nstate=%s\n' "$w/bin/fake-pool" "$w/home/state" >"$w/home/con
 run_reader() {
   : >"$w/log-upstream"; : >"$w/log-pool"; rm -f "$w/home/state/claude-accounts.json"
   out=$(env -i PATH="$w/bin${1:+:$1}:/usr/bin:/bin" HOME="$w" TMPDIR="$w" \
-    FM_HOME="$w/home" FM_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
-    FM_CLAUDE_ACCOUNTS_SECONDS=5 FM_ACCOUNTS_PROVIDER=claude \
-    FM_QUOTA_AXI_POOL_UPSTREAM="$2" FM_MODEL_POOL="$w/bin/fake-pool" \
+    JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" \
+    JG_CLAUDE_ACCOUNTS_SECONDS=5 JG_ACCOUNTS_PROVIDER=claude \
+    JG_QUOTA_AXI_POOL_UPSTREAM="$2" JG_MODEL_POOL="$w/bin/fake-pool" \
     timeout 30 "$reader" 2>&1)
   rc=$?
 }
@@ -63,12 +70,12 @@ run_reader() {
 run_wrapper() {
   : >"$w/log-upstream"; : >"$w/log-pool"
   if [ -n "$1" ]; then
-    out=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" \
-      FM_QUOTA_AXI_POOL_UPSTREAM="$w/upstream" FM_MODEL_POOL="$w/bin/fake-pool" \
-      FM_QUOTA_AXI_POOL_DEPTH="$1" timeout 15 "$w/bin/quota-axi" --json 2>&1)
+    out=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" JG_HOME="$w/home" \
+      JG_QUOTA_AXI_POOL_UPSTREAM="$w/upstream" JG_MODEL_POOL="$w/bin/fake-pool" \
+      JG_QUOTA_AXI_POOL_DEPTH="$1" timeout 15 "$w/bin/quota-axi" --json 2>&1)
   else
-    out=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" \
-      FM_QUOTA_AXI_POOL_UPSTREAM="$w/upstream" FM_MODEL_POOL="$w/bin/fake-pool" \
+    out=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" JG_HOME="$w/home" \
+      JG_QUOTA_AXI_POOL_UPSTREAM="$w/upstream" JG_MODEL_POOL="$w/bin/fake-pool" \
       timeout 15 "$w/bin/quota-axi" --json 2>&1)
   fi
   rc=$?

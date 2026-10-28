@@ -4,7 +4,7 @@
 # otherwise. Every other new row is counted, per UTC day, in state/delete-guard.counted for the daily fleet summary:
 # a $VAR target with no literal value, a bare . .. * target, a temp or scratch target, a block from an agent working
 # in a temp or scratch folder (a lab or probe), and a repeat the guard already woke on (same task, or cwd, within 10
-# min). The blocks themselves never change. Usage: check.sh <fm-home>
+# min). The blocks themselves never change. Usage: check.sh <jg-home>
 set -u
 LOG="$1/state/delete-guard.log" SEEN="$1/state/.delete-guard.seen" COUNTED="$1/state/delete-guard.counted"
 [ -f "$LOG" ] || exit 0
@@ -18,7 +18,7 @@ rows=$(head -n "$total" "$LOG" | jq -Rnr --argjson seen "$seen" --arg home "$HOM
   def ts: (.at // "") | sub("\\.[0-9]+Z$"; "Z") | (try fromdate catch 0);
   def key: if (.task // "") == "" then .cwd else .task end;
   def tohome: sub("^(\\$HOME|\\$\\{HOME\\})(?=/|$)"; "~");
-  def temp: test("^/(tmp|var/tmp|dev/shm)(/|$)|/\\.cache/fm-scratch(/|$)") and (test("(^|/)\\.\\.(/|$)") | not);
+  def temp: test("^/(tmp|var/tmp|dev/shm)(/|$)|/\\.cache/jg-scratch(/|$)") and (test("(^|/)\\.\\.(/|$)") | not);
   # The absolute path a target names: itself, or the last literal value the command assigns to its variable ($HOME
   # unassigned is the home folder). null for anything else: a bare . .. * or a variable whose value is unknown.
   def path: (.target // "") as $t

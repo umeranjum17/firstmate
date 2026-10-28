@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Print the newest data/*retro*/report.md across the main home and known sibling
-# firstmate homes (secondmates.md and ~/.treehouse/firstmate-*/*/firstmate), by
+# juggernaut homes (squad_leads.md and ~/.treehouse/juggernaut-*/*/juggernaut), by
 # mtime. No output when none exist. Usage: newest-retro-report.sh <main-home>
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -9,7 +18,7 @@ if [ "$#" -ne 1 ]; then
   exit 2
 fi
 main=$(cd "$1" && pwd -P)
-treehouse=${FM_TREEHOUSE:-$HOME/.treehouse}
+treehouse=${JG_TREEHOUSE:-$HOME/.treehouse}
 
 datas=
 add_data() {
@@ -23,13 +32,13 @@ add_data() {
 }
 
 add_data "$main/data"
-if [ -f "$main/data/secondmates.md" ]; then
+if [ -f "$main/data/squad_leads.md" ]; then
   while IFS= read -r hp; do
     [ -n "$hp" ] && add_data "$hp/data"
-  done < <(sed -n 's/.*(home: \([^;]*\);.*/\1/p' "$main/data/secondmates.md")
+  done < <(sed -n 's/.*(home: \([^;]*\);.*/\1/p' "$main/data/squad_leads.md")
 fi
 if [ -d "$treehouse" ]; then
-  for hp in "$treehouse"/firstmate-*/*/firstmate; do
+  for hp in "$treehouse"/juggernaut-*/*/juggernaut; do
     [ -d "$hp" ] && add_data "$hp/data"
   done
 fi

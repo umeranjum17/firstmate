@@ -2,7 +2,7 @@
 # route-change - move worker dispatch, the no-mistakes gate and lead pins to
 # one route together.
 #
-# Usage: route-change [--dry-run] <fm-home> <route>
+# Usage: route-change [--dry-run] <jg-home> <route>
 #
 # A route is one model of the pipeline-quota-failover chain, the fleet's one
 # route list: it is read from the wrapper the gate runs (agent_path_override.pi
@@ -15,23 +15,23 @@
 #     nothing is written.
 #  2. Every file it will change is backed up as <file>.bak-route-change-<stamp>.
 #  3. All pins move:
-#     - <fm-home>/config/crew-dispatch.json: in the default and every rule, the
+#     - <jg-home>/config/crew-dispatch.json: in the default and every rule, the
 #       route leads the non-Claude profiles (Claude and Opus entries keep their
 #       place; an Opus-only rule is left alone). A list that already holds the
 #       route, as <route> or <provider>/<route> on any harness, moves that entry;
 #       any other list gets a pi profile for it.
 #     - the gate: agent and agent_config.pi.model in the no-mistakes config,
 #       edited by key name; no value other than route names is printed.
-#     - lead pins: config/secondmate-harness and config/secondmates/*/harness,
+#     - lead pins: config/squad-lead-harness and config/squad_leads/*/harness,
 #       except pins on Claude or Opus, which are not routes.
 #  4. One real request (a one-word prompt through pi on the route, as the gate
 #     calls it). When it fails every backup is restored and the cause printed.
 # --dry-run runs step 1, prints the planned edits and writes nothing.
-# Each switch is one line in <fm-home>/state/route-change.log. It holds
+# Each switch is one line in <jg-home>/state/route-change.log. It holds
 # quota-failover's lock while it works, so the two never edit dispatch at once.
 #
 # Needs pi, quota-axi, jq, python3 with yaml, flock and timeout on PATH, and
-# <fm-home>/bin/fm-quota-axi-lib.sh. ROUTE_CHANGE_TEST_SECS (default 90) bounds
+# <jg-home>/bin/jg-quota-axi-lib.sh. ROUTE_CHANGE_TEST_SECS (default 90) bounds
 # the real request; ROUTE_CHANGE_MAX_AGE (default 10m) is the oldest quota
 # reading it trusts.
 set -u
@@ -40,16 +40,16 @@ die() { echo "route-change: $*" >&2; exit 1; }
 
 dry=0
 [ "${1:-}" = --dry-run ] && { dry=1; shift; }
-[ $# -eq 2 ] || die "usage: route-change [--dry-run] <fm-home> <route>"
-[ -d "$1/config" ] && [ -d "$1/state" ] || die "$1 is not a firstmate home (no config/ or state/)"
-FM_HOME=$(cd "$1" && pwd) route=$2
-CONFIG=$FM_HOME/config STATE=$FM_HOME/state
+[ $# -eq 2 ] || die "usage: route-change [--dry-run] <jg-home> <route>"
+[ -d "$1/config" ] && [ -d "$1/state" ] || die "$1 is not a juggernaut home (no config/ or state/)"
+JG_HOME=$(cd "$1" && pwd) route=$2
+CONFIG=$JG_HOME/config STATE=$JG_HOME/state
 DISPATCH=$CONFIG/crew-dispatch.json
 NM=${NM_CONFIG:-$HOME/.no-mistakes/config.yaml}
 [ -f "$DISPATCH" ] || die "no $DISPATCH"
 [ -f "$NM" ] || die "no no-mistakes config at $NM"
 # shellcheck source=/dev/null
-. "$FM_HOME/bin/fm-quota-axi-lib.sh" || die "cannot load $FM_HOME/bin/fm-quota-axi-lib.sh"
+. "$JG_HOME/bin/jg-quota-axi-lib.sh" || die "cannot load $JG_HOME/bin/jg-quota-axi-lib.sh"
 
 exec 9>"$STATE/.quota-failover.lock" && flock -w 120 9 || die "quota-failover holds its lock; try again"
 
@@ -77,10 +77,10 @@ trap 'rm -rf -- "$tmp"' EXIT
 
 # 1. quota-axi first.
 quota=$(quota-axi --json --no-credential-refresh --max-age "${ROUTE_CHANGE_MAX_AGE:-10m}" 2>"$tmp/err") \
-  && fm_quota_json_valid <<<"$quota" || die "quota-axi gave no reading: $(head -c 300 "$tmp/err")"
+  && jg_quota_json_valid <<<"$quota" || die "quota-axi gave no reading: $(head -c 300 "$tmp/err")"
 # Scope matching is quota-failover's exhausted(): the model's bare name against
 # a model: or product: scope, and the account-wide scopes.
-why=$(jq -r --arg p "$provider" --arg m "$route" "$FM_QUOTA_ROW_JQ"'
+why=$(jq -r --arg p "$provider" --arg m "$route" "$JG_QUOTA_ROW_JQ"'
   ($m | split("/") | last) as $b
   | [(quota_row(.; $p; quota_lane("pi"; $m)) // {}).quotaSemantics.effectiveAvailability[]?
     | select(.runway.status == "exhausted_now") | .scope as $s
@@ -150,7 +150,7 @@ if ! cmp -s "$NM" "$tmp/gate"; then
 fi
 
 n=0
-for pin in "$CONFIG/secondmate-harness" "$CONFIG"/secondmates/*/harness; do
+for pin in "$CONFIG/squad-lead-harness" "$CONFIG"/squad_leads/*/harness; do
   [ -f "$pin" ] || continue
   line=$(grep -m1 -vE '^[[:space:]]*(#|$)' "$pin") || continue
   read -r h m e _ <<<"$line"

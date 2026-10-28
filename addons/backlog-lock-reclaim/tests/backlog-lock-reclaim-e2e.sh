@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# End to end: install into a throwaway HOME against a fixture home built from a Firstmate checkout's bin/, then drive the
+# End to end: install into a throwaway HOME against a fixture home built from a Juggernaut checkout's bin/, then drive the
 # installed check against real tasks-axi writers. A writer SIGKILLed between its lock open and its token write leaves a
 # 0-byte lock; once old the check reclaims it and the next write succeeds. A young 0-byte lock, a lock with a token, and
-# a lock a live writer still has open are each left alone. Usage: backlog-lock-reclaim-e2e.sh <firstmate-checkout> [git-ref]
+# a lock a live writer still has open are each left alone. Usage: backlog-lock-reclaim-e2e.sh <juggernaut-checkout> [git-ref]
 set -euo pipefail
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 TASKS_JS=$(readlink -f "$(command -v tasks-axi)") || { echo "FAIL: tasks-axi is not installed" >&2; exit 1; }
@@ -33,7 +33,7 @@ kill_writer() { kill -9 "$W" 2>/dev/null || true; wait "$W" 2>/dev/null || true;
 age_lock() { touch -d '5 minutes ago' -- "$LOCK"; }
 
 inst --dry-run > "$T/dry.out"
-[ ! -e "$CHECK" ] && [ ! -e "$T/data/fm-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
+[ ! -e "$CHECK" ] && [ ! -e "$T/data/jg-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
   && ok "dry run writes nothing" || no "dry run wrote files"
 inst > "$T/install.out" && inst > "$T/reinstall.out"
 grep -q 'registered: state/backlog-lock-reclaim.check.sh' "$T/install.out" && ok "check registered" || no "check not registered"
@@ -70,7 +70,7 @@ out=$("$CHECK")
   || no "lock not reclaimed after holder death: $out"
 
 HOME="$T/home" XDG_DATA_HOME="$T/data" "$ADDON/uninstall.sh" "$T/fm" > "$T/uninstall.out" \
-  && [ ! -e "$CHECK" ] && [ ! -e "$T/data/fm-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
+  && [ ! -e "$CHECK" ] && [ ! -e "$T/data/jg-backlog-lock-reclaim/backlog-lock-reclaim.check.sh" ] \
   && ok "uninstall retires the check and its copy" || no "uninstall left files: $(cat "$T/uninstall.out")"
 
 [ "$fail" -eq 0 ] && echo "PASS: backlog-lock-reclaim e2e" || echo "FAIL: backlog-lock-reclaim e2e"

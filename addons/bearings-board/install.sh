@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wire the Bearings board wrapper into one Firstmate home: a launcher that runs the
+# Wire the Bearings board wrapper into one Juggernaut home: a launcher that runs the
 # checkout's board. A home hook at config/bearings-board-command
 # is pointed at the launcher only when it exists; otherwise install prints the command.
 # The hook keeps the file, mode and links it had: install saves its content beside it and
@@ -9,11 +9,20 @@
 # ownership mark: install wrote the hook exactly when it is set.
 # The launcher and the install record are written before the hook is repointed, so a
 # failed install leaves the home's board command working and removable.
-# Idempotent: rerun it to update. Usage: install.sh [--dry-run] <fm-home>
+# Idempotent: rerun it to update. Usage: install.sh [--dry-run] <jg-home>
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
-[ "$#" -eq 1 ] && [ -x "$1/bin/fm-bearings-board.sh" ] || { echo "usage: install.sh [--dry-run] <fm-home>" >&2; exit 2; }
+[ "$#" -eq 1 ] && [ -x "$1/bin/jg-bearings-board.sh" ] || { echo "usage: install.sh [--dry-run] <jg-home>" >&2; exit 2; }
 FMH=$(cd "$1" && pwd -P)
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 LAUNCHER="$FMH/state/bearings-board-thin"
@@ -52,7 +61,7 @@ if [ "$DRY" -eq 1 ]; then
 fi
 
 mkdir -p "$FMH/state"
-printf '#!/usr/bin/env bash\nexec env FM_CODE_ROOT=%q FM_HOME=%q %q "$@"\n' "$FMH" "$FMH" "$SRC/bin/fm-bearings-board.sh" > "$LAUNCHER.tmp-$STAMP"
+printf '#!/usr/bin/env bash\nexec env JG_CODE_ROOT=%q JG_HOME=%q %q "$@"\n' "$FMH" "$FMH" "$SRC/bin/jg-bearings-board.sh" > "$LAUNCHER.tmp-$STAMP"
 chmod 700 "$LAUNCHER.tmp-$STAMP" && mv "$LAUNCHER.tmp-$STAMP" "$LAUNCHER"
 printf 'launcher=%s\nhook=%s\nbackup=%s\n' "$LAUNCHER" "$hook_state" "$hook_backup" > "$RECORD"
 echo "installed: $LAUNCHER"

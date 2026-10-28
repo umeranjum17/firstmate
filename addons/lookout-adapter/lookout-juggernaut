@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""lookout-juggernaut - print or serve this fleet as Lookout's lookout.fleet.v1 document (read-only).
+
+  lookout-juggernaut [--home DIR] [--no-build]            print the JSON
+  lookout-juggernaut --serve [--port N] [--bind ADDR]     serve it at /fleet.json (Lookout's --adapter URL), the last good
+                                                         snapshot at once, rebuilt in the background every --every seconds
+
+The document comes from the read-only fleet-flow reader and registered home records. Only whitelisted metadata fields are copied,
+so no key, token or account secret reaches the document. JG_HOME defaults to the current directory's Juggernaut home.
+"""
+import json, os, re, socket, subprocess, sys, threading, time, argparse
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+STAGES = {'queued': 'queued', 'working': 'working', 'resolved': 'working', 'done': 'done', 'building': 'working', 'review': 'review', 'test': 'review', 'ci': 'review', 'merge': 'merging', 'landed': 'done'}
+WORKER_STATES = {'working': 'working', 'idle': 'idle', 'done': 'exited'}
+META_KEYS = ('model', 'harness', 'account', 'pr')  # the only fields read from a lane's .meta
+
+
+def iso(t):
+    if isinstance(t, str):
+        t = datetime.fromisoformat(t).timestamp()
+    return datetime.fromtimestamp(float(t), timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def load(path):
+    with open(path) as f:
+        return json.load(f)
+
+
+def refresh(home, force_build, flow_json=None):
+    if flow_json:
+        return load(flow_json)
+    env = dict(os.environ, JG_HOME=home)
+    env.setdefault('JG_BIN', os.path.join(home, 'bin'))
+    reader = os.path.join(HERE, '../fleet-flow/bin/jg-flow.sh')
+    result = subprocess.run(['bash', reader, '--json'], env=env, capture_output=True, text=True, timeout=240)
+    if result.returncode:
+        raise RuntimeError('jg-flow failed: ' + (result.stderr.strip() or result.stdout.strip())[-500:])
+    return json.loads(result.stdout)
+
+
+def home_dirs(home):
+    """Each registered home's directory, from data/squad_leads.md; Main is this home."""
+    dirs = {'main': home}
+    try:
+        for line in open(os.path.join(home, 'data/squad_leads.md')):
+            m = re.match(r'- (\S+) - .*\(home: ([^;)]+)', line)
+            if m:
+                dirs[m.group(1)] = m.group(2)
+    except OSError:
+        pass
+    return dirs
+
+
+def lane_meta(dirs, home_id, task):
+    try:
+        text = open(os.path.join(dirs[home_id], 'state', task + '.meta')).read()
+    except (KeyError, OSError):
+        return {}
+    return {k: v for k, v in (l.split('=', 1) for l in text.splitlines() if '=' in l) if k in META_KEYS}
+
+
+def host_doc(data, now, proc):
+    name = socket.gethostname()
+    mem = dict(l.split(':', 1) for l in open(os.path.join(proc, 'meminfo')) if ':' in l)
+    kb = lambda k: float(mem[k].split()[0])
+    st = os.statvfs('/')
+    load1 = float(open(os.path.join(proc, 'loadavg')).read().split()[0])
+    lim, mach, metrics = data.get('machine_limits', {}), data.get('machine', {}), data.get('metrics', {})
+    pressure = mach.get('pressure')
+    host = {'id': name, 'name': name, 'cpu_pct': round(min(100.0, 100 * load1 / (os.cpu_count() or 1)), 1),
+            'mem_pct': round(100 * (1 - kb('MemAvailable') / kb('MemTotal')), 1),
+            'disk_pct': round(100 * (1 - st.f_bavail / st.f_blocks), 1), 'load1': load1, 'sampled_at': iso(now)}
+    if pressure is not None and lim.get('memory_pressure'):
+        host['gate'] = {'state': 'closed' if pressure >= lim['memory_pressure'] else 'open', 'limit_pct': lim['memory_pressure']}
+    jobs = [{'kind': k, 'running': int(metrics.get(m, {}).get('value') or 0), **({'limit': lim[k + 's' if k == 'emulator' else k]} if lim.get(k + 's' if k == 'emulator' else k) else {})}
+            for k, m in (('emulator', 'emulators'), ('gradle', 'gradle_builds'))]
+    return host | {'jobs': jobs}
+
+
+def home_names(home):
+    names = {'main': 'Main'}
+    try:
+        for line in open(os.path.join(home, 'data/squad_leads.md')):
+            match = re.match(r'- (\S+) - ([^(]+) \(.*home:', line)
+            if match:
+                names[match[1]] = match[2].strip()
+    except OSError:
+        pass
+    return names
+
+
+def build_fleet(home, build=True, proc='/proc', flow_json=None):
+    data = refresh(home, build, flow_json)
+    now = data['at']
+    dirs = home_dirs(home)
+    host = host_doc({}, now, proc)
+    names = home_names(home)
+    homes = [{'id': name, 'name': names.get(name, name), 'host': host['id'], 'lane_cap': 1,
+              'supervision': {'state': 'ok', 'last_beat_at': iso(now)}} for name in data['homes']]
+    lanes, workers, merges = [], [], []
+    for row in data['lanes']:
+        lane_id = row['home'] + '/' + row['task']
+        meta = lane_meta(dirs, row['home'], row['task'])
+        merged = row.get('times', {}).get('merged')
+        if merged and now - merged < 30 * 86400:
+            repo = re.match(r'https://github.com/([^/]+/[^/]+)/pull/', meta.get('pr', ''))
+            merges.append({'at': iso(merged), 'repo': repo[1] if repo else row.get('project') or row['home'],
+                           'title': row['task'], 'outcome': 'merged', 'checks': 'pass', 'home': row['home'], 'lane': lane_id,
+                           **({'pr_url': meta['pr']} if meta.get('pr') else {}),
+                           **({'started_at': iso(row['times']['dispatched'])} if row['times'].get('dispatched') else {})})
+        if not row.get('open') and not merged:
+            continue
+        state = row.get('stage')
+        waits = row.get('open_waits') or []
+        started = row.get('times', {}).get('dispatched') or row.get('times', {}).get('working') or now
+        updated = now - row['seconds_in_stage'] if isinstance(row.get('seconds_in_stage'), int) else now
+        lane = {'id': lane_id, 'home': row['home'], 'title': row['task'], 'project': row.get('project') or row['home'],
+                'stage': STAGES.get(state, 'review'), 'stuck': state in ('blocked', 'needs-decision'),
+                'started_at': iso(started), 'updated_at': iso(updated)}
+        if meta.get('pr'):
+            lane['pr_url'] = meta['pr']
+        reason = next((wait.get('reason') for wait in waits if wait.get('reason')), row.get('reason'))
+        if reason and (waits or state in ('blocked', 'needs-decision', 'paused')):
+            lane['waiting_on'] = str(reason)
+        lanes.append(lane)
+        if row.get('kind') in ('ship', 'scout') and any(meta.get(key) for key in ('harness', 'model', 'account')):
+            workers.append({'id': lane_id, 'lane': lane_id, 'agent': meta.get('harness', 'unknown'),
+                            'model': meta.get('model', 'unknown'), 'account': meta.get('account', 'unknown'),
+                            'state': 'working' if state in ('working', 'resolved') else 'waiting' if waits else 'idle',
+                            'started_at': iso(started), 'last_activity_at': iso(updated)})
+    return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Juggernaut fleet',
+            'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers, 'quota': [],
+            'merges': merges, 'releases': [], 'incidents': []}
+
+
+def main(argv):
+    p = argparse.ArgumentParser(prog='lookout-juggernaut')
+    p.add_argument('--home', default=os.environ.get('JG_HOME') or os.getcwd())
+    p.add_argument('--no-build', action='store_true')
+    p.add_argument('--proc', default=os.environ.get('LOOKOUT_PROC', '/proc'))
+    p.add_argument('--flow-json', help='use a saved jg-flow document instead of running the reader')
+    p.add_argument('--serve', action='store_true')
+    p.add_argument('--port', type=int, default=4391)
+    p.add_argument('--bind', default='127.0.0.1')
+    p.add_argument('--every', type=int, default=30)
+    p.add_argument('--cold-wait', type=int, default=120)
+    a = p.parse_args(argv)
+    make = lambda: build_fleet(a.home, not a.no_build, a.proc, a.flow_json)
+    if not a.serve:
+        json.dump(make(), sys.stdout, indent=1)
+        print()
+        return 0
+
+    snap = {}  # the last good document; a failed rebuild keeps it, and its own generated_at tells the page how old it is
+
+    def refresh():
+        try:
+            snap['doc'] = json.dumps(make())
+            snap.pop('err', None)
+        except Exception as e:  # the cause is shown only while there is no snapshot to serve
+            snap['err'] = str(e)
+
+    def keep_fresh():
+        while True:
+            refresh()
+            time.sleep(a.every)
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path not in ('/', '/fleet.json'):
+                code, body = 404, json.dumps({'error': 'not found'})
+            elif 'doc' in snap:
+                code, body = 200, snap['doc']
+            else:  # cold start: wait for the first build
+                for _ in range(a.cold_wait * 10):
+                    if 'doc' in snap or 'err' in snap:
+                        break
+                    time.sleep(0.1)
+                code, body = (200, snap['doc']) if 'doc' in snap else (502, json.dumps({'error': snap.get('err', 'the first build is still running')}))
+            self.send_response(code)
+            self.send_header('content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(body.encode())
+        log_message = lambda *x: None
+
+    threading.Thread(target=keep_fresh, daemon=True).start()
+    srv = ThreadingHTTPServer((a.bind, a.port), H)
+    print(f'lookout-juggernaut serving http://{a.bind}:{srv.server_port}/fleet.json', flush=True)
+    srv.serve_forever()
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

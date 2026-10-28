@@ -24,6 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from task_rows import toon_rows
 from lane import progress as lane_progress
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for _jg_old, _jg_val in list(os.environ.items()):
+    if _jg_old.startswith("FM_") and "JG_" + _jg_old[3:] not in os.environ:
+        os.environ["JG_" + _jg_old[3:]] = _jg_val
 
 def run(args, env=None, cwd=None, missing=False):
     r = sp.run(args, env=env, cwd=cwd, text=True, capture_output=True, timeout=60)
@@ -39,7 +43,7 @@ def rows(args, env, cwd=None):
     return result
 
 ICONS = Path(__file__).resolve().parent / 'icons'
-ALIAS = {'firstmate-fork': 'firstmate', 'main': 'firstmate', 'muxr': 'pockit'}
+ALIAS = {'juggernaut-fork': 'juggernaut', 'main': 'juggernaut', 'muxr': 'pockit'}
 
 def icon_problem(image):
     if image.suffix == '.svg':
@@ -69,7 +73,7 @@ def register_icon(board, project, registry):
     return None
 
 def ticket_id(home, item):
-    return "fm-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
+    return "jg-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
 
 def sync():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -81,8 +85,8 @@ def sync():
     options = parser.parse_args()
     if bool(options.close) != bool(options.reason): parser.error('--close and --reason are required together')
     started = time.monotonic()
-    budget = float(os.environ.get('FM_TICKETS_SYNC_BUDGET_SECS', '20'))
-    home = Path(os.environ['FM_HOME']).resolve()
+    budget = float(os.environ.get('JG_TICKETS_SYNC_BUDGET_SECS', '20'))
+    home = Path(os.environ['JG_HOME']).resolve()
     board = Path((home / 'config/fleet-board').read_text().strip())
     if not board.is_absolute(): board = home / board
     if options.audit: print(run(['sign-off-axi', 'ticket', str(board), '--json'])); return
@@ -101,7 +105,7 @@ def sync():
         closures_file = state / 'closures.json'
         closures = json.loads(closures_file.read_text()) if closures_file.exists() else {}
         homes = {'main': home}
-        registry = home / 'data/secondmates.md'
+        registry = home / 'data/squad_leads.md'
         for line in registry.read_text().splitlines() if registry.exists() else []:
             m = re.match(r'- (\S+) - .*\(home: ([^;]+);', line)
             if m: homes[m[1]] = Path(m[2])
@@ -156,16 +160,16 @@ def sync():
         upkeep_id = ticket_id('fleet', ':upkeep')
         publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued'))
         for tid, old in existing.items():
-            if tid.startswith('fm-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
+            if tid.startswith('jg-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
                 publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done'))
-            elif tid.startswith('fm-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
+            elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
                 publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
         for name, source in ordered:
-            env = {k: v for k, v in os.environ.items() if k not in ('FM_DATA_OVERRIDE', 'FM_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
-            env['FM_HOME'] = str(source)
-            reader = ['bash', str(home / 'bin/fm-tasks-axi.sh')]
+            env = {k: v for k, v in os.environ.items() if k not in ('JG_DATA_OVERRIDE', 'JG_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
+            env['JG_HOME'] = str(source)
+            reader = ['bash', str(home / 'bin/jg-tasks-axi.sh')]
             tasks = rows(reader + ['list'], env) + rows(reader + ['list', '--state', 'done'], env)
-            address = run(['bash', '-c', '. "$1/fm-tasks-axi-lib.sh"; . "$1/fm-backlog-transition-lib.sh"; fm_backlog_tasks_axi_addressing "$FM_HOME/data" || exit; printf "%s\\n%s\\n" "$FM_BACKLOG_AXI_ROOT" "$FM_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
+            address = run(['bash', '-c', '. "$1/jg-tasks-axi-lib.sh"; . "$1/jg-backlog-transition-lib.sh"; jg_backlog_tasks_axi_addressing "$JG_HOME/data" || exit; printf "%s\\n%s\\n" "$JG_BACKLOG_AXI_ROOT" "$JG_BACKLOG_AXI_FILE"', 'tickets-sync', str(home / 'bin')], env).splitlines()
             root, file = address
             if not file: raise RuntimeError(f'{name}: archive backfill requires markdown addressing')
             settings = {}
@@ -251,7 +255,7 @@ def sync():
                 publish(tid, desired)
         if options.check:
             for tid, old in existing.items():
-                if tid.startswith('fm-') and tid not in seen and (old.get('state') or '') != 'done':
+                if tid.startswith('jg-') and tid not in seen and (old.get('state') or '') != 'done':
                     print(f"tickets-check: {str(old.get('title'))[:70]} ticket says {old.get('state') or 'no state'}, but no home's work accounts for it")
             return
         save(cursor, {})

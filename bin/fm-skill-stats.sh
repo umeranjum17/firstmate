@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
-# fm-skill-stats.sh - thin shim for the fleet per-skill statistics reader, which lives in this repository's addons/.
-#
-# The reader is the fleet-stats add-on (fleet-stats/bin/fm-skill-stats.sh, importing
-# fm_stats_lib from that same folder); this shim only resolves the add-ons
-# directory and execs it with FM_BIN pointing at this fork's bin/, the same
-# contract as the fleet add-on shims.
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
 set -u
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CODE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOME_DIR="${FM_HOME:-$CODE_ROOT}"
-# shellcheck source=bin/fm-addons-dir-lib.sh
-. "$SCRIPT_DIR/fm-addons-dir-lib.sh"
-ADDONS_DIR=$(fm_addons_dir "$HOME_DIR")
-TARGET="$ADDONS_DIR/fleet-stats/bin/fm-skill-stats.sh"
-if [ ! -f "$TARGET" ]; then
-  echo "fm-skill-stats: the add-ons are missing (set FM_ADDONS_DIR): looked for $TARGET" >&2
-  exit 1
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-skill-stats.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
 fi
-FM_BIN="$SCRIPT_DIR" FM_HOME="$HOME_DIR" exec "$TARGET" "$@"

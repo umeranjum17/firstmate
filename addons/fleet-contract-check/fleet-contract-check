@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# fleet-contract-check: run each real cross-repo call with the installed versions, in a throwaway HOME and FM_HOME.
+# fleet-contract-check: run each real cross-repo call with the installed versions, in a throwaway HOME and JG_HOME.
 #
 #   fleet-contract-check [caller...]     callers: dispatch-resolve owner-guard checks-lint limit-prompt-move (default: all)
 #
-# Reads only: the fork's bin/ and config/ (FM_MAIN_HOME, default $FM_HOME or ~/firstmate) and this repo's add-ons.
+# Reads only: the fork's bin/ and config/ (JG_MAIN_HOME, default $JG_HOME or ~/juggernaut) and this repo's add-ons.
 # Prints `ok <caller>` or `FAIL <caller>: <cause>` per caller; exits 1 when any caller fails, 2 on a usage error.
 set -u
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-MAIN=${FM_MAIN_HOME:-${FM_HOME:-$HOME/firstmate}}
-ADDONS=${FM_ADDONS_DIR:-$SRC}
+MAIN=${JG_MAIN_HOME:-${JG_HOME:-$HOME/juggernaut}}
+ADDONS=${JG_ADDONS_DIR:-$SRC}
 d=$(mktemp -d) || exit 2
 trap 'rm -rf -- "$d"' EXIT
 mkdir -p "$d/home" "$d/fm/config" "$d/fm/data" "$d/fm/state" "$d/ev" "$d/stub" || exit 2
 
-# One throwaway environment for every caller; the real HOME and FM_HOME are never touched.
-sandbox() { HOME=$d/home FM_HOME=$d/fm FM_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/.local/share TMPDIR=$d "$@"; }
+# One throwaway environment for every caller; the real HOME and JG_HOME are never touched.
+sandbox() { HOME=$d/home JG_HOME=$d/fm JG_MAIN_HOME=$MAIN XDG_DATA_HOME=$d/home/.local/share TMPDIR=$d "$@"; }
 
-# fm-dispatch-resolve.sh validates the live rules before any network call; a stub curl keeps it offline.
+# jg-dispatch-resolve.sh validates the live rules before any network call; a stub curl keeps it offline.
 check_dispatch_resolve() {
   [ -r "$MAIN/config/crew-dispatch.json" ] || { echo "no $MAIN/config/crew-dispatch.json"; return 1; }
   cp "$MAIN/config/crew-dispatch.json" "$d/fm/config/"
   printf '#!/bin/sh\nexit 7\n' > "$d/stub/curl"; chmod +x "$d/stub/curl"
   echo '## Captain'"'"'s intent' > "$d/brief.md"
-  out=$(sandbox env TYPESAFE_API_KEY=contract-check PATH="$d/stub:$PATH" "$MAIN/bin/fm-dispatch-resolve.sh" "$d/brief.md" 2>&1) || { printf '%s' "${out:0:300}"; return 1; }
+  out=$(sandbox env TYPESAFE_API_KEY=contract-check PATH="$d/stub:$PATH" "$MAIN/bin/jg-dispatch-resolve.sh" "$d/brief.md" 2>&1) || { printf '%s' "${out:0:300}"; return 1; }
 }
 
 # The live merge gate names the owner-guard binary it execs; that binary must be installed and executable.
@@ -42,7 +42,7 @@ check_checks_lint() {
 }
 
 # Installs the candidate limit-prompt-move into a scratch install root with its install.sh and runs the installed quota
-# mover on a fixture home that has no core fm-account-pool-lib.sh: a package that leaves out a library it loads fails here.
+# mover on a fixture home that has no core jg-account-pool-lib.sh: a package that leaves out a library it loads fails here.
 check_limit_prompt_move() {
   out=$(sandbox bash "$ADDONS/limit-prompt-move/tests/limit-prompt-move-e2e.sh" --installed 2>&1) || { printf '%s' "$(tail -n 2 <<<"$out" | cut -c1-300 | tr '\n' ' ')"; return 1; }
 }

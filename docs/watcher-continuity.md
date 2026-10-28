@@ -5,7 +5,7 @@ Read it when debugging a supervision gap or changing a harness's re-arm path.
 
 The watcher remains intentionally one-shot: one actionable reason closes one watcher cycle.
 Must-work continuity now lives above that process boundary instead of depending on the model remembering a re-arm step.
-In this document, an arm is one run of `bin/fm-watch-arm.sh`, which starts a watcher cycle or attaches to one and returns the cycle's reason.
+In this document, an arm is one run of `bin/jg-watch-arm.sh`, which starts a watcher cycle or attaches to one and returns the cycle's reason.
 
 | Topic | Section |
 | --- | --- |
@@ -13,7 +13,7 @@ In this document, an arm is one run of `bin/fm-watch-arm.sh`, which starts a wat
 | What happens between an actionable close and the wake reaching the model | [Actionable wake ordering](#actionable-wake-ordering) |
 | How a watcher-downtime episode is announced and retired | [Recovery episode acknowledgement](#recovery-episode-acknowledgement) |
 | How each actor consumes the wake queue | [Per-actor acknowledgement](#per-actor-acknowledgement) |
-| What `bin/fm-watch-arm.sh` guarantees about each cycle | [Arm-layer cycle contract](#arm-layer-cycle-contract) |
+| What `bin/jg-watch-arm.sh` guarantees about each cycle | [Arm-layer cycle contract](#arm-layer-cycle-contract) |
 | Which test suites pin these contracts | [Regression coverage](#regression-coverage) |
 | What is not guaranteed, and where live evidence lives | [Active limits and verification](#active-limits-and-verification) |
 
@@ -24,17 +24,17 @@ Codex and Grok keep their own protocols; see [Manual recovery and other harnesse
 
 | Harness | Re-arm owner |
 | --- | --- |
-| Pi | `.pi/extensions/fm-primary-pi-watch.ts` |
-| omp | `.omp/extensions/fm-primary-omp-watch.ts` |
-| OpenCode | `.opencode/plugins/fm-primary-watch-arm.js` |
-| Cursor | `.cursor/hooks.json` `stop` hook (`bin/fm-turnend-guard-cursor.sh`) |
-| Claude | `.claude/settings.json` Stop `asyncRewake` hook (`bin/fm-claude-stop-autoarm.sh`) |
+| Pi | `.pi/extensions/jg-primary-pi-watch.ts` |
+| omp | `.omp/extensions/jg-primary-omp-watch.ts` |
+| OpenCode | `.opencode/plugins/jg-primary-watch-arm.js` |
+| Cursor | `.cursor/hooks.json` `stop` hook (`bin/jg-turnend-guard-cursor.sh`) |
+| Claude | `.claude/settings.json` Stop `asyncRewake` hook (`bin/jg-claude-stop-autoarm.sh`) |
 
 On a non-Pi primary, a home that runs the supervision host also changes what the owner runs; see [Supervision host](#supervision-host).
 
 ### Pi, omp, and OpenCode adapters
 
-Pi's `.pi/extensions/fm-primary-pi-watch.ts`, omp's `.omp/extensions/fm-primary-omp-watch.ts`, and OpenCode's `.opencode/plugins/fm-primary-watch-arm.js` own continuous re-arm after an actionable child close.
+Pi's `.pi/extensions/jg-primary-pi-watch.ts`, omp's `.omp/extensions/jg-primary-omp-watch.ts`, and OpenCode's `.opencode/plugins/jg-primary-watch-arm.js` own continuous re-arm after an actionable child close.
 Each adapter:
 
 - Starts the next arm before delivering the wake prompt.
@@ -50,7 +50,7 @@ A running OpenCode session keeps the plugin it loaded at launch, so an existing 
 
 ### Pi session replacement
 
-Pi same-process session replacement follows the generation-owner contract in `.pi/extensions/fm-primary-pi-watch.ts`:
+Pi same-process session replacement follows the generation-owner contract in `.pi/extensions/jg-primary-pi-watch.ts`:
 
 1. `session_shutdown` changes the current generation's durable extension marker from `active` to `handoff`, but keeps its established arm child alive.
 2. The owning `session_start` publishes a distinct active generation.
@@ -72,33 +72,33 @@ The extension header owns how consumption is observed and why it only decides wh
 
 ### omp session replacement
 
-omp's replacement follows its own generation-owner contract in `.omp/extensions/fm-primary-omp-watch.ts`, whose header owns its differences from Pi:
+omp's replacement follows its own generation-owner contract in `.omp/extensions/jg-primary-omp-watch.ts`, whose header owns its differences from Pi:
 
 - It retires the predecessor arm at replacement shutdown instead of retaining it across the handoff.
 - It reports no shutdown reason, so every shutdown with a pending actionable close persists the handoff for the next owning `session_start` to replay.
 
 ### Cursor stop hook
 
-Cursor's `.cursor/hooks.json` `stop` hook (`bin/fm-turnend-guard-cursor.sh`) owns routine tokenless re-arm for a Cursor primary.
-It re-arms by parking that awaited hook on `bin/fm-watch-arm.sh` and returning an actionable close as one follow-up.
+Cursor's `.cursor/hooks.json` `stop` hook (`bin/jg-turnend-guard-cursor.sh`) owns routine tokenless re-arm for a Cursor primary.
+It re-arms by parking that awaited hook on `bin/jg-watch-arm.sh` and returning an actionable close as one follow-up.
 [`turnend-guard.md`](turnend-guard.md#harness-integrations) owns its Pi-host stand-down, loop bounds, and supersession baton.
 
 ### Claude Stop hook
 
-Claude's `.claude/settings.json` Stop `asyncRewake` hook (`bin/fm-claude-stop-autoarm.sh`) owns routine tokenless re-arm.
+Claude's `.claude/settings.json` Stop `asyncRewake` hook (`bin/jg-claude-stop-autoarm.sh`) owns routine tokenless re-arm.
 Do not run the hook as a manual arm from a tool turn: a short-lived tool process cannot own its park; its header and help own the invocation contract.
 The hook fires on every Stop.
-On each Stop, an eligible primary with supervision need admits one home-scoped owner, which foregrounds `bin/fm-watch-arm.sh` inside the hook-owned process tree.
+On each Stop, an eligible primary with supervision need admits one home-scoped owner, which foregrounds `bin/jg-watch-arm.sh` inside the hook-owned process tree.
 While supervision is still needed and away mode remains inactive, an actionable close wakes the idle session through exit 2.
 
 ### Claude session-lock ownership
 
 The hook handles the session lock as follows:
 
-- A numeric session-lock owner that fails the shared `fm_harness_pid_alive` predicate is reclaimed through `bin/fm-lock.sh` before auto-arm state changes.
+- A numeric session-lock owner that fails the shared `jg_harness_pid_alive` predicate is reclaimed through `bin/jg-lock.sh` before auto-arm state changes.
 - A live owner the session does not own, an absent lock, or a malformed lock keeps the competing hook inert.
 
-Whether the session owns that lock is the shared `fm_session_lock_owned_by_self` verdict in `bin/fm-session-lock-lib.sh`.
+Whether the session owns that lock is the shared `jg_session_lock_owned_by_self` verdict in `bin/jg-session-lock-lib.sh`.
 That verdict accepts either of two cases:
 
 - A recorded pid inside the current harness ancestry.
@@ -123,7 +123,7 @@ The Claude turn-end guard owns that notice commit contract, the monotonic failur
 
 ### Supervision host
 
-On a non-Pi primary, a home that runs the supervision host runs `bin/fm-supervision-host.sh` in place of the arm its re-arm owner would start.
+On a non-Pi primary, a home that runs the supervision host runs `bin/jg-supervision-host.sh` in place of the arm its re-arm owner would start.
 The host owns successive watcher cycles through the same arm.
 [supervision-host.md](supervision-host.md#failure-direction) owns the hand-back's downtime restoration, including when the successor already exited; the arm's recovery and acknowledgement contracts below still apply.
 
@@ -148,14 +148,14 @@ A failed confirmation is a restoration failure: the adapter classifies the error
 Pi retires the current successor only when the failed token names its exact watcher pid and generation and that pid is no longer alive, while omp and OpenCode retire the current successor whenever the restoration's watcher pid is no longer alive.
 On Pi a generation mismatch means a newer pipeline superseded this delivery mid-restore, so the wake routes like a confirmed delivery, with no failure appendix, and nothing is retired.
 An already-acknowledged episode confirms as a no-op when the confirmation names its generation, because the drain acknowledged it after the successor started but before the confirmation ran.
-The Pi extension diagnostic log is opt-in and off by default: only a positive FM_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness timeouts, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
+The Pi extension diagnostic log is opt-in and off by default: only a positive JG_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness timeouts, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
 docs/configuration.md owns the knob's default and accepted values.
 A failed confirmation is never swallowed.
 
 ### Readiness timeout and retry
 
 The adapter waits at most one readiness timeout per attempt.
-Unless explicitly overridden, readiness uses the shared startup budget owned by `fm_watcher_confirmation_budget` in `bin/fm-wake-lib.sh`, allowing the successor's first supervision scan to finish.
+Unless explicitly overridden, readiness uses the shared startup budget owned by `jg_watcher_confirmation_budget` in `bin/jg-wake-lib.sh`, allowing the successor's first supervision scan to finish.
 If the successor is not ready in that time, the adapter sends TERM and waits a bounded retirement confirmation before the next lock-verified exponential retry.
 
 If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and delivers the typed fallback immediately.
@@ -171,7 +171,7 @@ When restoration does not succeed, the model is never left blind.
 Claude's Stop hook also starts one handling successor before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
-1. Launches `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
+1. Launches `bin/jg-watch-arm.sh` with the closed arm's pid as `JG_WATCH_PREDECESSOR_ARM_PID`.
 2. Waits for that arm's one status line, relaunching it boundedly while it stays unconfirmed.
 3. Only then exits 2 with the wake.
 
@@ -182,7 +182,7 @@ So that successor is the one deliberate detached launch in the continuity path:
 - Its stdio is away from the hook's pipes.
 - It has its own process group.
 
-This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
+This is the shape `bin/jg-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
 A successor that confirms no live watcher on any bounded attempt adds one line to the rewake banner and never withholds the wake.
@@ -197,12 +197,12 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `FM_SECONDMATE_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
+The watcher's local queue backstop observes the oldest actionable row and re-delivers it after `JG_SQUAD_LEAD_WAKE_STALL_SECS` without progress, without appending, consuming, or rewriting a row.
 Its observation timer survives watcher replacement, resets when the oldest row changes or a reminder is delivered, and clears when no actionable row remains, giving each handling successor time to establish continuity.
-A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `FM_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
+A live supervision-branch grant for that row defers the reminder only until the same no-progress interval reaches `JG_BUSY_TURN_MAX_SECS`; this local path does not use main's busy verdict.
 Declared external-wait stale rows are excluded and retain their existing pause cadence.
 Reminders preserve the queued reason except that a signal payload marked `needs-decision:` is delivered as the supported `signal:` reason, leaving the durable decision marker intact for routing and drain.
-`tests/fm-watch-triage.test.sh`'s `test_own_queue_redelivers_without_churning_successors` exercises the watcher, live grant, reminder, drain, and acknowledgement journey.
+`tests/jg-watch-triage.test.sh`'s `test_own_queue_redelivers_without_churning_successors` exercises the watcher, live grant, reminder, drain, and acknowledgement journey.
 
 ### Manual recovery and other harnesses
 
@@ -222,8 +222,8 @@ In its `--claude` mode it cooperates with the auto-arm.
 ### Agent-runtime restart
 
 Every owner above runs inside the agent runtime, so a killed Herdr server takes all of them down at once, and a Claude primary whose turn had already ended has no Stop event left to re-arm.
-`bin/fm-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
-`mkdir -p ~/.config/systemd/user && FM_HOME="/absolute/home" bin/fm-sentinel.sh unit > ~/.config/systemd/user/fm-sentinel.service && systemctl --user enable --now fm-sentinel`.
+`bin/jg-sentinel.sh` is the one piece that must run outside the runtime, as a systemd user service:
+`mkdir -p ~/.config/systemd/user && JG_HOME="/absolute/home" bin/jg-sentinel.sh unit > ~/.config/systemd/user/jg-sentinel.service && systemctl --user enable --now jg-sentinel`.
 While the service is inactive, session start on a primary Herdr home with a systemd user bus prints a `SENTINEL:` line carrying the install command with shell-quoted absolute home and executable paths.
 On a server restart it reconciles the home's direct reports, orders each live Squad Lead to run its own session start, and types an operational-input doorbell into the primary, so that turn's end re-arms through the primary's own owner.
 Session start runs the same reconcile once in the background, so every home resumes its own lanes: a dead lane is relaunched, a lane whose turn was lost gets one resume nudge, and a mid-turn or properly waiting lane is left alone.
@@ -255,7 +255,7 @@ A downtime republication of a pending episode reuses its generation.
 A watcher close leaves an announced downtime episode announced, while a successful durable append opens a fresh pending generation so a live watcher can recover the new work.
 An announced handling episode becomes pending downtime on the same generation because its handling turn may have been interrupted.
 That handling republication gives a successor exactly one recovery presentation without orphaning the acknowledgement already printed for that generation.
-A watcher stopped so an arm can take its cycle over (`bin/fm-watch-arm.sh --take-over`) publishes downtime like any close, but the taking arm restores an acknowledged episode that stop reopened only when the taken-over arm's cycle-ledger row for that exact arm and watcher records the watcher ending by the take-over's TERM and no wake was appended in between.
+A watcher stopped so an arm can take its cycle over (`bin/jg-watch-arm.sh --take-over`) publishes downtime like any close, but the taking arm restores an acknowledged episode that stop reopened only when the taken-over arm's cycle-ledger row for that exact arm and watcher records the watcher ending by the take-over's TERM and no wake was appended in between.
 The taking arm waits within a short bound for that row; a missing row or any other signal leaves downtime for the fresh cycle's ordinary recovery wake, while take-over still proceeds.
 Any other episode is left for the next cycle's arm check.
 
@@ -276,8 +276,8 @@ An acknowledged episode does not freeze the generation, because the next downtim
 
 ## Per-actor acknowledgement
 
-`bin/fm-wake-drain.sh` consumes the queue per actor, not per whole-queue cutoff.
-It uses the `fm_lease_actor` identity owned by `bin/fm-lease-lib.sh`.
+`bin/jg-wake-drain.sh` consumes the queue per actor, not per whole-queue cutoff.
+It uses the `jg_lease_actor` identity owned by `bin/jg-lease-lib.sh`.
 The Pi branch extension injects its branch actor into its own bash tool calls.
 
 ### Claiming rows
@@ -285,7 +285,7 @@ The Pi branch extension injects its branch actor into its own bash tool calls.
 Every presented row is claimed to exactly one actor under the durable queue lock.
 
 - Main records its presented set in `state/.main-eligible-rows`.
-- A branch grant is published through `bin/fm-wake-grant.sh` under that same lock in `state/.branch-eligible-rows`.
+- A branch grant is published through `bin/jg-wake-grant.sh` under that same lock in `state/.branch-eligible-rows`.
   The grant is bound to the live branch process and extension generation recorded in `state/.branch-eligible-owner`.
   Publication is refused if main already claimed any requested row.
 - A main drain validates that owner evidence under the queue lock and reclaims the grant when its process is gone or its identity no longer matches.
@@ -304,9 +304,9 @@ Acknowledgement invocations and every other mutation-critical queue-lock acquire
 
 ### Guard counts for branch-held rows
 
-Because the main drain's exclusion makes branch-granted rows invisible to main, `bin/fm-guard.sh`'s queued-wake warning counts only the rows the calling actor can itself present or retire.
+Because the main drain's exclusion makes branch-granted rows invisible to main, `bin/jg-guard.sh`'s queued-wake warning counts only the rows the calling actor can itself present or retire.
 So an actor is never sent to a drain that provably has nothing for it.
-`bin/fm-wake-lib.sh` owns that per-actor count (`fm_wake_actor_pending_count`) alongside the grant row-list and owner-record reads that the drain and `bin/fm-wake-grant.sh` share.
+`bin/jg-wake-lib.sh` owns that per-actor count (`jg_wake_actor_pending_count`) alongside the grant row-list and owner-record reads that the drain and `bin/jg-wake-grant.sh` share.
 
 A row a live grant reserves is therefore never counted as drainable for main.
 Rather than going silent about a visibly non-empty queue, the guard prints a distinct advisory.
@@ -355,7 +355,7 @@ So it is never part of a branch claim and never defers one.
 Main is woken for it on that check's own triggering close.
 Under the away-posture record the exclusion lifts and a check row is offered to and claimed by the branch like every other actionable row.
 
-`fm-wake-drain.sh` never reclassifies a row itself.
+`jg-wake-drain.sh` never reclassifies a row itself.
 It filters the queue to the current actor's opaque claim before same-key deduplication, then presents and acknowledges only that actor-local view.
 A missing or empty branch snapshot is refused loudly rather than read as "nothing eligible", because reaching the drain without the non-empty handoff promised by the extension is a wiring bug.
 A branch acknowledgement retires the check-row receipts - inactive-outcome, inactive-reconcile notice, and Squad Lead stall - of exactly the granted sequences it consumes, so a branch-consumed check is never re-queued by its producer.
@@ -363,7 +363,7 @@ Attended, a grant names no check row and each scan finds nothing.
 
 ### Per-actor regression tests
 
-`tests/fm-wake-queue.test.sh`'s mixed-queue actor, stale-acknowledgement remedy, and presentation-deadline tests drive the real scripts and check that:
+`tests/jg-wake-queue.test.sh`'s mixed-queue actor, stale-acknowledgement remedy, and presentation-deadline tests drive the real scripts and check that:
 
 - Branch acknowledgement cannot swallow a main row.
 - A concurrent main turn cannot present or acknowledge an active branch grant.
@@ -371,19 +371,19 @@ Attended, a grant names no check row and each scan finds nothing.
 - Live-holder presentation contention stays bounded and retriable.
 - Acknowledgement locking remains blocking.
 
-The same suite pins the counted-equals-presentable invariant against `bin/fm-guard.sh` and `bin/fm-wake-drain.sh` together:
+The same suite pins the counted-equals-presentable invariant against `bin/jg-guard.sh` and `bin/jg-wake-drain.sh` together:
 
 - A branch-held row raises the held advisory rather than the ordinary queued-wake warning for main.
 - That row is presented with its acknowledgement command - with the ordinary warning restored - as soon as the grant clears.
 - Structurally unusable rows are retired by main alone while every remaining row stays presentable and acknowledgeable.
 
-Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/fm-wake-queue.test.sh` for the Squad Lead stall receipt and by `tests/fm-inactive-reconcile.test.sh` for the inactive-outcome receipt.
+Branch acknowledgement retiring the check-row receipts of exactly its granted sequences is pinned by `tests/jg-wake-queue.test.sh` for the Squad Lead stall receipt and by `tests/jg-inactive-reconcile.test.sh` for the inactive-outcome receipt.
 
-`tests/fm-pi-branch-extension.test.sh` pins extension-side classification, claim publication and release, and the pre-drain recheck.
+`tests/jg-pi-branch-extension.test.sh` pins extension-side classification, claim publication and release, and the pre-drain recheck.
 
 ## Arm-layer cycle contract
 
-`bin/fm-watch-arm.sh` never returns a clean empty success.
+`bin/jg-watch-arm.sh` never returns a clean empty success.
 
 ### How an arm resolves a close
 
@@ -415,7 +415,7 @@ Each record includes:
 - Lock identity before and after close.
 - Successor disposition.
 
-The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYCLE_LOG_KEEP_LINES`.
+The file is size-capped through `JG_WATCH_CYCLE_LOG_MAX_BYTES` and `JG_WATCH_CYCLE_LOG_KEEP_LINES`.
 `state/.watch-triage.log` remains only the watcher's bounded absorbed-wake debug log and carries no lifecycle semantics.
 
 ### Grace, beacon, and stop signals
@@ -424,9 +424,9 @@ The default 300-second grace is unchanged.
 [Guard grace and the poll cadence](turnend-guard.md#guard-grace-and-the-poll-cadence) owns beacon publication, scan completion, and stalled-holder replacement safeguards.
 An arm whose own script path sits under a disposable no-mistakes validation checkout (`.no-mistakes/worktrees/`) refuses with the typed failure line before touching any state, because a watcher started there outlives the validation step and keeps writing the real home's state from a checkout about to be deleted.
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
-The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked check or a blocked `fm_backend_capture` pane read, so both run its EXIT cleanup and stop that read.
-`watcher_stop_signals` in `bin/fm-watch.sh` owns the signal-handling rationale.
-The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
+The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked check or a blocked `jg_backend_capture` pane read, so both run its EXIT cleanup and stop that read.
+`watcher_stop_signals` in `bin/jg-watch.sh` owns the signal-handling rationale.
+The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `JG_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
 
@@ -434,7 +434,7 @@ A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lo
 
 ### Pi and OpenCode watch extension
 
-`tests/fm-pi-watch-extension.test.sh` checks Pi's first-cycle-or-explicit-repair tool metadata and ownership-based redundant-call no-ops.
+`tests/jg-pi-watch-extension.test.sh` checks Pi's first-cycle-or-explicit-repair tool metadata and ownership-based redundant-call no-ops.
 It then simulates actionable and empty child closes against the actual Pi and OpenCode close handlers, and:
 
 - Blocks prompt delivery to prove the successor launches first.
@@ -462,7 +462,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 
 ### Arm, recovery, triage, and lock suites
 
-`tests/fm-watch-arm.test.sh` covers:
+`tests/jg-watch-arm.test.sh` covers:
 
 - Durable queue replay.
 - Real remote parent-replies ingestion into the authoritative status log.
@@ -482,17 +482,17 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - The home-gone and state-gone watcher exits.
 - The test reaper that stops a watcher armed for a temporary home.
 
-`tests/fm-watch-recovery-loop.test.sh` covers:
+`tests/jg-watch-recovery-loop.test.sh` covers:
 
 - The once-per-generation announcement bound with the real Pi extension against a refused handling handshake.
 - A handling successor that must surface a real crew event instead of going blind.
 
-`tests/fm-watch-triage.test.sh` proves TERM stops a watcher blocked inside a poll's pane capture and still releases its lock and records an acknowledgeable stop.
+`tests/jg-watch-triage.test.sh` proves TERM stops a watcher blocked inside a poll's pane capture and still releases its lock and records an acknowledgeable stop.
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
 It checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
-`tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.
+`tests/jg-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.
 
-`tests/fm-watcher-lock.test.sh` covers:
+`tests/jg-watcher-lock.test.sh` covers:
 
 - Verified-successor attach.
 - Recovery publication before stale-lock removal.
@@ -502,9 +502,9 @@ It checks that a newly appended keyed decision is classified without rereading e
 
 ### Claude auto-arm and turn-end guard
 
-`tests/fm-subagent-pretool-check.test.sh` proves Claude retains only the non-status Bash seatbelts.
+`tests/jg-subagent-pretool-check.test.sh` proves Claude retains only the non-status Bash seatbelts.
 
-`tests/fm-claude-stop-autoarm.test.sh` covers:
+`tests/jg-claude-stop-autoarm.test.sh` covers:
 
 - The auto-arm's scope.
 - Stale and live session owners.
@@ -521,14 +521,14 @@ It checks that a newly appended keyed decision is classified without rereading e
 It also covers generation-claim single-flight, stuck-claim supersession, superseded-owner silence, notice-marker refusal and retry, ownership-atomic episode reset, and the legacy upgrade shim.
 [`turnend-guard.md`](turnend-guard.md) owns those behavior contracts.
 
-`FM_CLAUDE_LIVE_E2E=1 tests/fm-claude-stop-autoarm-live-e2e.test.sh`:
+`JG_CLAUDE_LIVE_E2E=1 tests/jg-claude-stop-autoarm-live-e2e.test.sh`:
 
 1. Starts with the reproduced stale-lock state.
 2. Receives session start through the tracked SessionStart hook.
 3. Completes two tokenless cycles.
 4. Checks the competing-live-owner negative control.
 
-`tests/fm-turnend-guard.test.sh` covers the cooperative `--claude` guard, including:
+`tests/jg-turnend-guard.test.sh` covers the cooperative `--claude` guard, including:
 
 - Monotonic failed-epoch progression.
 - The integrated bounded fail-open.

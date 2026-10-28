@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Remove the pipeline quota-failover key and installed wrapper. Usage: uninstall.sh [--dry-run] [--config <path>] [--home <dir>]
 set -euo pipefail
-dry=0; root=${HOME:?}/.local/share/fm-pipeline-quota-failover; config=${NM_CONFIG:-$HOME/.no-mistakes/config.yaml}
+dry=0; root=${HOME:?}/.local/share/jg-pipeline-quota-failover; config=${NM_CONFIG:-$HOME/.no-mistakes/config.yaml}
 while [ "$#" -gt 0 ]; do case "$1" in --dry-run) dry=1 ;; --config) config=${2:?--config needs a path}; shift ;; --home) root=${2:?--home needs a path}; shift ;; *) echo 'usage: uninstall.sh [--dry-run] [--config <path>] [--home <dir>]' >&2; exit 2 ;; esac; shift; done
 wrapper=$root/pi-quota-failover
 [ -f "$config" ] || { echo "uninstall.sh: no config at $config" >&2; exit 1; }

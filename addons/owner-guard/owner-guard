@@ -18,7 +18,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # recorded at install (the install dir is per user, so a lane home without
 # a file falls back to the installing home).
 patterns_path() {
-  local cand=${FM_HOME:-}
+  local cand=${JG_HOME:-}
   if [ -z "$cand" ] || [ ! -s "$cand/config/owner-details-patterns" ]; then
     cand=$(cat "$HERE/home" 2>/dev/null || true)
   fi
@@ -87,7 +87,7 @@ refuse() { # refuse <hook> <hits>: final refusal listing file:line hits only.
   {
     printf 'owner-guard: %s refused: %s added line(s) match protected owner details:\n' "$1" "$n"
     printf '%s\n' "$2"
-    printf 'fix: replace each detail with a placeholder (you@example.com, ~/firstmate, /home/you) and retry. This refusal is final: there is no bypass.\n'
+    printf 'fix: replace each detail with a placeholder (you@example.com, ~/juggernaut, /home/you) and retry. This refusal is final: there is no bypass.\n'
   } >&2
   exit 1
 }

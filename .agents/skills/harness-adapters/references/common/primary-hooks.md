@@ -6,16 +6,16 @@ The tool reference establishes either that identity's empirical path or its unsu
 ## Turn end
 
 `../../../docs/turnend-guard.md` owns the "no turn ends blind" contract, hook installation, per-surface blocking behavior, and tradeoffs when a hook cannot block.
-`../../../docs/supervision-protocols/` and `../../../bin/fm-supervision-instructions.sh` own harness-specific wake protocols.
+`../../../docs/supervision-protocols/` and `../../../bin/jg-supervision-instructions.sh` own harness-specific wake protocols.
 Never substitute another harness's wait shape.
-`../../../bin/fm-busy-lib.sh` remains the semantic busy owner; a tool reference names only its source and evidence.
+`../../../bin/jg-busy-lib.sh` remains the semantic busy owner; a tool reference names only its source and evidence.
 
 Validate any turn-end change against the real harness in a scratch project or throwaway home.
 Update its executable or hook owner, concise tool fact, and `../../../docs/verification/supervision.md` under "Turn-end guard".
 
 ## Pre-tool protection
 
-Supported primaries deny watcher-arm anti-patterns before execution, including shell `&`, truncating pipes, bundling, and broad `pkill -f fm-watch`.
+Supported primaries deny watcher-arm anti-patterns before execution, including shell `&`, truncating pipes, bundling, and broad `pkill -f jg-watch`.
 `../../../docs/arm-pretool-check.md` owns hook commands, output quirks, and evidence.
 The tool reference names the integration form.
 Validate changes against the real harness in a scratch project before trusting them.
@@ -34,7 +34,7 @@ Read it before changing session-open behavior.
 
 ## Watcher supervision
 
-`../../../bin/fm-session-start.sh` prints exactly one block for the detected primary.
+`../../../bin/jg-session-start.sh` prints exactly one block for the detected primary.
 Follow only that rendered protocol.
 When changing a watcher adapter, update its file under `../../../docs/supervision-protocols/`, update `../../../docs/turnend-guard.md` if shared idle or turn-end behavior changed, and refresh the tool fact.
 An identity without a dedicated protocol uses its documented unsupported or unknown boundary; never invent one from a similar TUI.

@@ -1,33 +1,33 @@
 # supervisor-guard
 
-The supervisor-work guard: a PreToolUse hook that stops a firstmate supervisor
+The supervisor-work guard: a PreToolUse hook that stops a juggernaut supervisor
 session from doing a worker's job. It refuses to drive a crew-owned
 `no-mistakes axi run` or `respond`, to sleep or poll inside a turn, and (for a
-secondmate lead) to type into a worker's pane. The add-on owns this logic. Upstream
-Kun's Firstmate has no such guard.
+squad lead lead) to type into a worker's pane. The add-on owns this logic. Upstream
+Kun's Juggernaut has no such guard.
 
 ## Layout
 
-- `bin/fm-supervisor-work-pretool-check.sh` — the hook. It scopes to any listed home
+- `bin/jg-supervisor-work-pretool-check.sh` — the hook. It scopes to any listed home
   it was installed for, prefilters the Bash command in shell, asks the decider,
   and writes the deny object on stderr. Fails open.
-- `bin/fm-supervisor-work-decide.mjs` — the command-line entry for the policy.
+- `bin/jg-supervisor-work-decide.mjs` — the command-line entry for the policy.
   It loads the shell lexer from the checkout named by `--lexer`.
-- `bin/fm-supervisor-work-command-policy.mjs` — the rules and the allow/deny
+- `bin/jg-supervisor-work-command-policy.mjs` — the rules and the allow/deny
   decision. The only place the patterns live.
 - `install.sh` / `uninstall.sh` — copy the three files to
-  `${XDG_DATA_HOME:-$HOME/.local/share}/fm-supervisor-guard`, record the home in
+  `${XDG_DATA_HOME:-$HOME/.local/share}/jg-supervisor-guard`, record the home in
   its `home` file, and merge or remove one PreToolUse Bash hook in
-  `~/.claude/settings.json`. Install adds a home; `uninstall.sh <fm-home>` removes
+  `~/.claude/settings.json`. Install adds a home; `uninstall.sh <jg-home>` removes
   only that home, while no-argument uninstall removes everything. Both take `--dry-run` and back up what they change.
-- `tests/fm-supervisor-work-guard.test.sh` — installs into a throwaway HOME, runs
+- `tests/jg-supervisor-work-guard.test.sh` — installs into a throwaway HOME, runs
   the installed hook against a fixture home and a linked worktree, then uninstalls.
 
-## Dependencies on the Firstmate checkout
+## Dependencies on the Juggernaut checkout
 
 The add-on reads two files from the home's checkout and copies neither:
-`bin/fm-primary-scope-lib.sh` (the scope predicate) and
-`bin/fm-arm-command-policy.mjs` (the shell lexer). Upgrading the checkout upgrades
+`bin/jg-primary-scope-lib.sh` (the scope predicate) and
+`bin/jg-arm-command-policy.mjs` (the shell lexer). Upgrading the checkout upgrades
 both with no merge here.
 
 ## Behaviour
@@ -52,6 +52,6 @@ both with no merge here.
 
 ## Checks
 
-- `FM_CODE_ROOT=<checkout> bash supervisor-guard/tests/fm-supervisor-work-guard.test.sh`
+- `JG_CODE_ROOT=<checkout> bash supervisor-guard/tests/jg-supervisor-work-guard.test.sh`
 - `shellcheck -x -e SC2015,SC1091 supervisor-guard/*.sh supervisor-guard/bin/*.sh supervisor-guard/tests/*.sh`
 - `node --check` on each `.mjs`, and `bash -n` on each script.

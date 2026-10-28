@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 # E2E: compare the pinned done-done adapter with the existing lint verdicts on size fixtures.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 d=$(mktemp -d)
@@ -48,27 +57,27 @@ case "$1 $2" in
   *) echo "unexpected gh call: $*" >&2; exit 2 ;;
 esac
 EOF
-cat > "$d/addons/receipts/bin/fm-run-receipt.sh" <<'EOF'
+cat > "$d/addons/receipts/bin/jg-run-receipt.sh" <<'EOF'
 #!/usr/bin/env bash
-printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$(cat "$3")" >> "$FM_MAIN_HOME/revocations"
+printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$(cat "$3")" >> "$JG_MAIN_HOME/revocations"
 EOF
 cat > "$d/legacy.sh" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in */1004) echo 'checks-lint: FAIL: 1000 added non-generated lines'; exit 1 ;; *) echo 'checks-lint: PASS: fixture' ;; esac
 EOF
-chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/addons/receipts/bin/fm-run-receipt.sh"
-export PATH="$d/bin:$PATH" FM_DONE_DONE_BIN="$d/bin/done-done" FM_LEGACY_CHECKS_LINT="$d/legacy.sh" FM_ADDONS_DIR="$d/addons" FM_MAIN_HOME="$d/main" DONE_DONE_ARGS_LOG="$d/done-done-args"
+chmod +x "$d/bin/gh" "$d/bin/done-done" "$d/legacy.sh" "$d/addons/receipts/bin/jg-run-receipt.sh"
+export PATH="$d/bin:$PATH" JG_DONE_DONE_BIN="$d/bin/done-done" JG_LEGACY_CHECKS_LINT="$d/legacy.sh" JG_ADDONS_DIR="$d/addons" JG_MAIN_HOME="$d/main" DONE_DONE_ARGS_LOG="$d/done-done-args"
 failures=0
 # done-done 0.6.17 reads the pull number from the URL, so each fixture carries a real-shaped one.
 for id in good:1001 generated:1002 routes:1003 bad:1004; do
   name=${id%%:*}; num=${id##*:}
-  mkdir -p "$d/fm-$name/state" "$d/fm-$name/data"
-  [ "$name" != bad ] || printf 'pr=https://github.com/owner/repo/pull/%s\n' "$num" > "$d/fm-$name/state/fixture.meta"
+  mkdir -p "$d/jg-$name/state" "$d/jg-$name/data"
+  [ "$name" != bad ] || printf 'pr=https://github.com/owner/repo/pull/%s\n' "$num" > "$d/jg-$name/state/fixture.meta"
   set +e
-  legacy=$(FM_HOME="$d/fm-$name" "$d/legacy.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); legacy_rc=$?
-  actual=$(FM_HOME="$d/fm-$name" "$ROOT/merge-on-green/checks-lint.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); actual_rc=$?
+  legacy=$(JG_HOME="$d/jg-$name" "$d/legacy.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); legacy_rc=$?
+  actual=$(JG_HOME="$d/jg-$name" "$ROOT/merge-on-green/checks-lint.sh" "https://github.com/owner/repo/pull/$num" "$d/fm/data/evidence" 2>&1); actual_rc=$?
   set -e
-  logged=$(awk -F '\t' -v src="https://github.com/owner/repo/pull/$num" '$2 == src { verdict = $4 } END { print verdict }' "$d/fm-$name/data/checks-gate.log")
+  logged=$(awk -F '\t' -v src="https://github.com/owner/repo/pull/$num" '$2 == src { verdict = $4 } END { print verdict }' "$d/jg-$name/data/checks-gate.log")
   want=pass; [ "$actual_rc" -eq 0 ] || want=fail
   if [ "$legacy_rc" -ne "$actual_rc" ] || [ "${logged/warn/pass}" != "$want" ]; then printf 'FAIL %s: legacy=%s (%s), done-done=%s (%s), log=%s\n' "$name" "$legacy_rc" "$legacy" "$actual_rc" "$actual" "$logged"; failures=$((failures + 1)); else echo "PASS $name: both verdicts $([ "$actual_rc" -eq 0 ] && echo PASS || echo FAIL)"; fi
 done
@@ -80,17 +89,17 @@ exit 2
 EOF
 chmod +x "$d/bin/old-done-done"
 set +e
-fallback=$(FM_HOME="$d/fm-good" FM_DONE_DONE_BIN="$d/bin/old-done-done" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' "$d/fm/data/evidence" 2>&1); fallback_rc=$?
+fallback=$(JG_HOME="$d/jg-good" JG_DONE_DONE_BIN="$d/bin/old-done-done" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' "$d/fm/data/evidence" 2>&1); fallback_rc=$?
 set -e
 [ "$fallback_rc" -eq 0 ] && [[ "$fallback" == *'checks-lint: PASS: fixture'* ]] || { echo "FAIL fallback: rc=$fallback_rc ($fallback)"; exit 1; }
-[ "$(wc -l < "$FM_MAIN_HOME/revocations")" -eq 1 ] && grep -q '^fixture|FAIL|' "$FM_MAIN_HOME/revocations" || { echo 'FAIL FAIL receipt'; exit 1; }
+[ "$(wc -l < "$JG_MAIN_HOME/revocations")" -eq 1 ] && grep -q '^fixture|FAIL|' "$JG_MAIN_HOME/revocations" || { echo 'FAIL FAIL receipt'; exit 1; }
 # A caller-relative evidence directory must survive the adapter's temporary cwd.
 printf 'evidence fixture\n' > "$d/cwd/data/evidence/result.txt"
-printf 'pr=https://github.com/owner/repo/pull/1001\n' > "$d/fm-good/state/fixture.meta"
+printf 'pr=https://github.com/owner/repo/pull/1001\n' > "$d/jg-good/state/fixture.meta"
 set +e
-relative=$(cd "$d/cwd" && FM_HOME="$d/fm-good" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' data/evidence 2>&1); relative_rc=$?
+relative=$(cd "$d/cwd" && JG_HOME="$d/jg-good" "$ROOT/merge-on-green/checks-lint.sh" 'https://github.com/owner/repo/pull/1001' data/evidence 2>&1); relative_rc=$?
 set -e
 [ "$relative_rc" -eq 0 ] && [[ "$relative" == *'checks-lint: PASS: not-proven:'* ]] || { echo "FAIL relative evidence: rc=$relative_rc ($relative)"; exit 1; }
 grep -Fq "https://github.com/owner/repo/pull/1001|$d/cwd/data/evidence" "$DONE_DONE_ARGS_LOG" || { echo 'FAIL relative evidence was not made absolute'; exit 1; }
-grep -q '^fixture|PASS|' "$FM_MAIN_HOME/revocations" || { echo 'FAIL PASS receipt'; exit 1; }
+grep -q '^fixture|PASS|' "$JG_MAIN_HOME/revocations" || { echo 'FAIL PASS receipt'; exit 1; }
 echo 'PASS: pinned done-done, relative evidence, generated exclusions, legacy fallback, and PASS/FAIL receipts'

@@ -20,7 +20,7 @@ git init -q -b main "$repo" && echo base > "$repo/README" && g add -A && g commi
 # change <file> <content>: a branch off main that adds exactly that file; prints the gate's output.
 change() {
   g checkout -q -B change main && mkdir -p "$(dirname "$repo/$1")" && printf '%s\n' "$2" > "$repo/$1" && g add -A && g commit -qm change
-  FM_HOME=$home "$home/config/merge-gate" lane "$repo" "$(g rev-parse HEAD)" - 2>&1
+  JG_HOME=$home "$home/config/merge-gate" lane "$repo" "$(g rev-parse HEAD)" - 2>&1
 }
 refuses() { # <label> <file> <content> <reason>
   local out; out=$(change "$2" "$3")

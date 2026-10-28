@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
 # Live proof journey for the service, never applying it: fleet-serve on a spare loopback port against the real home,
 # then curl for the fleet and retired routes plus install.sh's dry-run. No Lookout source clone is needed.
 set -Eeuo pipefail
-: "${FM_HOME:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
+: "${JG_HOME:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
 ev=$DONE_DONE_EVIDENCE_ROOT
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')

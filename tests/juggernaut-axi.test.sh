@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
 # Behavior test for bin/juggernaut-axi (slices 1-3): status, tickets, decisions, messages, answer, message, ticket, TOON by
 # default with --json parity, the juggernaut-axi.v1 contract, bounds with disclosed
 # omissions, and refusal of unknown commands and bad arguments.
@@ -11,22 +19,22 @@ set -u
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 
 AXI="$ROOT/bin/juggernaut-axi"
-TMP_ROOT=$(fm_test_tmproot juggernaut-axi)
+TMP_ROOT=$(jg_test_tmproot juggernaut-axi)
 HOME_DIR=$TMP_ROOT/home
 mkdir -p "$HOME_DIR/data" "$HOME_DIR/state" "$HOME_DIR/config" "$HOME_DIR/projects"
 cat > "$HOME_DIR/data/backlog.md" <<'MD'
 ## In flight
-- [ ] ship-task - Ship the thing (repo: firstmate) (kind: ship) (since 2026-07-11)
+- [ ] ship-task - Ship the thing (repo: juggernaut) (kind: ship) (since 2026-07-11)
 
 ## Queued
-- [ ] live-gate - Real queued work blocked-by: ship-task (repo: firstmate) (kind: ship)
+- [ ] live-gate - Real queued work blocked-by: ship-task (repo: juggernaut) (kind: ship)
 - [ ] other-gate - Work elsewhere (repo: other) (kind: scout)
 
 ## Done
-- [x] done-a - Landed thing (repo: firstmate) (kind: ship) (merged 2026-07-10)
+- [x] done-a - Landed thing (repo: juggernaut) (kind: ship) (merged 2026-07-10)
 MD
-export FM_HOME=$HOME_DIR FM_ROOT_OVERRIDE=$TMP_ROOT/fixture-root
-mkdir -p "$FM_ROOT_OVERRIDE"
+export JG_HOME=$HOME_DIR JG_ROOT_OVERRIDE=$TMP_ROOT/fixture-root
+mkdir -p "$JG_ROOT_OVERRIDE"
 
 [ -x "$AXI" ] || fail "bin/juggernaut-axi is missing or not executable"
 
@@ -52,14 +60,14 @@ assert_equals status "$(jq -r .view <<<"$status")" "status view"
 assert_contains "$("$AXI" status)" "view: status" "status TOON renders"
 
 assert_equals 0 "$("$AXI" decisions --json | jq -r .count)" "no open decisions before a hold"
-"$ROOT/bin/fm-captain-hold.sh" hold other-gate --reason "pick A or B" --priority 1 >/dev/null 2>&1 || fail "could not hold a task for the captain"
+"$ROOT/bin/jg-captain-hold.sh" hold other-gate --reason "pick A or B" --priority 1 >/dev/null 2>&1 || fail "could not hold a task for the captain"
 dec=$("$AXI" decisions --json) || fail "decisions failed"
 assert_equals 1 "$(jq -r .count <<<"$dec")" "held task is an open decision"
 assert_equals other-gate "$(jq -r '.decisions[0].id' <<<"$dec")" "decision names the held task"
 
 mkdir -p "$HOME_DIR/state/ship-task.inbox/handled"
-printf 'schema=fm-task-inbox.v1\nat=2026-10-27T10:00:00Z\n--\nhello\nline2\n' > "$HOME_DIR/state/ship-task.inbox/001.msg"
-printf 'schema=fm-task-inbox.v1\nat=2026-10-27T10:05:00Z\n--\nbye\n' > "$HOME_DIR/state/ship-task.inbox/handled/002.msg"
+printf 'schema=jg-task-inbox.v1\nat=2026-10-27T10:00:00Z\n--\nhello\nline2\n' > "$HOME_DIR/state/ship-task.inbox/001.msg"
+printf 'schema=jg-task-inbox.v1\nat=2026-10-27T10:05:00Z\n--\nbye\n' > "$HOME_DIR/state/ship-task.inbox/handled/002.msg"
 msgs=$("$AXI" messages ship-task --json) || fail "messages failed"
 assert_equals "pending handled" "$(jq -r '[.messages[].state] | join(" ")' <<<"$msgs")" "messages carry delivery state"
 assert_equals $'hello\nline2' "$(jq -r '.messages[0].body' <<<"$msgs")" "message body is verbatim"
@@ -68,13 +76,13 @@ assert_equals 1 "$("$AXI" messages ship-task --limit 1 --json | jq -r '.omitted[
 "$AXI" messages ../state >/dev/null 2>&1 && fail "path-like task id must be refused"
 
 # Writes: each goes through its guarded path and claims only what the record confirms.
-printf 'window=x:y\nworktree=/tmp\nproject=firstmate\nharness=claude\nkind=ship\nmode=direct-PR\n' > "$HOME_DIR/state/ship-task.meta"
+printf 'window=x:y\nworktree=/tmp\nproject=juggernaut\nharness=claude\nkind=ship\nmode=direct-PR\n' > "$HOME_DIR/state/ship-task.meta"
 sent=$("$AXI" message ship-task "please rebase" --json 2>/dev/null) || fail "message failed"
 assert_equals true "$(jq -r .ok <<<"$sent")" "message reports ok"
 assert_contains "$(cat "$HOME_DIR"/state/ship-task.inbox/*.msg)" "please rebase" "message landed in the durable inbox"
 "$AXI" message ship-task "/exit" >/dev/null 2>&1 && fail "terminal-bound text must be refused"
 "$AXI" message guessed-task hi >/dev/null 2>&1 && fail "message to an unknown task must be refused"
-tk=$("$AXI" ticket "Probe ticket" --repo firstmate --priority 2 --json 2>/dev/null) || fail "ticket failed"
+tk=$("$AXI" ticket "Probe ticket" --repo juggernaut --priority 2 --json 2>/dev/null) || fail "ticket failed"
 assert_equals queued "$(jq -r '.ticket.state' <<<"$tk")" "ticket is queued, never started"
 "$AXI" ticket "x" --kind captain >/dev/null 2>&1 && fail "unlisted ticket kind must be refused"
 ans=$("$AXI" answer other-gate "Take A" --json 2>/dev/null) || fail "answer failed"

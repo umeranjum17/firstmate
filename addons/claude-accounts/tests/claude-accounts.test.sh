@@ -2,6 +2,15 @@
 # claude-accounts: run the quota reader against a fixture muxr registry and a stub quota-axi.
 # Journey: two Claude accounts read, one failing account recorded with its cause, the stub sees
 # only each profile folder in CLAUDE_CONFIG_DIR, and the output never carries a secret field.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 w=$(mktemp -d "${TMPDIR:-/tmp}/claude-accounts-test.XXXXXX") || exit 1
@@ -30,7 +39,7 @@ S
 chmod +x "$w/bin/quota-axi"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
-run() { out=$(env -i QDIR="$w" PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" FM_HOME="$w/home" FM_ACCOUNTS_PROVIDER="${PROVIDER:-claude}" FM_CLAUDE_ACCOUNTS_REGISTRY="${REG:-$w/registry.json}" bash "$here/../bin/claude-accounts-quota.sh" "$@" 2>&1); rc=$?; }
+run() { out=$(env -i QDIR="$w" PATH="$w/bin:$PATH" HOME="$w" TMPDIR="$w" JG_HOME="$w/home" JG_ACCOUNTS_PROVIDER="${PROVIDER:-claude}" JG_CLAUDE_ACCOUNTS_REGISTRY="${REG:-$w/registry.json}" bash "$here/../bin/claude-accounts-quota.sh" "$@" 2>&1); rc=$?; }
 f=$w/home/state/claude-accounts.json
 
 run --print

@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
-# owner-rules e2e: the real fm-brief.sh of a firstmate checkout that carries the brief-inherit seam.
-# Usage: owner-rules/tests/owner-rules.test.sh <firstmate-checkout>
+# owner-rules e2e: the real jg-brief.sh of a juggernaut checkout that carries the brief-inherit seam.
+# Usage: owner-rules/tests/owner-rules.test.sh <juggernaut-checkout>
 # Proves a no-owner-ask refusal, a no-risk-reason refusal and a clean pass (brief written), plus the
 # exemptions and the no-op when the add-on is not installed.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 addons=$(cd "$here/../.." && pwd) || exit 1
 FM=${1:-}
-[ -n "$FM" ] && [ -x "$FM/bin/fm-brief.sh" ] \
-  || { echo "usage: $0 <firstmate-checkout with the brief-inherit seam>" >&2; exit 1; }
+[ -n "$FM" ] && [ -x "$FM/bin/jg-brief.sh" ] \
+  || { echo "usage: $0 <juggernaut-checkout with the brief-inherit seam>" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/tmp}/owner-rules-e2e.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT
 export HOME=$work/user XDG_DATA_HOME=$work/data
@@ -60,7 +69,7 @@ BL
 # brief <id> <args...>: stderr, then rc= on the last line.
 brief() {
   local id=$1 out rc; shift
-  out=$(FM_HOME=$home FM_ADDONS_DIR=$addons bash "$FM/bin/fm-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
+  out=$(JG_HOME=$home JG_ADDONS_DIR=$addons bash "$FM/bin/jg-brief.sh" "$id" sample "$@" 2>&1 >/dev/null); rc=$?
   printf '%s\n' "$out" >> "$work/emitted"
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
@@ -98,10 +107,10 @@ is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)
 [ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
 is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
-FM_HOME=$home FM_ADDONS_DIR=$addons FM_SECONDMATE_CHARTER=x bash "$FM/bin/fm-brief.sh" sm --secondmate --no-projects >/dev/null 2>&1 \
-  && ok "pass: secondmate charter is exempt" || no "secondmate charter refused"
+JG_HOME=$home JG_ADDONS_DIR=$addons JG_SQUAD_LEAD_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --squad-lead --no-projects >/dev/null 2>&1 \
+  && ok "pass: squad_lead charter is exempt" || no "squad_lead charter refused"
 
-tree=$(bash "$addons/owner-rules/bin/fm-owner-rules-tree.sh" "$home/data/backlog.md")
+tree=$(bash "$addons/owner-rules/bin/jg-owner-rules-tree.sh" "$home/data/backlog.md")
 printf '%s\n' "$tree" | grep -qF 'with-main: with-main -> with-ask -> [epic root]' && ok "tree: prints epic parent chain" || no "tree: epic parent chain missing"
 printf '%s\n' "$tree" | grep -qF 'bad-parent: bad-parent -> [missing: nowhere]' && ok "tree: reports missing parent id" || no "tree: missing parent id unreported"
 printf '%s\n' "$tree" | grep -qF 'cycle-a: cycle-a -> cycle-b -> cycle-a -> [cycle: cycle-a]' && ok "tree: reports cycle" || no "tree: cycle unreported"
@@ -115,10 +124,10 @@ is "uninstalled: check is off again" "$(brief no-ask --mode direct-PR | tail -1)
 # match a line they actually emitted.
 "$addons/owner-rules/install.sh" "$home" >/dev/null
 brief bad-design --mode direct-PR >/dev/null
-mkdir -p "$work/bin" "$work/ship" "$work/data/fm-merge-on-green" "$home/data/lane/.done-done/runs"
-printf '#!/bin/sh\nexit 0\n' > "$work/bin/gh"; printf '#!/bin/sh\nexit 0\n' > "$work/data/fm-merge-on-green/checks-lint.sh"
-chmod +x "$work/bin/gh" "$work/data/fm-merge-on-green/checks-lint.sh"
-gate() { PATH=$work/bin:$PATH FM_HOME=$home FM_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane "$1" abc123 https://github.com/o/r/pull/9 2>&1 | tee -a "$work/emitted" >/dev/null; }
+mkdir -p "$work/bin" "$work/ship" "$work/data/jg-merge-on-green" "$home/data/lane/.done-done/runs"
+printf '#!/bin/sh\nexit 0\n' > "$work/bin/gh"; printf '#!/bin/sh\nexit 0\n' > "$work/data/jg-merge-on-green/checks-lint.sh"
+chmod +x "$work/bin/gh" "$work/data/jg-merge-on-green/checks-lint.sh"
+gate() { PATH=$work/bin:$PATH JG_HOME=$home JG_FLEET_BOARD=$work/board.json "$home/config/merge-gate" lane "$1" abc123 https://github.com/o/r/pull/9 2>&1 | tee -a "$work/emitted" >/dev/null; }
 gate "$work/ship"
 printf '{"schema":1,"exit":0,"dirty":false,"commit":"abc123","files":["a.png"],"run_id":"r1"}\n' > "$home/data/lane/.done-done/runs/r1.json"
 gate "$work/ship"

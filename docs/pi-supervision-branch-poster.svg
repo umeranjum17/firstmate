@@ -13,7 +13,7 @@
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
     <text x="48" y="56" fill="#E6EDF3" font-size="36" font-weight="700">Multi-brain agent architecture</text>
     <text x="48" y="86" fill="#8CA3C7" font-size="18">One agent. Two branches of attention. Events are commits.</text>
-    <text x="1152" y="56" text-anchor="end" fill="#8CA3C7" fill-opacity="0.7" font-size="14">fig. 1 - firstmate</text>
+    <text x="1152" y="56" text-anchor="end" fill="#8CA3C7" fill-opacity="0.7" font-size="14">fig. 1 - juggernaut</text>
   </g>
   <g transform="translate(0 100)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
 <title id="mb-title">Multi-brain agent architecture drawn as a git graph: one fix's lifecycle. The worker finishes and CI runs (routine note), the captain's merge-when-green instruction is cherry-picked down, a flaky test is rerun (routine note), and when CI goes green the supervision brain persists the exact requested outcome visibly before main processes it.</title>

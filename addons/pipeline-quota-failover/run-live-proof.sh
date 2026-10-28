@@ -5,6 +5,15 @@
 # a throwaway pool state folder. The first account a call lands on is limited by a pi shim (claude-bridge's own limit
 # text); the next account's answer is real Haiku through the real pi and bridge. No paid route exists
 # in the chain. Captures name account ids only, never a folder or a credential.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd -P)
 evidence=${DONE_DONE_EVIDENCE_ROOT:?}
@@ -31,9 +40,9 @@ fi
 exec "$REAL_PI" "$@"
 SHIM
 chmod +x "$work/pi"
-# The pool reads only its own state folder (no FM_HOME): a real reading taken once, refreshed for each role.
-FM_HOME=$work/home "$repo/claude-accounts/bin/claude-accounts-quota.sh" >/dev/null
-unset FM_HOME
+# The pool reads only its own state folder (no JG_HOME): a real reading taken once, refreshed for each role.
+JG_HOME=$work/home "$repo/claude-accounts/bin/claude-accounts-quota.sh" >/dev/null
+unset JG_HOME
 export REAL_PI=$real_pi LIMITED=$work/limited READING=$work/pool/claude-accounts.json PI_QUOTA_FAILOVER_REAL_PI=$work/pi \
   PI_QUOTA_FAILOVER_ACCOUNT_POOL=$work/account-pool PI_QUOTA_FAILOVER_LOG=$evidence/wrapper.log PI_QUOTA_FAILOVER_PROBE=0 \
   PI_QUOTA_FAILOVER_GATE=

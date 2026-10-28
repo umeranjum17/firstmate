@@ -25,7 +25,7 @@ async function readRequest() {
 
 function reply(requestId, result) {
   process.stdout.write(`${JSON.stringify({
-    schema: "firstmate.extension-response.v1",
+    schema: "juggernaut.extension-response.v1",
     request_id: requestId,
     ok: true,
     result,
@@ -35,9 +35,9 @@ function reply(requestId, result) {
 
 function handshake(request) {
   process.stdout.write(`${JSON.stringify({
-    schema: "firstmate.extension-handshake-response.v1",
+    schema: "juggernaut.extension-handshake-response.v1",
     request_id: request.request_id,
-    extension_id: "org.firstmate.example.file-signal",
+    extension_id: "org.juggernaut.example.file-signal",
     extension_version: "1.0.0",
     host_protocol: 1,
     capability: "process-event-adapter",

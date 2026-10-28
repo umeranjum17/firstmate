@@ -25,7 +25,7 @@ case $cmd in
     while [ "$#" -gt 0 ]; do
       case $1 in --from) message=$2; shift 2 ;; *) shift ;; esac
     done
-    jq --slurpfile msg "$message" '.items += [($msg[0] + {type:"evidence",filer:"firstmate-merge",dismissed:false,evidence:$msg[0].run} | del(.run))]' "$file" >"$file.tmp"
+    jq --slurpfile msg "$message" '.items += [($msg[0] + {type:"evidence",filer:"juggernaut-merge",dismissed:false,evidence:$msg[0].run} | del(.run))]' "$file" >"$file.tmp"
     mv "$file.tmp" "$file"
     ;;
   dismiss)
@@ -40,9 +40,9 @@ STUB
 chmod +x "$work/bin/sign-off-axi"
 
 jq -n '{schema:2,items:[
-  {key:"merge-owner-linkrepo-pull-12",title:"Internal change passed its checks",about:"legacy one",link:"https://github.com/acme/linkrepo/pull/12",evidence:{run_id:"run-one",commit:"1111111111111111111111111111111111111111",outcome:"one",repro:"one",proof:"run one",evidence:"one"},type:"evidence",filer:"firstmate-merge",dismissed:false},
-  {key:"merge-north-keyrepo-pull-34",title:"Internal change passed its checks",about:"legacy two",evidence:{run_id:"run-two",commit:"2222222222222222222222222222222222222222",outcome:"two",repro:"two",proof:"run two",evidence:"two"},type:"evidence",filer:"firstmate-merge",dismissed:false},
-  {key:"misc-card",title:"Internal change passed its checks",about:"unknown",type:"evidence",filer:"firstmate-merge",dismissed:false}
+  {key:"merge-owner-linkrepo-pull-12",title:"Internal change passed its checks",about:"legacy one",link:"https://github.com/acme/linkrepo/pull/12",evidence:{run_id:"run-one",commit:"1111111111111111111111111111111111111111",outcome:"one",repro:"one",proof:"run one",evidence:"one"},type:"evidence",filer:"juggernaut-merge",dismissed:false},
+  {key:"merge-north-keyrepo-pull-34",title:"Internal change passed its checks",about:"legacy two",evidence:{run_id:"run-two",commit:"2222222222222222222222222222222222222222",outcome:"two",repro:"two",proof:"run two",evidence:"two"},type:"evidence",filer:"juggernaut-merge",dismissed:false},
+  {key:"misc-card",title:"Internal change passed its checks",about:"unknown",type:"evidence",filer:"juggernaut-merge",dismissed:false}
 ]}' >"$board"
 
 before=$(sha256sum "$board")
