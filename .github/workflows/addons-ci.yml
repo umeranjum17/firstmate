@@ -23,8 +23,8 @@ jobs:
         working-directory: addons
     env:
       # Use the fork and add-ons from the exact same candidate, not a remote main.
-      FM_TEST_FORK: ${{ github.workspace }}
-      FM_CODE_ROOT: ${{ github.workspace }}
+      JG_TEST_FORK: ${{ github.workspace }}
+      JG_CODE_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +42,7 @@ jobs:
       # An add-on script is the catalog's own `install-all.sh`, or a shell script under a
       # top-level add-on directory, either one level down (`merge-card/merge-card`) or two
       # levels down in its `bin/` and `tests/`
-      # subdirectories (`fleet-flow/bin/fm-flow.sh`, `fleet-flow/tests/fm-flow.test.sh`),
+      # subdirectories (`fleet-flow/bin/jg-flow.sh`, `fleet-flow/tests/jg-flow.test.sh`),
       # so a new add-on in either shape needs no edit here and a non-script file is left alone.
       # The runner image ships shellcheck, so nothing is downloaded at run time.
       - name: ShellCheck add-on scripts
@@ -71,7 +71,7 @@ jobs:
             exclude=SC2015
             case "$f" in
               ./sentinel/*|./supervisor-guard/*|./wait-timers/bin/*|./signoff/bin/*|./host-memory/bin/*|./alerts/*|./receipts/bin/*|./fleet-stats/bin/*) exclude=SC2015,SC1091 ;;
-              ./wait-timers/tests/fm-wait-timers.test.sh) exclude=SC2015,SC1091,SC2034 ;;
+              ./wait-timers/tests/jg-wait-timers.test.sh) exclude=SC2015,SC1091,SC2034 ;;
             esac
             echo "== shellcheck -x -e $exclude $f =="
             shellcheck -x -e "$exclude" "$f"
@@ -97,7 +97,7 @@ jobs:
           fi
       # Stub emulator, Gradle, pgrep and memory files only: nothing heavy starts.
       - name: Memory gate test
-        run: bash host-memory/tests/fm-mem-gate.test.sh
+        run: bash host-memory/tests/jg-mem-gate.test.sh
       # Fixture home and config, stub quota-axi and pi: nothing real is touched.
       - name: Route change test
         run: |
@@ -121,7 +121,7 @@ jobs:
       - name: Fleet contract check test
         run: bash fleet-contract-check/tests/fleet-contract-check.test.sh
       # Fixture homes, stub herdr and a temp state dir: nothing real is touched.
-      # A real Claude limit-menu capture on fixture panes, stub fm-control: nothing real is touched.
+      # A real Claude limit-menu capture on fixture panes, stub jg-control: nothing real is touched.
       - name: Limit prompt move test
         run: |
           bash limit-prompt-move/tests/limit-prompt-move-e2e.sh
@@ -131,9 +131,9 @@ jobs:
       # Fixture home and real fixture processes with a canary key value: nothing real is touched or signalled.
       - name: Key-in-env check test
         run: bash key-in-env-check/tests/key-in-env-check-e2e.sh
-      # Fixture Main and lead homes with stub fm-tasks-axi.sh and fm-crew-state.sh: lane slots and dry.
+      # Fixture Main and lead homes with stub jg-tasks-axi.sh and jg-crew-state.sh: lane slots and dry.
       - name: Home flow check test
-        run: bash fleet-flow/tests/fm-flow-check.test.sh
+        run: bash fleet-flow/tests/jg-flow-check.test.sh
       # The real guard installers in a throwaway HOME; commands run the way Codex runs them: nothing real is touched.
       - name: Kill guard Main allowance and CLI journeys
         run: |
@@ -169,7 +169,7 @@ jobs:
         run: bash task-priority/tests/task-priority.test.sh
       - name: Tickets sync real-board journey
         run: command -v identify >/dev/null || sudo apt-get install -y --no-install-recommends imagemagick; npm install --global sign-off-axi@0.6.9 && bash tickets-sync/tests/sync.test.sh
-      # Stub Firstmate checkout and a fixture home: no real board, hook or launcher is touched.
+      # Stub Juggernaut checkout and a fixture home: no real board, hook or launcher is touched.
       - name: Bearings board test
         run: bash bearings-board/tests/bearings-board.test.sh
       # Fixture transcripts and a throwaway home; no real chat data is read or written.
@@ -181,7 +181,7 @@ jobs:
       # Fixture registry and readings only: no network, no login copy, no real model CLI.
       - name: Model pool helper test
         run: bash account-pool/tests/model-pool.test.sh
-      # Fixture pool readings and stub upstream quota-axi: Claude row follows fm-model-pool.
+      # Fixture pool readings and stub upstream quota-axi: Claude row follows jg-model-pool.
       - name: Quota-axi pool test
         run: bash quota-axi-pool/tests/quota-axi-pool.test.sh
       # Wrapper first on PATH, a stub upstream and a stand-in pool tool: the reader must reach the
@@ -235,7 +235,7 @@ jobs:
           npm install --global sign-off-axi@0.6.9
           bash owner-rules/tests/no-lavish.test.sh
           bash ask-default/tests-owner-ask.test.sh
-          bash signoff/tests/fm-procevent-signoff.test.sh
+          bash signoff/tests/jg-procevent-signoff.test.sh
       # Fixture home: fleet JSON for Lookout from the builder's output files; no real home is read.
       - name: Lookout adapter test
         run: bash lookout-adapter/tests/test.sh

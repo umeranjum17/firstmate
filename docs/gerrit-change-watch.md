@@ -21,7 +21,7 @@ GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)
 
 The live evidence here reads two changes on a private Gerrit server, so a reader outside that network cannot rerun these commands against the same data.
 The server is named below as `review.internal` and its project as `group/apps/console`, the placeholders the fixtures use; every other byte is the tool's own output.
-What these transcripts establish is a property of Gerrit's own record shape rather than of any one server, and the hermetic regression in `tests/fm-pr-check-security.test.sh` pins every one of them with no server at all, so the reproducible check is that suite rather than these transcripts.
+What these transcripts establish is a property of Gerrit's own record shape rather than of any one server, and the hermetic regression in `tests/jg-pr-check-security.test.sh` pins every one of them with no server at all, so the reproducible check is that suite rather than these transcripts.
 Change 4200 is merged, and change 4201 was open and blocked on review when this was collected.
 
 ## Status is read explicitly, because submittability is a different question
@@ -79,7 +79,7 @@ $ cd /tmp && gerrit-axi show 4200 --json
 
 `gerrit-axi` resolves its server from the current directory's `origin` remote first, so outside a clone it has nothing to reach.
 The poll is silent on every failure, so without `--host` the watch would wait forever on a change it never looked at.
-`bin/fm-pr-poll.sh` therefore passes `--host` from the validated record, and `bin/fm-crew-state.sh` reads an open change's status through the same explicit host.
+`bin/jg-pr-poll.sh` therefore passes `--host` from the validated record, and `bin/jg-crew-state.sh` reads an open change's status through the same explicit host.
 `--host` pins only the server, and the SSH user and port resolve down that same current-directory `origin` path before falling back to the local login name and 29418, so watching a change requires `GERRIT_USER` - and `GERRIT_PORT` on a server that does not use 29418 - set in the watcher's environment or in `~/.config/gerrit-axi/config.json`, because the poll cannot report that it never authenticated.
 
 ## The poll against the real server
@@ -87,12 +87,12 @@ The poll is silent on every failure, so without `--host` the watch would wait fo
 Run from `/tmp`, outside any clone, against the published poll program, collected 2026-09-23.
 
 ```
-$ bash bin/fm-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/4200 review.internal group/apps/console 4200
+$ bash bin/jg-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/4200 review.internal group/apps/console 4200
 merged
 
-$ bash bin/fm-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/4201 review.internal group/apps/console 4201
+$ bash bin/jg-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/4201 review.internal group/apps/console 4201
 
-$ bash bin/fm-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/999999999 review.internal group/apps/console 999999999
+$ bash bin/jg-pr-poll.sh --validated gerrit https://review.internal/c/group/apps/console/+/999999999 review.internal group/apps/console 999999999
 ```
 
 The merged change emits one `merged` line.
@@ -101,8 +101,8 @@ The open change and a change that does not exist both emit nothing.
 ## The merge path refuses
 
 ```
-$ bin/fm-pr-merge.sh task-a https://gerrit.example/c/proj/+/1
-error: firstmate does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server
+$ bin/jg-pr-merge.sh task-a https://gerrit.example/c/proj/+/1
+error: juggernaut does not submit a Gerrit change: submitting requires an attributed human approval it must not manufacture, so a human submits the change on the server
 $ echo $?
 2
 ```
@@ -113,7 +113,7 @@ The server permitting self-approval is what makes this a policy boundary rather 
 
 ## What the hermetic regression pins
 
-`tests/fm-pr-check-security.test.sh` covers, with no server:
+`tests/jg-pr-check-security.test.sh` covers, with no server:
 
 - The canonical change URL parses into the provider-tagged identity with its whole nested project path, and an adversarial URL matrix is refused.
 - Only an exact `MERGED` status wakes the watch, and a fully submittable open change does not.
@@ -121,13 +121,13 @@ The server permitting self-approval is what makes this a policy boundary rather 
 - A merged record whose `url` is null, absent, or on an alias host still wakes the watch, because the change number is the whole match.
 - A merged spelling inside a change's free-text subject cannot forge a status.
 - An absent `gerrit-axi` or `jq` produces no wake, and arming reports the missing tool instead.
-- Arming records no `pr_head`: a Gerrit revision names one patch set, and `bin/fm-review-diff.sh` has no Gerrit path to resolve a current head with, so a recorded revision would quietly become the reviewed content after the next amend.
+- Arming records no `pr_head`: a Gerrit revision names one patch set, and `bin/jg-review-diff.sh` has no Gerrit path to resolve a current head with, so a recorded revision would quietly become the reviewed content after the next amend.
 - The merge path refuses a Gerrit change.
 - Arming accepts a done naming a Gerrit change only when a live read shows the change's current patch set carrying the worker's HEAD tree, even when a remote-tracking ref such as the no-mistakes gate branch holds that HEAD, and refuses a mismatched, unknown, or unreadable patch set before recording anything.
 - Once arming has recorded the change as `pr=`, a later done naming it is accepted from that record with no forge read, so a server-side rebase or new patch set does not revoke it.
 - A no-mistakes done naming a Gerrit change is also refused unless the copy holds a passed pipeline's result: refused when the run's outcome is missing or not a pass, while the run reports `recover_custody` or `continue_active_run`, when HEAD's tree differs from the pipeline head's, or when the run cannot be read, and accepted once recovered even after the Change-Id stamp rewrote the branch's messages.
 - A `published for review` done whose URL is not a canonical Gerrit change URL is refused, even when a remote-tracking ref holds HEAD.
 
-`tests/fm-crew-state.test.sh` pins the crew-state read with no server either: a passed run whose change is open reports `PR open`, an abandoned one `PR closed`, a merged one `PR merged`, and an unreadable record or one naming another change reports an honest unknown rather than a merge.
+`tests/jg-crew-state.test.sh` pins the crew-state read with no server either: a passed run whose change is open reports `PR open`, an abandoned one `PR closed`, a merged one `PR merged`, and an unreadable record or one naming another change reports an honest unknown rather than a merge.
 
 Refresh this record by rerunning those suites, and rerun the transcripts above after a `gerrit-axi` upgrade.

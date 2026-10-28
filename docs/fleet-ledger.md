@@ -35,7 +35,7 @@ Readers must ignore members and events they do not recognize, so later versions 
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
 
-`task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote Squad Lead; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
+`task.dispatched` members: `kind` is `ship`, `scout`, or `squad lead`; `project` is the project directory name, or `null` for a remote Squad Lead; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
 
 `task.pr_ready` members: `pr` is the PR's full URL.
 It is written each time Juggernaut records a PR for the task, so registering a replacement PR, or the same PR again, writes another record; recording the PR again as part of merging it writes none.
@@ -76,31 +76,31 @@ Example:
 
 ## Reading lifecycle metrics
 
-The fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/fm-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/fm-flow.sh` with `FM_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
+The fleet-flow add-on reads retained fleet records into lifecycle, queue-reason, and bottleneck metrics, with optional live capacity observations; this fork's `bin/jg-flow.sh` is a thin shim that execs the add-on's `fleet-flow/bin/jg-flow.sh` with `JG_BIN` pointing at this checkout's `bin/`, and the add-on reader's header owns usage, output interpretation, timestamp provenance, and uncertainty limits.
 The Lookout adapter reads lifecycle output and maps supported rows into Lookout's `lookout.fleet.v1` document.
-It does not generate a dashboard `board.json` or embed the full `fm-flow.v1` document.
-The reader's CLI regression journey is the add-on's `fleet-flow/tests/fm-flow.test.sh`, run with `FM_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/fm-flow-shim.test.sh`](../tests/fm-flow-shim.test.sh).
+It does not generate a dashboard `board.json` or embed the full `jg-flow.v1` document.
+The reader's CLI regression journey is the add-on's `fleet-flow/tests/jg-flow.test.sh`, run with `JG_BIN` naming this checkout's `bin/`; the shim's own behavior is covered by [`tests/jg-flow-shim.test.sh`](../tests/jg-flow-shim.test.sh).
 
 ## Per-model statistics
 
-[`fm-task-outcome.sh`](../bin/fm-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
-`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `fm-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
+[`jg-task-outcome.sh`](../bin/jg-task-outcome.sh) appends one durable, append-only row per finished task to the home-local `data/metrics/task-outcomes.tsv`, whose header row and columns are `home`, `task`, `kind`, `project`, `models`, `started`, `ended`, `outcome`, and `pr`; give it the same trust as `state/`.
+`models` lists every launch of the task in order as `harness:model:effort`, joined by `;`, sourced from the `state/<id>.models` history that `jg-spawn.sh` starts on a fresh spawn and appends to on each relaunch, so a mid-task model switch is recorded rather than lost.
 `outcome` is `merged`, `closed`, `cancelled`, `scout`, or `failed`; a Squad Lead retirement is not a task and records nothing.
-The recorder runs best-effort from `bin/fm-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
+The recorder runs best-effort from `bin/jg-teardown.sh` before the task's durable presentation is retired, and never blocks cleanup.
 
-[`fm-model-stats.sh`](../bin/fm-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `fm-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.
+[`jg-model-stats.sh`](../bin/jg-model-stats.sh) reads every local home's `task-outcomes.tsv` and the main home's sampled `lanes.tsv`/`prs.tsv` into `jg-model-stats.v1`: per model over 7- and 30-day windows, started, finished, merged, merge rate, time-to-merge P50/P75, first-pass rate, rework, revert, escape, cancelled/failed, and model switches, each with its sample size.
 The fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), attribution, and uncertainty limits.
 A task is attributed to the model of its final launch, and one that changed model mid-flight counts as a switch under that model.
 Every recorded outcome is authoritative; a sampled lane that predates the recorder is a disclosed fallback, and merge rate is computed over recorded outcomes only so a sampled row never fabricates a rate.
 First-pass, rework, revert and escape figures use the same recorded merged PRs as merge rate, since a sampled lane only proves the merges it observed and never the tasks that ended without one; the coverage line counts the sampled tasks they leave out.
-Lookout does not include these model statistics in its fleet document; the reader remains available through `fm-model-stats.sh`.
+Lookout does not include these model statistics in its fleet document; the reader remains available through `jg-model-stats.sh`.
 
 ## Skill statistics
 
-[`fm-skill-stats.sh`](../bin/fm-skill-stats.sh) reads the main home's private `data/metrics/skills.tsv` (`day`, `home`, `skill`, `reads`) into `fm-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
+[`jg-skill-stats.sh`](../bin/jg-skill-stats.sh) reads the main home's private `data/metrics/skills.tsv` (`day`, `home`, `skill`, `reads`) into `jg-skill-stats.v1`: per skill over 7- and 30-day windows, its read count and the number of homes it was read in, plus a per-home breakdown and, for each window the file's coverage spans, the known skills that had no reads in it.
 Known skill names come from each local home's `skills/` and `.agents/skills/` directories; a missing file or directory contributes nothing rather than failing.
 A registered remote home's reads are not readable locally and are disclosed; while one is registered the reader makes no zero-read claim, since a skill it never saw locally may still have been read there.
-The fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits; the reader remains available through `fm-skill-stats.sh`, but its output is not part of Lookout's fleet document.
+The fleet-stats add-on reader's header owns usage (`--json [--now <epoch>]`), window arithmetic, and uncertainty limits; the reader remains available through `jg-skill-stats.sh`, but its output is not part of Lookout's fleet document.
 
 ## Not included
 
@@ -114,4 +114,4 @@ These are possible follow-ups, deliberately left out of this version:
 - backfill or replay of events from before the ledger was turned on;
 - secret scrubbing beyond what status lines already contain, and privacy guarantees stronger than those of `state/`.
 
-`bin/fm-fleet-ledger.sh`'s header owns the writer mechanics and lists every producer.
+`bin/jg-fleet-ledger.sh`'s header owns the writer mechanics and lists every producer.

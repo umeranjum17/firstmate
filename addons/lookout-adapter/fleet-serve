@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # fleet-serve [--bind ADDR] [--port N]: Lookout and its fleet adapter behind one address.
-# FM_HOME: the home to read (default ~/firstmate). FM_SIGNOFF_URL_FILE: the board's url file.
+# JG_HOME: the home to read (default ~/juggernaut). JG_SIGNOFF_URL_FILE: the board's url file.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-export FM_HOME=${FM_HOME:-$HOME/firstmate}
+export JG_HOME=${JG_HOME:-$HOME/juggernaut}
 bind=127.0.0.1 port=4390
 while [ $# -gt 0 ]; do case $1 in --bind) bind=$2; shift 2 ;; --port) port=$2; shift 2 ;; *) echo "fleet-serve: unknown argument $1" >&2; exit 2 ;; esac; done
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 ap=$(free_port); lp=$(free_port)
 trap 'kill $(jobs -p) 2>/dev/null || true' EXIT
-"$here/lookout-firstmate" --serve --port "$ap" & 
+"$here/lookout-juggernaut" --serve --port "$ap" & 
 npx --yes --package=lookout-axi@0.1.0 lookout serve --adapter "http://127.0.0.1:$ap/fleet.json" --port "$lp" &
-"$here/lookout-front" --upstream "http://127.0.0.1:$lp" --bind "$bind" --port "$port" --board-url-file "${FM_SIGNOFF_URL_FILE:-$FM_HOME/state/signoff-board.url}" &
+"$here/lookout-front" --upstream "http://127.0.0.1:$lp" --bind "$bind" --port "$port" --board-url-file "${JG_SIGNOFF_URL_FILE:-$JG_HOME/state/signoff-board.url}" &
 wait -n

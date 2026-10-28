@@ -8,8 +8,8 @@
 # Usage: $0 [quota-json-file] (file = test input; ZAI_QUOTA_MARK then names the repeat-state file, default a fresh temp file).
 # ponytail: fixed thresholds; tune here if the number of GLM lanes changes.
 set -u
-FM_MAIN=${FM_MAIN_HOME:-$HOME/firstmate}
-MARK=$FM_MAIN/state/.zai-quota.last
+JG_MAIN=${JG_MAIN_HOME:-$HOME/juggernaut}
+MARK=$JG_MAIN/state/.zai-quota.last
 now=$(date +%s)
 if [ $# -eq 0 ]; then
   [ -f "$MARK" ] && [ $((now - $(stat -c %Y "$MARK"))) -lt 600 ] && exit 0

@@ -12,11 +12,11 @@ for tool in jq curl python3; do
 done
 
 AXI="$ROOT/bin/juggernaut-axi"
-TMP_ROOT=$(fm_test_tmproot juggernaut-axi-serve)
+TMP_ROOT=$(jg_test_tmproot juggernaut-axi-serve)
 H=$TMP_ROOT/home
 mkdir -p "$H/data" "$H/state" "$H/config" "$H/projects" "$TMP_ROOT/fixture-root"
-printf '## In flight\n\n## Queued\n- [ ] q1 - Queued one (repo: firstmate) (kind: ship)\n\n## Done\n' > "$H/data/backlog.md"
-export FM_HOME=$H FM_ROOT_OVERRIDE=$TMP_ROOT/fixture-root
+printf '## In flight\n\n## Queued\n- [ ] q1 - Queued one (repo: juggernaut) (kind: ship)\n\n## Done\n' > "$H/data/backlog.md"
+export JG_HOME=$H JG_ROOT_OVERRIDE=$TMP_ROOT/fixture-root
 TOKEN=0123456789abcdef0123456789abcdef0123456789
 
 "$AXI" serve >/dev/null 2>"$TMP_ROOT/err" && fail "serve must refuse without a token"
@@ -40,7 +40,7 @@ assert_equals 401 "$(code "$B/v1/status")" "no token is refused"
 assert_equals 401 "$(code -H 'Authorization: Bearer wrong' "$B/v1/status")" "wrong token is refused"
 assert_equals 200 "$(code "${auth[@]}" "$B/v1/status")" "good token reads status"
 assert_equals juggernaut-axi.v1 "$(curl -s "${auth[@]}" "$B/v1/tickets" | jq -r .schema)" "JSON carries the schema"
-assert_equals q1 "$(curl -s "${auth[@]}" "$B/v1/tickets?repo=firstmate&limit=5" | jq -r '.tickets[0].id')" "query filters apply"
+assert_equals q1 "$(curl -s "${auth[@]}" "$B/v1/tickets?repo=juggernaut&limit=5" | jq -r '.tickets[0].id')" "query filters apply"
 assert_contains "$(curl -s "${auth[@]}" -H 'Accept: application/toon' "$B/v1/tickets")" "view: tickets" "TOON on request"
 assert_equals 403 "$(code "${auth[@]}" -H 'Origin: http://evil.example' "$B/v1/status")" "Origin is refused"
 assert_equals 403 "$(code "${auth[@]}" -H 'Host: evil.example' "$B/v1/status")" "foreign Host is refused"

@@ -11,7 +11,7 @@ metadata:
 
 # quiet
 
-Quiet supervision mode (kunchenguid/firstmate#2356): the same token-saving
+Quiet supervision mode (kunchenguid/juggernaut#2356): the same token-saving
 daemon tradeoff as `/watchover`, made explicit for a captain who is staying,
 watching the session, and does not want to exit the mode just by chatting.
 
@@ -23,25 +23,25 @@ For captain-held rechecks under quiet, see [architecture](../../../docs/architec
 
 0. **First check whether quiet mode needs anything here.**
    On Pi or pi-signed, enter nothing: the attended branch already keeps routine wakes out of this conversation (the `watchover` skill's step 2); tell the captain so.
-   Everywhere else run `bin/fm-afk-launch.sh quiet-check`; its header's QUIET MODE owns what each result means.
+   Everywhere else run `bin/jg-afk-launch.sh quiet-check`; its header's QUIET MODE owns what each result means.
    - Exit 0: enter nothing - no record, no flag, no daemon, and `/radio-silence off` then needs nothing either.
      Tell the captain in `AGENTS.md` section 9 language that supervision here already works that way: routine fleet events stay off this conversation, while decisions, failures, credentials, and review-ready work still reach them.
      When its line says the supervision session is paused, say instead that routine updates reach them until it recovers, and when it next retries.
    - Exit 2: an away record is live, so the captain has returned: run the `watchover` skill's return and clear its catch-up gate, then run `quiet-check` again and follow its new result.
    - Exit 1: go on to step 1; if it printed a line, first tell the captain plainly what keeps supervision from already being quiet here.
 
-1. **Enter the lifecycle through `bin/fm-afk-launch.sh`, exactly as `/watchover`
-   does, with `FM_AFK_MODE=quiet` set first.**
+1. **Enter the lifecycle through `bin/jg-afk-launch.sh`, exactly as `/watchover`
+   does, with `JG_AFK_MODE=quiet` set first.**
    Follow the `watchover` skill's record entry, daemon launch, and announcement steps,
    except that on a home that runs the supervision host its `/watchover` no-daemon rule does not apply
-   after `quiet-check` exits 1. Never arm a separate `fm-watch.sh`. Export
-   `FM_AFK_MODE=quiet` in the shell that invokes `bin/fm-afk-launch.sh enter`
+   after `quiet-check` exits 1. Never arm a separate `jg-watch.sh`. Export
+   `JG_AFK_MODE=quiet` in the shell that invokes `bin/jg-afk-launch.sh enter`
    and `start` (or `start-native`), so the record notes quiet mode and
    `state/.afk`'s first line reads `quiet` instead of `away`.
    On a home that runs the supervision host, launch the daemon on the path
    this harness uses without the host; `start` and `start-native` take quiet
    mode from the record `enter` wrote.
-   Keep `FM_AFK_MODE=quiet` on a quiet refresh: an `/watchover` entry, even without new words, replaces a quiet record with an away record and starts hold-for-return.
+   Keep `JG_AFK_MODE=quiet` on a quiet refresh: an `/watchover` entry, even without new words, replaces a quiet record with an away record and starts hold-for-return.
 
 2. **Acknowledge** in `AGENTS.md` section 9 language: "Captain, quiet mode is
    active; I will batch routine updates and surface only decisions, failures,
@@ -54,7 +54,7 @@ Unlike `/watchover`, ordinary chat is never the exit signal - that is the entire
 point of this mode (AGENTS.md section 8's away-mode stub, quiet branch).
 
 - Only an explicit `/radio-silence off` (or the captain plainly asking to leave quiet
-  mode / resume normal supervision) exits it: run `bin/fm-afk-return.sh`
+  mode / resume normal supervision) exits it: run `bin/jg-afk-return.sh`
   unchanged, exactly the procedure `/watchover`'s "How to exit afk" section
   documents for its own return path (correct-ordered daemon shutdown,
   durable wake presentation and acknowledgement, escalation/wedge evidence,
@@ -73,7 +73,7 @@ Quiet mode changes how aggressively Juggernaut surfaces things, never who approv
 A PR ready for merge keeps the merge authority from `AGENTS.md` section 7, and a needs-decision finding keeps the `ask-user-authority` policy.
 
 The captain is present, so quiet mode holds nothing for a return.
-The record a quiet entry writes carries quiet mode (`bin/fm-afk-contract.sh mode`), and its entry, read-back, and session-start lines say so.
+The record a quiet entry writes carries quiet mode (`bin/jg-afk-contract.sh mode`), and its entry, read-back, and session-start lines say so.
 Every action the captain asks for or standing authority covers - landing local-only work, a merge, a dispatch - proceeds now exactly as it would without quiet mode; the `watchover` skill's away holds never apply to a quiet record.
 
 ## Must not hide a decision or a failure

@@ -6,9 +6,13 @@ import { basename, dirname, isAbsolute, relative, sep } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { userInfo } from "node:os";
+// jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
+for (const [_jgOld, _jgVal] of Object.entries(process.env))
+  if (_jgOld.startsWith("FM_") && process.env[`JG_${_jgOld.slice(3)}`] === undefined)
+    process.env[`JG_${_jgOld.slice(3)}`] = _jgVal;
 
-const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/FM_HOME
-const MAIN_HOME = `${ACCOUNT_HOME}/firstmate`;
+const ACCOUNT_HOME = userInfo().homedir; // OS account record, never HOME/JG_HOME
+const MAIN_HOME = `${ACCOUNT_HOME}/juggernaut`;
 const AUDIT = `${dirname(fileURLToPath(import.meta.url))}/state/main-kills.jsonl`;
 const under = (root, path) => path === root || path.startsWith(`${root}/`);
 const statOf = (pid) => readFileSync(`/proc/${pid}/stat`, "utf8").split(/\) /).at(-1).trim().split(/\s+/);
@@ -43,8 +47,8 @@ function primaryMain(caller, table) {
 function fleetPath(path) {
 	try {
 		const resolved = realpathSync(path);
-		return under(realpathSync(MAIN_HOME), resolved) || /^\.treehouse\/[^/]+\/(?:[^/]+\/)?firstmate[^/]*(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved)) ||
-			/^\.local\/(?:share|bin)\/fm-[^/]+(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved));
+		return under(realpathSync(MAIN_HOME), resolved) || /^\.treehouse\/[^/]+\/(?:[^/]+\/)?juggernaut[^/]*(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved)) ||
+			/^\.local\/(?:share|bin)\/jg-[^/]+(?:\/|$)/.test(relative(ACCOUNT_HOME, resolved));
 	} catch { return false; }
 }
 function fleetOwned(p) {
@@ -58,7 +62,7 @@ function fleetOwned(p) {
 const safeArg = (arg) => /^(?:--?[a-zA-Z][a-zA-Z-]*|-?[0-9]+|node|python3?|sleep|bash|sh|kill|server|daemon|stuck|cleanup|worker|watcher|sampler|preview|fleet|test|Umer)$/.test(arg) || (isAbsolute(arg) && fleetPath(arg)) ? arg : "[redacted]";
 const safeCommand = (text) => text.split(/\s+/).map(safeArg).join(" ");
 const MODELLED = { kill: "lL", pkill: "f", killall: "" }; // options the guard reads; any other option refuses
-const DEVICE_RECORD = ".fm-kill-guard-device-pids.json";
+const DEVICE_RECORD = ".jg-kill-guard-device-pids.json";
 const worktreeRoot = (caller) => {
 	const cwd = realpathSync(`/proc/${caller}/cwd`);
 	const root = realpathSync(execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim());
@@ -167,7 +171,7 @@ function inCallerWorktree(target, caller) {
 		const home = realpathSync(process.env.HOME);
 		const under = (parent, path) => { const rel = relative(parent, path); return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel)); };
 		if (cwd !== root || root === "/" || root === "/tmp" || under(root, home) ||
-			(existsSync(`${root}/state`) && existsSync(`${root}/data`) && existsSync(`${root}/bin/fm-spawn.sh`))) return false;
+			(existsSync(`${root}/state`) && existsSync(`${root}/data`) && existsSync(`${root}/bin/jg-spawn.sh`))) return false;
 		const rel = relative(root, target);
 		return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
 	} catch { return false; }
@@ -321,7 +325,7 @@ function blockedBy(command, caller, procs) {
 
 // Returns the block message, or null to allow. caller is the process whose descendants may be signalled: in-process
 // adapters leave it at this process, the Claude hook passes the agent's pid. Unreadable /proc refuses.
-export function guard(command, { caller = process.pid, reason = process.env.FM_KILL_REASON } = {}) {
+export function guard(command, { caller = process.pid, reason = process.env.JG_KILL_REASON } = {}) {
 	let table, target;
 	const procs = () => {
 		if (!table) { table = procTable(); procs.main = primaryMain(caller, table); }

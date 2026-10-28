@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
 # done-done journey: prove ticket write-back through the poll, lifecycle writer and
 # fork shim; retain transcripts and the step record in $DONE_DONE_EVIDENCE_ROOT.
 set -u
@@ -9,7 +17,7 @@ failed=0
 
 # 1. The port plus the writer and the check, through the add-on's own suite and a
 #    disposable fleet board: real tasks-axi, real sign-off-axi, no live board.
-FM_TEST_FORK=$REPO bash addons/tickets-sync/tests/sync.test.sh >"$OUT/tickets-sync-test.log" 2>&1 || failed=1
+JG_TEST_FORK=$REPO bash addons/tickets-sync/tests/sync.test.sh >"$OUT/tickets-sync-test.log" 2>&1 || failed=1
 if grep -q '^PASS:' "$OUT/tickets-sync-test.log" && ! grep -q '^FAIL' "$OUT/tickets-sync-test.log"; then
   grep '^PASS:' "$OUT/tickets-sync-test.log" >"$OUT/tickets-sync-passed.log"
 else
@@ -18,10 +26,10 @@ fi
 
 # 2. The fork shim: silent without the add-on or a board, and it hands an installed
 #    writer this home's task and flags.
-bash tests/fm-ticket.test.sh >"$OUT/fm-ticket-test.log" 2>&1 || failed=1
+bash tests/jg-ticket.test.sh >"$OUT/jg-ticket-test.log" 2>&1 || failed=1
 
 if [ "$failed" -ne 0 ]; then
-  echo "tickets-writeback: a step failed; read tickets-sync-test.log and fm-ticket-test.log" >&2
+  echo "tickets-writeback: a step failed; read tickets-sync-test.log and jg-ticket-test.log" >&2
 fi
 
 python3 - "$OUT/steps.json" "$(git rev-parse HEAD)" <<'PY'

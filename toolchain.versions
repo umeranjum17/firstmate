@@ -12,7 +12,7 @@
 # Bump ritual.
 # 1. Verify the new version on a real home for one working day, including one dispatch and one merge.
 # 2. Change that single row; never edit a row without step 1, and never lower a row.
-# 3. Run `bin/fm-test-run.sh tests/fm-one-install.test.sh` and `bash bin/fm-bootstrap.sh`, which must agree
+# 3. Run `bin/jg-test-run.sh tests/jg-one-install.test.sh` and `bash bin/jg-bootstrap.sh`, which must agree
 #    with the new row, then ship the row with the verification in the change description.
 #
 no-mistakes 1.46.0
@@ -23,7 +23,7 @@ tasks-axi tasks-axi@0.2.6
 quota-axi quota-axi@0.1.67
 learn-from-mistakes learn-from-mistakes-axi@0.10.0
 done-done done-done-axi@0.6.18
-sign-off-axi sign-off-axi@0.8.0
+sign-off-axi sign-off-axi@0.7.0
 first-draft-axi first-draft-axi@0.3.0
 # Lookout is the only supported fleet dashboard package.
 lookout-axi lookout-axi@0.1.0

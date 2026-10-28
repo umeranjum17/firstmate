@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
-# Live proof journey: Lookout shows this fleet's real data. Serves lookout-firstmate on the real home (read-only) and a lookout clone
-# on spare ports; captures the screens the adapter fills (390 px light, 1440 px dark) as text and PNG into $DONE_DONE_EVIDENCE_ROOT. FM_HOME is the home to read, LOOKOUT_DIR a lookout clone.
+# Live proof journey: Lookout shows this fleet's real data. Serves lookout-juggernaut on the real home (read-only) and a lookout clone
+# on spare ports; captures the screens the adapter fills (390 px light, 1440 px dark) as text and PNG into $DONE_DONE_EVIDENCE_ROOT. JG_HOME is the home to read, LOOKOUT_DIR a lookout clone.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -Eeuo pipefail
-: "${FM_HOME:?}" "${LOOKOUT_DIR:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
+: "${JG_HOME:?}" "${LOOKOUT_DIR:?}" "${DONE_DONE_EVIDENCE_ROOT:?}"
 here=$(cd "$(dirname "$0")" && pwd)
 export CHROME_DEVTOOLS_AXI_SESSION=lookout-adapter-proof-$$
 tmp=$(mktemp -d)
@@ -15,7 +24,7 @@ cleanup() {
 trap cleanup EXIT
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 ap=$(free_port); lp=$(free_port)
-"$here/lookout-firstmate" --home "$FM_HOME" --no-build --serve --port "$ap" >"$tmp/adapter.log" 2>&1 & pids+=("$!")
+"$here/lookout-juggernaut" --home "$JG_HOME" --no-build --serve --port "$ap" >"$tmp/adapter.log" 2>&1 & pids+=("$!")
 (cd "$LOOKOUT_DIR" && exec node bin/lookout.js serve --adapter "http://127.0.0.1:$ap/fleet.json" --port "$lp" >"$tmp/lookout.log" 2>&1) & pids+=("$!")
 for _ in $(seq 50); do curl -fs "http://127.0.0.1:$lp/api/fleet" -o "$tmp/api.json" && break; sleep 0.2; done
 python3 - "$tmp/api.json" >"$DONE_DONE_EVIDENCE_ROOT/document.txt" <<'P'
@@ -26,7 +35,7 @@ assert f['name'] != 'Sample fleet' and f['lanes'] and f['quota'] and f['merges']
 P
 python3 - "$(git -C "$here" rev-parse HEAD)" >"$DONE_DONE_EVIDENCE_ROOT/steps.json" <<'P'
 import json, sys
-print(json.dumps({'target': {'version': sys.argv[1]}, 'start': 'the real Firstmate home, read only, with lookout-firstmate serving it and a lookout clone reading that URL',
+print(json.dumps({'target': {'version': sys.argv[1]}, 'start': 'the real Juggernaut home, read only, with lookout-juggernaut serving it and a lookout clone reading that URL',
   'steps': ['open Lookout on its Overview, Lanes, Flow and Capacity screens', 'read the fleet name and the lanes, quota and merges of the real fleet'],
   'result': 'the screens show the real fleet (document.txt names it and its list counts), not the Sample fleet'}, indent=2))
 P

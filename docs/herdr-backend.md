@@ -9,7 +9,7 @@ Broad backend verification covers versions 0.7.1, 0.7.3, 0.7.4, 0.7.5, and 0.8.0
 Protocol-16 features remain gated by availability.
 Default-on presentation spaces have a higher floor of Herdr 0.8.0 for the reason given under [Presentation spaces](#presentation-spaces).
 Herdr provides the terminal session while Treehouse continues to provide task worktrees.
-[`configuration.md`](configuration.md#runtime-backend-configbackend--fm_backend) owns shared backend selection and metadata semantics.
+[`configuration.md`](configuration.md#runtime-backend-configbackend--jg_backend) owns shared backend selection and metadata semantics.
 
 ## Find a topic
 
@@ -47,10 +47,10 @@ Juggernaut invokes its CLI as a separate process.
 Select Herdr in any of these ways:
 
 - Local `config/backend` containing `herdr`.
-- `FM_BACKEND=herdr` for one launch.
+- `JG_BACKEND=herdr` for one launch.
 - An explicit request to Juggernaut.
 
-A remote Squad Lead agent is the one case with no choice: it always runs on Herdr, and [`remote-secondmates.md`](remote-secondmates.md) owns that requirement and the readiness its host must meet.
+A remote Squad Lead agent is the one case with no choice: it always runs on Herdr, and [`remote-squad-leads.md`](remote-squad-leads.md) owns that requirement and the readiness its host must meet.
 
 Herdr is also auto-detected when the primary runs natively under `HERDR_ENV=1` and is not inside tmux.
 A tmux pane nested inside Herdr resolves to tmux because the innermost multiplexer wins.
@@ -61,7 +61,7 @@ An auto-detected Herdr spawn stays silent, matching the verified tmux default pa
 Spawn stops before creating a Herdr container or acquiring a task worktree when `herdr`, `jq`, or the protocol floor is unavailable.
 No separate first-run provisioning is required.
 
-The required CI lane uses the pinned installers in `bin/fm-install-herdr.sh` and `bin/fm-install-treehouse.sh`.
+The required CI lane uses the pinned installers in `bin/jg-install-herdr.sh` and `bin/jg-install-treehouse.sh`.
 Those script headers own release assets, checksums, download bounds, and post-install gates.
 Real harness credential tests remain opt-in rather than part of default CI.
 
@@ -90,7 +90,7 @@ Selection also follows these rules:
 - Status that supplies neither `.server.compatible` nor both client and server protocols leaves compatibility unknown.
 - No other failure triggers a reselection.
 
-`fm-remote-doctor.sh` reports the client selected for the remote session.
+`jg-remote-doctor.sh` reports the client selected for the remote session.
 Removing or upgrading the shadowing client is the durable fix.
 `bin/backends/herdr.sh` "client selection" owns the mechanics.
 
@@ -101,15 +101,15 @@ When the launcher has no Herdr workspace to inherit, the adapter maintains one d
 
 | Home | Workspace label |
 | --- | --- |
-| Primary | `firstmate` |
-| Squad Lead | `2ndmate-<secondmate-id>`, derived from its validated `.fm-secondmate-home` marker |
+| Primary | `juggernaut` |
+| Squad Lead | `2ndmate-<squad-lead-id>`, derived from its validated `.jg-squad-lead-home` marker |
 
 A Squad Lead launched by the primary receives a narrowly scoped home override during container creation.
 
 ### Watching tasks
 
 Attach to the selected named Herdr session and switch to the relevant home workspace to watch its task tabs.
-Routine supervision uses `bin/fm-peek.sh <id>` and `FM_HOME=<home> bin/fm-send.sh <id> '<text>'` without attaching.
+Routine supervision uses `bin/jg-peek.sh <id>` and `JG_HOME=<home> bin/jg-send.sh <id> '<text>'` without attaching.
 
 ### Focus
 
@@ -128,7 +128,7 @@ Older injection shapes are unverified, so a claimed launcher pane without the in
 With presentation spaces disabled, an operator or Recon is created in the exact workspace that identity currently resolves to.
 That workspace is read live from Herdr rather than from the injected snapshot, so the worker always appears beside the agent that launched it.
 Duplicate labels elsewhere in the session are irrelevant, and the globally focused workspace is never the target.
-A `--secondmate` launch is the deliberate exception: it stands up that Squad Lead home's own workspace instead of joining the launcher's.
+A `--squad-lead` launch is the deliberate exception: it stands up that Squad Lead home's own workspace instead of joining the launcher's.
 
 ### Unresolvable launcher identity
 
@@ -147,10 +147,10 @@ Juggernaut running outside Herdr entirely has no launcher workspace to inherit, 
 That path needs the home label to identify exactly one workspace.
 Two workspaces sharing it are an unresolvable placement and refuse rather than adopting either.
 
-Avoid naming a personal workspace `firstmate` or `2ndmate-<id>` for that reason.
+Avoid naming a personal workspace `juggernaut` or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
 
-An older Squad Lead workspace using `firstmate-<id>` is not migrated automatically.
+An older Squad Lead workspace using `juggernaut-<id>` is not migrated automatically.
 Rename it manually before expecting new tasks or recovery to use it.
 
 ### Recovery and existing tasks
@@ -267,7 +267,7 @@ Projected children are never collapsed back into that parent.
 The parent is the placement and ordering reference the projection is bound under.
 At projected creation Juggernaut also declares the workspace's lineage to Herdr, reporting the display-only tokens `parent=<parent workspace id>` and `kind=task` through `herdr workspace report-metadata --source Juggernaut`, which is the declaration consumers such as the phone's Spaces list group by.
 The declaration is best-effort display metadata, verified on Herdr 0.9.1 to merge per token so pre-existing `task` tokens survive: a failed report prints one warning and leaves the workspace rendering top-level, exactly as an undeclared workspace always has, while the flat per-home layout declares nothing because its workspaces are durable places, not transient tasks.
-The normal `fm-<id>` task tab is created in the exact new workspace returned by Herdr.
+The normal `jg-<id>` task tab is created in the exact new workspace returned by Herdr.
 Only the exact seeded default tab returned by the same workspace-create response can be pruned.
 Before and after create, prune, order, abort cleanup, and normal cleanup, Juggernaut verifies exact workspace, tab, pane, and active-focus ids.
 An ambiguous response grants no mutation or cleanup authority.
@@ -461,10 +461,10 @@ Any of these preserves the candidate and lets session startup continue with at m
   So a Herdr create failure surfaces as a spawn failure in every Herdr home, rather than only in homes that opted in.
   Every earlier degradation on the fresh projected-create path (no session server, contended presentation lock, absent or ambiguous parent) still warns and continues flat.
 - Recovery of an existing presentation journal refuses by default when the shared presentation lock is contended, rather than falling back flat.
-  Pass `fm-spawn.sh --herdr-resume-lock-wait` to opt that recovery into waiting for the lock instead, so concurrent recoveries can serialize.
+  Pass `jg-spawn.sh --herdr-resume-lock-wait` to opt that recovery into waiting for the lock instead, so concurrent recoveries can serialize.
   The flag applies to a fresh ship or Recon spawn that recovers a journal.
   The multi-task path forwards the flag to each per-pair spawn.
-  `fm-spawn.sh --relaunch` and `--secondmate` take no exact-resume presentation-order lock, so the flag has no effect there.
+  `jg-spawn.sh --relaunch` and `--squad-lead` take no exact-resume presentation-order lock, so the flag has no effect there.
   Dead-owner reclaim still stops the wait when a holder crashed.
   Unbounded blocking on the session lock is never the default.
 - Existing layouts are not force-renamed or rearranged.
@@ -480,12 +480,12 @@ Any of these preserves the candidate and lets session startup continue with at m
 
 | Test | What it covers |
 | --- | --- |
-| `tests/fm-backend-herdr-presentation-e2e.test.sh` | Multi-home ordering, concurrency, lock contention, legacy coexistence, focus preservation, exact same-identity restart replacement, ambiguous bindings and tokens, and exact-pane cleanup through the guarded lab path. |
-| `tests/fm-herdr-session-cleanup.test.sh` | Every discovery, ownership, topology, process, locking, revalidation, focus, retirement, and continue-on-error boundary. |
-| `tests/fm-herdr-session-cleanup-e2e.test.sh` | The restored-shell cleanup in a guarded non-default named lab. |
-| `tests/fm-backend-herdr-focus-flash-e2e.test.sh` | Reproduces the raw explicit-close focus steal on the installed release, and proves the focus-safe emptying-close plan removes a doomed workspace with no wrong-focus interval. |
-| `tests/fm-backend-herdr-stale-active-tab-e2e.test.sh` | Proves a persisted-focused tab still closes when no foreground client is attached. |
-| `tests/fm-herdr-attached-viewer-live-e2e.test.sh` | Proves the other half against a real attached viewer, which `bin/fm-herdr-lab.sh viewer start` supplies over a pty sized before the fork. |
+| `tests/jg-backend-herdr-presentation-e2e.test.sh` | Multi-home ordering, concurrency, lock contention, legacy coexistence, focus preservation, exact same-identity restart replacement, ambiguous bindings and tokens, and exact-pane cleanup through the guarded lab path. |
+| `tests/jg-herdr-session-cleanup.test.sh` | Every discovery, ownership, topology, process, locking, revalidation, focus, retirement, and continue-on-error boundary. |
+| `tests/jg-herdr-session-cleanup-e2e.test.sh` | The restored-shell cleanup in a guarded non-default named lab. |
+| `tests/jg-backend-herdr-focus-flash-e2e.test.sh` | Reproduces the raw explicit-close focus steal on the installed release, and proves the focus-safe emptying-close plan removes a doomed workspace with no wrong-focus interval. |
+| `tests/jg-backend-herdr-stale-active-tab-e2e.test.sh` | Proves a persisted-focused tab still closes when no foreground client is attached. |
+| `tests/jg-herdr-attached-viewer-live-e2e.test.sh` | Proves the other half against a real attached viewer, which `bin/jg-herdr-lab.sh viewer start` supplies over a pty sized before the fork. |
 
 [`verification/runtime-backends.md`](verification/runtime-backends.md#workspace-removal-focus-safety) owns the active versioned evidence for the focus-flash test.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#attached-foreground-viewer) owns the active versioned evidence and the re-run trigger for the attached-viewer test.
@@ -499,9 +499,9 @@ Immediately before close, Juggernaut rechecks the exact tab, expected seed label
 A working seed pane is never closed.
 
 This created-versus-adopted gate is a destructive safety boundary.
-A prior label heuristic could adopt a captain-owned workspace named `firstmate` and close its live seed-shaped tab.
+A prior label heuristic could adopt a captain-owned workspace named `juggernaut` and close its live seed-shaped tab.
 The current structural gate removes label inference from cleanup authority.
-`tests/fm-backend-herdr-prune-safety-e2e.test.sh` reproduces the collision in an isolated named session and proves the adopted pane remains untouched.
+`tests/jg-backend-herdr-prune-safety-e2e.test.sh` reproduces the collision in an isolated named session and proves the adopted pane remains untouched.
 
 ## Endpoint metadata
 
@@ -523,7 +523,7 @@ Workspace and tab ids support verification and cleanup but are not inferred from
 ### Named server and session routing
 
 The adapter starts and polls a named server before workspace, tab, pane, or agent calls.
-Every Herdr invocation goes through `fm_backend_herdr_cli`, which sets the environment and passes an explicit trailing `--session <name>`.
+Every Herdr invocation goes through `jg_backend_herdr_cli`, which sets the environment and passes an explicit trailing `--session <name>`.
 An environment variable alone is not reliable when another Herdr server is running.
 
 When the selected named server is not running, the adapter launches it without these inherited values:
@@ -538,7 +538,7 @@ Explicit named-session routing and unrelated launch environment remain intact.
 
 ### Sending text and keys
 
-Literal text and Enter are separate operations on `fm-send.sh`'s typed plane.
+Literal text and Enter are separate operations on `jg-send.sh`'s typed plane.
 Ordinary local text steers instead use the durable steering inbox and send only its best-effort constant doorbell through this adapter.
 Spawn-time fixed commands may use Herdr's atomic run primitive.
 Enter, Escape, and Ctrl-C are supported.
@@ -551,10 +551,10 @@ Typed-plane text is typed once; only Enter is retried.
 When native `agent get` identity is Claude, the adapter types only into an empty composer.
 A Claude composer that already holds text, or cannot be read, before the send is refused with nothing typed.
 Before that Enter, the adapter continues only when the selected composer shows the typed payload, or only Claude paste placeholders with no literal remainder.
-Every herdr adapter composer read (`fm_backend_herdr_composer_state`, `fm_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/fm-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
+Every herdr adapter composer read (`jg_backend_herdr_composer_state`, `jg_backend_herdr_composer_content`) captures the full visible viewport, never a bounded tail, while the shared inbox pending-line confirmation read (bin/jg-task-inbox-lib.sh) stays a bounded tail on every backend: an overlay Claude renders between the composer and the pane bottom - the slash-command popup is the verified shape - pushes the composer outside a tail window, and the composer is by definition inside the viewport.
 Dated measurement: docs/verification/runtime-backends.md "Claude exit behind the slash-command popup".
 
-That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-firstmate label.
+That comparison ignores whitespace and U+2063, the invisible mark that starts operational inputs and ends the from-juggernaut label.
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
 A composer that holds a shorter suffix, or a placeholder plus a literal remainder, does not receive Enter.
@@ -576,7 +576,7 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 1. Wait for `working` or `blocked` across a bounded polling window.
 2. If native status stays idle, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery, and proven pending text retries Enter.
-3. After the retry budget, `fm_composer_queued_enter_verdict` treats proven pending text plus a generating busy signal as a queued delivered Enter.
+3. After the retry budget, `jg_composer_queued_enter_verdict` treats proven pending text plus a generating busy signal as a queued delivered Enter.
    It keeps an idle pending composer as a genuine swallow.
 
 On an already active or unreadable baseline, the adapter falls back to conservative composer clearance.
@@ -620,14 +620,14 @@ The adapter's own composer reads are exempt because they read the visible viewpo
 
 Herdr's native agent state can read idle while a harness waits on its own long foreground tool.
 The shared crew-state path therefore accepts a native `busy` as evidence of activity.
-It never accepts a native `idle` as evidence that a worker has stopped; the task's own semantic busy state (`bin/fm-busy-lib.sh`) decides that.
+It never accepts a native `idle` as evidence that a worker has stopped; the task's own semantic busy state (`bin/jg-busy-lib.sh`) decides that.
 A human-blocked permission dialog has no busy banner and still surfaces.
 
 ## Composer and injection safety
 
 Herdr has no direct cursor-row primitive.
 The adapter is a thin capture.
-It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier in `bin/fm-composer-lib.sh`, which owns every shape:
+It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier in `bin/jg-composer-lib.sh`, which owns every shape:
 
 - Bordered boxes.
 - Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
@@ -645,7 +645,7 @@ Identity stays a lazy second read, consulted only when a separator pair could ch
 ### Placeholder and ghost text
 
 ANSI capture preserves de-emphasized placeholder style.
-`bin/fm-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
+`bin/jg-composer-lib.sh` is the fleet-wide owner that strips dim or faint runs and dark truecolor placeholders while retaining bright typed input.
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 The classifier then degrades a glyph row carrying trailing text to `unknown` instead of misreading ghost suggestions as typed input.
@@ -659,11 +659,11 @@ This prevents a dead agent pane from receiving and possibly executing an escalat
 
 ### Operational input markers
 
-The current operational envelope starts with U+2063 and `FIRSTMATE_OP: `.
-The separate routed-request carrier uses `[fm-from-firstmate]` plus U+2063.
+The current operational envelope starts with U+2063 and `JUGGERNAUT_OP: `.
+The separate routed-request carrier uses `[jg-from-juggernaut]` plus U+2063.
 U+2063 survives Herdr terminal input as text, unlike the legacy ASCII control separator that could erase the visible routing label.
 Claude Code itself then removes it from the submitted prompt, so a Claude Code primary receives away-mode escalations as the owner's record-backed doorbell instead.
-`bin/fm-operational-input.sh` owns current operational construction and parsing, and the AFK skill owns legacy away-input compatibility.
+`bin/jg-operational-input.sh` owns current operational construction and parsing, and the AFK skill owns legacy away-input compatibility.
 No Herdr-specific copy of that protocol exists.
 
 ## Restart and liveness behavior
@@ -673,8 +673,8 @@ No Herdr-specific copy of that protocol exists.
 Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
 Every process in the server dies with it, including the harness processes, watchers, Stop-hook arms, and the away daemon, and no live agent registration survives: newer releases report agent_not_found on the revived pane, while 0.7.4 restores a label-less unknown record over the bare shell.
 With its default `resume_agents_on_restore`, Herdr 0.9.1 then resumes each recorded agent session (`claude --resume <id>`, `pi --session <path>`) without its original launch flags, in the pane's creation folder.
-`bin/fm-spawn.sh` creates a new worker's pane at the project's primary checkout before it enters the worktree, so a resumed worker can land in the primary checkout.
-`bin/fm-sentinel.sh` runs outside Herdr and owns recovery from a restart ([watcher continuity](watcher-continuity.md#agent-runtime-restart)).
+`bin/jg-spawn.sh` creates a new worker's pane at the project's primary checkout before it enters the worktree, so a resumed worker can land in the primary checkout.
+`bin/jg-sentinel.sh` runs outside Herdr and owns recovery from a restart ([watcher continuity](watcher-continuity.md#agent-runtime-restart)).
 A restored same-labeled tab with a missing pane, no registered agent, or only such a proven shell-only leftover record is a husk.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
@@ -688,7 +688,7 @@ In that case `agent get` still reports `agent=pi` with its last status.
 Legacy pane-driven `treehouse get` left that nested-shell shape behind (measured on Herdr 0.9.0 - [verification](verification/runtime-backends.md) "Stale agent registration"; upstream issue #4115).
 
 So before a registered agent counts as live, the pane classifier reads `pane process-info` and the real process table.
-It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, the same rule the tmux adapter proves liveness with:
+It uses the shared harness-process classifier in `bin/jg-agent-process-lib.sh`, the same rule the tmux adapter proves liveness with:
 
 | What the process view shows | Verdict |
 | --- | --- |
@@ -722,12 +722,12 @@ The generic Herdr agent-liveness probe reuses that pane classifier, then applies
 | A registered agent with a live process | `alive` |
 | Every other unexpected read | `unreadable` |
 
-Neither the stopped-server exception nor the stale-registration verdict widens the generic husk classifier (`fm_backend_herdr_tab_is_husk`), the session-startup sweep, or any unreadable-pane refusal.
+Neither the stopped-server exception nor the stale-registration verdict widens the generic husk classifier (`jg_backend_herdr_tab_is_husk`), the session-startup sweep, or any unreadable-pane refusal.
 Outside the exact same-identity restart reclaim, a `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell; only that reclaim path may replace a proven shell-only leftover record in place, as [Restart recovery](#restart-recovery) describes.
 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
 The process-level proof only decides whether that registration is backed by a running process.
-`tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
+`tests/jg-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 
 The session-start sweep and the watcher's dedicated Squad Lead liveness tick use this probe.
@@ -742,19 +742,19 @@ That authority is bound to a session identity, and in the crew shape the registr
 An agent started FRESH in such a pane reports a new session and Herdr ignores its reports, so the pane stays frozen at whatever the previous agent last reported - an operator running its pipeline reads `idle` until its task ends, and nothing from outside repairs it (measured 2026-09-21 on Herdr 0.9.1 against a real Pi; `pane report-agent-session` and `pane report-agent` for `herdr:pi` are accepted without being applied unless the reporter is the registered pane agent, and `pane release-agent` on the stale record changes nothing).
 A fresh spawn never meets this: it gets a new pane with nothing bound.
 
-So a **relaunch** preserves the binding instead of fighting it: before the Pi-family launch line is composed, `bin/fm-spawn.sh` reads the pane's recorded session reference through `fm_backend_herdr_pane_agent_session_ref` and passes it back as Pi's own `--session <path-or-id>` (`relaunch_resume_args`; `bin/fm-control-lib.sh`'s `fm_control_relaunch_resume_flag` owns which adapters and which registration labels qualify).
+So a **relaunch** preserves the binding instead of fighting it: before the Pi-family launch line is composed, `bin/jg-spawn.sh` reads the pane's recorded session reference through `jg_backend_herdr_pane_agent_session_ref` and passes it back as Pi's own `--session <path-or-id>` (`relaunch_resume_args`; `bin/jg-control-lib.sh`'s `jg_control_relaunch_resume_flag` owns which adapters and which registration labels qualify).
 The replacement therefore starts on the exact identity the authority is bound to, and its `working`/`idle`/`blocked` reports land again.
 The reference is the endpoint's own record, never a guess about which session is recent, and only a `pi` label may supply it: a registration belonging to another adapter is ignored, as is an unreadable, missing, or malformed one, in which case the relaunch is the ordinary fresh session it always was.
 A relaunch that changes harness AWAY from Pi is not repaired by this and keeps the pre-existing behavior; only the adapter the authority belongs to can resume its session.
 
 The session file may not exist any more: Pi creates it at exactly that path, so the identity survives either way.
 The read grants no send, close, or lifecycle authority of its own - it is a read of Herdr's record.
-The portable halves are pinned by `tests/fm-backend-herdr.test.sh` (the read, against a canned CLI) and `tests/fm-control.test.sh` (the per-adapter rule), and `tests/fm-control-herdr-smoke.test.sh` exercises the relaunch path against the real binary; the versioned live measurement, including the reproduction and the resume that lifts it, is [`verification/runtime-backends.md`](verification/runtime-backends.md) "Pane status authority across a relaunch".
+The portable halves are pinned by `tests/jg-backend-herdr.test.sh` (the read, against a canned CLI) and `tests/jg-control.test.sh` (the per-adapter rule), and `tests/jg-control-herdr-smoke.test.sh` exercises the relaunch path against the real binary; the versioned live measurement, including the reproduction and the resume that lifts it, is [`verification/runtime-backends.md`](verification/runtime-backends.md) "Pane status authority across a relaunch".
 
 ## Push events and polling fallback
 
 Protocol 16 can subscribe to `pane.agent_status_changed` over one bounded Unix-socket reader.
-`bin/fm-transition-lib.sh` owns the backend-neutral transition vocabulary and policy.
+`bin/jg-transition-lib.sh` owns the backend-neutral transition vocabulary and policy.
 The Herdr adapter subscribes before reconciling current levels, buffers edges during reconciliation, and returns fresh blocked transitions for this home's panes.
 
 The watcher maps the pane back to the task and skips these (the optional wait-timers add-on applies its own native-evidence admission and active-hold policy on top when installed):
@@ -780,7 +780,7 @@ Polling runs every cycle and remains the permanent fallback when any of these is
 
 There is still one watcher process; the event reader is a bounded child of that watcher.
 
-`tests/fm-backend-herdr-eventwait-smoke.test.sh`, `tests/fm-transition-lib.test.sh`, and `tests/fm-supervision-events.test.sh` cover capability, subscribe-then-reconcile ordering, dedupe, exemptions, and polling fallback.
+`tests/jg-backend-herdr-eventwait-smoke.test.sh`, `tests/jg-transition-lib.test.sh`, and `tests/jg-supervision-events.test.sh` cover capability, subscribe-then-reconcile ordering, dedupe, exemptions, and polling fallback.
 
 ## Away-mode supervisor support
 
@@ -794,9 +794,9 @@ The pane-independent max-defer alert is configured in [`wedge-alarm.md`](wedge-a
 - Harnesses with native tracked background execution can run the daemon in their terminal.
 - Pi and pi-signed no longer launch the away daemon; their ordinary supervision session continues under the posture record.
 - A non-Pi home that runs the supervision host also skips the daemon for `/watchover`; see [supervision-host.md](supervision-host.md).
-- For another harness without native tracked background execution, `bin/fm-afk-launch.sh` runs the daemon in a Herdr workspace, as described next.
+- For another harness without native tracked background execution, `bin/jg-afk-launch.sh` runs the daemon in a Herdr workspace, as described next.
 
-In that last case, `bin/fm-afk-launch.sh`:
+In that last case, `bin/jg-afk-launch.sh`:
 
 1. Creates a dedicated unfocused Herdr workspace.
 2. Runs the daemon there with an explicit supervisor target and backend.
@@ -822,10 +822,10 @@ Never use ambient `herdr server stop` for Juggernaut verification.
 An environment-only session selection can silently reach a different running server.
 The ambient stop command has no explicit target.
 
-`bin/fm-herdr-lab.sh` is the sole supported lifecycle helper for isolated verification.
+`bin/jg-herdr-lab.sh` is the sole supported lifecycle helper for isolated verification.
 The helper:
 
-- Provisions only non-default names beginning with `fm-lab-`.
+- Provisions only non-default names beginning with `jg-lab-`.
 - Supplies an explicit `--session` Herdr option before any `--` delimiter in allowed task commands.
 - Refuses caller-supplied session flags and server/session lifecycle subcommands.
 - Performs destructive stop/delete only through its guarded lifecycle actions.
@@ -856,24 +856,24 @@ Prepare-based adapter tests enter the disposable runtime environment before serv
 ## Regression entry points
 
 ```sh
-tests/fm-backend-herdr.test.sh
-tests/fm-composer-lib.test.sh
-tests/fm-herdr-submit-confirm-live-e2e.test.sh
-tests/fm-backend-herdr-smoke.test.sh
-tests/fm-backend-herdr-prune-safety-e2e.test.sh
-tests/fm-backend-herdr-respawn-idem-e2e.test.sh
-tests/fm-backend-herdr-workspace-per-home-e2e.test.sh
-tests/fm-backend-herdr-launcher-workspace-e2e.test.sh
-tests/fm-backend-herdr-presentation-e2e.test.sh
-tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh
-tests/fm-herdr-pi-stale-registration-live-e2e.test.sh
-tests/fm-backend-herdr-eventwait-smoke.test.sh
-tests/fm-control-herdr-smoke.test.sh
-tests/fm-herdr-session-cleanup.test.sh
-tests/fm-herdr-session-cleanup-e2e.test.sh
-tests/fm-herdr-attached-viewer-live-e2e.test.sh
-tests/fm-afk-inject-herdr-e2e.test.sh
-tests/fm-afk-pi-herdr-return-e2e.test.sh
+tests/jg-backend-herdr.test.sh
+tests/jg-composer-lib.test.sh
+tests/jg-herdr-submit-confirm-live-e2e.test.sh
+tests/jg-backend-herdr-smoke.test.sh
+tests/jg-backend-herdr-prune-safety-e2e.test.sh
+tests/jg-backend-herdr-respawn-idem-e2e.test.sh
+tests/jg-backend-herdr-workspace-per-home-e2e.test.sh
+tests/jg-backend-herdr-launcher-workspace-e2e.test.sh
+tests/jg-backend-herdr-presentation-e2e.test.sh
+tests/jg-backend-herdr-agent-exit-shell-e2e.test.sh
+tests/jg-herdr-pi-stale-registration-live-e2e.test.sh
+tests/jg-backend-herdr-eventwait-smoke.test.sh
+tests/jg-control-herdr-smoke.test.sh
+tests/jg-herdr-session-cleanup.test.sh
+tests/jg-herdr-session-cleanup-e2e.test.sh
+tests/jg-herdr-attached-viewer-live-e2e.test.sh
+tests/jg-afk-inject-herdr-e2e.test.sh
+tests/jg-afk-pi-herdr-return-e2e.test.sh
 ```
 
 Real Herdr tests use the named lab helper and default-session tripwire.

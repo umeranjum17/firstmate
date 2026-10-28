@@ -7,6 +7,15 @@
 # PR passes; the previous gate still runs and its refusal still refuses; a
 # forge failure refuses; install twice is a no-op; uninstall restores.
 # Usage: owner-guard/tests/owner-guard-merge.test.sh
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)
@@ -60,21 +69,21 @@ wcommit() { git -C "$d/work" -c core.hooksPath=/dev/null -c user.name=You -c use
 printf 'one\n' >"$d/work/notes.txt"
 git -C "$d/work" add notes.txt && wcommit -m base
 git -C "$d/work" push -q --no-verify origin main
-gate() { env FM_HOME="$FM" "$FM/config/merge-gate" "$@" 2>&1; }
+gate() { env JG_HOME="$FM" "$FM/config/merge-gate" "$@" 2>&1; }
 # The standalone doctor catches both missing guard files and missing global wiring.
 out=$("$SRC/doctor.sh" "$FM" 2>&1)
 has "doctor confirms installed guard" "$out" "$FM is installed"
-mv "$XDG_DATA_HOME/fm-owner-guard/owner-guard" "$d/guard.off"
+mv "$XDG_DATA_HOME/jg-owner-guard/owner-guard" "$d/guard.off"
 git config --global --unset core.hooksPath
 out=$("$SRC/doctor.sh" "$FM" 2>&1) && rc=0 || rc=$?
 check "doctor fails when guard and global hook path are missing" "$rc" 1
-has "doctor names home and missing executable" "$out" "$FM is missing executable $XDG_DATA_HOME/fm-owner-guard/owner-guard"
+has "doctor names home and missing executable" "$out" "$FM is missing executable $XDG_DATA_HOME/jg-owner-guard/owner-guard"
 has "doctor names unset global hook path" "$out" "$FM has unset global core.hooksPath"
 has "doctor prints recovery command" "$out" "owner-guard/install.sh $FM"
 out=$(gate missing - HEAD -) && rc=0 || rc=$?
 check "missing guard merge gate refuses explicitly" "$rc" 1
 has "missing guard merge gate names recovery" "$out" "owner-guard is missing from this home; reinstall"
-mv "$d/guard.off" "$XDG_DATA_HOME/fm-owner-guard/owner-guard"
+mv "$d/guard.off" "$XDG_DATA_HOME/jg-owner-guard/owner-guard"
 "$SRC/install.sh" "$FM" >/dev/null
 
 git -C "$d/work" checkout -q -b clean

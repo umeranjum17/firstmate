@@ -8,6 +8,15 @@
 # lead pins and keeps a backup of each; a route whose real request fails
 # restores every file. Needs bash, jq, flock, timeout and python3 with yaml;
 # no real tool, home or config is touched.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
@@ -16,7 +25,7 @@ rc_bin=$here/../route-change wrapper=$here/../../pipeline-quota-failover/pi-quot
 work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 home=$work/home stub=$work/bin
-mkdir -p "$home/state" "$home/bin" "$home/config/secondmates/lead-claude" "$home/config/secondmates/lead-glm" "$stub"
+mkdir -p "$home/state" "$home/bin" "$home/config/squad_leads/lead-claude" "$home/config/squad_leads/lead-glm" "$stub"
 
 fails=0
 ok() { printf 'ok - %s\n' "$1"; }
@@ -29,12 +38,12 @@ awk -v w="$work" '
   /^#--- / { file = w "/" substr($0, 6); next }
   file { print > file }
 ' <<'FIXTURE' || exit 1
-#--- home/bin/fm-quota-axi-lib.sh
+#--- home/bin/jg-quota-axi-lib.sh
 # shellcheck shell=bash
-# The schema-5 join of firstmate's bin/fm-quota-axi-lib.sh.
-FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): "";
+# The schema-5 join of juggernaut's bin/jg-quota-axi-lib.sh.
+JG_QUOTA_ROW_JQ='def quota_lane($harness; $model): "";
   def quota_row($snapshot; $provider; $lane): ([$snapshot.providers[]? | select(.provider == $provider)] | first) // null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
 #--- home/config/crew-dispatch.json
 {"rules": [
   {"when": "tough", "use": [
@@ -48,12 +57,12 @@ fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "a
     {"harness": "pi", "model": "muse-spark-1.3-contributor", "provider": "opencode-go"}]}],
  "default": [{"harness": "pi", "model": "zai/glm-5.3-flash", "provider": "zai"}],
  "notes": ["kept as is"]}
-#--- home/config/secondmate-harness
+#--- home/config/squad-lead-harness
 # global lead default
 opencode opencode/deepseek-v4.1-flash-free high
-#--- home/config/secondmates/lead-claude/harness
+#--- home/config/squad_leads/lead-claude/harness
 claude claude-opus-5-5 high
-#--- home/config/secondmates/lead-glm/harness
+#--- home/config/squad_leads/lead-glm/harness
 pi zai/glm-5.3-flash high
 #--- nm.yaml
 # no-mistakes config
@@ -106,8 +115,8 @@ export PATH="$stub:$PATH" NM_CONFIG=$work/nm.yaml STUB_QUOTA=$work/quota.json ST
 export PI_QUOTA_FAILOVER_CHAIN='zai/glm-5.3-flash muse-spark-1.3-contributor deepseek/deepseek-v4.1-flash'
 : >"$STUB_LOG"
 
-pins=("$home/config/crew-dispatch.json" "$NM_CONFIG" "$home/config/secondmate-harness"
-  "$home/config/secondmates/lead-claude/harness" "$home/config/secondmates/lead-glm/harness")
+pins=("$home/config/crew-dispatch.json" "$NM_CONFIG" "$home/config/squad-lead-harness"
+  "$home/config/squad_leads/lead-claude/harness" "$home/config/squad_leads/lead-glm/harness")
 snap() { cat "${pins[@]}" | sha256sum; }
 baks() { find "$work" -name '*.bak-route-change-*' | wc -l; }
 models() { jq -c "$1 | map(.model)" "$home/config/crew-dispatch.json"; }
@@ -167,9 +176,9 @@ is "gate: every other key and comment is unchanged" \
 is "the agent line keeps its provenance comment" "$(grep -cF 'agent: pi # pipeline and reviews stay on free/cheap models' "$NM_CONFIG")" 1
 is "the model line keeps its provenance comment" \
   "$(grep -cF 'model: muse-spark-1.3-contributor # operator decision on the board' "$NM_CONFIG")" 1
-is "global lead pin" "$(tail -n 1 "$home/config/secondmate-harness")" "pi muse-spark-1.3-contributor high"
-is "Claude lead pin stays" "$(cat "$home/config/secondmates/lead-claude/harness")" "claude claude-opus-5-5 high"
-is "route lead pin" "$(cat "$home/config/secondmates/lead-glm/harness")" "pi muse-spark-1.3-contributor high"
+is "global lead pin" "$(tail -n 1 "$home/config/squad-lead-harness")" "pi muse-spark-1.3-contributor high"
+is "Claude lead pin stays" "$(cat "$home/config/squad_leads/lead-claude/harness")" "claude claude-opus-5-5 high"
+is "route lead pin" "$(cat "$home/config/squad_leads/lead-glm/harness")" "pi muse-spark-1.3-contributor high"
 is "one backup per changed file" "$(baks)" 4
 if cmp -s "$work/dispatch.orig" "$home/config/crew-dispatch.json".bak-route-change-*; then ok "the backup holds the old file"; else no "the backup holds the old file"; fi
 is "one real request, on the route, as the gate calls pi" "$(cat "$STUB_LOG")" \
@@ -187,7 +196,7 @@ is "no log line for the failed switch" "$(grep -c deepseek "$home/state/route-ch
 
 # An unusable quota-axi reading (lib signature drift): refused, nothing written.
 mkdir -p "$work/home2/config" "$work/home2/state" "$work/home2/bin"
-sed 's/def quota_row(/def quota_row_unusable(/' "$home/bin/fm-quota-axi-lib.sh" >"$work/home2/bin/fm-quota-axi-lib.sh"
+sed 's/def quota_row(/def quota_row_unusable(/' "$home/bin/jg-quota-axi-lib.sh" >"$work/home2/bin/jg-quota-axi-lib.sh"
 cp "$work/dispatch.orig" "$work/home2/config/crew-dispatch.json"
 out=$("$rc_bin" "$work/home2" muse-spark-1.3-contributor 2>&1)
 is "an unusable quota reading exits non-zero" "$?" 1

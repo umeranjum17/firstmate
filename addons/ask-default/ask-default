@@ -4,7 +4,7 @@
 #
 #   ask-default open <ask-id> --wait-until <YYYY-MM-DDTHH:MM:SSZ> | --wait <seconds>
 #       --default-cmd <command> --safety <class> --reason <one line>
-#     Records one ask in $FM_HOME/data/ask-default/asks/<ask-id>: its wait clock (when an
+#     Records one ask in $JG_HOME/data/ask-default/asks/<ask-id>: its wait clock (when an
 #     unanswered ask may be defaulted), the pre-declared default action, that action's safety
 #     class, and the reason. Re-opening refreshes the clock; a defaulted ask is settled and
 #     is never re-opened under the same id.
@@ -39,7 +39,7 @@ set -u
 
 die() { echo "ask-default: $*" >&2; exit 1; }
 
-DATA_DIR="$FM_HOME/data/ask-default"
+DATA_DIR="$JG_HOME/data/ask-default"
 ASKS_DIR="$DATA_DIR/asks"
 LOG="$DATA_DIR/applied.log"
 
@@ -264,7 +264,7 @@ show_ask() {
   [ -z "$R_DEFAULTED" ] || printf 'defaulted_at: %s\ndefaulted_rc: %s\n' "$R_DEFAULTED" "$R_RC"
 }
 
-[ -n "${FM_HOME:-}" ] || die "FM_HOME is not set, so the ask records have no home"
+[ -n "${JG_HOME:-}" ] || die "JG_HOME is not set, so the ask records have no home"
 mkdir -p "$ASKS_DIR" 2>/dev/null || true
 
 case ${1:-} in

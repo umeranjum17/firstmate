@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# jg-model-gate - one allow-list per provider for every model the fleet can run.
+# The list is one JSON file, one key per provider: {"ollama-cloud": ["deepseek-v4.1-flash"]}. A provider the file does
+# not name is not limited; a provider it names may run only its listed models, and a pinned tag of a listed model
+# (deepseek-v4.1-flash:1017) is still that model. Default action is the fleet check (watch).
+# check <provider> <model> allowed?; list the file; allow|deny <provider> <model>... edit it; opencode [--remove]
+# [--dry-run] writes the list into opencode's own per-provider whitelist; watch (default) restores that whitelist, then
+# reads usage per model and warns once per off-list sighting. The API key is read from its file, never printed, never
+# copied. bin/jg-model-gate-lib.sh is the jg-spawn hook beside this file.
+set -uo pipefail
+# The fleet check is a copy at $JG_HOME/state/model-gate.check.sh, so it names its own home and needs no environment.
+case ${0##*/} in *.check.sh) JG_HOME=${JG_HOME:-$(cd -- "$(dirname -- "$0")/.." && pwd -P)} ;; esac
+
+LIST=${JG_MODEL_GATE_LIST:-${JG_HOME:-$HOME/juggernaut}/config/model-allow-list.json}
+STATE=${JG_STATE_OVERRIDE:-${JG_HOME:-$HOME/juggernaut}/state}
+API_KEY_FILE=${OLLAMA_API_KEY_FILE:-$HOME/.config/ollama-cloud/api_key}
+MARK=$STATE/.model-gate.last
+SEEN=$STATE/.model-gate.seen
+die() { printf 'jg-model-gate: %s\n' "$*" >&2; exit 2; }
+say() { printf 'model-gate: %s %s\n' "$1" "$2"; }
+norm() { case $2 in "$1"/*) printf '%s\n' "${2#"$1"/}" ;; *) printf '%s\n' "$2" ;; esac; }
+
+# listed <provider>: its allowed models, one per line. Non-zero when the file does not name the provider at all.
+listed() { [ -r "$LIST" ] && jq -e --arg p "$1" 'type == "object" and has($p)' "$LIST" >/dev/null 2>&1 && jq -r --arg p "$1" '.[$p][]? | strings' "$LIST"; }
+allowed_words() { local l; l=$(listed "$1" | paste -sd, - | sed 's/,/, /g'); printf '%s\n' "${l:-none}"; }
+
+# allowed <provider> <model>: a listed model, or a pinned tag of one.
+allowed() {
+  local p=$1 m a
+  m=$(norm "$p" "$2")
+  listed "$p" >/dev/null || return 0
+  while IFS= read -r a; do
+    [ -n "$a" ] || continue
+    [ "$m" = "$a" ] && return 0
+    case $m in "$a":*) return 0 ;; esac
+  done < <(listed "$p")
+  return 1
+}
+check() {
+  [ "$#" -eq 2 ] || die "usage: jg-model-gate check <provider> <model>"
+  allowed "$1" "$2" && exit 0
+  printf 'jg-model-gate: %s model %s is not allowed (allowed: %s); list: %s\n' "$1" "$(norm "$1" "$2")" "$(allowed_words "$1")" "$LIST" >&2
+  exit 1
+}
+show() {
+  [ -r "$LIST" ] || { printf 'jg-model-gate: no list at %s (every provider is unconstrained)\n' "$LIST"; return 0; }
+  jq -r --arg f "$LIST" 'to_entries[] | "\(.key): \(.value | join(" "))  (list: \($f))"' "$LIST"
+}
+edit() {
+  local mode=$1 p=$2 cur ms
+  shift 2
+  [ "$#" -ge 1 ] || die "usage: jg-model-gate $mode <provider> <model>..."
+  mkdir -p -- "${LIST%/*}" || die "cannot create ${LIST%/*}"
+  cur=$( [ -s "$LIST" ] && cat -- "$LIST" || echo '{}' )
+  ms=$(printf '%s\n' "$@" | jq -R . | jq -s -c .)
+  printf '%s' "$cur" | jq --arg p "$p" --argjson ms "$ms" --arg mode "$mode" \
+    '.[$p] = (if $mode == "allow" then ((.[$p] // []) + $ms | unique) else ((.[$p] // []) - $ms) end)' \
+    > "$LIST.tmp-$$" || { rm -f -- "$LIST.tmp-$$"; die "cannot update $LIST"; }
+  mv -f -- "$LIST.tmp-$$" "$LIST"
+  show
+}
+# opencode [--remove] [--dry-run]: the provider layer. The list goes into opencode's own per-provider whitelist for the
+# providers the list names, and nothing else; one line when it changes or repairs that file, nothing when it is already
+# right. The fleet check runs it every pass, so an opencode update or a config rewrite cannot silently unlock every model.
+opencode_conf() {
+  local mode=set dry=0 a p wl conf work old
+  for a in "$@"; do case $a in --remove) mode=del ;; --dry-run) dry=1 ;; *) die "usage: jg-model-gate opencode [--remove] [--dry-run]" ;; esac; done
+  conf=${OPENCODE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json}
+  [ -f "$conf" ] && [ -r "$LIST" ] || return 0
+  work=$(mktemp "${TMPDIR:-/tmp}/opencode-model-gate.XXXXXX") || die "cannot write beside $conf"
+  cp -p "$conf" "$work"
+  while IFS= read -r p; do
+    jq -e --arg p "$p" '.provider[$p] != null' "$work" >/dev/null 2>&1 || continue
+    wl=$(jq -c --arg p "$p" '.[$p]' "$LIST")
+    old=$(jq -c --arg p "$p" '.provider[$p].whitelist // empty' "$work"); old=${old:-absent}
+    if [ "$mode" = del ]; then
+      [ "$old" = "$wl" ] || { say kept ".provider[$p].whitelist $old (edited since install)"; continue; }
+      jq --arg p "$p" 'del(.provider[$p].whitelist)' "$work" > "$work.tmp" && mv -f -- "$work.tmp" "$work"
+      say removed ".provider[$p].whitelist"
+    else
+      [ "$old" != "$wl" ] || continue
+      jq --arg p "$p" --argjson wl "$wl" '.provider[$p].whitelist = $wl' "$work" > "$work.tmp" && mv -f -- "$work.tmp" "$work"
+      say restored "the opencode whitelist for $p to $wl (was $old); list: $LIST"
+    fi
+  done < <(jq -r 'keys[]' "$LIST")
+  if cmp -s "$conf" "$work"; then rm -f -- "$work"; return 0; fi
+  [ "$dry" = 0 ] || { say would-write "$conf"; rm -f -- "$work"; return 0; }
+  cp -p "$conf" "$conf.bak-model-gate-$(date +%s)"
+  chmod --reference="$conf" "$work" 2>/dev/null || true
+  mv -f -- "$work" "$conf"
+}
+
+api() { curl -sS --max-time 20 --fail -H "Authorization: Bearer $(cat -- "$API_KEY_FILE")" "https://ollama.com$1"; }
+
+balance_line() {
+  printf '%s' "$1" | jq -r 'if .included.balance_usd != null then
+      "credit left $\(.included.balance_usd) of $\(.included.allowance_usd // "?") (period ends \(.included.period.until // "unknown"))"
+    else "credit left unknown" end' 2>/dev/null || printf 'credit left unknown'
+}
+# watch [provider]: one read per cadence window; one warning per off-list model ever seen, never a repeat.
+watch() {
+  local p=${1:-ollama-cloud} now usage bal rows m n usd out cur prev credit
+  opencode_conf
+  listed "$p" >/dev/null || return 0 # not limited here: nothing to enforce
+  case $p in ollama-cloud) ;; *) return 0 ;; esac # ponytail: the one usage reader; add the next beside it
+  now=$(date +%s)
+  [ -f "$MARK" ] && [ "$((now - $(stat -c %Y -- "$MARK" 2>/dev/null || echo 0)))" -lt "${JG_MODEL_GATE_MIN_SECONDS:-600}" ] && return 0
+  mkdir -p -- "$STATE" 2>/dev/null || return 0
+  : > "$MARK"
+  usage=$(api "/api/usage?range=${JG_MODEL_GATE_RANGE:-7d}&group_by=model") || return 0
+  bal=$(api /api/balance 2>/dev/null || true)
+  rows=$(printf '%s' "$usage" | jq -r '.totals.groups[]? | select((.request_count // 0) > 0) | "\(.model)\t\(.request_count)\t\(.usage_usd)"' 2>/dev/null) || rows=
+  prev=$( [ -r "$SEEN" ] && cat -- "$SEEN" || true)
+  credit=$(balance_line "$bal")
+  out=''
+  cur=''
+  while IFS=$'\t' read -r m n usd; do
+    [ -n "$m" ] || continue
+    allowed "$p" "$m" && continue
+    cur+="$m"$'\n'
+    printf '%s\n' "$prev" | grep -qxF -- "$m" && continue
+    out+=$(printf 'model-gate: %s/%s was used %s time(s) for $%.4f in the last %s but only %s is allowed (%s); list: %s\n' \
+      "$p" "$m" "$n" "$usd" "${JG_MODEL_GATE_RANGE:-7d}" "$(allowed_words "$p")" "$credit" "$LIST")$'\n'
+  done <<<"$rows"
+  printf '%s' "$cur" > "$SEEN" 2>/dev/null || true
+  [ -z "$out" ] || printf '%s' "$out" | sed '/^$/d'
+}
+
+case ${1:-watch} in
+check) shift; check "$@" ;;
+list) show ;;
+allow | deny) edit "$@" ;;
+opencode) shift; opencode_conf "$@" ;;
+watch) shift || true; watch "$@" ;;
+*) die "unknown action: $1 (check, list, allow, deny, opencode, watch)" ;;
+esac

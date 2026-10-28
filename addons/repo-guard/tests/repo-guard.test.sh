@@ -31,7 +31,7 @@ git clone -q "$d/fork.git" "$d/clone"
 git -C "$d/clone" -c user.name=You -c user.email=you@example.com commit -q --allow-empty -m base
 git -C "$d/clone" push -q origin main
 git -C "$d/clone" remote set-url origin https://github.com/umeranjum17/juggernaut.git
-git -C "$d/clone" remote add parent https://github.com/kunchenguid/firstmate.git
+git -C "$d/clone" remote add parent https://github.com/kunchenguid/juggernaut.git
 git -C "$d/clone" remote add local "$d/fork.git"
 
 has "install guards gh" "$("$SRC/install.sh")" "guarded: $HOME/.local/bin/gh "
@@ -43,21 +43,21 @@ lacks "the package's own gh-axi file is not overwritten" "$(cat "$d/npm/gh-axi.j
 # repository is refused by name, our own repository passes.
 run gh-axi pr create --title t --body b
 check "create on our own origin succeeds with the repo pinned" "$RC/$(tail -n 1 "$d/calls")" "0/pr create --title t --body b --repo umeranjum17/juggernaut"
-lacks "the parent repository is never resolved by default" "$(cat "$d/calls")" "kunchenguid/firstmate"
+lacks "the parent repository is never resolved by default" "$(cat "$d/calls")" "kunchenguid/juggernaut"
 before=$(wc -l <"$d/calls")
-run gh-axi pr create --repo kunchenguid/firstmate --title t --body b
+run gh-axi pr create --repo kunchenguid/juggernaut --title t --body b
 check "create against the parent is refused" "$RC" 1
-has "the refusal names the refused repository" "$OUT" "kunchenguid/firstmate"
+has "the refusal names the refused repository" "$OUT" "kunchenguid/juggernaut"
 has "the refusal names the allow-listed alternative" "$OUT" "umeranjum17/*"
 check "a refused create never reaches gh-axi" "$(wc -l <"$d/calls")" "$before"
 for cmd in "pr comment 1 --body b" "pr review 1 --approve" "issue create --title t"; do
   # shellcheck disable=SC2086 # the fixture splits one intended command line
-  run gh-axi $cmd -R kunchenguid/firstmate
+  run gh-axi $cmd -R kunchenguid/juggernaut
   check "$cmd against the parent is refused" "$RC" 1
 done
 run gh-axi pr comment 1 --body b --repo=umeranjum17/juggernaut
 check "a comment on our own repository passes" "$RC" 0
-run gh pr create --repo kunchenguid/firstmate --title t --body b
+run gh pr create --repo kunchenguid/juggernaut --title t --body b
 check "a plain gh create against the parent is refused" "$RC" 1
 run gh pr create --title t --body b
 check "a plain gh create on our own origin passes" "$RC" 0
@@ -70,14 +70,14 @@ check "a read command passes through" "$RC" 0
 # shellcheck source=/dev/null
 lane() (cd "$d/clone" && "$d/fm/config/launch-env-hook" "$d/env.sh" && . "$d/env.sh" && "$@")
 hooks=$(lane git rev-parse --path-format=absolute --git-path hooks)
-check "the lane's hooks dir is the one git runs" "$hooks" "$XDG_DATA_HOME/fm-git-identity/hooks"
+check "the lane's hooks dir is the one git runs" "$hooks" "$XDG_DATA_HOME/jg-git-identity/hooks"
 hook() { OUT=$(printf '' | "$hooks/pre-push" "$@" 2>&1) && RC=0 || RC=$?; }
 hook origin https://github.com/umeranjum17/juggernaut.git
 check "a push to our own repository passes" "$RC" 0
-hook parent https://github.com/kunchenguid/firstmate.git
+hook parent https://github.com/kunchenguid/juggernaut.git
 check "a push to the parent is refused" "$RC" 1
-has "the push refusal names the refused repository" "$OUT" "kunchenguid/firstmate"
-hook parent git@github.com:kunchenguid/firstmate.git
+has "the push refusal names the refused repository" "$OUT" "kunchenguid/juggernaut"
+hook parent git@github.com:kunchenguid/juggernaut.git
 check "the scp-style parent url is refused too" "$RC" 1
 RC=0; lane git push -q local HEAD:refs/heads/probe >/dev/null 2>&1 || RC=$?
 check "a real push through the chain passes" "$RC" 0
@@ -86,7 +86,7 @@ check "a real push through the chain passes" "$RC" 0
 "$SRC/install.sh" --uninstall >/dev/null
 check "uninstall restores the gh-axi symlink" "$(readlink "$d/stub/gh-axi")" "$d/npm/gh-axi.js"
 check "uninstall restores the moved gh wrapper" "$(cat "$HOME/.local/bin/gh")" "$(cat "$d/npm/gh-axi.js")"
-run gh-axi pr create --repo kunchenguid/firstmate --title t --body b
+run gh-axi pr create --repo kunchenguid/juggernaut --title t --body b
 check "an uninstalled guard no longer refuses" "$RC" 0
 
 [ "$fails" -eq 0 ] || { echo "FAILED: $fails check(s)" >&2; exit 1; }

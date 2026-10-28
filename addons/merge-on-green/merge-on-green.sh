@@ -1,45 +1,54 @@
 #!/usr/bin/env bash
-# merge-on-green watcher check: merge a yolo task's PR through bin/fm-pr-merge.sh once its required
+# merge-on-green watcher check: merge a yolo task's PR through bin/jg-pr-merge.sh once its required
 # checks are green, so the merge wait after green (about 21 min per change) disappears.
-# Usage: merge-on-green.sh check <fm-home>
+# Usage: merge-on-green.sh check <jg-home>
 #
 # Per home, for each state/<task>.meta with yolo=on and a recorded pr= and pr_head=, it acts only when the
-# task's resolved state (bin/fm-crew-state.sh <task>) says checks green / PR ready. It silently skips a task
+# task's resolved state (bin/jg-crew-state.sh <task>) says checks green / PR ready. It silently skips a task
 # marked merge=manual and a PR whose evidence-gate PASS is a not-proven PASS (the gate reads the PR's
 # newest "## Checks" block; the lead files the proof gap first). Then, in this order and as separate
 # sequential commands, never piped and never in parallel:
-#   1. FM_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task> - use done-done lint, or the legacy Firstmate lint if unavailable.
+#   1. JG_HOME=<home> checks-lint.sh <PR URL> <home>/data/<task> - use done-done lint, or the legacy Juggernaut lint if unavailable.
 #   2. state/<task>.run-receipt.json - require verdict PASS, head == pr_head, spawn_gen == the meta's spawn_gen.
-#   3. FM_HOME=<home> bin/fm-pr-merge.sh <task> <PR URL> - never --auto, never gh merge directly.
+#   3. JG_HOME=<home> bin/jg-pr-merge.sh <task> <PR URL> - never --auto, never gh merge directly.
 # Any refusal or FAIL: one wake line naming the task, the PR URL and the first refusal reason, so the lead
 # acts; the refusal is remembered per task+head+reason+receipt state and repeats stay silent until pr_head,
 # the run receipt or the reason changes. An evidence gate or the merge this check itself kills on its
 # timeout wakes truthfully once per task+head+reason like a refusal, records no merge attempt, and is
-# retried next sweep; a fm-crew-state timeout stays silent and is retried next sweep. A merge:
+# retried next sweep; a jg-crew-state timeout stays silent and is retried next sweep. A merge:
 # one wake line with the verified merged URL, so the lead does the post-merge steps (install from main,
 # teardown), and the normal "done [at=<epoch>]: merged <PR URL>" line in state/<task>.status, so the
 # lead relays it.
 # One merge attempt per task per head: the attempted head and the last gate refusal are remembered in this
-# add-on's own data dir (<home>/data/fm-merge-on-green/<task>.head, <task>.refused), never in state/.
+# add-on's own data dir (<home>/data/jg-merge-on-green/<task>.head, <task>.refused), never in state/.
 # Nothing is printed when nothing happened.
 # Every command is bounded with timeout; a merge always finishes before the watcher's kill, a gate cut
 # by it is retried next sweep.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
-[ "$#" -eq 2 ] && [ "$1" = check ] && [ -d "$2/state" ] || { echo "usage: merge-on-green.sh check <fm-home>" >&2; exit 2; }
+[ "$#" -eq 2 ] && [ "$1" = check ] && [ -d "$2/state" ] || { echo "usage: merge-on-green.sh check <jg-home>" >&2; exit 2; }
 FMH=$(cd "$2" && pwd -P)
 STATE=$FMH/state
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-LINT=${FM_MOG_CHECKS_LINT:-$SRC/checks-lint.sh}
-DATA=$FMH/data/fm-merge-on-green
+LINT=${JG_MOG_CHECKS_LINT:-$SRC/checks-lint.sh}
+DATA=$FMH/data/jg-merge-on-green
 umask 077
 # One third of the watcher's per-check bound per command (floor 5s). Gate commands start only while
 # under 80% of the bound and a merge only when it fits inside the whole bound, so the watcher's kill
-# at FM_CHECK_TIMEOUT can at worst cut a gate command (harmlessly retried next sweep), never a merge.
-BUDGET=$(( ${FM_CHECK_TIMEOUT:-30} / 3 )); [ "$BUDGET" -ge 5 ] || BUDGET=5
+# at JG_CHECK_TIMEOUT can at worst cut a gate command (harmlessly retried next sweep), never a merge.
+BUDGET=$(( ${JG_CHECK_TIMEOUT:-30} / 3 )); [ "$BUDGET" -ge 5 ] || BUDGET=5
 START=$(date +%s)
-DEADLINE=$(( START + ${FM_CHECK_TIMEOUT:-30} * 4 / 5 ))
+DEADLINE=$(( START + ${JG_CHECK_TIMEOUT:-30} * 4 / 5 ))
 
-meta_get() { # <meta-file> <key> -> last value, the same rule fm_meta_get applies
+meta_get() { # <meta-file> <key> -> last value, the same rule jg_meta_get applies
   local line value=''
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in "$2="*) value=${line#*=} ;; esac
@@ -57,7 +66,7 @@ first_reason() { # first non-empty line of a command's output, trimmed to keep t
 
 # Every "NOT merging" wake line ends with this routing: a green lead-owned PR is the lead's to merge
 # (standing authority), not a card for Main; only a genuine hold goes up.
-LEAD_NOTE='lead: clear it and merge through bin/fm-pr-merge.sh; only a genuine hold (owner review, red CI, missing proof, security, destructive) goes to Main'
+LEAD_NOTE='lead: clear it and merge through bin/jg-pr-merge.sh; only a genuine hold (owner review, red CI, missing proof, security, destructive) goes to Main'
 
 timed_out() { [ "$1" = 124 ] || [ "$1" = 137 ]; }
 
@@ -85,7 +94,7 @@ for m in "$STATE"/*.meta; do
 
   # Gate: the task's resolved state must say checks green / PR ready. "PR merged" means the work
   # already landed; nothing happened, so nothing is printed.
-  cs=$(FM_HOME="$FMH" timeout "$BUDGET" "$FMH/bin/fm-crew-state.sh" "$task" 2>/dev/null) || continue
+  cs=$(JG_HOME="$FMH" timeout "$BUDGET" "$FMH/bin/jg-crew-state.sh" "$task" 2>/dev/null) || continue
   case "$cs" in
     *"checks green: PR ready"*|*"checks green: PR held for merge"*) ;;
     *) continue ;;
@@ -93,7 +102,7 @@ for m in "$STATE"/*.meta; do
 
   # 1. The evidence gate, run as its own command, must print PASS; a not-proven PASS is the lead's
   # proof gap to file first: skip silently before the receipt or merge.
-  lint_out=$(FM_HOME="$FMH" timeout "$BUDGET" "$LINT" "$pr" "$FMH/data/$task" 2>&1); lint_rc=$?
+  lint_out=$(JG_HOME="$FMH" timeout "$BUDGET" "$LINT" "$pr" "$FMH/data/$task" 2>&1); lint_rc=$?
   if timed_out "$lint_rc"; then
     refuse "checks lint timed out after ${BUDGET}s, no verdict; retrying next sweep" ''
     continue
@@ -139,29 +148,29 @@ for m in "$STATE"/*.meta; do
     continue
   fi
 
-  # 3. Merge through fm-pr-merge.sh only: its own live green check, head pin and refusal rules stay in
+  # 3. Merge through jg-pr-merge.sh only: its own live green check, head pin and refusal rules stay in
   # charge, no --auto is ever passed. The attempted head is recorded first, so a check killed between
   # record and merge cannot retry the same head next sweep.
   # A merge killed by the watcher after the head was recorded burns it with no wake line:
   # start one only when it still fits inside the watcher's whole-check bound; the fit arithmetic
   # doubles as the merge's bound, so the whole remaining window is available to it.
-  mbudget=$(( START + ${FM_CHECK_TIMEOUT:-30} - $(date +%s) - 1 ))
+  mbudget=$(( START + ${JG_CHECK_TIMEOUT:-30} - $(date +%s) - 1 ))
   [ "$mbudget" -ge "$BUDGET" ] || exit 0
   mkdir -p "$DATA" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA; $LEAD_NOTE"; continue; }
   printf '%s\n' "$pr_head" > "$DATA/$task.head" || { echo "merge-on-green: NOT merging $task $pr: cannot write $DATA/$task.head; $LEAD_NOTE"; continue; }
-  merge_out=$(FM_HOME="$FMH" timeout "$mbudget" "$FMH/bin/fm-pr-merge.sh" "$task" "$pr" 2>&1); merge_rc=$?
+  merge_out=$(JG_HOME="$FMH" timeout "$mbudget" "$FMH/bin/jg-pr-merge.sh" "$task" "$pr" 2>&1); merge_rc=$?
   if timed_out "$merge_rc"; then
     rm -f "$DATA/$task.head" 2>/dev/null || :
-    refuse "fm-pr-merge timed out, no verdict; retrying next sweep" ''
+    refuse "jg-pr-merge timed out, no verdict; retrying next sweep" ''
     continue
   fi
   if [ "$merge_rc" -eq 0 ]; then
-    echo "merge-on-green: merged $task $pr through fm-pr-merge; lead: run the post-merge steps (install from main, teardown)"
+    echo "merge-on-green: merged $task $pr through jg-pr-merge; lead: run the post-merge steps (install from main, teardown)"
     # The normal merged line, so the lead relays it, plus the fleet-ledger hook every status append runs.
     echo "done [at=$(date +%s)]: merged $pr" >> "$STATE/$task.status"
     [ ! -e "$FMH/config/fleet-ledger" ] \
-      || "$FMH/bin/fm-fleet-ledger.sh" appended "$FMH/config" "$STATE/$task.status" >/dev/null 2>&1 || :
+      || "$FMH/bin/jg-fleet-ledger.sh" appended "$FMH/config" "$STATE/$task.status" >/dev/null 2>&1 || :
   else
-    echo "merge-on-green: NOT merging $task $pr: fm-pr-merge refused: $(first_reason "$merge_out" "$merge_rc"); $LEAD_NOTE"
+    echo "merge-on-green: NOT merging $task $pr: jg-pr-merge refused: $(first_reason "$merge_out" "$merge_rc"); $LEAD_NOTE"
   fi
 done

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Planned drain for a no-mistakes update: Main starts a drain, the watcher check asks for go once no pipeline run is
 # active, and go updates without --force, restarts the daemon only through its own idle guard, and verifies.
-# Usage: nm-drain.sh start|status|go|stop|check <fm-home>
-# The drain record is <fm-home>/state/.nm-drain ("<start-epoch> [asked]"); go logs to <fm-home>/state/.nm-drain.log.
+# Usage: nm-drain.sh start|status|go|stop|check <jg-home>
+# The drain record is <jg-home>/state/.nm-drain ("<start-epoch> [asked]"); go logs to <jg-home>/state/.nm-drain.log.
 # Active means what `no-mistakes update` itself refuses on: a run in status pending or running, PR/CI monitoring
 # included, because without --force the update refuses on those too. The state DB is read only from a copy.
 set -u
 CAP=${NM_DRAIN_CAP_SECS:-3600} TARGET=${NM_DRAIN_TARGET:-v1.84.0}
 NMROOT=${NM_HOME:-$HOME/.no-mistakes}
-[ "$#" -eq 2 ] && [ -d "$2/state" ] || { echo "usage: nm-drain.sh start|status|go|stop|check <fm-home>" >&2; exit 2; }
+[ "$#" -eq 2 ] && [ -d "$2/state" ] || { echo "usage: nm-drain.sh start|status|go|stop|check <jg-home>" >&2; exit 2; }
 CMD=$1 F=$2/state/.nm-drain LOG=$2/state/.nm-drain.log
 
 die() { printf 'nm-drain: %s\n' "$*" >&2; exit 1; }
@@ -87,5 +87,5 @@ case $CMD in
     rm -f -- "$F"
     echo "nm-drain: no-mistakes $from -> $now, daemon restarted (pid $(daemon_pid)). Run no-mistakes doctor, then tell the leads new pipeline runs may start."
     ;;
-  *) echo "usage: nm-drain.sh start|status|go|stop|check <fm-home>" >&2; exit 2 ;;
+  *) echo "usage: nm-drain.sh start|status|go|stop|check <jg-home>" >&2; exit 2 ;;
 esac

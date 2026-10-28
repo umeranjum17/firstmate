@@ -1,52 +1,17 @@
 #!/usr/bin/env bash
-# Retire an intentional custom watcher check and its trust binding.
-# Usage: fm-check-unregister.sh <id>
-# Pass only the id. An unset FM_STATE_OVERRIDE selects FM_HOME/state; an
-# explicitly empty override, an invalid id, or a resolved state path that is
-# not an existing non-symlink directory is refused before removal.
-# Each existing named artifact must be an ordinary single-link file on the
-# state directory's device; only <id>.check.sh and <id>.check-trust are removed.
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
 set -u
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
-STATE="${FM_STATE_OVERRIDE-$FM_HOME/state}"
-
-# shellcheck source=bin/fm-pr-lib.sh
-. "$SCRIPT_DIR/fm-pr-lib.sh"
-
-if [ "$#" -ne 1 ] || ! fm_pr_task_id_valid "$1"; then
-  echo "error: invalid custom check unregistration" >&2
-  exit 2
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-check-unregister.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
 fi
-
-ID=$1
-
-if [ -z "${STATE-}" ] || [ ! -d "${STATE-}" ] || [ -L "${STATE-}" ]; then
-  echo "error: state directory is unavailable" >&2
-  exit 1
-fi
-
-CHECK="$STATE/$ID.check.sh"
-TRUST="$STATE/$ID.check-trust"
-STATE_DEVICE=$(fm_pr_file_device "$STATE") || {
-  echo "error: state directory is unavailable" >&2
-  exit 1
-}
-
-for artifact in "$CHECK" "$TRUST"; do
-  [ -e "$artifact" ] || [ -L "$artifact" ] || continue
-  if [ ! -f "$artifact" ] || [ -L "$artifact" ] \
-    || [ "$(fm_pr_file_device "$artifact")" != "$STATE_DEVICE" ] \
-    || [ "$(fm_pr_file_link_count "$artifact")" != 1 ]; then
-    echo "error: custom check is unsafe to remove" >&2
-    exit 1
-  fi
-done
-
-rm -f -- "$CHECK" "$TRUST" || {
-  echo "error: custom check could not be removed" >&2
-  exit 1
-}
-printf 'unregistered: state/%s.check.sh\n' "$ID"

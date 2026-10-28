@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# Wrapper test: a stub Firstmate checkout stands in for the real board. Covers
+# Wrapper test: a stub Juggernaut checkout stands in for the real board. Covers
 # build and path passthrough, argument forwarding, the recursion guard, and install
 # and uninstall round trips including their failure paths, dry runs, hook cleanup,
 # and the hook's file, mode and links surviving that round trip.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -eu
 
 ADDON=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-WRAPPER="$ADDON/bin/fm-bearings-board.sh"
+WRAPPER="$ADDON/bin/jg-bearings-board.sh"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/bearings-board-test.XXXXXX")
 trap 'rm -rf -- "$TMP"' EXIT
 export HOME=$TMP/home XDG_DATA_HOME=$TMP/data
@@ -14,17 +23,17 @@ export HOME=$TMP/home XDG_DATA_HOME=$TMP/data
 fail() { printf 'not ok: %s\n' "$*" >&2; exit 1; }
 FMH="$TMP/fm"
 mkdir -p "$FMH/bin" "$FMH/state" "$FMH/config"
-cat > "$FMH/bin/fm-bearings-board.sh" <<'STUB'
+cat > "$FMH/bin/jg-bearings-board.sh" <<'STUB'
 #!/usr/bin/env bash
-printf '%s\n' "$@" > "$FM_HOME/state/build-args"
+printf '%s\n' "$@" > "$JG_HOME/state/build-args"
 case "$1" in
-  build) printf 'built\n' > "$FM_HOME/state/board.html" ;;
-  path) printf '%s/state/board.html\n' "$FM_HOME" ;;
+  build) printf 'built\n' > "$JG_HOME/state/board.html" ;;
+  path) printf '%s/state/board.html\n' "$JG_HOME" ;;
 esac
 STUB
-chmod +x "$FMH/bin/fm-bearings-board.sh"
+chmod +x "$FMH/bin/jg-bearings-board.sh"
 printf 'old\n' > "$FMH/config/bearings-board-command"
-export FM_CODE_ROOT="$FMH" FM_HOME="$FMH"
+export JG_CODE_ROOT="$FMH" JG_HOME="$FMH"
 
 echo '{"projects":[]}' > "$TMP/good.json"
 "$WRAPPER" build "$TMP/good.json" || fail "good payload refused"
@@ -33,7 +42,7 @@ grep -q built "$FMH/state/board.html" || fail "checkout build did not run"
 "$WRAPPER" build "$TMP/good.json" --flag || fail "payload with a flag refused"
 [ "$(sed -n 3p "$FMH/state/build-args")" = --flag ] || fail "extra argument dropped"
 [ "$("$WRAPPER" path)" = "$FMH/state/board.html" ] || fail "path is not the checkout's board"
-FM_CODE_ROOT="$ADDON" "$WRAPPER" build "$TMP/good.json" >/dev/null 2>&1 && fail "wrapper re-entered itself"
+JG_CODE_ROOT="$ADDON" "$WRAPPER" build "$TMP/good.json" >/dev/null 2>&1 && fail "wrapper re-entered itself"
 
 LAUNCHER="$FMH/state/bearings-board-thin"
 rm -rf -- "$FMH/state"; : > "$FMH/state"

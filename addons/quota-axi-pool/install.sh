@@ -4,7 +4,7 @@ set -euo pipefail
 dry=0; [ "${1:-}" = --dry-run ] && dry=1
 src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/bin/quota-axi-pool
 [ -f "$src" ] || { echo "install.sh: missing $src" >&2; exit 1; }
-dest_dir=${XDG_DATA_HOME:-$HOME/.local/share}/fm-quota-axi-pool
+dest_dir=${XDG_DATA_HOME:-$HOME/.local/share}/jg-quota-axi-pool
 dest=$dest_dir/quota-axi-pool
 link=$HOME/.local/bin/quota-axi
 upstream_file=$dest_dir/upstream

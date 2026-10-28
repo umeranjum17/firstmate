@@ -2,7 +2,7 @@
 # quota-failover watcher check: prints the wake lines the last passes left in
 # state/quota-failover.wake as one line (the watcher's check: wake), then
 # starts the next pass detached, since a pass's live tests outlast a check.
-# Usage: check.sh <fm-home>
+# Usage: check.sh <jg-home>
 set -u
 wake=$1/state/quota-failover.wake
 mv -f "$wake" "$wake.$$" 2>/dev/null && { paste -sd ';' "$wake.$$"; rm -f "$wake.$$"; }

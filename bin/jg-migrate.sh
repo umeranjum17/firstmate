@@ -20,6 +20,33 @@ RULES = (
 )
 LEGACY = re.compile(rb"FIRSTMATE_OP:|FIRSTMATE|firstmate-addons|firstmate|secondmate|crewmate|second mate|first mate|FM_|fm-|fm_")
 KNOWN_NONRECORDS = (re.compile(r"state/model-gate\.check\.sh"),)
+# An old script path, environment name, function name, add-ons path or operational-input marker
+# still resolves through the compatibility layer, so it needs no rewrite.
+COMPAT_RESOLVED = re.compile(rb"\bbin/fm-[a-z0-9-]+\.sh|\bfm-[a-z0-9-]+\.sh|\bFM_[A-Z0-9_]+|\bfm_[a-z0-9_]+|FIRSTMATE_OP:|firstmate-addons|(?m:^kind=secondmate$)|(?m:^(?:window|endpoint|session|tab|pane)=fm-\S*)|[\w./@+~-]*/[\w./@+~-]*(?:firstmate|secondmate|fm-)[\w./@+~-]*")
+# The last alternative is an absolute or relative host path; it names where a home sits, which no migration can change.
+# Free text and per-task records: a legacy word here is prose or history, never a name the code reads.
+FREE_TEXT = (
+    re.compile(r"data/.*\.(md|txt|log|hashes|json)"),
+    re.compile(r"data/[^/]+/.*"),
+    re.compile(r"config/.*\.md"),
+    re.compile(r"state/.*\.(log|out|err|txt|md|json)"),
+    re.compile(r"state/\.[^/]*branch-outcome-index"),
+    # Per-task and per-message state: history that no reader keys on by name.
+    re.compile(r"state/(terminal-outcomes|operational-inbox|branch-session)/.*"),
+    re.compile(r"state/[^/]+\.inbox/.*"),
+    re.compile(r"state/\.[^/]*(inherited-config-reread|custom-check)[^/]*"),
+    re.compile(r"state/\.(watch\.lock\.owner|wake-queue|branch-)[^/]*.*"),
+    # Per-task side records: prior briefs and metas, poll registrations, operator-written check scripts and their trust hash.
+    re.compile(r"state/[^/]+\.(brief-prior|meta-prior|pr-poll-[a-z-]+|check\.sh|check-trust)"),
+    re.compile(r"state/[^/]+\.control-relaunch\.(brief|meta)-prior"),
+    re.compile(r"state/(decision-bindings|procevent)/.*"),
+    re.compile(r"state/[^/]+\.lock"),
+    # Runtime prompts, mirrors, summaries and outcome logs: generated text rewritten by the running code.
+    re.compile(r"state/\.(home-summary\.json\.[^/]*|host-mirror\.jsonl|supervision-host-[a-z]+)"),
+    re.compile(r"state/(branch-outcomes\.jsonl|[^/]+\.merge-authority)"),
+    # Captain-authored host hooks and routing files hold absolute host paths and prose, not product names.
+    re.compile(r"config/(crew-dispatch\.json|fleet-board|launch-env-hook|merge-gate|owner-rules-canary|post-merge)"),
+)
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--home', required=True, help='the single home to migrate')
@@ -49,13 +76,21 @@ def transform(path, raw):
     if supported:
         _, field, replacement = supported[0]
         updated = field.sub(replacement, updated)
-    if LEGACY.search(updated):
+    if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
+        return updated
+    if re.fullmatch(r"state/[^/]+\.status", rel):
+        # Prose in a status event is history; only a legacy event key at the start of a line is read by name.
+        if re.search(rb"^(fm-|FM_)[a-z0-9_-]*:", updated, re.M):
+            raise ValueError(f'unclassified legacy content: {rel}')
+        return updated
+    if LEGACY.search(COMPAT_RESOLVED.sub(b"", updated)):
         raise ValueError(f'unclassified legacy content: {rel}')
     return updated
 
 
 def files():
     found = []
+    unknown = []
     for part in ('config', 'state', 'data'):
         base = home / part
         for root, dirs, names in os.walk(base, followlinks=False):
@@ -64,21 +99,30 @@ def files():
                 path = pathlib.Path(root) / name
                 rel = path.relative_to(home).as_posix()
                 if path.is_symlink():
+                    if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
+                        continue
                     if LEGACY.search(os.readlink(path).encode()):
-                        raise ValueError(f'unclassified legacy symbolic link: {rel}')
+                        unknown.append(f'unclassified legacy symbolic link: {rel}')
                     continue
                 if not path.is_file():
-                    raise ValueError(f'unclassifiable record: {rel}')
+                    unknown.append(f'unclassifiable record: {rel}')
+                    continue
                 raw = path.read_bytes()
                 try:
                     raw.decode('utf-8')
                 except UnicodeDecodeError:
                     if LEGACY.search(raw):
-                        raise ValueError(f'unclassified legacy binary record: {rel}')
+                        unknown.append(f'unclassified legacy binary record: {rel}')
                     continue
-                updated = transform(path, raw)
+                try:
+                    updated = transform(path, raw)
+                except ValueError as e:
+                    unknown.append(str(e))
+                    continue
                 if updated != raw:
                     found.append((path, raw, updated))
+    if unknown:
+        raise ValueError('\nunknown: '.join(unknown))
     return found
 
 try:

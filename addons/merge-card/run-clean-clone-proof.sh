@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Post a merge card with the real merge-card and sign-off-axi against a real throwaway git clone,
 # with done-done's post opt-in emulated by a stub, and show the clone stays clean.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 
 : "${DONE_DONE_EVIDENCE_ROOT:?done-done must provide its run evidence folder}"
@@ -27,12 +36,12 @@ case $1 in
   --version) echo 0.6.7 ;;
   check)
     [ "${2:-}" = --help ] && { echo '--citation-base'; exit 0; }
-    jq -n --arg e "$FM_HOME/data/demo/shot.png" '{claim: "A merge leaves the project clone clean", evidence: [$e]}' ;;
+    jq -n --arg e "$JG_HOME/data/demo/shot.png" '{claim: "A merge leaves the project clone clean", evidence: [$e]}' ;;
   signoff)
     b=$PWD/.sign-off/decisions.json
     while [ $# -gt 0 ]; do [ "$1" = --board ] && b=$2; shift; done
     mkdir -p "${b%/*}"
-    cp "$FM_HOME/data/demo/shot.png" "${b%/*}/shot.png"
+    cp "$JG_HOME/data/demo/shot.png" "${b%/*}/shot.png"
     printf '{"contract":1,"kind":"evidence","schema":1,"key":"dd-evidence-demo","title":"t","about":"a","link":"https://example.com/x","media":["shot.png"]}\n' >"${b%/*}/m.json"
     sign-off-axi post "$b" --kind evidence --from "${b%/*}/m.json" --filer done-done >/dev/null ;;
 esac
@@ -46,7 +55,7 @@ STUB
 printf 'command=%s\nstate=%s\n' "$w/bin/pool-claude" "$w/pool" >"$w/home/config/account-pool"
 chmod +x "$w/bin/done-done" "$w/bin/pool-claude"
 export POOL_FOLDER=$w/pool/profile
-export PATH="$w/bin:$PATH" FM_HOME="$w/home"
+export PATH="$w/bin:$PATH" JG_HOME="$w/home"
 out=$(bash "$here/merge-card" post --board "$w/board/decisions.json" demo "$w/clone" "$head" - 2>&1) || { printf '%s\n' "$out" >&2; exit 1; }
 echo "merge-card post (done-done post opt-in on, the clone is the work copy):"
 printf '%s\n' "$out" | sed 's/^/  /'

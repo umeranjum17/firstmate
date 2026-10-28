@@ -8,7 +8,7 @@ DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
 [ "$#" -eq 0 ] || { echo "usage: install.sh [--dry-run]" >&2; exit 2; }
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-DEST=${XDG_DATA_HOME:-$HOME/.local/share}/fm-pipeline-literal-delete
+DEST=${XDG_DATA_HOME:-$HOME/.local/share}/jg-pipeline-literal-delete
 STAMP=$(date +%s)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
@@ -35,7 +35,7 @@ starthook() {
   [ -d "$(dirname "$file")" ] || { echo "skipped: $file (Claude Code not installed)"; return; }
   # shellcheck disable=SC2016 # $cmd is a jq variable
   { [ -s "$file" ] && cat "$file" || echo '{}'; } | jq --arg cmd "$cmd" '
-    .hooks.SessionStart = ([.hooks.SessionStart[]? | .hooks |= map(select((.command // "") | contains("fm-pipeline-literal-delete") | not)) | select(.hooks | length > 0)]
+    .hooks.SessionStart = ([.hooks.SessionStart[]? | .hooks |= map(select((.command // "") | contains("jg-pipeline-literal-delete") | not)) | select(.hooks | length > 0)]
       + [{hooks: [{type: "command", command: $cmd, timeout: 10}]}])' > "$TMP/ss.json"
   put "$file" "$TMP/ss.json" .hooks.SessionStart
 }
@@ -44,7 +44,7 @@ put "$DEST/rule.txt" "$SRC/rule.txt"
 put "$DEST/context.mjs" "$SRC/context.mjs"
 if [ -d "$HOME/.pi/agent" ]; then
   sed "s|__RULE_PATH__|$DEST/rule.txt|" "$SRC/pi-literal-delete.ts" > "$TMP/pi-literal-delete.ts"
-  put "$HOME/.pi/agent/extensions/fm-literal-delete.ts" "$TMP/pi-literal-delete.ts"
+  put "$HOME/.pi/agent/extensions/jg-literal-delete.ts" "$TMP/pi-literal-delete.ts"
 else
   echo "skipped: $HOME/.pi/agent (pi not installed)"
 fi

@@ -4,27 +4,27 @@
 # The approved design (data/juggernaut-axi/report.md), read-only commands so far:
 # `status`, `tickets`, `decisions`, and `messages` (a task's steering-inbox records),
 # plus the three writes `answer`, `message`, and `ticket`, each delegated to an existing
-# guarded path (fm-captain-hold.sh, fm-send.sh, fm-tasks-axi.sh); it never closes tasks
-# or writes state itself, and a result claims only what the durable record confirms. Like bin/fm-bearings-snapshot.sh it projects the canonical JSON model
-# (fm-bearings-snapshot.sh / fm-fleet-snapshot.sh --json) and renders TOON at the
-# output boundary (bin/fm-toon-lib.sh); `--json` prints the same model.
+# guarded path (jg-captain-hold.sh, jg-send.sh, jg-tasks-axi.sh); it never closes tasks
+# or writes state itself, and a result claims only what the durable record confirms. Like bin/jg-bearings-snapshot.sh it projects the canonical JSON model
+# (jg-bearings-snapshot.sh / jg-fleet-snapshot.sh --json) and renders TOON at the
+# output boundary (bin/jg-toon-lib.sh); `--json` prints the same model.
 # Output contract: `juggernaut-axi.v1`; consumers ignore unknown fields.
 # It never writes state, never reads task transcripts, and states every omission.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=bin/fm-toon-lib.sh
+# shellcheck source=bin/jg-toon-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/fm-toon-lib.sh"
-# shellcheck source=bin/fm-task-inbox-lib.sh
+. "$SCRIPT_DIR/jg-toon-lib.sh"
+# shellcheck source=bin/jg-task-inbox-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
+. "$SCRIPT_DIR/jg-task-inbox-lib.sh"
 
 VERSION=0.1.0
 TICKETS_MAX=100
 MESSAGE_BYTES=8192
 HOME_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-STATE=${FM_STATE_OVERRIDE:-${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}/state}
+STATE=${JG_STATE_OVERRIDE:-${JG_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}/state}
 
 usage() {
   cat <<'USAGE'
@@ -65,11 +65,11 @@ jq_or_die() {  # <what> <jq args...> - reads the model on stdin
 
 cmd_status() {
   local snap
-  snap=$("$SCRIPT_DIR/fm-bearings-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
+  snap=$("$SCRIPT_DIR/jg-bearings-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
   printf '%s\n' "$snap" | jq_or_die status '{
     schema: "juggernaut-axi.v1", view: "status", home, generated,
     counts: {in_flight: (.in_flight | length), decisions_open: (.decisions_open | length),
-             secondmates: (.secondmates | length), gates: (.gates | length)},
+             squad_leads: (.squad_leads | length), gates: (.gates | length)},
     in_flight: [.in_flight[] | {id, kind, state, repo, name, doing}],
     omitted: .omitted}'
 }
@@ -89,11 +89,11 @@ cmd_tickets() {
   case "$limit" in ''|*[!0-9]*|0) die "--limit must be a positive integer" ;; esac
   [ "$limit" -le "$TICKETS_MAX" ] || limit=$TICKETS_MAX
   local snap
-  snap=$("$SCRIPT_DIR/fm-fleet-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
+  snap=$("$SCRIPT_DIR/jg-fleet-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
   printf '%s\n' "$snap" | jq_or_die tickets --arg state "$state" --arg repo "$repo" --argjson limit "$limit" '
     [.backlog.records[] | select(.structured)
      | select($state == "" or .state == $state) | select($repo == "" or .repo == $repo)] as $all
-    | {schema: "juggernaut-axi.v1", view: "tickets", home: (.fm_home | split("/") | .[-2:] | join("/")), generated,
+    | {schema: "juggernaut-axi.v1", view: "tickets", home: (.jg_home | split("/") | .[-2:] | join("/")), generated,
        count: ($all | length),
        tickets: [$all[:$limit][] | {id, title, state, repo, kind, blocked_by: (.unresolved_blocker_ids | join(" "))}],
        omitted: (if ($all | length) > $limit then [{surface: "tickets beyond limit", count: (($all | length) - $limit), reveal: "--limit <n> (at most 100)"}] else [] end)}'
@@ -101,7 +101,7 @@ cmd_tickets() {
 
 cmd_decisions() {
   local snap
-  snap=$("$SCRIPT_DIR/fm-bearings-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
+  snap=$("$SCRIPT_DIR/jg-bearings-snapshot.sh" --json) || { echo "juggernaut-axi: fleet snapshot failed" >&2; exit 1; }
   printf '%s\n' "$snap" | jq_or_die decisions '{
     schema: "juggernaut-axi.v1", view: "decisions", home, generated,
     count: (.decisions_open | length),
@@ -125,17 +125,17 @@ cmd_messages() {
   case "$limit" in ''|*[!0-9]*|0) die "--limit must be a positive integer" ;; esac
   [ "$limit" -le "$TICKETS_MAX" ] || limit=$TICKETS_MAX
   local dir hdir
-  dir=$(fm_task_inbox_dir "$STATE" "$task"); hdir=$(fm_task_inbox_handled_dir "$STATE" "$task")
+  dir=$(jg_task_inbox_dir "$STATE" "$task"); hdir=$(jg_task_inbox_handled_dir "$STATE" "$task")
   [ -d "$dir" ] || [ -e "$STATE/$task.meta" ] || die "unknown task: $task"
   local files
   files=$(for f in "$dir"/*.msg "$hdir"/*.msg; do
-    [ -f "$f" ] && seq=$(fm_task_inbox_seq_of "${f##*/}") && printf '%s\t%s\n' "$seq" "$f"
+    [ -f "$f" ] && seq=$(jg_task_inbox_seq_of "${f##*/}") && printf '%s\t%s\n' "$seq" "$f"
   done | sort -n)
   n=$(printf '%s' "$files" | grep -c . || true)
   while IFS=$'\t' read -r seq f; do
     [ -n "$f" ] || continue
     at=$(sed -n 's/^at=//p;/^--$/q' "$f" | head -n1)
-    body=$(fm_task_inbox_body "$f" | head -c "$MESSAGE_BYTES")
+    body=$(jg_task_inbox_body "$f" | head -c "$MESSAGE_BYTES")
     rows+=$(jq -nc --argjson id "$seq" --arg at "$at" --arg state "$([ "${f%/*}" = "$hdir" ] && echo handled || echo pending)" \
       --arg body "$body" --argjson cut "$([ "$(wc -c < "$f")" -gt $((MESSAGE_BYTES + 200)) ] && echo true || echo false)" \
       '{id: $id, at: $at, state: $state, body: $body, truncated: $cut}')$'\n'
@@ -167,15 +167,15 @@ cmd_answer() {
   known_task_id "$task"
   [ -n "$text" ] || die "answer needs the answer text"
   [ "$(printf '%s' "$text" | wc -c)" -le 8192 ] || die "answer is over 8192 bytes"
-  "$HOME_ROOT/bin/fm-captain-hold.sh" open "$task" >/dev/null || die "$task is not an open captain decision"
+  "$HOME_ROOT/bin/jg-captain-hold.sh" open "$task" >/dev/null || die "$task is not an open captain decision"
   f=$(mktemp) || exit 1
   printf '%s\n' "$text" > "$f"
-  "$HOME_ROOT/bin/fm-captain-hold.sh" answer "$task" --decision-file "$f" ${mode:+"$mode"} >&2
+  "$HOME_ROOT/bin/jg-captain-hold.sh" answer "$task" --decision-file "$f" ${mode:+"$mode"} >&2
   local rc=$?
   rm -f -- "$f"
   [ "$rc" -eq 0 ] || exit "$rc"
-  if "$HOME_ROOT/bin/fm-captain-hold.sh" answered "$task"; then
-    write_result answer "$task" true "answer recorded by fm-captain-hold.sh"
+  if "$HOME_ROOT/bin/jg-captain-hold.sh" answered "$task"; then
+    write_result answer "$task" true "answer recorded by jg-captain-hold.sh"
   else
     write_result answer "$task" false "answer accepted but the durable record does not confirm it yet"
   fi
@@ -190,7 +190,7 @@ cmd_message() {
   [ -n "${text//[[:space:]]/}" ] || die "message text is empty"
   [ "$(printf '%s' "$text" | wc -c)" -le "$MESSAGE_BYTES" ] || die "message is over $MESSAGE_BYTES bytes"
   case "$text" in /*|\$*) die "message must not start with / or $ (those reach the terminal, not the inbox)" ;; esac
-  FM_HOME=${FM_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/fm-send.sh" "$task" "$text" >&2 || exit $?
+  JG_HOME=${JG_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/jg-send.sh" "$task" "$text" >&2 || exit $?
   write_result message "$task" true "steering record written; the worker acting on it is not confirmed"
 }
 
@@ -214,7 +214,7 @@ cmd_ticket() {
       --priority:*) die "--priority must be 0-3" ;;
     esac
   done
-  out=$(FM_HOME=${FM_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/fm-tasks-axi.sh" add --mint "$title" "${args[@]}" --json) || exit $?
+  out=$(JG_HOME=${JG_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/jg-tasks-axi.sh" add --mint "$title" "${args[@]}" --json) || exit $?
   printf '%s\n' "$out" | jq -c '{schema: "juggernaut-axi.v1", view: "write", action: "ticket", task: .task.id, ok: .ok, confirmed: (.task.state == "queued"), note: "queued by tasks-axi", ticket: (.task | {id, title, state, repo, kind})}' \
     || { echo "juggernaut-axi: ticket result unreadable" >&2; exit 1; }
 }
@@ -222,7 +222,7 @@ cmd_ticket() {
 case "${1:-}" in
   -h|--help|help|"") usage; [ -n "${1:-}" ] || exit 2; exit 0 ;;
   --version) echo "juggernaut-axi $VERSION"; exit 0 ;;
-  serve) shift; JUGGERNAUT_AXI_HOME=${FM_HOME:-$HOME_ROOT} exec python3 "$SCRIPT_DIR/juggernaut-axi-serve.py" "$@" ;;
+  serve) shift; JUGGERNAUT_AXI_HOME=${JG_HOME:-$HOME_ROOT} exec python3 "$SCRIPT_DIR/juggernaut-axi-serve.py" "$@" ;;
 esac
 CMD=$1; shift
 FORMAT=toon
@@ -238,5 +238,5 @@ MODEL=$("cmd_$CMD" "${ARGS[@]+"${ARGS[@]}"}") || exit $?
 if [ "$FORMAT" = json ]; then
   printf '%s\n' "$MODEL"
 else
-  printf '%s\n' "$MODEL" | jq -r "$FM_TOON_JQ" || { echo "juggernaut-axi: TOON rendering failed" >&2; exit 1; }
+  printf '%s\n' "$MODEL" | jq -r "$JG_TOON_JQ" || { echo "juggernaut-axi: TOON rendering failed" >&2; exit 1; }
 fi

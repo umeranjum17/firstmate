@@ -1,31 +1,17 @@
-# shellcheck shell=bash
-# Shared .env-style file accessor.
-# Usage: . bin/fm-env-lib.sh
-#
-# This file is the single owner of the one-key .env read: the Relay pairing
-# token (bin/fm-x-lib.sh and its callers) and the optional typesafe.ai
-# dispatch key (bin/fm-dispatch-resolve.sh) both resolve their value through
-# fmx_env_get, so those opt-in secrets in $FM_HOME/.env are parsed by one rule.
-# (bin/fm-mail.sh loads its whole .env block itself under the same env-wins
-# contract.) The value is printed to the caller's command substitution only;
-# nothing is logged.
-
-# fmx_env_get <key> <file>
-# Read the value of KEY from a .env-style file: last assignment wins; tolerates a
-# leading "export ", surrounding whitespace, and one layer of matching single or
-# double quotes. Prints nothing (and succeeds) when the file or key is absent, so
-# callers can treat empty output as "unset".
-fmx_env_get() {
-  local key=$1 file=$2 line val
-  [ -f "$file" ] || return 0
-  line=$(grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$file" 2>/dev/null | tail -n1) || return 0
-  [ -n "$line" ] || return 0
-  val=${line#*=}
-  val=${val#"${val%%[![:space:]]*}"}   # strip leading whitespace
-  val=${val%"${val##*[![:space:]]}"}   # strip trailing whitespace (incl. CR)
-  case "$val" in
-    \"*\") val=${val#\"}; val=${val%\"} ;;
-    \'*\') val=${val#\'}; val=${val%\'} ;;
-  esac
-  printf '%s' "$val"
-}
+#!/usr/bin/env bash
+# alias shim (slice S3, deleted by slice S10): still called by live homes,
+# watchers, panes, generated per-lane extensions, and persisted records that
+# resolved this path before the rename. Executed it runs the renamed script;
+# sourced it loads the renamed library, because a library reached through its
+# old path must not exec a shell.
+set -u
+_jg_alias_dir=${BASH_SOURCE[0]%/*}
+[ "$_jg_alias_dir" != "${BASH_SOURCE[0]}" ] || _jg_alias_dir=.
+_jg_alias_new="$_jg_alias_dir/jg-env-lib.sh"
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  # shellcheck source=/dev/null
+  . "$_jg_alias_new"
+  if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
+else
+  exec "$_jg_alias_new" "$@"
+fi

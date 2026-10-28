@@ -4,7 +4,7 @@
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-install-all.XXXXXX")
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/jg-install-all.XXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
 
 home=$tmp/home
@@ -30,7 +30,7 @@ install_pairs() {  # install_pairs <round>
 chain_state() {  # chain_state: every chain file's content digest, in a fixed order
   local f
   for f in "$home/config/launch-env-hook" \
-    "$XDG_DATA_HOME/fm-pane-titles/previous-launch-env-hook" \
+    "$XDG_DATA_HOME/jg-pane-titles/previous-launch-env-hook" \
     "$home/config/merge-gate" \
     "$home/config/merge-gate.pre-owner-rules" \
     "$home/config/merge-gate.pre-owner-guard"; do
@@ -62,7 +62,7 @@ printf 'ok - a repeat install adds no hook backup\n'
 # Both sides of each pair still run: pane-titles' shim execs the launcher, and walking the merge gate's
 # chained prev= links reaches both gates without ever revisiting a file. A repeat install that re-chained a
 # gate already in the chain would close a loop here, and the merge gate would exec itself forever.
-if ! grep -q 'fm-pane-titles/launch-env-hook' "$home/config/launch-env-hook"; then
+if ! grep -q 'jg-pane-titles/launch-env-hook' "$home/config/launch-env-hook"; then
   printf 'not ok - the launch-env hook no longer runs pane-titles\n' >&2
   exit 1
 fi
@@ -75,8 +75,8 @@ while [ -e "$gate" ] && [ "$depth" -lt 8 ]; do
     *" $gate "*) printf 'not ok - the merge gate chains back to %s: it would exec itself forever\n' "$gate" >&2; exit 1 ;;
   esac
   seen="$seen$gate "
-  if grep -q 'fm-owner-guard' "$gate"; then found_guard=1; fi
-  if grep -q 'fm-owner-rules-gate.sh' "$gate"; then found_rules=1; fi
+  if grep -q 'jg-owner-guard' "$gate"; then found_guard=1; fi
+  if grep -q 'jg-owner-rules-gate.sh' "$gate"; then found_rules=1; fi
   gate=$(sed -n 's/^prev=//p' "$gate" | head -1)
   [ -n "$gate" ] || break
   depth=$((depth + 1))

@@ -6,6 +6,15 @@
 # repo's own hooks and a previous global hooks dir still run, install twice
 # is a no-op, and uninstall restores the previous global hooksPath.
 # Usage: owner-guard/tests/owner-guard-global.test.sh
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 GISRC=$(cd "$SRC/../git-identity" && pwd -P)
@@ -22,9 +31,9 @@ check() { if [ "$2" = "$3" ]; then echo "ok: $1"; else printf 'FAIL: %s\n  want:
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else printf 'FAIL: %s\n  want text: %s\n  got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)); fi; }
 ME=you@example.com
 printf '%s\n' '# fixture-only patterns' '' 'testguard-fake-surname' 'guardtest[0-9]{3}@example\.test' >"$FM/config/owner-details-patterns"
-export FM_HOME=$FM
-GH=$d/data/fm-owner-guard/hooks
-plain() (cd "$d/plain" && env -u FM_HOME "$@")
+export JG_HOME=$FM
+GH=$d/data/jg-owner-guard/hooks
+plain() (cd "$d/plain" && env -u JG_HOME "$@")
 
 # A previous global hooks dir, to prove chaining and restore.
 mkdir -p "$d/prevhooks"
@@ -44,7 +53,7 @@ chmod +x "$d/plain/.git/hooks/pre-commit" "$d/plain/.git/hooks/pre-push"
 
 out=$("$SRC/install.sh" "$FM")
 check "global hooksPath points at the guard" "$(git config --global --get core.hooksPath)" "$GH"
-check "previous global hooksPath recorded" "$(cat "$d/data/fm-owner-guard/prev-hooks-path")" "$d/prevhooks"
+check "previous global hooksPath recorded" "$(cat "$d/data/jg-owner-guard/prev-hooks-path")" "$d/prevhooks"
 
 printf 'reach testguard-fake-surname here\n' >"$d/plain/details.txt"
 git -C "$d/plain" add details.txt
@@ -153,9 +162,9 @@ has "missing patterns prints one note" "$out" "nothing to protect"
 mv "$d/patterns.off" "$FM/config/owner-details-patterns"
 
 # Install twice is a no-op.
-before=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
+before=$(git config --global --get core.hooksPath; cat "$d/data/jg-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
 out=$("$SRC/install.sh" "$FM")
-after=$(git config --global --get core.hooksPath; cat "$d/data/fm-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
+after=$(git config --global --get core.hooksPath; cat "$d/data/jg-owner-guard/prev-hooks-path"; sha256sum "$GH"/pre-commit "$GH"/pre-push "$GH"/pre-receive "$GH"/post-receive)
 check "second install changes nothing" "$after" "$before"
 
 # Uninstall restores the previous global hooksPath; the guard stops firing.

@@ -86,15 +86,15 @@ jobs:
           : >"$details"
           first_limit=""
           core_status="FAIL"
-          session="fm-windows-spike-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          session="jg-windows-spike-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           server_pid=""
           workspace_id=""
           tab_id=""
           pane_id=""
-          worktree_stub="$RUNNER_TEMP/fm-herdr-worktree-stub-${GITHUB_RUN_ATTEMPT}"
-          primitive_marker="FM_WINDOWS_PRIMITIVE_${GITHUB_RUN_ID}"
-          ansi_marker="FM_WINDOWS_ANSI_${GITHUB_RUN_ID}"
-          e2e_marker="FM_WINDOWS_E2E_ACK_${GITHUB_RUN_ID}"
+          worktree_stub="$RUNNER_TEMP/jg-herdr-worktree-stub-${GITHUB_RUN_ATTEMPT}"
+          primitive_marker="JG_WINDOWS_PRIMITIVE_${GITHUB_RUN_ID}"
+          ansi_marker="JG_WINDOWS_ANSI_${GITHUB_RUN_ID}"
+          e2e_marker="JG_WINDOWS_E2E_ACK_${GITHUB_RUN_ID}"
 
           clean_detail() {
             printf '%s' "$1" | tr '\r\n|' '   ' | sed 's/[[:space:]][[:space:]]*/ /g'
@@ -162,7 +162,7 @@ jobs:
             record 'ANSI capture fidelity' DEGRADED 'not attempted because the CLI prerequisite failed'
             record 'End-to-end shell stand-in' FAIL 'not attempted because the CLI prerequisite failed'
           else
-            mkdir -p "$RUNNER_TEMP/fm-windows-herdr-home/state"
+            mkdir -p "$RUNNER_TEMP/jg-windows-herdr-home/state"
             "$HERDR" server --session "$session" >"$RUNNER_TEMP/herdr-${session}.log" 2>&1 &
             server_pid=$!
             ready=0
@@ -185,11 +185,11 @@ jobs:
 
             if [ "$ready" = 1 ]; then
               repo_cwd=$(cygpath -w "$GITHUB_WORKSPACE")
-              workspace_json=$(herdr_call workspace create --cwd "$repo_cwd" --label fm-windows-spike --no-focus 2>>"$details" || true)
+              workspace_json=$(herdr_call workspace create --cwd "$repo_cwd" --label jg-windows-spike --no-focus 2>>"$details" || true)
               workspace_id=$(printf '%s' "$workspace_json" | "$JQ" -r '.result.workspace.workspace_id // empty' 2>/dev/null || true)
               root_pane=$(printf '%s' "$workspace_json" | "$JQ" -r '.result.root_pane.pane_id // empty' 2>/dev/null || true)
               if [ -n "$workspace_id" ] && [ -n "$root_pane" ]; then
-                tab_json=$(herdr_call tab create --workspace "$workspace_id" --cwd "$repo_cwd" --label fm-windows-spike-task --env "FM_WINDOWS_PRIMITIVE_MARKER=$primitive_marker" --env "FM_WINDOWS_ANSI_MARKER=$ansi_marker" --env "FM_WINDOWS_E2E_MARKER=$e2e_marker" --no-focus 2>>"$details" || true)
+                tab_json=$(herdr_call tab create --workspace "$workspace_id" --cwd "$repo_cwd" --label jg-windows-spike-task --env "JG_WINDOWS_PRIMITIVE_MARKER=$primitive_marker" --env "JG_WINDOWS_ANSI_MARKER=$ansi_marker" --env "JG_WINDOWS_E2E_MARKER=$e2e_marker" --no-focus 2>>"$details" || true)
                 tab_id=$(printf '%s' "$tab_json" | "$JQ" -r '.result.tab.tab_id // empty' 2>/dev/null || true)
                 pane_id=$(printf '%s' "$tab_json" | "$JQ" -r '.result.root_pane.pane_id // empty' 2>/dev/null || true)
                 if [ -n "$tab_id" ] && [ -n "$pane_id" ]; then
@@ -211,7 +211,7 @@ jobs:
               fi
 
               if [ -n "$pane_id" ]; then
-                if herdr_call pane send-text "$pane_id" 'Write-Output $env:FM_WINDOWS_PRIMITIVE_MARKER' >>"$details" 2>&1 &&
+                if herdr_call pane send-text "$pane_id" 'Write-Output $env:JG_WINDOWS_PRIMITIVE_MARKER' >>"$details" 2>&1 &&
                   herdr_call pane send-keys "$pane_id" enter >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$primitive_marker" --timeout 10000 >>"$details" 2>&1; then
                   capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 2>>"$details" || true)
@@ -228,7 +228,7 @@ jobs:
 
                 agent_list=$(herdr_call agent list 2>>"$details" || true)
                 agent_reported=0
-                if herdr_call pane report-agent "$pane_id" --source fm-windows-spike --agent spike-shell --state idle >>"$details" 2>&1; then
+                if herdr_call pane report-agent "$pane_id" --source jg-windows-spike --agent spike-shell --state idle >>"$details" 2>&1; then
                   agent_reported=1
                 fi
                 agent_get=$(herdr_call agent get "$pane_id" 2>>"$details" || true)
@@ -257,15 +257,15 @@ jobs:
                   limit 'Pane process inspection was unavailable.'
                 fi
 
-                event_state="$RUNNER_TEMP/fm-windows-herdr-home/state"
+                event_state="$RUNNER_TEMP/jg-windows-herdr-home/state"
                 event_rc=0
                 if (
-                  export FM_ROOT_OVERRIDE="$GITHUB_WORKSPACE"
-                  export FM_HOME="$RUNNER_TEMP/fm-windows-herdr-home"
-                  export FM_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1
-                  . "$GITHUB_WORKSPACE/bin/fm-backend.sh"
-                  fm_backend_source herdr
-                  fm_backend_herdr_wait_transition "$session" 3 "$event_state" "$session:$pane_id"
+                  export JG_ROOT_OVERRIDE="$GITHUB_WORKSPACE"
+                  export JG_HOME="$RUNNER_TEMP/jg-windows-herdr-home"
+                  export JG_BACKEND_EVENTS_CAPABILITY_CONFIRMED=1
+                  . "$GITHUB_WORKSPACE/bin/jg-backend.sh"
+                  jg_backend_source herdr
+                  jg_backend_herdr_wait_transition "$session" 3 "$event_state" "$session:$pane_id"
                 ) >>"$details" 2>&1; then
                   event_rc=0
                 else
@@ -305,7 +305,7 @@ jobs:
                   limit 'The stubbed isolated-copy step could not be prepared.'
                 fi
 
-                ansi_command="[Console]::Write([char]27 + '[31m' + \$env:FM_WINDOWS_ANSI_MARKER + [char]27 + '[0m' + [Environment]::NewLine)"
+                ansi_command="[Console]::Write([char]27 + '[31m' + \$env:JG_WINDOWS_ANSI_MARKER + [char]27 + '[0m' + [Environment]::NewLine)"
                 if herdr_call pane run "$pane_id" "$ansi_command" >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$ansi_marker" --timeout 10000 >>"$details" 2>&1; then
                   ansi_capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 --format ansi 2>>"$details" || true)
@@ -322,7 +322,7 @@ jobs:
                   limit 'ANSI capture could not be measured.'
                 fi
 
-                if herdr_call pane send-text "$pane_id" 'Write-Output $env:FM_WINDOWS_E2E_MARKER' >>"$details" 2>&1 &&
+                if herdr_call pane send-text "$pane_id" 'Write-Output $env:JG_WINDOWS_E2E_MARKER' >>"$details" 2>&1 &&
                   herdr_call pane send-keys "$pane_id" enter >>"$details" 2>&1 &&
                   herdr_call pane wait-output "$pane_id" --match "$e2e_marker" --timeout 10000 >>"$details" 2>&1; then
                   e2e_capture=$(herdr_call pane read "$pane_id" --source recent --lines 200 2>>"$details" || true)
@@ -380,9 +380,9 @@ jobs:
           kill "$msys_pid" 2>/dev/null || true
           wait "$msys_pid" 2>/dev/null || true
 
-          lock_dir="$RUNNER_TEMP/fm-windows-lock-target"
-          plain_link="$RUNNER_TEMP/fm-windows-lock-plain"
-          strict_link="$RUNNER_TEMP/fm-windows-lock-strict"
+          lock_dir="$RUNNER_TEMP/jg-windows-lock-target"
+          plain_link="$RUNNER_TEMP/jg-windows-lock-plain"
+          strict_link="$RUNNER_TEMP/jg-windows-lock-strict"
           mkdir -p "$lock_dir"
           plain_result=FAIL
           strict_result=FAIL
@@ -433,6 +433,6 @@ jobs:
           path: |
             ${{ runner.temp }}/windows-herdr-measurement.md
             ${{ runner.temp }}/windows-herdr-details.log
-            ${{ runner.temp }}/herdr-fm-windows-spike-*.log
+            ${{ runner.temp }}/herdr-jg-windows-spike-*.log
             ${{ runner.temp }}/herdr-windows-install.log
           if-no-files-found: warn

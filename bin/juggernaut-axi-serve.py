@@ -131,7 +131,7 @@ def main():
     args = ap.parse_args()
     if args.reads_per_minute < 1:
         sys.exit("juggernaut-axi serve: --reads-per-minute must be positive")
-    config = os.environ.get("FM_CONFIG_OVERRIDE") or os.path.join(os.environ["JUGGERNAUT_AXI_HOME"], "config")
+    config = os.environ.get("JG_CONFIG_OVERRIDE") or os.path.join(os.environ["JUGGERNAUT_AXI_HOME"], "config")
     token = load_token(config)
     srv = HTTPServer(("127.0.0.1", args.port), Handler)
     srv.token, srv.reads_per_minute, srv.hits = token, args.reads_per_minute, {}

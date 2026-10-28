@@ -20,7 +20,7 @@ const sensitive = [
 ];
 const protectedFiles = ["~/.codex/auth.json", "~/.local/share/opencode/auth.json", "~/.pi/agent/auth.json", "~/.claude/.credentials.json", "~/.no-mistakes/config.yaml", "~/.no-mistakes/config.yml"];
 const metadata = new Set(["ls", "stat", "test", "["]);
-const textOnly = new Set(["echo", "printf", "fm-send.sh"]);
+const textOnly = new Set(["echo", "printf", "jg-send.sh"]);
 const pathFields = new Set(["path", "file_path", "filePath", "paths", "glob"]);
 
 function tokens(command) {

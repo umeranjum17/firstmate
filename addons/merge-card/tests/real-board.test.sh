@@ -4,6 +4,15 @@
 # and another filer's cards for the PR are archived too (one-card-per-pr keeps the newest valid proof).
 # The screen-free path needs no done-done, only a sealed run record; gh is a stub. Skips (exit 0)
 # when sign-off-axi is not on PATH. Never touches a real board: SIGN_OFF_HOME is a temp folder.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
 command -v sign-off-axi >/dev/null || { echo "skip - sign-off-axi is not on PATH"; exit 0; }
@@ -16,7 +25,7 @@ case " $* " in *" --jq .headRefOid "*) printf '%s\n' "$GH_HEAD"; exit 0 ;; esac
 printf 'outcome: a user sees one card\nevidence: x.png\nscreen: none\n'
 STUB
 chmod +x "$work/bin/gh"
-export SIGN_OFF_HOME=$work/board FM_HOME=$work/home PATH="$work/bin:$PATH"
+export SIGN_OFF_HOME=$work/board JG_HOME=$work/home PATH="$work/bin:$PATH"
 board=$work/board/decisions.json
 (cd "$work/board" && sign-off-axi init >/dev/null 2>&1)
 pr=https://github.com/o/r/pull/12
@@ -42,8 +51,8 @@ is "first head: the card cites the sealed run's own capture" "$(sign-off-axi lis
 is "first head: the other filer's older card is archived" "$(live_keys)" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2") || { echo "$out"; fails=$((fails + 1)); }
 is "new head: exactly one live card, the newest" "$(live)" 20261022T000000Z-second0001
-is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
-is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true and .filer == "firstmate-merge") | .key')" merge-o-r-pull-12
+is "new head: old card archived, history kept" "$(sign-off-axi list "$board" --json --full | jq -r '[.decisions[] | select(.dismissed == true and .filer == "juggernaut-merge") | .evidence.run_id] | join(",")')" 20261022T000000Z-first0001
+is "new head: first card keeps the PR key" "$(sign-off-axi list "$board" --json --full | jq -r '.decisions[] | select(.dismissed == true and .filer == "juggernaut-merge") | .key')" merge-o-r-pull-12
 out=$(post_at 20261022T000000Z-second0001 "$h2")
 case $out in *"already on the board"*) echo "ok - repeat post adds nothing" ;; *) echo "not ok - repeat post: [$out]"; fails=$((fails + 1)) ;; esac
 # A newer card from another filer without a receipt: the sweep keeps the valid proof and archives it.

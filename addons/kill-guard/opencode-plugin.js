@@ -1,4 +1,4 @@
-// Fleet kill guard for OpenCode (installed by firstmate-addons kill-guard/install.sh); throwing stops the bash call.
+// Fleet kill guard for OpenCode (installed by juggernaut-addons kill-guard/install.sh); throwing stops the bash call.
 import { guard } from "__GUARD__";
 
 export const FmKillGuard = async () => ({

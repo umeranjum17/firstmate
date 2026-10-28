@@ -11,7 +11,7 @@ pushing the owner's private details to a public repo, shaped like
   ref doesn't already have (for a new branch, every commit no
   remote-tracking ref has). Each added line is
   matched case-insensitively against every extended regex in the patterns
-  file: `$FM_HOME/config/owner-details-patterns` when that home holds one,
+  file: `$JG_HOME/config/owner-details-patterns` when that home holds one,
   else the installing home's file (full-line `#` comments and blank lines
   ignored). A hit refuses with
   `file:line` plus a placeholder hint, never the pattern list. A missing or
@@ -45,7 +45,7 @@ pushing the owner's private details to a public repo, shaped like
   with the same args (moved aside to `config/merge-gate.pre-owner-guard`;
   `--uninstall [<home>]` moves it back). Rerun it after writing another
   gate shim over `config/merge-gate` to re-chain it.
-- `doctor.sh <fm-home>` — exits nonzero with the missing guard path or incorrect
+- `doctor.sh <jg-home>` — exits nonzero with the missing guard path or incorrect
   global `core.hooksPath` and prints the install command to recover.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,
   made-up patterns only): matching commit refused, clean commit passes,
@@ -105,4 +105,4 @@ proof (one hit repo, one clean repo, made-up patterns only).
 
 ## Placeholders
 
-Replace a refused detail with `you@example.com`, `~/firstmate`, `/home/you`.
+Replace a refused detail with `you@example.com`, `~/juggernaut`, `/home/you`.

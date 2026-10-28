@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # Live proof on a real Android device: this checkout's kill guard, copied to a temporary path, records a device process
 # with own start, allows the task's own kill and refuses device PID 1 and a name kill; the kill runs only once allowed.
-# Only the sleep this proof starts is signalled. Needs FM_DEVICE_SERIAL; FM_DEVICE_LOCK (a lock command taking
-# <serial> <command...>, such as fm-device-lock.sh) holds the device for the whole journey.
+# Only the sleep this proof starts is signalled. Needs JG_DEVICE_SERIAL; JG_DEVICE_LOCK (a lock command taking
+# <serial> <command...>, such as jg-device-lock.sh) holds the device for the whole journey.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
-S=${FM_DEVICE_SERIAL:?set FM_DEVICE_SERIAL to the test device}
+S=${JG_DEVICE_SERIAL:?set JG_DEVICE_SERIAL to the test device}
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 OUT=${DONE_DONE_EVIDENCE_ROOT:?run through done-done}/kill-guard-device; T=$(mktemp -d)
 trap 'rm -rf -- "$T"' EXIT
@@ -13,7 +22,7 @@ cat > "$T/journey.sh" <<'EOF'
 set -u; cd "$1"; G=$2; S=$3
 verdict() { jq -n --arg c "$1" '{tool_input:{command:$c}}' | node "$G" --caller $$ 2>&1; }
 echo "\$ own start $S -- sleep 120"; start=$(date +%s); node "$G" own start "$S" -- sleep 120 || exit 4; echo "returned in $(( $(date +%s) - start ))s"
-P=$(jq -r '.[-1].pid' .fm-kill-guard-device-pids.json); echo "recorded device pid $P"
+P=$(jq -r '.[-1].pid' .jg-kill-guard-device-pids.json); echo "recorded device pid $P"
 echo "\$ ps -p $P"; adb -s "$S" shell ps -o PID,NAME -p "$P" || exit 5
 echo "--- guard on: adb shell kill $P"; verdict "adb -s $S shell kill $P" && echo "allowed" || exit 6
 echo "--- guard on: adb shell kill 1"; ! verdict "adb -s $S shell kill 1" || exit 7
@@ -21,7 +30,7 @@ echo "--- guard on: adb shell pkill sleep"; ! verdict "adb -s $S shell pkill sle
 echo "\$ adb shell kill $P"; adb -s "$S" shell kill "$P"; sleep 1
 echo "\$ ps -p $P"; ! adb -s "$S" shell ps -o PID,NAME -p "$P" && echo "gone"
 EOF
-lock=(); [ -z "${FM_DEVICE_LOCK:-}" ] || lock=("$FM_DEVICE_LOCK" "$S")
+lock=(); [ -z "${JG_DEVICE_LOCK:-}" ] || lock=("$JG_DEVICE_LOCK" "$S")
 rc=0; "${lock[@]}" bash "$T/journey.sh" "$T/repo" "$T/guard.mjs" "$S" > "$OUT/journey.txt" 2>&1 || rc=$?
 sed "s/$S/<serial>/g" "$OUT/journey.txt" > "$OUT/journey.tmp" && mv "$OUT/journey.tmp" "$OUT/journey.txt"
 cat "$OUT/journey.txt"

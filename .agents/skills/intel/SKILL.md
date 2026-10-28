@@ -81,7 +81,7 @@ While the flag is present:
 
 Every `/intel` invocation performs this complete pass, even when the session contains no new finding:
 
-1. Run `bin/fm-startup-memory-budget.sh report` before considering a write.
+1. Run `bin/jg-startup-memory-budget.sh report` before considering a write.
    Record its effective budget and each file's estimated-token total.
    The budget is per home: this home's three files against this home's own allowance, never a fleet total.
    The helper's stable estimate is the documented conservative local approximation, not provider-exact accounting.
@@ -123,7 +123,7 @@ Every `/intel` invocation performs this complete pass, even when the session con
    Convergence precondition: before evicting anything, total the eligible pool and check that archiving all of it would reach the budget; when even that cannot, skip the eviction rung entirely, archive nothing for budget reasons, and carry the concrete inability to the final step, naming the exempt pinned and pending-capture floor that crowds out the budget.
    Automatic processes never move a `pinned` entry: decay clocks, legacy grace cycles, oldest-first budget eviction, immediate budget archiving, and autonomous offload do not apply to it.
    The sole exception is relocation to a JIT owner after explicit, per-item captain approval under the offload flow below, and that entry remains in memory until its destination is live.
-8. Run `bin/fm-startup-memory-budget.sh report` again after the complete pass.
+8. Run `bin/jg-startup-memory-budget.sh report` again after the complete pass.
    Finish at or below the effective budget, or open a concrete captain decision before ending the pass.
    A Squad Lead must explicitly report `primary-owned-shared-file-alone-exceeds-budget` when the inherited shared file alone exceeds its allowance, because local curation cannot resolve it.
    Route that constraint to the primary owner and open one concrete captain decision at the primary owning level that names the shortfall, with exactly these options: raise the affected home's effective budget, or explicitly approve the primary owner trimming or offloading each named shared-file entry.
@@ -181,7 +181,7 @@ Every test must hold for a candidate:
 Approved project-level destinations are not produced by stow: they ship normally through that project's own registered delivery path.
 
 - A user-owned local skill: a directory under `.agents/skills/<freeform-name>/` whose path is appended to the active home clone's repository-local exclude file, never to a `.gitignore`.
-  Resolve `home_root` to `$FM_HOME` when it is set and otherwise to the Juggernaut code root, and anchor every destination index check, exclude-path lookup, and ignore verification to that root with `git -C "$home_root"`.
+  Resolve `home_root` to `$JG_HOME` when it is set and otherwise to the Juggernaut code root, and anchor every destination index check, exclude-path lookup, and ignore verification to that root with `git -C "$home_root"`.
   Before approval and again before migration, validate that the chosen freeform destination under `home_root` is absent from that home's git index and collides with no existing file or directory, and reject the destination if either check fails.
   The name is freeform with no user-vs-Juggernaut naming convention, the skill stays per-home and untracked, and the harness still lists and JIT-loads it because skill discovery scans the filesystem and ignores git status (verified in `docs/verification/intel-memory.md`).
   Its precise, condition-stated description line is its entire trigger; it gets no `AGENTS.md` declaration because `AGENTS.md` is shared tracked material.
@@ -201,11 +201,11 @@ A local skill exists only in this home, so offloading an entry out of `data/capt
    Autonomously relocate it only by adding it to an already-existing allowed JIT note, or by routing it through a project's established delivery path to an already-existing allowed project-level destination, then confirming that destination holds the quoted entry before removing the memory entry.
    A destination that needs creation, uncompleted project delivery, or any other future work is not live and cannot count as relief, so continue with the next archival or eviction rung instead of leaving an over-budget proposal pending.
 2. Propose pinned relocation only.
-   For a pinned candidate, append a `proposed-offload` section with the same fields to the completion receipt, create or refresh one durable backlog item with `bin/fm-tasks-axi.sh add`, `bin/fm-tasks-axi.sh show <id> --full`, and `bin/fm-tasks-axi.sh update <id> --body-file <path>` as appropriate, then hold it through `bin/fm-captain-hold.sh hold`.
+   For a pinned candidate, append a `proposed-offload` section with the same fields to the completion receipt, create or refresh one durable backlog item with `bin/jg-tasks-axi.sh add`, `bin/jg-tasks-axi.sh show <id> --full`, and `bin/jg-tasks-axi.sh update <id> --body-file <path>` as appropriate, then hold it through `bin/jg-captain-hold.sh hold`.
    Preserve each candidate's approval state in that item, and require explicit plain-chat approval for that named item before any migration.
    If the captain never answers, nothing migrates and the held item persists, but it is never treated as budget relief.
 3. Migrate an approved pinned candidate outside this pass.
-   Resolve `home_root` to `$FM_HOME` when it is set and otherwise to the Juggernaut code root, then re-validate the approved local-skill destination under that root for both index absence with `git -C "$home_root"` and filesystem collision absence.
+   Resolve `home_root` to `$JG_HOME` when it is set and otherwise to the Juggernaut code root, then re-validate the approved local-skill destination under that root for both index absence with `git -C "$home_root"` and filesystem collision absence.
    Before creating the destination or writing any private content, resolve the exclude file with `git -C "$home_root" rev-parse --git-path info/exclude`, append the destination directory path to it, and verify the future `SKILL.md` path is ignored with `git -C "$home_root" check-ignore`.
    Only after that verification succeeds, create the destination and write the `SKILL.md` with its precise description trigger, then confirm the skill appears in a fresh session's skill index.
    If any migration step fails, remove the destination content and the exclude rule written by this attempt, leaving neither partial private content nor a partial rule behind.
@@ -235,7 +235,7 @@ A local skill exists only in this home, so offloading an entry out of `data/capt
      Keep the candidate in `data/learnings.md` or surface it in the completion receipt so the captain can extend the file by hand.
    - Knowledge general to every Juggernaut user belongs in this repo's shared tracked material through the normal branch, no-mistakes, PR, and captain-merge path, which exists only under this home's Juggernaut repository publication authority (`AGENTS.md` section 1's role boundary).
      A user/operator home instead keeps the lesson in `data/learnings.md` and may leave a sanitized local draft for the captain to carry upstream.
-   - For task-scoped notes, inspect the item with `bin/fm-tasks-axi.sh show <id> --full`, classify the change as new, duplicate, superseding, or obsolete, then use a considered replacement body through `bin/fm-tasks-axi.sh update <id> --body-file <path>`.
+   - For task-scoped notes, inspect the item with `bin/jg-tasks-axi.sh show <id> --full`, classify the change as new, duplicate, superseding, or obsolete, then use a considered replacement body through `bin/jg-tasks-axi.sh update <id> --body-file <path>`.
      Use `--archive-body` when recoverability matters.
      Never append.
    - File each undone next step as a queued backlog item with a genuine `blocked-by` dependency when applicable.
@@ -291,19 +291,19 @@ In a primary home, every `/intel` cascades to every registered Squad Lead after 
 In a Squad Lead home, `/intel` curates that home only and never cascades further.
 The cascade changes nothing until `/intel` is invoked: it adds no notification, no digest section, and no background work.
 
-Run `bin/fm-stow-cascade.sh` once the primary's own pass is done.
+Run `bin/jg-stow-cascade.sh` once the primary's own pass is done.
 It enumerates each registered Squad Lead exactly once, reports that home's own budget accounting, and resolves how the sweep reaches it; its header owns the stanza fields, the bound, and the exit codes.
 Every home is judged against its own `config/startup-memory-budget` allowance, so never add homes together or treat one home's excess as another's.
 
 Act on each home by its reported `transport`:
 
-- `agent` - send the marked request with `bin/fm-send.sh fm-<id> "<request>"` so the live Squad Lead performs its own `/intel`, including the uncaptured knowledge that exists only in its session.
+- `agent` - send the marked request with `bin/jg-send.sh jg-<id> "<request>"` so the live Squad Lead performs its own `/intel`, including the uncaptured knowledge that exists only in its session.
   Ask it for the same completion receipt this skill defines, and read its reply from its status file or the document it points to, never from its chat.
 - `direct` - curate that local home's editable memory files yourself under the same retention plan, then re-run the cascade to confirm the after totals.
   `data/captain-shared.md` stays a read-only counted input there, exactly as it is in any Squad Lead home.
 - `deferred` - a remote home with no live agent. Its memory is accounted read-only and cannot be curated from here, because there is no generic remote write path for a home's own memory files.
   Report it as an unresolved exception and leave it to its next cascade.
-  Relaunching that Squad Lead is a separate decision owned by `secondmate-provisioning`, never something `/intel` does on its own.
+  Relaunching that Squad Lead is a separate decision owned by `squad-lead-provisioning`, never something `/intel` does on its own.
 - `unavailable` - that home's own accounting did not complete. Report the concrete exception and continue; a slow or unreachable home never blocks this home's `/intel`.
 
 A newly discovered shared captain preference still routes to the primary's `data/captain-shared.md` under the existing primary-authoritative contract, whichever home found it.

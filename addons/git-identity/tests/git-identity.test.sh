@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # End-to-end: a pooled-style lane worktree whose shared clone .git/config carries a stray identity
-# (t <t@e.c>), launched the way the fork's fm-spawn runs config/launch-env-hook, against a throwaway HOME and home.
-# With FM_ROOT set to a firstmate checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
-# as a real spawn does. Usage: [FM_ROOT=<firstmate>] git-identity/tests/git-identity.test.sh
+# (t <t@e.c>), launched the way the fork's jg-spawn runs config/launch-env-hook, against a throwaway HOME and home.
+# With JG_ROOT set to a juggernaut checkout, the lane also gets that checkout's AI-trailer hooks dir layered on top,
+# as a real spawn does. Usage: [JG_ROOT=<juggernaut>] git-identity/tests/git-identity.test.sh
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -euo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 d=$(mktemp -d)
@@ -59,11 +68,11 @@ has "install notes a home without the fork hook" "$out" "does not run config/lau
 check "install backed up the old hook" "$(cat "$FM"/config/launch-env-hook.bak-git-identity-*)" "echo old"
 snap() { (cd "$d" && find data fm -type f -print0 | sort -z | xargs -0 sha256sum); }
 before=$(snap)
-echo 'launch-env-hook' >"$FM/bin/fm-spawn.sh"
+echo 'launch-env-hook' >"$FM/bin/jg-spawn.sh"
 out=$("$SRC/install.sh" "$FM")
-rm "$FM/bin/fm-spawn.sh"
+rm "$FM/bin/jg-spawn.sh"
 check "rerun changes nothing" "$(snap)" "$before"
-check "pinned identity" "$(git config -f "$XDG_DATA_HOME/fm-git-identity/identity.gitconfig" user.email)" "$ME"
+check "pinned identity" "$(git config -f "$XDG_DATA_HOME/jg-git-identity/identity.gitconfig" user.email)" "$ME"
 
 # (c) The lane launch: the hook runs in the pane at the worktree, then the launch sources its export.
 lane() {
@@ -72,11 +81,11 @@ lane() {
     "$FM/config/launch-env-hook" "$d/env.sh"
     # shellcheck source=/dev/null
     . "$d/env.sh"
-    if [ -n "${FM_ROOT:-}" ]; then
-      "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$d/fm-hooks" "$WT"
-      "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" env-file "$d/fm-hooks" "$d/fm-env.sh"
+    if [ -n "${JG_ROOT:-}" ]; then
+      "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh" install "$d/jg-hooks" "$WT"
+      "$JG_ROOT/bin/jg-git-strip-ai-trailers.sh" env-file "$d/jg-hooks" "$d/jg-env.sh"
       # shellcheck source=/dev/null
-      . "$d/fm-env.sh"
+      . "$d/jg-env.sh"
     fi
     "$@"
   )
@@ -102,7 +111,7 @@ has "repo's own pre-push hook ran with git's stdin" "$(cat "$d/repo-hook.log" 2>
 # the failure is produced with a real missing object rather than a shimmed git.
 git -C "$WT" -c user.name=t -c user.email=t@e.c commit -q --allow-empty -m uninspectable
 missing=$(printf x | git hash-object --stdin)
-out=$(lane "$XDG_DATA_HOME/fm-git-identity/git-identity" hook pre-push \
+out=$(lane "$XDG_DATA_HOME/jg-git-identity/git-identity" hook pre-push \
   <<<"refs/heads/lane $missing refs/heads/lane $(git -C "$d/origin.git" rev-parse refs/heads/lane)" 2>&1) && rc=0 || rc=$?
 check "an inspection failure refuses the push" "$rc" 1
 has "refusal names the uninspectable push" "$out" "cannot inspect pushed commits"

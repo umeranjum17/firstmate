@@ -19,6 +19,15 @@
 # low account; passes 14 and 15 prove a Claude route test with no account
 # runs on the pool's pick, never the default login. Needs bash, jq, flock, timeout, sed and stat
 # on PATH; no real tool or home is touched.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+
 set -u
 
 here=$(cd "$(dirname "$0")" && pwd) || exit 1
@@ -35,40 +44,40 @@ is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; 
 has() { if grep -q -- "$3" "$2" 2>/dev/null; then ok "$1"; else no "$1: $2 lacks [$3]"; fi; }
 count() { local got; got=$(grep -c -- "$3" "$2" 2>/dev/null) || got=0; is "$1" "$got" "$4"; }
 
-# The fixture's firstmate surface: one stub lib (screens are state/<id>.screen,
-# an fm-control relaunch clears the task's screen and status), the two exec'd
+# The fixture's juggernaut surface: one stub lib (screens are state/<id>.screen,
+# an jg-control relaunch clears the task's screen and status), the two exec'd
 # scripts, and the CLI stubs.
 awk -v w="$work" '
   /^#--- / { file = w "/" substr($0, 6); next }
   file { print > file }
 ' <<'STUBS' || exit 1
-#--- home/bin/fm-stub-lib.sh
+#--- home/bin/jg-stub-lib.sh
 # shellcheck shell=bash
-fm_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
-fm_backend_of_meta() { echo fixture; }
-fm_backend_target_of_meta() { fm_meta_get "$1" endpoint_task_id; }
-fm_backend_visible_capture() { [ -f "$FM_HOME/state/$2.screen" ] && cat "$FM_HOME/state/$2.screen"; return 0; }
-fm_busy_classify_meta() { cat "$FM_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
-fm_busy_record_read() { echo ''; }
-FM_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
-fm_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
-fm_quota_single_provider_for_harness() { return 1; }
-fm_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
-fm_run_timed() { shift; "$@"; }
-#--- home/bin/fm-crew-state.sh
+jg_meta_get() { [ -f "$1" ] || return 0; sed -n "s|^$2=||p" "$1" | tail -n 1; }
+jg_backend_of_meta() { echo fixture; }
+jg_backend_target_of_meta() { jg_meta_get "$1" endpoint_task_id; }
+jg_backend_visible_capture() { [ -f "$JG_HOME/state/$2.screen" ] && cat "$JG_HOME/state/$2.screen"; return 0; }
+jg_busy_classify_meta() { cat "$JG_HOME/state/$2.verdict" 2>/dev/null || echo 'idle no-busy-record'; }
+jg_busy_record_read() { echo ''; }
+JG_QUOTA_ROW_JQ='def quota_lane($harness; $model): ""; def quota_row($snapshot; $provider; $lane): null;'
+jg_quota_json_valid() { jq -e '.schemaVersion == 5 and (.providers | type) == "array"' >/dev/null 2>&1; }
+jg_quota_single_provider_for_harness() { return 1; }
+jg_parent_channel_report() { printf '%s\n' "$3" >>"$1/state/parent-channel.log"; }
+jg_run_timed() { shift; "$@"; }
+#--- home/bin/jg-crew-state.sh
 #!/usr/bin/env bash
 echo 'state: working · source: fixture'
-#--- home/bin/fm-control.sh
+#--- home/bin/jg-control.sh
 #!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FM_HOME/state/fm-control.log"
+printf '%s\n' "$*" >>"$JG_HOME/state/jg-control.log"
 [ "${2:-}" = relaunch ] || exit 0
 id=${1:-}
-# d1's pool has no next account ready, as fm-control answers after its rest.
+# d1's pool has no next account ready, as jg-control answers after its rest.
 [ "$id $3 $4" != "d1 --account next" ] || { echo "error: config/account-pool cannot start a claude worker: no account is ready"; exit 1; }
 # p6's relaunch replaces the incarnation, then fails a later launch step.
-[ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$FM_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
-rm -f "$FM_HOME/state/$id.screen"
-date +%s >"$FM_HOME/state/$id.status"
+[ "$id $3 $4" != "p6 --account next" ] || { printf 'spawn_gen=s1.p6\naccount=nextacct\n' >>"$JG_HOME/state/p6.meta"; echo "error: launch step failed"; exit 1; }
+rm -f "$JG_HOME/state/$id.screen"
+date +%s >"$JG_HOME/state/$id.status"
 #--- bin/opencode
 #!/usr/bin/env bash
 # Every model answers PONG except the two dead routes, which answer the
@@ -86,7 +95,7 @@ exit 1
 #!/usr/bin/env bash
 # The one-line test records the profile folder it ran on, so a pass can prove a
 # pool task's limit was read on its own account and not on the ambient login.
-printf '%s\n' "${CLAUDE_CONFIG_DIR:-ambient}" >>"$FM_HOME/state/claude-probe.log"
+printf '%s\n' "${CLAUDE_CONFIG_DIR:-ambient}" >>"$JG_HOME/state/claude-probe.log"
 case ${CLAUDE_LIMIT_ACCOUNT:-} in
   '') ;;
   *) case "${CLAUDE_CONFIG_DIR:-}" in *"/profiles/$CLAUDE_LIMIT_ACCOUNT") echo "You've hit your usage limit for your plan; try again in 3h"; exit 1 ;; esac ;;
@@ -104,21 +113,21 @@ echo '{"schemaVersion":5,"providers":[]}'
 # The pool command: `status <id>` names one account's tool and profile folder.
 case ${1:-} in
   status) id=${2:-}
-    [ -d "$FM_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
-    printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$FM_HOME/state/profiles/$id" ;;
+    [ -d "$JG_HOME/state/profiles/$id" ] || { echo "error: no account $id" >&2; exit 1; }
+    printf '{"ok":true,"id":"%s","tool":"claude","folder":"%s"}\n' "$id" "$JG_HOME/state/profiles/$id" ;;
   rest) id=${2:-}
     [ "$id" = deadpool ] && { echo "error: pool lib broken at $(date +%s%N)" >&2; exit 1; }
-    printf 'rest %s\n' "$id" >>"$FM_HOME/state/pool.log" ;;
+    printf 'rest %s\n' "$id" >>"$JG_HOME/state/pool.log" ;;
   pick) [ -z "${POOL_PICK_FAIL:-}" ] || { echo "error: no account can take a worker" >&2; exit 1; }
-    mkdir -p "$FM_HOME/state/profiles/pooled"
-    printf '{"ok":true,"id":"pooled","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$FM_HOME/state/profiles/pooled" ;;
+    mkdir -p "$JG_HOME/state/profiles/pooled"
+    printf '{"ok":true,"id":"pooled","set":{"CLAUDE_CONFIG_DIR":"%s"},"unset":["ANTHROPIC_API_KEY"]}\n' "$JG_HOME/state/profiles/pooled" ;;
   *) echo "usage: byokit-accounts status <id>" >&2; exit 1 ;;
 esac
 STUBS
-for lib in fm-backend.sh fm-busy-lib.sh fm-quota-axi-lib.sh fm-parent-channel-lib.sh; do
-  ln -s fm-stub-lib.sh "$home/bin/$lib" || exit 1
+for lib in jg-backend.sh jg-busy-lib.sh jg-quota-axi-lib.sh jg-parent-channel-lib.sh; do
+  ln -s jg-stub-lib.sh "$home/bin/$lib" || exit 1
 done
-chmod +x "$home/bin/fm-crew-state.sh" "$home/bin/fm-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi" "$stub/byokit-accounts"
+chmod +x "$home/bin/jg-crew-state.sh" "$home/bin/jg-control.sh" "$stub/opencode" "$stub/claude" "$stub/quota-axi" "$stub/byokit-accounts"
 
 # Step 5 ranked first, a second dead route, then the live ones.
 cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
@@ -129,19 +138,19 @@ cat >"$home/config/crew-dispatch.json" <<'JSON' || exit 1
  "default": [{"harness": "opencode", "model": "opencode-go/deepseek-v4.1-flash"}]}
 JSON
 
-# lead1 (a secondmate) sits on the 429 route with a clean screen: only the
+# lead1 (a squad_lead) sits on the 429 route with a clean screen: only the
 # pinned-route provider-error test can move it. w1 sits on the second dead
 # route with the usage-limit text on its screen.
-printf 'endpoint_task_id=lead1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=secondmate\nspawn_gen=s0.lead1\n' \
+printf 'endpoint_task_id=lead1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=squad_lead\nspawn_gen=s0.lead1\n' \
   >"$home/state/lead1.meta" || exit 1
-printf 'endpoint_task_id=w1\nharness=opencode\nmodel=openai-codex/gpt-5.6-luna\nkind=crewmate\nspawn_gen=s0.w1\n' \
+printf 'endpoint_task_id=w1\nharness=opencode\nmodel=openai-codex/gpt-5.6-luna\nkind=operator\nspawn_gen=s0.w1\n' \
   >"$home/state/w1.meta" || exit 1
 printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$home/state/w1.screen"
 
-log=$home/state/quota-failover.log ctl=$home/state/fm-control.log
+log=$home/state/quota-failover.log ctl=$home/state/jg-control.log
 dead=$home/state/quota-failover-dead.json disp=$home/config/crew-dispatch.json
 run() { # one watcher pass, with the knobs the fixture needs
-  env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" FM_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
+  env -u CLAUDE_CONFIG_DIR PATH="$stub:$PATH" JG_HOME="$home" QUOTA_FAILOVER_PROBE_SECS=0 \
     QUOTA_FAILOVER_RETEST_SECS="${RETEST_SECS:-1800}" "$here/../quota-failover" "$home"
 }
 
@@ -173,7 +182,7 @@ printf 'state=/pool\n' >"$home/config/account-pool"
 mkdir -p "$home/state/profiles/c1" "$home/state/profiles/c2" "$home/state/profiles/go1" "$home/state/profiles/cx1" \
   "$home/state/profiles/go9" "$home/state/profiles/c3" "$home/state/profiles/deadpool"
 pool() { # <id> <harness> <model> <account> [generation]
-  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=%s\naccount=%s\n' \
+  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=operator\nspawn_gen=%s\naccount=%s\n' \
     "$1" "$2" "$3" "${5:-s0.$1}" "$4" >"$home/state/$1.meta"
   printf '%s\n' "You've hit your usage limit for your plan; try again in 3h" >"$home/state/$1.screen"
 }
@@ -201,7 +210,7 @@ is "pass3: Go and Codex accounts rested" "$(sort "$pooll" | paste -sd, -)" "rest
 has "pass3: a worker on an account the pool does not name takes the route move" "$ctl" \
   '^y1 relaunch --harness opencode --model opencode-go/deepseek-v4.1-flash '
 has "pass3: the Go wake names the account and the manual command" "$wake" \
-  'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/fm-control.sh g1 relaunch --account <id>$'
+  'g1 stopped on opencode opencode-go/mimo-v2.6-flash account go1 .*bin/jg-control.sh g1 relaunch --account <id>$'
 is "pass3: an account limit leaves the route in dispatch" "$(jq -c . "$dead")" '[]'
 
 # The home asks for the human instead: a Claude pool worker only rests, a
@@ -218,11 +227,11 @@ count "pass4: no relaunch with the opt-out file" "$ctl" '^b1 ' 0
 count "pass4: no relaunch for the failed-rest worker either" "$ctl" '^f1 ' 0
 is "pass4: the account rested once" "$(cat "$pooll")" "rest c3"
 has "pass4: one log line names the account and the manual command" "$log" \
-  'b1: stopped on claude claude-opus-4-8 account c3 .*bin/fm-control.sh b1 relaunch --account <id|next>$'
+  'b1: stopped on claude claude-opus-4-8 account c3 .*bin/jg-control.sh b1 relaunch --account <id|next>$'
 has "pass4: a failed rest is logged with the pool's error" "$log" \
   'f1: stopped on claude claude-opus-4-8 account deadpool .*rest failed (error: config/account-pool cannot rest account deadpool: pool lib broken at [0-9]*; it stays on the pick.s list until it rests), move it by hand'
 has "pass4: a failed rest still wakes the home with the account named" "$wake" \
-  'f1 stopped on claude claude-opus-4-8 account deadpool .*bin/fm-control.sh f1 relaunch --account <id|next>$'
+  'f1 stopped on claude claude-opus-4-8 account deadpool .*bin/jg-control.sh f1 relaunch --account <id|next>$'
 count "pass4: one wake line per stopped worker" "$wake" '' 2
 
 # The home takes the wake's advice and relaunches b1 on the same account c3;
@@ -239,7 +248,7 @@ count "pass5: the failed-rest wake stays at one line" "$wake" 'f1 stopped' 1
 # A pool worker wedged with a clean screen on the 429 route: only the
 # route-scoped pinned probe sees the outage, and it must still take the
 # route out of dispatch while the worker itself rests and wakes.
-printf 'endpoint_task_id=q1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=crewmate\nspawn_gen=s0.q1\naccount=go9\n' \
+printf 'endpoint_task_id=q1\nharness=opencode\nmodel=opencode-go/step-5-preview-free\nkind=operator\nspawn_gen=s0.q1\naccount=go9\n' \
   >"$home/state/q1.meta"
 run
 
@@ -248,7 +257,7 @@ is "pass6: the pinned probe takes the pool worker's route out" \
 is "pass6: and the route leaves new dispatch" \
   "$(grep -Eo 'step-5-preview-free' "$disp" 2>/dev/null | sort -u | paste -sd, -)" ""
 has "pass6: the worker itself still rests and wakes" "$wake" \
-  'q1 stopped on opencode opencode-go/step-5-preview-free account go9 .*bin/fm-control.sh q1 relaunch --account <id>$'
+  'q1 stopped on opencode opencode-go/step-5-preview-free account go9 .*bin/jg-control.sh q1 relaunch --account <id>$'
 
 # The next pass sees q1's route as already out of dispatch instead of
 # probe-detected, but the stop is the same one: nothing rests or wakes again.
@@ -278,13 +287,13 @@ is "pass8: an account limit leaves the claude route in dispatch" \
 # stopped worker to a permitted live route; ordinary 400s do not.
 printf '[]\n' >"$dead"
 printf '{"rules":[{"when":"credits","use":[{"harness":"opencode","model":"opencode-go/credit-exhausted"},{"harness":"opencode","model":"opencode-go/mimo-v2.6-flash"}]}],"default":[] }\n' >"$disp"
-printf 'endpoint_task_id=credit\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=crewmate\nspawn_gen=s0.credit\n' >"$home/state/credit.meta"
+printf 'endpoint_task_id=credit\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=operator\nspawn_gen=s0.credit\n' >"$home/state/credit.meta"
 run
 has "pass16: insufficient credits on HTTP 400 moves the stopped worker" "$ctl" \
   '^credit relaunch --harness opencode --model opencode-go/mimo-v2.6-flash '
 has "pass16: insufficient-credit route leaves dispatch" "$dead" 'credit-exhausted'
 printf '{"rules":[{"when":"invalid request","use":[{"harness":"opencode","model":"opencode-go/invalid-request"},{"harness":"opencode","model":"opencode-go/mimo-v2.6-flash"}]}],"default":[]}\n' >"$disp"
-printf 'endpoint_task_id=invalid400\nharness=opencode\nmodel=opencode-go/invalid-request\nkind=crewmate\nspawn_gen=s0.invalid400\n' >"$home/state/invalid400.meta"
+printf 'endpoint_task_id=invalid400\nharness=opencode\nmodel=opencode-go/invalid-request\nkind=operator\nspawn_gen=s0.invalid400\n' >"$home/state/invalid400.meta"
 run
 is "pass16: ordinary invalid-request 400 keeps its route out of the dead list" \
   "$(jq -r 'any(.[]; .model == "opencode-go/invalid-request")' "$dead")" false
@@ -293,7 +302,7 @@ is "pass16: ordinary invalid-request 400 leaves its route in dispatch" \
 
 # Without a permitted fallback, keep the worker stopped and record its wait.
 printf '{"rules":[{"when":"credits","use":[{"harness":"opencode","model":"opencode-go/credit-exhausted"}]}],"default":[] }\n' >"$disp"
-printf 'endpoint_task_id=credit-wait\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=crewmate\nspawn_gen=s0.credit-wait\n' >"$home/state/credit-wait.meta"
+printf 'endpoint_task_id=credit-wait\nharness=opencode\nmodel=opencode-go/credit-exhausted\nkind=operator\nspawn_gen=s0.credit-wait\n' >"$home/state/credit-wait.meta"
 run
 has "pass17: no fallback records a durable wait" "$log" \
   'credit-wait: stopped on opencode opencode-go/credit-exhausted .* no live route in crew-dispatch, left waiting'
@@ -302,7 +311,7 @@ count "pass17: no fallback does not relaunch" "$ctl" '^credit-wait relaunch ' 0
 # Wrapper/file text is not Claude's limit banner and must not remove its route.
 printf '[]\n' >"$dead"
 printf '{"rules":[],"default":[{"harness":"claude","model":"claude-haiku-5-5"}]}\n' >"$disp"
-printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=crewmate\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
+printf 'endpoint_task_id=cw\nharness=claude\nmodel=claude-haiku-5-5\nkind=operator\nspawn_gen=s0.cw\n' >"$home/state/cw.meta"
 printf 'quota exhausted' >"$home/state/cw.screen"
 run
 is "pass9: wrapper text leaves Haiku dispatch intact" "$(jq -r '.default[0].model' "$disp")" claude-haiku-5-5
@@ -328,7 +337,7 @@ reading() { # <tool> <generated_at> <id 5h 7d>...
 reading claude "$now" "lowacct 90 3" "okacct 60 70"
 reading codex "$now" "lowcx 12 80"
 prelim() { # <id> <harness> <model> <account>
-  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=crewmate\nspawn_gen=s0.%s\naccount=%s\n' "$1" "$2" "$3" "$1" "$4" >"$home/state/$1.meta"
+  printf 'endpoint_task_id=%s\nharness=%s\nmodel=%s\nkind=operator\nspawn_gen=s0.%s\naccount=%s\n' "$1" "$2" "$3" "$1" "$4" >"$home/state/$1.meta"
 }
 prelim p1 claude claude-opus-4-8 lowacct
 prelim p2 claude claude-opus-4-8 lowacct
@@ -355,7 +364,7 @@ has "pass13: a relaunch that fails after the swap reports the account it moved t
 # A Claude route test that names no account runs on the pool's pick; when the pick fails it
 # reuses the last good pick and never the default login.
 is "pass14: the route tests ran on the pool's pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"
-printf 'endpoint_task_id=cz\nharness=claude\nmodel=claude-sonnet-test\nkind=crewmate\nspawn_gen=s0.cz\n' >"$home/state/cz.meta"
+printf 'endpoint_task_id=cz\nharness=claude\nmodel=claude-sonnet-test\nkind=operator\nspawn_gen=s0.cz\n' >"$home/state/cz.meta"
 printf "%s\n" "You've hit your usage limit for your plan; try again in 3h" >"$home/state/cz.screen"
 POOL_PICK_FAIL=1 run
 is "pass15: a failed pick reuses the last good pick" "$(tail -n 1 "$home/state/claude-probe.log")" "$home/state/profiles/pooled"

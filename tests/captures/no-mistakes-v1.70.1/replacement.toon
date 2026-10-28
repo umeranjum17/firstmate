@@ -1,10 +1,10 @@
 run:
   id: "01M2GAWMSDQK4B5EA9GZW35RXE"
-  branch: fm/fm-bearings-board-loses-owner-state-and-links
+  branch: fm/jg-bearings-board-loses-owner-state-and-links
   status: running
   head: 146a90ee
   head_sha: 146a90ee48c675ec7908faf141026efef5158c5a
-  pr: "https://github.com/kunchenguid/firstmate/pull/4019"
+  pr: "https://github.com/kunchenguid/juggernaut/pull/4019"
   findings: 6 info
   steps[9]{step,status,findings,duration_ms}:
     intent,completed,0,129
