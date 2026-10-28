@@ -2730,9 +2730,9 @@ EOF
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   assert_contains "$out" "quiet-mode supervision is active" "AFK digest did not report quiet mode for a quiet-content flag"
-  assert_contains "$out" "only an explicit /quiet off exits it" "AFK digest lost the explicit-only exit rule"
+  assert_contains "$out" "only an explicit /radio-silence off exits it" "AFK digest lost the explicit-only exit rule"
   assert_contains "$out" "Quiet mode is active" "next step did not switch to quiet-mode guidance"
-  assert_contains "$out" "load /quiet" "next step did not name the /quiet skill"
+  assert_contains "$out" "load /radio-silence" "next step did not name the /radio-silence skill"
   assert_contains "$out" "- Quiet mode: active" "supervision block did not include active quiet state"
   assert_not_contains "$out" "Away mode is active" "quiet-mode flag was misreported as away mode"
   assert_not_contains "$out" "  bin/fm-watch-arm.sh" "quiet next step still told the agent to arm the watcher directly"

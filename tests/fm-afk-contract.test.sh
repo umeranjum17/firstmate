@@ -112,7 +112,7 @@ test_words_preserve_final_newline_shape() {
   pass "words preserve their final newline shape in storage and read-back"
 }
 
-# /afk is itself the go: one `enter` call writes the record, with no proposal
+# /watchover is itself the go: one `enter` call writes the record, with no proposal
 # staged and no later confirmation, then announces and reads it back.
 test_enter_writes_a_v2_record_in_one_step_and_announces_hold_for_return() {
   local home out record before after
@@ -562,8 +562,8 @@ test_record_changes_refuse_while_a_reader_holds_the_lock() {
 
 # Daemon-backed quiet mode writes the same record with `mode: quiet`, and the
 # captain is present: its entry, refresh, and read-back must never read as
-# hold-for-return (the live /quiet finding where a present captain's requested
-# local landing was held until /quiet off), while an away record keeps its
+# hold-for-return (the live /radio-silence finding where a present captain's requested
+# local landing was held until /radio-silence off), while an away record keeps its
 # hold-for-return reading unchanged.
 test_quiet_record_reads_as_a_present_captain_holding_nothing() {
   local home out
@@ -597,7 +597,7 @@ test_quiet_record_reads_as_a_present_captain_holding_nothing() {
   pass "a quiet record announces, refreshes, and reads back as a present captain holding nothing, while an away record keeps hold-for-return"
 }
 
-# The mode written follows who is present: an /afk entry over quiet mode (a
+# The mode written follows who is present: an /watchover entry over quiet mode (a
 # refresh included) makes the record away, and a quiet entry never turns a
 # standing away record quiet, because the captain's return comes first.
 test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away() {
@@ -608,7 +608,7 @@ test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away() {
   out=$(contract "$home" enter 2>&1) || fail "away refresh over quiet failed: $out"
   assert_contains "$out" 'quiet mode became the away posture' 'the conversion names itself'
   assert_contains "$out" 'hold-for-return only' 'the converted record holds for the return'
-  [ "$(contract "$home" mode)" = away ] || fail "an /afk refresh over quiet mode left the record quiet"
+  [ "$(contract "$home" mode)" = away ] || fail "an /watchover refresh over quiet mode left the record quiet"
   ls "$home/state/afk-contracts/$quiet_entered-superseded-"*.afk-contract >/dev/null 2>&1 \
     || fail "the quiet record was not archived when it became away"
 

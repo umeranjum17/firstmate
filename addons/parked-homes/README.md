@@ -35,7 +35,7 @@ Crewmate and lead lanes are never parked, whatever their task id spells.
 |---|---|---|
 | Supervision session (message, steer, answer, nudge — `fm-send.sh`) | after target resolution | one `error:` line, exit 1, nothing delivered or marked |
 | Relaunch (`fm-control.sh <id> relaunch`, `fm-remote-secondmate-relaunch.sh`) | before the launch transaction | one `error:` line, exit 1 |
-| Restart pass (`fm-secondmate-restart.sh`, used by /updatefirstmate) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
+| Restart pass (`fm-secondmate-restart.sh`, used by /resupply) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
 | Reconcile nudge (`fm-secondmate-reconcile.sh`) | per-target | `skipped: <id> parked`; request preserved |
 | Config push (`fm-config-push.sh`) | per-home | `secondmate <id>: skipped - its home is parked` |
 | Inherited config push (CONFIG_REREAD, both bootstrap loops) | per-home | one skip line; no push, no reread nudge |

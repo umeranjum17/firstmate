@@ -5,7 +5,7 @@
 # This is the one implementation of "advance a firstmate checkout to a base by a
 # clean fast-forward, never forcing, merging, or stashing" used by every sync
 # path:
-#   - /updatefirstmate (bin/fm-update.sh) pulls from origin: base_mode "origin".
+#   - /resupply (bin/fm-update.sh) pulls from origin: base_mode "origin".
 #   - the local-HEAD secondmate sync (bin/fm-spawn.sh on launch, bin/fm-bootstrap.sh
 #     on startup) follows the PRIMARY checkout's current default-branch commit:
 #     base_mode is that local commit, with NO fetch and no origin dependency.
@@ -252,7 +252,7 @@ changed_instr() {
 REMOTE_SYNC_UNSUPPORTED_STATUS=2
 remote_sync_failure_reason() { # <exit-status> <output>
   if [ "$1" = "$REMOTE_SYNC_UNSUPPORTED_STATUS" ]; then
-    printf '%s\n' "the Firstmate copy on that host is too old to sync to this primary's commit; run /updatefirstmate"
+    printf '%s\n' "the Firstmate copy on that host is too old to sync to this primary's commit; run /resupply"
     return 0
   fi
   first_line "$2"
@@ -443,7 +443,7 @@ ff_maybe_clear_stale_index_lock() { # <dir> <label> <merge-output>
 #   FF_INSTR  = comma list of changed instruction paths (only when updated)
 #
 # base_mode selects where the fast-forward base comes from:
-#   origin       - fetch origin and advance to origin/<default> (the /updatefirstmate
+#   origin       - fetch origin and advance to origin/<default> (the /resupply
 #                  path); requires an origin remote and network reachability.
 #   <commit-ish> - advance to that LOCAL commit with NO fetch and no origin
 #                  dependency (the local-HEAD secondmate sync). The commit must
@@ -610,7 +610,7 @@ FF_SEEN_HOMES=""
 #     live window, whether it advanced (status=updated) or was already there
 #     (status=current). A home that was SKIPPED is never settled, so a dirty,
 #     diverged, offline, or unsafe home never reaches this hook and nothing here
-#     forces, stashes, or discards its work. /updatefirstmate uses this hook to
+#     forces, stashes, or discards its work. /resupply uses this hook to
 #     reach every live mate that is genuinely on the new bytes, including the
 #     ones that needed no advance to get there.
 # An undefined hook is simply not called.

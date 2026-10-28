@@ -547,7 +547,7 @@ That is why `bin/fm-branch-prompt.sh`'s header is the contract's single owner an
 
 One supervision session runs in two postures, attended and away.
 The posture is a file: the away-posture record `state/.afk-contract`.
-Only `bin/fm-afk-contract.sh` writes it, in the same turn as `/afk`.
+Only `bin/fm-afk-contract.sh` writes it, in the same turn as `/watchover`.
 The return path archives it on the captain's first unmarked message.
 
 ### Who reads the record

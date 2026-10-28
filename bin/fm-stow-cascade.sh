@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Enumerate this home's registered secondmates for an internal /stow cascade.
+# Enumerate this home's registered secondmates for an internal /intel cascade.
 # Usage: fm-stow-cascade.sh [--help]
 #
-# The internal /stow skill owns curation judgement; this command owns only the
+# The internal /intel skill owns curation judgement; this command owns only the
 # mechanical inputs a cascade needs: which homes exist, what each home's own
 # startup-memory accounting says right now, and how the sweep can reach it.
 #

@@ -24,9 +24,9 @@
 # quiet record, a refresh included, rewrites it as away, and a quiet entry never
 # turns a standing away record quiet (the captain's return comes first).
 #
-# ENTRY IS THE GO. `/afk` itself is the captain's go: `enter` writes the record
+# ENTRY IS THE GO. `/watchover` itself is the captain's go: `enter` writes the record
 # in the same turn, before any other work, and never waits for a further human
-# response, because the captain who typed /afk may not look at the screen again.
+# response, because the captain who typed /watchover may not look at the screen again.
 # The read-back is printed after the record exists; it is informational, never a
 # gate, and never asks for a go.
 #
@@ -53,13 +53,13 @@
 #   reach_channels: none
 #   reach_announced: <the one-sentence reach announcement>
 #   spend_max_concurrent_workers: <n>
-#   confirmed: <UTC ISO 8601>       when this mandate was recorded; /afk itself
+#   confirmed: <UTC ISO 8601>       when this mandate was recorded; /watchover itself
 #   confirmed_epoch: <seconds>        is the go, so no later human step stamps it
 #   mode: quiet                    only on a quiet entry (FM_AFK_MODE=quiet); absent
 #                                  means away
 #   words: | or |-                 the captain's words, verbatim, never edited,
 #     <line>                       one record line per input line (or `words: -`
-#     ...                          when /afk carried no words); `|` retains a
+#     ...                          when /watchover carried no words); `|` retains a
 #                                  final newline and `|-` records its absence
 # The words block runs to the end of a version 2 record; in a version 1 record
 # only its legacy clauses:, refused:, and merge_grants: sections end it. Any
@@ -411,7 +411,7 @@ fm_afk_contract_render_readback() {  # <path>
 fm_afk_contract_render_announcement() {  # <path>
   local path=$1 expected words mandate_text
   if [ "$(fm_afk_contract_record_mode "$path")" = quiet ]; then
-    printf 'Quiet mode recorded at %s: %s Only an explicit /quiet off ends it.\n' \
+    printf 'Quiet mode recorded at %s: %s Only an explicit /radio-silence off ends it.\n' \
       "$(fm_afk_contract_read_field "$path" confirmed)" "$FM_AFK_CONTRACT_QUIET_HOLDS_NOTHING"
     return 0
   fi
@@ -494,7 +494,7 @@ fm_afk_contract_archive_target() {  # <record> [superseded-stamp]
   printf '%s\n' "$target"
 }
 
-# /afk is the go: write the record in this same call, with no proposal and no
+# /watchover is the go: write the record in this same call, with no proposal and no
 # later confirmation step. Inputs were parsed before the lock (WORDS,
 # EXPECTED_RETURN, SPEND, FM_AFK_CONTRACT_SCALARS_GIVEN). The written mode
 # follows the header's AWAY OR QUIET rules.
@@ -587,7 +587,7 @@ fm_afk_contract_select_path() {  # <args...> -> prints the record path chosen by
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --proposal)
-        fm_afk_contract_log "--proposal was retired with the wait-for-go gate: /afk writes the record directly, so read the record itself"
+        fm_afk_contract_log "--proposal was retired with the wait-for-go gate: /watchover writes the record directly, so read the record itself"
         return 2 ;;
       --path) [ "$#" -gt 1 ] || return 2; path=$2; shift 2 ;;
       *) return 2 ;;
@@ -618,7 +618,7 @@ fm_afk_contract_main() {
       fm_afk_contract_parse_inputs "$@" || return 2
       fm_afk_contract_locked_cmd fm_afk_contract_cmd_enter ;;
     propose|confirm)
-      fm_afk_contract_log "'$cmd' was retired with the wait-for-go gate: /afk is itself the go, so run 'enter' to write the record in the same turn"
+      fm_afk_contract_log "'$cmd' was retired with the wait-for-go gate: /watchover is itself the go, so run 'enter' to write the record in the same turn"
       return 2 ;;
     readback)
       [ "$#" -eq 0 ] || { fm_afk_contract_select_path "$@" >/dev/null; fm_afk_contract_usage >&2; return 2; }

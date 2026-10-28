@@ -3886,7 +3886,7 @@ test_unreadable_away_record_refuses_merge() {
 # longer holds.
 # away_change_script writes the change the gh mock attempts from inside the
 # forge call, which IS that window. Its body drives the real away-record
-# commands /afk and the return use, never a file edit, and takes a one-second
+# commands /watchover and the return use, never a file edit, and takes a one-second
 # lock bound so a contended case refuses quickly instead of waiting.
 away_change_script() {  # <case-dir> <name>; script body on stdin
   local case_dir=$1 name=$2 path
@@ -3903,7 +3903,7 @@ away_change_script() {  # <case-dir> <name>; script body on stdin
 }
 
 # Two away-record changes, each attempted from inside the merge's critical
-# section: the archive a captain return performs, and the replacement /afk with
+# section: the archive a captain return performs, and the replacement /watchover with
 # new words performs. Neither may land there, and the merge must still complete
 # on the authority it read.
 test_away_record_cannot_change_between_the_authority_read_and_the_merge() {

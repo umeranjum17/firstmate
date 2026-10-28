@@ -2026,15 +2026,15 @@ test_afk_turn_exemption() {
   dir=$(make_supercase afk-exempt)
   state="$dir/state"
   afk_enter "$state"
-  # /afk while already away must NOT self-cancel (re-entering/extending)
-  should_exit_afk "$state" "/afk" \
-    && fail "bare /afk should not exit afk"
-  should_exit_afk "$state" "/afk back in an hour" \
-    && fail "/afk with args should not exit afk"
+  # /watchover while already away must NOT self-cancel (re-entering/extending)
+  should_exit_afk "$state" "/watchover" \
+    && fail "bare /watchover should not exit afk"
+  should_exit_afk "$state" "/watchover back in an hour" \
+    && fail "/watchover with args should not exit afk"
   # a non-/afk skill invocation DOES exit (the captain is actively working)
   should_exit_afk "$state" "/no-mistakes" \
     || fail "non-afk skill should exit afk"
-  pass "/afk invocation is exempt from afk exit (no self-cancel)"
+  pass "/watchover invocation is exempt from afk exit (no self-cancel)"
 }
 
 test_should_exit_afk_when_afk_inactive() {

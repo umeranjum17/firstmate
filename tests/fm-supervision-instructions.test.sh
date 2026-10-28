@@ -81,8 +81,8 @@ test_supervision_host_protocol_on_every_arm_owner() {
     [ "$(printf '%s\n' "$body" | grep -c '^ *Only a wake the host hands back reaches you')" -eq 1 ] \
       || fail "$harness: the protocol must name exactly one wake path: $body"
     [ "$(printf '%s\n' "$body" | grep -c '^3\. ')" -eq 1 ] || fail "$harness: the protocol must say once how the park boundary arrives: $body"
-    [ "$(printf '%s\n' "$body" | grep -c '^6\. ./afk. writes only the record here')" -eq 1 ] \
-      || fail "$harness: the protocol must say once what /afk does here: $body"
+    [ "$(printf '%s\n' "$body" | grep -c '^6\. ./watchover. writes only the record here')" -eq 1 ] \
+      || fail "$harness: the protocol must say once what /watchover does here: $body"
   done
   rm -f "$config/supervision-host"
   plain=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness grok)
@@ -133,11 +133,11 @@ test_quiet_mode_stanzas() {
   mkdir -p "$home/state" "$config"
   out=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness codex --afk 1 --afk-mode quiet)
   assert_contains "$out" "- Quiet mode: active" "quiet stanza missing"
-  assert_contains "$out" "load /quiet" "quiet stanza did not name the /quiet skill"
+  assert_contains "$out" "load /radio-silence" "quiet stanza did not name the /radio-silence skill"
   assert_contains "$out" "Ordinary captain chat does NOT exit it" "quiet stanza lost the explicit-only exit rule"
   assert_not_contains "$out" "- Away mode: active" "quiet mode incorrectly rendered as away mode"
   out=$(FM_HOME="$home" "$RENDER" --harness codex --afk 1 --afk-mode quiet --repair-line)
-  assert_contains "$out" "Quiet mode owns watcher supervision; load /quiet" "quiet repair line did not name /quiet"
+  assert_contains "$out" "Quiet mode owns watcher supervision; load /radio-silence" "quiet repair line did not name /radio-silence"
 
   out=$(FM_HOME="$home" "$RENDER" --harness codex --afk 1)
   assert_contains "$out" "- Away mode: active" "omitting --afk-mode did not default to away (regression)"

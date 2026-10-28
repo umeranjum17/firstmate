@@ -116,7 +116,7 @@ fm_afk_flag_write() {  # <state-dir> [mode]
     pending attempt=0 status=1 mode
   mkdir -p "$state" || return 1
   [ ! -d "$state/.afk" ] || return 1
-  # An explicit mode is a caller's deliberate request (a fresh /afk or /quiet
+  # An explicit mode is a caller's deliberate request (a fresh /watchover or /radio-silence
   # entry). Omitted means "just refresh" (an already-running daemon, or
   # recovery re-entering generically) and PRESERVES whatever mode is already
   # on disk via fm_afk_mode - which itself falls back to "away" when nothing
