@@ -9,7 +9,7 @@ def canonical_url:
     or test("^https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+/-/merge_requests/[1-9][0-9]*$"));
 def sha: type == "string" and test("^[a-fA-F0-9]{40}$");
 def valid_record:
-  try (.schema == "jg-contributions.v1" and (.task | type == "string")
+  try ((.schema | IN("jg-contributions.v1","fm-contributions.v1")) and (.task | type == "string")
   and (.records | type == "array")
   and all(.records[]; (.url | canonical_url) and (.kind == "pr" or .kind == "issue")
     and (.pending | type == "array") and (.seen | type == "array")

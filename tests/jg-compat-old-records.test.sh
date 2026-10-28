@@ -76,4 +76,10 @@ for pair in "bin/fm-backend.sh:fm_meta_get" "bin/fm-backend.sh:fm_backend_of_met
   (. "$ROOT/$lib" >/dev/null 2>&1; declare -F "$fn" >/dev/null) || fail "$fn is not defined after sourcing $lib"
 done
 pass "old function names answer through the old library paths"
+# a per-lead pin left under the old directory name
+mkdir -p "$h/config/${legacy_lead}s/lead1"
+printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}s/lead1/harness"
+[ "$(JG_HOME="$h" JG_CONFIG_OVERRIDE="$h/config" bash "$ROOT/bin/jg-harness.sh" squad-lead-model lead1 2>&1)" = claude-haiku-5-5 ] \
+  || fail "an old config/${legacy_lead}s/<id>/harness pin is not read"
+pass "an old per-lead pin directory is still read"
 printf 'jg-compat-old-records passed\n'

@@ -50,4 +50,24 @@ else
   grep -q 'state/unknown.status' "$scratch/unknown" || { echo 'check did not list unknown.status' >&2; exit 1; }
   grep -q 'state/unknown2.status' "$scratch/unknown" || { echo 'check stopped before unknown2.status' >&2; exit 1; }
 fi
+old_lead=second
+old_lead+=mate
+lh=$scratch/lead
+mkdir -p "$lh"/{config/${old_lead}s/l1,state,data}
+printf 'claude claude-haiku-5-5 low\n' > "$lh/config/${old_lead}s/l1/harness"
+printf 'l1\n' > "$lh/.fm-${old_lead}-home"
+printf 'schema=fm-%s-parent.v1\nroute=remote\n' "$old_lead" > "$lh/.fm-${old_lead}-parent"
+printf '# main-authoritative. read-only in %s homes, must not be edited there. Ask the main first%s.\n' "$old_lead" "mate" > "$lh/data/captain-shared.md"
+cp -a "$lh" "$scratch/lead-before"
+bash "$root/bin/jg-migrate.sh" --home "$lh" --apply
+bash "$root/bin/jg-migrate.sh" --home "$lh" --verify
+grep -q '^l1$' "$lh/.jg-squad-lead-home"
+grep -q '^schema=jg-squad-lead-parent.v1$' "$lh/.jg-squad-lead-parent"
+grep -q 'read-only in squad_lead homes' "$lh/data/captain-shared.md"
+grep -q 'main juggernaut' "$lh/data/captain-shared.md"
+grep -q 'claude-haiku-5-5' "$lh/config/squad_leads/l1/harness"
+[ ! -e "$lh/.fm-${old_lead}-home" ] && [ ! -e "$lh/.fm-${old_lead}-parent" ] && [ ! -e "$lh/config/${old_lead}s" ] \
+  || { echo 'migrator left an old marker or pin directory' >&2; exit 1; }
+bash "$root/bin/jg-migrate.sh" --home "$lh" --rollback
+diff -r "$scratch/lead-before" "$lh"
 printf 'jg-migrate integration passed\n'

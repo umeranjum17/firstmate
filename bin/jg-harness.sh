@@ -484,7 +484,7 @@ squad_lead_line() {
     case "$SQUAD_LEAD_ID" in
       ''|.*|*[!a-zA-Z0-9._-]*) echo "error: invalid squad_lead id '$SQUAD_LEAD_ID'" >&2; return 1 ;;
     esac
-    file="$CONFIG/squad_leads/$SQUAD_LEAD_ID/harness"
+    file="$(jg_compat_pick "$CONFIG/squad_leads")/$SQUAD_LEAD_ID/harness"
     if [ -e "$file" ] || [ -L "$file" ]; then
       pinned=1
       [ -f "$file" ] && [ -r "$file" ] || { echo "error: unreadable squad_lead pin $file" >&2; return 1; }

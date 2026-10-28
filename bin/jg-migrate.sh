@@ -17,7 +17,14 @@ RULES = (
     (re.compile(r"config/crew"), re.compile(rb"^(FM_MODEL=)([^\r\n]*)$", re.M), rb"JG_MODEL=\2"),
     (re.compile(r"state/[^/]+\.status"), re.compile(rb"^fm-open-decision:" , re.M), b"jg-open-decision:"),
     (re.compile(r"data/records"), re.compile(rb"^projects/firstmate-addons$", re.M), b"projects/juggernaut-addons"),
+    # The shared captain-preference header phrases the inheritance check requires.
+    (re.compile(r"data/captain-shared\.md"), re.compile(rb"read-only in secondmate homes"), b"read-only in squad_lead homes"),
+    (re.compile(r"data/captain-shared\.md"), re.compile(rb"main firstmate"), b"main juggernaut"),
 )
+# Renames: the lead-home markers (with the parent marker's schema line) and the per-lead pin directories.
+MARKERS = ((".fm-secondmate-home", ".jg-squad-lead-home"), (".fm-secondmate-parent", ".jg-squad-lead-parent"))
+MARKER_SCHEMA = (re.compile(rb"^schema=fm-secondmate-parent\.v1$", re.M), b"schema=jg-squad-lead-parent.v1")
+PIN_DIRS = ("config/secondmates", "config/squad_leads")
 LEGACY = re.compile(rb"FIRSTMATE_OP:|FIRSTMATE|firstmate-addons|firstmate|secondmate|crewmate|second mate|first mate|FM_|fm-|fm_")
 KNOWN_NONRECORDS = (re.compile(r"state/model-gate\.check\.sh"),)
 # An old script path, environment name, function name, add-ons path or operational-input marker
@@ -73,8 +80,7 @@ def transform(path, raw):
     updated = raw
     if not supported and any(pattern.fullmatch(rel) for pattern in KNOWN_NONRECORDS):
         return updated
-    if supported:
-        _, field, replacement = supported[0]
+    for _, field, replacement in supported:
         updated = field.sub(replacement, updated)
     if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
         return updated
@@ -125,8 +131,28 @@ def files():
         raise ValueError('\nunknown: '.join(unknown))
     return found
 
+def moves():
+    found = []
+    for old, new in MARKERS:
+        src, dst = home / old, home / new
+        if src.is_symlink() or not src.is_file():
+            continue
+        if dst.exists() or dst.is_symlink():
+            raise ValueError(f'rename target exists: {new}')
+        found.append((src, dst, MARKER_SCHEMA[0].sub(MARKER_SCHEMA[1], src.read_bytes())))
+    old_dir, new_dir = (home / d for d in PIN_DIRS)
+    if old_dir.is_dir() and not old_dir.is_symlink():
+        for src in sorted(old_dir.iterdir()):
+            dst = new_dir / src.name
+            if dst.exists() or dst.is_symlink():
+                raise ValueError(f'rename target exists: {dst.relative_to(home)}')
+            if src.is_dir() and not src.is_symlink():
+                found.append((src, dst, None))
+    return found
+
 try:
     changes = files()
+    renames = moves()
 except (OSError, ValueError) as e:
     print(f'unknown: {e}', file=sys.stderr)
     sys.exit(3)
@@ -134,18 +160,20 @@ except (OSError, ValueError) as e:
 if a.check:
     for path, _, _ in changes:
         print(path.relative_to(home))
-    if not changes:
+    for src, dst, _ in renames:
+        print(f'{src.relative_to(home)} -> {dst.relative_to(home)}')
+    if not changes and not renames:
         print('no rewrites required')
     sys.exit(0)
 if a.verify:
-    if changes:
-        print('not migrated: ' + ', '.join(str(x[0].relative_to(home)) for x in changes), file=sys.stderr)
+    if changes or renames:
+        print('not migrated: ' + ', '.join(str(x[0].relative_to(home)) for x in changes + renames), file=sys.stderr)
         sys.exit(1)
     print('verified: no supported legacy names remain')
     sys.exit(0)
 if a.apply:
     if journal.exists():
-        if not changes:
+        if not changes and not renames:
             print('already applied')
             sys.exit(0)
         print('existing journal does not match current home', file=sys.stderr)
@@ -155,6 +183,9 @@ if a.apply:
         for part in ('config', 'state', 'data'):
             archive.add(home / part, arcname=part, recursive=True,
                         filter=lambda info: None if '.jg-migration' in pathlib.PurePosixPath(info.name).parts else info)
+        for old, _ in MARKERS:
+            if (home / old).is_file():
+                archive.add(home / old, arcname=old)
     for path, _, updated in changes:
         fd, temp = tempfile.mkstemp(dir=path.parent, prefix='.jg-migrate-')
         try:
@@ -167,7 +198,19 @@ if a.apply:
         finally:
             if os.path.exists(temp):
                 os.unlink(temp)
-    print(f'applied {len(changes)} rewrites; journal: {journal.relative_to(home)}')
+    for src, dst, updated in renames:
+        if updated is None:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(src, dst)
+        else:
+            dst.write_bytes(updated)
+            shutil.copystat(src, dst)
+            src.unlink()
+    try:
+        (home / PIN_DIRS[0]).rmdir()
+    except OSError:
+        pass
+    print(f'applied {len(changes) + len(renames)} rewrites; journal: {journal.relative_to(home)}')
     sys.exit(0)
 if a.rollback:
     if not journal.is_file():
@@ -175,6 +218,19 @@ if a.rollback:
         sys.exit(1)
     with tarfile.open(journal, 'r:gz') as archive:
         archive.extractall(home, filter='data')
+    # The apply refuses an existing target, so a target beside a restored source is the migrated copy.
+    for old, new in MARKERS:
+        if (home / old).is_file() and (home / new).is_file():
+            (home / new).unlink()
+    old_dir, new_dir = (home / d for d in PIN_DIRS)
+    if old_dir.is_dir() and new_dir.is_dir():
+        for src in old_dir.iterdir():
+            if (new_dir / src.name).is_dir():
+                shutil.rmtree(new_dir / src.name)
+        try:
+            new_dir.rmdir()
+        except OSError:
+            pass
     journal.unlink()
     try:
         mig.rmdir()
