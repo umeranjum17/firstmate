@@ -27,7 +27,7 @@ export HOME=$d/user XDG_CONFIG_HOME=$d/xdg-config XDG_DATA_HOME=$d/xdg-data TMPD
 mkdir -p "$HOME" "$TMPDIR" "$d/fork" "$d/fakebin" "$d/empty"
 cp -a "$JG_TEST_FORK/bin" "$JG_TEST_FORK/tests" "$d/fork/"
 python3 "$addons/lead-wake/tests/stage-step-b.py" "$d/fork/bin"
-cp "$addons/lead-wake/tests/jg-lead-wake.test.sh" "$d/fork/tests/"
+cp "$addons/lead-wake/tests/jg-lead-wake.test.sh" "$addons/lead-wake/tests/lead-wake-harness.sh" "$d/fork/tests/"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$d/fakebin/tmux"
 printf '#!/usr/bin/env bash\necho "state: unknown · source: none · fake default"\n' > "$d/fakebin/jg-crew-state.sh"
 chmod +x "$d/fakebin/"*

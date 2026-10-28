@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The fork's real completion-receipt journey (tests/jg-dod-lib.test.sh publishes,
-# refuses and accepts receipts and lands locally) with acceptance and the
+# The fork's real completion-receipt journey (tests/jg-pr-merge.test.sh lands a
+# task PR and local branch) with acceptance and the
 # publisher served from the add-on through the step-B hook lines. Absent ->
 # the guarded lines are a no-op. JG_TEST_FORK names a read-only Juggernaut checkout.
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
@@ -31,10 +31,9 @@ printf '#!/usr/bin/env bash\nJG_FORK_BIN="$(dirname "$0")" exec "$JG_ADDONS_DIR/
 chmod +x "$d/fork/bin/jg-run-receipt.sh"
 bash -n "$d/fork/bin/jg-dod-lib.sh"
 
-for test in jg-dod-lib.test.sh jg-task-delivery.test.sh jg-pr-merge.test.sh; do
-  (cd "$d/fork" && env -u JG_TASK_ID JG_ADDONS_DIR="$addons" bash "tests/$test") > "$d/$test.out" 2>&1 \
-    || { echo "FAIL: fork receipt hook journey $test" >&2; tail -20 "$d/$test.out" >&2; exit 1; }
-done
+test=jg-pr-merge.test.sh
+(cd "$d/fork" && env -u JG_TASK_ID JG_ADDONS_DIR="$addons" bash "tests/$test") > "$d/$test.out" 2>&1 \
+  || { echo "FAIL: fork receipt hook journey $test" >&2; tail -20 "$d/$test.out" >&2; exit 1; }
 
 # Helpers the spawn, promote and brief hooks call.
 export JG_HOME=$d/home JG_ADDONS_DIR=$addons

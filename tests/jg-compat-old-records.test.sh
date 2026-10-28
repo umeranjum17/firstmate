@@ -93,4 +93,28 @@ printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}s/lead1/harnes
 [ "$(JG_HOME="$h" JG_CONFIG_OVERRIDE="$h/config" bash "$ROOT/bin/jg-harness.sh" squad-lead-model lead1 2>&1)" = claude-haiku-5-5 ] \
   || fail "an old config/${legacy_lead}s/<id>/harness pin is not read"
 pass "an old per-lead pin directory is still read"
+# a saved contribution record under the old schema name
+rec='{"schema":"fm-contributions.v1","task":"t","records":[]}'
+prog=$(cat "$ROOT/bin/jg-contributions.jq"; printf '\nvalid_record\n')
+printf '%s' "$rec" | jq -e "$prog" >/dev/null \
+  || fail "a record saved under fm-contributions.v1 is treated as unreadable"
+pass "an old contribution record is still readable"
+# the migrator renames a lead home's markers, header wording and pin directory, and rolls back exactly
+lh=$h/leadhome
+mkdir -p "$lh"/config/"${legacy_lead}"s/l1 "$lh"/state "$lh"/data
+printf 'claude claude-haiku-5-5 low\n' > "$lh/config/${legacy_lead}s/l1/harness"
+printf 'l1\n' > "$lh/.fm-${legacy_lead}-home"
+printf 'schema=fm-%s-parent.v1\nroute=remote\n' "$legacy_lead" > "$lh/.fm-${legacy_lead}-parent"
+printf '# main-authoritative. read-only in %s homes, must not be edited there. Ask the main first%s.\n' "$legacy_lead" mate > "$lh/data/captain-shared.md"
+cp -a "$lh" "$h/leadhome-before"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --apply >/dev/null 2>&1 || fail "migrator apply failed on an old lead home"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --verify >/dev/null 2>&1 || fail "migrator verify failed on an old lead home"
+grep -q '^l1$' "$lh/.jg-squad-lead-home" && grep -q '^schema=jg-squad-lead-parent.v1$' "$lh/.jg-squad-lead-parent" \
+  && grep -q 'read-only in squad_lead homes' "$lh/data/captain-shared.md" \
+  && grep -q 'claude-haiku-5-5' "$lh/config/squad_leads/l1/harness" \
+  && [ ! -e "$lh/.fm-${legacy_lead}-home" ] && [ ! -e "$lh/.fm-${legacy_lead}-parent" ] && [ ! -e "$lh/config/${legacy_lead}s" ] \
+  || fail "the migrator left an old marker, header wording or pin directory"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --rollback >/dev/null 2>&1 || fail "migrator rollback failed"
+diff -r "$h/leadhome-before" "$lh" >/dev/null || fail "rollback did not restore the old lead home"
+pass "the migrator renames old lead records and rolls back exactly"
 printf 'jg-compat-old-records passed\n'

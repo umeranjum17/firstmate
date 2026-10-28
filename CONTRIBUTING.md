@@ -55,7 +55,7 @@ Verify missing or red checks prevent ordinary merging without creating a test me
 
 `bin/jg-ci-scope.sh` owns which changes need the behavior lanes.
 A change touching only documentation, media assets, or the license runs `Repo invariants` and `CI required`, which still prove the repo invariants, the complete-regression partition, the linted workflows, and the documentation inventory.
-Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS snapshot, so a code change can never lose a behavior gate to a path filter.
+Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS parse check, so a code change can never lose a behavior gate to a path filter.
 The scope is a job-level condition, never a trigger `paths:` filter: a filtered-out workflow leaves its required check pending forever, while a false condition reports a skip `CI required` accepts.
 
 ## Repo conventions

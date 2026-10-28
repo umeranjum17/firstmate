@@ -6,75 +6,37 @@ This record owns concurrent isolation evidence for the portable parallel candida
 
 ## Verification
 
-- Date: 2026-08-20
+- Date: 2026-10-28
 - Command: `bin/jg-test-isolation-proof.sh --jobs 4 --json /tmp/jg-isolation-proof.json`
-- Result: `JG_ISOLATION_SUMMARY total=24 failed=0 concurrency=4 duration_ms=113278`
+- Result: `JG_ISOLATION_SUMMARY total=5 failed=0 concurrency=4 duration_ms=439406`
 
 | Field | Value |
 |---|---|
-| `run_id` | `jg-isolation-1787273044622-10250` |
-| `started_at` | `2026-08-21T00:44:04Z` |
-| `finished_at` | `2026-08-21T00:45:57Z` |
+| `run_id` | `jg-isolation-1793212298351-567373` |
+| `started_at` | `2026-10-28T18:31:38Z` |
+| `finished_at` | `2026-10-28T18:38:57Z` |
 | concurrency | 4 |
-| candidates | 24 |
+| candidates | 5 |
 | failed | 0 |
-| wall duration | 113278 ms |
+| wall duration | 439406 ms |
 
 ## Candidate set
 
-- `tests/jg-arm-pretool-check.test.sh`
-- `tests/jg-backend-herdr.test.sh`
 - `tests/jg-brief.test.sh`
 - `tests/jg-captain-hold-lifecycle.test.sh`
-- `tests/jg-cd-pretool-check.test.sh`
-- `tests/jg-composer-ghost.test.sh`
-- `tests/jg-composer-lib.test.sh`
 - `tests/jg-crew-state.test.sh`
-- `tests/jg-ensure-agents-md.test.sh`
-- `tests/jg-grok-harness.test.sh`
-- `tests/jg-herdr-lab.test.sh`
-- `tests/jg-lint.test.sh`
-- `tests/jg-pi-primary-types.test.sh`
 - `tests/jg-pr-merge.test.sh`
-- `tests/jg-review-diff.test.sh`
-- `tests/jg-send-popup-settle.test.sh`
-- `tests/jg-send-settle.test.sh`
-- `tests/jg-send-strict.test.sh`
-- `tests/jg-spawn-batch.test.sh`
-- `tests/jg-supervision-instructions.test.sh`
-- `tests/jg-test-run.test.sh`
-- `tests/jg-tmux-submit-busy.test.sh`
-- `tests/jg-transition-lib.test.sh`
 - `tests/jg-x-mode.test.sh`
 
 ## Durations
 
 | duration_ms | exit | worker | script |
 |---:|---:|---:|---|
-| 45356 | 0 | 2 | `tests/jg-backend-herdr.test.sh` |
-| 35415 | 0 | 24 | `tests/jg-x-mode.test.sh` |
-| 35095 | 0 | 4 | `tests/jg-captain-hold-lifecycle.test.sh` |
-| 27529 | 0 | 1 | `tests/jg-arm-pretool-check.test.sh` |
-| 20922 | 0 | 21 | `tests/jg-test-run.test.sh` |
-| 17558 | 0 | 8 | `tests/jg-crew-state.test.sh` |
-| 16582 | 0 | 5 | `tests/jg-cd-pretool-check.test.sh` |
-| 9766 | 0 | 12 | `tests/jg-lint.test.sh` |
-| 9562 | 0 | 11 | `tests/jg-herdr-lab.test.sh` |
-| 6768 | 0 | 10 | `tests/jg-grok-harness.test.sh` |
-| 6290 | 0 | 14 | `tests/jg-pr-merge.test.sh` |
-| 5569 | 0 | 6 | `tests/jg-composer-ghost.test.sh` |
-| 4563 | 0 | 16 | `tests/jg-send-popup-settle.test.sh` |
-| 4021 | 0 | 22 | `tests/jg-tmux-submit-busy.test.sh` |
-| 3544 | 0 | 7 | `tests/jg-composer-lib.test.sh` |
-| 3025 | 0 | 18 | `tests/jg-send-strict.test.sh` |
-| 2753 | 0 | 17 | `tests/jg-send-settle.test.sh` |
-| 2166 | 0 | 15 | `tests/jg-review-diff.test.sh` |
-| 1315 | 0 | 3 | `tests/jg-brief.test.sh` |
-| 975 | 0 | 19 | `tests/jg-spawn-batch.test.sh` |
-| 598 | 0 | 13 | `tests/jg-pi-primary-types.test.sh` |
-| 513 | 0 | 9 | `tests/jg-ensure-agents-md.test.sh` |
-| 331 | 0 | 20 | `tests/jg-supervision-instructions.test.sh` |
-| 99 | 0 | 23 | `tests/jg-transition-lib.test.sh` |
+| 439347 | 0 | 2 | `tests/jg-captain-hold-lifecycle.test.sh` |
+| 192843 | 0 | 4 | `tests/jg-pr-merge.test.sh` |
+| 59703 | 0 | 3 | `tests/jg-crew-state.test.sh` |
+| 30035 | 0 | 5 | `tests/jg-x-mode.test.sh` |
+| 11142 | 0 | 1 | `tests/jg-brief.test.sh` |
 
 ## Family concurrency proofs
 

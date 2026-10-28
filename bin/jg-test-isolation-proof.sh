@@ -119,59 +119,31 @@ now_ms() {
 # evidence; do not re-add a basename without clearing its reason.
 exclusion_reason() {
   case "$1" in
-    jg-test-isolation-proof.test.sh)
-      printf '%s\n' 'isolation-proof harness contract itself; must not re-enter concurrent matrix'
-      ;;
     jg-backend-tmux-smoke.test.sh)
       printf '%s\n' 'real tmux on a private socket; keep exclusive of default-server contention class'
       ;;
-    jg-backend.test.sh)
-      printf '%s\n' 'old-vs-new main checkout diff fixture; gray-zone concurrent git/worktree cost'
-      ;;
-    jg-spawn-dispatch-profile.test.sh|jg-spawn-worktree-settle.test.sh|jg-trace-context-spawn.test.sh)
+    jg-spawn-dispatch-profile.test.sh)
       printf '%s\n' 'real isolated git worktrees plus spawn settle loops; gray zone until dedicated proof'
-      ;;
-    jg-pr-check-security.test.sh)
-      printf '%s\n' 'watcher lock / migration / poll security surface; intentional shared-lock class'
       ;;
     jg-teardown.test.sh)
       printf '%s\n' 'landed-work + lock-race teardown matrix; keep serial with forge/git stress peers'
       ;;
-    jg-herdr-session-cleanup.test.sh)
-      printf '%s\n' 'session-start task/presentation lock matrix; keep serial until dedicated concurrent proof'
-      ;;
-    jg-daemon.test.sh|jg-guard-stale-banner.test.sh|jg-pi-watch-extension.test.sh|\
-    jg-supervision-events.test.sh|jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
-    jg-wake-queue.test.sh|jg-watch-checkpoint.test.sh|jg-watch-triage.test.sh|\
+    jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
     jg-watcher-lock.test.sh)
       printf '%s\n' 'watcher/wake/lock family; intentional process locks and daemon races'
       ;;
-    jg-afk-inject-e2e.test.sh|jg-afk-return.test.sh|jg-afk-inject-herdr-e2e.test.sh|\
-    jg-afk-launch.test.sh)
+    jg-afk-inject-e2e.test.sh|jg-afk-inject-herdr-e2e.test.sh)
       printf '%s\n' 'AFK lifecycle / inject path; exclusive daemon and pane control'
       ;;
-    jg-afk-pi-herdr-return-e2e.test.sh|\
     jg-codex-continuity-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
     jg-opencode-primary-live-e2e.test.sh|jg-pi-primary-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-squad-lead-marker-herdr-e2e.test.sh|\
-    jg-sessionstart-instruction-refresh-live-e2e.test.sh)
+    jg-quota-array-dispatch-live-e2e.test.sh)
       printf '%s\n' 'live harness opt-in; never default parallel CI'
       ;;
-    jg-backend-autodetect-smoke.test.sh|jg-backend-herdr-eventwait-smoke.test.sh|\
     jg-backend-herdr-presentation-e2e.test.sh|jg-backend-herdr-prune-safety-e2e.test.sh|\
     jg-backend-herdr-respawn-idem-e2e.test.sh|jg-backend-herdr-smoke.test.sh|\
-    jg-backend-herdr-agent-exit-shell-e2e.test.sh|\
     jg-backend-herdr-workspace-per-home-e2e.test.sh|jg-herdr-session-cleanup-e2e.test.sh)
       printf '%s\n' 'real Herdr-gated; Herdr lane is a later phase'
-      ;;
-    jg-backend-cmux.test.sh|jg-backend-cmux-smoke.test.sh)
-      printf '%s\n' 'cmux GUI backend; never parallel with another cmux mutator'
-      ;;
-    jg-backend-zellij.test.sh|jg-backend-zellij-smoke.test.sh)
-      printf '%s\n' 'zellij optional backend; keep out of pure parallel pool'
-      ;;
-    jg-backend-orca.test.sh)
-      printf '%s\n' 'orca backend surface; keep serial until dedicated isolation proof'
       ;;
     *)
       return 1
@@ -183,29 +155,10 @@ exclusion_reason() {
 # path requires a new audit and proof archive.
 list_parallel_candidates() {
   cat <<'EOF'
-tests/jg-arm-pretool-check.test.sh
-tests/jg-backend-herdr.test.sh
 tests/jg-brief.test.sh
 tests/jg-captain-hold-lifecycle.test.sh
-tests/jg-cd-pretool-check.test.sh
-tests/jg-composer-ghost.test.sh
-tests/jg-composer-lib.test.sh
 tests/jg-crew-state.test.sh
-tests/jg-ensure-agents-md.test.sh
-tests/jg-grok-harness.test.sh
-tests/jg-herdr-lab.test.sh
-tests/jg-lint.test.sh
-tests/jg-pi-primary-types.test.sh
 tests/jg-pr-merge.test.sh
-tests/jg-review-diff.test.sh
-tests/jg-send-popup-settle.test.sh
-tests/jg-send-settle.test.sh
-tests/jg-send-strict.test.sh
-tests/jg-spawn-batch.test.sh
-tests/jg-supervision-instructions.test.sh
-tests/jg-test-run.test.sh
-tests/jg-tmux-submit-busy.test.sh
-tests/jg-transition-lib.test.sh
 tests/jg-x-mode.test.sh
 EOF
 }
@@ -219,19 +172,12 @@ list_exclusions_for_report() {
       printf '%s\t%s\n' "$base" "$reason"
     fi
   done <<'EOF'
-jg-test-isolation-proof.test.sh
 jg-backend-tmux-smoke.test.sh
-jg-backend.test.sh
 jg-spawn-dispatch-profile.test.sh
-jg-spawn-worktree-settle.test.sh
-jg-trace-context-spawn.test.sh
-jg-pr-check-security.test.sh
 jg-teardown.test.sh
 jg-watcher-lock.test.sh
-jg-wake-queue.test.sh
 jg-afk-inject-e2e.test.sh
 jg-backend-herdr-smoke.test.sh
-jg-backend-cmux-smoke.test.sh
 jg-pi-primary-live-e2e.test.sh
 jg-quota-array-dispatch-live-e2e.test.sh
 EOF
