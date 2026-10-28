@@ -6,7 +6,7 @@
 # $GITHUB_OUTPUT: true when the lint and behavior lanes are needed.
 #
 #   git diff --name-only <base> <head> | fm-ci-scope.sh
-#   fm-ci-scope.sh --full    # a main push, or a diff CI could not read
+#   fm-ci-scope.sh --full    # a diff CI could not read
 #
 # The classification is an allowlist of paths that cannot change executable
 # behavior; everything else, including any path this script does not recognize,
