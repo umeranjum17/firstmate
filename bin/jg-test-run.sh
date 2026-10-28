@@ -332,7 +332,7 @@ family_for_basename() {
     jg-composer-matrix-live-e2e.test.sh|jg-codex-continuity-live-e2e.test.sh|\
     jg-codex-hook-layer-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
     jg-cursor-primary-live-e2e.test.sh|jg-harness-adapter-instructions-live-e2e.test.sh|\
-    jg-harness-liveness-drift-live-e2e.test.sh|jg-devin-signals-live-e2e.test.sh|\
+    jg-devin-signals-live-e2e.test.sh|\
     jg-muse-signals-live-e2e.test.sh|jg-rovo-signals-live-e2e.test.sh|\
     jg-agy-signals-live-e2e.test.sh|jg-launch-prompt-signals-live-e2e.test.sh|\
     jg-pi-seeded-home-trust-live-e2e.test.sh|jg-herdr-version-floor-live-e2e.test.sh|\
@@ -564,7 +564,6 @@ tests/jg-fleet-sync.test.sh 40541
 tests/jg-gate-refuse.test.sh 9953
 tests/jg-grok-continuity-live-e2e.test.sh 46
 tests/jg-harness-adapter-instructions-live-e2e.test.sh 72
-tests/jg-harness-liveness-drift-live-e2e.test.sh 1309
 tests/jg-herdr-version-floor-live-e2e.test.sh 50
 tests/jg-inbox.test.sh 6062
 tests/jg-launch-prompt-signals-live-e2e.test.sh 50
