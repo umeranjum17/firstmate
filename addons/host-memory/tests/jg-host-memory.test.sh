@@ -22,8 +22,6 @@ export HOME="$d/home" TMPDIR="$d/tmp" XDG_CONFIG_HOME="$d/config" XDG_DATA_HOME=
 export JG_TEST_SKIP_ORPHAN_REAP=1 JG_ADDONS_DIR="$addons" JG_BACKEND=tmux TMUX=''
 unset JG_HOME JG_ROOT_OVERRIDE JG_STATE_OVERRIDE JG_CONFIG_OVERRIDE JG_TEST_LIB_SOURCED
 cd "$d/fork"
-echo '=== current fork with add-on checkout available (no hook installed yet) ==='
-bash tests/jg-jev-mem-guard.test.sh
 # Apply prospective sampler seams ONLY in our scratch clone; tests assert behavior, not source bytes.
 python3 - "$addons" <<'PY'
 import pathlib
@@ -44,8 +42,6 @@ p.write_text(s)
 pathlib.Path('bin/jg-host-memory-sampler.sh').write_text(
     '. "${JG_ADDONS_DIR}/host-memory/bin/jg-host-memory-lib.sh"\n')
 PY
-echo '=== relocated add-on sampler through optional watcher seam ==='
-bash tests/jg-jev-mem-guard.test.sh
 export JG_ADDON_TEST_ROOT="$addons" JG_ADDON_ABSENT_ROOT="$d/absent-addons"
 echo '=== ordinary watcher check with present and absent add-on ==='
 bash -s <<'SH'

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The fork's lead-wake cases (tests/jg-watch-triage.test.sh: idle lead, lane floor, transient
-# empty, withdraw, full-but-idle; tests/jg-wake-queue.test.sh: drain ring), carried so the fork
+# The fork's lead-wake cases (idle lead, lane floor, transient
+# empty, withdraw, full-but-idle, drain ring), carried so the fork
 # can drop them. lead-wake-e2e.sh runs this from a staged fork's tests/ on the fork's wake harness,
 # which Kun's suites keep. Needs tasks-axi. `ring` runs only the ring case; RING_TEXT sets its steer.
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
@@ -16,13 +16,8 @@ set -u
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=/dev/null
 . "$here/wake-helpers.sh"
-borrow() {  # <suite> <function>...: define the named harness functions from a fork suite
-  local suite=$here/$1 n; shift
-  for n; do eval "$(sed -n "/^$n() *{/,/^}/p" "$suite")"; done
-}
-borrow jg-watch-triage.test.sh ack_stopped_cycle watch_bg wait_poll_cycle reap file_mtime
-borrow jg-wake-queue.test.sh squad_lead_stall_watch_leg stall_watch_beat_epoch stall_watch_has_wake \
-  stall_watch_record_met install_squad_lead_alive_tmux install_squad_lead_stall_date
+# shellcheck source=addons/lead-wake/tests/lead-wake-harness.sh
+. "$here/lead-wake-harness.sh"
 # shellcheck disable=SC2034 # WATCH and TMP_ROOT are read by the borrowed fork harness.
 WATCH="$ROOT/bin/jg-watch.sh" DRAIN="$ROOT/bin/jg-wake-drain.sh" TASKS="$ROOT/bin/jg-tasks-axi.sh" TMP_ROOT=$(jg_test_tmproot jg-lead-wake-tests)
 WORKING='state: working · source: run-step · validating (running)'

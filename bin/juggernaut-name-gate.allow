@@ -419,23 +419,15 @@ bin/fm-merge-gate-lib.sh  # alias for bin/jg-merge-gate-lib.sh; called by live h
 bin/fm-pin-lib.sh  # alias for bin/jg-pin-lib.sh; called by live homes, panes and per-lane records
 bin/fm-tool-wiring.sh  # alias for bin/jg-tool-wiring.sh; called by live homes, panes and per-lane records
 addons/quota-axi-pool/tests/quota-axi-pool-recursion.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
-tests/jg-tool-wiring.test.sh  # inline FM_ alias (slice S4); deleted by slice S10
 bin/fm-ci-required.sh  # alias for bin/jg-ci-required.sh; called by live homes, panes and per-lane records
 bin/fm-ci-scope.sh  # alias for bin/jg-ci-scope.sh; called by live homes, panes and per-lane records
-tests/jg-backend.test.sh  # adapt_old_names rewrites the old words in a pre-rename baseline, so it must name them; deleted by slice S10
 bin/fm-addons-dir-lib.sh  # alias for bin/jg-addons-dir-lib.sh
 addons/install-all.sh  # inline jg-compat env alias
 addons/model-gate/bin/jg-model-gate-lib.sh  # inline jg-compat env alias
 addons/model-gate/install.sh  # inline jg-compat env alias
 addons/model-gate/tests/model-gate.test.sh  # inline jg-compat env alias
-tests/jg-addons-dir.test.sh  # inline jg-compat env alias
-tests/jg-one-install.test.sh  # inline jg-compat env alias
 install.sh  # inline jg-compat env alias
-tests/jg-supervision-host-late.test.sh  # inline jg-compat env alias
 bin/jg-migrate.sh  # the migrator names the old spellings it rewrites; they are its data
-tests/jg-migrate.test.sh  # fixtures in the old spellings the migrator rewrites
-tests/jg-ai-engine.test.sh  # inline jg-compat env alias
-tests/juggernaut-axi.test.sh  # inline jg-compat env alias
 addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env alias
 .agents/skills/updatefirstmate/SKILL.md  # old skill name kept as an alias stub until S10
 .agents/skills/secondmate-provisioning/SKILL.md  # old skill name kept as an alias stub until S10
@@ -444,6 +436,5 @@ addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env 
 .agents/skills/firstmate-self-repo/SKILL.md  # old skill name kept as an alias stub until S10
 .agents/skills/firstmate-orca/SKILL.md  # old skill name kept as an alias stub until S10
 .agents/skills/firstmate-codexapp/SKILL.md  # old skill name kept as an alias stub until S10
-tests/jg-skill-rename-aliases.test.sh  # names the old skill spellings it proves still alias
 tests/jg-compat-old-records.test.sh  # builds old-name records to prove the read fallbacks; deleted by S10
 docs/documentation-audiences.json  # classifies the seven retired alias skills by their old paths
