@@ -77,10 +77,10 @@ Full detail on every feature lives in [docs/architecture.md](docs/architecture.m
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.svg">
-    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.svg">
-    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.svg">
-    <img src="assets/diagrams/how-it-works-light.svg" width="100%" alt="The chain of command: Captain to Overwatch to Squad Leads to Operators to Work to Outcomes. Each Squad Lead owns its Operators, and Squad Leads are optional for small fleets.">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-mobile-dark.png">
+    <source media="(max-width: 600px)" srcset="assets/diagrams/how-it-works-mobile-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/how-it-works-dark.png">
+    <img src="assets/diagrams/how-it-works-light.png" width="100%" alt="Chain of command: the Captain sets the objective, Overwatch plans the work and keeps watch, optional Squad Leads own a project and its Operators, Operators each run one mission in an isolated work copy, and the work moves from brief to work copy, validation, pull request and merge. Outcomes are a pull request, a merged change or a report, ending in objective secured.">
   </picture>
 </p>
 
