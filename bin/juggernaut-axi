@@ -2,7 +2,10 @@
 # juggernaut-axi - bounded, read-only fleet facts for external tools (AXI style).
 #
 # The approved design (data/juggernaut-axi/report.md), read-only commands so far:
-# `status`, `tickets`, `decisions`, and `messages` (a task's steering-inbox records). Like bin/fm-bearings-snapshot.sh it projects the canonical JSON model
+# `status`, `tickets`, `decisions`, and `messages` (a task's steering-inbox records),
+# plus the three writes `answer`, `message`, and `ticket`, each delegated to an existing
+# guarded path (fm-captain-hold.sh, fm-send.sh, fm-tasks-axi.sh); it never closes tasks
+# or writes state itself, and a result claims only what the durable record confirms. Like bin/fm-bearings-snapshot.sh it projects the canonical JSON model
 # (fm-bearings-snapshot.sh / fm-fleet-snapshot.sh --json) and renders TOON at the
 # output boundary (bin/fm-toon-lib.sh); `--json` prints the same model.
 # Output contract: `juggernaut-axi.v1`; consumers ignore unknown fields.
@@ -20,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION=0.1.0
 TICKETS_MAX=100
 MESSAGE_BYTES=8192
+HOME_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 STATE=${FM_STATE_OVERRIDE:-${FM_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}/state}
 
 usage() {
@@ -35,6 +39,13 @@ commands:
   messages <task-id> [--limit <n>]
                          newest steering messages for one known task (default 20,
                          at most 100; bodies cut at 8 KiB)
+  answer <task-id> <answer> [--release]
+                         record the captain's answer to an open decision
+  message <task-id> <text>
+                         append a steering message to one known task (text of
+                         at most 8 KiB, not starting with / or $)
+  ticket <title> [--repo <name>] [--kind <ship|scout|docs>] [--priority <0-3>]
+                         queue a new ticket (never starts work)
 
 TOON by default; --json prints the same versioned model (juggernaut-axi.v1).
 Errors go to stderr with a nonzero exit. Omitted rows are counted in omitted[].
@@ -130,6 +141,80 @@ cmd_messages() {
      omitted: (if $total > $limit then [{surface: "older messages", count: ($total - $limit), reveal: "--limit <n> (at most 100)"}] else [] end)}'
 }
 
+write_result() {  # <action> <task> <confirmed true|false> <note>
+  jq -nc --arg action "$1" --arg task "$2" --argjson confirmed "$3" --arg note "$4" \
+    '{schema: "juggernaut-axi.v1", view: "write", action: $action, task: $task, ok: true, confirmed: $confirmed, note: $note}'
+}
+
+known_task_id() {  # <id> - shape only; callers prove the task exists
+  case "$1" in ""|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) die "invalid task id" ;; esac
+}
+
+cmd_answer() {
+  local task="" text="" mode="" f
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --release) mode=--release ;;
+      -*) die "unknown answer argument: $1" ;;
+      *) if [ -z "$task" ]; then task=$1; elif [ -z "$text" ]; then text=$1; else die "answer takes a task id and one answer"; fi ;;
+    esac
+    shift
+  done
+  known_task_id "$task"
+  [ -n "$text" ] || die "answer needs the answer text"
+  [ "$(printf '%s' "$text" | wc -c)" -le 8192 ] || die "answer is over 8192 bytes"
+  "$HOME_ROOT/bin/fm-captain-hold.sh" open "$task" >/dev/null || die "$task is not an open captain decision"
+  f=$(mktemp) || exit 1
+  printf '%s\n' "$text" > "$f"
+  "$HOME_ROOT/bin/fm-captain-hold.sh" answer "$task" --decision-file "$f" ${mode:+"$mode"} >&2
+  local rc=$?
+  rm -f -- "$f"
+  [ "$rc" -eq 0 ] || exit "$rc"
+  if "$HOME_ROOT/bin/fm-captain-hold.sh" answered "$task"; then
+    write_result answer "$task" true "answer recorded by fm-captain-hold.sh"
+  else
+    write_result answer "$task" false "answer accepted but the durable record does not confirm it yet"
+  fi
+}
+
+cmd_message() {
+  local task="" text=""
+  [ $# -eq 2 ] || die "message takes a task id and the text"
+  task=$1; text=$2
+  known_task_id "$task"
+  [ -e "$STATE/$task.meta" ] || die "unknown task: $task"
+  [ -n "${text//[[:space:]]/}" ] || die "message text is empty"
+  [ "$(printf '%s' "$text" | wc -c)" -le "$MESSAGE_BYTES" ] || die "message is over $MESSAGE_BYTES bytes"
+  case "$text" in /*|\$*) die "message must not start with / or $ (those reach the terminal, not the inbox)" ;; esac
+  FM_HOME=${FM_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/fm-send.sh" "$task" "$text" >&2 || exit $?
+  write_result message "$task" true "steering record written; the worker acting on it is not confirmed"
+}
+
+cmd_ticket() {
+  local title="" args=() out
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo|--kind|--priority) [ $# -ge 2 ] || die "$1 needs a value"; args+=("$1" "$2"); shift ;;
+      -*) die "unknown ticket argument: $1" ;;
+      *) [ -z "$title" ] || die "ticket takes one title"; title=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$title" ] || die "ticket needs a title"
+  local i
+  for ((i = 0; i < ${#args[@]}; i += 2)); do
+    case "${args[i]}:${args[i+1]}" in
+      --kind:ship|--kind:scout|--kind:docs) ;;
+      --kind:*) die "--kind must be ship, scout, or docs" ;;
+      --priority:[0-3]) ;;
+      --priority:*) die "--priority must be 0-3" ;;
+    esac
+  done
+  out=$(FM_HOME=${FM_HOME:-$HOME_ROOT} "$HOME_ROOT/bin/fm-tasks-axi.sh" add --mint "$title" "${args[@]}" --json) || exit $?
+  printf '%s\n' "$out" | jq -c '{schema: "juggernaut-axi.v1", view: "write", action: "ticket", task: .task.id, ok: .ok, confirmed: (.task.state == "queued"), note: "queued by tasks-axi", ticket: (.task | {id, title, state, repo, kind})}' \
+    || { echo "juggernaut-axi: ticket result unreadable" >&2; exit 1; }
+}
+
 case "${1:-}" in
   -h|--help|help|"") usage; [ -n "${1:-}" ] || exit 2; exit 0 ;;
   --version) echo "juggernaut-axi $VERSION"; exit 0 ;;
@@ -141,7 +226,7 @@ for a in "$@"; do
   case "$a" in --json) FORMAT=json ;; *) ARGS+=("$a") ;; esac
 done
 case "$CMD" in
-  status|tickets|decisions|messages) ;;
+  status|tickets|decisions|messages|answer|message|ticket) ;;
   *) die "unknown command: $CMD (try --help)" ;;
 esac
 MODEL=$("cmd_$CMD" "${ARGS[@]+"${ARGS[@]}"}") || exit $?
