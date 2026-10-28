@@ -39,13 +39,16 @@ jg_sup_stat_mtime() {
 #                         registered event source (a source is a wait on an
 #                         external process, not a task, so it has no metadata),
 #                         or a registered custom check
-#   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window
+#   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window, or
+#                         a live lock-matched watcher still in its first scan (no
+#                         beacon yet) younger than the stall bound; needs
+#                         bin/jg-wake-lib.sh sourced, else only the beacon counts
 #   JG_SUP_BEACON_DESC    human-readable beacon age, for banners ("never" if absent)
 #   JG_SUP_QUEUE_PENDING  true/false - state/.wake-queue has unread records
 # grace-seconds defaults to $JG_GUARD_GRACE, then 300, matching jg-guard.sh.
 # Always returns 0; callers read the vars, or use jg_supervision_unhealthy below.
 jg_supervision_status() {
-  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age pid
   JG_SUP_IN_FLIGHT=0
   JG_SUP_NEEDED=false
   JG_SUP_WATCHER_FRESH=false
@@ -89,6 +92,20 @@ jg_supervision_status() {
     else
       # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
       JG_SUP_BEACON_DESC=unknown
+    fi
+  elif declare -F jg_watcher_lock_matches_pid >/dev/null; then
+    # The watcher deletes the beacon at cycle start and rewrites it only after
+    # a full scan, so a live watcher in its first scan has none. Treat it as
+    # fresh until the stall bound, the same bound that evicts a stuck holder.
+    pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+    if jg_pid_alive "$pid" \
+      && jg_watcher_lock_matches_pid "$state" "$JG_WAKE_LIB_DIR/jg-watch.sh" "$pid" "${JG_HOME:-}"; then
+      age=$(jg_watcher_progress_age "$state")
+      if [ "$age" -lt "$(jg_watcher_stall_bound)" ]; then
+        # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
+        JG_SUP_BEACON_DESC="starting (${age}s)"
+        JG_SUP_WATCHER_FRESH=true
+      fi
     fi
   fi
 
