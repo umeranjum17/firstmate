@@ -27,7 +27,7 @@
 # which the parent resolves on its own checkout and passes in, so a remote home
 # tracks the primary exactly like a local one instead of stopping at whatever
 # this host's Juggernaut copy happens to hold. Omitting <parent-commit> targets
-# this host's own code-root HEAD instead, which is what /updatejuggernaut wants
+# this host's own code-root HEAD instead, which is what /resupply wants
 # after it has refreshed that
 # code root from origin. Because this home is a standalone clone, the target
 # commit is imported here first and the fast-forward itself is the shared one in
@@ -393,7 +393,7 @@ cmd_sync() {
     commit=$(git -C "$JG_ROOT" rev-parse HEAD 2>/dev/null) || die "remote code root HEAD is unreadable"
   fi
   import_home_commit "$TARGET_HOME" "$commit" \
-    || die "remote home could not import $commit from this host's Juggernaut copy or the home's origin; run /updatejuggernaut to refresh this host's copy, or push that commit first"
+    || die "remote home could not import $commit from this host's Juggernaut copy or the home's origin; run /resupply to refresh this host's copy, or push that commit first"
   # ff_target publishes its verdict in FF_STATUS, so it must run in THIS shell.
   report=$(mktemp "${TMPDIR:-/tmp}/jg-remote-sync.XXXXXX") || die "cannot stage the sync report"
   ff_target "$TARGET_HOME" "remote home" "$commit" yes yes "$id" "$TARGET_HOME/state" > "$report" 2>&1

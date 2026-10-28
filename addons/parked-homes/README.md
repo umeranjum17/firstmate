@@ -35,7 +35,7 @@ Operator and lead lanes are never parked, whatever their task id spells.
 |---|---|---|
 | Supervision session (message, steer, answer, nudge — `jg-send.sh`) | after target resolution | one `error:` line, exit 1, nothing delivered or marked |
 | Relaunch (`jg-control.sh <id> relaunch`, `jg-remote-squad-lead-relaunch.sh`) | before the launch transaction | one `error:` line, exit 1 |
-| Restart pass (`jg-squad-lead-restart.sh`, used by /updatejuggernaut) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
+| Restart pass (`jg-squad-lead-restart.sh`, used by /resupply) | argv filter | one `parked: <id>:` line; no persist request, no restart, no nudge |
 | Reconcile nudge (`jg-squad-lead-reconcile.sh`) | per-target | `skipped: <id> parked`; request preserved |
 | Config push (`jg-config-push.sh`) | per-home | `squad lead <id>: skipped - its home is parked` |
 | Inherited config push (CONFIG_REREAD, both bootstrap loops) | per-home | one skip line; no push, no reread nudge |

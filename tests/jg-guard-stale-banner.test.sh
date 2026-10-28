@@ -207,17 +207,17 @@ test_first_stale_call_prints_full_banner() {
 
 test_full_banner_names_quiet_mode_when_active() {
   # kunchenguid/juggernaut#2356: the banner's repair line must not misdirect a
-  # captain in quiet mode to /afk - jg-guard.sh threads the flag's declared
+  # captain in quiet mode to /watchover - jg-guard.sh threads the flag's declared
   # mode through to jg-supervision-instructions.sh's --afk-mode.
   local dir home out
   dir=$(make_guard_case quiet-mode-banner)
   home=$(case_home "$dir")
   printf 'quiet\n%s\n' "$(date '+%s')" > "$home/state/.afk"
   out=$(run_guard_case "$dir")
-  assert_contains "$out" "Quiet mode owns watcher supervision; load /quiet" \
-    "full banner did not name /quiet for an active quiet-mode flag"
+  assert_contains "$out" "Quiet mode owns watcher supervision; load /radio-silence" \
+    "full banner did not name /radio-silence for an active quiet-mode flag"
   assert_not_contains "$out" "Away mode owns watcher supervision" \
-    "full banner misdirected a quiet-mode captain to /afk"
+    "full banner misdirected a quiet-mode captain to /watchover"
   pass "jg-guard stale banner: repair line is quiet-mode-aware, not hardcoded to away mode"
 }
 

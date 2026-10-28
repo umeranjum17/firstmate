@@ -1379,7 +1379,7 @@ test_away_record_relocates_main_owned_actions_to_the_branch() {
   [ "$status" -eq 6 ] || fail "attended branch jg-pr-merge exited $status, not 6: $out"
   assert_contains "$out" "$refusal" "attended refusal lost its wording"
 
-  # /afk is the go: the one entry call writes the record that relocates.
+  # /watchover is the go: the one entry call writes the record that relocates.
   JG_HOME="$home" "$ROOT/bin/jg-afk-contract.sh" enter --spend 2 >/dev/null || fail "away entry failed"
 
   # Under the record the partition passes and the merge script reaches its

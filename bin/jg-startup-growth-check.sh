@@ -13,7 +13,7 @@
 #
 # A due evaluation uses metadata only: regular-file safety checks plus stat(1)
 # byte sizes.  It does not run the startup digest, bootstrap, network checks,
-# model calls, repository refreshes, /stow, or full preference/learning
+# model calls, repository refreshes, /intel, or full preference/learning
 # rereads.  The budget total, its verdict, and its squad_lead exception come
 # from `bin/jg-startup-memory-budget.sh report`, the single owner of
 # config/startup-memory-budget, and are never re-derived here.  data/projects.md

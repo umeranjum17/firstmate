@@ -314,7 +314,7 @@ test_away_reentry_refuses_pending_return_gate() {
 }
 
 test_return_is_mode_agnostic_for_quiet_mode() {
-  # kunchenguid/juggernaut#2356's /quiet off calls this exact script, unchanged
+  # kunchenguid/juggernaut#2356's /radio-silence off calls this exact script, unchanged
   # - it must behave identically whether state/.afk declares "away" or
   # "quiet", since return_guard/return_reconcile only ever test presence.
   local dir out
@@ -327,7 +327,7 @@ test_return_is_mode_agnostic_for_quiet_mode() {
   assert_contains "$out" 'catch-up clear' "quiet-mode return did not announce ordinary work may proceed"
   [ ! -e "$dir/home/state/.afk" ] || fail "quiet-mode return left the mode flag behind"
   [ "$(wc -l < "$dir/home/stop.log" | tr -d ' ')" -eq 1 ] || fail "quiet-mode return did not stop the daemon exactly once"
-  pass "/quiet off's return path behaves identically for a quiet-content flag as for a legacy away-content one"
+  pass "/radio-silence off's return path behaves identically for a quiet-content flag as for a legacy away-content one"
 }
 
 test_check_retries_recorded_terminal_teardown() {

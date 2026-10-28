@@ -32,7 +32,7 @@
 #     Juggernaut copy on its own host: the parent resolves the commit and the host
 #     imports it (from the home, that copy, or the home's origin) before running
 #     the same ff guards, skipping with an actionable reason when it cannot. The
-#     host's own copy is never moved, /updatejuggernaut's code-root-relative sync
+#     host's own copy is never moved, /resupply's code-root-relative sync
 #     is unchanged, and a launch never re-targets that copy.
 set -u
 
@@ -1052,7 +1052,7 @@ test_seed_marker_clean_when_gitignored() {
 # is still untracked-and-unignored, and the fix itself only arrives by fast-forward.
 # The marker-tolerant ff-skip (ignore_seed_marker=yes) bridges the gap for
 # linked-worktree homes, which bootstrap/spawn fast-forward from the primary's local HEAD.
-# Standalone-clone homes converge through /updatejuggernaut's origin fetch instead.
+# Standalone-clone homes converge through /resupply's origin fetch instead.
 # Once advanced, the now-ignored marker reads clean with no hand intervention.
 test_seed_marker_converges_existing_home() {
   local w c0 base
@@ -1220,7 +1220,7 @@ test_remote_sync_targets_primary_not_host_copy() {
 # --- R2: the target is imported from the host's copy when the home lacks it ----
 # --- R1b: a remote sync reports WHICH instruction paths its advance changed ----
 # The parent cannot diff a checkout it cannot read, so the host's own result is
-# the only place that fact can come from. /updatejuggernaut needs it to decide
+# the only place that fact can come from. /resupply needs it to decide
 # whether the running remote agent must be replaced to reload, or whether the
 # advance reloads itself.
 test_remote_sync_reports_the_changed_instruction_surface() {
@@ -1336,7 +1336,7 @@ test_remote_sync_skips_unimportable_target() {
   [ "$REMOTE_SYNC_RC" -ne 0 ] || fail "remote sync claimed success on an unreachable commit"
   assert_contains "$REMOTE_SYNC_OUT" "could not import $c2" \
     "the skip does not name the commit that could not be imported"
-  assert_contains "$REMOTE_SYNC_OUT" "/updatejuggernaut" \
+  assert_contains "$REMOTE_SYNC_OUT" "/resupply" \
     "the skip does not name the command that refreshes the host's copy"
   [ "$(head_of "$w/sm")" = "$before" ] || fail "an unreachable target still moved the home"
   pass "R5 a target neither the host copy nor the origin holds skips with an actionable reason"
@@ -1385,7 +1385,7 @@ test_remote_sync_skips_dirty_diverged_and_feature_branch() {
   pass "R6 dirty, diverged, and feature-branch remote homes skip and are left untouched"
 }
 
-# --- R7: /updatejuggernaut's contract is unchanged ------------------------------
+# --- R7: /resupply's contract is unchanged ------------------------------
 # That path refreshes the host's own Juggernaut copy from origin first and then
 # syncs the home to THAT copy, so the no-target call must still target the copy.
 test_remote_sync_without_target_follows_host_copy() {
@@ -1396,7 +1396,7 @@ test_remote_sync_without_target_follows_host_copy() {
   bump_primary "$w" instr
   c2=$(head_of "$w/main")
   git -C "$w/main" push -q origin main
-  git -C "$w/coderoot" pull -q --ff-only        # what /updatejuggernaut does first
+  git -C "$w/coderoot" pull -q --ff-only        # what /resupply does first
   [ "$(head_of "$w/coderoot")" = "$c2" ] || fail "precondition: the host copy should be refreshed"
 
   remote_sync "$w" sm
@@ -1488,7 +1488,7 @@ test_bootstrap_reports_outdated_host_actionably() {
 
   assert_contains "$out" "SQUAD_LEAD_SYNC: squad_lead sm: skipped:" \
     "an outdated host did not produce its own convergence line"
-  assert_contains "$out" "too old to sync to this primary's commit; run /updatejuggernaut" \
+  assert_contains "$out" "too old to sync to this primary's commit; run /resupply" \
     "the outdated-host report does not say how to fix it"
   pass "R10 a host too old for a parent-targeted sync is reported with the command that fixes it"
 }

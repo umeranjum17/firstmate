@@ -337,7 +337,7 @@ A home that does not run the host behaves exactly as it does without it, and a P
 
 While the home runs the host, the primary's arm owner runs it in place of the watcher arm.
 The host handles wakes on the engine under the [posture rules](supervision-host.md#postures), including an away record and attended operation on a Claude or Cursor primary with a verified dialog mirror.
-On that home, `/afk` launches no away daemon; see [Quiet mode](supervision-host.md#quiet-mode) for `/quiet`'s attended statement and fallback.
+On that home, `/watchover` launches no away daemon; see [Quiet mode](supervision-host.md#quiet-mode) for `/radio-silence`'s attended statement and fallback.
 The same gate governs the primary's dialog-mirror hooks (`bin/jg-host-mirror.sh`), which record on a Claude or Cursor primary ([supervision-host.md](supervision-host.md#the-dialog-mirror)).
 Grok's arm command is rendered at session start, so a change to its host mode takes effect at its next session start; the other arm owners check the gate at every arm.
 
@@ -551,7 +551,7 @@ Test cleanup must use the guarded path in [`docs/cmux-backend.md`](cmux-backend.
 
 ## Away-mode supervisor backend (JG_SUPERVISOR_BACKEND / JG_SUPERVISOR_TARGET)
 
-The `/afk` sub-supervisor injects escalation digests into Juggernaut's own pane independently of where new task endpoints are spawned.
+The `/watchover` sub-supervisor injects escalation digests into Juggernaut's own pane independently of where new task endpoints are spawned.
 It currently supports only `tmux` and `herdr` supervisor panes.
 
 Set `JG_SUPERVISOR_BACKEND=tmux|herdr` and `JG_SUPERVISOR_TARGET=<target>` to override both axes explicitly; for herdr the target is `"<session>:<pane-id>"`.
@@ -602,7 +602,7 @@ See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, 
 ## Juggernaut role (config/juggernaut-role)
 
 The optional local, gitignored `config/juggernaut-role` declares this home's relationship to the Juggernaut repository itself.
-Every home defaults to **user/operator** with no Juggernaut-upstream publication authority: ordinary project work and `/updatejuggernaut` pulls are unaffected, but without an explicit grant no ship task on the Juggernaut repository may carry a publishing contract.
+Every home defaults to **user/operator** with no Juggernaut-upstream publication authority: ordinary project work and `/resupply` pulls are unaffected, but without an explicit grant no ship task on the Juggernaut repository may carry a publishing contract.
 For the agent's local diagnosis, workaround, and draft-only response to a Juggernaut bug, see [`juggernaut-self-repo`](../.agents/skills/juggernaut-self-repo/SKILL.md#when-a-juggernaut-bug-surfaces-in-ordinary-use).
 
 The file holds exactly one directive line, with blank lines and `#` comment lines ignored:
@@ -691,7 +691,7 @@ Portable shard evidence and coverage rules are in [jg-test-portable-shards.md](j
 ## Captain Preferences (data/captain.md / data/captain-shared.md)
 
 Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad_leads.md`.
-Before changing it, inspect the current file and curate the matching bullet in place under the internal [`stow` skill's](../.agents/skills/intel/SKILL.md) tiering and archive contract; add a new bullet only for a genuinely new durable preference.
+Before changing it, inspect the current file and curate the matching bullet in place under the internal [`intel` skill's](../.agents/skills/intel/SKILL.md) tiering and archive contract; add a new bullet only for a genuinely new durable preference.
 
 Shared captain preferences that apply across Squad Lead domains live only in the primary home's optional `data/captain-shared.md`.
 `squad-lead-provisioning` owns its propagation contract, including the required header, read-only Squad Lead copies, quarantine diagnostics, and the rollout rule that existing homes trim `data/captain.md` by hand after first propagation rather than deleting private content automatically.
@@ -699,7 +699,7 @@ Shared captain preferences that apply across Squad Lead domains live only in the
 ## Operational learnings (data/learnings.md)
 
 Fleet-local operational facts and gotchas live locally in `data/learnings.md`; it is gitignored and printed after the captain-preference files in the session-start context digest.
-The file is created lazily on first learning and follows the internal [`stow` skill's](../.agents/skills/intel/SKILL.md) aging-tier and cold-archive contract: inspect the current file first and curate it instead of appending forever.
+The file is created lazily on first learning and follows the internal [`intel` skill's](../.agents/skills/intel/SKILL.md) aging-tier and cold-archive contract: inspect the current file first and curate it instead of appending forever.
 
 There is no shared learnings file by captain decision.
 
@@ -722,7 +722,7 @@ The declaration is per-home untracked state under `data/`, like every other capt
 A fresh primary home has no declaration until the captain re-declares the `Memory layering` section there from their own records.
 Until then local files are the only memory owners.
 
-[`AGENTS.md`](../AGENTS.md) section 6 owns what a declaration changes about knowledge routing, and the internal [`stow` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
+[`AGENTS.md`](../AGENTS.md) section 6 owns what a declaration changes about knowledge routing, and the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
 The section counts toward the startup memory budget like the rest of its file, so keep it to the mapping rather than restating these rules.
 
 ## Startup memory budget (config/startup-memory-budget)
@@ -744,7 +744,7 @@ Use `bin/jg-startup-memory-budget.sh read` to validate and print the effective v
 The stable local estimate is `ceil(UTF-8 bytes / 3)` per file, a conservative portable approximation rather than a provider-exact tokenizer.
 
 An inherited `data/captain-shared.md` counts in a Squad Lead's total but remains primary-owned and read-only there.
-The internal [`/stow` skill](../.agents/skills/intel/SKILL.md) owns curation and its automatic Squad Lead cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
+The internal [`/intel` skill](../.agents/skills/intel/SKILL.md) owns curation and its automatic Squad Lead cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
 
 The helper's header owns exact parsing, publication, and report output mechanics.
 
@@ -760,7 +760,7 @@ A due evaluation uses file metadata and byte sizes before any content inspection
 `bin/jg-startup-memory-budget.sh` remains the sole owner of the budget total and its verdict, so the check never re-derives either: when that owner annotates an overrun caused by the primary-owned `data/captain-shared.md` alone, a Squad Lead home is not woken about an overrun it cannot act on.
 A Squad Lead home is likewise not notified about per-file growth of that same primary-owned `data/captain-shared.md`, which it receives read-only; the growth is still observed and recorded, and a primary home reports it normally.
 Those tracked bytes are code and instruction-surface size, not prompt-memory cost.
-The check does not run session-start, bootstrap, network checks, model calls, repository refreshes, `/stow`, or full preference/learnings rereads.
+The check does not run session-start, bootstrap, network checks, model calls, repository refreshes, `/intel`, or full preference/learnings rereads.
 
 Growth is measured against a per-file baseline retained in the check's own state record, so accumulation that stays under one day's threshold is still caught once it adds up; reporting a file rebases its baseline to the reported size, so accepted growth then stays silent.
 A surface observed for the first time is baselined silently, including the first content of an optional file that did not exist yet when the check was armed, and an established baseline survives that file disappearing and coming back.
@@ -820,8 +820,8 @@ The guard's header owns consumer attribution, sample format, and exact output.
 
 ## Stow pass horizon (config/stow-pass-horizon)
 
-`config/stow-pass-horizon` is an optional local, gitignored presence flag that opts this home in to the pass-count decay horizon in the internal [`/stow` skill](../.agents/skills/intel/SKILL.md).
-Without it a `/stow` pass decays memory entries on their wall-clock horizons alone - 30 days for `aging`, 7 days for `perishable` - which is the default and unchanged behavior.
+`config/stow-pass-horizon` is an optional local, gitignored presence flag that opts this home in to the pass-count decay horizon in the internal [`/intel` skill](../.agents/skills/intel/SKILL.md).
+Without it a `/intel` pass decays memory entries on their wall-clock horizons alone - 30 days for `aging`, 7 days for `perishable` - which is the default and unchanged behavior.
 
 With it, an entry is also stale after 10 passes (`aging`) or 3 passes (`perishable`) that evaluated it without reinforcing it, whichever horizon it reaches first.
 Opt in for a home that stows often enough that entries never sit unreinforced for a wall-clock horizon, so memory only grows against the startup-memory budget above; a home that stows rarely already exceeds its date horizon on a single pass and gains nothing.
@@ -876,7 +876,7 @@ The tracked root `.gitignore` ignores both markers, so validation can read them 
 This does not relax protection for any other untracked file.
 An existing linked-worktree home that predates this rule advances through its marker-only state during its next bootstrap or spawn local sync, after which Git ignores the marker normally.
 
-A local standalone-clone home cannot receive a primary-local commit through that no-fetch sync, so it receives the rule through `/updatejuggernaut`'s origin refresh instead.
+A local standalone-clone home cannot receive a primary-local commit through that no-fetch sync, so it receives the rule through `/resupply`'s origin refresh instead.
 
 ## Harness support
 
@@ -2715,7 +2715,7 @@ JG_SEND_RETRIES=3       # jg-send typed-plane Enter-retry attempts after typing 
 JG_SEND_SLEEP=0.4       # seconds between jg-send typed-plane submit checks
 JG_SEND_SETTLE=1        # seconds jg-send waits after a successful typed-plane submit; 0 disables
 JG_PENDING_REPLY_GRACE_SECS=120   # seconds after the request turn completes without a correlated parent report before its one recovery repost is eligible, and after the recovery turn completes before the missed-report escalation is eligible; never counted from delivery
-# sub-supervisor (bin/jg-supervise-daemon.sh); presence-gated via /afk
+# sub-supervisor (bin/jg-supervise-daemon.sh); presence-gated via /watchover
 JG_SUPERVISOR_BACKEND=             # optional supervisor pane backend override; tmux/herdr only, otherwise detects $TMUX_PANE then HERDR_ENV/HERDR_PANE_ID before tmux fallback
 JG_SUPERVISOR_TARGET=              # optional supervisor pane target override; tmux target or herdr <session>:<pane-id>, otherwise auto-detected
 JG_INJECT_SKIP=heartbeat           # |-prefixes force-self-handled bypassing classification; empty disables

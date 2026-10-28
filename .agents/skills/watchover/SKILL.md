@@ -14,7 +14,7 @@ Away mode is a POSTURE of the one supervision session, not a second architecture
 Being away changes exactly two things: how the captain is informed, and what happens at a captain-owned decision point (hold for return, or the answer the captain's away words already gave).
 It never changes the authority set.
 The posture is a file, `state/.afk-contract`, written only by `bin/jg-afk-contract.sh` in the same turn as `/watchover`; nothing infers the posture from chat.
-A record carrying quiet mode (`bin/jg-afk-contract.sh mode`) is not this posture: the captain is present, so none of this skill's holds for a return apply to it (the `quiet` skill owns it).
+A record carrying quiet mode (`bin/jg-afk-contract.sh mode`) is not this posture: the captain is present, so none of this skill's holds for a return apply to it (the `radio-silence` skill owns it).
 Typing `/watchover` is itself the go: the captain may not look at the screen again, so entry never waits for a further human response, and no read-back gates it or asks for a go.
 Hold-for-return is the default and the only reach profile this release records: there is no phone channel, and the entry announcement says so aloud every time.
 
@@ -31,11 +31,11 @@ Hold-for-return is the default and the only reach profile this release records: 
    - **Pi and pi-signed**: nothing to launch; go on to the announcement.
      The away daemon is no longer launched on Pi; the ordinary supervision session (`docs/pi-supervision-branch.md`) keeps running with the record present, and `bin/jg-afk-launch.sh start` refuses on these harnesses.
      With the record present main is parked: the supervision branch takes every safe actionable wake, captain outcomes accumulate for the return brief, and main's standing authority relocates to the branch through the guarded scripts (`docs/pi-supervision-branch.md` "Postures"); only a wake the branch declines (including a broken branch or unsafe scan) or a watcher failure wakes main.
-     `/quiet` needs nothing extra on Pi: the attended branch already keeps routine wakes out of this conversation, so quiet-while-present is the attended posture's own shape there.
+     `/radio-silence` needs nothing extra on Pi: the attended branch already keeps routine wakes out of this conversation, so quiet-while-present is the attended posture's own shape there.
    - **A home that runs the supervision host** (a Claude home unless `config/supervision-host-off` opts it out, or a Cursor, OpenCode, omp, Grok, or Codex home with `config/supervision-host` and no opt-out; `docs/configuration.md` "Supervision host"): nothing to launch for `/watchover`; go on to the announcement.
      The supervision host (`docs/supervision-host.md`) is the away session there: it runs the branch's contract on a headless engine under the record while main is parked, and `bin/jg-afk-launch.sh start` and `start-native` refuse the away daemon on that home.
      If `enter` printed a `Supervision host: no engine ...` line, every away wake reaches this conversation instead; say so in the announcement.
-     `/quiet` enters nothing there where the attended host runs, and otherwise still launches the daemon below (the quiet skill's `quiet-check` decides).
+     `/radio-silence` enters nothing there where the attended host runs, and otherwise still launches the daemon below (the radio-silence skill's `quiet-check` decides).
    - **Harness WITH a native in-pane tracked-background tool** (claude's and grok's, on a home that does not run the supervision host): run `bin/jg-afk-launch.sh start-native`, then run `JG_AFK_STATE_PREPARED=1 bin/jg-afk-start.sh` through that native tool.
      This is a deliberate no-separate-terminal exception because the harness-hosted job creates no terminal or layout mutation, and a shell launcher cannot invoke a harness-native background tool.
      If the native launch fails, run `bin/jg-afk-launch.sh stop` to roll back the prepared lifecycle.
@@ -86,7 +86,7 @@ No `/back` is needed. The first genuine message is the return signal:
 - Re-invoking `/watchover` while already away -> stay away (refresh); this does **not** trigger an exit.
 
 Bias ambiguous cases toward exit: a present captain beats token savings, and a false exit is self-correcting (the captain re-runs `/watchover`).
-When the captain wants this same token-saving supervision while staying present and chatting - ordinary messages should NOT exit it - that is `/quiet` (kunchenguid/juggernaut#2356), not `/watchover`.
+When the captain wants this same token-saving supervision while staying present and chatting - ordinary messages should NOT exit it - that is `/radio-silence` (kunchenguid/juggernaut#2356), not `/watchover`.
 
 ## Orthogonal to approval authority
 

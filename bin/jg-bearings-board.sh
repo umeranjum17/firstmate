@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# jg-bearings-board.sh - build and arm the /bearings lavish fleet board.
+# jg-bearings-board.sh - build and arm the /sitrep lavish fleet board.
 #
-# The board is the captain-facing interactive surface of /bearings lavish: the
+# The board is the captain-facing interactive surface of /sitrep lavish: the
 # shipped template (.agents/skills/sitrep/assets/board-template.html) plus one
 # injected jg-bearings-board.v1 JSON payload. This script owns the mechanics so
 # the invoking agent's per-run work stays "compose the JSON, run build" - the

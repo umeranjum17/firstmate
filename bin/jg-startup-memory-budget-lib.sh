@@ -6,7 +6,7 @@
 # strictly formatted positive decimal value followed by one newline.  The
 # locked primary bootstrap owns overwatchrialization.  This library owns safe
 # parsing, default publication, and the portable prompt-memory estimate used by
-# bin/jg-startup-memory-budget.sh and the internal /stow skill.
+# bin/jg-startup-memory-budget.sh and the internal /intel skill.
 
 JG_STARTUP_MEMORY_BUDGET_FILE="startup-memory-budget"
 JG_STARTUP_MEMORY_BUDGET_DEFAULT="7500"

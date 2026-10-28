@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Enumerate this home's registered squad_leads for an internal /stow cascade.
+# Enumerate this home's registered squad_leads for an internal /intel cascade.
 # Usage: jg-stow-cascade.sh [--help]
 #
-# The internal /stow skill owns curation judgement; this command owns only the
+# The internal /intel skill owns curation judgement; this command owns only the
 # mechanical inputs a cascade needs: which homes exist, what each home's own
 # startup-memory accounting says right now, and how the sweep can reach it.
 #

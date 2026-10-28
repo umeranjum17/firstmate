@@ -750,7 +750,7 @@ The lab opened the gates, interrupted a worker mid-turn, tried a main-actor stee
 Engine turns cost $0.06 to $0.79 each; whole away windows cost $0.66 (Claude), $1.21 (Cursor), $1.64 (OpenCode), $2.51 (Grok), and $3.76 (Codex, two windows).
 An engine-dispatched Grok 1.0.41 worker stops on Grok's workspace-trust prompt for a project under `/private/tmp`; the engine held it for the captain rather than answering it.
 
-Without `config/supervision-host`, attended and away sessions on Codex, Cursor, and Grok primaries ran identically on the tree before this change (`9284978f`) and with it: the attended worker landed and was cleaned up, `/afk` started the daemon, the away finish was delivered, the return brief rendered, and nothing landed.
+Without `config/supervision-host`, attended and away sessions on Codex, Cursor, and Grok primaries ran identically on the tree before this change (`9284978f`) and with it: the attended worker landed and was cleaned up, `/watchover` started the daemon, the away finish was delivered, the return brief rendered, and nothing landed.
 The OpenCode pair could not run, because every primary turn hit the model rejection or usage limit above in both trees.
 The live guards gave the same results in both trees:
 

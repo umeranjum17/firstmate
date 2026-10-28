@@ -14,9 +14,9 @@
 # or omits anything it names a state/.subsuper-digests/ file holding every
 # buffered event verbatim.
 #
-# PRESENCE-GATING (the /afk contract). The daemon is the away-mode engine: it
+# PRESENCE-GATING (the /watchover contract). The daemon is the away-mode engine: it
 # injects ONLY when the durable away-mode flag state/.afk is present. Invoking
-# the /afk skill sets that flag and starts this daemon; any real (unmarked)
+# the /watchover skill sets that flag and starts this daemon; any real (unmarked)
 # user message clears it and juggernaut resumes full responsiveness.
 # When afk is off, normal jg-watch.sh always-on triage is the active mechanism.
 # Any buffered daemon escalations that remain while afk is off survive in
@@ -39,7 +39,7 @@
 # daemon and the human share one input channel - so they live together under
 # /afk.
 #
-# Reliability model (see the /afk skill):
+# Reliability model (see the /watchover skill):
 #   - Nothing is lost in away mode: while state/.afk exists, the watcher reverts
 #     to daemon-owned one-shot behavior and enqueues every wake to
 #     state/.wake-queue BEFORE advancing its suppression markers, so a
@@ -76,7 +76,7 @@
 # escalations before exit.
 #
 # Usage: jg-supervise-daemon.sh
-#          Long-lived background loop. Normally started by the /afk skill, which
+#          Long-lived background loop. Normally started by the /watchover skill, which
 #          sets state/.afk first. Env knobs:
 #          JG_SUPERVISOR_TARGET     supervisor pane target (override; otherwise
 #                                   auto-discovered per backend - $TMUX_PANE
@@ -300,7 +300,7 @@ afk_active() {  # <state>
   [ -e "$1/$AFK_FLAG_NAME" ]
 }
 
-# afk_enter / afk_exit: write/clear the away-mode flag. Called by the /afk
+# afk_enter / afk_exit: write/clear the away-mode flag. Called by the /watchover
 # skill (enter) and by juggernaut on user return (exit). Durable: a plain file,
 # so recovery (§5) re-enters afk if it is present after a restart.
 afk_enter() {  # <state>
@@ -317,17 +317,17 @@ afk_exit() {  # <state>
 #                              bin/jg-afk-contract.sh owns, or the legacy flag)
 #   message has marker, or is a doorbell for a record in this home
 #                           -> 1 (internal escalation; stay afk)
-#   message is /afk command -> 1 (re-entering/extending afk; stay afk)
+#   message is /watchover command -> 1 (re-entering/extending afk; stay afk)
 #   anything else           -> 0 (captain is back; exit afk)
 # Bias toward exit: only the marker, a doorbell this home's record backs, and an
-# explicit /afk invocation keep afk alive. A false exit is self-correcting (the
-# captain re-runs /afk).
+# explicit /watchover invocation keep afk alive. A false exit is self-correcting (the
+# captain re-runs /watchover).
 should_exit_afk() {  # <state> <message-text>
   local state=$1 msg=$2
   afk_active "$state" || jg_afk_contract_present "$state" || return 1
   message_is_injection "$msg" "$state" && return 1
   case "$msg" in
-    /afk*) return 1 ;;
+    /watchover*) return 1 ;;
   esac
   return 0
 }

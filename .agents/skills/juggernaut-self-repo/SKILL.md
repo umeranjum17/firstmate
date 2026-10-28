@@ -62,7 +62,7 @@ Never work around a refusal by pointing the task at a second checkout, fork, or 
 
 ## Updating is not contributing
 
-`/updatejuggernaut` and every guarded sync pull **from** upstream, which is consumption, not publication, and stays allowed for every role.
+`/resupply` and every guarded sync pull **from** upstream, which is consumption, not publication, and stays allowed for every role.
 The boundary covers only traffic that writes to the upstream repository.
 
 ## Squad Leads

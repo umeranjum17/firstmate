@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavioral coverage for the internal /stow cascade enumerator: per-home budget
+# Behavioral coverage for the internal /intel cascade enumerator: per-home budget
 # accounting that never sums a fleet total, one stanza per registered home,
 # local versus remote transport routing, the facts a per-home completion receipt
 # is built from, and the bound that keeps one slow home from blocking the sweep.

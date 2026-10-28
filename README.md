@@ -202,20 +202,20 @@ Setup guides for tmux (the default) and every other supported runtime are linked
 
 ## Built-in skills
 
-Juggernaut ships these user-invocable built-in skills. Claude and Grok use the slash form shown here; Codex uses the same names with `$`, such as `$afk`.
+Juggernaut ships these user-invocable built-in skills. Claude and Grok use the slash form shown here; Codex uses the same names with `$`, such as `$watchover`.
 
-- **`/afk`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/watchover/SKILL.md) for the posture and return contract.
-- **`/quiet`** — keep routine wakes off main while you stay and chat; `/quiet off` ends it.
-- **`/ahoy`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
-- **`/bearings`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.
-- **`/updatejuggernaut`** — guardedly update Juggernaut and its Squad Leads, then restart live mates on the target commit.
-- **`/stow`** — sweep the session for uncaptured durable knowledge and report what is safe to reset.
+- **`/watchover`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/watchover/SKILL.md) for the posture and return contract.
+- **`/radio-silence`** — keep routine wakes off main while you stay and chat; `/radio-silence off` ends it.
+- **`/debrief`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
+- **`/sitrep`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.
+- **`/resupply`** — guardedly update Juggernaut and its Squad Leads, then restart live mates on the target commit.
+- **`/intel`** — sweep the session for uncaptured durable knowledge and report what is safe to reset.
 
 Bearings invocation examples:
 
-- `/bearings` returns the four-section sitrep in chat only.
-- `/bearings file` writes today's dated `data/status-report-<YYYY-MM-DD>.md`.
-- `/bearings file include PRs` adds live PR enrichment.
+- `/sitrep` returns the four-section sitrep in chat only.
+- `/sitrep file` writes today's dated `data/status-report-<YYYY-MM-DD>.md`.
+- `/sitrep file include PRs` adds live PR enrichment.
 
 Agent-only reference skills live under `.agents/skills/` and are loaded by Juggernaut at the trigger points named in [`AGENTS.md`](AGENTS.md).
 

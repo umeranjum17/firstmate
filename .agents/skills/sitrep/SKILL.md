@@ -59,7 +59,7 @@ For a contribution wake or linked-issue filing, go directly to Contribution foll
    Render it under Charted Next with the related `omitted` disclosure, never invent an Underway row from backlog-only state, and never move it into Captain's Call.
    The same holds for a Squad Lead home whose current state is unavailable, and for a readable home whose `invalidity` reports a backlog-vs-metadata mismatch: the mismatch is a repair notice about that home's own books, not a reason to drop its separately projected decisions, queued, landed, or live work.
    The `(return-catchup)` gate is the same shape: an action-free notice that an away-return catch-up is still open, naming the blockers left to clear or the reason the catch-up was retained.
-   Render it under Charted Next like any other warning row: reporting is not ordinary work, while acting on the fleet still waits for `bin/jg-afk-return.sh check` (`/afk`).
+   Render it under Charted Next like any other warning row: reporting is not ordinary work, while acting on the fleet still waits for `bin/jg-afk-return.sh check` (`/watchover`).
 
 2. **Record a later reconcile notification for any home whose own books disagree.**
    When the snapshot reports a Squad Lead home whose `invalidity` is `orphan_in_flight`, `unowned_current`, or `terminal_in_flight`, that home's backlog and its own task metadata disagree and only that home may fix it.

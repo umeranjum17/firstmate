@@ -207,7 +207,7 @@
 #   profile consultation. A --squad-lead spawn is exempt and resolves the SQUAD_LEAD
 #   profile through jg-harness.sh with the mate's id, so the
 #   squad-lead-vs-operator split is DURABLE across every respawn (recovery,
-#   /updatejuggernaut, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
+#   /resupply, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
 #   overrides it for this spawn (either kind). A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, jg-spawn resolves the selected executable
@@ -2561,7 +2561,7 @@ case "$ARG3" in
   # squad_lead harness (config/squad-lead-harness -> config/crew-harness -> own);
   # every other kind uses the crew harness only when no dispatch profile file is
   # active. Resolving here on every spawn is what makes the split DURABLE - a
-  # respawn (recovery, /updatejuggernaut, restart) re-resolves, so
+  # respawn (recovery, /resupply, restart) re-resolves, so
   # config/squad-lead-harness keeps governing squad_lead launches across restarts.
   # The launch_template lookup below is the unverified-adapter guard for both
   # kinds: a harness with no template aborts the spawn.
@@ -4327,7 +4327,6 @@ spawn_send_key() { # <target> <key>
 # primary checkout. The same explicit cd gives every backend one
 # launch boundary and makes a dropped or ignored cwd change a refusal.
 spawn_enter_recorded_worktree() {
-  [ "$KIND" = squad_lead ] && return 0
   spawn_send_text_line "$WT_TARGET" "cd -- $(shell_quote "$WT")" || {
     echo "error: task $ID's endpoint could not be moved into its recorded worktree '$WT'; refusing to launch outside the copy holding its work" >&2
     exit 1
@@ -4339,7 +4338,6 @@ spawn_enter_recorded_worktree() {
 # before launch prevents the probe from becoming input to a live worker.
 spawn_assert_agent_worktree() {
   local expected seen i
-  [ "$KIND" = squad_lead ] && return 0
   [ "$BACKEND" = orca ] && return 0
   expected=$(real_path_or_raw "$WT")
   for i in $(seq 1 20); do
@@ -4697,40 +4695,7 @@ agy_spawn_fail() {  # <detail>
 
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = squad_lead ] || validate_spawn_worktree "relaunch" "$T"
-elif [ "$RELAUNCH" -eq 1 ]; then
-  # No worktree is acquired: the recorded one is reused as-is. What must be
-  # proven instead is that the adopted endpoint's shell is actually sitting in
-  # that worktree, so the replacement agent starts where the work is rather
-  # than wherever the pane happened to drift.
-  relaunch_wt_real=$(real_path_or_raw "$WT")
-  relaunch_seen=
-  for _ in $(seq 1 10); do
-    relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
-    [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
-    sleep 0.5
-  done
-  if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
-    if [ "$BACKEND" != herdr ]; then
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    fi
-    relaunch_cd_path=${WT//\'/\'\\\'\'}
-    spawn_send_text_line "$WT_TARGET" "cd -- '$relaunch_cd_path'" || {
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and could not be told to return to its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    }
-    for _ in $(seq 1 10); do
-      relaunch_seen=$(spawn_current_path "$WT_TARGET" || true)
-      [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ] || break
-      sleep 0.5
-    done
-    if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
-      echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}' and did not return to its recorded worktree '$WT' when told to; refusing to relaunch an agent outside the copy holding its work" >&2
-      exit 1
-    fi
-  fi
-  [ "$KIND" = squad_lead ] || validate_spawn_worktree "relaunch" "$T"
-elif [ "$KIND" != squad_lead ] && [ "$BACKEND" != orca ]; then
+elif [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != squad_lead ] && [ "$BACKEND" != orca ]; then
   # Lease recorded task copies without touching their Git contents, then
   # acquire in the explicit project, never the new pane's inherited cwd.
   jg_local_juggernaut_state_dirs "$STATE" || {
@@ -4833,12 +4798,28 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != squad_lead ]; then
   freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
 fi
 
-# Re-assert the durable task copy after either treehouse acquisition or endpoint
-# adoption. This also updates Herdr's restored pane shell before any harness is
-# started, so a later host restart inherits the task worktree rather than the
-# tab's original project directory.
-spawn_enter_recorded_worktree
-spawn_assert_agent_worktree
+# Fresh ships/scouts and all relaunches must enter and verify the durable task
+# copy before launch. Fresh squad_lead homes already use their own launch path.
+# Updating Herdr's pane shell here also preserves the cwd across host restarts.
+if [ "$RELAUNCH" -eq 1 ] || [ "$KIND" != squad_lead ]; then
+  spawn_enter_recorded_worktree
+  spawn_assert_agent_worktree
+fi
+if [ "$RELAUNCH" -eq 1 ]; then
+  if [ "$KIND" = squad_lead ]; then
+    role_marker=$(cat "$WT/.jg-squad-lead-home" 2>/dev/null || true)
+    [ "$role_marker" = "$ID" ] || {
+      echo "error: squad_lead $ID's relaunch does not resolve to its recorded home; refusing to start with a different role" >&2
+      exit 1
+    }
+  else
+    if [ "$(head -n 1 "$BRIEF" 2>/dev/null)" != '# Current worker role contract' ] \
+      || ! grep -Fq "Your steering inbox is \`$STATE/$ID.inbox\`" "$BRIEF"; then
+      echo "error: task $ID's relaunch instructions do not establish its recorded worker role and steering inbox; refusing to start with a different role" >&2
+      exit 1
+    fi
+  fi
+fi
 
 # Pre-register Claude's workspace trust for the directory this launch starts in,
 # at the first point that directory is known and before any per-task state is

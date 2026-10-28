@@ -440,13 +440,13 @@ squad_lead_sync() {
   # primary checkout's current default-branch commit. The local path is purely
   # LOCAL - no fetch, no origin dependency: a linked-worktree home already holds
   # the primary's commit (jg-ff-lib.sh), while a standalone clone without it is
-  # skipped until /updatejuggernaut refreshes it from origin. A remote home is on
+  # skipped until /resupply refreshes it from origin. A remote home is on
   # another machine, so its host is handed that same commit and imports it there
   # (bin/jg-remote-squad-lead-control.sh); this side still fetches nothing.
   # Startup sends reread nudges only for RUNNING squad_leads whose instruction
   # surface (AGENTS.md, bin/, or .agents/skills/) actually changed, so a squad_lead already on the primary's
   # version is never disturbed (AGENTS.md bootstrap + supervision). Unlike
-  # /updatejuggernaut, startup owns the live-convergence send itself because it is
+  # /resupply, startup owns the live-convergence send itself because it is
   # a deterministic locked sweep and can report success as BOOTSTRAP_INFO while
   # preserving failed sends as NUDGE_SQUAD_LEADS retry markers.
   [ -d "$STATE" ] || return 0

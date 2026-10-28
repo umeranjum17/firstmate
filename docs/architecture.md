@@ -200,7 +200,7 @@ It leads with a prominent bordered tangle banner, while `bin/jg-guard.sh` owns t
 On every verified primary harness, tracked hook integration gives the primary session a push-based backstop: when work, a process-event source, a registered custom check, or Relay polling needs supervision and no supervision owner provably holds this home with a fresh beacon, blocking-capable Stop hooks block and nonblocking turn-end integrations force one bounded follow-up.
 The guard covers the main primary and genuinely marked Squad Lead homes, exempts child operator/scout worktrees, is loop-safe per harness, and is documented in [turnend-guard.md](turnend-guard.md).
 
-Away mode is a posture of the one supervision session, recorded in `state/.afk-contract` by `bin/jg-afk-contract.sh` in the same turn as `/afk` with no wait for a further go, read back in plain sentences only after entry, and announced at entry as hold-for-return only because no phone channel exists.
+Away mode is a posture of the one supervision session, recorded in `state/.afk-contract` by `bin/jg-afk-contract.sh` in the same turn as `/watchover` with no wait for a further go, read back in plain sentences only after entry, and announced at entry as hold-for-return only because no phone channel exists.
 The captain's away words are the whole mandate: the record owner's header is the single owner of the record schema, the words are recorded verbatim, and by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
 The supervision session reads the words at the tail of every wake and acts on them by its own judgment at the moment an event makes them relevant, only through the guarded scripts under standing authority, never by analogy, holding for the return on doubt; `bin/jg-branch-prompt.sh` "Postures" owns those execution rules.
 What stays mechanical is exactly what a script can check without reading words: a merge green at its live head under the record lock, synchronous merges only, the spend cap, and the never-set; destructive, irreversible, and security-sensitive actions are never pre-authorizable whatever the words say.
@@ -210,7 +210,7 @@ The record's mode distinguishes away from quiet on every harness; `bin/jg-afk-la
 While the away record exists neither supervisor rechecks an item held for the captain, and a declared external wait names when it clears with `until` for a condition-aware recheck in both postures that occurs at the declared time or the hours-long `JG_PAUSE_RESURFACE_SECS` bound, whichever comes first.
 On Pi and pi-signed the away daemon is no longer launched: the ordinary supervision session continues under the record with main parked, so the supervision branch takes every actionable wake, captain outcomes accumulate for the return brief, and main's standing authority relocates to the branch through the guarded scripts, each keeping its own gate ([`pi-supervision-branch.md`](pi-supervision-branch.md#postures)); a wake the branch cannot take and a watcher failure still reach main.
 On a non-Pi home that runs the [supervision host](supervision-host.md), the host runs the away session instead of the daemon.
-A presence-gated sub-supervisor (`bin/jg-supervise-daemon.sh`) still extends walk-away supervision on the remaining harnesses: the `/afk` skill starts it through the tracked foreground helper `bin/jg-afk-start.sh` once the record exists, after which the watcher reverts to daemon-managed one-shot mode and the daemon self-handles routine wakes in bash.
+A presence-gated sub-supervisor (`bin/jg-supervise-daemon.sh`) still extends walk-away supervision on the remaining harnesses: the `/watchover` skill starts it through the tracked foreground helper `bin/jg-afk-start.sh` once the record exists, after which the watcher reverts to daemon-managed one-shot mode and the daemon self-handles routine wakes in bash.
 The watcher and daemon share `bin/jg-classify-lib.sh` for captain-relevant status verbs, declared-wait vocabulary (a `paused:` external wait and a verified `captain-held` transfer alike, through one combined predicate), and status-scan primitives.
 Terminal verbs remain captain-relevant, while a nonterminal progress verb cannot become terminal merely because its prose contains a legacy free-text token such as `merged`; bare legacy free-text lines remain compatible.
 The shared latest-event read takes the most recent line that leads with a recognized verb, a legacy token, or an unrecognized status prefix, so a bad declaration stays visible as itself while continuation prose and trailing blank lines after a multi-line record cannot hide a declared wait.
@@ -488,14 +488,14 @@ For manual project initialization, [`bin/jg-ensure-agents-md.sh`](../bin/jg-ensu
 
 ## Operational memory routing
 
-`/stow` sweeps the current session for durable knowledge that only exists in conversation and routes each finding to the most specific disk home.
+`/intel` sweeps the current session for durable knowledge that only exists in conversation and routes each finding to the most specific disk home.
 The destination for each kind of knowledge, including project-intrinsic knowledge, is owned by [`AGENTS.md` section 6](../AGENTS.md#6-project-and-knowledge-management).
-Memory writes use inspect-then-update rather than blind append; the internal [`stow` skill](../.agents/skills/intel/SKILL.md) owns tier markers, decay, cold archival, and offload.
+Memory writes use inspect-then-update rather than blind append; the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns tier markers, decay, cold archival, and offload.
 The same pass also persists open-work record state the session is holding - filing a thread that was never recorded and correcting one the session knows went stale - bounded to the open work that session is actually holding.
 It is deliberately not a reconciliation of durable records against repository or PR reality: its input is the volatile context, so it can only preserve what the session still knows, and no reconciliation that outlives a session exists today.
 Task-scoped notes use `bin/jg-tasks-axi.sh show <id> --full` followed by `bin/jg-tasks-axi.sh update <id> --body-file <path>`, adding `--archive-body` when the prior body should remain recoverable.
 The stow pass never writes a skill, but a separately executed, captain-approved migration may move conditional knowledge into a user-owned local skill excluded from the Juggernaut clone; changes to Juggernaut's tracked skills remain deliberate repository work through the normal PR pipeline.
-Invoked in a primary home, `/stow` then cascades the same sweep to every registered Squad Lead, enumerated through `bin/jg-stow-cascade.sh`: each home is accounted and curated against its own startup-memory allowance, a live Squad Lead sweeps its own session, and a slow or unreachable home is reported as an exception rather than blocking the primary.
+Invoked in a primary home, `/intel` then cascades the same sweep to every registered Squad Lead, enumerated through `bin/jg-stow-cascade.sh`: each home is accounted and curated against its own startup-memory allowance, a live Squad Lead sweeps its own session, and a slow or unreachable home is reported as an exception rather than blocking the primary.
 
 ## Local clones stay fresh
 
@@ -509,22 +509,22 @@ The refresh also prunes local branches whose remote is gone and that no worktree
 
 ## Self-updates stay safe
 
-`/updatejuggernaut` fast-forwards the running Juggernaut repo and registered Squad Lead homes from `origin` without touching project clones.
+`/resupply` fast-forwards the running Juggernaut repo and registered Squad Lead homes from `origin` without touching project clones.
 It restarts every live Squad Lead whose home the pass left on the target commit through a persist-gated replacement, including a home that needed no advance, because a restart is also the only thing that re-resolves launch-time harness wiring; the re-read nudge is retained only as the fallback for live agents whose runtime cannot prove a restart.
 For a remote route, the configured code root updates from its own origin on that host before the persistent home fast-forwards to the code-root commit.
 The primary update is fast-forward only, while a clean Squad Lead divergence may reconcile with `reset --keep` only when a three-way temporary-index proof shows its complete local tree result is already present at the target, including after a squash merge.
 Dirty, uniquely diverged, offline, and off-default targets are reported and left untouched, and genuine Squad Lead divergence remains visible through a durable reconciliation record until a later successful convergence clears it.
 Local homes share the guarded fast-forward helper, while remote updates delegate the same safety decision to the configured host through the generic transport.
-The procedure and outcome vocabulary are owned by the [`/updatejuggernaut` skill](../.agents/skills/resupply/SKILL.md); the relevant script headers own the mechanics.
+The procedure and outcome vocabulary are owned by the [`/resupply` skill](../.agents/skills/resupply/SKILL.md); the relevant script headers own the mechanics.
 
 ## Restart-proof
 
 Fleet state lives in each task's session-provider backend (tmux by hard default, herdr or cmux when selected or auto-detected, zellij/orca when explicitly selected), no-mistakes run records, status event logs, local markdown under `data/` including `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, and persistent Squad Lead homes.
 For herdr, respawning after a server-restored layout closes and replaces confirmed no-agent or dead task-tab husks instead of requiring manual tab cleanup.
 At session start and again on the watcher's bounded liveness cadence, confirmed-dead Squad Lead agent endpoints are closed and relaunched through the same Squad Lead spawn path, while ambiguous liveness reads are left untouched to avoid duplicate supervisors.
-Use `/stow` before an intentional reset when the conversation may hold durable knowledge that has not yet been written to disk; after that, the next Juggernaut session can reconcile and carry on.
+Use `/intel` before an intentional reset when the conversation may hold durable knowledge that has not yet been written to disk; after that, the next Juggernaut session can reconcile and carry on.
 
 ## Development notes
 
 The current watcher reliability work combines always-on bash triage with a durable queue for actionable wakes, generation-bound post-handling acknowledgement, deterministic re-arm recovery after watcher downtime, a race-proof singleton lock, duplicate self-eviction, drain-time liveness assertion, and a self-verifying tracked-child arm wrapper.
-The away posture is the record `bin/jg-afk-contract.sh` owns; see [supervision-host.md](supervision-host.md) for the non-Pi away session and the `/afk` skill for the remaining daemon-backed harnesses.
+The away posture is the record `bin/jg-afk-contract.sh` owns; see [supervision-host.md](supervision-host.md) for the non-Pi away session and the `/watchover` skill for the remaining daemon-backed harnesses.
