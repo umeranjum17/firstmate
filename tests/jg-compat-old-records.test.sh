@@ -24,6 +24,13 @@ printf 'maintainer github.com/o/r\n' > "$h/config/firstmate-role"
   [ "${JG_ROLE:-}" = maintainer ]
 ) || fail "an old config/firstmate-role no longer grants the maintainer role"
 pass "old role file still grants maintainer"
+(
+  # shellcheck disable=SC1090
+  . "$ROOT/bin/fm-role-lib.sh"
+  fm_role_resolve "$h" "$h/config" >/dev/null 2>&1
+  [ "${FM_ROLE:-}" = maintainer ]
+) || fail "the old role resolver does not answer in its old variables"
+pass "the old role resolver answers in its old variables"
 touch "$h/config/.fm-inherit-firstmate-role.generation"
 [ "$(. "$ROOT/bin/jg-role-lib.sh"; jg_role_inherit_receipt "$h/config")" = "$h/config/.fm-inherit-firstmate-role.generation" ] \
   || fail "an old inheritance receipt is not found"

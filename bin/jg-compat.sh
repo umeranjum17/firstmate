@@ -165,6 +165,14 @@ jg_compat_meta_is_squad_lead() {  # <meta-file>
   grep -qE '^kind=(squad_lead|secondmate)$' "${1-}" 2>/dev/null
 }
 
+# Copy every variable whose name starts with <JG_prefix> to its old FM_ name.
+jg_compat_mirror_vars() {  # <JG_ prefix>
+  local _jg_v
+  for _jg_v in $(compgen -v "${1-}"); do
+    printf -v "FM_${_jg_v#JG_}" '%s' "${!_jg_v}"
+  done
+}
+
 # Old function names for a library reached through its old path. The add-ons
 # source the old library path and call the old function names (fm_* for jg_*,
 # the old nested-supervisor word for squad_lead_*). A shim that loads a library
@@ -179,7 +187,11 @@ jg_compat_function_aliases() {
       *) continue ;;
     esac
     declare -F "$old" >/dev/null 2>&1 && continue
-    eval "$old() { $fn \"\$@\"; }"
+    case "$fn" in
+      # The role resolver answers in variables; an old caller reads them under their old prefix.
+      jg_role_*) eval "$old() { local _jg_rc=0; $fn \"\$@\" || _jg_rc=\$?; jg_compat_mirror_vars JG_ROLE; return \$_jg_rc; }" ;;
+      *) eval "$old() { $fn \"\$@\"; }" ;;
+    esac
   done
 }
 
