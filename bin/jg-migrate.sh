@@ -22,7 +22,8 @@ LEGACY = re.compile(rb"FIRSTMATE_OP:|FIRSTMATE|firstmate-addons|firstmate|second
 KNOWN_NONRECORDS = (re.compile(r"state/model-gate\.check\.sh"),)
 # An old script path, environment name, function name, add-ons path or operational-input marker
 # still resolves through the compatibility layer, so it needs no rewrite.
-COMPAT_RESOLVED = re.compile(rb"\bbin/fm-[a-z0-9-]+\.sh|\bfm-[a-z0-9-]+\.sh|\bFM_[A-Z0-9_]+|\bfm_[a-z0-9_]+|FIRSTMATE_OP:|firstmate-addons")
+COMPAT_RESOLVED = re.compile(rb"\bbin/fm-[a-z0-9-]+\.sh|\bfm-[a-z0-9-]+\.sh|\bFM_[A-Z0-9_]+|\bfm_[a-z0-9_]+|FIRSTMATE_OP:|firstmate-addons|[\w./@+~-]*/[\w./@+~-]*(?:firstmate|secondmate|fm-)[\w./@+~-]*")
+# The last alternative is an absolute or relative host path; it names where a home sits, which no migration can change.
 # Free text and per-task records: a legacy word here is prose or history, never a name the code reads.
 FREE_TEXT = (
     re.compile(r"data/.*\.(md|txt|log|hashes|json)"),
@@ -30,6 +31,21 @@ FREE_TEXT = (
     re.compile(r"config/.*\.md"),
     re.compile(r"state/.*\.(log|out|err|txt|md|json)"),
     re.compile(r"state/\.[^/]*branch-outcome-index"),
+    # Per-task and per-message state: history that no reader keys on by name.
+    re.compile(r"state/(terminal-outcomes|operational-inbox|branch-session)/.*"),
+    re.compile(r"state/[^/]+\.inbox/.*"),
+    re.compile(r"state/\.[^/]*(inherited-config-reread|custom-check)[^/]*"),
+    re.compile(r"state/\.(watch\.lock\.owner|wake-queue|branch-)[^/]*.*"),
+    # Per-task side records: prior briefs and metas, poll registrations, operator-written check scripts and their trust hash.
+    re.compile(r"state/[^/]+\.(brief-prior|meta-prior|pr-poll-[a-z-]+|check\.sh|check-trust)"),
+    re.compile(r"state/[^/]+\.control-relaunch\.(brief|meta)-prior"),
+    re.compile(r"state/(decision-bindings|procevent)/.*"),
+    re.compile(r"state/[^/]+\.lock"),
+    # Runtime prompts, mirrors, summaries and outcome logs: generated text rewritten by the running code.
+    re.compile(r"state/\.(home-summary\.json\.[^/]*|host-mirror\.jsonl|supervision-host-[a-z]+)"),
+    re.compile(r"state/(branch-outcomes\.jsonl|[^/]+\.merge-authority)"),
+    # Captain-authored host hooks and routing files hold absolute host paths and prose, not product names.
+    re.compile(r"config/(crew-dispatch\.json|fleet-board|launch-env-hook|merge-gate|owner-rules-canary|post-merge)"),
 )
 
 p = argparse.ArgumentParser(description=__doc__)
@@ -62,6 +78,11 @@ def transform(path, raw):
         updated = field.sub(replacement, updated)
     if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
         return updated
+    if re.fullmatch(r"state/[^/]+\.status", rel):
+        # Prose in a status event is history; only a legacy event key at the start of a line is read by name.
+        if re.search(rb"^(fm-|FM_)[a-z0-9_-]*:", updated, re.M):
+            raise ValueError(f'unclassified legacy content: {rel}')
+        return updated
     if LEGACY.search(COMPAT_RESOLVED.sub(b"", updated)):
         raise ValueError(f'unclassified legacy content: {rel}')
     return updated
@@ -78,6 +99,8 @@ def files():
                 path = pathlib.Path(root) / name
                 rel = path.relative_to(home).as_posix()
                 if path.is_symlink():
+                    if any(pattern.fullmatch(rel) for pattern in FREE_TEXT):
+                        continue
                     if LEGACY.search(os.readlink(path).encode()):
                         unknown.append(f'unclassified legacy symbolic link: {rel}')
                     continue
