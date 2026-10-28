@@ -1517,14 +1517,14 @@ Every home requires:
 - done-done (`done-done-axi`, at its [`toolchain.versions`](../toolchain.versions) row).
 - sign-off-axi (at its `toolchain.versions` row).
 
-[`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns the axi-family floor policy and the gh-axi and lavish-axi floors, while [`bin/fm-tasks-axi-lib.sh`](../bin/fm-tasks-axi-lib.sh) and [`bin/fm-quota-axi-lib.sh`](../bin/fm-quota-axi-lib.sh) hold their own tools' floor constants.
+[`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns the axi-family floor policy and the gh-axi floor, while [`bin/fm-tasks-axi-lib.sh`](../bin/fm-tasks-axi-lib.sh) and [`bin/fm-quota-axi-lib.sh`](../bin/fm-quota-axi-lib.sh) hold their own tools' floor constants.
 The two companion tools install at the exact published npm version their `toolchain.versions` rows name, never from git, and that row is their floor too.
 This section is the single owner of that universal toolchain list; backend guides' prerequisites point here and add only their backend-specific tools.
 [`toolchain.versions`](../toolchain.versions) is the single owner of the exact version of every tool the toolchain installs, and every floor these checks enforce derives from its rows; its header owns the bump ritual.
 [`install.sh`](../install.sh) is the one command for a clean machine: it clones this repo into a home, writes [`defaults/`](../defaults) into the home once without overwriting an existing file, merges the shared account picker into `~/.learn-from-mistakes/config.yaml` only when that key is missing, and installs those pins into `~/.local/bin`, the same prefix [`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) installs into, so no install needs sudo and no tool ends up installed twice in two directories.
 
 In that list, no-mistakes runs the validation pipeline, gh-axi and chrome-devtools-axi cover GitHub and browser operations, and tasks-axi plus quota-axi back backlog mutations and quota-aware array dispatch.
-Lavish is a presentation-only dependency for visual decisions and reports; nonvisual work can proceed with plain text when it is unavailable.
+Lavish remains an optional presentation tool for visual decisions and reports, but Juggernaut does not install it; nonvisual work can proceed with plain text when it is unavailable.
 
 **Backend requirements**
 
@@ -1566,7 +1566,7 @@ Sign-off arming stays per home and is never done for the user; the first wiring 
 
 - An absent or incompatible `tasks-axi` reports `MISSING: tasks-axi (install: npm install -g tasks-axi)`; when `config/backlog-backend` is not `manual`, a home with a configured non-markdown adapter or a markdown backlog refuses lifecycle mutation until compatible `tasks-axi` is on `PATH`, while a manual-backend home keeps its backlog hand-edited.
 - An absent or incompatible `gh-axi` reports `MISSING: gh-axi (install: npm install -g gh-axi && gh-axi setup hooks)`.
-- An absent or board-incompatible `lavish-axi` reports `PRESENTATION_UNAVAILABLE` with the 0.1.77 compatibility floor, install command, and explicit text fallback; compatible versions below 0.1.80 retain legacy board replies and report an upgrade recommendation for synchronous acceptance, while [`bootstrap-diagnostics`](../.agents/skills/bootstrap-diagnostics/SKILL.md) owns diagnostic handling.
+- An absent or board-incompatible `lavish-axi` reports `PRESENTATION_UNAVAILABLE` with the 0.1.77 compatibility floor and explicit text fallback; Juggernaut does not provide an install command for this optional tool, while [`bootstrap-diagnostics`](../.agents/skills/bootstrap-diagnostics/SKILL.md) owns diagnostic handling.
 - An absent or too-old `quota-axi` reports `MISSING: quota-axi (install: npm install -g quota-axi)`; Juggernaut cannot resolve a profile array without a compatible binary.
 
 **Checkout diagnostics**
