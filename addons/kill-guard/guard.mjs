@@ -55,8 +55,19 @@ function fleetOwned(p) {
 	if ([p.cwd, ...p.argv.filter(isAbsolute)].filter(Boolean).some(fleetPath)) return true;
 	try { // Registered project worktrees share their repository with the primary home's projects.
 		const common = execFileSync("git", ["-C", p.cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-		return under(realpathSync(`${MAIN_HOME}/projects`), realpathSync(common));
+		const real = realpathSync(common);
+		return registeredHomes().some((home) => { try { return under(realpathSync(`${home}/projects`), real); } catch { return false; } });
 	} catch { return false; }
+}
+// The primary home plus every lead home its registry names, so a lead's project worktree counts as fleet-owned too.
+function registeredHomes() {
+	const homes = [MAIN_HOME];
+	for (const name of ["squad_leads.md", "secondmates.md"]) {
+		try {
+			for (const m of readFileSync(`${MAIN_HOME}/data/${name}`, "utf8").matchAll(/\(home: (\/[^;)]+?)[;)]/g)) homes.push(m[1]);
+		} catch {}
+	}
+	return homes;
 }
 // Never retain prompts, credentials, URLs or arbitrary argument values in the audit.
 const safeArg = (arg) => /^(?:--?[a-zA-Z][a-zA-Z-]*|-?[0-9]+|node|python3?|sleep|bash|sh|kill|server|daemon|stuck|cleanup|worker|watcher|sampler|preview|fleet|test|Umer)$/.test(arg) || (isAbsolute(arg) && fleetPath(arg)) ? arg : "[redacted]";

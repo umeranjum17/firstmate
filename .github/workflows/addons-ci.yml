@@ -141,6 +141,7 @@ jobs:
       - name: Kill guard Main allowance and CLI journeys
         run: |
           node kill-guard/tests/main-allowance.test.mjs
+          node kill-guard/tests/lead-project-worktree.test.mjs
           bash kill-guard/tests/kill-guard.test.sh --guard-only
       # Fixture throwaway HOME, XDG and home with a stub opencode and a stub fleet check: nothing real is touched.
       - name: Model gate test
