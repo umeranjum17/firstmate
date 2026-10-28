@@ -4,7 +4,7 @@
 
 Anyone who runs a fleet of coding agents on their own machine and wants it to keep moving when a provider slows down, a task wedges, or an agent tries something destructive.
 
-We are the first users: this is one public repo for the fleet dashboard and every other add-on we built for our own fleet.
+We are the first users: this is one public repo for Lookout integration and every other add-on we built for our own fleet.
 
 ## The problem
 
@@ -26,7 +26,7 @@ In the owner's words: "Whatever is in [the upstream] repo stays in [the fleet ma
 - **Wrap, don't copy.** An add-on runs on the upstream tool plus our thin layer, so upstream updates arrive with no merge.
 - **Clean install and uninstall.** Every add-on installs and uninstalls cleanly, like an extension.
 - **A guard's block is final.** A blocked destructive action is not retried or worked around, no agent or reviewer approves it, and the block alerts you.
-- **The dashboard is exact and glanceable.** Numbers are deterministic and correct, the first phone screen answers everything ("I should not be needing to open and dig into the weeds"), and "Waiting on you" shows only what really needs you. It is visual first, with real charts, not a page of text.
+- **Lookout is exact and glanceable.** Its fleet data is deterministic and correct, and its first phone screen answers the key questions without hiding the detail.
 - **Functional first.** A new thing a user can do, working end to end and rolled out, comes before polish. Working with slight rough edges beats never shipped; the main path's look and flow still have to be right.
 - **Proof on the real product.** Integration and end-to-end tests only, driving the real product like a user.
 - **Small changes.** Each piece moves in a pull request of at most 300 changed lines.
@@ -43,5 +43,5 @@ In the owner's words: "Whatever is in [the upstream] repo stays in [the fleet ma
 
 The last tagged cut was v0.1.0, the first one, on 22 Oct 2026; these add-ons live in this package's `addons/` directory and no release tag has followed the move.
 
-1. **v0.2.0 "tickets"** (target 24-25 Oct 2026): a task needs a priority and a target release when it is added or held; a Tickets view on the fleet dashboard with release lanes; old evidence cards retitled.
+1. **v0.2.0 "tickets"** (target 24-25 Oct 2026): a task needs a priority and a target release when it is added or held; Tickets stay on the sign-off board; old evidence cards retitled.
 2. **v0.3.0**: the account pool and the lead-wake policy leave the fork, each behind one hook line, so upstream updates need no merge.

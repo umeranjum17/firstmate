@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# jg-skill-stats.sh - per-skill fleet statistics for the dashboard's Skills view.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+# jg-skill-stats.sh - per-skill fleet statistics reader.
 # Usage: JG_HOME=<home> jg-skill-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads
@@ -16,16 +24,7 @@
 #   zero_read_w7, zero_read_w30  known skills with no reads in that window, only for
 #                 windows the coverage spans and while no remote home is registered
 #   coverage      whether skills.tsv was present, its row/day/skill/home counts
-#   limitations   human-readable coverage notices (the dashboard shows the count)
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  declare -p "$_jg_new" >/dev/null 2>&1 && continue
-  export "$_jg_new=${!_jg_old}"
-done
-unset _jg_old _jg_new 2>/dev/null || true
-
+#   limitations   human-readable coverage notices
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 - "$SCRIPT_DIR" "${JG_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'

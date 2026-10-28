@@ -175,8 +175,8 @@ test_wrapper_overrides_ambient_file() {
     || fail "add under an ambient TASKS_AXI_FILE failed"
   assert_grep "amb-1" "$dir/home/data/backlog.md" "an ambient TASKS_AXI_FILE diverted the write from the home"
   assert_no_grep "amb-1" "$dir/decoy.md" "an ambient TASKS_AXI_FILE received the write"
-  wrapper_from_code "$dir" >/dev/null || fail "the no-command dashboard failed"
-  pass "jg-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves the dashboard"
+  wrapper_from_code "$dir" >/dev/null || fail "the no-command task listing failed"
+  pass "jg-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves read-only listings"
 }
 
 test_wrapper_refusals() {

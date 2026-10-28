@@ -18,7 +18,6 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
 - `delete-guard` — stops any agent from recursively deleting `/` or a home folder; a block alerts you and is final. Wire in: `delete-guard/install.sh <home>`.
 - `fleet-contract-check` — runs each real cross-repo call (dispatch-resolve, owner-guard, checks-lint) in a throwaway HOME and names the caller that breaks. Nothing to install: run `fleet-contract-check/fleet-contract-check`.
-- `fleet-dashboard` — legacy files retained for shared helpers used by `tickets-sync` and the `claude-accounts` proof; not a supported fleet view.
 - `lookout-adapter` — the only fleet dashboard: serves Lookout's read-only `lookout.fleet.v1` document from `jg-flow` and registered home records; no secrets.
 - `tickets-sync` - reads registered backlogs into sign-off Tickets; see [setup and limits](../tickets-sync/README.md).
 - `fleet-flow` — reads fleet lifecycle, queue and bottleneck JSON; installs the home flow check for task slots. Wire in: `fleet-flow/install.sh`.

@@ -159,7 +159,7 @@ run_ahoy_transcript_regressions() {
     "$ROOT/bin/jg-gate-refuse-lib.sh" \
     "$ROOT/bin/jg-operational-input.sh" \
     "$AHOY_PROJECT/bin/"
-  cp "$ROOT/.agents/skills/ahoy/SKILL.md" "$AHOY_PROJECT/.agents/skills/ahoy/SKILL.md"
+  cp "$ROOT/.agents/skills/debrief/SKILL.md" "$AHOY_PROJECT/.agents/skills/ahoy/SKILL.md"
   chmod +x "$AHOY_PROJECT/bin/jg-sessionstart-nudge.sh"
   # shellcheck disable=SC2016 # Variables expand in the generated script, not this test shell.
   printf '%s\n' \

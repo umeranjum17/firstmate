@@ -5,7 +5,7 @@
 # BOOTSTRAP_INFO fact, or completed bootstrap no-action fact and is silent when
 # all is well. juggernaut consumes the exact 'MISSING: treehouse (install: ...)',
 # 'MISSING: tasks-axi (install: ...)', 'MISSING: quota-axi (install: ...)',
-# 'MISSING: gh-axi (install: ...)', 'PRESENTATION_UNAVAILABLE: lavish-axi ...', and
+# 'MISSING: gh-axi (install: ...)' and the optional presentation fallback, and
 # 'BOOTSTRAP_INFO: ...' lines, so those contracts are pinned verbatim. The cases
 # are table-driven over the inputs that vary: whether `treehouse get --help`
 # advertises --lease, which (if any) tasks-axi version is on PATH, whether
@@ -37,7 +37,7 @@ export JG_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 . "$ROOT/bin/jg-pin-lib.sh"
 export JG_FAKE_GH_AXI_VERSION=${JG_FAKE_GH_AXI_VERSION:-$(jg_pin_version gh-axi)}
 export JG_FAKE_QUOTA_AXI_VERSION=${JG_FAKE_QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
-export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-$(jg_pin_version lavish-axi)}
+export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-0.1.80}
 export JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(jg_pin_version learn-from-mistakes)}
 export JG_FAKE_DONE_DONE_AXI_VERSION=${JG_FAKE_DONE_DONE_AXI_VERSION:-$(jg_pin_version done-done)}
 export JG_FAKE_SIGN_OFF_AXI_VERSION=${JG_FAKE_SIGN_OFF_AXI_VERSION:-$(jg_pin_version sign-off-axi)}
@@ -411,9 +411,9 @@ ROWS
 
 test_lavish_axi_min_version() {
   local label version mode case_dir fakebin out unavailable upgrade n
-  unavailable="PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g $(jg_pin_npm lavish-axi) && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish"
+  unavailable="PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports"
   local lavish_min lavish_below
-  lavish_min=$(jg_pin_version lavish-axi)
+  lavish_min=0.1.80
   lavish_below=$(just_below "$lavish_min")
   upgrade="BOOTSTRAP_INFO: lavish-axi >=$lavish_min enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
   n=0
@@ -439,7 +439,7 @@ test_lavish_axi_min_version() {
     esac
   done <<ROWS
 absent lavish-axi permits text fallback^absent^unavailable
-pinned lavish-axi version is accepted^$lavish_min^empty
+synchronous-reply minimum is accepted^$lavish_min^empty
 older compatible lavish-axi retains boards and recommends upgrade^$lavish_below^upgrade
 minimum legacy board version is accepted with upgrade advice^0.1.77^upgrade
 newer lavish-axi patch is accepted^0.2.0^empty

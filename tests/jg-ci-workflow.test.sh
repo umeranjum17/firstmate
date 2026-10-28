@@ -458,7 +458,7 @@ test_path_scope_keeps_every_executable_change_on_the_full_suite() {
 bin/jg-watch.sh
 tests/jg-ci-workflow.test.sh
 AGENTS.md
-.agents/skills/afk/SKILL.md
+.agents/skills/watchover/SKILL.md
 .github/workflows/ci.yml
 docs/examples/crew-dispatch.json
 docs/supervision-protocols/builds.md

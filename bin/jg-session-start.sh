@@ -1020,7 +1020,7 @@ if jg_pf_relay_active "$JG_HOME" \
     printf '\nEach line is a public loop this home still holds: a reply still owed, or an open loop with nothing owed.\n'
     printf 'Reconcile terminal results with %s/bin/jg-public-followup.sh consume, then deliver a ready one with\n' "$JG_ROOT"
     printf '%s/bin/jg-public-followup.sh deliver <id>. Hand a delivered loop on with rechain, or close it with\n' "$JG_ROOT"
-    printf '%s/bin/jg-public-followup.sh retire <id> --reason "...". Load fmx-respond for the procedure.\n' "$JG_ROOT"
+    printf '%s/bin/jg-public-followup.sh retire <id> --reason "...". Load relay-respond for the procedure.\n' "$JG_ROOT"
   fi
 fi
 

@@ -6,7 +6,7 @@
 #          exits 0.
 #          Silent = all good.
 #          Lines: "MISSING: <tool> (install: <command>)",
-#                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
+#                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)",
 #                 "NEEDS_GH_AUTH" (skipped when every registered project is
 #                 local-only with a clone and no clone is unregistered),
@@ -63,7 +63,7 @@
 #          The AXI-family floor policy is owned beside GH_AXI_MIN and
 #          LAVISH_AXI_MIN below; the per-tool owners point there. An installed
 #          essential build below its floor reports MISSING like no-mistakes.
-#          Missing or incompatible lavish-axi reports PRESENTATION_UNAVAILABLE;
+#          Missing or incompatible lavish-axi reports PRESENTATION_UNAVAILABLE without an install command;
 #          a compatible older build keeps legacy boards and reports a BOOTSTRAP_INFO
 #          upgrade recommendation for synchronous reply acceptance.
 #          tasks-axi feature probes remain a separate defense-in-depth check.
@@ -879,7 +879,7 @@ install_cmd() {
       # command and the installer cannot disagree about a version.
       spec=$(jg_pin_npm "$1") || return 1
       case "$1" in
-        gh-axi|chrome-devtools-axi|lavish-axi) echo "npm install -g $spec && $1 setup hooks" ;;
+        gh-axi|chrome-devtools-axi) echo "npm install -g $spec && $1 setup hooks" ;;
         *) echo "npm install -g $spec" ;;
       esac
       ;;
@@ -929,7 +929,7 @@ NO_MISTAKES_MIN=$(jg_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # of its floor.
 GH_AXI_MIN=$(jg_pin_version gh-axi) || GH_AXI_MIN=0.0.0
 LEARN_FROM_MISTAKES_AXI_MIN=$(jg_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
-LAVISH_AXI_MIN=$(jg_pin_version lavish-axi) || LAVISH_AXI_MIN=0.0.0
+LAVISH_AXI_MIN=0.1.80
 LAVISH_AXI_BOARD_MIN=0.1.77
 # The proof and decision tools Juggernaut publishes install at the exact build
 # their toolchain.versions rows name, and that row is their floor too, so one bump
@@ -1563,7 +1563,7 @@ detect_local_tools() {
     echo "MISSING: sign-off-axi (install: $(install_cmd sign-off-axi))"
   fi
   if ! tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"; then
-    echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; install: $(install_cmd lavish-axi)) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish"
+    echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports"
   elif ! tool_version_at_least lavish-axi "$LAVISH_AXI_MIN"; then
     echo "BOOTSTRAP_INFO: lavish-axi >=$LAVISH_AXI_MIN enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
   fi

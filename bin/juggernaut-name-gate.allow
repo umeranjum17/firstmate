@@ -451,3 +451,4 @@ bin/jg-migrate.sh  # the migrator names the old spellings it rewrites; they are 
 tests/jg-migrate.test.sh  # fixtures in the old spellings the migrator rewrites
 tests/jg-ai-engine.test.sh  # inline jg-compat env alias
 tests/juggernaut-axi.test.sh  # inline jg-compat env alias
+addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env alias

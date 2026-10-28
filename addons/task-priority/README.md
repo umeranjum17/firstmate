@@ -1,6 +1,6 @@
 # task-priority
 
-A new backlog task must carry a priority 0-3 and a target release, so every open item reads as a ticket on the fleet dashboard.
+A new backlog task must carry a priority 0-3 and a target release, so every open item can be published as a ticket on the sign-off board.
 
 - `bin/jg-task-priority-check.sh <tasks-axi command> [args...]` checks `add`/`create` only (other commands exit 0).
   Priority comes from `--priority 0-3`; missing or out of range exits 1 with `task-priority: ... pass --priority 0|1|2|3`.

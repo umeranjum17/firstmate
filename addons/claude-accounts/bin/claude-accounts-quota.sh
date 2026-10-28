@@ -2,7 +2,7 @@
 # claude-accounts-quota.sh - one quota view of every Claude account the owner has signed in.
 # Reads the account list from the muxr registry, asks the real `quota-axi --profile-only` about each
 # profile folder (the folder path is the only thing passed; nothing inside a login folder is opened),
-# and writes <home>/state/claude-accounts.json for the dashboard card and for dispatch input.
+# and writes <home>/state/claude-accounts.json for dispatch input.
 # Usage: claude-accounts-quota.sh [--print]     (--print: also show the file on stdout)
 # Env:   JG_HOME (required), JG_CLAUDE_ACCOUNTS_REGISTRY
 #        (default: ~/.muxr/plans/accounts-v1.json), JG_CLAUDE_ACCOUNTS_SECONDS (per-account read limit, 60).

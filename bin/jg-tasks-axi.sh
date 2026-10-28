@@ -29,8 +29,8 @@
 # tasks-axi's built-in defaults, which keep the archive beside the backlog)
 # supplies the adapter, done_keep, and the archive path; a markdown backlog is
 # additionally pinned to `<data>/backlog.md` through TASKS_AXI_FILE. The
-# environment carries the pin rather than a trailing --file so the no-command
-# dashboard works too. A configured non-markdown adapter is addressed by that
+# environment carries the pin rather than a trailing --file so read-only
+# task listings use the same home. A configured non-markdown adapter is addressed by that
 # root alone, so an inherited TASKS_AXI_FILE is cleared for it.
 #
 # The data directory is JG_DATA_OVERRIDE, else $JG_HOME/data, else the code

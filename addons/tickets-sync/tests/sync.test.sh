@@ -48,7 +48,7 @@ source_before=$(sha256sum "$JG_HOME/data/backlog.md" "$work/parked/data/backlog.
 bash "$root/tickets-sync/install.sh" --dry-run
 test ! -d "$XDG_DATA_HOME/jg-tickets-sync"
 bash "$root/tickets-sync/install.sh"
-printf 'not an image' > "$XDG_DATA_HOME/jg-tickets-sync/fleet-dashboard/jg-dashboard/icons/takeone.png"
+printf 'not an image' > "$XDG_DATA_HOME/jg-tickets-sync/tickets-sync/icons/takeone.png"
 env -u JG_HOME "$JG_HOME/state/tickets-sync.check.sh" | tee "$work/first.out"
 # Missing/broken icons are recorded quietly; check stdout would wake Main.
 jq -e '.["alpha-app"] == "no local image" and .takeone == "not a readable png image"' "$JG_HOME/state/tickets-sync/icons-skipped.json"
@@ -97,8 +97,8 @@ PY
 jq -e --arg internal "$(ticket_id main/internal)" '.tickets[] | select(.id == $internal) | (.project // "") == ""' <(sign-off-axi ticket "$work/board.json" --json)
 grep -qiE 'herdr( |$)' "$work/first.out" && { echo 'FAIL: herdr must not appear on check stdout'; exit 1; }
 sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name | ascii_downcase] | (index("herdr") == null) and (index("herdr-runtime") == null)'
-sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/fleet-dashboard/jg-dashboard/icons/ownvoice.png" | cut -d" " -f1)"'"'
-cmp "$root/fleet-dashboard/jg-dashboard/icons/ownvoice.png" "$work/icons/ownvoice.png"
+sign-off-axi project "$work/board.json" --json | jq -e '[.projects[] | .name] == ["ownvoice"] and .projects[0].icon.sha256 == "'"$(sha256sum "$root/tickets-sync/icons/ownvoice.png" | cut -d" " -f1)"'"'
+cmp "$root/tickets-sync/icons/ownvoice.png" "$work/icons/ownvoice.png"
 test ! -e "$work/icons/takeone.png"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 30 and .ticket.state == "in progress" and .ticket.stage == "building" and .ticket.last_event_at == 1700000050'
 printf 'working [key=nm-umer-ci] [at=1700000100]: checking CI\n' >> "$JG_HOME/state/long.status"

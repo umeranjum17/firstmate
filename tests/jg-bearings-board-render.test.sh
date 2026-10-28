@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Behavior tests for the shipped bearings board renderer
-# (.agents/skills/bearings/assets/board-template.html), exercised through a real
+# (.agents/skills/sitrep/assets/board-template.html), exercised through a real
 # `jg-bearings-board.sh build` and then executed under the minimal DOM shim in
 # tests/assets/board-render-harness.mjs. The assertions are on what the page
 # renders - row badges, the stat strip, the empty state - never on the

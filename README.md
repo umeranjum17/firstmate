@@ -204,7 +204,7 @@ Setup guides for tmux (the default) and every other supported runtime are linked
 
 Juggernaut ships these user-invocable built-in skills. Claude and Grok use the slash form shown here; Codex uses the same names with `$`, such as `$afk`.
 
-- **`/afk`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/afk/SKILL.md) for the posture and return contract.
+- **`/afk`** — away-mode supervision: Pi's in-process branch, a [supervision host](docs/configuration.md#supervision-host-configsupervision-host), or the daemon handles wakes while you step away. See the [away procedure](.agents/skills/watchover/SKILL.md) for the posture and return contract.
 - **`/quiet`** — keep routine wakes off main while you stay and chat; `/quiet off` ends it.
 - **`/ahoy`** — recap session events and unanswered Captain decisions, then walk open decisions one at a time.
 - **`/bearings`** — four-section fleet sitrep; `file` writes a dated report, `include PRs` adds live GitHub enrichment.

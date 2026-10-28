@@ -360,7 +360,7 @@ print('PASS: real flow CLI, two homes, queue, keyed waits, retained lifecycle, u
 PY
 
 # The per-model and per-skill readers and the outcome recorder: run the real CLIs
-# over isolated durable records and read the JSON the dashboard's Models and Skills views consume.
+# over isolated durable records and read the JSON the model and skill statistics commands consume.
 mkdir -p "$TMP/stats"
 HOME="$TMP/stats/home" XDG_CONFIG_HOME="$TMP/xdg" TMPDIR="$TMP/tmp" python3 - \
   "$JG_BIN/jg-model-stats.sh" "$JG_BIN/jg-skill-stats.sh" "$JG_BIN/jg-task-outcome.sh" "$TMP/stats" <<'PY'

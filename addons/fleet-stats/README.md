@@ -1,20 +1,16 @@
 # fleet-stats
 
-The per-model and per-skill fleet statistics — the readers the dashboard's
-Models and Skills sections call, their shared library, and the outcome
-recorder that spawn and teardown call — moved **verbatim** out of the
-supervising fork into this add-on repository. Nothing reads or writes from
-here yet: the live flow keeps running the fork's `bin/jg-model-stats.sh`,
-`bin/jg-skill-stats.sh` and `bin/jg-task-outcome.sh`, and the fork-side hook
-that will exec into this directory lands in a later PR. Until that swap this
-directory is dormant, and every moved byte below is identical to the fork
-copy the live flow runs today, except the lock-library line of
-`bin/jg-task-outcome.sh` (see Layout).
+The per-model and per-skill fleet statistics readers, their shared library,
+and the outcome recorder that spawn and teardown call moved **verbatim** out
+of the supervising fork into this add-on repository. The statistics remain
+available as CLI readers; Lookout does not display them. The fork-side hook
+continues to run its own readers, and the lock-library line of
+`bin/jg-task-outcome.sh` differs from the original copy (see Layout).
 
 ## Layout
 
-- `bin/jg-model-stats.sh` — per-model fleet statistics for the dashboard's
-  Models view. Read-only: it writes nothing and never touches an endpoint.
+- `bin/jg-model-stats.sh` — per-model fleet statistics. Read-only: it writes
+  nothing and never touches an endpoint.
   It reads this home, then every locally registered home, from
   `data/metrics/task-outcomes.tsv` (authoritative), the older sampled
   `data/metrics/lanes.tsv` (only for tasks the outcomes file predates, marked
@@ -22,8 +18,8 @@ copy the live flow runs today, except the lock-library line of
   revert and escape counts). It imports `jg_stats_lib` from its own
   directory, so the moved copy only runs with the library beside it (see the
   proof below).
-- `bin/jg-skill-stats.sh` — per-skill fleet statistics for the dashboard's
-  Skills view. Read-only. It reads `data/metrics/skills.tsv` (absent file
+- `bin/jg-skill-stats.sh` — per-skill fleet statistics. Read-only. It reads
+  `data/metrics/skills.tsv` (absent file
   reports no rows rather than failing) and enumerates each local home's
   skill directories to name skills that were never read. It imports
   `jg_stats_lib` from its own directory like the model reader.
@@ -102,8 +98,8 @@ refactor.
    must be empty, and the sha256 and mode of each file must match the table
    above.
 3. Run `tests/jg-flow.test.sh` in the fork scratch tree (it covers the stats
-   readers and outcome recording; `jg-spawn.sh`, `jg-teardown.sh` and the
-   dashboard stay in the fork and are NOT moved); one PASS proves the
+   readers and outcome recording; `jg-spawn.sh` and `jg-teardown.sh` stay in the fork and are NOT moved); one
+   PASS proves the
    identical bytes.
 4. Run the repo CI gate (shellcheck plus syntax check over every add-on
    script) on the PR head. `bin/jg-task-outcome.sh` sources the lock library

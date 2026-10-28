@@ -59,7 +59,7 @@ jg_git_identity fmtest fmtest@example.com
 . "$ROOT/bin/jg-pin-lib.sh"
 export JG_FAKE_GH_AXI_VERSION=${JG_FAKE_GH_AXI_VERSION:-$(jg_pin_version gh-axi)}
 export JG_FAKE_QUOTA_AXI_VERSION=${JG_FAKE_QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
-export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-$(jg_pin_version lavish-axi)}
+export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-0.1.80}
 export JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(jg_pin_version learn-from-mistakes)}
 export JG_FAKE_DONE_DONE_AXI_VERSION=${JG_FAKE_DONE_DONE_AXI_VERSION:-$(jg_pin_version done-done)}
 export JG_FAKE_SIGN_OFF_AXI_VERSION=${JG_FAKE_SIGN_OFF_AXI_VERSION:-$(jg_pin_version sign-off-axi)}

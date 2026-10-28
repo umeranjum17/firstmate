@@ -24,7 +24,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-skill-stats.sh`      | Shim for the fleet-stats add-on: read per-skill fleet read counts as JSON ([skill statistics](fleet-ledger.md#skill-statistics)) |
 | `jg-ticket.sh`           | Record one task's ticket truth on the fleet board now: stage, state, delivered PR and target release ([tickets](../addons/tickets-sync/README.md#writing-a-ticket-at-the-moment-it-changes)) |
 | `jg-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
-| `juggernaut-axi`          | Read-only fleet facts for external tools: `status` and `tickets` as TOON or `--json` (`juggernaut-axi.v1`) |
+| `juggernaut-axi`          | Read-only fleet facts for external tools: `status`, `tickets`, `decisions`, and `messages` as TOON, plus the guarded writes `answer`, `message`, and `ticket` or `--json` (`juggernaut-axi.v1`) |
 | `jg-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
 | `jg-squad-lead-reconcile.sh` | Queue Bearings reconcile requests for later supervision delivery and ask each mismatched home through its durable inbox with a per-home cooldown |
 | `jg-update.sh`           | Guarded self-update of Juggernaut and local or remote Squad Lead homes, reconciling redundant divergence and classifying every live mate left on the target commit for restart or fallback nudge |

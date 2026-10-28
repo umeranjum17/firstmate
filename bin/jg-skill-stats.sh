@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# jg-skill-stats.sh - thin shim for the fleet per-skill statistics reader, which lives in this repository's addons/.
-#
-# The reader is the fleet-stats add-on (fleet-stats/bin/jg-skill-stats.sh, importing
-# jg_stats_lib from that same folder); this shim only resolves the add-ons
-# directory and execs it with JG_BIN pointing at this fork's bin/, the same
-# contract as the jg-dashboard.sh shim.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -24,6 +18,12 @@ else
     jg_compat_claims_root() { printf "%s\n" "${1-}"; }'
 fi
 unset _jg_d
+# jg-skill-stats.sh - thin shim for the fleet per-skill statistics reader, which lives in this repository's addons/.
+#
+# The reader is the fleet-stats add-on (fleet-stats/bin/jg-skill-stats.sh, importing
+# jg_stats_lib from that same folder); this shim only resolves the add-ons
+# directory and execs it with JG_BIN pointing at this fork's bin/, the same
+# contract as the fleet add-on shims.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

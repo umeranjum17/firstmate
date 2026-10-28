@@ -7,7 +7,7 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=${!_jg_old}"
 done
 unset _jg_old _jg_new 2>/dev/null || true
-# Behavior test for bin/juggernaut-axi (slice 1): status and tickets, TOON by
+# Behavior test for bin/juggernaut-axi (slices 1-3): status, tickets, decisions, messages, answer, message, ticket, TOON by
 # default with --json parity, the juggernaut-axi.v1 contract, bounds with disclosed
 # omissions, and refusal of unknown commands and bad arguments.
 set -u
@@ -59,8 +59,39 @@ assert_equals juggernaut-axi.v1 "$(jq -r .schema <<<"$status")" "status schema i
 assert_equals status "$(jq -r .view <<<"$status")" "status view"
 assert_contains "$("$AXI" status)" "view: status" "status TOON renders"
 
+assert_equals 0 "$("$AXI" decisions --json | jq -r .count)" "no open decisions before a hold"
+"$ROOT/bin/jg-captain-hold.sh" hold other-gate --reason "pick A or B" --priority 1 >/dev/null 2>&1 || fail "could not hold a task for the captain"
+dec=$("$AXI" decisions --json) || fail "decisions failed"
+assert_equals 1 "$(jq -r .count <<<"$dec")" "held task is an open decision"
+assert_equals other-gate "$(jq -r '.decisions[0].id' <<<"$dec")" "decision names the held task"
+
+mkdir -p "$HOME_DIR/state/ship-task.inbox/handled"
+printf 'schema=jg-task-inbox.v1\nat=2026-10-27T10:00:00Z\n--\nhello\nline2\n' > "$HOME_DIR/state/ship-task.inbox/001.msg"
+printf 'schema=jg-task-inbox.v1\nat=2026-10-27T10:05:00Z\n--\nbye\n' > "$HOME_DIR/state/ship-task.inbox/handled/002.msg"
+msgs=$("$AXI" messages ship-task --json) || fail "messages failed"
+assert_equals "pending handled" "$(jq -r '[.messages[].state] | join(" ")' <<<"$msgs")" "messages carry delivery state"
+assert_equals $'hello\nline2' "$(jq -r '.messages[0].body' <<<"$msgs")" "message body is verbatim"
+assert_equals 1 "$("$AXI" messages ship-task --limit 1 --json | jq -r '.omitted[0].count')" "older messages are counted"
+"$AXI" messages guessed-task >/dev/null 2>&1 && fail "unknown task must be refused"
+"$AXI" messages ../state >/dev/null 2>&1 && fail "path-like task id must be refused"
+
+# Writes: each goes through its guarded path and claims only what the record confirms.
+printf 'window=x:y\nworktree=/tmp\nproject=juggernaut\nharness=claude\nkind=ship\nmode=direct-PR\n' > "$HOME_DIR/state/ship-task.meta"
+sent=$("$AXI" message ship-task "please rebase" --json 2>/dev/null) || fail "message failed"
+assert_equals true "$(jq -r .ok <<<"$sent")" "message reports ok"
+assert_contains "$(cat "$HOME_DIR"/state/ship-task.inbox/*.msg)" "please rebase" "message landed in the durable inbox"
+"$AXI" message ship-task "/exit" >/dev/null 2>&1 && fail "terminal-bound text must be refused"
+"$AXI" message guessed-task hi >/dev/null 2>&1 && fail "message to an unknown task must be refused"
+tk=$("$AXI" ticket "Probe ticket" --repo juggernaut --priority 2 --json 2>/dev/null) || fail "ticket failed"
+assert_equals queued "$(jq -r '.ticket.state' <<<"$tk")" "ticket is queued, never started"
+"$AXI" ticket "x" --kind captain >/dev/null 2>&1 && fail "unlisted ticket kind must be refused"
+ans=$("$AXI" answer other-gate "Take A" --json 2>/dev/null) || fail "answer failed"
+assert_equals true "$(jq -r .confirmed <<<"$ans")" "answer confirmed by the durable record"
+assert_equals 0 "$("$AXI" decisions --json | jq -r .count)" "answered decision is no longer open"
+"$AXI" answer done-a "x" >/dev/null 2>&1 && fail "answering a non-decision must be refused"
+
 "$AXI" bogus >/dev/null 2>&1 && fail "unknown command must fail"
 "$AXI" tickets --state nope >/dev/null 2>&1 && fail "bad --state must fail"
 "$AXI" tickets --limit 0 >/dev/null 2>&1 && fail "bad --limit must fail"
 assert_contains "$("$AXI" --version)" "juggernaut-axi" "--version prints"
-pass "juggernaut-axi status and tickets"
+pass "juggernaut-axi status, tickets, decisions, messages, writes"

@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# jg-model-stats.sh - per-model fleet statistics for the dashboard's Models view.
+# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
+# here, so an unmigrated shell, unit, pane or record keeps this script working.
+for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
+  _jg_new="JG_${_jg_old#FM_}"
+  declare -p "$_jg_new" >/dev/null 2>&1 && continue
+  export "$_jg_new=${!_jg_old}"
+done
+unset _jg_old _jg_new 2>/dev/null || true
+# jg-model-stats.sh - per-model fleet statistics reader.
 # Usage: JG_HOME=<home> jg-model-stats.sh --json [--now <unix-seconds>]
 #
 # Read-only: it writes nothing and never touches an endpoint. It reads this home,
@@ -15,22 +23,13 @@
 #   models[w]    one entry per model over the window, largest finished first
 #   coverage     which sources were present, how many task rows each supplied, and
 #                whether any sampled task contributed
-#   limitations  human-readable coverage notices (the dashboard shows the count)
+#   limitations  human-readable coverage notices
 #
 # A task is attributed to the model it ended on; a task whose history names more
 # than one model also counts as a switch. Merge rate is merged ship tasks over
 # finished ship tasks with a recorded terminal outcome; a sampled lane with no
 # merged PR is reported in unknown_outcome and left out of the denominator so a
 # sampled row never fabricates a verdict.
-# jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
-# here, so an unmigrated shell, unit, pane or record keeps this script working.
-for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
-  _jg_new="JG_${_jg_old#FM_}"
-  declare -p "$_jg_new" >/dev/null 2>&1 && continue
-  export "$_jg_new=${!_jg_old}"
-done
-unset _jg_old _jg_new 2>/dev/null || true
-
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 - "$SCRIPT_DIR" "${JG_HOME:-$SCRIPT_DIR/..}" "$@" <<'PY'

@@ -1,12 +1,11 @@
 # fleet-flow
 
-The read-only fleet flow reader — the lifecycle, queue, bottleneck and capacity
-JSON reader the dashboard consumes as its `jg-flow.v1` observation — moved out
-of the Juggernaut fork into this add-on repository. The fork's `bin/jg-flow.sh`
-is a thin shim that resolves this checkout (`JG_ADDONS_DIR`, default
-`$JG_HOME/projects/juggernaut-addons`) and execs `fleet-flow/bin/jg-flow.sh`
-with `JG_BIN` pointing at the fork's `bin/`; the served dashboard reaches the
-reader only through that shim.
+The read-only fleet flow reader emits lifecycle, queue, bottleneck and capacity
+JSON. The Lookout adapter consumes this output directly as its `jg-flow.v1`
+input. The reader moved out of the Juggernaut fork into this add-on repository.
+The fork's `bin/jg-flow.sh` is a thin shim that resolves this checkout
+(`JG_ADDONS_DIR`, default `$JG_HOME/projects/juggernaut-addons`) and execs
+`fleet-flow/bin/jg-flow.sh` with `JG_BIN` pointing at the fork's `bin/`.
 
 ## Layout
 

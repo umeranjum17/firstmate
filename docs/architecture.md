@@ -220,7 +220,7 @@ The watcher's `.seen-*` and `.hb-surfaced-<task>` markers and the daemon's `.sub
 A keyed `needs-decision` or `blocked` transition accepted by the whole-file decision fold is retired only when that fold retires it - an explicit close for its exact key, or a terminal declaration by the ship or Recon that owns the log - while a reserved-key transition the fold rejects surfaces as a reconciliation signal without becoming an open decision.
 The fold remains the sole owner of open/closed semantics, including same-key reopening and reserved-key handling, shared with the durable OPEN DECISIONS surface.
 The always-on watcher also uses that library's absorb classification on no-verb signals and first-sighting stale panes before status-log terminality is trusted, while the daemon maintains distinct wedge and declared-wait recheck cadences.
-The daemon's stale-routing precedence, declared-wait aging, and steering-inbox exception are owned by [Classification policy](../.agents/skills/afk/SKILL.md#classification-policy).
+The daemon's stale-routing precedence, declared-wait aging, and steering-inbox exception are owned by [Classification policy](../.agents/skills/watchover/SKILL.md#classification-policy).
 In away mode, seen-status dedupe does not clear possible-wedge aging for nonterminal progress, so housekeeping still re-escalates an unchanged idle pane at the configured bound.
 Away-mode housekeeping has no worktree-write deferral of its own, so while `state/.afk` exists a quiet crew that is writing its own worktree still escalates as a possible wedge at that bound.
 The daemon batches the escalations selected by that policy into a single-line digest using the canonical `away-supervisor` kind from `bin/jg-operational-input.sh`; a Claude Code primary receives that owner's record-backed doorbell instead of the stripped invisible marker, so Juggernaut can distinguish the escalation from ordinary captain messages.
@@ -447,7 +447,7 @@ On the locked session-start bootstrap step, that token creates the local polling
 Without the token, the locked session-start bootstrap step removes those artifacts on opt-out and otherwise stays silent, so non-Relay users see no behavior change.
 Newly offered mentions are stored as `state/x-inbox/<request_id>.json` and wake Juggernaut once per retained request ID; the [Relay configuration reference](configuration.md#relay-env) owns the durable offer-marker and re-offer contract.
 Attached media stays in that stashed payload as URLs the responding agent fetches and views with its own tools, so the polling path itself never downloads third-party content.
-The `fmx-respond` agent-only skill drains that inbox, uses the preserved Relay conversation context for continuity under the wire contract owned by the [Relay configuration reference](configuration.md#relay-env), classifies each mention as an actionable request, question, or pure acknowledgment, and submits public-safe replies through `bin/jg-x-reply.sh`.
+The `relay-respond` agent-only skill drains that inbox, uses the preserved Relay conversation context for continuity under the wire contract owned by the [Relay configuration reference](configuration.md#relay-env), classifies each mention as an actionable request, question, or pure acknowledgment, and submits public-safe replies through `bin/jg-x-reply.sh`.
 When a reply has a real visual artifact, `--image <path>` attaches one local PNG, JPEG, GIF, WebP, BMP, or TIFF to the relay's optional `{media_type,data_base64}` image object.
 Actionable reversible requests run through Juggernaut's normal intake, backlog, dispatch, investigation, or ship lifecycle.
 Work that completes in the answering turn gets one outcome reply.
@@ -479,7 +479,7 @@ The emitter mirrors `tasks-axi`'s deliverable rules to reject correctable mistak
 When that home is a remote Squad Lead, no local path reaches the owning home, so the result is staged where the work runs and the owning home pulls it over the same SSH route with `bin/jg-public-followup-collect.sh`.
 Because a terminal event's id is derived from its identity tuple rather than generated, duplicate reports and restart replay converge without coordination.
 Reconciliation rides the existing relay poll and the session-start digest instead of a new watcher, daemon, or timer, and both are gated on the same `.env` activation contract so a home that never opted into the relay executes none of it.
-The [Relay configuration reference](configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, and the `fmx-respond` skill owns the procedure.
+The [Relay configuration reference](configuration.md#promised-public-replies-statepublic-followup) owns the operator-facing contract, and the `relay-respond` skill owns the procedure.
 
 ## Project memory belongs to projects
 
@@ -490,7 +490,7 @@ For manual project initialization, [`bin/jg-ensure-agents-md.sh`](../bin/jg-ensu
 
 `/stow` sweeps the current session for durable knowledge that only exists in conversation and routes each finding to the most specific disk home.
 The destination for each kind of knowledge, including project-intrinsic knowledge, is owned by [`AGENTS.md` section 6](../AGENTS.md#6-project-and-knowledge-management).
-Memory writes use inspect-then-update rather than blind append; the internal [`stow` skill](../.agents/skills/stow/SKILL.md) owns tier markers, decay, cold archival, and offload.
+Memory writes use inspect-then-update rather than blind append; the internal [`stow` skill](../.agents/skills/intel/SKILL.md) owns tier markers, decay, cold archival, and offload.
 The same pass also persists open-work record state the session is holding - filing a thread that was never recorded and correcting one the session knows went stale - bounded to the open work that session is actually holding.
 It is deliberately not a reconciliation of durable records against repository or PR reality: its input is the volatile context, so it can only preserve what the session still knows, and no reconciliation that outlives a session exists today.
 Task-scoped notes use `bin/jg-tasks-axi.sh show <id> --full` followed by `bin/jg-tasks-axi.sh update <id> --body-file <path>`, adding `--archive-body` when the prior body should remain recoverable.
@@ -515,7 +515,7 @@ For a remote route, the configured code root updates from its own origin on that
 The primary update is fast-forward only, while a clean Squad Lead divergence may reconcile with `reset --keep` only when a three-way temporary-index proof shows its complete local tree result is already present at the target, including after a squash merge.
 Dirty, uniquely diverged, offline, and off-default targets are reported and left untouched, and genuine Squad Lead divergence remains visible through a durable reconciliation record until a later successful convergence clears it.
 Local homes share the guarded fast-forward helper, while remote updates delegate the same safety decision to the configured host through the generic transport.
-The procedure and outcome vocabulary are owned by the [`/updatejuggernaut` skill](../.agents/skills/updatejuggernaut/SKILL.md); the relevant script headers own the mechanics.
+The procedure and outcome vocabulary are owned by the [`/updatejuggernaut` skill](../.agents/skills/resupply/SKILL.md); the relevant script headers own the mechanics.
 
 ## Restart-proof
 

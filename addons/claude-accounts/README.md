@@ -1,6 +1,6 @@
 # claude-accounts
 
-One quota view of every Claude account signed in on this machine.
+A quota reader for every Claude account signed in on this machine.
 
 `bin/claude-accounts-quota.sh` reads the account list from the muxr registry (`~/.muxr/plans/accounts-v1.json`, or `JG_CLAUDE_ACCOUNTS_REGISTRY`), takes only the `id`, `name` and `folder` of each Claude account, and runs `quota-axi --provider claude --profile-only --json` with `CLAUDE_CONFIG_DIR` set to that folder. It resolves the real upstream `quota-axi` (`JG_QUOTA_AXI_REAL`, then the target `quota-axi-pool` recorded, then `PATH` without the wrapper) and never the `quota-axi-pool` wrapper itself, which delegates to the account pick and would come back here for another reading. It never opens, copies, links or edits anything inside a login folder, and changes nothing about how accounts sign in.
 
@@ -15,7 +15,7 @@ It writes `<home>/state/claude-accounts.json` (atomic replace):
 
 `left` is percent remaining; a window that could not be read is `null` and the account's `problem` names the cause. Exit 0 when at least one account was read. Run it on a timer (a few minutes apart); `--print` also shows the file.
 
-The fleet dashboard's Overview and index page show a "Claude accounts" card from that file; the card is absent when the file is.
+The file remains an input to account dispatch. Lookout does not display Claude quota data.
 
 Test: `bash claude-accounts/tests/claude-accounts.test.sh`.
 
@@ -36,6 +36,6 @@ Test: `bash claude-accounts/tests/claude-accounts-pick.test.sh`.
 
 ## Refresh timer
 
-`install-timer.sh [--dry-run] <home>` installs a systemd user timer (`jg-claude-accounts-quota.timer`) that runs the reader every 5 minutes for that home, so the dashboard card and `state/claude-accounts.json` stay current; `--dry-run` prints what would be written. It copies the reader to `~/.local/share/jg-claude-accounts/` and enables the timer only when something changed. Remove with `uninstall-timer.sh`. Install from merged main only.
+`install-timer.sh [--dry-run] <home>` installs a systemd user timer (`jg-claude-accounts-quota.timer`) that runs the reader every 5 minutes for that home, so `state/claude-accounts.json` stays current for dispatch; `--dry-run` prints what would be written. It copies the reader to `~/.local/share/jg-claude-accounts/` and enables the timer only when something changed. Remove with `uninstall-timer.sh`. Install from merged main only.
 
 Test: `bash claude-accounts/tests/claude-accounts-timer.test.sh`.

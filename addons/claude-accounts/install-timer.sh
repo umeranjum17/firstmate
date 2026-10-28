@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Juggernaut home, so the
-# dashboard's Claude accounts card and state/claude-accounts.json stay fresh. Copies the reader to
-# ${XDG_DATA_HOME:-~/.local/share}/jg-claude-accounts/, writes jg-claude-accounts-quota.service and .timer under
-# ~/.config/systemd/user/ (the unit carries the installer's PATH so quota-axi and jq resolve), and enables the timer only when a file changed. Reads quota only; touches no login folder.
-# Usage: install-timer.sh [--dry-run] <jg-home>      (--dry-run writes nothing)       Undo: uninstall-timer.sh
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
@@ -12,7 +7,11 @@ for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
   export "$_jg_new=${!_jg_old}"
 done
 unset _jg_old _jg_new 2>/dev/null || true
-
+# Install a systemd user timer that runs claude-accounts-quota.sh every 5 minutes for one Juggernaut home, so
+# state/claude-accounts.json stays fresh for dispatch. Copies the reader to
+# ${XDG_DATA_HOME:-~/.local/share}/jg-claude-accounts/, writes jg-claude-accounts-quota.service and .timer under
+# ~/.config/systemd/user/ (the unit carries the installer's PATH so quota-axi and jq resolve), and enables the timer only when a file changed. Reads quota only; touches no login folder.
+# Usage: install-timer.sh [--dry-run] <jg-home>      (--dry-run writes nothing)       Undo: uninstall-timer.sh
 set -euo pipefail
 DRY=0
 [ "${1:-}" = --dry-run ] && { DRY=1; shift; }
