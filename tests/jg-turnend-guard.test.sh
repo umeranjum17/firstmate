@@ -75,6 +75,39 @@ test_predicate_healthy_fresh_beacon() {
   pass "jg_supervision_unhealthy: false with in-flight task and a fresh beacon"
 }
 
+# shellcheck disable=SC2030,SC2031 # JG_HOME is deliberately scoped to the subshells.
+test_predicate_first_scan_watcher_is_fresh() {
+  local dir="$TMP_ROOT/pred-first-scan" state sleeper identity
+  state="$dir/state"
+  mkdir -p "$state"
+  : > "$state/t.meta"
+  sleep 300 & sleeper=$!
+  identity=$(bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$sleeper")
+  mkdir -p "$state/.watch.lock"
+  printf '%s\n' "$sleeper" > "$state/.watch.lock/pid"
+  printf '%s\n' "$ROOT" > "$state/.watch.lock/jg-home"
+  printf '%s\n' "$ROOT/bin/jg-watch.sh" > "$state/.watch.lock/watcher-path"
+  printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  (
+    export JG_HOME="$ROOT"
+    . "$ROOT/bin/jg-wake-lib.sh"
+    jg_supervision_status "$state" 300
+    [ "$JG_SUP_WATCHER_FRESH" = true ] || { echo "live first-scan watcher read unhealthy" >&2; exit 1; }
+    case "$JG_SUP_BEACON_DESC" in starting*) ;; *) echo "desc: $JG_SUP_BEACON_DESC" >&2; exit 1 ;; esac
+    JG_WATCHER_STALL_BOUND=0 jg_supervision_status "$state" 300
+    [ "$JG_SUP_WATCHER_FRESH" = false ] || { echo "stalled first-scan watcher read fresh" >&2; exit 1; }
+  ) || { kill "$sleeper" 2>/dev/null; fail "first-scan watcher freshness wrong"; }
+  kill "$sleeper" 2>/dev/null
+  wait "$sleeper" 2>/dev/null
+  (
+    export JG_HOME="$ROOT"
+    . "$ROOT/bin/jg-wake-lib.sh"
+    jg_supervision_status "$state" 300
+    [ "$JG_SUP_WATCHER_FRESH" = false ]
+  ) || fail "dead first-scan watcher read fresh"
+  pass "jg_supervision_status: live first-scan watcher fresh; stalled or dead unhealthy"
+}
+
 test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
   mkdir -p "$state"
@@ -2201,6 +2234,7 @@ test_predicate_healthy_no_inflight
 test_predicate_unhealthy_no_beacon
 test_predicate_unhealthy_stale_beacon
 test_predicate_healthy_fresh_beacon
+test_predicate_first_scan_watcher_is_fresh
 test_predicate_queue_pending_flag
 test_predicate_x_mode_needs_supervision
 test_predicate_source_needs_supervision
