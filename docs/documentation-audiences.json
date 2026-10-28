@@ -109,6 +109,14 @@
   ],
   "surfaces": [
     {
+      "path": ".agents/skills/fmx-respond/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/away-quiet-supervision/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/afk/SKILL.md",
       "audience": "agent-runtime"
     },
@@ -181,7 +189,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/fmx-respond/SKILL.md",
+      "path": ".agents/skills/relay-respond/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -665,7 +673,7 @@
       "audience": "agent-runtime"
     },
     {
-      "path": ".agents/skills/away-quiet-supervision/SKILL.md",
+      "path": ".agents/skills/watchover-supervision/SKILL.md",
       "audience": "agent-runtime"
     },
     {

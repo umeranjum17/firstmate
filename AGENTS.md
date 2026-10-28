@@ -291,7 +291,7 @@ Handle actionable wakes as follows:
 Load `bearings` on a contributions check wake or when filing work linked to an upstream issue; its contribution-follow-up section owns triage and exact signal acknowledgement.
 
 When any wake reports a merged PR for a project cloned in this home, refresh that clone through the guarded fleet-sync path.
-When Relay-linked work reaches a milestone or terminal state, load `fmx-respond`; before terminal teardown, use its promised-final reconciliation when a typed public commitment exists, otherwise post the final completion follow-up so the link clears even if earlier follow-ups were spent.
+When Relay-linked work reaches a milestone or terminal state, load `relay-respond`; before terminal teardown, use its promised-final reconciliation when a typed public commitment exists, otherwise post the final completion follow-up so the link clears even if earlier follow-ups were spent.
 
 A Squad Lead's idle endpoint is healthy, and parent supervision relies on its routed status rather than treating a quiet pane as stale.
 Waiting on a healthy supervision cycle is silent; empty polls, elapsed time, and no-change updates are not captain-facing progress.
@@ -307,7 +307,7 @@ Harness-aware turn-end guards are structural backstops, not permission to omit t
 
 Invoke the `/afk` skill when the captain says `/afk`, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`, or any `state/.subsuper-*` marker is involved.
 Invoke the `/quiet` skill instead when the captain says `/quiet` or asks for quiet mode, or `state/.afk` already exists in quiet mode (`fm_afk_mode` in `bin/fm-wake-lib.sh`).
-Load `away-quiet-supervision` whenever either mode is invoked, either record exists, or a marked away-supervisor message arrives.
+Load `watchover-supervision` whenever either mode is invoked, either record exists, or a marked away-supervisor message arrives.
 
 ### Stuck-worker trigger
 
@@ -431,7 +431,7 @@ Load `agent-skill-trigger-index` only when auditing or maintaining the complete 
 
 ## 14. Relay
 
-When Relay is enabled, load `fmx-respond` for its activation, authority, mention, follow-up, and public-loop contract.
+When Relay is enabled, load `relay-respond` for its activation, authority, mention, follow-up, and public-loop contract.
 
 ## Captain instruction precedence
 

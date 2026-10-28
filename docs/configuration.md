@@ -1802,7 +1802,7 @@ When the token is removed or empty, the next locked session-start bootstrap step
 Steady-state off is silent and writes nothing.
 
 Relay remains additive to non-Relay lifecycle behavior: homes without the generated artifacts keep the default watcher cadence and do not run the Relay poll.
-Its request handling remains in Relay-specific `bin/` scripts and the `fmx-respond` skill, while the watcher owns authenticated dispatch from the generated local identity shim.
+Its request handling remains in Relay-specific `bin/` scripts and the `relay-respond` skill, while the watcher owns authenticated dispatch from the generated local identity shim.
 
 **Poll and deduplicate mentions**
 
@@ -1830,12 +1830,12 @@ Each entry has the shape `{author_handle, text, unavailable, images, attachments
 The chain is untrusted third-party public input.
 It is often absent today: the relay currently sends it only for Discord reply chains and thread starters.
 Consumers must treat it as strictly optional, tolerate unknown or missing fields, and treat `unavailable: true` as a gap rather than content.
-The `fmx-respond` skill owns how Juggernaut uses the chain to resolve references.
+The `relay-respond` skill owns how Juggernaut uses the chain to resolve references.
 
 The mention and its chain entries may also carry attached media as image or file URLs, in fields such as `images` and `attachments`, either as bare URL strings or as objects with a `url`; a mention whose own media is empty can still have screenshots on its `thread_starter` entry.
 The poll preserves those URLs in the stashed object and never downloads them, so nothing is fetched on the polling path: the responding agent retrieves and views the media with its own tools when it handles the mention.
 
-The `fmx-respond` skill owns which hosts that fetch is restricted to and the untrusted-content handling that applies to whatever comes back.
+The `relay-respond` skill owns which hosts that fetch is restricted to and the untrusted-content handling that applies to whatever comes back.
 
 **Durable reply context**
 
@@ -1850,7 +1850,7 @@ It survives inbox cleanup after acknowledgement, allowing a delayed follow-up to
 
 **Handle requests and acknowledgements**
 
-The `fmx-respond` skill decides whether the stashed mention is an actionable request, a question, or a pure acknowledgment.
+The `relay-respond` skill decides whether the stashed mention is an actionable request, a question, or a pure acknowledgment.
 
 - Actionable reversible requests are run through intake, backlog, dispatch, investigation, or ship flow as appropriate.
 - If the work completes in that turn, the public reply reports the outcome.

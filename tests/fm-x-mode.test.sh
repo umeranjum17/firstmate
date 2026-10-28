@@ -2057,7 +2057,7 @@ test_regression_discord_followup_survives_inbox_cleanup() {
   expect_code 0 "$rc" "poll exit"
   reg="$home/state/x-context/req-disc.json"
   assert_present "$reg" "poll recorded the per-request context"
-  # 2. The acknowledgement drains the inbox file (fmx-respond step 2f).
+  # 2. The acknowledgement drains the inbox file (relay-respond step 2f).
   rm -f "$home/state/x-inbox/req-disc.json"
   # 3. The delayed milestone follow-up is posted DIRECTLY by request_id, with no
   #    task link at all - the exact path that regressed.
