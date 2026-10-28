@@ -102,6 +102,7 @@ jg_supervision_status() {
       && jg_watcher_lock_matches_pid "$state" "$JG_WAKE_LIB_DIR/jg-watch.sh" "$pid" "${JG_HOME:-}"; then
       age=$(jg_watcher_progress_age "$state")
       if [ "$age" -lt "$(jg_watcher_stall_bound)" ]; then
+        # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
         JG_SUP_BEACON_DESC="starting (${age}s)"
         JG_SUP_WATCHER_FRESH=true
       fi
