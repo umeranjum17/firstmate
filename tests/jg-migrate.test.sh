@@ -35,6 +35,7 @@ printf 'worker agent managed by firstmate\n' > "$home/state/t1.inbox/001.msg"
 printf 'cd /home/x/.treehouse/firstmate-abc/4/firstmate/projects/p\n' > "$home/state/t1.meta"
 printf 'merged a secondmate fix; bin/fm-lint.sh ran\n' > "$home/state/t1.status"
 printf 'a firstmate hook\n' > "$home/state/t1.pr-poll-registration"
+printf 'kind=secondmate\nwindow=fm-demo\n' > "$home/state/t2.meta"
 printf 'exec /x/firstmate-1/bin/run\n' > "$home/config/launch-env-hook"
 bash "$root/bin/jg-migrate.sh" --home "$home" --check > "$scratch/classified2" 2>&1 \
   || { echo 'check stopped on per-task records, host paths or status prose' >&2; cat "$scratch/classified2" >&2; exit 1; }
