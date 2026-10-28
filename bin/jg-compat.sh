@@ -137,17 +137,17 @@ jg_compat_legacy_product() {  # <text>
 # derived: jg- becomes fm-, squad-lead becomes its old word, squad_leads its
 # old plural, and the product word its old token.
 jg_compat_pick() {  # <path>
-  local path=${1-} dir base old
-  if [ -e "$path" ] || [ -L "$path" ]; then printf '%s\n' "$path"; return 0; fi
-  dir=${path%/*}; base=${path##*/}
-  [ "$dir" != "$path" ] || dir=.
-  old=${base/#.jg-/.fm-}; old=${old/#jg-/fm-}
-  old=${old//squad-lead/secondmate}; old=${old//squad_leads/secondmates}
-  old=${old//juggernaut/firstmate}
-  if [ "$old" != "$base" ] && { [ -e "$dir/$old" ] || [ -L "$dir/$old" ]; }; then
-    printf '%s\n' "$dir/$old"
+  local _jg_p=${1-} _jg_dir _jg_base _jg_old
+  if [ -e "$_jg_p" ] || [ -L "$_jg_p" ]; then printf '%s\n' "$_jg_p"; return 0; fi
+  _jg_dir=${_jg_p%/*}; _jg_base=${_jg_p##*/}
+  [ "$_jg_dir" != "$_jg_p" ] || _jg_dir=.
+  _jg_old=${_jg_base/#.jg-/.fm-}; _jg_old=${_jg_old/#jg-/fm-}
+  _jg_old=${_jg_old//squad-lead/secondmate}; _jg_old=${_jg_old//squad_leads/secondmates}
+  _jg_old=${_jg_old//juggernaut/firstmate}
+  if [ "$_jg_old" != "$_jg_base" ] && { [ -e "$_jg_dir/$_jg_old" ] || [ -L "$_jg_dir/$_jg_old" ]; }; then
+    printf '%s\n' "$_jg_dir/$_jg_old"
   else
-    printf '%s\n' "$path"
+    printf '%s\n' "$_jg_p"
   fi
 }
 
@@ -168,14 +168,14 @@ jg_compat_meta_is_squad_lead() {  # <meta-file>
 # The reverse of jg_compat_pick for the registry: a path naming the old
 # registry file whose file has been renamed prints the new path.
 jg_compat_pick_new() {  # <path>
-  local path=${1-}
-  case "$path" in
+  local _jg_p=${1-}
+  case "$_jg_p" in
     *secondmates.md)
-      if [ ! -e "$path" ] && [ -e "${path%secondmates.md}squad_leads.md" ]; then
-        printf '%s\n' "${path%secondmates.md}squad_leads.md"; return 0
+      if [ ! -e "$_jg_p" ] && [ -e "${_jg_p%secondmates.md}squad_leads.md" ]; then
+        printf '%s\n' "${_jg_p%secondmates.md}squad_leads.md"; return 0
       fi ;;
   esac
-  printf '%s\n' "$path"
+  printf '%s\n' "$_jg_p"
 }
 
 # Copy every variable whose name starts with <JG_prefix> to its old FM_ name.
