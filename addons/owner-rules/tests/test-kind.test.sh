@@ -24,11 +24,11 @@ change() {
 }
 refuses() { # <label> <file> <content> <reason>
   local out; out=$(change "$2" "$3")
-  [[ $out == *"adds $2, and $4; this repo takes integration and end-to-end journey tests only"* ]] && ok "refused: $1" || no "$1 was not refused: $out"
+  if [[ $out == *"adds $2, and $4; this repo takes integration and end-to-end journey tests only"* ]]; then ok "refused: $1"; else no "$1 was not refused: $out"; fi
 }
 passes() { # <label> <file> <content>
   local out; out=$(change "$2" "$3")
-  [[ $out == *"no passed-proof receipt"* && $out != *"journey tests only"* ]] && ok "accepted: $1" || no "$1 was refused or stuck: $out"
+  if [[ $out == *"no passed-proof receipt"* && $out != *"journey tests only"* ]]; then ok "accepted: $1"; else no "$1 was refused or stuck: $out"; fi
 }
 refuses "unit test by name" tests/fm-widget.unit.test.sh 'true' 'its path marks a unit, snapshot or mock test'
 refuses "snapshot file" tests/__snapshots__/widget.snap 'x' 'its path marks a unit, snapshot or mock test'
@@ -37,4 +37,4 @@ passes "journey test" tests/widget-journey.test.sh 'true'
 passes "e2e test" tests/e2e/widget.test.ts 'await page.click()'
 passes "change with no test file" docs/widget.md 'text'
 
-[ "$fails" -eq 0 ] && echo "PASS test-kind" || { echo "FAIL test-kind: $fails"; exit 1; }
+if [ "$fails" -eq 0 ]; then echo "PASS test-kind"; else echo "FAIL test-kind: $fails"; exit 1; fi
