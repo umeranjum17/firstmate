@@ -134,6 +134,9 @@ jobs:
       # Fixture home and real fixture processes with a canary key value: nothing real is touched or signalled.
       - name: Key-in-env check test
         run: bash key-in-env-check/tests/key-in-env-check-e2e.sh
+      # The real installer in a throwaway HOME; the installed plugin is loaded and no command is executed.
+      - name: Lead sleep guard test
+        run: bash lead-sleep-guard/tests/lead-sleep-guard.test.sh
       # Fixture Main and lead homes with stub jg-tasks-axi.sh and jg-crew-state.sh: lane slots and dry.
       - name: Home flow check test
         run: bash fleet-flow/tests/jg-flow-check.test.sh
