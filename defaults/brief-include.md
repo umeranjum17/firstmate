@@ -5,7 +5,8 @@ They are the defaults this repo installs; edit this file freely, because the ins
 
 - Prove the change on the real product before reporting done, and name the evidence files you kept.
 - Report a Checks block: outcome, repro, proof, evidence. Write "not proven: <cause>" rather than a pass nobody saw.
-- Integration and end-to-end tests only. No unit, snapshot or mock-heavy tests; extend the journey test your change touches.
+- Tests: integration and end-to-end only, driving the real product like a user; no unit, snapshot or mock-heavy tests, no duplicate coverage, and a new test only for a journey nothing covers, so the total count goes down over time (the merge gate refuses a PR that adds one).
+- CI: run few jobs; skip drafts, skip body-only edits, cancel in-progress runs per PR, path-filter docs and evidence, and never run twice on main.
 - One worker, one agent: start no sub-agents.
 - Never run a recursive delete over home, a directory directly in it, `/`, or a bare `*` or `$VAR` target; keep a temp directory's literal path in the same command that deletes it.
 - Kill only processes you started yourself in this task, never a parent, and never one found by name or pattern.

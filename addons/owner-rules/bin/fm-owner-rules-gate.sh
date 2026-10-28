@@ -39,6 +39,8 @@ else id=$1; head=$3; pr=$4
 fi
 [[ $id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $head =~ ^[a-f0-9]{40,64}$ ]] || { echo "owner-rules: invalid task id or commit head" >&2; exit 1; }
 case $pr in *$'\n'*|*$'\r'*|*$'\t'*) echo "owner-rules: invalid proof scope" >&2; exit 1 ;; esac
+# Tests rule first: it needs no receipt, and a refusal here saves sealing proof for a change that must change anyway.
+[ "$mode" != gate ] || "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/fm-owner-rules-test-kind.sh" "$2" "$3" "$4" || exit 1
 mc=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../merge-card" && pwd -P)/merge-card
 script=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/fm-owner-rules-gate.sh
 proof_dir=$FM_HOME/data/$id/proof-authorizations
