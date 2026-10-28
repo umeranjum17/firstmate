@@ -12,7 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [model allow-lists](#model-allow-lists-configmodel-allow-listjson), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and [launch environment hook](#launch-environment-hook-configlaunch-env-hook) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [startup memory budget](#startup-memory-budget-configstartup-memory-budget), and [host memory guard](#host-memory-guard-confighost-memory) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
-| Persistent Squad Leads | [Squad Lead routes](#squad-lead-routes-datasquad leadsmd) |
+| Persistent Squad Leads | [Squad Lead routes](#squad-lead-routes-datasquad_leadsmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
 ## JG_HOME
@@ -690,7 +690,7 @@ Portable shard evidence and coverage rules are in [jg-test-portable-shards.md](j
 
 ## Captain Preferences (data/captain.md / data/captain-shared.md)
 
-Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad leads.md`.
+Domain-local preferences for one captain's fleet live locally in each home's `data/captain.md`; it is gitignored and printed in the session-start context digest after `data/projects.md` and optional `data/squad_leads.md`.
 Before changing it, inspect the current file and curate the matching bullet in place under the internal [`stow` skill's](../.agents/skills/intel/SKILL.md) tiering and archive contract; add a new bullet only for a genuinely new durable preference.
 
 Shared captain preferences that apply across Squad Lead domains live only in the primary home's optional `data/captain-shared.md`.
@@ -756,7 +756,7 @@ Registering it is a reason to watch on the same terms as the [watched-tool check
 Use `bin/jg-startup-growth-check.sh disarm` to remove the check and its local report record.
 
 The check evaluates at most once per day and stays silent when nothing meaningful changed.
-A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/squad leads.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
+A due evaluation uses file metadata and byte sizes before any content inspection: it asks `bin/jg-startup-memory-budget.sh report` for the budget verdict over `data/captain.md`, `data/captain-shared.md`, and `data/learnings.md`, watches the `data/projects.md` and `data/squad_leads.md` that session start also prints in full for growth without entering that budget total, and separately watches the tracked startup/instruction owner files described by the script header.
 `bin/jg-startup-memory-budget.sh` remains the sole owner of the budget total and its verdict, so the check never re-derives either: when that owner annotates an overrun caused by the primary-owned `data/captain-shared.md` alone, a Squad Lead home is not woken about an overrun it cannot act on.
 A Squad Lead home is likewise not notified about per-file growth of that same primary-owned `data/captain-shared.md`, which it receives read-only; the growth is still observed and recorded, and a primary home reports it normally.
 Those tracked bytes are code and instruction-surface size, not prompt-memory cost.
@@ -831,9 +831,9 @@ Only the file's presence is read, so its contents are ignored; remove it to retu
 
 The skill text owns the marker spelling, the tick order, and the reinforcement rule.
 
-## Squad Lead routes (data/squad leads.md)
+## Squad Lead routes (data/squad_leads.md)
 
-Persistent Squad Lead routes live locally in `data/squad leads.md`.
+Persistent Squad Lead routes live locally in `data/squad_leads.md`.
 The concise single-line route contract is owned by the [`squad-lead-provisioning` skill](../.agents/skills/squad-lead-provisioning/SKILL.md#routing-table), including the parser-compatible fields, one-sentence summary requirement, `home:` pointer to the seeded charter, and limit on extra registry prose.
 
 ### Remote routes and validation
@@ -1608,7 +1608,7 @@ It uses the same live Squad Lead discovery and propagation helper as bootstrap; 
 - When an allowlisted config item changes for an already-running local home, it sends the literal-content reread pointer described in [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md); unchanged allowlisted config sends no pointer unless a previous delivery is pending.
 - A changed remote home instead receives one durably recorded marked re-read instruction after the allowlisted bytes have transferred because primary-local generation paths are not meaningful on another host.
 - The locked bootstrap inheritance pass uses the same placement-specific behavior; see `squad-lead-provisioning` for the single contract owner.
-- That live discovery starts from `state/*.meta` records with `kind=squad lead`; `data/squad leads.md` only backfills `home=` for older or incomplete meta records.
+- That live discovery starts from `state/*.meta` records with `kind=squad_lead`; `data/squad_leads.md` only backfills `home=` for older or incomplete meta records.
 - Skipped items, such as a destination checkout that does not yet gitignore the item, are visible warnings but not hard failures.
 
 ## Forge selection (data/projects.md forge= token)

@@ -446,3 +446,4 @@ addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env 
 .agents/skills/firstmate-codexapp/SKILL.md  # old skill name kept as an alias stub until S10
 tests/jg-skill-rename-aliases.test.sh  # names the old skill spellings it proves still alias
 tests/jg-compat-old-records.test.sh  # builds old-name records to prove the read fallbacks; deleted by S10
+docs/documentation-audiences.json  # classifies the seven retired alias skills by their old paths
