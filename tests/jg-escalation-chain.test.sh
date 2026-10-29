@@ -466,6 +466,12 @@ worker-prose|none|I will press Enter to select the file, then continue.\n>
 code-output|none|ok - 12 tests passed\nEnter the value of x\n> 
 TABLE
   [ "$(verdict "$fixture")" = question ] || fail "the real Claude AskUserQuestion capture was not detected"
+  # Panes captured from the live runtimes (tests/captures/stuck-live/README.md).
+  local cap
+  for cap in pi-question codex-question opencode-quota; do
+    got=$(verdict "$(cat "$ROOT/tests/captures/stuck-live/$cap.txt")")
+    [ "$got" = "${cap#*-}" ] || fail "the live $cap capture read as $got"
+  done
   # A question scrolled off the bottom 12 lines is gone, so it is not stuck.
   got=$(verdict "$(printf '%s\n' "$fixture"; seq 1 30)")
   [ "$got" = none ] || fail "a dialog scrolled out of view still read as stuck"

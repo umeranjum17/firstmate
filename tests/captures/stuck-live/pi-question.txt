@@ -1,0 +1,45 @@
+
+ Ponytail loaded: full
+
+ Warning: Linux accessibility is unavailable. Ensure AT-SPI is enabled and a D-Bus desktop accessibility bus is running.
+
+ Warning: Extension package "~/.pi/agent/npm/node_modules/pi-hermes-memory/package.json": Host-provided extension packages must be declared
+ in peerDependencies with a "*" range, not dependencies: @earendil-works/pi-tui. Installed copies can bypass the extension loader and create
+ duplicate runtime modules.
+
+
+ Call your ask user question tool right now with one question: Which color? options Red and Blue. Do nothing else.
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 1.4.0 is available. Run pi update
+ Changelog: https://pi.dev/changelog
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ask_user_question questions=[{"question":"Which color?","header":"Color","options":[{"label":"Red","description":"C...
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Package Updates Available
+ Package updates are available. Run pi update --extensions
+ Packages:
+ - pi-subagents
+ - pi-agent-browser-native
+ - @dietrichgebert/ponytail
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  Color
+
+ Which color?
+
+❯ 1. Red
+     Choose red.
+  2. Blue
+     Choose blue.
+  3. Type something.
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel · Ctrl+] to collapse
