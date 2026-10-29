@@ -23,6 +23,8 @@ journeys:
     command: bash journeys/stuck-question-replay.sh
   worker-no-ask-tool:
     command: bash journeys/worker-no-ask-tool.sh
+  watcher-exit-beacon:
+    command: bash journeys/watcher-exit-beacon.sh
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
