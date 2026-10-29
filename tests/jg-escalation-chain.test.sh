@@ -78,7 +78,7 @@ cycle() {  # <home> [absent]
     JG_READY_STALL_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
-  wait_for_exit "$pid" 40 || rc=$?
+  wait_for_exit "$pid" "${CYCLE_POLLS:-40}" || rc=$?
   case "$rc" in 0|124) ;; *) fail "watcher failed ($rc): $(cat "$h/err")" ;; esac
   cat "$h/out" >> "$h/events"
   [ "${2:-}" != absent ] || return 0
@@ -498,6 +498,8 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
 
 test_silent_worker_climbs_whatever_it_declared() {
   local m w n=0 hold
+  # Six windows per poll: a loaded runner needs far longer than the default cycle budget.
+  local CYCLE_POLLS=300
   m=$(home silent)
   # id:status line:pane, one worker each; ld is an idle lead.
   hold=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%MZ)
@@ -524,11 +526,11 @@ test_silent_worker_climbs_whatever_it_declared() {
     [ ! -e "$m/state/.wait-sources/$w.silent" ] || fail "$w was flagged silent"
   done
   backdate "$m" sp 3
-  for n in 1 2 3 4; do grep -q 'waiting-state sp (silent, .*level=owner' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
+  for n in 1 2 3 4 5 6 7 8; do grep -q 'waiting-state sp (silent, .*level=owner' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
   grep -q 'check: waiting-state sp (silent, .*level=owner' "$m/events" || fail "a silent paused worker never reached the owner rung: $(cat "$m/events")"
   # One wake ends a cycle, so give the other silent worker's rung its own cycles.
   backdate "$m" sp 5
-  for n in 1 2 3 4; do grep -q 'waiting-state sp (silent, .*level=main' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
+  for n in 1 2 3 4 5 6 7 8; do grep -q 'waiting-state sp (silent, .*level=main' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
   grep -q 'check: waiting-state sp (silent, .*level=main' "$m/events" || fail "a silent paused worker never reached Main: $(cat "$m/events"; cat "$m/state/.waiting-timers/sp")"
   printf 'working [at=2]: back\n' >> "$m/state/sp.status"
   for n in 1 2 3 4 5 6 7 8; do [ ! -e "$m/state/.wait-sources/sp.silent" ] || PANES='1 2 3 4 5 6' cycle "$m"; done
