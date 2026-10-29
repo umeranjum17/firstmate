@@ -1,0 +1,54 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "679ad850a6471f4ff8171fbe622e005b01438ea7",
+  "tree": "0a9cf7da1cd2c59877d8ac75b298f97ec8a6ca7d",
+  "claim": "Dispatch, the quota wake and the dashboard read the same view of every registered Claude and Codex account, with Main's own login shown apart",
+  "result": "pass",
+  "at": "2026-10-29T23:15:28.554Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T231518Z-679ad850-736d35/live.log",
+      "sha256": "2fd53858c211994fb26175be8e448f0266ed6888a624f65bb5cd6aa35c1a3b32"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T231518Z-679ad850-736d35",
+      "commit": "679ad850a6471f4ff8171fbe622e005b01438ea7",
+      "journey": null,
+      "command": "bash -c 'bash \"$LIVE\"'",
+      "tool": "0.6.22",
+      "steps": {
+        "target": {
+          "version": "juggernaut multiaccount quota branch"
+        },
+        "start": "live home readings of every registered Claude and Codex account, real quota-axi upstream",
+        "steps": [
+          "quota-axi --json through the wrapper lists each account, best worker as default, Main reserved as main",
+          "dispatch validator accepts the snapshot",
+          "quota wake judges the default row",
+          "Lookout adapter quota lists every account"
+        ],
+        "result": "one view feeds dispatch, quota wake and dashboard"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T231518Z-679ad850-736d35/live.log",
+        "sha256": "2fd53858c211994fb26175be8e448f0266ed6888a624f65bb5cd6aa35c1a3b32",
+        "verdict": "pass",
+        "seen": "I read all 6 dispatch rows and all 6 dashboard lines. Dispatch and dashboard agree on every registered account: pa_536c925c8580938938 shows left=100 for both 5h and week; pa_90d25d0591bf4c260d shows seven_day=0 (stale=true) and dashboard week left_pct=0; Main claude shows left=19 (tighter window, week=19, 5h=94) matching dashboard 5h 94 and week 19; Main codex shows left=91 matching dashboard week 91. Quota wake reports claude=healthy and codex=healthy, and the dispatch validator is valid. The ambient 'claude default' and 'codex default' rows are not registered accounts and do not appear on the dashboard, which fits the outcome's 'registered accounts' wording; the outcome's separate Main login is shown apart as stated."
+      }
+    ]
+  }
+}
