@@ -28,7 +28,7 @@ export FAKE_LFM_DIR=$WORK
 check() { JG_HOME="$home" JG_TOKENS_RETRO_LFM="$WORK/bin/lfm" "$ROOT/bin/jg-tokens-retro.sh" check; }
 today=$(date -u +%F)
 out_dir="$home/data/tokens-retro"
-wait_for() { local i; for i in $(seq 50); do [ -e "$1" ] && return 0; sleep 0.1; done; return 1; }
+wait_for() { for _ in $(seq 50); do [ -e "$1" ] && return 0; sleep 0.1; done; return 1; }
 
 echo 1000 >"$WORK/per-day"
 touch "$home/config/token-saver-off"
@@ -45,7 +45,7 @@ pass "an lfm older than tokens mode stays silent"
 
 [ -z "$(check)" ] || fail "starting a retro must be silent"
 wait_for "$out_dir/$today/tokens.json" || fail "the background retro never landed today's report"
-wait_for_gone() { local i; for i in $(seq 50); do [ ! -e "$1" ] && return 0; sleep 0.1; done; return 1; }
+wait_for_gone() { for _ in $(seq 50); do [ ! -e "$1" ] && return 0; sleep 0.1; done; return 1; }
 wait_for_gone "$out_dir/.$today.running" || fail "a finished retro must release its lock"
 pass "a missing day starts one background retro that lands a complete report"
 
