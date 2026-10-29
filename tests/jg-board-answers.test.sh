@@ -138,9 +138,48 @@ test_arm_registers_a_check_the_watcher_trusts() {
   pass "arm writes a check the watcher accepts; disarm removes it"
 }
 
+registered() {  # <case-dir>; 0 when the watcher would run the armed check
+  bash -c '. "$1/bin/jg-pr-lib.sh"; . "$1/bin/jg-check-lib.sh"; jg_custom_check_registered "$2" board-answers' _ "$ROOT" "$1/home/state"
+}
+
+test_session_start_arm_replaces_a_hand_written_shim_once_and_keeps_a_disarm() {
+  local d shim out
+  d=$(setup ifneeded)
+  shim=$d/home/state/board-answers.check.sh
+  printf '#!/usr/bin/env bash\necho "board-answers: relay each to its lead now"\n' > "$shim"
+  out=$(run "$d" "$BA" arm --if-needed) || fail "arm --if-needed failed: $out"
+  assert_contains "$out" "armed: board-answers" "a hand-written shim was not replaced by the relay"
+  assert_grep "jg-board-answers.sh check" "$shim" "the armed shim does not run the relay"
+  registered "$d" || fail "the watcher would reject the check armed at session start"
+  out=$(run "$d" "$BA" arm --if-needed)
+  [ -z "$out" ] || fail "an already armed home was armed again: $out"
+  run "$d" "$BA" disarm > /dev/null
+  out=$(run "$d" "$BA" arm --if-needed)
+  [ -z "$out" ] && [ ! -e "$shim" ] || fail "session start re-armed a relay the operator disarmed: $out"
+  run "$d" "$BA" arm > /dev/null || fail "a plain arm after disarm failed"
+  [ ! -e "$d/home/state/.board-answers-disarmed" ] || fail "a plain arm left the disarm record"
+  pass "session start arms the relay over a hand-written shim once, then leaves it, and keeps an explicit disarm"
+}
+
+test_session_start_arm_skips_a_squad_lead_home_and_a_home_without_a_board() {
+  local d e out
+  d=$(setup ifneeded-lead)
+  : > "$d/home/.jg-squad-lead-home"
+  out=$(run "$d" "$BA" arm --if-needed) || fail "arm --if-needed failed in a squad_lead home: $out"
+  [ -z "$out" ] && [ ! -e "$d/home/state/board-answers.check.sh" ] || fail "a squad_lead home armed the relay: $out"
+  e=$(setup ifneeded-noboard)
+  rm -f "$e/so/.sign-off/decisions.json"
+  out=$(run "$e" "$BA" arm --if-needed) || fail "arm --if-needed failed with no board: $out"
+  [ -z "$out" ] && [ ! -e "$e/home/state/board-answers.check.sh" ] || fail "a home with no board armed the relay: $out"
+  out=$(run "$e" "$BA" arm --bogus) && fail "an unknown arm option was accepted"
+  pass "session start never arms a squad_lead home or a home with no board, and refuses an unknown option"
+}
+
 test_routed_answer_reaches_the_lead_and_closes_its_decision
 test_card_archives_after_the_lead_acknowledges
 test_unrouted_answer_wakes_main_with_the_answer_first
 test_failed_delivery_is_retried_and_reported_once
 test_question_card_route_records_the_owner
 test_arm_registers_a_check_the_watcher_trusts
+test_session_start_arm_replaces_a_hand_written_shim_once_and_keeps_a_disarm
+test_session_start_arm_skips_a_squad_lead_home_and_a_home_without_a_board

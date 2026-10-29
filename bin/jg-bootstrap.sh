@@ -79,7 +79,9 @@
 #          and config/merge-gate when the home has none. Sign-off arming stays per
 #          home and is never done there; the first wiring prints one line naming
 #          bin/jg-procevent-signoff.sh arm, so the user is told instead of
-#          remembering it.
+#          remembering it. The board answer relay is different: the locked
+#          mutable path arms it on a primary home through
+#          bin/jg-board-answers.sh arm --if-needed, and a failed arm is MISSING.
 #          On a primary home, the locked mutable path materializes the visible
 #          default config/startup-memory-budget=7500 when absent. It never
 #          guesses at malformed or unsafe existing files, and squad_lead homes
@@ -1762,6 +1764,11 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     && [ -d "$DATA" ] && [ -x "$SCRIPT_DIR/jg-contributions.sh" ]; then
     "$SCRIPT_DIR/jg-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
+  fi
+  # A board answer reaches its owning lead only through the armed relay check.
+  if local_phase && [ -x "$SCRIPT_DIR/jg-board-answers.sh" ]; then
+    "$SCRIPT_DIR/jg-board-answers.sh" arm --if-needed >/dev/null \
+      || echo "MISSING: the board answer relay could not be armed; board answers reach no lead"
   fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true

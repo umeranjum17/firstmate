@@ -5,7 +5,7 @@
 # Usage:
 #   jg-board-answers.sh route <card-key> <lead> [<decision-key>]
 #   jg-board-answers.sh [check|poll]
-#   jg-board-answers.sh arm | disarm
+#   jg-board-answers.sh arm [--if-needed] | disarm
 #
 # route  Record that <lead> (a task id in this home) owns the card; written by
 #        `jg-question-card.sh post --route <lead> [--decision-key <slug>]`. The
@@ -23,8 +23,16 @@
 #            it into a wake for Main. Reported once; answers already on the
 #            board at the first pass are recorded, not reported.
 # arm    Write state/board-answers.check.sh, bind it with jg-check-register.sh,
-#        and run one pass. disarm removes the shim and its trust binding.
-# State: state/board-routes/<card-key>, state/.board-answers-seen. Unrouted keys
+#        and run one pass. disarm removes the shim and its trust binding and
+#        records the choice; a later plain arm clears it.
+#        --if-needed is the session-start form (bin/jg-bootstrap.sh): it arms
+#        only a primary home (never a squad_lead home) that has sign-off-axi and
+#        a board file, was not disarmed, and does not already hold the exact shim
+#        arm writes with its trust binding; otherwise it does nothing, exit 0.
+#        It replaces an older hand-written shim, so a merged relay goes live
+#        without anyone remembering to arm it.
+# State: state/board-routes/<card-key>, state/.board-answers-seen,
+# state/.board-answers-disarmed. Unrouted keys
 # starting `jg-` belong to the captain-hold card adapter and are skipped.
 set -u
 export LC_ALL=C
@@ -34,6 +42,7 @@ STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 ROUTES="$STATE/board-routes"
 SEEN="$STATE/.board-answers-seen"
 SHIM="$STATE/board-answers.check.sh"
+DISARMED="$STATE/.board-answers-disarmed"
 # shellcheck source=bin/jg-compat.sh
 . "$SCRIPT_DIR/jg-compat.sh"
 # shellcheck source=bin/jg-question-lib.sh
@@ -105,12 +114,25 @@ cmd_check() {
   [ -z "$report" ] || printf '%s' "$report"
 }
 
+shim_text() { printf '#!/usr/bin/env bash\nexport JG_HOME=%q\nexec %q check\n' "$JG_HOME" "$SCRIPT_DIR/jg-board-answers.sh"; }
+
 cmd_arm() {
-  local tmp
+  local tmp marker
+  case "${1-}" in
+    '') ;;
+    --if-needed)
+      marker=$(jg_compat_marker "$JG_HOME")
+      { [ -e "$marker" ] || [ -L "$marker" ]; } && return 0
+      [ ! -e "$DISARMED" ] || return 0
+      jg_question_signoff_available && [ -n "$(jg_question_board)" ] || return 0
+      [ "$(cat "$SHIM" 2>/dev/null)" = "$(shim_text)" ] && [ -f "$STATE/board-answers.check-trust" ] && return 0
+      ;;
+    *) die "unknown arm option: $1" 2 ;;
+  esac
   tmp=$(umask 077; mktemp "$STATE/.jg-board-answers.XXXXXX") || die "cannot write the check shim"
-  { printf '#!/usr/bin/env bash\nexport JG_HOME=%q\nexec %q check\n' "$JG_HOME" "$SCRIPT_DIR/jg-board-answers.sh" > "$tmp" \
-    && chmod 0700 "$tmp" && mv -f -- "$tmp" "$SHIM"; } || { rm -f -- "$tmp"; die "cannot write the check shim"; }
+  { shim_text > "$tmp" && chmod 0700 "$tmp" && mv -f -- "$tmp" "$SHIM"; } || { rm -f -- "$tmp"; die "cannot write the check shim"; }
   JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-check-register.sh" board-answers || die "cannot register the check"
+  rm -f -- "$DISARMED"
   cmd_check > /dev/null
   printf 'armed: board-answers\n'
 }
@@ -118,7 +140,7 @@ cmd_arm() {
 case "${1:-check}" in
   route) shift; cmd_route "$@" ;;
   check|poll) cmd_check ;;
-  arm) cmd_arm ;;
-  disarm) rm -f -- "$SHIM" "$STATE/board-answers.check-trust"; printf 'disarmed: board-answers\n' ;;
+  arm) shift; cmd_arm "$@" ;;
+  disarm) rm -f -- "$SHIM" "$STATE/board-answers.check-trust"; : > "$DISARMED"; printf 'disarmed: board-answers\n' ;;
   *) die "unknown command: $1" 2 ;;
 esac
