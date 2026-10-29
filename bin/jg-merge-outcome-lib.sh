@@ -125,8 +125,9 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 # shellcheck source=bin/jg-merge-gate-lib.sh
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-merge-gate-lib.sh"
 # Optional merge-card add-on: defines the same two hooks for homes that install it.
+_jg_mo_hooks=$(jg_addon_path "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}" merge-card/bin/jg-merge-hooks-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "$_jg_mo_hooks" ] || . "$_jg_mo_hooks"
 
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}

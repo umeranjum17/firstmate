@@ -34,10 +34,9 @@ CODE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOME_DIR="${JG_HOME:-$CODE_ROOT}"
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
-ADDONS_DIR=$(jg_addons_dir "$HOME_DIR")
-TARGET="$ADDONS_DIR/fleet-stats/bin/jg-skill-stats.sh"
+TARGET=$(jg_addon_path "$HOME_DIR" fleet-stats/bin/jg-skill-stats.sh)
 if [ ! -f "$TARGET" ]; then
-  echo "jg-skill-stats: the add-ons are missing (set JG_ADDONS_DIR): looked for $TARGET" >&2
+  echo "jg-skill-stats: the add-ons are missing or refused (set JG_ADDONS_DIR)" >&2
   exit 1
 fi
 JG_BIN="$SCRIPT_DIR" JG_HOME="$HOME_DIR" exec "$TARGET" "$@"

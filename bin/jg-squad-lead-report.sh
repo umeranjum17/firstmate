@@ -64,7 +64,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 jg_squad_lead_report_status_blocked_wait() {  # <verb> <text>
   local hook
-  hook=$(jg_addons_dir "$CALLER_JG_HOME")/status-wait-check/status-wait-check
+  hook=$(jg_addon_path "$CALLER_JG_HOME" status-wait-check/status-wait-check)
   [ -x "$hook" ] || return 0
   local out rc=0
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?

@@ -45,7 +45,22 @@ jg_addons_dir() { # jg_addons_dir [home]: print the add-ons directory this check
   fi
 }
 
-jg_addon_path() { # jg_addon_path [home] <path inside the add-ons directory>: print one add-on file's path.
-  local home=$1 path=$2
-  printf '%s/%s\n' "$(jg_addons_dir "$home")" "$path"
+jg_addon_trusted() { # jg_addon_trusted <path>: 0 unless the file resolves outside the checkout and is not ours-only-writable.
+  # The in-repo addons/ is as trusted as bin/; the override and the pre-fold clone must be owned by the
+  # current user and not group- or world-writable. An absent file passes: there is nothing to refuse.
+  local p=$1
+  case $p in "$_JG_ADDONS_LIB_ROOT/addons/"*) return 0 ;; esac
+  [ -e "$p" ] || return 0
+  [ -n "$(find -L "$p" -maxdepth 0 -user "$(id -u)" ! -perm -g=w ! -perm -o=w 2>/dev/null)" ]
+}
+
+jg_addon_path() { # jg_addon_path [home] <path inside the add-ons directory>: print one add-on file's path, or nothing when refused.
+  local home=$1 path=$2 full
+  full=$(jg_addons_dir "$home")/$path
+  if jg_addon_trusted "$full"; then
+    printf '%s\n' "$full"
+  else
+    echo "jg-addons: refusing $full: not owned by the current user or writable by group/others; treating the add-on as absent" >&2
+  fi
+  return 0
 }
