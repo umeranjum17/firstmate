@@ -457,6 +457,10 @@ claude-quota|quota|⎿ You've hit your limit · resets 3pm\n>
 codex-quota|quota|■ You've hit your usage limit. Upgrade or try again at 9:41 PM.\n> 
 pi-quota|quota|Error: 429 Too Many Requests - rate limit exceeded\n> 
 opencode-quota|quota|Error: insufficient_quota - You exceeded your current quota\n> 
+opencode-errors|errors|┃  User not found.\n┃\n▣  Build · Some Model\n┃  User not found.\n┃\n▣  Build · Some Model\n┃  User not found.\n┃\n> 
+pi-errors|errors|Error: Provider returned error\nretrying\nError: Provider returned error\nretrying\nError: Provider returned error\n> 
+errors-once|none|┃  User not found.\n┃\nI will look at the key next.\n> 
+errors-prose|none|I will check the config.\nI will check the config.\nI will check the config.\n> 
 claude-idle|none|● Done. All checks pass.\n\n> 
 worker-prose|none|I will press Enter to select the file, then continue.\n> 
 code-output|none|ok - 12 tests passed\nEnter the value of x\n> 
@@ -465,17 +469,18 @@ TABLE
   # A question scrolled off the bottom 12 lines is gone, so it is not stuck.
   got=$(verdict "$(printf '%s\n' "$fixture"; seq 1 30)")
   [ "$got" = none ] || fail "a dialog scrolled out of view still read as stuck"
-  pass "the stuck-cause matcher reads a question, a quota wall, or nothing for each harness rendering"
+  pass "the stuck-cause matcher reads a question, a quota wall, a repeated provider error, or nothing for each harness rendering"
 }
 
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
   local m kind want pane
-  for kind in question quota; do
+  for kind in question quota errors; do
     m=$(home "chain-$kind")
     printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nharness=pi\n' > "$m/state/w1.meta"
     printf 'working [at=1]: on it\n' > "$m/state/w1.status"
     prime_status_seen "$m/state" "$m/state/w1.status"
     if [ "$kind" = question ]; then pane=$(cat "$ROOT/tests/captures/claude-askuserquestion/picker.txt")
+    elif [ "$kind" = errors ]; then pane=$'┃  User not found.\n▣  Build\n┃  User not found.\n▣  Build\n┃  User not found.\n▣  Build'
     else pane=$'working...\nYou\'ve hit your usage limit. Try again at 9:41 PM.'; fi
     printf '%s\n' "$pane" > "$m/panes/1"
     PANES=1 cycle "$m"
@@ -493,7 +498,7 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
     PANES=1 cycle "$m"; PANES=1 cycle "$m"
     [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
   done
-  pass "a question dialog and a provider quota wall climb owner, Main and the board, and clear with the cause"
+  pass "a question dialog, a provider quota wall and a repeating provider error climb owner, Main and the board, and clear with the cause"
 }
 
 test_silent_worker_climbs_whatever_it_declared() {

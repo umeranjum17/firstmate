@@ -904,6 +904,45 @@ test_opencode_threads_model_and_effort_variant() {
   pass "opencode receives --model and the effort as its config's agent variant"
 }
 
+# An image, embedding, speech or video model answers every agent turn with a
+# provider error, and the worker retries at once. The shipped default refuses
+# such a pick, and an OpenCode launch with no model is checked against the model
+# its TUI used last, since that is the one it would start on.
+test_opencode_refuses_a_model_that_cannot_run_an_agent() {
+  local rec id out status xdg
+  id=profile-opencode-image-z7c
+  rec=$(make_spawn_case profile-opencode-image opencode "$id")
+  read_case_record "$rec"
+  xdg="$CASE_DIR/xdg"
+  mkdir -p "$xdg/opencode"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model openrouter/google/gemini-3-pro-image-preview 2>&1)
+  status=$?
+  expect_code 1 "$status" "an explicit image model must be refused"
+  assert_contains "$out" "cannot run an agent" "the refusal must say why"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused model still reached a launch: $(cat "$LAUNCH_LOG")"
+
+  printf '{"recent":[{"providerID":"openrouter","modelID":"google/gemini-3-pro-image-preview"}]}\n' > "$xdg/opencode/model.json"
+  out=$(XDG_STATE_HOME="$xdg" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 2>&1)
+  status=$?
+  expect_code 1 "$status" "a launch with no model must be refused when OpenCode would start on an image model"
+  assert_contains "$out" "the model its TUI used last" "the refusal must name the inherited model's source"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused inherited model still reached a launch"
+
+  printf '{"recent":[{"providerID":"opencode-go","modelID":"deepseek-v4.1-flash"}]}\n' > "$xdg/opencode/model.json"
+  out=$(XDG_STATE_HOME="$xdg" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" 2>&1)
+  status=$?
+  expect_code 0 "$status" "a chat model as the last-used model must launch"$'\n'"$out"
+
+  id=profile-opencode-image-z7d
+  rec=$(make_spawn_case profile-opencode-image-allowed opencode "$id")
+  read_case_record "$rec"
+  out=$(JG_ALLOW_NON_AGENT_MODEL=1 run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --model openrouter/google/gemini-3-pro-image-preview 2>&1)
+  status=$?
+  expect_code 0 "$status" "JG_ALLOW_NON_AGENT_MODEL=1 must let a deliberate pick launch"$'\n'"$out"
+  pass "a model that cannot run an agent is refused at launch, and so is an inherited one, unless allowed on purpose"
+}
+
 test_opencode_without_effort_keeps_launch_config_unchanged() {
   local rec id out status launch
   id=profile-opencode-noeffort-z7b
@@ -2587,6 +2626,7 @@ test_cursor_threads_model_workspace_and_omits_effort_axis
 test_cursor_refuses_model_absent_from_live_catalog
 test_cursor_failed_catalog_probe_does_not_block_spawn
 test_opencode_squad_lead_writes_exact_channel_grant
+test_opencode_refuses_a_model_that_cannot_run_an_agent
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged
 test_opencode_go_model_takes_per_task_store_when_auth_has_key

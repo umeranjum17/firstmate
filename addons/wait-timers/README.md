@@ -71,7 +71,10 @@ provenance table now records history, not the current bytes.
   The watcher also writes `<task>.question` (a picker or question dialog on
   screen, for any harness, whatever status the terminal shows),
   `<task>.quota` (a provider rate-limit or usage-limit banner in the last
-  twelve lines) and `<task>.silent` (no status line, no native progress and no
+  twelve lines), `<task>.errors` (one provider or API error line, such as an
+  unknown user, a bad key or an unknown model, repeated three or more times in
+  the pane: a runtime that fails every turn keeps changing the pane, so neither
+  silence nor quota sees it) and `<task>.silent` (no status line, no native progress and no
   pane text change for `JG_SILENT_SECS`, default 900; a future-dated pause, a
   finished worker, an idle lead and a running validation are exempt), from
   `bin/jg-stuck-gate-lib.sh`. They are fresh-bounded like the prompt source and

@@ -11,12 +11,32 @@
 #             Claude AskUserQuestion, OpenCode question, Codex request_user_input),
 #             whatever status the terminal shows for the pane
 #   quota     a provider rate-limit or usage-limit banner at the bottom of the pane
+#   errors    one provider or API error line repeated on screen (a bad key, an
+#             unknown user or model): a runtime failing every turn keeps the pane
+#             changing, so neither the silence nor the quota detector fires
 #   silent    no status line and no pane change for JG_SILENT_SECS (default 900),
 #             whatever the worker last declared; a future-dated pause and a
 #             running validation are exempt
 
-# jg_stuck_verdict: read a pane capture on stdin; print "question|quota <TAB>
-# <line>" for the first stuck cause on screen, or nothing. Text signatures are
+# jg_stuck_error_loop: read a pane capture on stdin; print the repeated provider
+# error line when it shows at least JG_STUCK_ERRLOOP_MIN (default 3) times, or
+# nothing. Lines compare as printable ASCII with digits dropped, so borders,
+# padding and counters do not hide a repeat, and only a line naming a provider
+# or API failure counts, so a worker repeating its own prose does not.
+jg_stuck_error_loop() {
+  local min=${JG_STUCK_ERRLOOP_MIN:-3} count line
+  line=$(LC_ALL=C tr -cd '[:print:]\n' | LC_ALL=C tr -d '0-9' | tr -s ' \t' ' ' \
+    | sed -e 's/^ //' -e 's/ $//' | awk 'length($0) > 0 && length($0) <= 160' \
+    | grep -iE "${JG_STUCK_ERRLOOP_REGEX:-(user not found|(invalid|incorrect|missing|expired) (x-)?api[ _-]?key|authentication[_ ](failed|error)|model[_ ]not[_ ]found|not a valid model|no such model|insufficient (credits|funds|balance)|payment required|provider returned error|api ?call ?error|api error|overloaded|service unavailable|bad gateway|internal server error|unable to connect|request failed with status)}" \
+    | sort | uniq -c | sort -rn | head -1) || true
+  [ -n "$line" ] || return 0
+  read -r count line <<<"$line"
+  [ "${count:-0}" -ge "$min" ] 2>/dev/null || return 0
+  printf '%s (%s times on screen)\n' "$(printf '%s' "$line" | cut -c1-160)" "$count"
+}
+
+# jg_stuck_verdict: read a pane capture on stdin; print "question|quota|errors
+# <TAB> <line>" for the first stuck cause on screen, or nothing. Text signatures are
 # harness-neutral so a new adapter is covered; every picker pairs a select/
 # confirm hint with an escape hint, so worker prose alone does not match.
 jg_stuck_verdict() {
@@ -26,6 +46,11 @@ jg_stuck_verdict() {
   line=$(printf '%s\n' "$tail12" | grep -iE "${JG_STUCK_QUOTA_REGEX:-(you.ve hit your|usage limit|rate.?limit(ed| exceeded| reached)|quota (exceeded|exhausted|reached)|insufficient[_ ]quota|too many requests|credit balance is too low|limit resets)}" | head -1) || true
   if [ -n "$line" ]; then
     printf 'quota\t%s\n' "$(printf '%s' "$line" | tr -s '[:space:]' ' ' | cut -c1-200)"
+    return 0
+  fi
+  line=$(printf '%s\n' "$buf" | jg_stuck_error_loop) || true
+  if [ -n "$line" ]; then
+    printf 'errors\t%s\n' "$line"
     return 0
   fi
   if printf '%s\n' "$tail12" | grep -qiE '(enter|return)[^a-z]+(to )?(select|confirm|submit|choose)|(select|confirm|submit|choose)[^a-z]+(enter|return)' \
@@ -49,9 +74,11 @@ stuck_gate_check() {  # <window> <task> <key> <tail40> <kind>
   verdict=$(printf '%s' "$tail40" | jg_stuck_verdict)
   stuck_source_set "$task" question ''
   stuck_source_set "$task" quota ''
+  stuck_source_set "$task" errors ''
   case "$verdict" in
     question$'\t'*) stuck_source_set "$task" question "${verdict#*$'\t'}" ;;
     quota$'\t'*) stuck_source_set "$task" quota "${verdict#*$'\t'}" ;;
+    errors$'\t'*) stuck_source_set "$task" errors "${verdict#*$'\t'}" ;;
   esac
   # Silence: a pane text change (spinner glyphs and counters ignored) or a
   # status line is progress. An idle lead is healthy by design.
