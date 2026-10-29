@@ -51,5 +51,11 @@ main() {
   [ "$fails" -eq 0 ] || { echo "$fails checks failed"; exit 1; }
   echo "all checks passed"
 }
+cat > "$DONE_DONE_EVIDENCE_ROOT/steps.json" <<'J'
+{"target":{"version":"juggernaut bin/jg-hold-sweep.sh and the hold_release_tick and stale_ask_tick functions of bin/jg-watch.sh at this commit"},
+ "start":"a disposable juggernaut home with a real tasks-axi backlog: one hold past its date, one future-dated hold, one future-dated captain hold, and a blocked status line six hours old",
+ "steps":["try to hold a task with an upcoming date in the reason and no --until","run the watcher's hold-release tick and stale-ask tick once","list the holds","run both ticks again"],
+ "result":"the dated reason is refused with the --until to pass; the past-dated hold is released and its wake queued; the future-dated and captain holds stay held; the stale blocked line raises one stale-ask wake; a second pass wakes nothing"}
+J
 main 2>&1 | tee "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID:-run}.log"
 exit "${PIPESTATUS[0]}"
