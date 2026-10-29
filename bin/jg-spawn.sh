@@ -3138,8 +3138,8 @@ claude_add_dirs_flag() {  # <kind> <state-dir> <data-dir> <code-root> <task-id>
   state_real=$(cd "$state_dir" && pwd -P) || return 1
   case "$kind" in
   squad_lead)
-    mkdir -p "$state_real/$id.inbox/handled" || return 1
-    dirs=("$state_real/$id.inbox")
+    mkdir -p "$state_real/$id.inbox/handled" "$state_real/pending-replies" || return 1
+    dirs=("$state_real/$id.inbox" "$state_real/pending-replies")
     ;;
   *)
     data_real=$(cd "$data_dir" && pwd -P) || return 1
