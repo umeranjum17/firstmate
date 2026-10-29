@@ -422,7 +422,6 @@ portable_parallel_weight_hints() {
 tests/jg-brief.test.sh 10594
 tests/jg-captain-hold-lifecycle.test.sh 343658
 tests/jg-crew-state.test.sh 82058
-tests/jg-hold-sweep.test.sh 32594
 tests/jg-pr-merge.test.sh 300199
 tests/jg-x-mode.test.sh 29896
 EOF
@@ -574,6 +573,7 @@ tests/jg-grok-continuity-live-e2e.test.sh 53
 tests/jg-harness-adapter-instructions-live-e2e.test.sh 57
 tests/jg-herdr-lead-label.test.sh 99
 tests/jg-herdr-version-floor-live-e2e.test.sh 61
+tests/jg-hold-sweep.test.sh 32594
 tests/jg-hometag-lead-label.test.sh 393
 tests/jg-inbox.test.sh 8757
 tests/jg-launch-prompt-signals-live-e2e.test.sh 56
