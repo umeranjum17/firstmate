@@ -1143,6 +1143,35 @@ test_squad_lead_control_command_carries_no_marker() {
   pass "jg-control: a lifecycle command to a squad_lead is unmarked and opens no reply expectation"
 }
 
+# A pin that names no model must reach jg-spawn as an explicit --model default:
+# without it jg-spawn reloads the recorded model for a same-harness relaunch and
+# the removed pin is silently lost. jg-spawn is stubbed to log its arguments, so
+# the launch itself fails and the relaunch rolls back; only the arguments matter.
+test_relaunch_after_pin_drops_model_clears_stored_model() {
+  local dir out bin_dir f
+  dir=$(new_case pin-model)
+  add_task "$dir" domain claude squad_lead
+  printf '%s\n' domain > "$dir/wt-domain/.jg-squad-lead-home"
+  mkdir -p "$dir/wt-domain/state"
+  sed -i 's/^model=default$/model=old-model/' "$dir/home/state/domain.meta"
+  mkdir -p "$dir/home/config"
+  printf 'claude\n' > "$dir/home/config/squad-lead-harness"
+  alive_as "$dir" claude
+  bin_dir="$dir/bin"
+  mkdir -p "$bin_dir"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$bin_dir/${f##*/}"; done
+  rm "$bin_dir/jg-spawn.sh"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > "%s/spawn-args"\nexit 1\n' "$dir" > "$bin_dir/jg-spawn.sh"
+  chmod +x "$bin_dir/jg-spawn.sh"
+  out=$(env PATH="$dir/fakebin:$PATH" JG_HOME="$dir/home" JG_FAKE_DIR="$dir/fake" \
+    JG_CONTROL_POLL=0.01 JG_CONTROL_SETTLE_WAIT=0.05 JG_CONTROL_EXIT_WAIT=0.05 \
+    JG_CONTROL_LAUNCH_WAIT=0.05 "$bin_dir/jg-control.sh" domain relaunch --note x 2>&1) || true
+  [ -f "$dir/spawn-args" ] || fail "relaunch never reached jg-spawn"$'\n'"$out"
+  assert_contains "$(cat "$dir/spawn-args")" "--model default" \
+    "a pin without a model must tell jg-spawn to clear the stored model"
+  pass "jg-control: a relaunch after the pin drops its model clears the stored model"
+}
+
 test_jg_send_still_marks_the_same_squad_lead_task() {
   local dir log out rc
   dir=$(new_case sm-send)
@@ -1294,6 +1323,7 @@ test_unverified_harness_is_refused
 test_harness_family_resolution
 test_relaunch_resume_flag_is_per_adapter_and_reference_owner
 test_prefixed_recorded_harness_reaches_each_control_verb
+test_relaunch_after_pin_drops_model_clears_stored_model
 test_backend_key_capability_matrix
 test_interrupt_clear_key_decision
 test_harness_kind_capability

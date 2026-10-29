@@ -1,7 +1,7 @@
 app: juggernaut
 journeys:
   relaunch-model-refusal:
-    command: bash tests/jg-control-relaunch.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+    command: bash tests/jg-control.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   receipt-candidate-hook:
     command: bash journeys/receipt-candidate-hook.sh
   tickets-stage-publish:
