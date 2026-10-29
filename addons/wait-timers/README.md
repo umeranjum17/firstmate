@@ -68,6 +68,14 @@ provenance table now records history, not the current bytes.
   lapses) and
   `<task>.supervision` for a Squad Lead with work under way whose own watcher
   is not running. A wait source outranks an open decision and a pause.
+  The watcher also writes `<task>.question` (a picker or question dialog on
+  screen, for any harness, whatever status the terminal shows),
+  `<task>.quota` (a provider rate-limit or usage-limit banner in the last
+  twelve lines) and `<task>.silent` (no status line, no native progress and no
+  pane text change for `JG_SILENT_SECS`, default 900; a future-dated pause, a
+  finished worker, an idle lead and a running validation are exempt), from
+  `bin/jg-stuck-gate-lib.sh`. They are fresh-bounded like the prompt source and
+  ride the same rungs, so a worker that ignores its own question still climbs.
 - Episode record: one tab-separated line per lane at
   `state/.waiting-timers/<task>` holding signature, first-observed time,
   owner-delivery time, Main-rung time (0 before it fires), report key, miss

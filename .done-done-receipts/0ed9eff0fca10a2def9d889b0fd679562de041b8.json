@@ -1,0 +1,56 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "0ed9eff0fca10a2def9d889b0fd679562de041b8",
+  "tree": "f23e704ba2ebafbcd171bc3312c6718b88b96f78",
+  "claim": "A stuck worker's question dialog is recorded by the watcher and climbs owner, Main and a board card, then clears when answered",
+  "result": "pass",
+  "at": "2026-10-29T15:19:01.174Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T151758Z-0ed9eff0-0c3d26/replay.txt",
+      "sha256": "d142f417b5d698660ee9e4aa388151417e80e6f7076b38a71eeaefb7487ee2e0"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T151758Z-0ed9eff0-0c3d26",
+      "commit": "0ed9eff0fca10a2def9d889b0fd679562de041b8",
+      "journey": "stuck-question-replay",
+      "command": "bash journeys/stuck-question-replay.sh",
+      "tool": "0.6.18",
+      "steps": {
+        "target": {
+          "version": "bin/jg-watch.sh at 0ed9eff0 driving 2.1.312 (Claude Code)"
+        },
+        "start": "a real Claude Haiku worker pane with no question open",
+        "steps": [
+          "the worker opens an AskUserQuestion dialog",
+          "the watcher records the dialog as a question wait source",
+          "the owner rung fires",
+          "the Main rung fires",
+          "a board card is raised",
+          "the dialog is answered"
+        ],
+        "result": "the wait source and episode are cleared after the dialog is answered"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T151758Z-0ed9eff0-0c3d26/replay.txt",
+        "sha256": "d142f417b5d698660ee9e4aa388151417e80e6f7076b38a71eeaefb7487ee2e0",
+        "verdict": "pass",
+        "seen": "Read the single capture entry (9 lines). It shows the question dialog in the worker pane, 'wait source: question', 'owner rung fired', 'Main rung fired', 'board card raised: 1 raise call(s)', 'dialog answered; wait source cleared', and 'PASS'. These match the outcome: the dialog is recorded, climbs owner, Main and a board card, then clears when answered. No error or contradicting values appear."
+      }
+    ]
+  }
+}
