@@ -46,6 +46,7 @@ No new app installation or manual runner setup is needed for that setting.
 
 Require exactly one context from this workflow: `CI required`.
 It always reports, and `bin/jg-ci-required.sh` owns its verdict: it fails whenever a lane the change needed did not run or did not pass, and accepts a lane's deliberate skip only when the change did not need that lane.
+The one exception is the stock macOS Bash job: GitHub cancels it unstarted when no macOS runner picks it up, so `cancelled` there warns instead of blocking, while `failure` still fails.
 The individual lane names are therefore not required; the compliance context `PR must be raised via no-mistakes` stays required beside it, and a retired job name leaves the required list in the same change that retires it.
 Apply the approved rule change only after the corresponding workflow is green and landed, confirming exact names and the Actions integration id from real checks first.
 Snapshot the current ruleset, amend that same rule with the authenticated GitHub API or settings UI, and read back both the ruleset and effective branch rules.

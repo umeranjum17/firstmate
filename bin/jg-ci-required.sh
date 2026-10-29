@@ -3,7 +3,8 @@
 #
 # JG_CI_NEEDS is GitHub's toJSON(needs), JG_CI_BEHAVIOR the invariants job's
 # scope verdict, and JG_CI_SKIP_MACOS the fork's macOS opt-out. A behavior
-# change needs every lane passed, with macOS skipped only under that opt-out; a
+# change needs every lane passed, with macOS skipped only under that opt-out
+# (or cancelled because no macOS runner started it, which only warns); a
 # documentation change needs the lanes deliberately skipped. Anything else
 # refuses, so a path filter can never become a silent skip.
 #
@@ -64,6 +65,11 @@ jg_ci_required_main() {
       case $result in failure|cancelled) bad="$bad $lane=$result" ;; esac
     elif [ "$lane" = macos-stock-bash ] && [ "$result" = skipped ] && [ "${JG_CI_SKIP_MACOS:-}" = 1 ]; then
       :
+    elif [ "$lane" = macos-stock-bash ] && [ "$result" = cancelled ]; then
+      # GitHub cancels this job unstarted when no macOS runner picks it up, and
+      # it must not hold every merge; a real parse failure is `failure`, which
+      # still refuses. A user-cancelled run never reaches this verdict.
+      printf 'warning: %s was cancelled without finishing, so stock macOS Bash was not checked\n' "$lane" >&2
     elif [ "$result" != success ]; then
       bad="$bad $lane=$result"
     fi
