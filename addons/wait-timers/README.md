@@ -122,20 +122,22 @@ Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
 
 A lead that ignores its ready-work wake (`bin/jg-watch.sh` `ready_work_waits_idle`) is the same ladder with the lead as the stuck party.
 `jg_wait_timers_backlog` runs from a lead home's tick at most every `JG_READY_STALL_POLL_SECS` (default 60), and the watcher's `ready_backlog_stall_state` owns the condition.
-The condition holds while a ready, unheld item could start now and the home has a free lane.
+The condition holds while a ready, unheld item could start now and either the home has a free lane or no worker is provably working.
 A free lane is fewer open lanes than `config/lane-target`, or than 4 without a usable one.
+A home at its floor still counts as stalled when no worker is provably working (the ready-work wake's "no worker working" case), so lanes that only wait on a merge or a cleanup never hide an idle lead.
 An item whose project's declared capacity is already held cannot start now, so it does not count (`bin/jg-project-capacity-lib.sh`).
 
 | rung | when | who acts |
 |---|---|---|
-| ready work on a free lane | first sight | the existing ready-work wake asks the lead to dispatch |
-| nothing started | `JG_READY_STALL_SECS` (default 900) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
+| ready work that could start | first sight | the existing ready-work wake asks the lead to dispatch |
+| nothing started | `JG_READY_STALL_SECS` (default 600) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main naming the lead and the ready task ids, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
 | still nothing started | every `JG_PROMPT_REALERT_SECS` | both fire again |
+| still open | `JG_WAIT_CARD_SECS` after Main's watcher first saw the report | the main home posts a guarded board card, and dismisses it when the report is resolved |
 
 - A start is a lane id that was not open before; it ends the episode and re-arms the clock.
-- The condition clearing (no startable ready item, or no free lane) ends the episode, and a reported one is closed with `waiting-timer-cleared`.
+- The condition clearing (no startable ready item, a worker provably working at the floor, or a free lane gone) ends the episode, and a reported one is closed with `waiting-timer-cleared`.
 - An unreadable backlog leaves the episode untouched for that poll.
-- There is no board card rung for a stalled backlog.
+- While ready work waits but the condition does not hold, `state/.waiting-timers/.ready-backlog-why` holds one tab-separated line: when that reason began, the reason (`lanes-working` or `project-capacity`), and the open/target lane counts. It is the on-disk answer to why a waiting backlog raised no escalation, and it is removed when the condition holds or no ready work waits.
 - Episode record: `state/.waiting-timers/.ready-backlog`, one tab-separated line holding first-observed time, open lane ids (comma-joined, `-` for none), report key (`waiting-timer-<home>-<lead>-g<generation>-ready-backlog`), first report time (0 before it), and last fire time.
 
 ## Provenance: byte-identical to the fork at the move
