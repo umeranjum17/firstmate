@@ -1,0 +1,54 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "5b29e768000b97450163258ece84f2c611c484ac",
+  "tree": "6c316c4aa999ec7ed04e9737a9b32ab25ffd5e60",
+  "claim": "The stuck-worker matcher names a question dialog on real pi and codex panes and a provider quota wall on a real OpenCode pane",
+  "result": "pass",
+  "at": "2026-10-29T21:53:21.161Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T215107Z-5b29e768-ba768f/replay.txt",
+      "sha256": "32f610a14ee1d011038ad7ac7ef9c0ca1c55cd2bb48a306e1e366e3430542cbb"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T215107Z-5b29e768-ba768f",
+      "commit": "5b29e768000b97450163258ece84f2c611c484ac",
+      "journey": "stuck-live-captures",
+      "command": "bash journeys/stuck-live-captures.sh",
+      "tool": "0.6.22",
+      "steps": {
+        "target": {
+          "version": "pi 1.0.0, codex-cli 0.159.2, opencode 1.18.25"
+        },
+        "start": "three real runtimes launched in a private tmux server",
+        "steps": [
+          "pi is told to ask a question and opens its dialog",
+          "codex is put in Plan mode and opens its question dialog",
+          "opencode shows its question dialog or its provider quota banner",
+          "each pane is read by jg_stuck_verdict"
+        ],
+        "result": "the stuck-worker matcher names the question or quota cause for each real runtime"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T215107Z-5b29e768-ba768f/replay.txt",
+        "sha256": "32f610a14ee1d011038ad7ac7ef9c0ca1c55cd2bb48a306e1e366e3430542cbb",
+        "verdict": "pass",
+        "seen": "I read three entries plus a PASS line. pi: verdict shows the question dialog hint 'Enter to select · ↑/↓ to navigate · n to add notes'. codex: Plan mode question dialog, verdict 'tab to add notes | enter to submit answer'. opencode: quota wall, verdict 'Free usage exceeded, subscribe to Go [retrying in 2h 15m attempt #1]'. All three match the outcome's named parts, and nothing contradicts them."
+      }
+    ]
+  }
+}
