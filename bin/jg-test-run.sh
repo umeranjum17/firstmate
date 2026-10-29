@@ -595,6 +595,8 @@ tests/jg-supervision-host.test.sh 800000
 tests/jg-tangle-guard.test.sh 8501
 tests/jg-tasks-axi.test.sh 2293
 tests/jg-teardown.test.sh 202132
+# Local measurement (about 300ms) until the next CI refresh.
+tests/jg-tokens-retro.test.sh 1000
 tests/jg-turnend-guard.test.sh 34727
 tests/jg-update.test.sh 11894
 tests/jg-wake-daemon-lifecycle-e2e.test.sh 7345

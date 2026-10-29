@@ -1246,6 +1246,26 @@ When stripping is enabled, the hooks directory is read-only, so a hook manager r
 The flag is a home-wide attribution choice, so it is inherited into Squad Lead homes under the [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md) inherited-local-material contract and a Squad Lead's own workers keep AI trailers too.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Juggernaut, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 
+### Token saver
+
+The token saver cuts per-request tokens in fleet sessions and meters the result.
+It is on by default, and the optional local, gitignored `config/token-saver-off` presence flag turns every part of it off in this home.
+None of it is inherited into Squad Lead homes, so each home chooses for itself.
+
+- **Ponytail off:** every Claude launch's settings carry `"enabledPlugins":{"ponytail@ponytail":false}`, a task worker's in its inline `--settings` JSON and a Squad Lead's in `state/<id>.claude-settings.json`.
+  This keeps a globally installed ponytail plugin out of fleet sessions without editing user settings; the token-optimizer lab measured ponytail 4.8.4 at +1.6k to +2.6k tokens per request and +6.4% cost.
+  The captain's own Overwatch session is launched by hand, so it is not covered.
+- **Poll guard, report-only:** when the installed `learn-from-mistakes-axi` has its tokens mode (0.12.0 and later), every Claude launch adds its poll guard as a `PreToolUse` and `SessionStart` hook with the hook's output discarded.
+  The guard never blocks; a would-be block of the third identical poll-like Bash command is only logged, and `learn-from-mistakes-axi tokens guard status` reports how many there were.
+- **Bash output cap trial:** when this home has `config/bash-output-max` holding one whole number from 1000 to 150000, its Claude launches set `BASH_MAX_OUTPUT_LENGTH` to it through the settings `env` key.
+  Claude Code saves a longer Bash output to a file and shows the model a preview; its default is 30000.
+  The file is absent by default, so the cap is a one-home trial; delete the file to end it.
+- **Daily token retro:** `bin/jg-tokens-retro.sh arm` registers a watcher check that runs `learn-from-mistakes-axi tokens retro --since 1d` once a day into `data/tokens-retro/<YYYY-MM-DD>/` and raises a `check:` notification only when tokens per day moved by 20% or more against the report from seven days earlier (`JG_TOKENS_RETRO_CHANGE_PCT`).
+  The retro reads the local session stores and makes no model calls.
+  `bin/jg-tokens-retro.sh disarm` removes the check and keeps the reports.
+
+All three launch parts apply to new launches; a running worker keeps the settings it started with.
+
 ## Project capacity (config/project-capacity)
 
 The optional local, gitignored `config/project-capacity` tells Juggernaut how many workers a project can run at once on this machine, for a project whose machine-local resource - a heavy test suite, a local editor stack, a device - only serves a few workers at a time.
