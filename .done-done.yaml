@@ -34,6 +34,8 @@ journeys:
   model-gate-concurrent:
     command: bash journeys/model-gate-concurrent.sh
     core: true
+  tmp-sweep:
+    command: bash journeys/tmp-sweep.sh
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
