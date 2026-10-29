@@ -557,6 +557,7 @@ tests/jg-bearings-board-lavish-live-e2e.test.sh 61
 tests/jg-bearings-board.test.sh 50015
 tests/jg-bootstrap.test.sh 83933
 tests/jg-calm-home-links.test.sh 381
+tests/jg-ci-required.test.sh 300
 tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
 tests/jg-codex-continuity-live-e2e.test.sh 57
 tests/jg-codex-hook-layer-live-e2e.test.sh 68
