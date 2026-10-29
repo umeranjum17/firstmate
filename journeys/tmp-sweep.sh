@@ -26,6 +26,12 @@ st=0
 grep -q '^not ok' "$LOG" && st=1
 [ "$(grep -c '^ok - ' "$LOG")" -ge 4 ] || st=1
 cat "$LOG"
+cat >"$OUT/steps.json" <<'J'
+{"target":{"version":"juggernaut bin/jg-tmp-sweep.sh at this commit"},
+ "start":"a disposable folder standing in for /tmp with stale and fresh entries, a stale claude-1000 session folder and an off-allowlist stale folder",
+ "steps":["check the folder's inode use against a 0 percent threshold","dry-run the sweep and list the folder","run the sweep for real and list the folder","run the sweep behavior test"],
+ "result":"the dry run removes nothing; the real run removes only the three stale allowlisted entries and keeps the fresh entry, the claude-1000 folder and the stale off-allowlist folder; the four behavior checks pass"}
+J
 find "$T" -type d -exec chmod u+rwx {} + 2>/dev/null
 rm -rf -- "$T"
 exit "$st"
