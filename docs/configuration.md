@@ -724,7 +724,7 @@ The declaration is per-home untracked state under `data/`, like every other capt
 A fresh primary home has no declaration until the captain re-declares the `Memory layering` section there from their own records.
 Until then local files are the only memory owners.
 
-[`AGENTS.md`](../AGENTS.md) section 6 owns what a declaration changes about knowledge routing, and the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
+the internal [`fleet-records` skill](../.agents/skills/fleet-records/SKILL.md) owns what a declaration changes about knowledge routing, and the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
 The section counts toward the startup memory budget like the rest of its file, so keep it to the mapping rather than restating these rules.
 
 ## Startup memory budget (config/startup-memory-budget)
@@ -1249,7 +1249,7 @@ Per-machine Cursor `cli-config.json` attribution-off is not this contract: it do
 ## Project capacity (config/project-capacity)
 
 The optional local, gitignored `config/project-capacity` tells Juggernaut how many workers a project can run at once on this machine, for a project whose machine-local resource - a heavy test suite, a local editor stack, a device - only serves a few workers at a time.
-Without it, dispatch stays uncapped as `AGENTS.md` section 7 describes, and a surplus worker is launched only to spend full-context turns waiting for the resource.
+Without it, dispatch stays uncapped as the `task-dispatch` skill describes, and a surplus worker is launched only to spend full-context turns waiting for the resource.
 The file lives in the machine's root Juggernaut home, so every local Squad Lead home reads the same limit, and it holds one line per project:
 
 ```text
@@ -1273,7 +1273,7 @@ Juggernaut cannot see which part of a worker's life uses the resource, so the nu
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that Juggernaut reads before dispatching an operator or Recon.
 Juggernaut chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Juggernaut resolves the rule's profile object or array under `AGENTS.md` section 4 and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `jg-spawn.sh`.
+Juggernaut resolves the rule's profile object or array under `task-dispatch` and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `jg-spawn.sh`.
 
 **Spawn requirements**
 
@@ -1284,7 +1284,7 @@ Juggernaut resolves the rule's profile object or array under `AGENTS.md` section
 **Contract owners**
 
 This section is the single owner of the canonical schema and its per-field semantics.
-`AGENTS.md` section 4 owns the always-loaded dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
+`task-dispatch` owns the dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
 
 ```json
 {
@@ -1486,7 +1486,7 @@ Every result above exits 0.
 
 **Juggernaut retains the dispatch decision**
 
-The tool never replaces Juggernaut's judgment, `quota-array-dispatch`, the captain-approval gate, or `jg-spawn.sh` validation; `AGENTS.md` section 4 owns what Juggernaut does with each outcome.
+The tool never replaces Juggernaut's judgment, `quota-array-dispatch`, the captain-approval gate, or `jg-spawn.sh` validation; `task-dispatch` owns what Juggernaut does with each outcome.
 By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
 
 Juggernaut passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.

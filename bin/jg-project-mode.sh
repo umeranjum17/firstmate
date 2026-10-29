@@ -14,7 +14,8 @@
 # for this project", never "how does this task ship". A task's delivery mode,
 # yolo, and ship-branch prefix are resolved by juggernaut at intake and passed
 # explicitly to bin/jg-brief.sh, bin/jg-spawn.sh, and bin/jg-promote.sh (AGENTS.md
-# section 7; bin/jg-brief.sh's own header owns the --branch-prefix flag it accepts).
+# section 7 and the task-dispatch skill; bin/jg-brief.sh's own header owns the
+# --branch-prefix flag it accepts).
 # The consumers are bin/jg-fleet-sync.sh (skip local-only clones),
 # bin/jg-bootstrap.sh (skip the GitHub-auth probe when every clone is local-only),
 # bin/jg-home-seed.sh and bin/jg-remote-home-seed.sh (refuse local-only seeding,

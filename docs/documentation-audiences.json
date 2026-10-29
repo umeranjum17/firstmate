@@ -725,6 +725,14 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/task-dispatch/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/fleet-records/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": "addons/.agents/skills/done-done-verify-juggernaut-addons/SKILL.md",
       "audience": "agent-runtime"
     },
