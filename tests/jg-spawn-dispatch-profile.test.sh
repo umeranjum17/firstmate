@@ -212,6 +212,7 @@ test_claude_squad_lead_launch_brief_publishes_into_its_own_home() {
   status=$?
   expect_code 0 "$status" "squad_lead claude spawn for the doorbell check should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "--add-dir '$(cd "$HOME_DIR/state" && pwd -P)/pending-replies'" "squad_lead claude launch must grant the parent's pending-replies"
   doorbell=$(claude_launch_brief_arg "$launch")
   [ "$(printf '%s' "$doorbell" | "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || fail "the squad_lead record does not hold a launch-brief envelope: $doorbell"
