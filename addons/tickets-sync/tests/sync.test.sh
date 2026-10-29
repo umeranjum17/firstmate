@@ -203,6 +203,7 @@ grep -q "ticket-cleanup-$(date -u +%F)" "$work/cards.json"
 jq -e '[.decisions[].detail // ""] | any(contains("no-ask-card: main/other")) and (any(contains("no-ask-card: main/ask3")) | not)' "$work/cards.json"
 jq -e --arg t "$(ticket_id main/ask3)" '[.decisions[] | select(.ticket == $t)] | length == 1 and .[0].title == "Umer wants the board to show quotes always?" and (.[0].about | contains("Umer wants the board to show quotes always"))' "$work/cards.json"
 test -z "$(bash "$work/cleanup.sh")"
+rm -f "$JG_HOME/state/tickets-sync/cleanup.day"
 bash "$work/cleanup.sh" >/dev/null
 test "$(sign-off-axi list "$work/board.json" --json | jq --arg t "$(ticket_id main/ask3)" '[.decisions[] | select(.ticket == $t)] | length')" = 1
 echo 'PASS: the daily clean-up flags, raises the missing ask card once, back-fills a quote from the steer record, raises one card and runs once a day'
