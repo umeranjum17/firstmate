@@ -83,7 +83,16 @@ row find t7 $'## Checks\noutcome: x' "$EMPTY"; shot t7
 run find t7
 assert_contains "$out" "mode: ui" "find reports UI work"
 assert_contains "$out" "media: $home/data/t7/shot.png" "find lists the media"
-pass "find lists the evidence files"
+row find-none t9 $'## Checks\nscreen: none\noutcome: Parser is faster' "$EMPTY"; seal t9
+mkdir -p "$root/retired/merge-card"
+printf '#!/bin/sh\necho retired >&2; exit 1\n' > "$root/retired/merge-card/merge-card"
+chmod +x "$root/retired/merge-card/merge-card"
+JG_ADDONS_DIR=$root/retired export JG_ADDONS_DIR
+run find t9
+unset JG_ADDONS_DIR
+assert_contains "$out" "mode: text" "find reports text mode for screen: none despite a stale override"
+assert_contains "$out" "receipt: 20261029T000000Z-01234567-ab" "find reports the sealed receipt"
+pass "find lists evidence and recognizes screen: none"
 
 # verify-merge-card-posts-after-pr-239: the real post-merge hook path files a card with only JG_HOME set.
 printf '#!/bin/sh\nexec "%s/addons/merge-card/merge-card" post --board "%s/b.json" "$@"\n' "$ROOT" "$root" > "$home/config/post-merge"
