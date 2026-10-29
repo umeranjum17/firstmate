@@ -95,8 +95,15 @@ install_skill() {  # <package-skill-dir> <skill-name>
   return "$rc"
 }
 
+# A published done-done-axi still ships integrations/firstmate; a renamed one ships integrations/juggernaut.
+integration_file() {  # <package-dir> <file>
+  if [ -r "$1/integrations/juggernaut/$2" ]; then printf '%s\n' "$1/integrations/juggernaut/$2"
+  else printf '%s\n' "$1/integrations/firstmate/$2"; fi
+}
+
 write_include() {  # <package-dir>
-  local block=$1/integrations/juggernaut/brief-include.md dest=$CONFIG/brief-include.md tmp
+  local block dest=$CONFIG/brief-include.md tmp
+  block=$(integration_file "$1" brief-include.md)
   [ -r "$block" ] || return 1
   mkdir -p "$CONFIG" || return 1
   if [ -L "$dest" ] || { [ -e "$dest" ] && [ ! -f "$dest" ]; }; then
@@ -120,7 +127,8 @@ write_include() {  # <package-dir>
 }
 
 place_gate() {  # <package-dir>
-  local src=$1/integrations/juggernaut/merge-gate dest=$CONFIG/merge-gate
+  local src dest=$CONFIG/merge-gate
+  src=$(integration_file "$1" merge-gate)
   [ -r "$src" ] || return 1
   if [ -e "$dest" ] || [ -L "$dest" ]; then
     return 0
