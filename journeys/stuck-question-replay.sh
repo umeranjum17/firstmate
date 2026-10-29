@@ -85,4 +85,8 @@ for _ in 1 2 3 4; do [ ! -e "$H/state/.wait-sources/w1.question" ] || cycle; don
 [ ! -e "$H/state/.wait-sources/w1.question" ] || fail "the wait source outlived the answered dialog"
 cp "$H/events" "$OUT/watcher-events.txt"; cp "$H/cards" "$OUT/board-calls.txt"
 log "dialog answered; wait source cleared"
+jq -n --arg v "$(claude --version 2>/dev/null | head -1)" --arg sha "$(git -C "$REPO" rev-parse --short HEAD)" '{target:{version:("bin/jg-watch.sh at " + $sha + " driving " + $v)},
+  start:"a real Claude Haiku worker pane with no question open",
+  steps:["the worker opens an AskUserQuestion dialog","the watcher records the dialog as a question wait source","the owner rung fires","the Main rung fires","a board card is raised","the dialog is answered"],
+  result:"the wait source and episode are cleared after the dialog is answered"}' > "$OUT/steps.json"
 log "PASS"
