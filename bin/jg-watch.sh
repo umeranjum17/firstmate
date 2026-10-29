@@ -130,8 +130,8 @@
 #                          running a check or removing poll artifacts
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
-#   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - start the top ready item now, or record why it waits
-#   check: ready work waiting with no worker working: <ids> - start each or record why it waits
+#   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - dispatch them now, P0 first, up to project capacity
+#   check: ready work waiting with no worker working: <ids> - dispatch them now, P0 first, up to project capacity
 #                          a squad_lead home's base-cadence scan found dispatchable
 #                          queued work (jg-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
@@ -285,6 +285,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-busy-lib.sh"
 # shellcheck source=bin/jg-watch-progress-lib.sh
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
+# shellcheck source=bin/jg-supervision-lib.sh
+. "$SCRIPT_DIR/jg-supervision-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -2811,15 +2813,12 @@ warn_invalid_lane_target_once() {
 # held or in flight) cannot reset the re-raise window. Intake is independent of
 # the heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
-  local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
+  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
   [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
-  ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
+  READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
   ready_rc=$?
-  READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
-    | awk '/^ready\[[0-9]+\]/ { on = 1; next } on && /^  / { sub(/^  /, ""); split($0, f, ","); print f[1]; next } { on = 0 }' \
-    | sort | paste -sd ' ' -)
   if [ -z "$READY_WORK_IDS" ]; then
     # A non-zero status means the backlog could not be read, not that the
     # condition is false, so leave the queued row for the next cycle instead of
@@ -2838,14 +2837,14 @@ ready_work_waits_idle() {
     warn_invalid_lane_target_once
   fi
   if [ -n "$target" ] && open=$(open_lane_count) && [ "$open" -lt "$target" ]; then
-    READY_WORK_REASON="check: ready work waiting with free lane slots ($open/$target open): $READY_WORK_IDS - start the top ready item now, or record why it waits"
+    READY_WORK_REASON="check: ready work waiting with free lane slots ($open/$target open): $READY_WORK_IDS - dispatch them now, P0 first, up to project capacity"
   else
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
       task=${meta##*/}
       crew_is_provably_working "${task%.meta}" && return 1
     done
-    READY_WORK_REASON="check: ready work waiting with no worker working: $READY_WORK_IDS - start each or record why it waits"
+    READY_WORK_REASON="check: ready work waiting with no worker working: $READY_WORK_IDS - dispatch them now, P0 first, up to project capacity"
   fi
   # Re-raise gate: a new ready set fires at once; the same still-holding set only
   # again after READY_WORK_RESURFACE_SECS. A record without a usable timestamp

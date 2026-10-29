@@ -142,6 +142,7 @@ Its scope field drives routing and its project list is non-exclusive provisionin
 Keep `local-only` work in the main home.
 
 A Squad Lead is idle by default and acts only on work routed by the main Overwatch.
+Routed backlog items count as routed work: when a Squad Lead is idle and its own backlog has ready items not held for the captain, the watcher wakes it to dispatch them, P0 first, up to project capacity, and the fleet view flags a lead that stays idle with ready work.
 It reconciles its own work under way after restart, then waits silently; an empty queue never authorizes a survey, audit, or self-directed improvement sweep.
 Do not reconstruct or supervise a Squad Lead's child tree from the main home.
 

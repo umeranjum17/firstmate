@@ -114,5 +114,8 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
    end),
   "",
   "## SquadLeads",
+  ([.squad_lead_current.records[]? | select(.idle_with_ready_work)]
+   | if length == 0 then empty
+     else (.[] | "IDLE WITH READY WORK: \(.id) has \(.ready_work) ready backlog item(s) and no worker running; it should be dispatching them (P0 first)."), "" end),
   .squad_lead_guidance.note
 '
