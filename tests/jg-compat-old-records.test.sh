@@ -87,6 +87,37 @@ for pair in "bin/fm-backend.sh:fm_meta_get" "bin/fm-backend.sh:fm_backend_of_met
   (. "$ROOT/$lib" >/dev/null 2>&1; declare -F "$fn" >/dev/null) || fail "$fn is not defined after sourcing $lib"
 done
 pass "old function names answer through the old library paths"
+# every old library path answers to the old name of each function its renamed
+# library defines, including a library that does not load the compatibility
+# layer itself (an OpenCode plugin loaded before the rename calls
+# fm_supervision_needed through bin/fm-supervision-lib.sh)
+for shim in "$ROOT"/bin/fm-*-lib.sh; do
+  missing=$(
+    before=$(compgen -A function)
+    # shellcheck disable=SC1090
+    . "${shim%/*}/jg-${shim##*/fm-}" >/dev/null 2>&1
+    new=$(compgen -A function | grep -vxF "$before" | grep '^jg_' | grep -v '^jg_compat_')
+    # shellcheck disable=SC1090
+    . "$shim" >/dev/null 2>&1
+    for fn in $new; do declare -F "fm_${fn#jg_}" >/dev/null || printf '%s ' "fm_${fn#jg_}"; done
+  )
+  [ -z "$missing" ] || fail "sourcing ${shim##*/} leaves old names undefined: $missing"
+done
+(. "$ROOT/bin/fm-supervision-lib.sh"; declare -F fm_supervision_needed >/dev/null) \
+  || fail "fm_supervision_needed is not defined after sourcing bin/fm-supervision-lib.sh"
+pass "every old library path answers to its library's old function names"
+# an old caller that runs a library as `bash <old path>` reaches the renamed
+# library even though that library is not executable
+[ ! -x "$ROOT/bin/jg-supervision-engine-lib.sh" ] \
+  || fail "bin/jg-supervision-engine-lib.sh is executable, so this case no longer proves anything"
+mkdir -p "$h/host-config"
+bash "$ROOT/bin/fm-supervision-engine-lib.sh" enabled "$h/host-config" opencode 2>/dev/null
+rc=$?
+[ "$rc" -eq 1 ] || fail "the old engine path answered $rc, not 1, for a home without a supervision host"
+printf 'claude claude-haiku-5-5\n' > "$h/host-config/supervision-host"
+bash "$ROOT/bin/fm-supervision-engine-lib.sh" enabled "$h/host-config" opencode 2>/dev/null \
+  || fail "the old engine path did not see the home's supervision host"
+pass "an old caller running a library through bash reaches the renamed library"
 # a per-lead pin left under the old directory name
 mkdir -p "$h/config/${legacy_lead}s/lead1"
 printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}s/lead1/harness"

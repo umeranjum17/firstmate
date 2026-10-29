@@ -350,4 +350,35 @@ if printf '%s\n' "$pane" | grep -Fq '$ bin/jg-watch-arm.sh'; then
   fail "OpenCode model attempted to re-arm instead of leaving continuity to the plugin"
 fi
 
-printf 'ok - OpenCode %s live E2E covered native Ahoy first/later messages, near misses, and watcher continuity\n' "$OPENCODE_VERSION"
+# A resumed primary gets no idle event until a turn ends, so the plugin must arm
+# at load. Resume the same session with no watcher and type nothing.
+session_id=$(sqlite3 "${XDG_DATA_HOME:-$HOME/.local/share}/opencode/opencode.db" \
+  "select id from session where directory='$PROJECT' order by time_created desc limit 1;")
+[ -n "$session_id" ] || fail "could not find the OpenCode session to resume"
+old_watcher=$(cat "$HOME_DIR/state/.watch.lock/pid" 2>/dev/null || true)
+old_arm=$(ps -p "$old_watcher" -o ppid= 2>/dev/null | tr -d ' ' || true)
+"$TMUX" -L "$SOCKET" kill-server 2>/dev/null || true
+for pid in "$old_watcher" "$old_arm"; do
+  if [ -n "$pid" ] && lab_pid_is_safe "$pid"; then kill -TERM "$pid" 2>/dev/null || true; fi
+done
+i=0
+while [ -n "$old_watcher" ] && kill -0 "$old_watcher" 2>/dev/null && [ "$i" -lt 60 ]; do
+  sleep 0.5
+  i=$((i + 1))
+done
+[ -z "$old_watcher" ] || ! kill -0 "$old_watcher" 2>/dev/null || fail "the first watcher did not stop before the resume"
+"$TMUX" -L "$SOCKET" new-session -d -s "$SESSION" -c "$PROJECT" \
+  "env OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' JG_HOME='$HOME_DIR' JG_ROOT_OVERRIDE='$PROJECT' JG_POLL=1 JG_SIGNAL_GRACE=0 JG_HEARTBEAT=600 bash -lc 'printf \"%s\\n\" \"\$\$\" > \"\$JG_HOME/state/.lock\"; opencode --session $session_id --auto; sleep 300'"
+i=0
+resumed_watcher=
+while [ "$i" -lt 120 ]; do
+  dismiss_update_offer || fail "OpenCode update offer obstructed the resumed session"
+  resumed_watcher=$(cat "$HOME_DIR/state/.watch.lock/pid" 2>/dev/null || true)
+  [ -n "$resumed_watcher" ] && [ "$resumed_watcher" != "$old_watcher" ] && kill -0 "$resumed_watcher" 2>/dev/null && break
+  resumed_watcher=
+  sleep 0.5
+  i=$((i + 1))
+done
+[ -n "$resumed_watcher" ] || fail "OpenCode $OPENCODE_VERSION resumed with --session did not arm the watcher before any turn"
+
+printf 'ok - OpenCode %s live E2E covered native Ahoy first/later messages, near misses, watcher continuity, and arming a resumed session\n' "$OPENCODE_VERSION"
