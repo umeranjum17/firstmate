@@ -44,8 +44,8 @@ case $KIND in ''|ready|review|merged) ;; *) die "kind must be ready, review or m
 case $ID in ''|*[!A-Za-z0-9._-]*) die "bad task id" ;; esac
 [ -n "${JG_HOME:-}" ] || die "JG_HOME is not set"
 DIR=${JG_DATA_OVERRIDE:-$JG_HOME/data}/$ID
-MC=$(jg_addon_path "$JG_HOME" merge-card/merge-card 2>/dev/null)
-[ -n "$MC" ] && [ -x "$MC" ] || skip "the merge-card add-on is not installed"
+MC=$SCRIPT_DIR/../addons/merge-card/merge-card
+[ -x "$MC" ] || skip "the merge-card add-on is not installed"
 command -v jq >/dev/null 2>&1 || skip "jq is not installed"
 if [ "$HEAD" = - ] && [ "$PR" != - ]; then
   HEAD=$(gh pr view "$PR" --json headRefOid --jq .headRefOid 2>/dev/null) || HEAD=-
