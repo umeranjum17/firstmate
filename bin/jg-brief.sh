@@ -47,6 +47,12 @@
 # refuses to merge a yes-task whose completion receipt evidence carries no
 # `first-draft receipt: <ref>` line. A brief without the line (an older brief)
 # warns at spawn and counts as no. No model decides: the gate is a shell check.
+# --ui-change <yes|no> records on a ship brief whether the task changes the UI, as
+# `UI change (nav-check): <yes|no>`. A yes brief carries the no-silent-removal rule:
+# the PR body lists `Nav before:` and `Nav after:` and any removed screen is named.
+# bin/jg-spawn.sh records ui_change= and bin/jg-merge-gate-lib.sh's jg_dod_nav_gate
+# refuses to merge a yes-task whose PR body drops a nav item without a
+# `Removed by captain words: <quote>` line. No flag (an older brief) warns and counts as no.
 # For ship tasks, --mode is REQUIRED and shapes the definition of done. Juggernaut
 # resolves it per task at intake (AGENTS.md section 7); data/projects.md holds the
 # captain's standing posture as context, and this script never reads it:
@@ -255,6 +261,7 @@ UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 DESIGN_CALL=
 DESIGN_REASON=
+UI_CHANGE=
 PROJECT_DIR=
 PROJECT_DIR_SET=0
 POS=()
@@ -274,6 +281,7 @@ for a in "$@"; do
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
       design-call) DESIGN_CALL=$a ;;
       design-reason) DESIGN_REASON=$a ;;
+      ui-change) UI_CHANGE=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -302,6 +310,8 @@ for a in "$@"; do
     --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
     --design-reason) want_value="design-reason" ;;
     --design-reason=*) DESIGN_REASON=${a#--design-reason=} ;;
+    --ui-change) want_value="ui-change" ;;
+    --ui-change=*) UI_CHANGE=${a#--ui-change=} ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -340,6 +350,14 @@ if [ -n "$DESIGN_CALL$DESIGN_REASON" ]; then
   esac
   case "$DESIGN_REASON" in
     ''|*[![:print:]]*|' '*) echo "error: --design-reason needs one printable line stating why (first-draft: $DESIGN_CALL)" >&2; exit 1 ;;
+  esac
+fi
+
+if [ -n "$UI_CHANGE" ]; then
+  [ "$KIND" = ship ] || { echo "error: --ui-change applies only to ship briefs" >&2; exit 1; }
+  case "$UI_CHANGE" in
+    yes|no) ;;
+    *) echo "error: --ui-change must be yes or no (got '$UI_CHANGE')" >&2; exit 1 ;;
   esac
 fi
 
@@ -814,6 +832,22 @@ The merge is refused without that line."
   DESIGN_SECTION="$DESIGN_SECTION
 "
 fi
+UI_SECTION=
+if [ -n "$UI_CHANGE" ]; then
+  UI_SECTION="
+# UI change
+UI change (nav-check): $UI_CHANGE"
+  if [ "$UI_CHANGE" = yes ]; then
+    UI_SECTION="$UI_SECTION
+A UI change never removes or renames an existing menu, tab or screen unless the captain's own words ask for it.
+A design option that removes a screen must name each removed screen in plain words.
+Put two lines in the PR body: \`Nav before: <item>, <item>\` and \`Nav after: <item>, <item>\`, listing every menu, tab and screen the change touches.
+An item in before that is missing from after needs a line \`Removed by captain words: <quote of the captain>\`.
+The merge is refused without the two lines, or with a dropped item and no quote."
+  fi
+  UI_SECTION="$UI_SECTION
+"
+fi
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 DOD=$(jg_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
 
@@ -821,7 +855,7 @@ cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-$DESIGN_SECTION
+$DESIGN_SECTION$UI_SECTION
 $HERDR_SECTION
 
 # Setup

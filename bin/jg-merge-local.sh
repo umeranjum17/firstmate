@@ -162,6 +162,7 @@ esac
 candidate=$(git -C "$PROJ" rev-parse --verify "refs/heads/$BRANCH^{commit}")
 if declare -F jg_dod_receipt_accept >/dev/null; then jg_dod_receipt_accept "$STATE" "$ID" "$META" "$candidate" >&2 || exit 1; fi
 if declare -F jg_dod_design_gate >/dev/null; then jg_dod_design_gate "$STATE" "$ID" "$META" "$candidate" >&2 || exit 1; fi
+if declare -F jg_dod_nav_gate >/dev/null; then jg_dod_nav_gate "$ID" "$META" "$(git -C "$PROJ" log --format=%B "$DEFAULT..$candidate")" >&2 || exit 1; fi
 if declare -F jg_dod_merge_gate >/dev/null; then jg_dod_merge_gate "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}" "$JG_HOME" "$ID" "$META" "$candidate" - >&2 || exit 1; fi
 merge_status=0
 git -C "$PROJ" merge --ff-only "$candidate" >/dev/null || merge_status=$?
