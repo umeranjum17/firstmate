@@ -21,9 +21,9 @@ A failed script's duration is excluded even when its lane uploaded an artifact.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
 
-The supervision-host suite now runs in early and late halves on separate serial runners, with the complete local suite available through `JG_SUPERVISION_HOST_PART=all bash tests/jg-supervision-host.test.sh`.
-The provisional 800000 ms early and 1000000 ms late weights come from case timestamps in [run 40453434558](https://github.com/umeranjum17/juggernaut/actions/runs/40453434558), where the unsplit host script finished in 1774307 ms but its shard hit the 30-minute job cap before an artifact.
-Refresh both weights from green timing artifacts before treating them as measured per-script maxima; the older unsplit 789123 ms sample from [run 36669175457](https://github.com/kunchenguid/juggernaut/actions/runs/36669175457) no longer describes either half.
+The serial hint table was refreshed on 2026-10-29 from the portable serial artifacts of five Ubuntu CI runs: [40834047706](https://github.com/umeranjum17/juggernaut/actions/runs/40834047706), [40836566918](https://github.com/umeranjum17/juggernaut/actions/runs/40836566918), [40838305188](https://github.com/umeranjum17/juggernaut/actions/runs/40838305188), [40843475618](https://github.com/umeranjum17/juggernaut/actions/runs/40843475618) (its one failed script excluded), and [40844984644](https://github.com/umeranjum17/juggernaut/actions/runs/40844984644).
+The measured maxima pack four shards to about 1520 s and five to about 1215 s against the 1200 s target, so the lane runs six shards; the largest is the single script `tests/jg-supervision-host.test.sh` at 1162449 ms.
+The complete local host suite remains available through `JG_SUPERVISION_HOST_PART=all bash tests/jg-supervision-host.test.sh`.
 The 2026-10-07 polytoken adapter tests carry provisional local measurements instead - 21090 ms for `tests/jg-polytoken-harness.test.sh` and the 103 ms live-guard skip for `tests/jg-polytoken-signals-live-e2e.test.sh`, both measured on the adapter-verification macOS host - until the next CI refresh replaces them with Ubuntu measurements, because they postdate the 2026-09-30 baseline.
 The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
 
@@ -111,7 +111,7 @@ No fast mode, path skips, or paid runner provisioning is part of this layout.
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the watcher-lock floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses ten long-lived Linux jobs (four serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twelve long-lived Linux jobs (six serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 
