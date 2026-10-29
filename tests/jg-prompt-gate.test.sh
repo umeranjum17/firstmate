@@ -51,7 +51,7 @@ screen() {  # <pending-tool> <target> <dir> [pattern] [extra-turn-lines]
 
 ROOTS=(--dir "inbox=$F/state/task1.inbox" --state-files "state=$F/state/task1"
   --dir "pending-replies=$F/state/pending-replies" --dir "tooling=$F/bin" --file "tooling=$F/AGENTS.md"
-  --dir "tooling=$F/.agents/skills" --dir "worktree=$F/wt")
+  --dir "tooling=$F/.agents/skills" --dir "worktree=$F/wt" --file "home-dir=$F" --file "state-dir=$F/state")
 READ=$'\342\240\264 Read'
 
 case_is() {  # <name> <expected verdict> <expected second field substring> <screen>
@@ -70,6 +70,8 @@ test_allowed_reads_are_approved() {
   case_is "pending-replies directory" approve pending-replies "$(screen "$READ" "$F/state/pending-replies" "$F/state/pending-replies")"
   case_is "home tooling" approve tooling "$(screen "$READ" "$F/bin/a.sh" "$F/bin")"
   case_is "home AGENTS.md" approve tooling "$(screen "$READ" "$F/AGENTS.md" "$F")"
+  case_is "the home folder itself" approve home-dir "$(screen "$READ" "$F" "$F")"
+  case_is "the state folder itself" approve state-dir "$(screen "$READ" "$F/state" "$F/state")"
   case_is "skill under a dot root" approve tooling "$(screen "$READ" "$F/.agents/skills/s/SKILL.md" "$F/.agents/skills/s")"
   case_is "worktree source" approve worktree "$(screen "$READ" "$F/wt/src/a.js" "$F/wt/src")"
   case_is "finished reads earlier in the step" approve inbox "$(screen "$READ" "$F/state/task1.inbox/001.msg" "$F/state/task1.inbox" "" \
@@ -81,6 +83,7 @@ test_disallowed_paths_are_cards() {
   case_is "another task's status" card "outside this fleet's own roots" "$(screen "$READ" "$F/state/other.status" "$F/state")"
   case_is "prefix-sibling task id" card "outside this fleet's own roots" "$(screen "$READ" "$F/state/task1x.status" "$F/state")"
   case_is "prefix-sibling home" card "outside this fleet's own roots" "$(screen "$READ" "$TMP_ROOT/fleet-evil/bin/a.sh" "$TMP_ROOT/fleet-evil/bin")"
+  case_is "a folder below the home" card "outside this fleet's own roots" "$(screen "$READ" "$F/data" "$F/data")"
   case_is "home data/" card "outside this fleet's own roots" "$(screen "$READ" "$F/data/x" "$F/data")"
   case_is "credential in an allowed root" card "credential-like path" "$(screen "$READ" "$F/state/task1.inbox/.env" "$F/state/task1.inbox")"
   case_is "dotfile in the worktree" card "hidden or credential-like path" "$(screen "$READ" "$F/wt/.npmrc" "$F/wt")"
@@ -136,7 +139,56 @@ test_lib_switch_and_trust_dialogs() {
   pass "a root at / or the user home, the off switch, and trust dialogs are all cards"
 }
 
+# The real watcher over a pane that never leaves its prompt: no scan between
+# them shows the pane unblocked, yet every interval it acts again - an
+# approvable read is approved again, anything else re-alerts Main.
+test_prompt_still_up_is_acted_on_every_interval() {
+  command -v tmux >/dev/null 2>&1 || { printf '# skip: tmux not found\n'; return 0; }
+  local lab w=jglab:jg-lead1 i n approvals wakes ack
+  lab=$("$ROOT/bin/jg-lab-home.sh" create "$TMP_ROOT/lab")
+  TMUX_TMPDIR=$("$ROOT/bin/jg-lab-home.sh" tmux-dir "$lab")
+  export TMUX_TMPDIR
+  trap 'tmux kill-server 2>/dev/null; "$ROOT/bin/jg-lab-home.sh" teardown "'"$lab"'" >/dev/null 2>&1; jg_test_cleanup' EXIT
+  mkdir -p "$lab/state/lead1.inbox" "$lab/signoff" "$TMP_ROOT/lead"
+  : > "$lab/state/lead1.inbox/001.msg"
+  : > "$lab/data/x"
+  screen "$READ" "$lab/state/lead1.inbox/001.msg" "$lab/state/lead1.inbox" > "$TMP_ROOT/approvable.txt"
+  screen "$READ" "$lab/data/x" "$lab/data" > "$TMP_ROOT/outside.txt"
+  printf 'window=%s\nendpoint_task_id=lead1\nworktree=%s\nhome=%s\nharness=opencode\nkind=squad_lead\nmode=squad_lead\nyolo=off\nbackend=tmux\n' \
+    "$w" "$TMP_ROOT/lead" "$TMP_ROOT/lead" > "$lab/state/lead1.meta"
+  show() { tmux respawn-pane -k -t "$w" "stty -echo; cat '$1'; exec sleep 999999" 2>/dev/null \
+    || tmux new-session -d -s jglab -n jg-lead1 -x 220 -y 60 "stty -echo; cat '$1'; exec sleep 999999"; sleep 1; }
+  watch_until() {  # <out> <wakes wanted>: rerun the watcher, which exits on each wake
+    : > "$1"
+    for i in 1 2 3 4 5 6 7 8; do
+      JG_HOME="$lab" SIGN_OFF_HOME="$lab/signoff" JG_POLL=1 JG_PROMPT_REALERT_SECS=3 \
+        JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 timeout 20 "$ROOT/bin/jg-watch.sh" >> "$1" 2>&1
+      # Main drains and acknowledges each wake before the watcher is re-armed.
+      JG_HOME="$lab" JG_STATE_OVERRIDE="$lab/state" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2>"$TMP_ROOT/drain.err"
+      ack=$(sed -n 's/^WAKE_ACK_REQUIRED: *//p' "$TMP_ROOT/drain.err")
+      [ -z "$ack" ] || JG_HOME="$lab" JG_STATE_OVERRIDE="$lab/state" "$ROOT/bin/jg-wake-drain.sh" \
+        ${ack#*jg-wake-drain.sh} >/dev/null 2>&1 || fail "the wake acknowledgement failed: $(cat "$TMP_ROOT/drain.err")"
+      [ "$(grep -c "stale: $w (permission prompt" "$1")" -lt "$2" ] || return 0
+    done
+  }
+
+  show "$TMP_ROOT/approvable.txt"
+  watch_until "$TMP_ROOT/a.out" 3
+  approvals=$(grep -c '"root":"inbox"' "$lab/state/prompt-approvals.jsonl" 2>/dev/null || true)
+  wakes=$(grep -c "stale: $w (permission prompt: .*not auto-approved: an approval sent under a minute ago did not take" "$TMP_ROOT/a.out" || true)
+  [ "${approvals:-0}" -ge 3 ] && [ "$wakes" -ge 3 ] \
+    || fail "an approvable prompt left on screen was not re-approved and re-alerted each interval (approvals=$approvals wakes=$wakes): $(cat "$TMP_ROOT/a.out")"
+
+  show "$TMP_ROOT/outside.txt"
+  watch_until "$TMP_ROOT/b.out" 3
+  n=$(grep -c "stale: $w (permission prompt: .*not auto-approved: outside this fleet's own roots" "$TMP_ROOT/b.out" || true)
+  [ "$n" -ge 3 ] || fail "a carded prompt left on screen did not re-alert each interval (wakes=$n): $(cat "$TMP_ROOT/b.out")"
+  [ "$(grep -c '"root"' "$lab/state/prompt-approvals.jsonl")" = "$approvals" ] || fail "a read outside the roots was approved"
+  pass "a prompt that never leaves the screen is approved or re-alerted again every interval, with no per-prompt latch"
+}
+
 test_allowed_reads_are_approved
 test_disallowed_paths_are_cards
 test_unprovable_calls_are_cards
 test_lib_switch_and_trust_dialogs
+test_prompt_still_up_is_acted_on_every_interval

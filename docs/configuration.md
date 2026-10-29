@@ -664,6 +664,7 @@ The flag is a home-local supervision-noise preference and is not inherited by Sq
 
 The watcher treats a worker or Squad Lead pane showing a permission or trust prompt as stuck at once.
 It approves only an OpenCode read it can prove is inside this fleet's own files, and raises a board card and a wake for every other prompt.
+While the same prompt stays on screen it is approved or re-alerted again every 10 minutes (`JG_PROMPT_REALERT_SECS`), with no once-per-prompt latch.
 The optional local, gitignored `config/prompt-approve-off` presence flag turns approval off, so every prompt becomes a card.
 `bin/jg-prompt-gate-lib.sh` owns the roots and the records, and `bin/jg-prompt-gate.py` owns the matcher.
 

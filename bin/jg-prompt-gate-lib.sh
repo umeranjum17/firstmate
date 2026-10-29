@@ -8,7 +8,8 @@
 # whose resolved path is inside this fleet's own roots, the ones
 # jg_prompt_gate_verdict passes below: the task's steering inbox, its own
 # state/<id>.<ext> files, state/pending-replies, its recorded worktree and home,
-# and the home's read-only tooling (bin/, docs/, .agents/skills/, AGENTS.md).
+# the home and state/ folders themselves (not what is below them), and the
+# home's read-only tooling (bin/, docs/, .agents/skills/, AGENTS.md).
 # Every other prompt, including Claude, Pi, omp and Gemini trust dialogs
 # (jg_busy_launch_prompt_parked), is a board card. config/prompt-approve-off
 # turns approval off, so every prompt becomes a card.
@@ -38,6 +39,7 @@ jg_prompt_gate_verdict() {  # <harness> <home> <state> <config> <task> <meta>
         --dir "inbox=$state/$task.inbox" --state-files "state=$state/$task" \
         --dir "pending-replies=$state/pending-replies" \
         ${wt:+--dir "worktree=$wt"} ${lead:+--dir "lead-home=$lead"} \
+        --file "home-dir=$home" --file "state-dir=$state" \
         --dir "tooling=$home/bin" --dir "tooling=$home/docs" \
         --dir "tooling=$home/.agents/skills" --file "tooling=$home/AGENTS.md" 2>/dev/null | head -1) || out=
       [ -n "$out" ] || out=$(printf 'card\tthe prompt matcher could not run\t-\tPermission required')

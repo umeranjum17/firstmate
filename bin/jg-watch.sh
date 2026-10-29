@@ -360,6 +360,7 @@ fi
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
 POLL=${JG_POLL:-15}                   # seconds between cycles
+PROMPT_REALERT=${JG_PROMPT_REALERT_SECS:-600}  # a prompt still up is re-acted on this often
 # Beacon publication and scan timing are owned by docs/turnend-guard.md
 # "Guard grace and the poll cadence".
 # jg_poll_derived_grace (bin/jg-wake-lib.sh, already sourced
@@ -2254,8 +2255,10 @@ captain_call_stale_bound() {  # <window-key> <task>
 # not cover it. bin/jg-prompt-gate-lib.sh owns the verdict. An approval is
 # re-proved on a fresh capture and logged before Enter is sent, and is silent;
 # the same prompt still on screen within a minute of it means the answer did
-# not take, so it becomes a card, which then stays that prompt's answer. Every
-# card is posted and woken once per prompt.
+# not take, so it becomes a card. There is no per-prompt latch: while the same
+# prompt stays on screen, every JG_PROMPT_REALERT_SECS (default 600) it is
+# approved again if approvable and otherwise its card is re-posted (sign-off
+# keeps one open card per question) and Main is woken again.
 # Returns 0 only after an approval, so the caller skips the stale path for that
 # poll; a pane left on a carded prompt keeps the ordinary stale path.
 prompt_gate_check() {  # <window> <task> [tail40]
@@ -2280,7 +2283,9 @@ prompt_gate_check() {  # <window> <task> [tail40]
   fi
   h=$(printf '%s' "$verdict" | hash_pane)
   IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
-  [ "$(cat "$mf" 2>/dev/null)" != "card:$h" ] || return 1
+  if [ "$(cat "$mf" 2>/dev/null)" = "card:$h" ] && [ "$(age_of "$mf")" -lt "$PROMPT_REALERT" ]; then
+    return 1
+  fi
   if [ "${verdict%%$'\t'*}" = approve ]; then
     if [ "$(cat "$mf" 2>/dev/null)" = "approved:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
       _r="an approval sent under a minute ago did not take"
