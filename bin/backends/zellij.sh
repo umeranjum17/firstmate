@@ -169,8 +169,8 @@ jg_backend_zellij_session() {
 # Moving an installation changes this tag and old zellij tab titles stop
 # matching; task meta already records absolute worktree paths, so repo
 # relocation is already outside the supported recovery contract.
-jg_backend_zellij_home_label() {
-  jg_backend_hometag
+jg_backend_zellij_home_label() {  # [legacy]
+  jg_backend_hometag "$@"
 }
 
 # jg_backend_zellij_scoped_title: the actual tab title a NEW task's tab is
@@ -178,9 +178,9 @@ jg_backend_zellij_home_label() {
 # "jg-<hometag>-<id>" (mirrors bin/backends/cmux.sh's identical
 # jg_backend_cmux_scoped_title). Every list/find/recover/kill path below
 # scopes its own-home matches through this.
-jg_backend_zellij_scoped_title() {  # <jg-task-label>
+jg_backend_zellij_scoped_title() {  # <jg-task-label> [legacy]
   local label=$1 rest home
-  home=$(jg_backend_zellij_home_label)
+  home=$(jg_backend_zellij_home_label "${2-}")
   case "$label" in
     jg-*) rest=${label#jg-} ;;
     *) rest=$label ;;
@@ -324,11 +324,12 @@ jg_backend_zellij_pane_exists() {  # <session> <pane_id>
 # already-fetched JSON), so a caller whose fake-CLI fixture supplies exactly
 # one list-tabs response keeps working unchanged.
 jg_backend_zellij_tab_matches_label() {  # <session> <tab_id> <label>
-  local session=$1 tab_id=$2 label=$3 scoped tabs count
+  local session=$1 tab_id=$2 label=$3 scoped legacy tabs count
   scoped=$(jg_backend_zellij_scoped_title "$label")
+  legacy=$(jg_backend_zellij_scoped_title "$label" legacy)
   tabs=$(jg_backend_zellij_cli "$session" action list-tabs --json 2>/dev/null)
-  printf '%s' "$tabs" | jq -e --argjson t "$tab_id" --arg want "$scoped" \
-    '[.[]? | select(.tab_id == $t and .name == $want)] | length > 0' >/dev/null 2>&1 && return 0
+  printf '%s' "$tabs" | jq -e --argjson t "$tab_id" --arg want "$scoped" --arg old "$legacy" \
+    '[.[]? | select(.tab_id == $t and (.name == $want or .name == $old))] | length > 0' >/dev/null 2>&1 && return 0
   printf '%s' "$tabs" | jq -e --argjson t "$tab_id" --arg want "$label" \
     '[.[]? | select(.tab_id == $t and .name == $want)] | length > 0' >/dev/null 2>&1 || return 1
   count=$(printf '%s' "$tabs" | jq -r --arg want "$label" '[.[]? | select(.name == $want)] | length' 2>/dev/null)
@@ -658,19 +659,20 @@ jg_backend_zellij_kill() {  # <target> [tab_id] [expected_label]
 # callers see the same plain label they always have). Read-only: a session
 # that does not exist yet simply lists nothing.
 jg_backend_zellij_list_live() {  # <session>
-  local session=$1 home prefix tabs tab_id name pane_id plain
+  local session=$1 prefix legacy_prefix tabs tab_id name pane_id plain
   jg_backend_zellij_session_exists "$session" || return 0
-  home=$(jg_backend_zellij_home_label)
-  prefix="jg-$home-"
+  prefix="jg-$(jg_backend_zellij_home_label)-"
+  legacy_prefix="jg-$(jg_backend_zellij_home_label legacy)-"
   tabs=$(jg_backend_zellij_cli "$session" action list-tabs --json 2>/dev/null) || return 0
   while IFS=$'\t' read -r tab_id name; do
     [ -n "$tab_id" ] || continue
     plain=${name#"$prefix"}
+    plain=${plain#"$legacy_prefix"}
     [ -n "$plain" ] || continue
     pane_id=$(jg_backend_zellij_pane_for_tab "$session" "$tab_id") || continue
     [ -n "$pane_id" ] || continue
     printf '%s:%s\tjg-%s\n' "$session" "$pane_id" "$plain"
-  done < <(printf '%s' "$tabs" | jq -r --arg prefix "$prefix" '.[]? | select(.name | startswith($prefix)) | "\(.tab_id)\t\(.name)"' 2>/dev/null)
+  done < <(printf '%s' "$tabs" | jq -r --arg prefix "$prefix" --arg legacy "$legacy_prefix" '.[]? | select(.name | startswith($prefix) or startswith($legacy)) | "\(.tab_id)\t\(.name)"' 2>/dev/null)
 }
 
 # jg_backend_zellij_resolve_bare_selector: the live-tab-listing fallback for
@@ -686,13 +688,14 @@ jg_backend_zellij_list_live() {  # <session>
 # tmux-only by design, and zellij/herdr tasks are targeted via task-selector
 # meta or an explicit recorded target.
 jg_backend_zellij_resolve_bare_selector() {  # <name>
-  local name=$1 scoped sessions session tabs tab_id count=0 pane_id bare_session='' bare_tab_id=''
+  local name=$1 scoped legacy sessions session tabs tab_id count=0 pane_id bare_session='' bare_tab_id=''
   scoped=$(jg_backend_zellij_scoped_title "$name")
+  legacy=$(jg_backend_zellij_scoped_title "$name" legacy)
   sessions=$(zellij list-sessions --short --no-formatting 2>/dev/null)
   while IFS= read -r session; do
     [ -n "$session" ] || continue
     tabs=$(jg_backend_zellij_cli "$session" action list-tabs --json 2>/dev/null)
-    tab_id=$(printf '%s' "$tabs" | jq -r --arg want "$scoped" '.[]? | select(.name == $want) | .tab_id' 2>/dev/null | head -1)
+    tab_id=$(printf '%s' "$tabs" | jq -r --arg want "$scoped" --arg old "$legacy" '.[]? | select(.name == $want or .name == $old) | .tab_id' 2>/dev/null | head -1)
     [ -n "$tab_id" ] || continue
     pane_id=$(jg_backend_zellij_pane_for_tab "$session" "$tab_id") || continue
     [ -n "$pane_id" ] || continue

@@ -35,7 +35,7 @@ Verify setup by spawning a small task and confirming metadata contains `backend=
 
 Every task receives one tab in the shared Zellij session.
 The caller-facing label remains `jg-<id>`, while the visible title is home-scoped as `jg-<home-label>-<id>`.
-The home label is `juggernaut` or `2ndmate-<id>` plus a short stable hash of the resolved Juggernaut root.
+The home label is `juggernaut` or `lead-<id>` (the older `2ndmate-<id>` titles are still read) plus a short stable hash of the resolved Juggernaut root.
 This prevents task-id collisions between a primary, Squad Leads, and separate Juggernaut installations sharing one session.
 
 Zellij does not enforce tab-name uniqueness, so the adapter performs its own duplicate check against the scoped title.
