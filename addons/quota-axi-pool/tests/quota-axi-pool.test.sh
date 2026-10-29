@@ -90,7 +90,7 @@ lookout=$(JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" pytho
 import importlib.machinery as m, json, sys
 mod = m.SourceFileLoader("l", sys.argv[1]).load_module()
 print(json.dumps(mod.quota_doc(sys.argv[2])))' "$addons/lookout-adapter/lookout-juggernaut" "$w/home")
-is "dashboard lists A, B and reserved Main" "$(jq -r '[.[].account]|unique|join(",")' <<<"$lookout")" "Umer A,Umer B,default (Main, reserved)"
+is "dashboard lists A, B and reserved Main" "$(jq -r '[.[].account]|unique|join(",")' <<<"$lookout")" "Umer A (pa_umer_a),Umer B (pa_umer_b),default (Main, reserved)"
 reading 0 0 0 0
 run_json '[]'
 is "all workers drained: Claude default reads exhausted, not ambient" "$(jq -r '[.providers[]|select(.provider=="claude" and .accountKey=="default")|.quotaSemantics.effectiveAvailability[0].runway.status]|first' <<<"$out")" exhausted_now

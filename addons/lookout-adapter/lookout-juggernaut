@@ -101,7 +101,7 @@ def quota_doc(home):
     rows = []
     for provider, group in json.loads(done.stdout)['providers'].items():
         for acct in group['workers'] + ([group['reserved']] if group['reserved'] else []):
-            label = (acct['name'] or acct['id']) + (' (Main, reserved)' if acct is group['reserved'] else '')
+            label = '%s (%s)' % (acct['name'] or acct['id'], 'Main, reserved' if acct is group['reserved'] else acct['id'])  # ids tell same-named accounts apart
             for window, left, reset in (('5h', acct['five_hour'], acct['five_hour_resets_at']), ('week', acct['seven_day'], acct['resets_at'])):
                 if left is not None and reset:
                     rows.append({'account': label, 'provider': provider, 'window': window, 'used_pct': 100 - left,
