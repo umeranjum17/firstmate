@@ -25,7 +25,7 @@ tmux new-window -t lab -n opencode -c "$T/work" \
 for _ in $(seq 1 40); do
   pane=$(tmux capture-pane -p -t lab:codex)
   case "$pane" in
-    *"Update available"*) tmux send-keys -t lab:codex Escape ;;
+    *"Update now"*) tmux send-keys -t lab:codex Escape ;;
     *"Trust and continue"*) tmux send-keys -t lab:codex Enter ;;
     *"OpenAI Codex (v"*) break ;;
   esac
@@ -35,6 +35,8 @@ sleep 3
 tmux send-keys -t lab:codex '/plan' Enter
 sleep 3
 tmux send-keys -t lab:codex "$ASK" Enter
+sleep 15
+tmux send-keys -t lab:codex Enter   # codex holds the first Plan-mode prompt until a second submit
 sleep 5
 tmux send-keys -t lab:opencode Enter; sleep 2; tmux send-keys -t lab:opencode Enter
 verdict_of() {  # <window> <capture-file> <want-regex>: wait up to 90s for the verdict
