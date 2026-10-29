@@ -31,6 +31,9 @@ journeys:
     command: bash journeys/watcher-exit-beacon.sh
   stuck-live-captures:
     command: bash journeys/stuck-live-captures.sh
+  model-gate-concurrent:
+    command: bash journeys/model-gate-concurrent.sh
+    core: true
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
