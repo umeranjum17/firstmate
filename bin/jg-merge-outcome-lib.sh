@@ -123,6 +123,10 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   # some earlier status line happened to mention.
   [ "$status" -ne 0 ] || JG_HOME=$home JG_STATE_OVERRIDE=$state "$_JG_MERGE_OUTCOME_LIB_DIR/jg-ticket.sh" "$id" --stage "done" --state "done" --pr "$JG_PR_URL" || true
   if [ "$status" -eq 0 ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${JG_CONFIG_OVERRIDE:-$home/config}" "$home" "$id" "$state/$id.meta" - "$JG_PR_URL" >&2; fi
+  # The merge card carries the proof too: a no-op when the post hook filed it, else files it or says what is missing.
+  if [ "$status" -eq 0 ] && { [ -e "${JG_CONFIG_OVERRIDE:-$home/config}/post-merge" ] || [ -n "${JG_PROOF_BOARD:-}" ]; }; then
+    JG_HOME=$home "$_JG_MERGE_OUTCOME_LIB_DIR/jg-proof-attach.sh" attach merged "$id" --pr "$JG_PR_URL" 2>&1 | sed 's/^/proof: /' >&2 || true
+  fi
   return "$status"
 }
 

@@ -13,6 +13,8 @@ journeys:
     timeout: 45m
   fleet-report:
     command: bash addons/fleet-report/run-proof.sh
+  proof-attach:
+    command: bash journeys/proof-attach.sh
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
