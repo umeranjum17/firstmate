@@ -1,0 +1,55 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "722977a842f954226191f46df539d5e513cbcbba",
+  "tree": "2a0f99d6b84049033f1432f71cded02aa42565c8",
+  "claim": "A board answer on a card routed to a lead reaches that lead's inbox and closes its decision key, the card archives after the lead acknowledges, and an unrouted answer wakes Main with the answer first",
+  "result": "pass",
+  "at": "2026-10-29T19:39:03.167Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T193849Z-722977a8-b6cbfe/jg-board-answers-test.txt",
+      "sha256": "12dfc9746619aa0ed5f0bff618524b01607ee17da1b55a864899759c7fb838e1"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T193849Z-722977a8-b6cbfe",
+      "commit": "722977a842f954226191f46df539d5e513cbcbba",
+      "journey": null,
+      "command": "bash /tmp/claude-1000/-home-umer--treehouse-juggernaut-23ae4f-22-juggernaut/2b63aafd-dad6-49c2-98c9-d52ef668f61e/scratchpad/prove.sh",
+      "tool": "0.6.20",
+      "steps": {
+        "target": {
+          "version": "juggernaut PR 250 head"
+        },
+        "start": "A home with a squad lead whose decision is open, and a board with a card routed to that lead plus an unrouted card",
+        "steps": [
+          "The owner answers the routed card on the board",
+          "One pass of the board-answers watcher check runs",
+          "The lead moves the delivered record to handled/",
+          "The next pass runs",
+          "The owner answers an unrouted card and a pass runs"
+        ],
+        "result": "The lead's inbox holds the marked answer line and its decision key is closed, Main saw one info line, the card is archived after the lead acknowledged, and the unrouted answer produced one wake line starting with the answer text"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T193849Z-722977a8-b6cbfe/jg-board-answers-test.txt",
+        "sha256": "12dfc9746619aa0ed5f0bff618524b01607ee17da1b55a864899759c7fb838e1",
+        "verdict": "pass",
+        "seen": "I read all 6 entries in the capture. The routed-answer lines say a routed answer lands in the lead's inbox, closes its decision key, and tells Main only by info. The archive line says the card archives once the lead moves the record to handled/. The unrouted line says an unrouted answer wakes Main once, answer text first, and old answers stay quiet. The remaining lines cover failed-delivery retry, jg-question-card --route validation, and arm/disarm. Every claim in the outcome is shown as ok, and nothing contradicts it. The outcome names one part, so parts is empty."
+      }
+    ]
+  }
+}
