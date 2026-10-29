@@ -3483,6 +3483,16 @@ watcher_cleanup() {
     echo "watcher: recovery state could not be persisted; retaining stale lock evidence" >&2
     cleanup_status=1
   fi
+  # A cycle that delivered an actionable wake proved a live watcher scanned up
+  # to it, but this cycle cleared the predecessor's beacon at start and exits
+  # before the end-of-scan touch. Without this stamp a busy home never has a
+  # beacon, so every reader calls it unsupervised. Written only after the lock
+  # is released, so an arm never sees a dying holder with a fresh beacon, and
+  # only on a delivered wake, so a killed or evicted watcher leaves none. The
+  # replacement still clears it at start and republishes after its full scan.
+  if [ "$owns_lock" -eq 1 ] && [ -n "${JG_WATCH_DELIVERED_REASON:-}" ]; then
+    touch "$STATE/.last-watcher-beat" 2>/dev/null || true
+  fi
   return "$cleanup_status"
 }
 trap watcher_cleanup EXIT
@@ -4294,7 +4304,7 @@ EOF
   # Confirm liveness only after a complete supervision scan. In particular a
   # replacement must not inherit its predecessor's beacon or announce recovery
   # while its task checks are still blocked. Actionable wakes exit above and
-  # are confirmed by the arm's delivery path instead.
+  # leave their own beacon in watcher_cleanup, after the lock is released.
   touch "$STATE/.last-watcher-beat" || exit 1
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
