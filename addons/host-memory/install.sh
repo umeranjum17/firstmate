@@ -46,5 +46,6 @@ for f in "$CONFIG/jg.slice.d/50-jg-heavy-weight.conf" "$CONFIG/jg-heavy.slice.d/
 done
 if [ "$DRY" -eq 0 ]; then
   systemctl --user daemon-reload || { echo 'host-memory: systemctl --user daemon-reload failed' >&2; exit 1; }
+  systemctl --user disable --now fm-heavy-adopt.timer >/dev/null 2>&1 || true # a pre-rename timer would run the mover twice
   systemctl --user enable --now jg-heavy-adopt.timer || { echo 'host-memory: failed to enable jg-heavy-adopt.timer' >&2; exit 1; }
 else echo 'dry run: nothing written'; fi
