@@ -633,6 +633,10 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "tests/captures/claude-askuserquestion/picker.txt",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "tests/captures/opencode-badge-wrap/40-empty.txt",
       "audience": "maintainer-verification"
     },
@@ -722,6 +726,14 @@
     },
     {
       "path": ".agents/skills/validation-supervision/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/task-dispatch/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/fleet-records/SKILL.md",
       "audience": "agent-runtime"
     },
     {
@@ -854,6 +866,10 @@
     },
     {
       "path": "addons/fleet-pulse/README.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "addons/fleet-report/README.md",
       "audience": "operator-current"
     },
     {

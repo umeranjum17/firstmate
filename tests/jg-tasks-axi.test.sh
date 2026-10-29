@@ -292,13 +292,37 @@ EOF
   (cd "$dir/code" && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" hold ca-1 --reason "pick one" >/dev/null \
     && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" answer ca-1 --decision-file "$dir/answer.txt" >/dev/null) \
     || fail "could not record a captain answer"
-  wrapper_from_code "$dir" rm ca-1 >/dev/null 2>&1 || fail "rm of an answered [captain-ask] item was refused"
+  # A recorded answer alone no longer closes a captain-asked item: the close needs his quoted words or an answered card.
+  expect_captain_refusal "$dir" ca-1 rm ca-1
+  expect_captain_refusal "$dir" ca-1 rm --captain-quote "   " ca-1
+  expect_captain_refusal "$dir" ca-1 rm --confirm-card ca-3 ca-1
+  wrapper_from_code "$dir" rm --captain-quote "cancel the pick-one ticket, I am done with it" ca-1 >/dev/null 2>&1 \
+    || fail "rm of a [captain-ask] item with the captain's quote was refused"
+  assert_grep "captain words: cancel the pick-one ticket, I am done with it" "$dir/home/data/captain-closures.md" "the quote was not recorded"
+  wrapper_from_code "$dir" add ca-6 "[captain-ask] closed with a card" >/dev/null
+  wrapper_from_code "$dir" add ca-7 "[captain-ask] confirm closing ca-6" >/dev/null
+  (cd "$dir/code" && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" hold ca-7 --reason "confirm card" >/dev/null \
+    && JG_HOME="$dir/home" JG_ROOT_OVERRIDE="$dir/code" "$ROOT/bin/jg-captain-hold.sh" answer ca-7 --decision-file "$dir/answer.txt" >/dev/null) \
+    || fail "could not answer the confirm card"
+  # Dropping the tag from an answered, undelivered ask is a close by another name.
+  expect_captain_refusal "$dir" ca-7 update ca-7 --title "confirm closing ca-6, untagged"
+  expect_captain_refusal "$dir" ca-6 "done" --confirm-card ca-6 --no-prune ca-6
+  expect_captain_refusal "$dir" ca-6 "done" --confirm-card ca-3 --no-prune ca-6
+  wrapper_from_code "$dir" "done" --confirm-card ca-7 --no-prune ca-6 >/dev/null 2>&1 \
+    || fail "close with an answered confirm card was refused"
+  assert_grep "Closed on answered board confirm card: ca-7" "$dir/home/data/backlog.md" "the card was not recorded in the ticket note"
   wrapper_from_code "$dir" update ca-4 --pr https://github.com/o/r/pull/2 >/dev/null
   PATH="$bin:$PATH" expect_captain_refusal "$dir" ca-4 "done" ca-4
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/1 >/dev/null
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/2 >/dev/null
   (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR among several links was refused"
   wrapper_from_code "$dir" rm plain-1 >/dev/null 2>&1 || fail "an untagged item was refused"
+  wrapper_from_code "$dir" add recon-1 "[captain-ask] recon" >/dev/null
+  wrapper_from_code "$dir" update recon-1 --report data/recon-1/report.md >/dev/null
+  (cd "$dir/home" && tasks-axi "done" recon-1 --no-prune >/dev/null)
+  expect_captain_refusal "$dir" recon-1 rm recon-1
+  mkdir -p "$dir/home/data/recon-1" && echo findings > "$dir/home/data/recon-1/report.md"
+  wrapper_from_code "$dir" rm recon-1 >/dev/null 2>&1 || fail "a done Recon with its report was refused"
   pass "jg-tasks-axi.sh keeps [captain-ask] items until answered or merged and leaves other items alone"
 }
 
@@ -325,7 +349,7 @@ test_captain_ask_guard_gaps() {
 
   JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answer reheld --release --decision-file "$dir/evidence.txt" >/dev/null
   JG_HOME="$home" "$ROOT/bin/jg-captain-hold.sh" answered reheld || fail "newest answer was not recognized"
-  wrapper_from_code "$dir" "done" reheld >/dev/null || fail "a newly answered ask could not close"
+  wrapper_from_code "$dir" "done" --captain-quote "choice is moot, close it" reheld >/dev/null || fail "a newly answered ask could not close"
 
   (cd "$home" && tasks-axi add legacy "[captain-ask] unanswered legacy row" >/dev/null && tasks-axi "done" legacy --no-prune >/dev/null)
   wrapper_from_code "$dir" add ordinary ordinary >/dev/null

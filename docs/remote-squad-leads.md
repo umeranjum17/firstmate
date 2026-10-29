@@ -428,7 +428,7 @@ The primary then takes these steps:
 3. It transfers the inherited-material allowlist.
 4. It asks the remote host to launch on Herdr in `jg-remote`.
 
-All remote Squad Leads on one host share `jg-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+All remote Squad Leads on one host share `jg-remote` and retain separate `lead-<id>` workspaces inside it.
 
 ### Refused and unsupported launches
 
@@ -672,7 +672,7 @@ It refuses while any of these holds:
 - The primary has an unfinished backlog outbox.
 - A routed reply remains unresolved.
 
-It closes only the retiring Squad Lead's panes or `2ndmate-<id>` workspace in `jg-remote`.
+It closes only the retiring Squad Lead's panes or `lead-<id>` (or older `2ndmate-<id>`) workspace in `jg-remote`.
 It never stops the shared session or removes a sibling Squad Lead's workspace or panes.
 SSH exit 255 preserves both the route and local records because completion is unknown.
 `--force` remains the explicit discard path and requires the same captain authority as local Squad Lead discard.

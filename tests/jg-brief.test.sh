@@ -656,7 +656,7 @@ test_herdr_lab_omission_is_loud_for_ship_and_scout() {
   pass "jg-brief.sh: ship and scout scaffolds make omitted Herdr intent fail-visible"
 }
 
-# Regression (issue #2575): AGENTS.md section 11 and this script's own help tell
+# Regression (issue #2575): the task-dispatch skill and this script's own help tell
 # juggernaut to fill `{TASK}` and `{JUGGERNAUT_SPEC}`. The unguarded Herdr gate used
 # to quote `{TASK}` in its own prose, so that documented global replace spliced
 # the whole task body into the middle of the gate's sentence - silently
@@ -1447,6 +1447,108 @@ ROWS
   pass "jg-brief.sh: --branch-prefix is refused on scout and squad_lead scaffolds"
 }
 
+# The UI change flag (nav-check yes/no) is ship-only: yes adds the no-silent-removal
+# rule and the Nav lines, no records the call, anything else is refused.
+test_ui_change_field() {
+  local home brief out status
+  home="$TMP_ROOT/ui-change-home"
+  mkdir -p "$home/data"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-yes some-proj --mode direct-PR --ui-change yes >/dev/null \
+    || fail "ui-change yes scaffold failed"
+  brief=$(cat "$home/data/brief-ui-yes/brief.md")
+  assert_contains "$brief" "UI change (nav-check): yes" "yes line missing"
+  assert_contains "$brief" "never removes or renames an existing menu, tab or screen" "rule missing"
+  assert_contains "$brief" "Nav before:" "Nav before instruction missing"
+  assert_contains "$brief" "Nav after:" "Nav after instruction missing"
+  assert_contains "$brief" "must name each removed screen" "design-option rule missing"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-no some-proj --mode direct-PR --ui-change no >/dev/null \
+    || fail "ui-change no scaffold failed"
+  brief=$(cat "$home/data/brief-ui-no/brief.md")
+  assert_contains "$brief" "UI change (nav-check): no" "no line missing"
+  assert_not_contains "$brief" "Nav before:" "no must not carry the Nav rule"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-none some-proj --mode direct-PR >/dev/null \
+    || fail "scaffold without ui-change failed"
+  assert_not_contains "$(cat "$home/data/brief-ui-none/brief.md")" "UI change (nav-check)" "omitted flag wrote a line"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-bad some-proj --mode direct-PR --ui-change maybe 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected a refusal for --ui-change maybe"
+  assert_absent "$home/data/brief-ui-bad/brief.md" "refused scaffold wrote a brief"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-scout some-proj --scout --ui-change yes 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted --ui-change"
+  assert_contains "$out" "applies only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --ui-change records yes/no, carries the nav rule, and refuses misuse"
+}
+
+# The design call (first-draft yes/no plus a reason) is a ship-only pair: yes adds
+# the receipt instruction, no records the call, and any half-set or misplaced
+# pair is refused before a brief is written.
+test_design_call_field() {
+  local home brief out status
+  home="$TMP_ROOT/design-call-home"
+  mkdir -p "$home/data"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-yes some-proj --mode direct-PR \
+    --design-call yes --design-reason "new landing page" >/dev/null || fail "design-call yes scaffold failed"
+  brief=$(cat "$home/data/brief-design-yes/brief.md")
+  assert_contains "$brief" "Design call (first-draft): yes - new landing page" "yes call line missing"
+  assert_contains "$brief" "first-draft receipt: <reference>" "yes call must ask for the receipt line"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-no some-proj --mode direct-PR \
+    --design-call no --design-reason "one-line copy fix" >/dev/null || fail "design-call no scaffold failed"
+  brief=$(cat "$home/data/brief-design-no/brief.md")
+  assert_contains "$brief" "Design call (first-draft): no - one-line copy fix" "no call line missing"
+  assert_not_contains "$brief" "first-draft receipt: <reference>" "no call must not ask for a receipt"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-none some-proj --mode direct-PR >/dev/null \
+    || fail "scaffold without a design call failed"
+  assert_not_contains "$(cat "$home/data/brief-design-none/brief.md")" "Design call (first-draft)" "omitted flag wrote a call"
+  for args in "--design-call yes" "--design-reason why" "--design-call maybe --design-reason why"; do
+    # shellcheck disable=SC2086  # args is an intentional word-split arg list
+    out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-bad some-proj --mode direct-PR $args 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "expected a refusal for: $args"
+    assert_absent "$home/data/brief-design-bad/brief.md" "refused scaffold wrote a brief ($args)"
+  done
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-scout some-proj --scout --design-call no --design-reason why 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted a design call"
+  assert_contains "$out" "apply only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --design-call records yes/no with a reason and refuses misuse"
+}
+
+# The TakeOne demo-video call is a ship-only pair like the design call, and takes
+# effect only while the home has config/takeone-demo: off, the pair is validated and
+# the brief carries no demo line; on, yes adds the receipt instruction.
+test_demo_call_field() {
+  local home brief out status args
+  home="$TMP_ROOT/demo-call-home"
+  mkdir -p "$home/data" "$home/config"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-off some-proj --mode direct-PR \
+    --demo-call yes --demo-reason "launch video" >/dev/null || fail "demo-call scaffold with the switch off failed"
+  assert_not_contains "$(cat "$home/data/brief-demo-off/brief.md")" "Demo-video call" "switch off must not write a demo line"
+  : > "$home/config/takeone-demo"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-yes some-proj --mode direct-PR \
+    --demo-call yes --demo-reason "launch video" >/dev/null || fail "demo-call yes scaffold failed"
+  brief=$(cat "$home/data/brief-demo-yes/brief.md")
+  assert_contains "$brief" "Demo-video call (TakeOne): yes - launch video" "yes call line missing"
+  assert_contains "$brief" "takeone receipt: <reference>" "yes call must ask for the receipt line"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-no some-proj --mode direct-PR \
+    --demo-call no --demo-reason "no video in this task" >/dev/null || fail "demo-call no scaffold failed"
+  brief=$(cat "$home/data/brief-demo-no/brief.md")
+  assert_contains "$brief" "Demo-video call (TakeOne): no - no video in this task" "no call line missing"
+  assert_not_contains "$brief" "takeone receipt: <reference>" "no call must not ask for a receipt"
+  for args in "--demo-call yes" "--demo-reason why" "--demo-call maybe --demo-reason why"; do
+    # shellcheck disable=SC2086  # args is an intentional word-split arg list
+    out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-bad some-proj --mode direct-PR $args 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "expected a refusal for: $args"
+    assert_absent "$home/data/brief-demo-bad/brief.md" "refused scaffold wrote a brief ($args)"
+  done
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-scout some-proj --scout --demo-call no --demo-reason why 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted a demo-video call"
+  assert_contains "$out" "apply only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --demo-call records yes/no with a reason behind config/takeone-demo and refuses misuse"
+}
+
 # A branch prefix is embedded verbatim into a `git checkout -b` command in the
 # generated brief, so a space or a leading dash could corrupt or hijack that
 # command; both must be rejected loudly rather than silently accepted.
@@ -1528,6 +1630,11 @@ test_operator_scaffolds_forbid_pool_administration() {
       "$mode ship brief gave the prohibition no exit for a genuine second-checkout need"
   done
 
+  assert_grep "no verify skill" "$home/data/brief-pool-no-mistakes/brief.md" \
+    "ship brief did not require the proof line to say no verify skill"
+  assert_grep "Commit nothing afterward" "$home/data/brief-pool-no-mistakes/brief.md" \
+    "ship brief did not forbid commits after the final-head done-done run"
+
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-pool-scout alpha --scout >/dev/null 2>&1 \
     || fail "jg-brief.sh --scout exited non-zero"
   brief="$home/data/brief-pool-scout/brief.md"
@@ -1604,3 +1711,6 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_operator_scaffolds_forbid_pool_administration
+test_design_call_field
+test_demo_call_field
+test_ui_change_field

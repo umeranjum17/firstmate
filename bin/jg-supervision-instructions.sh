@@ -266,7 +266,7 @@ if [ "$REPAIR_LINE" -eq 1 ]; then
   exit 0
 fi
 
-RULE='================================================================================'
+RULE='================'
 printf '%s\n' "$RULE"
 printf 'SUPERVISION OPERATING INSTRUCTIONS - primary harness: %s\n' "$HARNESS"
 printf '%s\n' "$RULE"

@@ -50,7 +50,8 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
 ## Lavish refusal: squad lead notes and merge-card posts
 
 With `config/owner-rules` present, `status-wait-check` checks squad lead report notes before append, and `merge-card` checks decoded card strings before posting or restoring a card.
-`bin/jg-owner-rules-text-check.sh` reads proposed text on stdin and refuses HTTP(S) links to port 4387 or the word `lavish-axi`, ignoring case.
+`bin/jg-owner-rules-text-check.sh` reads proposed text on stdin and refuses HTTP(S) links to port 4387 or a `lavish-axi` publish command (`lavish-axi publish` or `lavish-axi <file>.html` at the start of a command or after a shell separator), ignoring case.
+A bare mention of the package name passes.
 It exits 1 and prints `owner-rules: Lavish publication refused; use the sign-off board (sign-off-axi) instead`.
 Other text, including clean sign-off links, passes; read errors retain their diagnostics and exit code.
 This covers squad lead notes and merge-card posts only: raw status appends, report files (including `--doc` contents), and `lavish-axi` commands are not intercepted.

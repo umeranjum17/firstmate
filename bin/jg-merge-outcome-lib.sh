@@ -32,6 +32,9 @@ _JG_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-parent-channel-lib.sh
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-parent-channel-lib.sh"
+# shellcheck source=bin/jg-board-link-lib.sh
+# shellcheck disable=SC1091
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-board-link-lib.sh"
 
 # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
 JG_MERGE_OUTCOME_ALREADY_RECORDED=false
@@ -58,7 +61,7 @@ JG_MERGE_OUTCOME_ALREADY_RECORDED=false
 # than treat it as success: the merge landed and the record did not.
 jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [authority]
   local home=$1 state=$2 id=$3 url=$4 origin=$5
-  local authority=${6-} suffix=
+  local authority=${6-} suffix='' card_link
   local self_rc=0 destination='' line lock status=0
   local provider host path number
   # shellcheck disable=SC2034 # Sourced wake helpers consume these scoped globals.
@@ -80,6 +83,9 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 
   if destination=$(jg_parent_channel_destination "$home" "$state"); then
     line="done [key=merged-$id]: merged $id $JG_PR_URL$suffix"
+    if card_link=$(jg_board_link reports "$(jg_board_merge_key "$JG_PR_URL")" 2>/dev/null); then
+      line="$line card=$card_link"
+    fi
   else
     self_rc=$?
     [ "$self_rc" -eq 1 ] || return 3
@@ -117,6 +123,10 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
   # some earlier status line happened to mention.
   [ "$status" -ne 0 ] || JG_HOME=$home JG_STATE_OVERRIDE=$state "$_JG_MERGE_OUTCOME_LIB_DIR/jg-ticket.sh" "$id" --stage "done" --state "done" --pr "$JG_PR_URL" || true
   if [ "$status" -eq 0 ] && declare -F jg_merge_post_hook >/dev/null; then jg_merge_post_hook "${JG_CONFIG_OVERRIDE:-$home/config}" "$home" "$id" "$state/$id.meta" - "$JG_PR_URL" >&2; fi
+  # The merge card carries the proof too: a no-op when the post hook filed it, else files it or says what is missing.
+  if [ "$status" -eq 0 ] && { [ -e "${JG_CONFIG_OVERRIDE:-$home/config}/post-merge" ] || [ -n "${JG_PROOF_BOARD:-}" ]; }; then
+    JG_HOME=$home "$_JG_MERGE_OUTCOME_LIB_DIR/jg-proof-attach.sh" attach merged "$id" --pr "$JG_PR_URL" 2>&1 | sed 's/^/proof: /' >&2 || true
+  fi
   return "$status"
 }
 
@@ -125,8 +135,9 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 # shellcheck source=bin/jg-merge-gate-lib.sh
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-merge-gate-lib.sh"
 # Optional merge-card add-on: defines the same two hooks for homes that install it.
+_jg_mo_hooks=$(jg_addon_path "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}" merge-card/bin/jg-merge-hooks-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "$(jg_addons_dir "${JG_HOME:-$_JG_MERGE_OUTCOME_LIB_DIR/..}")/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "$_jg_mo_hooks" ] || . "$_jg_mo_hooks"
 
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}

@@ -18,8 +18,9 @@ JG_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-transition-lib.sh
 . "$JG_PUSH_TRANSITION_LIB_DIR/jg-transition-lib.sh"
 # Optional wait-timers add-on.
+_jg_pt_timers=$(jg_addon_path "${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}" wait-timers/bin/jg-wait-timers-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "$(jg_addons_dir "${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}")/wait-timers/bin/jg-wait-timers-lib.sh" ] || . "$(jg_addons_dir "${JG_HOME:-$JG_PUSH_TRANSITION_LIB_DIR/..}")/wait-timers/bin/jg-wait-timers-lib.sh"
+[ ! -r "$_jg_pt_timers" ] || . "$_jg_pt_timers"
 
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${JG_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}

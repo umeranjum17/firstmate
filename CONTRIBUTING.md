@@ -55,7 +55,7 @@ Verify missing or red checks prevent ordinary merging without creating a test me
 
 `bin/jg-ci-scope.sh` owns which changes need the behavior lanes.
 A change touching only documentation, media assets, or the license runs `Repo invariants` and `CI required`, which still prove the repo invariants, the complete-regression partition, the linted workflows, and the documentation inventory.
-Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS snapshot, so a code change can never lose a behavior gate to a path filter.
+Everything else, including any path the classifier does not recognize, runs lint, both portable parallel lanes, the portable serial shards, the Herdr lane, and the macOS parse check, so a code change can never lose a behavior gate to a path filter.
 The scope is a job-level condition, never a trigger `paths:` filter: a filtered-out workflow leaves its required check pending forever, while a false condition reports a skip `CI required` accepts.
 
 ## Repo conventions
@@ -138,8 +138,11 @@ Portable shard balance evidence lives in `docs/jg-test-portable-shards.md`.
 Family selection is the ordinary local path; `--all` is deliberate full regression only.
 CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` are never cancelled, and the workflow owns that contract and its rationale.
+Draft pull requests skip `CI` and `Add-ons CI` until they are marked ready for review, and a push to `main` runs only the repo invariants because the pull request already ran the full suite.
 A fork can set the repository variable `JG_CI_SKIP_PUSH` to `1` to skip the push run of `CI`, and `JG_CI_SKIP_MACOS` to `1` to skip the stock macOS Bash job, without a tracked edit that drifts from upstream.
 Each skip is a job-level condition, so a skipped job reports success rather than leaving the pull request pending, and with neither variable set every job runs on upstream and on every fork exactly as before.
+`JG_CI_SKIP_MACOS` is currently set to `1` on `umeranjum17/juggernaut` because no macOS runner starts, so the stock macOS Bash job is skipped and `CI required` passes without it (`bin/jg-ci-required.sh` accepts that skip under the variable).
+To turn the job back on, run `gh variable delete JG_CI_SKIP_MACOS --repo umeranjum17/juggernaut`, or set it to `0`.
 Use `bin/jg-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
 Those sleeps look like recoverable overhead - `jg-watch-triage.test.sh` alone issues about 1,900 of them, each paying a flat ~100ms scheduler wake-up penalty on macOS - but they are not overhead added to the clock; they are how a test waits for a subject that only moves on `jg-watch.sh`'s own one-second `JG_POLL` cadence.

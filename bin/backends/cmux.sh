@@ -333,13 +333,13 @@ jg_backend_cmux_container_ensure() {
 # itself lives in bin/jg-backend-hometag-lib.sh, shared with zellij's
 # identical shared-namespace collision fix (docs/zellij-backend.md
 # "Home-scoped tab titles").
-jg_backend_cmux_home_label() {
-  jg_backend_hometag
+jg_backend_cmux_home_label() {  # [legacy]
+  jg_backend_hometag "$@"
 }
 
-jg_backend_cmux_scoped_title() {  # <jg-task-label>
+jg_backend_cmux_scoped_title() {  # <jg-task-label> [legacy]
   local label=$1 rest home
-  home=$(jg_backend_cmux_home_label)
+  home=$(jg_backend_cmux_home_label "${2-}")
   case "$label" in
     jg-*) rest=${label#jg-} ;;
     *) rest=$label ;;
@@ -438,6 +438,7 @@ jg_backend_cmux_target_ready() {  # <target> [expected-label]
     # Compatibility (slice S5): a workspace titled before the rename keeps
     # resolving, so a live pane is still recognized by its owning task.
     if [ "$title" = "$expected_title" ] \
+      || [ "$title" = "$(jg_backend_cmux_scoped_title "$expected_label" legacy)" ] \
       || [ "$title" = "$(jg_backend_cmux_scoped_title "$(jg_compat_legacy_of "$expected_label")")" ]; then
       jg_backend_cmux_surface_exists "$JG_BACKEND_CMUX_WORKSPACE" "$JG_BACKEND_CMUX_SURFACE" && return 0
       wsid=$JG_BACKEND_CMUX_WORKSPACE
@@ -663,16 +664,17 @@ jg_backend_cmux_kill() {  # <target> [unused] [expected-label]
 # One "<workspace_id>:<surface_id>\t<jg-id>" line per live task workspace.
 # Read-only: an unreachable cmux simply lists nothing.
 jg_backend_cmux_list_live() {
-  local wss wsid title sfid home prefix plain
-  home=$(jg_backend_cmux_home_label)
-  prefix="jg-$home-"
+  local wss wsid title sfid prefix legacy_prefix plain
+  prefix="jg-$(jg_backend_cmux_home_label)-"
+  legacy_prefix="jg-$(jg_backend_cmux_home_label legacy)-"
   wss=$(jg_backend_cmux_cli workspace list --json --id-format uuids 2>/dev/null) || return 0
   while IFS=$'\t' read -r wsid title; do
     [ -n "$wsid" ] || continue
     plain=${title#"$prefix"}
+    plain=${plain#"$legacy_prefix"}
     [ -n "$plain" ] || continue
     sfid=$(jg_backend_cmux_surface_id_for_workspace "$wsid")
     [ -n "$sfid" ] || continue
     printf '%s:%s\tjg-%s\n' "$wsid" "$sfid" "$plain"
-  done < <(printf '%s' "$wss" | jq -r --arg prefix "$prefix" '.workspaces[]? | select(.title | startswith($prefix)) | "\(.id)\t\(.title)"' 2>/dev/null)
+  done < <(printf '%s' "$wss" | jq -r --arg prefix "$prefix" --arg legacy "$legacy_prefix" '.workspaces[]? | select(.title | startswith($prefix) or startswith($legacy)) | "\(.id)\t\(.title)"' 2>/dev/null)
 }

@@ -75,6 +75,33 @@ test_predicate_healthy_fresh_beacon() {
   pass "jg_supervision_unhealthy: false with in-flight task and a fresh beacon"
 }
 
+test_predicate_first_scan_watcher_is_fresh() {
+  local dir="$TMP_ROOT/pred-first-scan" state sleeper identity
+  state="$dir/state"
+  mkdir -p "$state"
+  : > "$state/t.meta"
+  sleep 300 &
+  sleeper=$!
+  identity=$(bash -c '. "$1"; jg_pid_identity "$2"' _ "$ROOT/bin/jg-wake-lib.sh" "$sleeper")
+  mkdir -p "$state/.watch.lock"
+  printf '%s\n' "$sleeper" > "$state/.watch.lock/pid"
+  printf '%s\n' "$ROOT" > "$state/.watch.lock/jg-home"
+  printf '%s\n' "$ROOT/bin/jg-watch.sh" > "$state/.watch.lock/watcher-path"
+  printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  # shellcheck disable=SC2016 # expands inside the probe shell, not here
+  local probe='. "$1/bin/jg-wake-lib.sh"; . "$1/bin/jg-supervision-lib.sh"; jg_supervision_status "$2" 300; echo "$JG_SUP_WATCHER_FRESH $JG_SUP_BEACON_DESC"'
+  local live stalled dead
+  live=$(JG_HOME="$ROOT" bash -c "$probe" _ "$ROOT" "$state")
+  stalled=$(JG_HOME="$ROOT" JG_WATCHER_STALL_BOUND=0 bash -c "$probe" _ "$ROOT" "$state")
+  kill "$sleeper" 2>/dev/null
+  wait "$sleeper" 2>/dev/null
+  dead=$(JG_HOME="$ROOT" bash -c "$probe" _ "$ROOT" "$state")
+  case "$live" in "true starting"*) ;; *) fail "live first-scan watcher read: $live" ;; esac
+  case "$stalled" in "false "*) ;; *) fail "stalled first-scan watcher read: $stalled" ;; esac
+  case "$dead" in "false "*) ;; *) fail "dead first-scan watcher read: $dead" ;; esac
+  pass "jg_supervision_status: live first-scan watcher fresh; stalled or dead unhealthy"
+}
+
 test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
   mkdir -p "$state"
@@ -551,6 +578,28 @@ test_hook_silent_in_idle_squad_lead_home() {
   expect_code 0 "$status" "hook must stay silent in an idle, empty-queue squad_lead home"
   [ -z "$out" ] || fail "idle squad_lead home produced guard output: $out"
   pass "jg-turnend-guard: idle-by-default - silent in a squad_lead home with nothing in flight"
+}
+
+# Routed backlog items are routed work: an idle lead whose own backlog has ready
+# (unheld, unblocked) items needs a live watcher, because the watcher's base-cadence
+# scan is what wakes it to dispatch them. An empty or all-held queue stays idle.
+test_hook_blocks_idle_squad_lead_with_ready_backlog() {
+  local dir out status ids
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-ready")
+  mkdir -p "$dir/data" "$dir/config"
+  cp "$ROOT"/bin/jg-*-lib.sh "$ROOT/bin/jg-tasks-axi.sh" "$dir/bin/"
+  tasks() { JG_HOME="$dir" "$dir/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
+  tasks add held-one "held item"; tasks hold held-one --reason "waiting for approval"
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 0 "$status" "a lead whose only backlog item is held must stay idle"
+  [ -z "$out" ] || fail "held-only backlog produced guard output: $out"
+  tasks add zed-low "unprioritized item"; tasks add urgent-one "urgent item" --priority 0
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 2 "$status" "an idle lead with ready backlog work must keep a live watcher"
+  assert_contains "$out" "2 ready backlog item(s) wait for this idle lead" "block banner must name the ready work"
+  ids=$(bash -c '. "$1"; jg_ready_work_ids "$2"' _ "$dir/bin/jg-supervision-lib.sh" "$dir")
+  [ "$ids" = "urgent-one zed-low" ] || fail "ready work must list P0 first, got: $ids"
+  pass "jg-turnend-guard: an idle squad_lead with ready backlog work keeps a watcher (P0 first); held-only stays idle"
 }
 
 # The stop_hook_active loop guard bounds the squad_lead to one forced
@@ -1060,6 +1109,112 @@ EOF
   expect_code 0 "$status" "OpenCode plugin must run the guard from worktree even when directory is elsewhere"
   [ -z "$out" ] || fail "OpenCode plugin worktree-root test printed output: $out"
   pass ".opencode primary plugin: guard path is anchored to worktree, not directory"
+}
+
+test_opencode_watch_arm_surfaces_a_blocked_arm() {
+  local repo out status
+  repo="$TMP_ROOT/opencode-watch-arm-blocked"
+  mkdir -p "$repo/.opencode/plugins/lib" "$repo/bin" "$repo/state"
+  cp "$ROOT/.opencode/plugins/jg-primary-watch-arm.js" "$repo/.opencode/plugins/"
+  cp "$ROOT/.opencode/plugins/lib/jg-operational-input.js" "$repo/.opencode/plugins/lib/"
+  cp "$ROOT/bin/jg-operational-input.sh" "$repo/bin/"
+  printf 'jg_primary_root_matches() { return 0; }\n' > "$repo/bin/jg-primary-scope-lib.sh"
+  printf 'jg_supervision_needed() { return 0; }\n' > "$repo/bin/jg-supervision-lib.sh"
+  # pid 1 never owns a home lock, so this session cannot arm a home that needs supervision.
+  printf '1\n' > "$repo/state/.lock"
+  # The trailing --session argument makes this process look like a resumed OpenCode TUI.
+  out=$(NODE_NO_WARNINGS=1 PLUGIN="$repo/.opencode/plugins/jg-primary-watch-arm.js" REPO="$repo" \
+    JG_WATCH_FAILURE_NOTICE_INTERVAL_MS=1500 \
+    JG_HOME="$repo" JG_ROOT_OVERRIDE="$repo" node --input-type=module - --session ses_resumed 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+
+const prompts = [];
+const client = { session: { promptAsync: async (request) => { prompts.push(request); } } };
+const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+const hooks = await mod.FmPrimaryWatchArm({ client, worktree: process.env.REPO });
+const idle = (sessionID) => hooks.event({ event: { type: "session.idle", properties: { sessionID } } });
+const fail = (message) => { console.error(message, JSON.stringify(prompts)); process.exit(1); };
+const text = (i) => prompts[i]?.body?.parts?.[0]?.text ?? "";
+
+await settle();
+if (prompts.length !== 1 || prompts[0].path.id !== "ses_resumed") fail("a resumed session did not try to arm at load");
+if (!text(0).includes("OpenCode cannot arm supervision: this session does not own the home lock")) fail("the blocked arm was not surfaced");
+// Idles while the same block stays are the report's own turn ending, so they do not report again.
+for (let i = 0; i < 4; i += 1) {
+  await idle("ses_resumed");
+  await settle();
+}
+if (prompts.length !== 1) fail("idles inside the notice interval reported the same block again");
+
+// A different block is a different notice and reports at once. A predicate that
+// cannot answer surfaces instead of reading as "not needed".
+writeFileSync(`${process.env.REPO}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.REPO}/bin/jg-supervision-lib.sh`, "jg_supervision_needed() { echo boom >&2; return 127; }\n");
+await idle("ses_resumed");
+await settle();
+await idle("ses_resumed");
+await settle();
+if (prompts.length !== 2 || !text(1).includes("the supervision-needed check could not answer (jg_supervision_needed exited 127)")) {
+  fail("a failing supervision-needed check was not surfaced");
+}
+
+// A block that stays is reported again once the notice interval has passed.
+await new Promise((resolve) => setTimeout(resolve, 1500));
+await idle("ses_resumed");
+await settle();
+if (prompts.length !== 3) fail("a block that stays was not reported again after the notice interval");
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "OpenCode watch-arm plugin must arm a resumed session and surface a blocked arm"
+  [ -z "$out" ] || fail "OpenCode watch-arm blocked-arm test printed output: $out"
+  pass ".opencode watch-arm plugin: a resumed session arms at load and a blocked arm re-surfaces once per notice interval"
+}
+
+test_opencode_watch_arm_failing_model_does_not_loop() {
+  local repo out status
+  repo="$TMP_ROOT/opencode-watch-arm-failing-model"
+  mkdir -p "$repo/.opencode/plugins/lib" "$repo/bin" "$repo/state"
+  cp "$ROOT/.opencode/plugins/jg-primary-watch-arm.js" "$repo/.opencode/plugins/"
+  cp "$ROOT/.opencode/plugins/lib/jg-operational-input.js" "$repo/.opencode/plugins/lib/"
+  cp "$ROOT/bin/jg-operational-input.sh" "$repo/bin/"
+  printf 'jg_primary_root_matches() { return 0; }\n' > "$repo/bin/jg-primary-scope-lib.sh"
+  printf 'jg_supervision_needed() { return 0; }\n' > "$repo/bin/jg-supervision-lib.sh"
+  printf '1\n' > "$repo/state/.lock"
+  # A prompt whose model call fails (a bad key, a model the provider rejects)
+  # ends its turn in two session.idle events, as the live leads did. The
+  # plugin's notice must not feed them back into more prompts.
+  out=$(NODE_NO_WARNINGS=1 PLUGIN="$repo/.opencode/plugins/jg-primary-watch-arm.js" REPO="$repo" \
+    JG_HOME="$repo" JG_ROOT_OVERRIDE="$repo" node --input-type=module - --session ses_failing 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+
+const prompts = [];
+let hooks = null;
+const idle = (sessionID) => hooks.event({ event: { type: "session.idle", properties: { sessionID } } });
+const client = {
+  session: {
+    promptAsync: async (request) => {
+      prompts.push(request);
+      setTimeout(() => void idle("ses_failing"), 20);
+      setTimeout(() => void idle("ses_failing"), 40);
+    },
+  },
+};
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+hooks = await mod.FmPrimaryWatchArm({ client, worktree: process.env.REPO });
+await new Promise((resolve) => setTimeout(resolve, 1500));
+if (prompts.length !== 1) {
+  console.error(`a failing model's idles produced ${prompts.length} prompts, not 1`);
+  process.exit(1);
+}
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "OpenCode watch-arm plugin must not turn a failing model's idles into a prompt loop"
+  [ -z "$out" ] || fail "OpenCode watch-arm failing-model test printed output: $out"
+  pass ".opencode watch-arm plugin: a failing model's idles do not loop the blocked-arm notice"
 }
 
 test_pi_extension_injects_once_per_logical_agent_run() {
@@ -2201,6 +2356,7 @@ test_predicate_healthy_no_inflight
 test_predicate_unhealthy_no_beacon
 test_predicate_unhealthy_stale_beacon
 test_predicate_healthy_fresh_beacon
+test_predicate_first_scan_watcher_is_fresh
 test_predicate_queue_pending_flag
 test_predicate_x_mode_needs_supervision
 test_predicate_source_needs_supervision
@@ -2226,6 +2382,7 @@ test_hook_uses_state_override
 test_hook_loop_guard_allows_retry
 test_hook_blocks_in_squad_lead_own_home
 test_hook_silent_in_idle_squad_lead_home
+test_hook_blocks_idle_squad_lead_with_ready_backlog
 test_hook_squad_lead_loop_guard_allows_retry
 test_hook_squad_lead_reinvoke_recovery_loop
 test_hook_silent_in_squad_lead_child_worktree
@@ -2247,6 +2404,8 @@ test_tracked_claude_entries_inert_under_grok
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root
 test_codex_hook_ignores_nested_git_root_guard
 test_opencode_plugin_anchors_guard_to_worktree
+test_opencode_watch_arm_surfaces_a_blocked_arm
+test_opencode_watch_arm_failing_model_does_not_loop
 test_pi_extension_injects_once_per_logical_agent_run
 test_pi_extension_retries_after_followup_delivery_failure
 test_hook_claude_mode_reblocks_stop_hook_active_when_unhealthy

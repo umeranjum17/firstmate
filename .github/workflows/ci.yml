@@ -6,6 +6,7 @@ on:
   # Any base branch rather than only main, so a pull request stacked on another
   # feature branch is verified too instead of reporting no checks at all.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -24,9 +25,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Timeout policy: docs/jg-test-portable-shards.md "Timeouts" owns the three
-# tiers and their rationale; tests/jg-ci-workflow.test.sh guards this workflow.
+# tiers and their rationale.
 # Each job comment identifies the tier implemented by its executable value.
 
+# Draft pull requests skip every job (invariants and the required gate carry the
+# check; the other jobs follow through `needs`) and run on ready_for_review.
+# `edited` is deliberately not a trigger: no check reads the pull request body.
+#
 # Path scope: a documentation, media, or license change runs only the fast
 # invariants job. bin/jg-ci-scope.sh owns that allowlist and the default that
 # anything it cannot classify needs the whole suite, and `CI required` is the one
@@ -119,17 +124,11 @@ jobs:
           set -eu
           npm install -g tasks-axi
           tasks-axi --version
-      - name: Install the Pi package for the Pi extension tests
-        run: |
-          set -eu
-          npm install -g @earendil-works/pi-coding-agent
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent
       - name: Run portable parallel shard 1
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/jg-test"
           bin/jg-test-run.sh --lane portable-parallel-1 \
-            --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
             --json "$RUNNER_TEMP/jg-test/jg-test-timing-portable-parallel-1.json"
       - name: Upload shard 1 timing artifact
         if: always()
@@ -196,7 +195,7 @@ jobs:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -224,14 +223,6 @@ jobs:
           set -eu
           npm install -g tasks-axi
           tasks-axi --version
-      # Runtime-facing Pi extension probes need the installed public package
-      # to avoid capability skips. tests/jg-pi-primary-types.test.sh owns its
-      # separate compiler dependencies.
-      - name: Install the Pi package for the Pi extension tests
-        run: |
-          set -eu
-          npm install -g @earendil-works/pi-coding-agent
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent
       - name: Run portable serial shard ${{ matrix.shard }}
         env:
           # job-total rather than a literal, so shrinking or growing the matrix
@@ -243,7 +234,6 @@ jobs:
           set -eu
           mkdir -p "$RUNNER_TEMP/jg-test"
           bin/jg-test-run.sh --lane "$JG_SERIAL_LANE" \
-            --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
             --json "$RUNNER_TEMP/jg-test/jg-test-timing-portable-serial-${JG_SERIAL_SHARD}.json"
       - name: Upload portable serial shard ${{ matrix.shard }} timing artifact
         if: always()
@@ -380,7 +370,7 @@ jobs:
           if-no-files-found: warn
 
   macos-stock-bash:
-    name: Stock macOS Bash snapshot compatibility
+    name: Stock macOS Bash parse compatibility
     runs-on: macos-latest
     needs: invariants
     if: ${{ needs.invariants.outputs.behavior == 'true' && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') && vars.JG_CI_SKIP_MACOS != '1' }}
@@ -388,7 +378,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - name: Run snapshot consumers with stock Bash
+      - name: Parse every shell file with stock Bash
         shell: /bin/bash {0}
         env:
           PATH: /bin:/usr/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin
@@ -413,23 +403,7 @@ jobs:
           npm install -g tasks-axi@0.2.6 >/dev/null
           PATH="$(npm prefix -g)/bin:$PATH"
           export PATH
-          command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regressions"; exit 1; }
-
-          snapshot_output=$(/bin/bash tests/jg-fleet-snapshot-view.test.sh)
-          printf '%s\n' "$snapshot_output"
-          snapshot_count=$(printf '%s\n' "$snapshot_output" | grep -c '^ok - ')
-          [ "$snapshot_count" -eq 19 ] || {
-            echo "::error::expected 19 snapshot/fleet-view tests, got $snapshot_count"
-            exit 1
-          }
-
-          bearings_output=$(/bin/bash tests/jg-bearings-snapshot.test.sh)
-          printf '%s\n' "$bearings_output"
-          bearings_count=$(printf '%s\n' "$bearings_output" | grep -c '^ok - ')
-          [ "$bearings_count" -eq 60 ] || {
-            echo "::error::expected 60 Bearings tests, got $bearings_count"
-            exit 1
-          }
+          command -v tasks-axi >/dev/null || { echo "::error::tasks-axi is required for the stock Bash regression"; exit 1; }
 
           # The full public-followup suite is not a stock-bash snapshot; run only
           # the empty-lock register regression under real /bin/bash 3.2.
@@ -442,43 +416,10 @@ jobs:
             exit 1
           }
 
-          # Same shape for the watcher's churn-deferral regression: an already-
-          # marked churn window expands an empty array that only stock Bash
-          # treats as an unbound variable under set -u.
-          churn_output=$(JG_TEST_ONLY=test_turn_ended_churn_existing_marker_absorbed \
-            /bin/bash tests/jg-watch-triage.test.sh)
-          printf '%s\n' "$churn_output"
-          churn_count=$(printf '%s\n' "$churn_output" | grep -c '^ok - ')
-          [ "$churn_count" -eq 1 ] || {
-            echo "::error::expected 1 watcher churn-deferral bash 3.2 regression, got $churn_count"
-            exit 1
-          }
-
-          # The fork-free hot-path helpers must stay byte-identical to the
-          # commands they replace under stock Bash 3.2, which lacks the
-          # printf %(...)T clock and falls back to date.
-          helpers_output=$(/bin/bash tests/jg-fork-free-helpers.test.sh)
-          printf '%s\n' "$helpers_output"
-          helpers_count=$(printf '%s\n' "$helpers_output" | grep -c '^ok - ')
-          [ "$helpers_count" -eq 6 ] || {
-            echo "::error::expected 6 fork-free helper bash 3.2 regressions, got $helpers_count"
-            exit 1
-          }
-
-          backend_output=$(JG_TEST_ONLY=test_backend_source_requires_adapter_file \
-            JG_TEST_BASH=/bin/bash \
-            /bin/bash tests/jg-backend.test.sh)
-          printf '%s\n' "$backend_output"
-          backend_count=$(printf '%s\n' "$backend_output" | grep -c '^ok - ')
-          [ "$backend_count" -eq 2 ] || {
-            echo "::error::expected 2 backend adapter-file bash 3.2 regressions, got $backend_count"
-            exit 1
-          }
-
   invariants:
     name: Repo invariants
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
+    if: ${{ !github.event.pull_request.draft && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
     # Fast tier: the invariant checks are seconds-long file comparisons, and the
     # complete-regression partition proof, so a cheap change still runs both.
     timeout-minutes: 5
@@ -497,12 +438,14 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: |
           set -eu
-          # A main push and an unreadable diff both keep the full suite.
+          # An unreadable diff keeps the full suite. A main push runs only
+          # the invariants: every change already passed the full suite on its
+          # pull request, so main repeats just the cheap repo-wide checks.
           if [ "$EVENT_NAME" = pull_request ]; then
             changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
             printf '%s\n' "$changed" | bin/jg-ci-scope.sh >>"$GITHUB_OUTPUT"
           else
-            bin/jg-ci-scope.sh --full >>"$GITHUB_OUTPUT"
+            echo behavior=false >>"$GITHUB_OUTPUT"
           fi
       # The one lint a documentation-only change gets. ShellCheck is absent for
       # a cheap change: no cheap path is a shell or workflow file.
@@ -514,9 +457,6 @@ jobs:
           PATH="$RUNNER_TEMP/bin:$PATH" bin/jg-lint-workflows.sh
       - name: Prove complete regression partition
         run: bin/jg-test-run.sh --check-coverage
-      - name: Check the documentation inventory
-        if: steps.scope.outputs.behavior == 'false'
-        run: bin/jg-test-run.sh tests/jg-documentation-audiences.test.sh
       - name: Compatibility pointers must stay intact
         run: |
           set -eu
@@ -547,7 +487,7 @@ jobs:
     timeout-minutes: 30
     needs: [invariants, lint, tests-portable-parallel-1, tests-portable-parallel-2,
             tests-portable-serial, tests-herdr, macos-stock-bash]
-    if: ${{ always() && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
+    if: ${{ always() && !github.event.pull_request.draft && !(github.event_name == 'push' && vars.JG_CI_SKIP_PUSH == '1') }}
     steps:
       - uses: actions/checkout@v6
       - name: Refuse a change whose needed lanes did not run

@@ -70,14 +70,14 @@ pass "dry-run install writes nothing and calls no systemctl"
 grep -qx "ExecStart=\"$DEST/bin/jg-sentinel.sh\" loop" "$UNIT" || fail "unit does not run the installed copy"
 grep -qx "Environment=\"JG_HOME=$(cd "$FMH" && pwd -P)\"" "$UNIT" || fail "unit does not carry the home"
 cmp -s "$DEST/unit.before" "$d/expect/unit" || fail "pre-install unit was not recorded"
-[ "$(cat "$LOG")" = "$(printf -- '--user daemon-reload\n--user restart jg-sentinel.service')" ] \
+[ "$(cat "$LOG")" = "$(printf -- '--user daemon-reload\n--user restart jg-sentinel.service\n--user disable --now fm-sentinel.service')" ] \
   || fail "install did not reload and restart in order: $(cat "$LOG")"
 pass "install copies the sentinel, re-points the unit, and restarts the service"
 
 installed=$(snapshot)
 "$INSTALL" "$FMH" >"$d/out/rerun" || fail "rerun failed"
 [ "$(snapshot)" = "$installed" ] || fail "rerun changed the tree"
-[ "$(wc -l <"$LOG")" -eq 2 ] || fail "rerun called systemctl again"
+[ "$(wc -l <"$LOG")" -eq 3 ] || fail "rerun called systemctl again"
 grep -q 'already installed' "$d/out/rerun" || fail "rerun did not report nothing to change"
 pass "rerunning install changes nothing and restarts nothing"
 

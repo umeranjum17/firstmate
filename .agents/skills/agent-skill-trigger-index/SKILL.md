@@ -19,6 +19,8 @@ These skills are not captain-invocable; load them only at their precise triggers
 - `ship-landing` - load when a ship reports a PR or ready branch, when deciding or monitoring landing, and before task cleanup.
 - `scout-completion` - load when a Recon reports completion, presents a visual artifact for iteration, or is being considered for promotion to implementation.
 - `quota-array-dispatch` - load before choosing among a matched crew-dispatch profile array from current quota-axi default TOON.
+- `task-dispatch` - load at every intake of project work and before choosing a dispatch profile, effort, or backend, writing a brief, spawning, promoting, or steering a worker.
+- `fleet-records` - load before routing durable knowledge, editing a backlog item or task note, handing work across homes, or interpreting home layout.
 - `harness-adapters` - load before spawning or recovering an operator or Squad Lead, handling a trust dialog, sending a harness-specific skill invocation, interrupting or exiting an agent, resuming an exited agent, or verifying a new harness adapter.
 - `juggernaut-orca` - load before switching to Orca, spawning or supervising Orca-backed work, smoke-testing Orca backend behavior, debugging Orca task state, or reconciling Orca-backed task metadata.
 - `project-management` - load before adding, creating, removing, or initializing a project.

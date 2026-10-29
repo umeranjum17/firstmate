@@ -19,10 +19,52 @@ guard_captain_ask() {  # <id>
   captain_ask_row "$1"
   [ -n "$CAPTAIN_ASK_SHOW" ] || return 0
   "$SCRIPT_DIR/jg-captain-hold.sh" answered "$1" && return 0
+  # A Recon delivers its report instead of an answer or a PR.
+  if printf '%s\n' "$CAPTAIN_ASK_SHOW" | grep -q "^  links: .*report:data/$1/report\.md" \
+    && [ -s "$DATA/$1/report.md" ]; then return 0; fi
   for pr in $(printf '%s\n' "$CAPTAIN_ASK_SHOW" | sed -n 's/^  links: //p' | grep -o 'pr:[^" ,]*' | sed 's/^pr://'); do
     [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ] && return 0
   done
   fail "$1 is a [captain-ask] item with no recorded captain answer (bin/jg-captain-hold.sh answer) and no merged PR (tasks-axi update --pr); it cannot leave the backlog"
+}
+
+# Closing, cancelling or deleting a captain-asked row: delivery (a merged PR or a Recon
+# report) closes it; otherwise it needs the captain's quoted words, or a board confirm card
+# he answered. A recorded answer alone is not enough. Callers set CAPTAIN_QUOTE and CONFIRM_CARD.
+guard_captain_ask_close() {  # <id>
+  local pr
+  captain_ask_row "$1"
+  [ -n "$CAPTAIN_ASK_SHOW" ] || return 0
+  if printf '%s\n' "$CAPTAIN_ASK_SHOW" | grep -q "^  links: .*report:data/$1/report\.md" \
+    && [ -s "$DATA/$1/report.md" ]; then return 0; fi
+  for pr in $(printf '%s\n' "$CAPTAIN_ASK_SHOW" | sed -n 's/^  links: //p' | grep -o 'pr:[^" ,]*' | sed 's/^pr://'); do
+    if [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ]; then return 0; fi
+  done
+  if [ -n "$(printf '%s' "$CAPTAIN_QUOTE" | tr -d '[:space:]')" ]; then
+    captain_ask_record_closure "$1" "captain words: $CAPTAIN_QUOTE"
+    return 0
+  fi
+  if [ -n "$CONFIRM_CARD" ]; then
+    [ "$CONFIRM_CARD" != "$1" ] \
+      || fail "$1 cannot confirm its own close: its recorded answer is not the captain's word to close it; use a separate confirm card"
+    tasks_axi show "$CONFIRM_CARD" --full 2>/dev/null | grep -qF -- "$1" \
+      || fail "confirm card $CONFIRM_CARD does not name $1; $1 is a [captain-ask] item and stays in the backlog"
+    "$SCRIPT_DIR/jg-captain-hold.sh" answered "$CONFIRM_CARD" >/dev/null 2>&1 \
+      || fail "$1 is a [captain-ask] item and confirm card $CONFIRM_CARD has no recorded captain answer; it cannot leave the backlog"
+    captain_ask_record_closure "$1" "answered board confirm card: $CONFIRM_CARD"
+    return 0
+  fi
+  fail "$1 is a [captain-ask] item with no delivery (merged PR or Recon report); closing, cancelling or deleting it needs --captain-quote '<his words>' or --confirm-card <answered card id>. If the captain rejected the options, redo them instead of cancelling"
+}
+
+captain_ask_record_closure() {  # <id> <evidence line>
+  if ! { mkdir -p "$DATA" && printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$1" "$2" >> "$DATA/captain-closures.md"; }; then
+    fail "cannot record the captain's closing words for $1; it stays in the backlog"
+  fi
+  # shellcheck disable=SC2034  # CLOSE_NOTE_ARGS is read by bin/jg-tasks-axi.sh, which sources this file
+  case "${verb:-}" in
+    done|close) CLOSE_NOTE_ARGS=(--note "Closed on $2") ;;
+  esac
 }
 
 # A raw hold would revive an old answer's record; the sanctioned hold starts a new hold set.

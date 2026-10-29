@@ -21,23 +21,20 @@ A failed script's duration is excluded even when its lane uploaded an artifact.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
 
-The supervision-host suite now runs in early and late halves on separate serial runners, with the complete local suite available through `JG_SUPERVISION_HOST_PART=all bash tests/jg-supervision-host.test.sh`.
-The provisional 800000 ms early and 1000000 ms late weights come from case timestamps in [run 40453434558](https://github.com/umeranjum17/juggernaut/actions/runs/40453434558), where the unsplit host script finished in 1774307 ms but its shard hit the 30-minute job cap before an artifact.
-Refresh both weights from green timing artifacts before treating them as measured per-script maxima; the older unsplit 789123 ms sample from [run 36669175457](https://github.com/kunchenguid/juggernaut/actions/runs/36669175457) no longer describes either half.
-The native-Windows-only `tests/jg-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
+The serial hint table was refreshed on 2026-10-29 from the portable serial artifacts of five Ubuntu CI runs: [40834047706](https://github.com/umeranjum17/juggernaut/actions/runs/40834047706), [40836566918](https://github.com/umeranjum17/juggernaut/actions/runs/40836566918), [40838305188](https://github.com/umeranjum17/juggernaut/actions/runs/40838305188), [40843475618](https://github.com/umeranjum17/juggernaut/actions/runs/40843475618) (its one failed script excluded), and [40844984644](https://github.com/umeranjum17/juggernaut/actions/runs/40844984644).
+The measured maxima pack four shards to about 1520 s and five to about 1215 s against the 1200 s target, so the lane runs six shards; the largest is the single script `tests/jg-supervision-host.test.sh` at 1162449 ms.
+The complete local host suite remains available through `JG_SUPERVISION_HOST_PART=all bash tests/jg-supervision-host.test.sh`.
 The 2026-10-07 polytoken adapter tests carry provisional local measurements instead - 21090 ms for `tests/jg-polytoken-harness.test.sh` and the 103 ms live-guard skip for `tests/jg-polytoken-signals-live-e2e.test.sh`, both measured on the adapter-verification macOS host - until the next CI refresh replaces them with Ubuntu measurements, because they postdate the 2026-09-30 baseline.
 The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
 
 ## Parallel lanes
 
 The two parallel lanes use longest-processing-time assignment over those hints.
-[`tests/jg-pi-primary-types.test.sh`](../tests/jg-pi-primary-types.test.sh) owns its typecheck dependencies independently of the lane's installed Pi runtime.
 [`bin/jg-test-run.sh`](../bin/jg-test-run.sh) holds the duration values in `portable_parallel_weight_hints` and the ordered memberships and lane-specific prerequisite constraints beside `list_portable_parallel_1` and `list_portable_parallel_2`.
 Read the derived packing estimates with that runner's `--check-coverage`; its header and `--help` own the output fields and the selection-specific `--list-scheduled` weight rules.
 The largest individual hint sets a lower bound on the estimated duration of any split, regardless of how evenly the remaining work is assigned.
 The CI cap follows the three-tier timeout policy in [Timeouts](#timeouts) below.
 
-[`tests/jg-test-run.test.sh`](../tests/jg-test-run.test.sh), in `test_portable_parallel_lanes_stay_duration_balanced`, requires every parallel member to have a hint and the lane sums to differ by no more than five percent of the larger sum.
 Its scheduling regressions also check stored parallel lane order and preserve serial-weight scheduling for other selections.
 These checks do not detect a script outgrowing an existing hint or establish measured job headroom.
 Refresh `portable_parallel_weight_hints` with the slowest completed `duration_ms` per script from several green CI runs' `jg-test-timing-portable-parallel-*` artifacts whenever the parallel set gains scripts or a member grows materially.
@@ -69,13 +66,11 @@ Refresh the hints whenever a serial member grows materially or the lane gains sc
 
 `bin/jg-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
 Its header and `--help` own the modeled-budget check and output fields; read the current estimates from `--check-coverage` instead of retaining copied lane sums here.
-[`tests/jg-test-run.test.sh`](../tests/jg-test-run.test.sh), in `test_portable_serial_packing_budget_boundary`, verifies acceptance exactly at the budget and refusal one millisecond above it through the executable runner.
-The longest script, `tests/jg-watch-triage.test.sh`, is the indivisible floor for this layout.
+The longest script, `tests/jg-watcher-lock.test.sh`, is the indivisible floor for this layout.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 The baseline watch-triage samples range from 944375 to 1074843 ms, while each observed completed portable job adds at most 30 seconds beyond its summed scripts in these runs.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
-`tests/jg-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
 
 Refresh the CI-derived hints by downloading the per-shard timing artifacts from several green CI runs and replacing the `portable_serial_weight_hints` table in `bin/jg-test-run.sh` with the slowest measured `duration_ms` per `path`:
 
@@ -114,9 +109,9 @@ Its `--list-files` interface exposes partition membership; `tests/jg-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
 
-The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
+The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the watcher-lock floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses seventeen long-lived Linux jobs (twelve serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twelve long-lived Linux jobs (six serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 
@@ -138,5 +133,4 @@ A lane that reaches its tier bound needs investigation and a distribution or run
 | Heavy | Herdr | family-run step 20 minutes under a 75-minute job-level last-resort backstop | Healthy runs finish in about 7-10 minutes, so the step tripwire fails a wedged suite while the `always()` cleanup and timing upload still run, and the job cap only catches a hang outside that step. |
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) holds the executable values and names each job's tier beside its `timeout-minutes`.
-[`tests/jg-ci-workflow.test.sh`](../tests/jg-ci-workflow.test.sh) holds the policy against the parsed workflow: every job belongs to exactly one tier, the workflow carries exactly three distinct job-level values, the fast tier stays within 5-10 minutes, the normal jobs share one 30-minute budget, and the Herdr family-run step is the 20-minute tripwire below its job backstop with an `always()` teardown after it.
 A passing coverage guard does not establish a healthy job duration; refresh the healthy figures above from the lanes' uploaded timing artifacts.

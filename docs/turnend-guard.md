@@ -215,8 +215,10 @@ With `state/.afk` absent the daemon lock proves nothing and the strict watcher p
 
 ### Guard grace and the poll cadence
 
-Only `bin/jg-watch.sh` publishes `state/.last-watcher-beat`: it clears the predecessor's beacon when it acquires the singleton and publishes a fresh one only after completing its supervision scan, immediately before its terminal wait (`event_wait_or_sleep`).
-Startup confirmation therefore requires resumed supervision; an actionable wake that exits before the beacon is handled through the arm's delivery path instead.
+Only `bin/jg-watch.sh` publishes `state/.last-watcher-beat`: it clears the predecessor's beacon when it acquires the singleton and publishes a fresh one after completing its supervision scan, immediately before its terminal wait (`event_wait_or_sleep`), or as it exits on a delivered actionable wake.
+Startup confirmation therefore requires resumed supervision.
+That exit beacon is written after the cycle releases the singleton lock and only when the wake was delivered, so a busy home whose every cycle ends early still reads as supervised for one grace window; a killed or evicted watcher leaves none.
+The replacement clears that beacon at start like any other, so it never announces recovery while its checks are blocked.
 A healthy watcher's beacon ages through the terminal wait and the following scan, so slow task checks also count toward its age.
 
 A fixed 300-second grace default stops correctly bounding staleness once a home's `JG_POLL` reaches or exceeds it.

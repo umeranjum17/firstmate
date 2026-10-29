@@ -10,6 +10,7 @@ import {
   isHidden,
   isStock,
   operational,
+  LEGACY_PREFERENCE,
   PREFERENCE,
   spinner,
   toolGroup,
@@ -61,10 +62,10 @@ describe("activation", () => {
     await expectInert($, on, "true");
   });
 
-  test("registers /calm at session start and stays a pass-through while off", async ($, on) => {
+  test("registers /stealth and the /calm alias at session start and stays a pass-through while off", async ($, on) => {
     const { clock, journal } = world(on);
     await $.session.start(sessionStart);
-    expect(journal.commands).toEqual(["calm"]);
+    expect(journal.commands).toEqual(["stealth", "calm"]);
     expect(isStock(await $.ui.render(spinner()))).toBe(true);
     expect(isStock(await $.ui.render(toolUse()))).toBe(true);
     expect(isStock(await $.ui.render(toolResult()))).toBe(true);
@@ -82,6 +83,20 @@ describe("activation", () => {
     expect(isHidden(await $.ui.render(toolGroup()))).toBe(true);
   });
 
+  test("reads the old config/calm file when config/stealth is absent", async ($, on) => {
+    world(on, { preference: "on\n", legacy: true });
+    expect(isHidden(await $.ui.render(toolUse()))).toBe(true);
+  });
+
+  test("the old /calm alias toggles and writes only config/stealth", async ($, on) => {
+    const { files, journal } = world(on, { preference: "on\n", legacy: true });
+    await $.session.start(sessionStart);
+    await $.command.run(calmCommand("calm"));
+    expect(files.get(PREFERENCE)).toBe("off\n");
+    expect(files.get(LEGACY_PREFERENCE)).toBe("on\n");
+    expect(journal.toasts).toEqual(["Stealth off"]);
+  });
+
   test("reads the legacy max value as on", async ($, on) => {
     world(on, { preference: "max\n" });
     expect(isHidden(await $.ui.render(toolResult()))).toBe(true);
@@ -93,7 +108,7 @@ describe("activation", () => {
   });
 });
 
-describe("/calm", () => {
+describe("/stealth", () => {
   test("toggles on: persists on, toasts, redraws every hooked drawing, and leaves no output row", async ($, on) => {
     const { files, journal } = world(on);
     await $.session.start(sessionStart);
@@ -101,7 +116,7 @@ describe("/calm", () => {
     const answer = await $.command.run(calmCommand());
     expect(answer.text).toBeUndefined();
     expect(files.get(PREFERENCE)).toBe("on\n");
-    expect(journal.toasts).toEqual(["Calm on"]);
+    expect(journal.toasts).toEqual(["Stealth on"]);
     expect(journal.invalidations).toContain("ui.render");
     expect(isHidden(await $.ui.render(toolUse()))).toBe(true);
     expect(isHidden(await $.ui.render(toolResult()))).toBe(true);
@@ -114,7 +129,7 @@ describe("/calm", () => {
     expect(isHidden(await $.ui.render(toolUse()))).toBe(true);
     await $.command.run(calmCommand());
     expect(files.get(PREFERENCE)).toBe("off\n");
-    expect(journal.toasts).toEqual(["Calm off"]);
+    expect(journal.toasts).toEqual(["Stealth off"]);
     expect(isStock(await $.ui.render(toolUse()))).toBe(true);
     expect(isStock(await $.ui.render(spinner()))).toBe(true);
   });
@@ -128,7 +143,7 @@ describe("/calm", () => {
     expect(files.get(PREFERENCE)).toBe("on\n");
     expect(isHidden(await $.ui.render(toolUse()))).toBe(true);
     expect(journal.toasts).toHaveLength(1);
-    expect(journal.toasts[0]).toContain("Calm unchanged");
+    expect(journal.toasts[0]).toContain("Stealth unchanged");
     expect(journal.toasts[0]).toContain(PREFERENCE);
     expect(journal.invalidations).toHaveLength(redrawsBefore);
   });
@@ -136,14 +151,14 @@ describe("/calm", () => {
   test("writes under JG_CONFIG_OVERRIDE when that override names the config directory", async ($, on) => {
     const { files } = world(on, { env: { JG_CONFIG_OVERRIDE: "/elsewhere/cfg" } });
     await $.command.run(calmCommand());
-    expect(files.get("/elsewhere/cfg/calm")).toBe("on\n");
+    expect(files.get("/elsewhere/cfg/stealth")).toBe("on\n");
     expect(files.has(PREFERENCE)).toBe(false);
   });
 
   test("falls back to JG_ROOT_OVERRIDE, then the tracked code root above the plugin, when JG_HOME is unset", async ($, on) => {
     const { files } = world(on, { home: undefined, env: { JG_ROOT_OVERRIDE: "/root/override" } });
     await $.command.run(calmCommand());
-    expect(files.get("/root/override/config/calm")).toBe("on\n");
+    expect(files.get("/root/override/config/stealth")).toBe("on\n");
   });
 
   test("derives the home from the plugin folder when nothing names it", async ($, on) => {
@@ -151,7 +166,7 @@ describe("/calm", () => {
     await $.command.run(calmCommand());
     const [path] = [...files.keys()];
     expect(path).toBeDefined();
-    expect(path!).toEndWith("/config/calm");
+    expect(path!).toEndWith("/config/stealth");
     expect(path!.startsWith(HOME)).toBe(false);
     // Three levels above the plugin folder: the tracked code root, above `.claude/`.
     expect(path!).not.toContain("juggernaut-calm/");

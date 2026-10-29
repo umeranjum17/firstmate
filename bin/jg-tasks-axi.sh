@@ -51,10 +51,16 @@
 #     first write would replace the link with a private copy, exactly the fork
 #     this command exists to prevent. Lifecycle transitions refuse the same file.
 #   - `rm`/`delete`, `done`/`close`, or `update`/`edit --title` dropping `[captain-ask]`,
-#     unless `bin/jg-captain-hold.sh answered <id>` finds an answer or a merged `pr:` link.
+#     unless the row has a merged `pr:` link or a Recon report (see the next entry).
 #     A raw `hold` is always refused. Done auto-prune, `prune`, and record-delivery/waive
 #     refuse only an unanswered ask an archive would move past keep (`--no-prune` skips
 #     the done prune).
+#   - the same close without delivery evidence and without `--captain-quote '<his words>'` or
+#     `--confirm-card <id>` (a separate board card that names the row and that
+#     `bin/jg-captain-hold.sh answered` finds answered): a recorded answer alone
+#     no longer closes a ticket the captain asked for, because a rejected option is a reason to redo
+#     it, never to cancel. The quote or card is recorded in the ticket note (`done`) and in
+#     data/captain-closures.md; both flags are consumed here and never reach tasks-axi.
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
@@ -128,7 +134,16 @@ absolute_from_caller() {  # <path-value>
 
 ARGS=()
 path_value_next=0
+# shellcheck disable=SC2034  # both are read by guard_captain_ask_close in bin/jg-captain-ask-lib.sh
+CAPTAIN_QUOTE=
+CONFIRM_CARD=
+cap_next=
 for arg in "$@"; do
+  if [ -n "$cap_next" ]; then
+    case $cap_next in quote) CAPTAIN_QUOTE=$arg ;; *) CONFIRM_CARD=$arg ;; esac
+    cap_next=
+    continue
+  fi
   if [ "$path_value_next" = 1 ]; then
     ARGS+=("$(absolute_from_caller "$arg")")
     path_value_next=0
@@ -138,6 +153,10 @@ for arg in "$@"; do
     --file|--file=*)
       fail "this command always addresses this home's backlog at $DATA; drop --file, or run tasks-axi directly for another backlog"
       ;;
+    --captain-quote) cap_next=quote ;;
+    --captain-quote=*) CAPTAIN_QUOTE=${arg#--captain-quote=} ;;
+    --confirm-card) cap_next=card ;;
+    --confirm-card=*) CONFIRM_CARD=${arg#--confirm-card=} ;;
     --start)
       case "${1:-}" in
         add|create)
@@ -159,6 +178,7 @@ for arg in "$@"; do
   esac
 done
 
+[ -z "$cap_next" ] || fail "--captain-quote and --confirm-card each need a value"
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/jg-bootstrap.sh for the install command"
 
 JG_BACKLOG_TRANSITION_ERROR=
@@ -218,7 +238,7 @@ captain_guard() {  # <tasks-axi args>
   case "$verb" in
     prune) guard_captain_ask_archive "$prune_state" "$keep_arg" "" ;;
     done|close)
-      guard_captain_ask "$id"
+      guard_captain_ask_close "$id"
       [ "$no_prune" = 1 ] || guard_captain_ask_archive "done" "$keep_arg" "$id"
       ;;
     public-followup)
@@ -226,13 +246,13 @@ captain_guard() {  # <tasks-axi args>
         record-delivery|waive) guard_captain_ask_archive "done" "" "$id" ;;
       esac
       ;;
-    rm|delete) guard_captain_ask "$id" ;;
+    rm|delete) guard_captain_ask_close "$id" ;;
     hold) guard_captain_ask_hold "$id" ;;
     update|edit)
       if [ "$has_title" = 1 ]; then
         case "$new_title" in
           *'[captain-ask]'*) ;;
-          *) guard_captain_ask "$id" ;;
+          *) guard_captain_ask_close "$id" ;;
         esac
       fi
       ;;
@@ -266,7 +286,11 @@ case "${1:-}" in
     esac
     ;;
 esac
+CLOSE_NOTE_ARGS=()
 captain_guard ${ARGS[@]+"${ARGS[@]}"}
+if [ "${#CLOSE_NOTE_ARGS[@]}" -gt 0 ]; then
+  case " ${ARGS[*]} " in *" --note "*) ;; *) ARGS+=("${CLOSE_NOTE_ARGS[@]}") ;; esac
+fi
 case "${1:-}" in
   show|view|list)
     set -o pipefail

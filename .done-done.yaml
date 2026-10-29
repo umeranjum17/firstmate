@@ -1,10 +1,34 @@
 app: juggernaut
 journeys:
   relaunch-model-refusal:
-    command: bash tests/jg-control-relaunch.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
+    command: bash tests/jg-control.test.sh > "$DONE_DONE_EVIDENCE_ROOT/${RUN_ID}.log" 2>&1
   receipt-candidate-hook:
     command: bash journeys/receipt-candidate-hook.sh
   tickets-stage-publish:
     command: bash addons/tickets-sync/run-stage-proof.sh
   tickets-writeback:
     command: bash journeys/tickets-writeback.sh
+  ready-backlog-stall:
+    command: bash journeys/ready-backlog-stall.sh
+    timeout: 45m
+  fleet-report:
+    command: bash addons/fleet-report/run-proof.sh
+  proof-attach:
+    command: bash journeys/proof-attach.sh
+  design-call-gate:
+    command: bash journeys/design-call-gate.sh
+  demo-call-gate:
+    command: bash journeys/demo-call-gate.sh
+  nav-removal-gate:
+    command: bash journeys/nav-removal-gate.sh
+  captain-close-gate:
+    command: bash journeys/captain-close-gate.sh
+  stuck-question-replay:
+    command: bash journeys/stuck-question-replay.sh
+  worker-no-ask-tool:
+    command: bash journeys/worker-no-ask-tool.sh
+  watcher-exit-beacon:
+    command: bash journeys/watcher-exit-beacon.sh
+secrets:
+  allow:
+    - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'

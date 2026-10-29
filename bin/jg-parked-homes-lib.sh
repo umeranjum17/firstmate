@@ -13,11 +13,11 @@
 _JG_PARKED_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$_JG_PARKED_LIB_DIR/jg-addons-dir-lib.sh"
-_JG_PARKED_ADDONS=$(jg_addons_dir "${JG_HOME:-$_JG_PARKED_LIB_DIR/..}")
+_JG_PARKED_LIB=$(jg_addon_path "${JG_HOME:-$_JG_PARKED_LIB_DIR/..}" parked-homes/bin/jg-parked-homes-lib.sh)
 jg_parked_refuse_meta() { return 0; }
 jg_parked_skip_meta() { return 1; }
-if [ -f "$_JG_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh" ]; then
+if [ -f "$_JG_PARKED_LIB" ]; then
   # shellcheck source=/dev/null
   # shellcheck source=bin/jg-parked-homes-lib.sh
-  . "$_JG_PARKED_ADDONS/parked-homes/bin/jg-parked-homes-lib.sh"
+  . "$_JG_PARKED_LIB"
 fi

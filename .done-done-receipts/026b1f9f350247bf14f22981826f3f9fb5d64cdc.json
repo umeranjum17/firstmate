@@ -1,0 +1,52 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "026b1f9f350247bf14f22981826f3f9fb5d64cdc",
+  "tree": "662ff7e06c87a4d2c2e8deb5a268b9cf6f0f76d1",
+  "claim": "A worker launched like a Juggernaut worker has no ask tool, so a question cannot reach the human and goes to its lead",
+  "result": "pass",
+  "at": "2026-10-29T16:31:04.272Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T163034Z-026b1f9f-c94a9d/replay.txt",
+      "sha256": "1da756d5657f970903a29fc0ae5c0f61652be15b6d41f2cf1be780e2ae35bd84"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T163034Z-026b1f9f-c94a9d",
+      "commit": "026b1f9f350247bf14f22981826f3f9fb5d64cdc",
+      "journey": "worker-no-ask-tool",
+      "command": "bash journeys/worker-no-ask-tool.sh",
+      "tool": "0.6.20",
+      "steps": {
+        "target": {
+          "version": "claude 2.1.312 (Claude Code)"
+        },
+        "start": "a real Claude Haiku worker launched with the ask-tool flag, and a control launched without it",
+        "steps": [
+          "both workers are told to ask the human a question",
+          "the control opens a question dialog",
+          "the flagged worker opens no dialog and reports it has no ask tool"
+        ],
+        "result": "the worker launched like a Juggernaut worker cannot put a question dialog in front of the human"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T163034Z-026b1f9f-c94a9d/replay.txt",
+        "sha256": "1da756d5657f970903a29fc0ae5c0f61652be15b6d41f2cf1be780e2ae35bd84",
+        "verdict": "pass"
+      }
+    ]
+  }
+}

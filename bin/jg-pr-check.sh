@@ -314,4 +314,9 @@ case "$READY_RC" in
   0|1) ;;
   *) printf 'actionable: PR %s is registered but its ready line did not reach the parent channel (rc=%s)\n' "$URL" "$READY_RC" >&2 ;;
 esac
+# The ready card carries the task's proof media and receipt, or this says what is missing
+# (bin/jg-proof-attach.sh). Homes with no board hook (config/post-merge) skip it.
+if [ "${JG_PR_CHECK_MERGE:-}" != 1 ] && { [ -e "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/post-merge" ] || [ -n "${JG_PROOF_BOARD:-}" ]; }; then
+  JG_HOME=$JG_HOME "$SCRIPT_DIR/jg-proof-attach.sh" attach ready "$ID" --pr "$URL" 2>&1 | sed 's/^/proof: /' >&2 || true
+fi
 printf 'armed: state/%s.check.sh\n' "$ID"

@@ -549,6 +549,21 @@ ok - unseeded path without --approve still prompts on Trust project folder?
 
 Portable launch-command coverage lives in `tests/jg-spawn-dispatch-profile.test.sh` (`test_pi_seeded_squad_lead_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
 
+## Permission-prompt gate
+
+`bin/jg-prompt-gate.py` reads OpenCode's rendered "Access external directory" dialog, which is identical for a Read, a Write, and a bash `rm`, so it also reads the pending tool line above the dialog.
+Verified 2026-10-29 on OpenCode 1.18.25 with `opencode/glm-5.3-flash-free`, on a Squad Lead hand-restarted with `opencode --continue` and no launch grant.
+
+```sh
+JG_PROMPT_GATE_LIVE=1 bash tests/jg-prompt-gate-live-e2e.test.sh
+```
+
+```
+# opencode 1.18.25, model opencode/glm-5.3-flash-free
+ok - a hand-restarted lead's inbox read is approved, logged, and shown in the fleet view
+ok - a read outside the fleet's roots is a card and a wake, never an approval
+```
+
 ## Launch-prompt backstop signatures
 
 `bin/jg-busy-lib.sh`'s launch-prompt backstop (`jg_busy_launch_prompt_parked`) reclassifies a launch whose busy record is still pinned at the jg-spawn seed as `unknown launch-prompt`, rather than `busy jg-spawn`, when the captured pane matches that harness's own recognized trust, sign-in, or first-run dialog.
@@ -1050,6 +1065,27 @@ sleep 40; echo "checked at $(date +%s)"              # rc=0
 An earlier `sleep 60` chained ahead of a status check was refused before execution, with a message pointing at `Monitor` with an until-loop and at `run_in_background: true`, and adding "Do not chain shorter sleeps to work around this block".
 The blocking foreground `until` loop is therefore the wait a Claude Code worker may use, and it is what the brief names, because the refusal's own `run_in_background` suggestion is the one shape a waiting worker must not take: a backgrounded call returns at once and so does not wait at all.
 The brief's portable regression is `tests/jg-brief.test.sh`; rerun these commands after upgrading any of the three harnesses and update the numbers in the brief when they move.
+
+## OpenCode resumed primary arm
+
+A resumed OpenCode TUI emits no session event until a turn ends, so `.opencode/plugins/jg-primary-watch-arm.js` arms at load when its process was started with `--session`.
+Verified on 2026-10-29 on Linux with OpenCode 1.18.25 (model DeepSeek V4.1 Flash Free) on a primary home without `config/supervision-host`.
+The plugin runs in a Bun worker whose own `process.argv` is `["bun","/$bunfs/root/src/cli/tui/worker.js"]`, while `process.pid` is the `opencode` process, so the CLI arguments come from `ps -o args= -p <pid>`.
+A TUI started as `opencode --session <id>` emitted only `plugin.added`, `catalog.updated`, `reference.updated`, and `integration.updated` before any turn, none carrying a session id.
+With the plugin from before this change, that resumed session with nothing typed had no watcher and `bin/jg-turnend-guard.sh` exited 2 with `TURN WOULD END BLIND`.
+With this plugin, the same resume armed at load with nothing typed:
+
+```text
+cycle ledger (latest): reason=actionable-check successor=started:2609810
+beat age: 5s
+guard exit=0
+session prompt: watcher: WATCHER FIRED - ... check: rearm-resurface
+```
+
+With `state/.lock` naming a dead pid, the resumed session received one `watcher: FAILED - OpenCode cannot arm supervision: this session does not own the home lock` prompt and one reply, and no further report after the idle that reply caused.
+`opencode --continue` resumes are not detected, because their command line carries no session id.
+The portable regression is `tests/jg-turnend-guard.test.sh`'s watch-arm case, and `JG_OPENCODE_LIVE_E2E=1 tests/jg-opencode-primary-live-e2e.test.sh` refreshes this record with its resumed-session case.
+That guard has not yet passed end to end with the resumed case on this host: the 2026-10-29 runs stopped earlier, once when the OpenCode TUI failed to load its render library (`Failed to initialize OpenTUI render library`) and once when the model never wrote its handled marker.
 
 ## Gemini
 

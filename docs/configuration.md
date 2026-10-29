@@ -130,10 +130,10 @@ The shared orchestrator behavior lives in [`AGENTS.md`](../AGENTS.md).
 Edit it like any prompt when the fleet is empty.
 While tasks are in flight, dispatch shared-repo edits to an operator.
 
-## Calm preference (config/calm)
+## Calm preference (config/stealth)
 
-The Pi Calm extension and the Claude Code Calm mod share the local, gitignored `config/calm` preference under the effective Juggernaut home.
-One `/calm` choice therefore applies on either harness.
+The Pi Calm extension and the Claude Code Calm mod share the local, gitignored `config/stealth` preference under the effective Juggernaut home.
+One `/stealth` choice therefore applies on either harness.
 Both resolve the home in this order: `JG_HOME`, `JG_ROOT_OVERRIDE`, then the tracked code root derived from their own path under it.
 When `JG_CONFIG_OVERRIDE` is present for tests or specialized setup, it selects the config directory directly.
 
@@ -146,6 +146,8 @@ When `JG_CONFIG_OVERRIDE` is present for tests or specialized setup, it selects 
 | Absent, unreadable, or unrecognized | Defaults to off. |
 
 Both written values end with one newline.
+Stealth was named Calm before; a home with only the old `config/calm` file reads it until the first `/stealth` toggle, which writes `config/stealth` and never touches `config/calm` again.
+The old `/calm` command stays as an alias on both harnesses.
 `max` is a legacy value from a removed third presentation level.
 Its behavior is now ordinary Calm, so it is still read as `on`.
 A home upgraded from `max` keeps Calm on rather than dropping to off.
@@ -182,6 +184,11 @@ bin/jg-model-allowlist.sh check codex gpt-5.6-sol      # one pick, exit 0 allowe
 ```
 
 The list is local to each home and not inherited by Squad Leads, so a Squad Lead home that should enforce the same limit keeps its own copy.
+
+With no list at all, `bin/jg-spawn.sh` still refuses a model that cannot run an agent: an image, embedding, speech, or video model (a `gemini-3-pro-image-preview`, a `*-embedding`, a `whisper`).
+Such a model fails every turn with a provider error and is retried at once, so the worker never settles.
+An OpenCode launch with no model starts on the model its own TUI used last, so that model is checked the same way and the refusal says to pin one.
+`JG_ALLOW_NON_AGENT_MODEL=1` lets a deliberate pick launch anyway.
 
 ## Pi supervision branch
 
@@ -385,7 +392,7 @@ Either would place a row In flight without a task record, status file, or inbox,
 The wrapper still passes through the documented direct transition `tasks-axi start <id>`.
 Completion refuses to report success until the item is closed, and session start reconciles this home's own books after an interrupted run.
 
-The same wrapper also refuses to remove or close a `[captain-ask]` row, or to drop its tag through `update` or `edit --title`, until `bin/jg-captain-hold.sh answered <id>` finds the captain's recorded answer or the row links a merged pull request; it refuses a raw `hold` of such a row, and an unanswered ask in the archive set blocks a close or prune only when that archive would move it past `done_keep`. The refusal names the row and exits 2. The guard covers only commands run through the wrapper, and the automatic dispatch and completion transitions do not use it ([`bin/jg-tasks-axi.sh`](../bin/jg-tasks-axi.sh) owns the complete refusal list).
+The same wrapper also refuses to remove or close a `[captain-ask]` row, or to drop its tag through `update` or `edit --title`, unless the row links a merged pull request or a Recon report, or the call carries `--captain-quote '<his words>'`, or `--confirm-card <id>` naming a separate board card that names the row and that `bin/jg-captain-hold.sh answered` finds answered. A recorded answer on the row itself no longer closes it, because a rejected option means redo the options, never cancel. The quote or card lands in the ticket note and in `data/captain-closures.md`; it refuses a raw `hold` of such a row, and an unanswered ask in the archive set blocks a close or prune only when that archive would move it past `done_keep`. The refusal names the row and exits 2. The guard covers only commands run through the wrapper, and the automatic dispatch and completion transitions do not use it ([`bin/jg-tasks-axi.sh`](../bin/jg-tasks-axi.sh) owns the complete refusal list).
 
 When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/jg-spawn.sh`](../bin/jg-spawn.sh); [`tests/jg-backlog-atomicity.test.sh`](../tests/jg-backlog-atomicity.test.sh)).
 
@@ -525,7 +532,7 @@ Legacy tmux metadata remains cleanup-compatible when its exact window name is `j
 
 ### Herdr homes and presentation
 
-`JG_HOME` determines Herdr's home label: the primary home uses `juggernaut`, and a Squad Lead home marked by `.jg-squad-lead-home` uses `2ndmate-<squad-lead-id>`.
+`JG_HOME` determines Herdr's home label: the primary home uses `juggernaut`, and a Squad Lead home marked by `.jg-squad-lead-home` uses `lead-<squad-lead-id>` (the older `2ndmate-<squad-lead-id>` is still read).
 [`herdr-backend.md`](herdr-backend.md#watching-and-task-containers) owns launcher-bound workspace placement, the label-only fallback, collision handling, and recovery behavior.
 
 The local `config/herdr-presentation-spaces` file instead opts a home out of, or explicitly in to, Herdr's default-on disposable single-task visual projection; [Presentation spaces](herdr-backend.md#presentation-spaces) owns its accepted values, default, Herdr version floor, migration, behavior, safety limits, recovery contract, and narrow locked session-start cleanup of exact restored idle-shell children.
@@ -636,6 +643,17 @@ With it present, ship and Recon briefs gain the `# Waiting` section and the fore
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
 The flag is a home-local preference and is not inherited by Squad Lead homes.
 
+## TakeOne demo-video rule (config/takeone-demo)
+
+The optional local, gitignored `config/takeone-demo` presence flag turns on the rule that every product demo video for every app is made with TakeOne.
+Turn it on with `touch config/takeone-demo` and off with `rm config/takeone-demo`.
+It is off by default, until TakeOne is demo-ready.
+With it present, a ship brief scaffolded with `--demo-call yes --demo-reason <text>` tells the worker to make each demo video with TakeOne and to put one `takeone receipt: <reference>` line in the evidence of its completion receipt.
+The merge scripts then refuse a task recorded `demo_call=yes` unless its passing receipt for the merge head carries that line, and an older task with no recorded call warns and counts as no.
+With the flag absent the scaffold accepts the flags without writing a demo line, and the merge scripts skip the check.
+The flag is a home-local preference and is not inherited by Squad Lead homes.
+`bin/jg-brief.sh`'s header owns the flags, and `bin/jg-merge-gate-lib.sh`'s `jg_dod_demo_gate` owns the check.
+
 ## No-mistakes pipeline spend (config/pipeline-spend)
 
 The optional local, gitignored `config/pipeline-spend` presence flag opts this home into recording per-task no-mistakes pipeline spend in `data/pipeline-spend.jsonl` during teardown.
@@ -657,6 +675,15 @@ The bound is required rather than cosmetic because churn and pane staleness read
 
 The flag is a home-local supervision-noise preference and is not inherited by Squad Lead homes, which run their own crew mix.
 [`architecture.md`](architecture.md) owns the triage contract and `bin/jg-watch.sh`'s `signal_turnend_panes_churned` owns the exact evidence and fail-closed boundaries.
+
+## Permission-prompt auto-approval (config/prompt-approve-off)
+
+The watcher treats a worker or Squad Lead pane showing a permission or trust prompt as stuck at once.
+It approves only an OpenCode read it can prove is inside this fleet's own files, and rejects one that touches a secrets path (`.env`, `~/.config`, or a home's `data/` or `config/`), telling the worker why.
+Every other prompt wakes the owning home at once and then rides the stuck-worker escalation chain: owner, Main, then a board card from the main home only ([`addons/wait-timers/README.md`](../addons/wait-timers/README.md) owns the rungs).
+While the same prompt stays on screen it is approved, rejected, or re-alerted again every 10 minutes (`JG_PROMPT_REALERT_SECS`), with no once-per-prompt latch.
+The optional local, gitignored `config/prompt-approve-off` presence flag turns approval off, so every prompt that is not rejected rides the chain.
+`bin/jg-prompt-gate-lib.sh` owns the roots and the records, and `bin/jg-prompt-gate.py` owns the matcher.
 
 ## Parked-gate wait deferral (config/wedge-defer-parked-gate)
 
@@ -722,7 +749,7 @@ The declaration is per-home untracked state under `data/`, like every other capt
 A fresh primary home has no declaration until the captain re-declares the `Memory layering` section there from their own records.
 Until then local files are the only memory owners.
 
-[`AGENTS.md`](../AGENTS.md) section 6 owns what a declaration changes about knowledge routing, and the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
+the internal [`fleet-records` skill](../.agents/skills/fleet-records/SKILL.md) owns what a declaration changes about knowledge routing, and the internal [`intel` skill](../.agents/skills/intel/SKILL.md) owns how curation reads the declaration and protects tier-owned entries from pruning.
 The section counts toward the startup memory budget like the rest of its file, so keep it to the mapping rather than restating these rules.
 
 ## Startup memory budget (config/startup-memory-budget)
@@ -1026,6 +1053,13 @@ The file is read from this home's own configuration directory on every launch, s
 It is not in the inherited configuration set, so no other home, including a Squad Lead home, receives it; create the file in each home that wants it.
 It does not apply to a Squad Lead's own agent, which neither reads nor refuses on it.
 
+### Built-in: workers cannot ask the human
+
+A worker never asks the human directly; its question belongs to its lead.
+So every ship and Recon launch hides the runtime's own ask tool, with or without this file: Claude gets `--disallowedTools=AskUserQuestion`, OpenCode gets `"question":"deny"` in its permission config, and `pi` and `pi-signed` get `ask_user_question` in `--exclude-tools` ahead of any listed names.
+A Squad Lead's agent keeps its tools, and the other runtimes have no ask tool to hide here.
+A dialog that still opens on any runtime is caught by the stuck-worker detector in `bin/jg-stuck-gate-lib.sh`.
+
 ### Runtime support
 
 | Runtime | With a non-empty list |
@@ -1125,9 +1159,11 @@ Ready intake uses the base heartbeat interval independently of idle-heartbeat ba
 When the ready set empties on a successful read - every named item since held or in flight - the check withdraws the queued ready-work row, so a notification whose condition no longer holds stops being presented instead of repeating until an acknowledgement that may never come, and it re-raises from scratch only when the condition holds again.
 That empty observation keeps the resurface record, so a transient empty set cannot reset the `JG_READY_WORK_RESURFACE_SECS` window and replay the identical set inside it.
 At or above the floor, or without the file, a home wakes when no worker is provably working, so open lanes that only wait never hide an idle home.
+The wake asks the lead to dispatch the ready items, P0 first, up to the project's declared capacity; a spawn beyond capacity stops and leaves its item queued.
 A malformed value is reported once in the watcher's triage log and then treated as absent, never as a number; `bin/jg-watch.sh`'s header owns the exact reason lines.
 
 The floor is a floor, not a cap: it never asks a home to stop working above its target.
+If ready work still waits on a free lane and nothing starts for 15 minutes, the lead is woken again and Main is told, every 10 minutes while that holds; [`addons/wait-timers/README.md`](../addons/wait-timers/README.md) "Stalled ready backlog" owns that backstop.
 
 ## Launch environment hook (config/launch-env-hook)
 
@@ -1243,10 +1279,30 @@ When stripping is enabled, the hooks directory is read-only, so a hook manager r
 The flag is a home-wide attribution choice, so it is inherited into Squad Lead homes under the [`squad-lead-provisioning`](../.agents/skills/squad-lead-provisioning/SKILL.md) inherited-local-material contract and a Squad Lead's own workers keep AI trailers too.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Juggernaut, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 
+### Token saver
+
+The token saver cuts per-request tokens in fleet sessions and meters the result.
+It is on by default, and the optional local, gitignored `config/token-saver-off` presence flag turns every part of it off in this home.
+None of it is inherited into Squad Lead homes, so each home chooses for itself.
+
+- **Ponytail off:** every Claude launch's settings carry `"enabledPlugins":{"ponytail@ponytail":false}`, a task worker's in its inline `--settings` JSON and a Squad Lead's in `state/<id>.claude-settings.json`.
+  This keeps a globally installed ponytail plugin out of fleet sessions without editing user settings; the token-optimizer lab measured ponytail 4.8.4 at +1.6k to +2.6k tokens per request and +6.4% cost.
+  The captain's own Overwatch session is launched by hand, so it is not covered.
+- **Poll guard, report-only:** when the installed `learn-from-mistakes-axi` has its tokens mode (0.12.0 and later), every Claude launch adds its poll guard as a `PreToolUse` and `SessionStart` hook with the hook's output discarded.
+  The guard never blocks; a would-be block of the third identical poll-like Bash command is only logged, and `learn-from-mistakes-axi tokens guard status` reports how many there were.
+- **Bash output cap trial:** when this home has `config/bash-output-max` holding one whole number from 1000 to 150000, its Claude launches set `BASH_MAX_OUTPUT_LENGTH` to it through the settings `env` key.
+  Claude Code saves a longer Bash output to a file and shows the model a preview; its default is 30000.
+  The file is absent by default, so the cap is a one-home trial; delete the file to end it.
+- **Daily token retro:** `bin/jg-tokens-retro.sh arm` registers a watcher check that runs `learn-from-mistakes-axi tokens retro --since 1d` once a day into `data/tokens-retro/<YYYY-MM-DD>/` and raises a `check:` notification only when tokens per day moved by 20% or more against the report from seven days earlier (`JG_TOKENS_RETRO_CHANGE_PCT`).
+  The retro reads the local session stores and makes no model calls.
+  `bin/jg-tokens-retro.sh disarm` removes the check and keeps the reports.
+
+All three launch parts apply to new launches; a running worker keeps the settings it started with.
+
 ## Project capacity (config/project-capacity)
 
 The optional local, gitignored `config/project-capacity` tells Juggernaut how many workers a project can run at once on this machine, for a project whose machine-local resource - a heavy test suite, a local editor stack, a device - only serves a few workers at a time.
-Without it, dispatch stays uncapped as `AGENTS.md` section 7 describes, and a surplus worker is launched only to spend full-context turns waiting for the resource.
+Without it, dispatch stays uncapped as the `task-dispatch` skill describes, and a surplus worker is launched only to spend full-context turns waiting for the resource.
 The file lives in the machine's root Juggernaut home, so every local Squad Lead home reads the same limit, and it holds one line per project:
 
 ```text
@@ -1270,7 +1326,7 @@ Juggernaut cannot see which part of a worker's life uses the resource, so the nu
 
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that Juggernaut reads before dispatching an operator or Recon.
 Juggernaut chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Juggernaut resolves the rule's profile object or array under `AGENTS.md` section 4 and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `jg-spawn.sh`.
+Juggernaut resolves the rule's profile object or array under `task-dispatch` and `quota-array-dispatch`, then passes only concrete `--harness`, `--model`, and `--effort` flags to `jg-spawn.sh`.
 
 **Spawn requirements**
 
@@ -1281,7 +1337,7 @@ Juggernaut resolves the rule's profile object or array under `AGENTS.md` section
 **Contract owners**
 
 This section is the single owner of the canonical schema and its per-field semantics.
-`AGENTS.md` section 4 owns the always-loaded dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
+`task-dispatch` owns the dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
 
 ```json
 {
@@ -1356,6 +1412,11 @@ This single-provider table is separate from the frozen legacy mapping used by `j
 - Codex `max` is valid when the profile selects `gpt-5.6-luna`, whose installed catalog entry supports that reasoning level.
 - An omitted model or effort means the selected harness uses its own default for that axis.
 - Juggernaut's OpenCode ship, Recon, Squad Lead, and relaunch commands pre-approve tool permissions and external-directory access, including steering inboxes outside the worktree and unrelated scratch paths such as `/tmp`; the grant is not a task-path allowlist or a worktree isolation boundary.
+  A Squad Lead launch also writes `.opencode/opencode.json` in the lead's own home with a persistent `external_directory` allow for exactly its steering inbox and the parent's `pending-replies` directory, so a lead restarted by hand with a bare `opencode --session` keeps access; restart through `bin/jg-control.sh <task-id> relaunch` instead.
+  The same file also lets the lead read the parent home's `bin/`, `docs/`, and `.agents/skills/` and denies OpenCode's edit tool there.
+  That read-only limit is partial: the shell is not sandboxed, so a command can still write to those directories.
+  This adds no new trust, because leads already append to the parent home through the shell for status lines.
+  `data/`, `config/`, `.env`, and `projects/` stay behind OpenCode's prompt.
   This per-launch permission policy is retained with or without model and effort selections; `bin/jg-spawn.sh`'s `launch_template()` owns the exact configuration, and `tests/jg-spawn-dispatch-profile.test.sh` covers its generated launches.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
 - A Juggernaut OpenCode launch with a model from a provider other than `opencode` gets its own session store, `juggernaut-<12-hex home token>-<task id>.db`, inside OpenCode's data directory, so concurrent workers stop locking one shared `opencode.db`.
@@ -1483,7 +1544,7 @@ Every result above exits 0.
 
 **Juggernaut retains the dispatch decision**
 
-The tool never replaces Juggernaut's judgment, `quota-array-dispatch`, the captain-approval gate, or `jg-spawn.sh` validation; `AGENTS.md` section 4 owns what Juggernaut does with each outcome.
+The tool never replaces Juggernaut's judgment, `quota-array-dispatch`, the captain-approval gate, or `jg-spawn.sh` validation; `task-dispatch` owns what Juggernaut does with each outcome.
 By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
 
 Juggernaut passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
@@ -2668,6 +2729,8 @@ JG_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/OpenCode wait for an unr
 JG_WATCH_REARM_RETRY_BASE_MS=250   # Pi/OpenCode adapter base delay for continuity restoration retries
 JG_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/OpenCode adapter cap for exponential continuity retry delay
 JG_WATCH_REARM_RETRY_LIMIT=5   # Pi/OpenCode adapter launch-failure retries before surfacing restoration failure
+JG_WATCH_FAILURE_NOTICE_INTERVAL_MS=600000   # OpenCode adapter: the same watcher-failure notice reaches a session at most this often, so a model that fails every turn cannot turn the notice into a prompt loop
+JG_STUCK_ERRLOOP_MIN=3   # watcher: a provider or API error line repeated this many times on a worker's screen records the errors wait source
 JG_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifecycle ledger
 JG_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 JG_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior

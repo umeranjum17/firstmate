@@ -26,6 +26,8 @@ const ARM_RETIRE_TIMEOUT_MS = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 
 const REARM_RETRY_BASE_MS = positiveInteger("JG_WATCH_REARM_RETRY_BASE_MS", 250);
 const REARM_RETRY_MAX_MS = positiveInteger("JG_WATCH_REARM_RETRY_MAX_MS", 4000);
 const REARM_RETRY_LIMIT = positiveInteger("JG_WATCH_REARM_RETRY_LIMIT", 5);
+const FAILURE_NOTICE_INTERVAL_MS = positiveInteger("JG_WATCH_FAILURE_NOTICE_INTERVAL_MS", 600000);
+const BLOCKED_ARM_NOTICE = "watcher: FAILED - OpenCode cannot arm supervision: ";
 
 let child = null;
 let armStatus = "idle";
@@ -139,13 +141,15 @@ function isPrimaryRoot(root) {
 // mode stays a local decline: its daemon owns supervision. X-mode homes arm
 // before their relay poll is registered in the state directory.
 function shouldArm(paths) {
-  if (existsSync(`${paths.state}/.afk`)) return false;
-  if (existsSync(`${paths.config}/x-mode.env`)) return true;
+  if (existsSync(`${paths.state}/.afk`)) return { arm: false, error: "" };
+  if (existsSync(`${paths.config}/x-mode.env`)) return { arm: true, error: "" };
   return supervisionNeeded(paths);
 }
 
 // jg_supervision_needed <state-dir> exits 0 exactly when the shared predicate
-// says the home needs supervision; exit 0 means arm here.
+// says the home needs supervision; exit 0 means arm here. Exit 1 with nothing
+// on stderr is a clean no, and anything else is a predicate that could not
+// answer, which must surface rather than read as "not needed".
 function supervisionNeeded(paths) {
   const result = spawnSync(
     "bash",
@@ -156,9 +160,15 @@ function supervisionNeeded(paths) {
       paths.root,
       paths.state,
     ],
-    { stdio: "ignore" },
+    { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"] },
   );
-  return result.status === 0;
+  const stderr = String(result.stderr || "").trim();
+  if (result.status === 0) return { arm: true, error: "" };
+  if (result.status === 1 && !stderr) return { arm: false, error: "" };
+  return {
+    arm: false,
+    error: `the supervision-needed check could not answer (jg_supervision_needed exited ${result.status ?? result.signal ?? "without a status"})${stderr ? `\n${stderr}` : ""}`,
+  };
 }
 
 async function sessionOwnsLock(paths) {
@@ -344,7 +354,26 @@ function wakePrompt(reason) {
   return `WATCHER FIRED - drain queued wakes with bin/jg-wake-drain.sh and handle the reported wake. Watcher continuity is plugin-owned.\n\n${reason}`;
 }
 
+// Every failure notice is a prompt whose own turn ends in another session.idle,
+// and a turn whose model call fails (a bad key, a model the provider rejects)
+// ends in several. A notice sent on every idle fed those back into new prompts,
+// about one failed model call a second, flipping the lead between working, done
+// and blocked. The same notice (its first line) now reaches a session at most
+// once per JG_WATCH_FAILURE_NOTICE_INTERVAL_MS (default ten minutes); a
+// different notice goes at once, and a cleared block drops its record.
+const failureNoticeAt = new Map();
+
+function failureNoticeDue(reason) {
+  const key = String(reason).split("\n", 1)[0];
+  const now = Date.now();
+  const last = failureNoticeAt.get(key);
+  if (last !== undefined && now - last < FAILURE_NOTICE_INTERVAL_MS) return false;
+  failureNoticeAt.set(key, now);
+  return true;
+}
+
 function surfaceFailure(paths, client, sessionID, reason) {
+  if (!failureNoticeDue(reason)) return;
   void sendPrompt(paths, client, sessionID, wakePrompt(reason)).catch(() => {
     // OpenCode owns delivery errors; continuity restoration never waits on prompting.
   });
@@ -420,9 +449,9 @@ async function scheduleRetry(paths, sessionID, client, reason, predecessorArmPid
   setArmStatus("retrying");
   const timer = setTimeout(() => {
     if (retryTimer === timer) retryTimer = null;
-    void ensureArm(paths, sessionID, client, predecessorArmPid).then((status) => {
+    void ensureArm(paths, sessionID, client, predecessorArmPid, true).then(({ status, blocked }) => {
       if (["armed", "starting", "wake"].includes(status)) return;
-      surfaceFailure(paths, client, sessionID, `watcher: FAILED - OpenCode could not launch a continuity retry (${status})`);
+      surfaceFailure(paths, client, sessionID, `watcher: FAILED - OpenCode could not launch a continuity retry (${status})${blocked ? `\n${blocked}` : ""}`);
     });
   }, retryDelay(retryFailures));
   timer.unref();
@@ -542,21 +571,61 @@ function spawnArm(paths, sessionID, client, predecessorArmPid, hostMode, timeout
   return armChild;
 }
 
+// A launch that cannot arm while the home needs supervision carries a blocked
+// reason; the idle handler surfaces it, so the turn-end guard's "let the plugin
+// arm, probe manually only if the plugin reports failure" never waits on silence.
 async function beginArm(paths, sessionID, client, predecessorArmPid) {
   if (!sessionID) return { status: "skipped", armChild: null };
   if (!isPrimaryRoot(paths.root)) return { status: "not-primary", armChild: null };
-  if (!(await sessionOwnsLock(paths))) return { status: "read-only", armChild: null };
+  if (!(await sessionOwnsLock(paths))) {
+    const need = shouldArm(paths);
+    const blocked = need.arm || need.error
+      ? `this session does not own the home lock (${paths.state}/.lock), so it cannot arm the watcher this home needs${need.error ? `\n${need.error}` : ""}`
+      : "";
+    return { status: "read-only", armChild: null, blocked };
+  }
   if (child) return { status: "existing", armChild: child };
   if (retryTimer) return { status: "retrying", armChild: null };
-  if (!shouldArm(paths)) return { status: "not-needed", armChild: null };
+  const need = shouldArm(paths);
+  if (need.error) return { status: "failed", armChild: null, blocked: need.error };
+  if (!need.arm) return { status: "not-needed", armChild: null };
   const hostMode = hostModeEnabled(paths);
   const timeoutMs = await armReadinessBudgetMs(paths, hostMode);
-  if (!timeoutMs) return { status: "failed", armChild: null };
+  if (!timeoutMs) return { status: "failed", armChild: null, blocked: "the arm readiness budget could not be computed (bin/jg-wake-lib.sh jg_watcher_confirmation_budget)" };
   return { status: "spawned", armChild: spawnArm(paths, sessionID, client, predecessorArmPid, hostMode, timeoutMs) };
 }
 
-function armAttempt(status, armChild, includeArmChild) {
-  return includeArmChild ? { status, armChild } : status;
+// A blocked launch reads as "failed" to a status-only caller, so the turn-end
+// guard defers to the failure this plugin surfaces instead of nagging in parallel.
+function armAttempt(status, armChild, includeArmChild, blocked = "") {
+  if (includeArmChild) return { status, armChild, blocked };
+  return blocked ? "failed" : status;
+}
+
+// Surface a blocked arm on a real idle while the block stays; surfaceFailure
+// owns how often the same notice may repeat, and a block that clears resets it.
+function reportArmOutcome(paths, client, sessionID, blocked) {
+  if (!blocked) {
+    for (const key of failureNoticeAt.keys()) {
+      if (key.startsWith(BLOCKED_ARM_NOTICE)) failureNoticeAt.delete(key);
+    }
+    return;
+  }
+  surfaceFailure(paths, client, sessionID, `${BLOCKED_ARM_NOTICE}${blocked}`);
+}
+
+// A TUI resumed onto an existing session (`opencode --session <id>`, as a
+// relaunched lead comes back) emits no session event until a turn ends, so a
+// resumed primary that receives no turn would never arm. The plugin runs in a
+// worker whose own argv is not the CLI's, so read the process's command line.
+function resumedSessionID() {
+  const result = spawnSync("ps", ["-o", "args=", "-p", String(process.pid)], { encoding: "utf8" });
+  const args = String(result.stdout || "").trim().split(/\s+/);
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === "--session" || args[i] === "-s") return args[i + 1] || "";
+    if (args[i].startsWith("--session=")) return args[i].slice("--session=".length);
+  }
+  return "";
 }
 
 async function ensureArm(paths, sessionID, client, predecessorArmPid = "", includeArmChild = false) {
@@ -574,9 +643,15 @@ async function ensureArm(paths, sessionID, client, predecessorArmPid = "", inclu
   }
   const armChild = launchResult.armChild;
   if (!armChild) {
-    return armAttempt(launchResult.status, null, includeArmChild);
+    return armAttempt(launchResult.status, null, includeArmChild, launchResult.blocked);
   }
   return armAttempt(await waitForArmReady(armChild), armChild, includeArmChild);
+}
+
+function armAndReport(paths, sessionID, client) {
+  void ensureArm(paths, sessionID, client, "", true).then(({ blocked }) => {
+    reportArmOutcome(paths, client, sessionID, blocked);
+  });
 }
 
 export const FmPrimaryWatchArm = async ({ client, directory, worktree }) => {
@@ -585,13 +660,15 @@ export const FmPrimaryWatchArm = async ({ client, directory, worktree }) => {
   globalThis[COORDINATOR_KEY] = {
     ensureArmed: (sessionID, activeClient) => ensureArm(paths, sessionID, activeClient ?? client),
   };
+  const resumed = resumedSessionID();
+  if (resumed) armAndReport(paths, resumed, client);
 
   return {
     event: async ({ event }) => {
       if (event.type !== "session.idle") return;
       const sessionID = event.properties?.sessionID;
       if (!sessionID) return;
-      void ensureArm(paths, sessionID, client);
+      armAndReport(paths, sessionID, client);
     },
   };
 };

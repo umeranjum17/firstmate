@@ -266,7 +266,18 @@ assert_no_re() {  # <regex> <file> <msg>
   ! grep -E -- "$1" "$2" >/dev/null || fail "$3"$'\n'"--- $2 ---"$'\n'"$(cat "$2" 2>/dev/null)"
 }
 
+# Waits for a condition that must come true. Its chain of watcher, engine and
+# handoff processes takes seconds idle and over 25s on a loaded runner, so no
+# such wait gets less than 200s; a pass returns as soon as the condition holds.
 wait_until() {  # <polls of 0.1s> <command...>
+  local limit=$1
+  shift
+  [ "$limit" -ge 2000 ] || limit=2000
+  poll_until "$limit" "$@"
+}
+# Waits an exact budget, for a condition whose failing to come true is the
+# expected result (a negated check, or a wait that falls back to another step).
+poll_until() {  # <polls of 0.1s> <command...>
   local limit=$1 i=0
   shift
   while [ "$i" -lt "$limit" ]; do
@@ -2053,7 +2064,7 @@ test_attended_latch_keeps_closes_on_main_and_records_recovery_off_main() {
   wait_until 250 handled_at_least "$home" $((handled + 1)) \
     || fail "latch: the successful probe was not handled: $(cat "$home/host.out"; tail -n 5 "$home/state/.supervision-host.log")"
   assert_re '	recovered	after a successful probe$' "$home/state/.supervision-host.log" "the ledger must record the recovery"
-  ! wait_until 20 host_exited "$home" || fail "a routine probe's recovery reached main: $(cat "$home/host.out")"
+  ! poll_until 20 host_exited "$home" || fail "a routine probe's recovery reached main: $(cat "$home/host.out")"
   assert_no_re '^supervision-host' "$home/host.out" "a recovery must stay off main"
   assert_grep 'cooldown=0' "$home/state/.supervision-host-health" "a successful probe must clear the latch"
   assert_grep 'errors=0' "$home/state/.supervision-host-health" "a successful probe must clear the error streak"
@@ -2640,7 +2651,7 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   fresh=$(sed -n 's/^watcher: started pid=\([0-9]*\).*/\1/p' "$home/host.out")
   [ "$fresh" != "$stale" ] || fail "stream: --restart attached to the watcher it should have replaced"
   wait_until 100 sh -c '! kill -0 "$1" 2>/dev/null' _ "$stale" || fail "stream: --restart left the old watcher running"
-  wait_until 200 host_exited "$home" || append_status "$home" 'second close' 'done'
+  poll_until 200 host_exited "$home" || append_status "$home" 'second close' 'done'
   wait_until 200 host_exited "$home" || fail "stream: the restarting host's close did not reach main"
   assert_re '^(signal: .*demo.status|check: rearm-resurface)$' "$home/host.out" "stream: the restarting host's close must reach main"
 
@@ -2874,7 +2885,7 @@ test_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event() {
       || fail "held: could not age the scan marker before cadence $cycle"
     wait_until 150 scan_ran "$home" || fail "held: cadence $cycle never rescanned"
     wait_until 150 scan_idle "$home" || fail "held: cadence $cycle never finished its scan"
-    ! wait_until 10 flood_signal "$home" \
+    ! poll_until 10 flood_signal "$home" \
       || fail "held: cadence $cycle re-escalated the unchanged held outcome: $(cat "$home/state/branch-outcomes.jsonl")"
   done
   [ "$(captain_rows "$home")" -eq 1 ] || fail "held: the unchanged situation reached the captain $(captain_rows "$home") times"

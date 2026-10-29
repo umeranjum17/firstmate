@@ -46,15 +46,24 @@ export function calmCodeRootFromPluginRoot(pluginRoot: string): string {
 }
 
 /**
- * The per-home `config/calm` path, resolved exactly as the Pi extension resolves it:
+ * The per-home `config/stealth` path (the only file ever written), resolved exactly as the Pi extension resolves it:
  * `JG_HOME`, then `JG_ROOT_OVERRIDE`, then the tracked code root, with
  * `JG_CONFIG_OVERRIDE` naming the config directory outright when present.
  */
 export function calmPreferencePath(env: CalmHomeEnvironment, pluginRoot: string): string {
-  const configDirectory =
+  return `${calmConfigDirectory(env, pluginRoot)}/stealth`;
+}
+
+/** The pre-rename `config/calm` file: read when `config/stealth` is absent, never written. */
+export function calmLegacyPreferencePath(env: CalmHomeEnvironment, pluginRoot: string): string {
+  return `${calmConfigDirectory(env, pluginRoot)}/calm`;
+}
+
+function calmConfigDirectory(env: CalmHomeEnvironment, pluginRoot: string): string {
+  return (
     env.JG_CONFIG_OVERRIDE ||
-    `${env.JG_HOME || env.JG_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/config`;
-  return `${configDirectory}/calm`;
+    `${env.JG_HOME || env.JG_ROOT_OVERRIDE || calmCodeRootFromPluginRoot(pluginRoot)}/config`
+  );
 }
 
 /**

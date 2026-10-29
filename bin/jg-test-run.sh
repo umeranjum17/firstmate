@@ -221,7 +221,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=12
+PORTABLE_SERIAL_SHARDS=6
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -305,161 +305,57 @@ cpu_count() {
 # lands in `unclassified` and stays serial until someone proves it.
 family_for_basename() {
   case "$1" in
-    jg-addons-dir.test.sh|jg-arm-pretool-check.test.sh|jg-ask-user-authority.test.sh|\
-    jg-bearings-board.test.sh|\
-    jg-brief.test.sh|jg-dod-lib.test.sh|jg-vendor-auth-probe.test.sh|\
-    jg-calm-pi-extension.test.sh|jg-cd-pretool-check.test.sh|\
-    jg-classify-decision-key.test.sh|\
-    jg-composer-ghost.test.sh|jg-composer-lib.test.sh|\
-    jg-crew-state.test.sh|jg-captain-hold-lifecycle.test.sh|\
-    jg-documentation-audiences.test.sh|jg-ensure-agents-md.test.sh|jg-forge-detect.test.sh|jg-grok-harness.test.sh|\
-    jg-fork-free-helpers.test.sh|\
-    jg-harness-precedence.test.sh|\
-    jg-kimi-harness.test.sh|jg-devin-harness.test.sh|jg-muse-harness.test.sh|jg-rovo-harness.test.sh|jg-agy-harness.test.sh|jg-omp-harness.test.sh|jg-herdr-lab.test.sh|jg-lint.test.sh|\
-    jg-lint-workflows.test.sh|\
-    jg-operational-input.test.sh|jg-pi-primary-types.test.sh|\
-    jg-calm-claude-mod.test.sh|\
-    jg-harness-adapter-references.test.sh|jg-project-mode.test.sh|\
-    jg-send-popup-settle.test.sh|jg-send-settle.test.sh|\
-    jg-subagent-pretool-check.test.sh|\
-    jg-supervision-instructions.test.sh|jg-task-delivery.test.sh|\
-    jg-timeout-lib.test.sh|\
-    jg-tmux-submit-busy.test.sh|jg-trace-context-lib.test.sh|\
-    jg-transition-lib.test.sh|\
-    jg-test-run.test.sh|jg-test-isolation-proof.test.sh)
+    jg-bearings-board.test.sh|jg-brief.test.sh|jg-crew-state.test.sh|\
+    jg-captain-hold-lifecycle.test.sh)
       printf '%s\n' pure-contract-unit
       ;;
-    jg-daemon.test.sh|jg-guard-stale-banner.test.sh|jg-pi-watch-extension.test.sh|\
-    jg-session-lock-ancestry.test.sh|jg-cursor-primary.test.sh|\
-    jg-parent-channel-scan-exclusion.test.sh|\
-    jg-supervision-events.test.sh|jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
-    jg-wake-drain-unread-status.test.sh|\
-    jg-tool-update-check.test.sh|\
-    jg-mail.test.sh|jg-mail-check.test.sh|\
-    jg-turnend-foreign-owner-arm-fix.test.sh|\
-    jg-wake-queue.test.sh|jg-watch-arm.test.sh|jg-watch-checkpoint.test.sh|jg-watch-recovery-loop.test.sh|\
-    jg-watch-triage.test.sh|jg-task-inbox.test.sh|\
-    jg-watcher-lock.test.sh|jg-inactive-reconcile.test.sh)
+    jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
+    jg-mail.test.sh|jg-watcher-lock.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
-    jg-afk-inject-herdr-e2e.test.sh|jg-afk-launch.test.sh|jg-backend-autodetect-smoke.test.sh|\
-    jg-backend-herdr-eventwait-smoke.test.sh|jg-backend-herdr-presentation-e2e.test.sh|\
-    jg-backend-herdr-launcher-workspace-e2e.test.sh|\
+    jg-afk-inject-herdr-e2e.test.sh|jg-backend-herdr-presentation-e2e.test.sh|\
     jg-backend-herdr-prune-safety-e2e.test.sh|jg-backend-herdr-respawn-idem-e2e.test.sh|\
-    jg-backend-herdr-focus-flash-e2e.test.sh|\
-    jg-backend-herdr-stale-active-tab-e2e.test.sh|\
-    jg-backend-herdr-agent-exit-shell-e2e.test.sh|\
-    jg-herdr-attached-viewer-live-e2e.test.sh|jg-herdr-session-cleanup-e2e.test.sh|\
-    jg-backend-herdr-smoke.test.sh|jg-backend-herdr-workspace-per-home-e2e.test.sh|\
-    jg-control-herdr-smoke.test.sh|jg-sentinel-restart-resume.test.sh|\
-    jg-sentinel-herdr-restart-live-e2e.test.sh|jg-herdr-lab-xdg.test.sh|\
-    jg-herdr-codex-state-live-e2e.test.sh|jg-herdr-doorbell-wrap-live-e2e.test.sh)
+    jg-herdr-session-cleanup-e2e.test.sh|jg-backend-herdr-smoke.test.sh|\
+    jg-backend-herdr-workspace-per-home-e2e.test.sh|jg-sentinel-restart-resume.test.sh|\
+    jg-sentinel-herdr-restart-live-e2e.test.sh)
       printf '%s\n' real-herdr-gated
       ;;
-    jg-backlog-handoff.test.sh|jg-on.test.sh|jg-remote-backlog-handoff.test.sh|\
-    jg-remote-doctor.test.sh|jg-remote-herdr-guard.test.sh|jg-remote-job.test.sh|jg-remote-job-orphan-reap.test.sh|\
-    jg-remote-transport-lanes.test.sh|\
-    jg-remote-reply.test.sh|jg-remote-squad-lead-lifecycle-e2e.test.sh|\
-    jg-remote-squad-lead-trace-context.test.sh|\
-    jg-squad-lead-harness.test.sh|jg-squad-lead-lifecycle-e2e.test.sh|\
-    jg-squad-lead-liveness.test.sh|jg-squad-lead-reconcile.test.sh|\
-    jg-squad-lead-restart.test.sh|jg-remote-squad-lead-relaunch.test.sh|\
-    jg-squad-lead-safety.test.sh|jg-squad-lead-sync.test.sh|\
-    jg-startup-memory-budget.test.sh|jg-stow-cascade.test.sh|\
-    jg-send-squad-lead-marker.test.sh|jg-shared-captain-inheritance.test.sh)
+    jg-backlog-handoff.test.sh|jg-on.test.sh|jg-remote-reply.test.sh|\
+    jg-remote-squad-lead-lifecycle-e2e.test.sh|jg-squad-lead-lifecycle-e2e.test.sh)
       printf '%s\n' squad_lead
       ;;
-    jg-backlog-atomicity.test.sh|\
-    jg-bootstrap.test.sh|jg-bootstrap-network-parallel.test.sh|jg-fleet-sync.test.sh|jg-gate-refuse.test.sh|jg-gotmp.test.sh|\
-    jg-one-install.test.sh|jg-ai-engine.test.sh|\
-    jg-session-start.test.sh|jg-sessionstart-nudge.test.sh|jg-startup-network.test.sh|\
-    jg-tangle-guard.test.sh|jg-update.test.sh)
+    jg-bootstrap.test.sh|jg-fleet-sync.test.sh|jg-gate-refuse.test.sh|\
+    jg-session-start.test.sh|jg-tangle-guard.test.sh|jg-update.test.sh)
       printf '%s\n' session-bootstrap
       ;;
-    jg-afk-pi-herdr-return-e2e.test.sh|\
-    jg-bearings-board-lavish-live-e2e.test.sh|\
-    jg-claude-stop-autoarm-live-e2e.test.sh|\
-    jg-cmux-claude-composer-live-e2e.test.sh|\
-    jg-composer-matrix-live-e2e.test.sh|\
-    jg-composer-codex-idle-live-e2e.test.sh|\
-    jg-codex-continuity-live-e2e.test.sh|jg-codex-hook-layer-live-e2e.test.sh|\
-    jg-grok-continuity-live-e2e.test.sh|\
-    jg-cursor-primary-live-e2e.test.sh|\
-    jg-grok-stop-live-e2e.test.sh|jg-harness-adapter-instructions-live-e2e.test.sh|\
-    jg-harness-liveness-drift-live-e2e.test.sh|\
-    jg-devin-signals-live-e2e.test.sh|jg-muse-signals-live-e2e.test.sh|jg-rovo-signals-live-e2e.test.sh|jg-agy-signals-live-e2e.test.sh|\
-    jg-launch-prompt-signals-live-e2e.test.sh|\
-    jg-pi-seeded-home-trust-live-e2e.test.sh|\
-    jg-herdr-version-floor-live-e2e.test.sh|\
-    jg-herdr-pi-stale-registration-live-e2e.test.sh|\
-    jg-worker-account-live-e2e.test.sh|\
-    jg-opencode-primary-live-e2e.test.sh|jg-pi-branch-live-e2e.test.sh|\
-    jg-pi-branch-responsiveness-live-e2e.test.sh|\
-    jg-pi-primary-live-e2e.test.sh|jg-pi-codex-native.test.sh|jg-omp-primary-live-e2e.test.sh|\
-    jg-pr-state-live-e2e.test.sh|\
-    jg-sessionstart-hook-live-e2e.test.sh|jg-sessionstart-instruction-refresh-live-e2e.test.sh|\
-    jg-supervision-host-live-e2e.test.sh|jg-supervision-host-attended-live-e2e.test.sh|\
-    jg-host-mirror-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-squad-lead-marker-herdr-e2e.test.sh|\
-    jg-send-inbox-doorbell-live-e2e.test.sh|\
-    jg-squad-lead-busy-contract-live-e2e.test.sh|\
-    jg-calm-claude-mod-plugin.test.sh|jg-calm-claude-mod-live-e2e.test.sh|\
-    jg-calm-pi-queue-retention-live-e2e.test.sh|\
-    jg-herdr-submit-confirm-live-e2e.test.sh)
+    jg-bearings-board-lavish-live-e2e.test.sh|jg-claude-stop-autoarm-live-e2e.test.sh|\
+    jg-composer-matrix-live-e2e.test.sh|jg-codex-continuity-live-e2e.test.sh|\
+    jg-codex-hook-layer-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
+    jg-cursor-primary-live-e2e.test.sh|jg-harness-adapter-instructions-live-e2e.test.sh|\
+    jg-devin-signals-live-e2e.test.sh|\
+    jg-muse-signals-live-e2e.test.sh|jg-rovo-signals-live-e2e.test.sh|\
+    jg-agy-signals-live-e2e.test.sh|jg-launch-prompt-signals-live-e2e.test.sh|\
+    jg-pi-seeded-home-trust-live-e2e.test.sh|jg-herdr-version-floor-live-e2e.test.sh|\
+    jg-worker-account-live-e2e.test.sh|jg-opencode-primary-live-e2e.test.sh|\
+    jg-pi-branch-live-e2e.test.sh|jg-pi-primary-live-e2e.test.sh|\
+    jg-omp-primary-live-e2e.test.sh|jg-pr-state-live-e2e.test.sh|\
+    jg-sessionstart-hook-live-e2e.test.sh|jg-supervision-host-live-e2e.test.sh|\
+    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-inbox-doorbell-live-e2e.test.sh|\
+    jg-prompt-gate-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
-    jg-backend-herdr.test.sh|jg-backend-tmux-smoke.test.sh|jg-backend.test.sh|\
-    jg-tmux-agent-liveness.test.sh|\
-    jg-control.test.sh|jg-control-relaunch.test.sh|\
-    jg-herdr-session-cleanup.test.sh|jg-send-resolve-key.test.sh|jg-send-strict.test.sh|\
-    jg-send-inbox.test.sh|jg-spawn-batch.test.sh|\
-    jg-spawn-dispatch-profile.test.sh|jg-claude-trust.test.sh|\
-    jg-worker-account.test.sh|\
-    jg-git-strip-ai-trailers.test.sh|\
-    jg-trace-context-spawn.test.sh|jg-spawn-worktree-settle.test.sh|\
-    jg-spawn-compact-adviser-disable.test.sh|\
-    jg-spawn-compact-adviser-disable-remote.test.sh|\
-    jg-project-capacity.test.sh|\
-    jg-teardown-endpoint-safety.test.sh)
+    jg-backend-tmux-smoke.test.sh|jg-control.test.sh|jg-send-inbox.test.sh|\
+    jg-spawn-dispatch-profile.test.sh)
       printf '%s\n' backend-dispatch
       ;;
-    jg-check-unregister.test.sh|jg-pipeline-spend.test.sh|jg-pr-check-security.test.sh|\
-    jg-pr-merge.test.sh|jg-pr-reviewers.test.sh|jg-pr-state.test.sh|\
-    jg-review-diff.test.sh|jg-teardown.test.sh|jg-x-mode.test.sh)
+    jg-pr-merge.test.sh|jg-teardown.test.sh|jg-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
-    jg-afk-contract.test.sh|jg-afk-inject-e2e.test.sh|jg-afk-return.test.sh|\
-    jg-supervision-host.test.sh|jg-host-mirror.test.sh)
+    jg-afk-inject-e2e.test.sh|jg-supervision-host.test.sh)
       printf '%s\n' afk
       ;;
-    jg-bearings-board-render.test.sh|jg-bearings-snapshot.test.sh|jg-contributions.test.sh|\
-    jg-fleet-snapshot-view.test.sh|jg-home-summary-refresh.test.sh)
-      printf '%s\n' snapshot-bearings
-      ;;
-    jg-backend-cmux.test.sh|jg-backend-cmux-smoke.test.sh)
-      printf '%s\n' cmux
-      ;;
-    jg-backend-zellij.test.sh|jg-backend-zellij-smoke.test.sh)
-      printf '%s\n' zellij
-      ;;
-    jg-backend-orca.test.sh)
-      printf '%s\n' orca
-      ;;
-    jg-branch-supervision.test.sh|jg-busy-adapter-wiring.test.sh|\
-    jg-busy-state.test.sh|jg-classify-corr-token.test.sh|\
-    jg-claude-stop-autoarm.test.sh|jg-cursor-harness.test.sh|\
-    jg-dispatch-resolve.test.sh|\
-    jg-extension-binding.test.sh|jg-gitignore-config.test.sh|\
-    jg-no-mistakes-required.test.sh|jg-peek-remote.test.sh|\
-    jg-pending-reply.test.sh|jg-pi-branch-extension.test.sh|\
-    jg-procevent-quota.test.sh|jg-procevent-when.test.sh|jg-procevent.test.sh|\
-    jg-live-gate.test.sh|\
-    jg-project-origin.test.sh|jg-public-followup.test.sh|jg-quota-choose.test.sh|\
-    jg-remote-entrypoint.test.sh|jg-remote-squad-lead-parent-binding.test.sh|\
-    jg-send-remote-delivery.test.sh|jg-spawn-pool-base-freshen.test.sh|\
-    jg-test-fixture-cleanup.test.sh|jg-test-fixtures.test.sh|\
-    jg-voice-relay.test.sh|jg-wake-drain-open-decisions-cursor.test.sh|\
-    jg-wake-drain-open-decisions.test.sh|jg-wake-drain-outcome-backstop.test.sh)
+    jg-procevent.test.sh|jg-public-followup.test.sh|\
+    jg-wake-drain-open-decisions-cursor.test.sh)
       printf '%s\n' standalone
       ;;
     *)
@@ -472,8 +368,6 @@ expected_gate_skip_for_family() {
   case "$1" in
     real-herdr-gated) printf '%s\n' herdr ;;
     live-harness-optin) printf '%s\n' live-capability ;;
-    cmux|zellij|orca) printf '%s\n' optional-binary ;;
-    snapshot-bearings) printf '%s\n' optional-binary ;;
     *) printf '%s\n' none ;;
   esac
 }
@@ -489,10 +383,6 @@ live-harness-optin
 backend-dispatch
 pr-forge
 afk
-snapshot-bearings
-cmux
-zellij
-orca
 standalone
 unclassified
 EOF
@@ -516,29 +406,10 @@ list_known_lanes() {
 # isolation proof archive.
 list_proven_isolated() {
   cat <<'EOF'
-tests/jg-arm-pretool-check.test.sh
-tests/jg-backend-herdr.test.sh
 tests/jg-brief.test.sh
 tests/jg-captain-hold-lifecycle.test.sh
-tests/jg-cd-pretool-check.test.sh
-tests/jg-composer-ghost.test.sh
-tests/jg-composer-lib.test.sh
 tests/jg-crew-state.test.sh
-tests/jg-ensure-agents-md.test.sh
-tests/jg-grok-harness.test.sh
-tests/jg-herdr-lab.test.sh
-tests/jg-lint.test.sh
-tests/jg-pi-primary-types.test.sh
 tests/jg-pr-merge.test.sh
-tests/jg-review-diff.test.sh
-tests/jg-send-popup-settle.test.sh
-tests/jg-send-settle.test.sh
-tests/jg-send-strict.test.sh
-tests/jg-spawn-batch.test.sh
-tests/jg-supervision-instructions.test.sh
-tests/jg-test-run.test.sh
-tests/jg-tmux-submit-busy.test.sh
-tests/jg-transition-lib.test.sh
 tests/jg-x-mode.test.sh
 EOF
 }
@@ -548,29 +419,10 @@ EOF
 # refresh procedure are owned by docs/jg-test-portable-shards.md.
 portable_parallel_weight_hints() {
   cat <<'EOF'
-tests/jg-arm-pretool-check.test.sh 33778
-tests/jg-backend-herdr.test.sh 36331
 tests/jg-brief.test.sh 10594
 tests/jg-captain-hold-lifecycle.test.sh 343658
-tests/jg-cd-pretool-check.test.sh 16801
-tests/jg-composer-ghost.test.sh 2292
-tests/jg-composer-lib.test.sh 9521
 tests/jg-crew-state.test.sh 82058
-tests/jg-ensure-agents-md.test.sh 895
-tests/jg-grok-harness.test.sh 7666
-tests/jg-herdr-lab.test.sh 18325
-tests/jg-lint.test.sh 252498
-tests/jg-pi-primary-types.test.sh 5426
 tests/jg-pr-merge.test.sh 300199
-tests/jg-review-diff.test.sh 4134
-tests/jg-send-popup-settle.test.sh 6624
-tests/jg-send-settle.test.sh 2310
-tests/jg-send-strict.test.sh 4804
-tests/jg-spawn-batch.test.sh 2987
-tests/jg-supervision-instructions.test.sh 809
-tests/jg-test-run.test.sh 156781
-tests/jg-tmux-submit-busy.test.sh 2600
-tests/jg-transition-lib.test.sh 101
 tests/jg-x-mode.test.sh 29896
 EOF
 }
@@ -594,18 +446,7 @@ portable_parallel_lane_weight() {
 list_portable_parallel_1() {
   cat <<'EOF'
 tests/jg-pr-merge.test.sh
-tests/jg-lint.test.sh
-tests/jg-backend-herdr.test.sh
 tests/jg-x-mode.test.sh
-tests/jg-cd-pretool-check.test.sh
-tests/jg-composer-lib.test.sh
-tests/jg-send-popup-settle.test.sh
-tests/jg-pi-primary-types.test.sh
-tests/jg-review-diff.test.sh
-tests/jg-send-settle.test.sh
-tests/jg-ensure-agents-md.test.sh
-tests/jg-supervision-instructions.test.sh
-tests/jg-transition-lib.test.sh
 EOF
 }
 
@@ -613,16 +454,8 @@ EOF
 list_portable_parallel_2() {
   cat <<'EOF'
 tests/jg-captain-hold-lifecycle.test.sh
-tests/jg-test-run.test.sh
 tests/jg-crew-state.test.sh
-tests/jg-arm-pretool-check.test.sh
-tests/jg-herdr-lab.test.sh
 tests/jg-brief.test.sh
-tests/jg-grok-harness.test.sh
-tests/jg-send-strict.test.sh
-tests/jg-spawn-batch.test.sh
-tests/jg-tmux-submit-busy.test.sh
-tests/jg-composer-ghost.test.sh
 EOF
 }
 
@@ -713,214 +546,75 @@ list_portable_serial() {
 # balance rather than coverage. That doc owns the refresh procedure.
 portable_serial_weight_hints() {
   cat <<'EOF'
-tests/jg-addons-dir.test.sh 240
-tests/jg-afk-contract.test.sh 11101
-tests/jg-afk-inject-e2e.test.sh 41958
-tests/jg-afk-pi-herdr-return-e2e.test.sh 52
-tests/jg-afk-return.test.sh 47380
-tests/jg-agy-harness.test.sh 50959
-tests/jg-agy-signals-live-e2e.test.sh 53
-tests/jg-ask-user-authority.test.sh 171
-tests/jg-backend-cmux-smoke.test.sh 34
-tests/jg-backend-cmux.test.sh 3754
-tests/jg-backend-orca.test.sh 27102
-tests/jg-backend-tmux-smoke.test.sh 291
-tests/jg-backend-zellij-smoke.test.sh 23
-tests/jg-backend-zellij.test.sh 10453
-tests/jg-backend.test.sh 23932
-tests/jg-backlog-atomicity.test.sh 219379
-tests/jg-backlog-handoff.test.sh 57458
-tests/jg-backlog-read-bound.test.sh 24743
-tests/jg-bearings-board-lavish-live-e2e.test.sh 51
-tests/jg-bearings-board-render.test.sh 15612
-tests/jg-bearings-board.test.sh 40817
-tests/jg-bearings-snapshot.test.sh 186219
-tests/jg-bootstrap-network-parallel.test.sh 30424
-tests/jg-bootstrap.test.sh 50965
-tests/jg-branch-supervision.test.sh 22979
-tests/jg-busy-adapter-wiring.test.sh 31642
-tests/jg-busy-state.test.sh 3185
-tests/jg-calm-claude-mod-live-e2e.test.sh 47
-tests/jg-calm-claude-mod-plugin.test.sh 77
-tests/jg-calm-claude-mod.test.sh 2527
-tests/jg-calm-pi-extension.test.sh 56463
-tests/jg-calm-pi-queue-retention-live-e2e.test.sh 1345
-tests/jg-check-unregister.test.sh 469
-tests/jg-ci-workflow.test.sh 5833
-tests/jg-classify-corr-token.test.sh 23085
-tests/jg-classify-decision-key.test.sh 4362
-tests/jg-claude-stop-autoarm-live-e2e.test.sh 73
-tests/jg-claude-stop-autoarm.test.sh 61189
-tests/jg-claude-trust.test.sh 12010
-tests/jg-cmux-claude-composer-live-e2e.test.sh 77
-tests/jg-codex-continuity-live-e2e.test.sh 108
-tests/jg-codex-hook-layer-live-e2e.test.sh 108
-tests/jg-composer-codex-idle-live-e2e.test.sh 77
-tests/jg-composer-matrix-live-e2e.test.sh 51
-tests/jg-contributions.test.sh 140911
-tests/jg-control-relaunch.test.sh 114115
-tests/jg-control.test.sh 72794
-tests/jg-cursor-harness.test.sh 30088
-tests/jg-cursor-primary-live-e2e.test.sh 75
-tests/jg-cursor-primary.test.sh 69845
-tests/jg-daemon.test.sh 33606
-tests/jg-devin-harness.test.sh 3725
-tests/jg-devin-signals-live-e2e.test.sh 49
-tests/jg-dispatch-resolve.test.sh 10051
-tests/jg-documentation-audiences.test.sh 1301
-tests/jg-dod-lib.test.sh 2035
-tests/jg-extension-binding.test.sh 11105
-tests/jg-fleet-ledger.test.sh 19980
-tests/jg-fleet-snapshot-view.test.sh 23334
-tests/jg-fleet-sync.test.sh 40541
-tests/jg-forge-detect.test.sh 193
-tests/jg-fork-free-helpers.test.sh 746
-tests/jg-gate-refuse.test.sh 9953
-tests/jg-gemini-harness.test.sh 947
-tests/jg-git-strip-ai-trailers.test.sh 2067
-tests/jg-gitignore-config.test.sh 59
-tests/jg-gotmp.test.sh 1509
-tests/jg-grok-continuity-live-e2e.test.sh 46
-tests/jg-grok-stop-live-e2e.test.sh 48
-tests/jg-guard-stale-banner.test.sh 17234
-tests/jg-harness-adapter-instructions-live-e2e.test.sh 72
-tests/jg-harness-adapter-references.test.sh 64
-tests/jg-harness-liveness-drift-live-e2e.test.sh 1309
-tests/jg-harness-precedence.test.sh 4083
-tests/jg-herdr-pi-stale-registration-live-e2e.test.sh 55
-tests/jg-herdr-session-cleanup.test.sh 7425
-tests/jg-herdr-submit-confirm-live-e2e.test.sh 51
-tests/jg-herdr-version-floor-live-e2e.test.sh 50
-tests/jg-home-summary-refresh.test.sh 37057
-tests/jg-host-mirror-live-e2e.test.sh 79
-tests/jg-host-mirror.test.sh 11587
-tests/jg-inactive-reconcile.test.sh 60823
-tests/jg-inbox.test.sh 6062
-tests/jg-jev-mem-guard.test.sh 336
-tests/jg-kimi-harness.test.sh 58917
-tests/jg-launch-prompt-signals-live-e2e.test.sh 50
-tests/jg-lint-workflows.test.sh 872
-tests/jg-live-gate.test.sh 7452
-tests/jg-live-lab-up-mate.test.sh 17363
-tests/jg-live-lab.test.sh 79639
-tests/jg-mail-check.test.sh 7524
-tests/jg-mail.test.sh 9684
-tests/jg-muse-harness.test.sh 46548
-tests/jg-muse-signals-live-e2e.test.sh 52
-tests/jg-nm-test-contract.test.sh 853
-tests/jg-no-mistakes-required.test.sh 270
-tests/jg-omp-harness.test.sh 63796
-tests/jg-omp-primary-live-e2e.test.sh 74
-tests/jg-on.test.sh 11473
-tests/jg-opencode-primary-live-e2e.test.sh 47
-tests/jg-operational-input.test.sh 2404
-tests/jg-peek-remote.test.sh 1082
-tests/jg-pending-reply.test.sh 41090
-tests/jg-pi-branch-extension.test.sh 77218
-tests/jg-pi-branch-live-e2e.test.sh 48
-tests/jg-pi-branch-responsiveness-live-e2e.test.sh 12834
-tests/jg-pi-codex-native.test.sh 75
-tests/jg-pi-primary-live-e2e.test.sh 72
-tests/jg-pi-seeded-home-trust-live-e2e.test.sh 45
-tests/jg-pi-watch-extension.test.sh 56515
-tests/jg-pi-windows-shell-invocation.test.sh 5121
-tests/jg-pr-check-security.test.sh 300675
-tests/jg-pr-reviewers.test.sh 157
-tests/jg-pr-state-live-e2e.test.sh 47
-tests/jg-pr-state.test.sh 525
-tests/jg-procevent-quota.test.sh 2459
-tests/jg-procevent-when.test.sh 25674
-tests/jg-procevent.test.sh 292297
-tests/jg-project-origin.test.sh 123
-tests/jg-public-followup.test.sh 381564
-tests/jg-quota-array-dispatch-live-e2e.test.sh 50
-tests/jg-quota-choose.test.sh 2860
-tests/jg-remote-backlog-handoff.test.sh 82063
-tests/jg-remote-doctor.test.sh 14460
-tests/jg-remote-entrypoint.test.sh 134
-tests/jg-remote-herdr-guard.test.sh 3140
-tests/jg-remote-job-orphan-reap.test.sh 2985
-tests/jg-remote-job.test.sh 81046
-tests/jg-remote-reply.test.sh 140887
-tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 345655
-tests/jg-remote-squad-lead-parent-binding.test.sh 42294
-tests/jg-remote-squad-lead-relaunch.test.sh 879
-tests/jg-remote-squad-lead-trace-context.test.sh 74870
-tests/jg-remote-transport-lanes.test.sh 66089
-tests/jg-rovo-harness.test.sh 15691
-tests/jg-rovo-signals-live-e2e.test.sh 52
-tests/jg-squad-lead-harness.test.sh 188187
-tests/jg-squad-lead-busy-contract-live-e2e.test.sh 90000
-tests/jg-squad-lead-lifecycle-e2e.test.sh 11268
-tests/jg-squad-lead-liveness.test.sh 24564
-tests/jg-squad-lead-reconcile.test.sh 100853
-tests/jg-squad-lead-restart.test.sh 52591
-tests/jg-squad-lead-safety.test.sh 69424
-tests/jg-squad-lead-sync.test.sh 55501
-tests/jg-send-agy-confirm.test.sh 4440
-tests/jg-send-inbox-doorbell-live-e2e.test.sh 108
-tests/jg-send-inbox.test.sh 41713
-tests/jg-send-remote-delivery.test.sh 31964
-tests/jg-send-resolve-key.test.sh 47317
-tests/jg-send-squad-lead-marker-herdr-e2e.test.sh 80
-tests/jg-send-squad-lead-marker.test.sh 7574
-tests/jg-session-lock-ancestry.test.sh 18918
-tests/jg-session-start.test.sh 363574
-tests/jg-sessionstart-hook-live-e2e.test.sh 50
-tests/jg-sessionstart-instruction-refresh-live-e2e.test.sh 49
-tests/jg-sessionstart-nudge.test.sh 71802
-tests/jg-shared-captain-inheritance.test.sh 7991
-tests/jg-spawn-compact-adviser-disable-remote.test.sh 38561
-tests/jg-spawn-compact-adviser-disable.test.sh 21654
-tests/jg-spawn-dispatch-profile.test.sh 197548
-tests/jg-spawn-orca-worktree.test.sh 2400
-tests/jg-spawn-pool-base-freshen.test.sh 68652
-tests/jg-spawn-worktree-settle.test.sh 9309
-tests/jg-startup-memory-budget.test.sh 8086
-tests/jg-startup-network.test.sh 72106
-tests/jg-stat-shadowing.test.sh 75
-tests/jg-stow-cascade.test.sh 3058
-tests/jg-subagent-pretool-check.test.sh 998
-tests/jg-supervision-events.test.sh 673
-tests/jg-supervision-host-attended-live-e2e.test.sh 49
-tests/jg-supervision-host-live-e2e.test.sh 75
-# Provisional halves from the completed case timestamps in CI run 40453434558;
-# its unsplit script finished in 1774307ms but the shard timed out before an artifact.
-tests/jg-supervision-host.test.sh 800000
-tests/jg-supervision-host-late.test.sh 1000000
-tests/jg-tangle-guard.test.sh 8501
-tests/jg-task-delivery.test.sh 32789
-tests/jg-task-inbox.test.sh 31965
-tests/jg-tasks-axi.test.sh 2293
-tests/jg-teardown-endpoint-safety.test.sh 40851
-tests/jg-teardown.test.sh 202132
-tests/jg-test-fixture-cleanup.test.sh 866
-tests/jg-test-fixtures.test.sh 1802
-tests/jg-test-isolation-proof.test.sh 2866
-tests/jg-ticket.test.sh 1200
-tests/jg-timeout-lib.test.sh 10750
-tests/jg-tmux-agent-liveness.test.sh 3770
-tests/jg-tool-update-check.test.sh 14383
-tests/jg-trace-context-lib.test.sh 221
-tests/jg-trace-context-spawn.test.sh 57488
-tests/jg-turnend-foreign-owner-arm-fix.test.sh 5575
-tests/jg-turnend-guard.test.sh 34727
-tests/jg-update.test.sh 11894
-tests/jg-vendor-auth-probe.test.sh 43278
-tests/jg-voice-relay.test.sh 28917
-tests/jg-wake-daemon-lifecycle-e2e.test.sh 7345
-tests/jg-wake-drain-open-decisions-cursor.test.sh 47677
-tests/jg-wake-drain-open-decisions.test.sh 8781
-tests/jg-wake-drain-outcome-backstop.test.sh 46316
-tests/jg-wake-drain-unread-status.test.sh 24251
-tests/jg-wake-queue.test.sh 165906
-tests/jg-watch-arm.test.sh 113076
-tests/jg-watch-checkpoint.test.sh 11234
-tests/jg-watch-recovery-loop.test.sh 59092
-tests/jg-watch-triage.test.sh 1074843
-tests/jg-watcher-lock.test.sh 1034661
-tests/jg-worker-account-live-e2e.test.sh 3179
-tests/jg-worker-account.test.sh 37445
+tests/board-link.test.sh 128
+tests/jg-addon-trust.test.sh 138
+tests/jg-afk-inject-e2e.test.sh 42537
+tests/jg-agents-md-floor.test.sh 423
+tests/jg-agy-signals-live-e2e.test.sh 61
+tests/jg-backend-tmux-smoke.test.sh 320
+tests/jg-backlog-handoff.test.sh 74166
+tests/jg-bearings-board-lavish-live-e2e.test.sh 61
+tests/jg-bearings-board.test.sh 50015
+tests/jg-bootstrap.test.sh 83933
+tests/jg-calm-home-links.test.sh 381
+tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
+tests/jg-codex-continuity-live-e2e.test.sh 57
+tests/jg-codex-hook-layer-live-e2e.test.sh 68
+tests/jg-compat-old-records.test.sh 2167
+tests/jg-composer-matrix-live-e2e.test.sh 59
+tests/jg-control.test.sh 91759
+tests/jg-cursor-primary-live-e2e.test.sh 57
+tests/jg-devin-signals-live-e2e.test.sh 65
+tests/jg-escalation-chain.test.sh 120130
+tests/jg-fleet-sync.test.sh 42151
+tests/jg-flow.test.sh 919
+tests/jg-gate-refuse.test.sh 14876
+tests/jg-grok-continuity-live-e2e.test.sh 53
+tests/jg-harness-adapter-instructions-live-e2e.test.sh 57
+tests/jg-herdr-lead-label.test.sh 99
+tests/jg-herdr-version-floor-live-e2e.test.sh 61
+tests/jg-hometag-lead-label.test.sh 393
+tests/jg-inbox.test.sh 8757
+tests/jg-launch-prompt-signals-live-e2e.test.sh 56
+tests/jg-mail.test.sh 10524
+tests/jg-merge-gate-lib.test.sh 83
+tests/jg-muse-signals-live-e2e.test.sh 61
+tests/jg-omp-primary-live-e2e.test.sh 58
+tests/jg-on.test.sh 18857
+tests/jg-opencode-primary-live-e2e.test.sh 56
+tests/jg-owner-rules.test.sh 3036
+tests/jg-pi-branch-live-e2e.test.sh 56
+tests/jg-pi-primary-live-e2e.test.sh 58
+tests/jg-pi-seeded-home-trust-live-e2e.test.sh 85
+tests/jg-pr-state-live-e2e.test.sh 59
+tests/jg-procevent.test.sh 351871
+tests/jg-prompt-gate-live-e2e.test.sh 56
+tests/jg-prompt-gate.test.sh 59264
+tests/jg-public-followup.test.sh 474556
+tests/jg-quota-array-dispatch-live-e2e.test.sh 54
+tests/jg-remote-reply.test.sh 240899
+tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 567728
+tests/jg-rovo-signals-live-e2e.test.sh 57
+tests/jg-self-repo-role.test.sh 9033
+tests/jg-send-inbox-doorbell-live-e2e.test.sh 55
+tests/jg-send-inbox.test.sh 51917
+tests/jg-session-start.test.sh 347046
+tests/jg-sessionstart-hook-live-e2e.test.sh 61
+tests/jg-spawn-dispatch-profile.test.sh 506834
+tests/jg-squad-lead-lifecycle-e2e.test.sh 15675
+tests/jg-supervision-host-live-e2e.test.sh 58
+tests/jg-supervision-host.test.sh 1162449
+tests/jg-tangle-guard.test.sh 12088
+tests/jg-tasks-axi.test.sh 42685
+tests/jg-teardown.test.sh 479995
+tests/jg-tokens-retro.test.sh 407
+tests/jg-turnend-guard.test.sh 42968
+tests/jg-update.test.sh 13448
+tests/jg-wake-daemon-lifecycle-e2e.test.sh 10177
+tests/jg-wake-drain-open-decisions-cursor.test.sh 57982
+tests/jg-watcher-lock.test.sh 1059731
+tests/jg-worker-account-live-e2e.test.sh 70
+tests/juggernaut-axi-serve.test.sh 1635
 EOF
 }
 
@@ -1445,13 +1139,9 @@ families_for_unmapped_bin() {
 families_for_changed_path() {
   local path=$1 fixture_ref
   case "$path" in
-    tests/jg-backend-herdr-eventwait.test.py)
-      printf '%s\n' real-herdr-gated
-      printf '%s\n' backend-dispatch
-      ;;
     tests/jg-supervision-host.test.sh)
       # The late half sources the same fixture and test definitions.
-      printf '%s\n' __script__:jg-supervision-host.test.sh __script__:jg-supervision-host-late.test.sh
+      printf '%s\n' __script__:jg-supervision-host.test.sh
       ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
@@ -1466,7 +1156,6 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       # Only this script wraps each suite in run_script_bounded's fixture Git
       # isolation, and only a standalone-family script proves it.
-      printf '%s\n' "__script__:jg-test-fixtures.test.sh"
       ;;
     bin/jg-test-isolation-proof.sh)
       # Same reason as the runner above: the proof drives every
@@ -1485,16 +1174,13 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       ;;
     bin/backends/zellij*|tests/zellij-test-safety.sh)
-      printf '%s\n' zellij
       printf '%s\n' backend-dispatch
       ;;
     bin/backends/cmux*|tests/cmux-test-safety.sh)
-      printf '%s\n' cmux
       printf '%s\n' backend-dispatch
       ;;
     bin/backends/orca*|bin/backends/tmux.sh)
       printf '%s\n' backend-dispatch
-      printf '%s\n' orca
       ;;
     bin/jg-backend.sh|bin/jg-backend-hometag-lib.sh)
       printf '%s\n' backend-dispatch
@@ -1520,7 +1206,6 @@ families_for_changed_path() {
       # The supervision host and its parts: its own suite and live guard, plus
       # the Claude Stop hook that runs it.
       printf '%s\n' afk
-      printf '%s\n' "__script__:jg-claude-stop-autoarm.test.sh"
       printf '%s\n' live-harness-optin
       ;;
     bin/jg-supervisor-target-lib.sh)
@@ -1556,24 +1241,17 @@ families_for_changed_path() {
       ;;
     bin/jg-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap
-      printf '%s\n' "__script__:jg-procevent-quota.test.sh"
-      printf '%s\n' "__script__:jg-quota-choose.test.sh"
-      printf '%s\n' "__script__:jg-dispatch-resolve.test.sh"
       ;;
     bin/jg-procevent-quota.sh)
-      printf '%s\n' "__script__:jg-procevent-quota.test.sh"
       ;;
     bin/jg-quota-choose.sh)
-      printf '%s\n' "__script__:jg-quota-choose.test.sh"
       ;;
     bin/jg-dispatch-resolve.sh)
-      printf '%s\n' "__script__:jg-dispatch-resolve.test.sh"
       ;;
     bin/jg-env-lib.sh)
       # The one .env accessor, sourced by bin/jg-x-lib.sh (Relay token) and
       # bin/jg-dispatch-resolve.sh (TYPESAFE_API_KEY).
       printf '%s\n' pr-forge
-      printf '%s\n' "__script__:jg-dispatch-resolve.test.sh"
       ;;
     .pi/extensions/jg-branch-supervision.ts|.pi/extensions/lib/jg-async-exec.ts|\
     .pi/extensions/lib/jg-branch-dispatch.ts|.pi/extensions/lib/jg-native-contract.ts)
@@ -1582,13 +1260,7 @@ families_for_changed_path() {
       # scan, which widens to each referencing suite's WHOLE family - and
       # these suites sit in four different families, so that pulls in dozens
       # of suites with nothing to do with Pi.
-      printf '%s\n' __script__:jg-pi-branch-extension.test.sh
-      printf '%s\n' __script__:jg-pi-watch-extension.test.sh
-      printf '%s\n' __script__:jg-calm-pi-extension.test.sh
-      printf '%s\n' __script__:jg-watch-recovery-loop.test.sh
-      printf '%s\n' __script__:jg-wake-queue.test.sh
-      printf '%s\n' __script__:jg-pi-primary-types.test.sh
-      printf '%s\n' __script__:jg-supervision-host.test.sh __script__:jg-supervision-host-late.test.sh
+      printf '%s\n' __script__:jg-supervision-host.test.sh
       # Whether an arriving outcome still lets the captain type is a fact only
       # a real Pi TUI can answer, so the live guards are selected too.
       printf '%s\n' live-harness-optin
@@ -1596,14 +1268,7 @@ families_for_changed_path() {
     .pi/extensions/lib/jg-operational-input.ts)
       # The same rule for the operational-input library, whose reach is wider:
       # every Pi extension that classifies or encodes operational text.
-      printf '%s\n' __script__:jg-pi-windows-shell-invocation.test.sh
-      printf '%s\n' __script__:jg-pi-branch-extension.test.sh
-      printf '%s\n' __script__:jg-pi-watch-extension.test.sh
-      printf '%s\n' __script__:jg-calm-pi-extension.test.sh
-      printf '%s\n' __script__:jg-watch-recovery-loop.test.sh
       printf '%s\n' __script__:jg-turnend-guard.test.sh
-      printf '%s\n' __script__:jg-sessionstart-nudge.test.sh
-      printf '%s\n' __script__:jg-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
     .claude/mods/juggernaut-calm/*|.pi/extensions/lib/jg-calm-working-ship.ts|\
@@ -1611,26 +1276,19 @@ families_for_changed_path() {
       # The Claude Code Calm mod and the sprite core it shares with the Pi Calm
       # extension: the portable Node checks, the Pi suites that draw the shared
       # sprite, the Pi typecheck, and the Claude-dependent guards.
-      printf '%s\n' __script__:jg-calm-claude-mod.test.sh
-      printf '%s\n' __script__:jg-calm-pi-extension.test.sh
-      printf '%s\n' __script__:jg-pi-primary-types.test.sh
       printf '%s\n' live-harness-optin
       ;;
     bin/jg-sessionstart-run.sh|.claude/settings.json|.codex/hooks.json|\
     .pi/extensions/jg-primary-turnend-guard.ts)
       # The run tier's two harness-supplied facts (source vocabulary and
       # context-reset stdout injection) only show up against a real harness.
-      printf '%s\n' __script__:jg-pi-windows-shell-invocation.test.sh
       printf '%s\n' session-bootstrap
       printf '%s\n' live-harness-optin
       ;;
     bin/jg-extension.mjs|bin/jg-extension.sh|docs/examples/process-event-extension/*)
-      printf '%s\n' __script__:jg-extension-binding.test.sh
       ;;
     bin/jg-procevent.sh|bin/jg-procevent-lib.sh|bin/jg-procevent-extension-capture.pl)
-      printf '%s\n' __script__:jg-extension-binding.test.sh
       printf '%s\n' __script__:jg-procevent.test.sh
-      printf '%s\n' __script__:jg-procevent-when.test.sh
       printf '%s\n' __script__:jg-remote-reply.test.sh
       ;;
     bin/jg-timeout-lib.sh)
@@ -1638,11 +1296,9 @@ families_for_changed_path() {
       # snapshots, the vendor auth probe, the stow cascade's per-home step, and
       # the wedge detector's worktree write probe all depend on it.
       printf '%s\n' session-bootstrap
-      printf '%s\n' snapshot-bearings
       printf '%s\n' pure-contract-unit
       printf '%s\n' squad_lead
       printf '%s\n' watcher-wake-lock
-      printf '%s\n' "__script__:jg-procevent-quota.test.sh"
       ;;
     bin/jg-pr-*|bin/jg-merge-local.sh|bin/jg-teardown.sh|bin/jg-review-diff.sh|\
     bin/jg-x-*|bin/jg-check*|bin/jg-pipeline-spend.sh)
@@ -1658,7 +1314,6 @@ families_for_changed_path() {
     bin/jg-control-lib.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' session-bootstrap
-      printf '%s\n' "__script__:jg-quota-choose.test.sh"
       ;;
     bin/jg-composer-lib.sh)
       # The shared shape catalogue is vendor-rendered signal; a change to it
@@ -1683,7 +1338,6 @@ families_for_changed_path() {
       ;;
     bin/jg-bearings-snapshot.sh|bin/jg-fleet-snapshot.sh|bin/jg-fleet-view.sh|bin/jg-contributions.sh|bin/jg-contributions.jq|\
     bin/jg-home-summary-refresh.sh)
-      printf '%s\n' snapshot-bearings
       ;;
     bin/jg-install-herdr.sh|bin/jg-install-treehouse.sh|bin/jg-herdr-ci-cleanup.sh)
       printf '%s\n' pure-contract-unit

@@ -54,5 +54,6 @@ install -D -m 755 "$SRC" "$DEST"
 install -D -m 644 "$TMP/service" "$UNITS/jg-claude-accounts-quota.service"
 install -D -m 644 "$TMP/timer" "$UNITS/jg-claude-accounts-quota.timer"
 systemctl --user daemon-reload
+systemctl --user disable --now fm-claude-accounts-quota.timer >/dev/null 2>&1 || true # a pre-rename timer would read every account twice
 systemctl --user enable --now jg-claude-accounts-quota.timer
 echo "written and enabled: jg-claude-accounts-quota.timer"

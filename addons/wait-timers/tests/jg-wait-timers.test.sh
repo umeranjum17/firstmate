@@ -23,7 +23,7 @@ cycle() {
     JG_CONFIG_OVERRIDE="$dir/config" JG_POLL=1 JG_SIGNAL_GRACE=1 \
     JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
     JG_SQUAD_LEAD_LIVENESS_SECS=99999999 JG_BUSY_TURN_MAX_SECS=999999 \
-    JG_STALE_ESCALATE_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 \
+    JG_STALE_ESCALATE_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 JG_WAIT_CARD_SECS=999999 \
     "$WATCH" > "$dir/out" 2> "$dir/err" &
   pid=$!
   wait_for_exit "$pid" 70 || rc=$?
@@ -125,7 +125,7 @@ grep -q 'waiting-state lane (blocked key=wait, .*level=main' "$dir/events" || fa
 ! grep -qi 'captain' "$dir/events" || fail 'Main-owned escalation paged the captain'
 [ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated'
 IFS=$'\t' read -r _sig _since _owner parent _key _misses < "$dir/state/.waiting-timers/lane"
-[ "$parent" -eq 1 ] || fail 'Main-owned escalation was not recorded'
+[ "$parent" -gt 1 ] || fail 'Main-owned escalation was not recorded'
 cycle
 [ "$(grep -c 'level=main' "$dir/events")" -eq 1 ] || fail 'Main-owned escalation repeated on a later poll'
 pass 'a Main-owned overdue wait escalates once to Main without paging the captain'
@@ -297,7 +297,7 @@ start=$((since - 900))
 printf '%s\t%s\t0\t0\t%s\t0\n' "$sig" "$start" "$key" > "$dir/state/.waiting-timers/lane"
 printf 'working\n' > "$dir/native"
 cycle
-IFS=$'\t' read -r _sig since owner _parent key misses < "$dir/state/.waiting-timers/lane"
+IFS=$'\t' read -r _sig since owner _parent key misses _levels < "$dir/state/.waiting-timers/lane"
 [ "$since" -eq "$start" ] || fail 'one non-blocked poll reset the blocked observation time'
 [ "$misses" -eq 1 ] || fail 'one non-blocked poll was not counted as a miss'
 printf 'blocked\n' > "$dir/native"

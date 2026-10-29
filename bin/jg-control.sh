@@ -42,6 +42,9 @@
 #              decision; its endpoint is closed instead and the outcome is
 #              `endpoint-gone`. Postcondition:
 #              the backend's recovery-grade classifier reports the agent gone.
+#              A verified exit also records state/<id>.exit; the watcher skips a
+#              lane whose exit is newer than its spawn, so a dead endpoint cannot
+#              emit stale on every arm. The task record keeps window= for relaunch.
 #              Already-stopped is success (idempotent). An endpoint that reads
 #              `missing` is put through the control plane's per-backend absence
 #              proof (jg_control_endpoint_absence_verdict) before anything is
@@ -1092,16 +1095,20 @@ resolve_relaunch_profile() {
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
+  MODEL_FROM_PIN=0
   if [ "$MODEL_SET" = 1 ]; then
     TARGET_MODEL=$NEW_MODEL
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
+    # A pin that names no model clears the axis: jg-spawn must be told so
+    # explicitly, or its same-harness relaunch reloads the stored model.
+    MODEL_FROM_PIN=1
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
     TARGET_MODEL=$PRIOR_MODEL
   else
     TARGET_MODEL=default
   fi
-  if [ "$MODEL_SET" = 0 ] && [ "$PRIOR_MODEL_MISSING" = 1 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ] && [ "$TARGET_MODEL" = default ]; then
+  if [ "$MODEL_SET" = 0 ] && [ "$MODEL_FROM_PIN" = 0 ] && [ "$PRIOR_MODEL_MISSING" = 1 ] && [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ] && [ "$TARGET_MODEL" = default ]; then
     die "task $ID has no stored model for $TARGET_HARNESS; refusing to relaunch on its default model; pass --model explicitly"
   fi
   if [ "$EFFORT_SET" = 1 ]; then
@@ -1289,7 +1296,7 @@ do_relaunch() {
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
   journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
-  if [ "$TARGET_MODEL" != default ] || [ "$MODEL_SET" = 1 ]; then
+  if [ "$TARGET_MODEL" != default ] || [ "$MODEL_SET" = 1 ] || [ "$MODEL_FROM_PIN" = 1 ]; then
     spawn_args+=(--model "$TARGET_MODEL")
   fi
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")

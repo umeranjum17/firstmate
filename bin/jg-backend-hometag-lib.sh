@@ -13,8 +13,9 @@
 # tab titles").
 #
 # jg_backend_hometag() derives a short, stable tag: a readable prefix
-# ("juggernaut" for the primary home, "2ndmate-<id>" for a squad_lead home
-# carrying .jg-squad-lead-home) plus a short hash of the resolved JG_ROOT
+# ("juggernaut" for the primary home, "lead-<id>" for a squad_lead home
+# carrying .jg-squad-lead-home; "jg_backend_hometag legacy" gives the
+# pre-rename "2ndmate-<id>" spelling so titles written under it still match) plus a short hash of the resolved JG_ROOT
 # path, so distinct installations - including multiple primaries on one
 # machine - never collide even though they share one backend-global
 # namespace. Callers source this file AFTER resolving their own
@@ -26,13 +27,14 @@
 # an accepted limitation, no worse than the existing fact that a task's
 # recorded absolute worktree path does not survive a move either.
 
-jg_backend_hometag() {
-  local marker id prefix root hash
+jg_backend_hometag() {  # [legacy]
+  local marker id prefix root hash lead=lead
+  [ "${1-}" = legacy ] && lead=2ndmate
   marker=$(jg_compat_marker "$JG_HOME")
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
-      prefix="2ndmate-$id"
+      prefix="$lead-$id"
     else
       prefix="juggernaut"
     fi

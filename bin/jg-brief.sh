@@ -14,7 +14,7 @@
 # charters still use a single `{TASK}` charter fill. Juggernaut may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--herdr-lab]
+# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab]
 #        jg-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        jg-brief.sh <task-id> --squad-lead {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -38,6 +38,29 @@
 #   after scaffolding and the caller-supplied repo string cannot reliably
 #   identify this repo. Briefs made without it carry a loud declaration so an
 #   omitted contract cannot be silent.
+# --design-call <yes|no> --design-reason <text> records the per-task first-draft
+# call on a ship brief as `Design call (first-draft): <yes|no> - <reason>`. Juggernaut
+# or the lead judges it per task: yes for bigger redesigns, new screens, landing
+# pages and design options; no for small UI fixes. The two flags go together and
+# are refused on --scout and --squad-lead. bin/jg-spawn.sh records the call in the
+# task record as design_call=, and bin/jg-merge-gate-lib.sh's jg_dod_design_gate
+# refuses to merge a yes-task whose completion receipt evidence carries no
+# `first-draft receipt: <ref>` line. A brief without the line (an older brief)
+# warns at spawn and counts as no. No model decides: the gate is a shell check.
+# --demo-call <yes|no> --demo-reason <text> records the per-task product demo-video
+# call as `Demo-video call (TakeOne): <yes|no> - <reason>`: yes when the task ships a
+# demo video of an app, no otherwise. The pair is validated like the design call and
+# refused on --scout and --squad-lead. It takes effect only while the home has the
+# presence flag config/takeone-demo (docs/configuration.md); with the flag absent the
+# pair is accepted and the brief carries no demo line. bin/jg-spawn.sh records demo_call=,
+# and bin/jg-merge-gate-lib.sh's jg_dod_demo_gate refuses to merge a yes-task whose
+# completion receipt evidence carries no `takeone receipt: <ref>` line.
+# --ui-change <yes|no> records on a ship brief whether the task changes the UI, as
+# `UI change (nav-check): <yes|no>`. A yes brief carries the no-silent-removal rule:
+# the PR body lists `Nav before:` and `Nav after:` and any removed screen is named.
+# bin/jg-spawn.sh records ui_change= and bin/jg-merge-gate-lib.sh's jg_dod_nav_gate
+# refuses to merge a yes-task whose PR body drops a nav item without a
+# `Removed by captain words: <quote>` line. No flag (an older brief) warns and counts as no.
 # For ship tasks, --mode is REQUIRED and shapes the definition of done. Juggernaut
 # resolves it per task at intake (AGENTS.md section 7); data/projects.md holds the
 # captain's standing posture as context, and this script never reads it:
@@ -244,6 +267,11 @@ SHAPE=
 SHAPE_SET=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
+DESIGN_CALL=
+DESIGN_REASON=
+DEMO_CALL=
+DEMO_REASON=
+UI_CHANGE=
 PROJECT_DIR=
 PROJECT_DIR_SET=0
 POS=()
@@ -261,6 +289,11 @@ for a in "$@"; do
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
+      design-call) DESIGN_CALL=$a ;;
+      design-reason) DESIGN_REASON=$a ;;
+      demo-call) DEMO_CALL=$a ;;
+      demo-reason) DEMO_REASON=$a ;;
+      ui-change) UI_CHANGE=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -285,6 +318,16 @@ for a in "$@"; do
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
     --project) want_value="project" ;;
     --project=*) PROJECT_DIR=${a#--project=}; PROJECT_DIR_SET=1 ;;
+    --design-call) want_value="design-call" ;;
+    --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
+    --design-reason) want_value="design-reason" ;;
+    --design-reason=*) DESIGN_REASON=${a#--design-reason=} ;;
+    --demo-call) want_value="demo-call" ;;
+    --demo-call=*) DEMO_CALL=${a#--demo-call=} ;;
+    --demo-reason) want_value="demo-reason" ;;
+    --demo-reason=*) DEMO_REASON=${a#--demo-reason=} ;;
+    --ui-change) want_value="ui-change" ;;
+    --ui-change=*) UI_CHANGE=${a#--ui-change=} ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -311,6 +354,38 @@ if [ "$KIND" = ship ]; then
 elif [ "$MODE_SET" -eq 1 ]; then
   echo "error: --mode applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
   exit 1
+fi
+
+# The design call is a ship-only pair: a call without its reason (or the reverse)
+# would record a decision nobody can audit.
+if [ -n "$DESIGN_CALL$DESIGN_REASON" ]; then
+  [ "$KIND" = ship ] || { echo "error: --design-call and --design-reason apply only to ship briefs" >&2; exit 1; }
+  case "$DESIGN_CALL" in
+    yes|no) ;;
+    *) echo "error: --design-call must be yes or no (got '$DESIGN_CALL')" >&2; exit 1 ;;
+  esac
+  case "$DESIGN_REASON" in
+    ''|*[![:print:]]*|' '*) echo "error: --design-reason needs one printable line stating why (first-draft: $DESIGN_CALL)" >&2; exit 1 ;;
+  esac
+fi
+
+if [ -n "$DEMO_CALL$DEMO_REASON" ]; then
+  [ "$KIND" = ship ] || { echo "error: --demo-call and --demo-reason apply only to ship briefs" >&2; exit 1; }
+  case "$DEMO_CALL" in
+    yes|no) ;;
+    *) echo "error: --demo-call must be yes or no (got '$DEMO_CALL')" >&2; exit 1 ;;
+  esac
+  case "$DEMO_REASON" in
+    ''|*[![:print:]]*|' '*) echo "error: --demo-reason needs one printable line stating why (TakeOne: $DEMO_CALL)" >&2; exit 1 ;;
+  esac
+fi
+
+if [ -n "$UI_CHANGE" ]; then
+  [ "$KIND" = ship ] || { echo "error: --ui-change applies only to ship briefs" >&2; exit 1; }
+  case "$UI_CHANGE" in
+    yes|no) ;;
+    *) echo "error: --ui-change must be yes or no (got '$UI_CHANGE')" >&2; exit 1 ;;
+  esac
 fi
 
 # A ship branch's prefix is optional per-project cosmetics, not a delivery
@@ -770,6 +845,50 @@ case "$MODE" in
 2. Run \`no-mistakes doctor\`; if it reports the repo is not initialized here, run \`no-mistakes init\`."
     ;;
 esac
+DESIGN_SECTION=
+if [ -n "$DESIGN_CALL" ]; then
+  DESIGN_SECTION="
+# Design call
+Design call (first-draft): $DESIGN_CALL - $DESIGN_REASON"
+  if [ "$DESIGN_CALL" = yes ]; then
+    DESIGN_SECTION="$DESIGN_SECTION
+Produce every design for this task with first-draft (\`first-draft-axi\`); do not hand-draw a separate design path.
+Put one line \`first-draft receipt: <reference>\` in the evidence file of your completion receipt.
+The merge is refused without that line."
+  fi
+  DESIGN_SECTION="$DESIGN_SECTION
+"
+fi
+DEMO_SECTION=
+if [ -n "$DEMO_CALL" ] && [ -e "$CONFIG/takeone-demo" ]; then
+  DEMO_SECTION="
+# Demo-video call
+Demo-video call (TakeOne): $DEMO_CALL - $DEMO_REASON"
+  if [ "$DEMO_CALL" = yes ]; then
+    DEMO_SECTION="$DEMO_SECTION
+Make every product demo video for this task with TakeOne; do not record or edit a separate video path.
+Put one line \`takeone receipt: <reference>\` in the evidence file of your completion receipt.
+The merge is refused without that line."
+  fi
+  DEMO_SECTION="$DEMO_SECTION
+"
+fi
+UI_SECTION=
+if [ -n "$UI_CHANGE" ]; then
+  UI_SECTION="
+# UI change
+UI change (nav-check): $UI_CHANGE"
+  if [ "$UI_CHANGE" = yes ]; then
+    UI_SECTION="$UI_SECTION
+A UI change never removes or renames an existing menu, tab or screen unless the captain's own words ask for it.
+A design option that removes a screen must name each removed screen in plain words.
+Put two lines in the PR body: \`Nav before: <item>, <item>\` and \`Nav after: <item>, <item>\`, listing every menu, tab and screen the change touches.
+An item in before that is missing from after needs a line \`Removed by captain words: <quote of the captain>\`.
+The merge is refused without the two lines, or with a dropped item and no quote."
+  fi
+  UI_SECTION="$UI_SECTION
+"
+fi
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 DOD=$(jg_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
 
@@ -777,7 +896,7 @@ cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-
+$DESIGN_SECTION$DEMO_SECTION$UI_SECTION
 $HERDR_SECTION
 
 # Setup
@@ -818,6 +937,8 @@ $ASK_USER_BLOCK
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Juggernaut's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a juggernaut reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+
+8. When the merge gate needs done-done proof, run done-done once at your final head with a clean tree and confirm \`merge-card receipt <id> <head>\` exits 0, where <head> is the commit you will push. Commit nothing afterward, not even the receipt, because any later commit moves the PR head and voids the proof. If you must commit again, rerun done-done at the new head. The PR proof line must name the done-done run and say 'no verify skill'.
 
 $WAIT_BLOCK$INBOX_SECTION
 

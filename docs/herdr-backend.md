@@ -102,7 +102,7 @@ When the launcher has no Herdr workspace to inherit, the adapter maintains one d
 | Home | Workspace label |
 | --- | --- |
 | Primary | `juggernaut` |
-| Squad Lead | `2ndmate-<squad-lead-id>`, derived from its validated `.jg-squad-lead-home` marker |
+| Squad Lead | `lead-<squad-lead-id>` (the older `2ndmate-<squad-lead-id>` is still read), derived from its validated `.jg-squad-lead-home` marker |
 
 A Squad Lead launched by the primary receives a narrowly scoped home override during container creation.
 
@@ -147,7 +147,7 @@ Juggernaut running outside Herdr entirely has no launcher workspace to inherit, 
 That path needs the home label to identify exactly one workspace.
 Two workspaces sharing it are an unresolvable placement and refuse rather than adopting either.
 
-Avoid naming a personal workspace `juggernaut` or `2ndmate-<id>` for that reason.
+Avoid naming a personal workspace `juggernaut`, `lead-<id>`, or `2ndmate-<id>` for that reason.
 Also avoid it because the adapter cannot distinguish that label collision from its own container.
 
 An older Squad Lead workspace using `juggernaut-<id>` is not migrated automatically.

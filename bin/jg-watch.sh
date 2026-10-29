@@ -89,6 +89,11 @@
 #                          busy form is a report only: the message stays owed and
 #                          its doorbell rings on the first non-busy poll, so it
 #                          needs no interrupt
+#   stale: <window> (permission prompt: <prompt>; path <path>; not answered: <why>)
+#                          a worker or squad_lead pane shows a permission or trust
+#                          prompt that bin/jg-prompt-gate-lib.sh did not approve
+#                          or reject; reported once per prompt, at first sight,
+#                          then escalated by the wait-timers chain (prompt_gate_check)
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
@@ -130,8 +135,8 @@
 #                          running a check or removing poll artifacts
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
-#   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - start the top ready item now, or record why it waits
-#   check: ready work waiting with no worker working: <ids> - start each or record why it waits
+#   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - dispatch them now, P0 first, up to project capacity
+#   check: ready work waiting with no worker working: <ids> - dispatch them now, P0 first, up to project capacity
 #                          a squad_lead home's base-cadence scan found dispatchable
 #                          queued work (jg-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
@@ -141,6 +146,14 @@
 #                          Re-raised while the condition holds, once per
 #                          new ready set and then every READY_WORK_RESURFACE_SECS;
 #                          intake uses HEARTBEAT's base interval, never its backoff
+#   check: ready backlog stalled: <ids> waits with free lanes (<open>/<target> open) and nothing started for <n>s - dispatch them now, P0 first, up to project capacity, or hold each with why it waits; Main was told id=<key>
+#                          the wait-timers chain's stalled-backlog backstop: a
+#                          squad_lead home's ready, startable work sat on a free
+#                          lane with no lane started for JG_READY_STALL_SECS, so
+#                          the lead is woken again and Main gets the same report,
+#                          both re-fired every JG_PROMPT_REALERT_SECS while it
+#                          holds (ready_backlog_stall_state owns the condition;
+#                          addons/wait-timers/README.md owns the rungs)
 #   check: ask-default safe default applied while the captain was unreachable: <ids> ...
 #                          the juggernaut-addons ask-default add-on, when installed,
 #                          applied the recorded safe default of each named ask
@@ -283,8 +296,16 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 # shellcheck source=bin/jg-busy-lib.sh
 . "$SCRIPT_DIR/jg-busy-lib.sh"
+# shellcheck source=bin/jg-prompt-gate-lib.sh
+. "$SCRIPT_DIR/jg-prompt-gate-lib.sh"
 # shellcheck source=bin/jg-watch-progress-lib.sh
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
+# shellcheck source=bin/jg-stuck-gate-lib.sh
+. "$SCRIPT_DIR/jg-stuck-gate-lib.sh"
+# shellcheck source=bin/jg-supervision-lib.sh
+. "$SCRIPT_DIR/jg-supervision-lib.sh"
+# shellcheck source=bin/jg-project-capacity-lib.sh
+. "$SCRIPT_DIR/jg-project-capacity-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -351,6 +372,7 @@ fi
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
 POLL=${JG_POLL:-15}                   # seconds between cycles
+PROMPT_REALERT=${JG_PROMPT_REALERT_SECS:-600}  # a prompt still up is re-acted on this often
 # Beacon publication and scan timing are owned by docs/turnend-guard.md
 # "Guard grace and the poll cadence".
 # jg_poll_derived_grace (bin/jg-wake-lib.sh, already sourced
@@ -986,6 +1008,10 @@ recorded_windows() {
   local meta w seen=
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
+    # A lane stopped by a verified `jg-control.sh exit` keeps its window= for
+    # relaunch and teardown, but its endpoint may be dead; watching it would
+    # emit stale on every arm and keep supervision from holding the lock.
+    ! jg_meta_exited_on_purpose "$meta" || continue
     w=$(jg_backend_target_of_meta "$meta")
     [ -n "$w" ] || continue
     case "$seen" in
@@ -1313,6 +1339,32 @@ EOF
   wake "$reason"
 }
 
+# lead_supervision_check: a live lead whose own watcher is not running while it
+# has work under way is a dead hop, so its workers' waits would reach nobody.
+# Main owns lead liveness, so the lead is steered to re-arm and the gap becomes
+# a wait source (state/.wait-sources/<id>.supervision) that the wait-timers
+# chain escalates like any other wait. Only the lead home's own supervision
+# state is read (bin/jg-supervision-lib.sh), never a child's records. Returns 0
+# on first detection only; the source clears once the lead is supervised again.
+lead_supervision_check() {  # <meta> <id>
+  local lead_home src="$STATE/.wait-sources/$2.supervision" text
+  lead_home=$(jg_meta_get "$1" home 2>/dev/null || true)
+  case "$lead_home" in /*) [ -d "$lead_home/state" ] || return 1 ;; *) return 1 ;; esac
+  if ! JG_HOME="$lead_home" jg_supervision_unhealthy "$lead_home/state" "$WATCHER_STALE_GRACE"; then
+    rm -f "$src"
+    return 1
+  fi
+  [ ! -f "$src" ] || return 1
+  text="supervision: squad lead $2 has work under way but its own watcher is not running"
+  mkdir -p "$STATE/.wait-sources" && printf '%s\n' "$text" > "$src" || return 1
+  steer_task "$2" "lead-supervision-$2-$(date +%s)" \
+    "Your own supervision is not running while you have work under way, so your workers' waits reach nobody. Re-arm your supervision now and handle your queued notifications." \
+    || triage_log "supervision steer to squad_lead $2 was not recorded"
+  if declare -F jg_wait_timer_source_delivered >/dev/null; then
+    jg_wait_timer_source_delivered "$2" "$(jg_backend_target_of_meta "$1")" "$text" || return 1
+  fi
+}
+
 squad_lead_liveness_tick() {
   local tick_marker="$STATE/.squad-lead-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SQUAD_LEAD_LIVENESS_SECS" ] || return 0
@@ -1360,6 +1412,10 @@ squad_lead_liveness_tick() {
         fi
         ;;
       alive)
+        if lead_supervision_check "$meta" "$id"; then
+          reason="check: squad_lead $id supervision not running while it has work under way; it was told to re-arm, and the wait escalates until it does"
+          notify_key="squad-lead-supervision-$id-$now"
+        fi
         if [ -e "$bound_marker" ] || [ -L "$bound_marker" ]; then
           if ! jg_squad_lead_liveness_ledger_add "$id" rearmed; then
             err="relaunch ledger is unwritable; auto-relaunch stays paused"
@@ -2236,6 +2292,120 @@ captain_call_stale_bound() {  # <window-key> <task>
 # Both records of an ordinary crew wait bound it (see task_captain_call_open
 # above): the status line the worker declared, and the backlog hold juggernaut
 # recorded once the captain took the work in hand.
+# prompt_gate_check: a pane parked on a permission or trust prompt is stuck at
+# once, never left to the wedge timer, and a squad_lead's idle exemption does
+# not cover it. bin/jg-prompt-gate-lib.sh owns the verdict, and rung one of the
+# escalation chain is answered here: an approval or a rejection is re-proved on
+# a fresh capture before its key is sent (an approval is logged first), and a
+# rejected worker is steered with the reason. The same prompt still on screen
+# within a minute means the answer did not take. While it stays up it is
+# answered again every JG_PROMPT_REALERT_SECS (default 600).
+# Any prompt left unanswered wakes this home's supervisor once, at first sight,
+# and is recorded as a wait source (state/.wait-sources/<task>.prompt, touched
+# on every sighting) so the wait-timers chain owns every later rung: re-alerts,
+# Main, and the board card (addons/wait-timers/README.md).
+# Returns 0 only after an answer was sent, so the caller skips the stale path
+# for that poll; a pane left on an unanswered prompt keeps the stale path.
+prompt_gate_check() {  # <window> <task> [tail40]
+  local w=$1 task=$2 harness backend label key mf src meta verdict again h reason kind act
+  local _r path prompt
+  harness=$(window_harness "$w")
+  jg_prompt_gate_harness "$harness" || return 1
+  backend=$(window_backend "$w")
+  label=$(window_label "$w")
+  key=$(window_key "$w")
+  mf="$STATE/.prompt-$key"
+  src="$STATE/.wait-sources/$task.prompt"
+  meta="$STATE/$task.meta"
+  if [ -n "${3-}" ] && ! printf '%s' "$3" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta" | grep -q .; then
+    rm -f "$mf" "$src"
+    return 1
+  fi
+  watcher_capture "$backend" "$w" 200 "$label" || return 1
+  verdict=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
+  if [ -z "$verdict" ]; then
+    rm -f "$mf" "$src"
+    return 1
+  fi
+  h=$(printf '%s' "$verdict" | hash_pane)
+  IFS=$'\t' read -r kind _r path prompt <<< "$verdict"
+  if [ "$(cat "$mf" 2>/dev/null)" = "wait:$h" ]; then
+    if [ "$kind" = card ] || [ "$(age_of "$mf")" -lt "$PROMPT_REALERT" ]; then
+      # Rewritten on every sighting: the chain honours the record only while
+      # it is fresh, so a prompt on a pane that died lapses by itself.
+      mkdir -p "$STATE/.wait-sources" && printf 'prompt: %s; path %s\n' "$prompt" "$path" > "$src" || exit 1
+      return 1
+    fi
+  fi
+  if [ "$kind" = approve ] || [ "$kind" = reject ]; then
+    act=approval
+    [ "$kind" = approve ] || act=rejection
+    if [ "$(cat "$mf" 2>/dev/null)" = "$kind:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
+      _r="$_r; the $act sent under a minute ago did not take"
+    else
+      watcher_capture "$backend" "$w" 200 "$label" || return 1
+      again=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
+      [ "$again" = "$verdict" ] || return 1
+      # ponytail: the re-proof and the key are two tmux calls, so a dialog
+      # replaced within that one round trip gets the key; tmux has no atomic
+      # capture-and-send, and this is the shortest window it allows.
+      if [ "$kind" = approve ] && ! jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt"; then
+        _r="the approval record could not be written"
+      elif [ "$kind" = approve ] && jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
+        printf 'approve:%s' "$h" > "$mf"
+        triage_log "approved permission prompt ($_r): $w $path"
+        return 0
+      elif [ "$kind" = reject ] && jg_backend_send_key "$backend" "$w" Escape "$label" >/dev/null 2>&1; then
+        printf 'reject:%s' "$h" > "$mf"
+        triage_log "rejected permission prompt ($_r): $w $path"
+        # A key typed right after Escape reads as Alt+key, so the doorbell
+        # waits for the terminal to take the Escape alone.
+        sleep 1
+        steer_task "$task" "prompt-reject-$task-$h-$(date +%s)" \
+          "Supervision rejected your permission prompt ($prompt) because $path is a $_r: .env files, ~/.config, and a home's data/ and config/ hold credentials and private records. Do not retry that access; carry on without it, or append blocked: to your status naming what you need." \
+          || triage_log "rejection steer to $task was not recorded"
+        return 0
+      else
+        _r="sending the $act key failed"
+      fi
+    fi
+  fi
+  mkdir -p "$STATE/.wait-sources" && printf 'prompt: %s; path %s\n' "$prompt" "$path" > "$src" || exit 1
+  printf 'wait:%s' "$h" > "$mf"
+  reason="stale: $w (permission prompt: $prompt; path $path; not answered: $_r)"
+  jg_wake_append stale "$w" "$reason" || exit 1
+  if declare -F jg_wait_timer_source_delivered >/dev/null; then
+    jg_wait_timer_source_delivered "$task" "$w" "$(head -n 1 "$src" | tr '\t' ' ' | cut -c1-300)" || exit 1
+  fi
+  wake "$reason"
+}
+
+# steer_task: one supervision steer through the durable inbox. A squad_lead
+# target needs a fire-and-forget id, or jg-send marks it as a request that
+# expects a reply; <seed> makes that id stable for one event.
+steer_task() {  # <task> <seed> <text>
+  local id
+  if [ "$(jg_meta_get "$STATE/$1.meta" kind 2>/dev/null)" = squad_lead ]; then
+    id=$(printf '%s' "$2" | hash_pane | cut -c1-16)
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-send.sh" "$1" --fire-and-forget "$id" "$3" >/dev/null 2>&1
+  else
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-send.sh" "$1" "$3" >/dev/null 2>&1
+  fi
+}
+
+# lead_nudge: tell a squad_lead about a wait it owns. A lead busy mid-turn is
+# interrupted first (bin/jg-control.sh), so the steer is read now rather than
+# after the turn; an idle lead only gets the steer, which rings its doorbell;
+# a dead or unreadable one gets the durable steer alone.
+lead_nudge() {  # <task> <window> <seed> <text>
+  squad_lead_busy_class "$2"
+  if [ "$SQUAD_LEAD_BUSY_CLASS" = busy ]; then
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-control.sh" "$1" interrupt >/dev/null 2>&1 \
+      || triage_log "interrupt of squad_lead $1 failed"
+  fi
+  steer_task "$1" "$3" "$4"
+}
+
 surface_nonterminal_stale() {  # <window> <hash>
   local win=$1 h=$2 key task last declared=1 bounded=1 throttled=1 until now
   key=$(window_key "$win")
@@ -2807,15 +2977,12 @@ warn_invalid_lane_target_once() {
 # held or in flight) cannot reset the re-raise window. Intake is independent of
 # the heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
-  local meta task target open now surfaced surfaced_at surfaced_ids ready_out ready_rc
+  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
   [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
-  ready_out=$(JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-tasks-axi.sh" ready 2>/dev/null)
+  READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
   ready_rc=$?
-  READY_WORK_IDS=$(printf '%s\n' "$ready_out" \
-    | awk '/^ready\[[0-9]+\]/ { on = 1; next } on && /^  / { sub(/^  /, ""); split($0, f, ","); print f[1]; next } { on = 0 }' \
-    | sort | paste -sd ' ' -)
   if [ -z "$READY_WORK_IDS" ]; then
     # A non-zero status means the backlog could not be read, not that the
     # condition is false, so leave the queued row for the next cycle instead of
@@ -2834,14 +3001,14 @@ ready_work_waits_idle() {
     warn_invalid_lane_target_once
   fi
   if [ -n "$target" ] && open=$(open_lane_count) && [ "$open" -lt "$target" ]; then
-    READY_WORK_REASON="check: ready work waiting with free lane slots ($open/$target open): $READY_WORK_IDS - start the top ready item now, or record why it waits"
+    READY_WORK_REASON="check: ready work waiting with free lane slots ($open/$target open): $READY_WORK_IDS - dispatch them now, P0 first, up to project capacity"
   else
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
       task=${meta##*/}
       crew_is_provably_working "${task%.meta}" && return 1
     done
-    READY_WORK_REASON="check: ready work waiting with no worker working: $READY_WORK_IDS - start each or record why it waits"
+    READY_WORK_REASON="check: ready work waiting with no worker working: $READY_WORK_IDS - dispatch them now, P0 first, up to project capacity"
   fi
   # Re-raise gate: a new ready set fires at once; the same still-holding set only
   # again after READY_WORK_RESURFACE_SECS. A record without a usable timestamp
@@ -2855,6 +3022,61 @@ ready_work_waits_idle() {
   [ "$surfaced_ids" != "$READY_WORK_IDS" ] && return 0
   case "$surfaced_at" in ''|*[!0-9]*) surfaced_at=0 ;; esac
   [ "$(( now - surfaced_at ))" -ge "$READY_WORK_RESURFACE_SECS" ]
+}
+
+# The stalled-backlog condition the wait-timers chain escalates
+# (addons/wait-timers/README.md "Stalled ready backlog"): this squad_lead home
+# has a ready item that could start now and a free lane. A free lane is fewer
+# open lanes than config/lane-target, or than 4 without a usable one; an item
+# could start now unless its project's declared capacity is already held
+# (bin/jg-project-capacity-lib.sh). Sets READY_STALL_IDS (startable ids, P0
+# first), READY_STALL_OPEN, READY_STALL_TARGET, and READY_STALL_LANES (the open
+# lane ids, comma-joined, so the chain can see a start). Returns 0 when the
+# condition holds, 1 when it does not, and 2 when the backlog cannot be read,
+# so an unknown poll never clears or fires an episode.
+ready_backlog_stall_state() {
+  local rows rc id repo proj cfg seen='|' full='|' meta kind
+  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES=''
+  [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
+  rows=$(jg_ready_work_rows "$JG_HOME"); rc=$?
+  [ "$rc" -eq 0 ] || return 2
+  [ -n "$rows" ] || return 1
+  READY_STALL_TARGET=$(lane_target_value) || READY_STALL_TARGET=4
+  READY_STALL_OPEN=$(open_lane_count) || return 2
+  [ "$READY_STALL_OPEN" -lt "$READY_STALL_TARGET" ] || return 1
+  cfg=$(jg_project_capacity_config_dir "$JG_HOME" "$CONFIG" 2>/dev/null) || cfg=
+  while read -r id repo; do
+    [ -n "$id" ] || continue
+    proj="$JG_HOME/projects/$repo"
+    if [ -n "$cfg" ] && [ "$repo" != - ] && [ -d "$proj" ]; then
+      case "$seen" in
+        *"|$repo|"*) ;;
+        *)
+          seen="$seen$repo|"
+          # A declaration or holder count that cannot be read keeps the item:
+          # nothing then starts at all, which is exactly what must escalate.
+          if jg_project_capacity_lookup "$cfg" "$repo" && [ -n "$JG_PROJECT_CAPACITY" ] \
+            && jg_project_capacity_occupants "$(jg_treehouse_project_lock_path "$proj" 2>/dev/null)" "$proj" "$STATE" "" \
+            && [ "$JG_PROJECT_CAPACITY_OCCUPANTS" -ge "$JG_PROJECT_CAPACITY" ]; then
+            full="$full$repo|"
+          fi
+          ;;
+      esac
+      case "$full" in *"|$repo|"*) continue ;; esac
+    fi
+    READY_STALL_IDS="${READY_STALL_IDS:+$READY_STALL_IDS }$id"
+  done <<EOF
+$rows
+EOF
+  [ -n "$READY_STALL_IDS" ] || return 1
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] || continue
+    kind=$(jg_meta_get "$meta" kind 2>/dev/null || true)
+    case "${kind:-ship}" in
+      ship|scout) id=${meta##*/}; READY_STALL_LANES="${READY_STALL_LANES:+$READY_STALL_LANES,}${id%.meta}" ;;
+    esac
+  done
+  return 0
 }
 
 # Records the ready set just surfaced with its epoch, after the wake was
@@ -3252,11 +3474,24 @@ watcher_cleanup() {
   jg_check_output_cleanup
   jg_capture_output_cleanup
   jg_custom_check_snapshot_cleanup
+  # A cycle that ends on a wake hands over to the next one through the arm
+  # script; this stamp lets jg-supervision-lib.sh bridge that gap briefly.
+  if [ "$owns_lock" -eq 1 ]; then touch "$STATE/.last-watcher-handoff" 2>/dev/null || true; fi
   if [ "$owns_lock" -eq 1 ] \
     && ! jg_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
       downtime "$CLEANUP_LOCK_BOUND"; then
     echo "watcher: recovery state could not be persisted; retaining stale lock evidence" >&2
     cleanup_status=1
+  fi
+  # A cycle that delivered an actionable wake proved a live watcher scanned up
+  # to it, but this cycle cleared the predecessor's beacon at start and exits
+  # before the end-of-scan touch. Without this stamp a busy home never has a
+  # beacon, so every reader calls it unsupervised. Written only after the lock
+  # is released, so an arm never sees a dying holder with a fresh beacon, and
+  # only on a delivered wake, so a killed or evicted watcher leaves none. The
+  # replacement still clears it at start and republishes after its full scan.
+  if [ "$owns_lock" -eq 1 ] && [ -n "${JG_WATCH_DELIVERED_REASON:-}" ]; then
+    touch "$STATE/.last-watcher-beat" 2>/dev/null || true
   fi
   return "$cleanup_status"
 }
@@ -3788,11 +4023,17 @@ EOF
     # this guard: reaching it would require backlog reads for windows this gate
     # deliberately skips, putting that read on the ordinary poll hot path.
     if [ "$kind" = squad_lead ] && ! status_is_paused_or_captain_held "$last"; then
+      [ -z "$task" ] || prompt_gate_check "$w" "$task" || true
+      if watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")"; then
+        stuck_gate_check "$w" "$task" "$key" "$WATCHER_CAPTURE" "$kind"
+      fi
       continue
     fi
     backend=$(window_backend "$w")
     watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" || continue
     tail40=$WATCHER_CAPTURE
+    stuck_gate_check "$w" "$task" "$key" "$tail40" "$kind"
+    if [ -n "$task" ] && prompt_gate_check "$w" "$task" "$tail40"; then continue; fi
     h=$(printf '%s' "$tail40" | hash_pane)
     hf="$STATE/.hash-$key"
     cf="$STATE/.count-$key"
@@ -4063,7 +4304,7 @@ EOF
   # Confirm liveness only after a complete supervision scan. In particular a
   # replacement must not inherit its predecessor's beacon or announce recovery
   # while its task checks are still blocked. Actionable wakes exit above and
-  # are confirmed by the arm's delivery path instead.
+  # leave their own beacon in watcher_cleanup, after the lock is released.
   touch "$STATE/.last-watcher-beat" || exit 1
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),

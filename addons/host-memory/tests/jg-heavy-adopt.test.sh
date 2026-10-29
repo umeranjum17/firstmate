@@ -25,6 +25,7 @@ installed=$d/data/jg-host-memory/jg-heavy-adopt.sh
 grep -Fqx "ExecStart=$installed" "$d/config/systemd/user/jg-heavy-adopt.service"
 grep -Fqx 'OnUnitActiveSec=20' "$d/config/systemd/user/jg-heavy-adopt.timer"
 grep -Fqx -- '--user enable --now jg-heavy-adopt.timer' "$SYSTEMCTL_LOG"
+grep -Fqx -- '--user disable --now fm-heavy-adopt.timer' "$SYSTEMCTL_LOG" || { echo 'FAIL pre-rename timer not retired'; exit 1; }
 # Previous sample is one interval old; PID 100 exceeded the measured 2 CPU-second threshold.
 mkdir -p "$d/state/jg-host-memory"
 specs=('100 yes 1 250' '101 worker 100 0' '102 node 100 250' '103 herdr 1 500' '104 java 1 0'

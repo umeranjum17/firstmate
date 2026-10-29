@@ -196,7 +196,7 @@ cmd_raise() {
   title=$(card_title "$3")
   [ -n "$title" ] || title=$(built_title "$2")
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
-    --title "$title" --about "$3" --why "$(card_why "$3")" \
+    --title "$title" --ask-ref "$1" --about "$3" --why "$(card_why "$3")" \
     --outcome yes="Answer recorded: yes." \
     --outcome no="Answer recorded: no." \
     --recommend yes --recommend-reason "The hold records no recommendation." \

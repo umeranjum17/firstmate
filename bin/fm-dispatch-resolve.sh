@@ -11,7 +11,16 @@ _jg_alias_new="$_jg_alias_dir/jg-dispatch-resolve.sh"
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
   # shellcheck source=/dev/null
   . "$_jg_alias_new"
+  # A library that does not load the compatibility layer itself still owes an
+  # old caller its old function names.
+  if ! declare -F jg_compat_function_aliases >/dev/null 2>&1 && [ -r "$_jg_alias_dir/jg-compat.sh" ]; then
+    # shellcheck source=bin/jg-compat.sh
+    . "$_jg_alias_dir/jg-compat.sh"
+  fi
   if declare -F jg_compat_function_aliases >/dev/null 2>&1; then jg_compat_function_aliases; fi
 else
+  # An old caller may run a library as `bash <old path>`, and the renamed
+  # library need not be executable.
+  [ -x "$_jg_alias_new" ] || exec bash "$_jg_alias_new" "$@"
   exec "$_jg_alias_new" "$@"
 fi

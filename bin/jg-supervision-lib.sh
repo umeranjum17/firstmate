@@ -12,6 +12,46 @@
 # live watcher process means per supervision model. The status fields here retain
 # the beacon-age details used in their messages.
 
+_JG_SUP_BIN=${BASH_SOURCE[0]%/*}
+
+# jg_ready_work_rows <home>
+# Prints one "<id> <repo>" line per ready backlog item of <home> (tasks-axi
+# ready: queued, not blocked, not held), highest priority first (P0 before P4,
+# an unprioritized item last, ties by id); <repo> is "-" for an item that names
+# none. Returns the ready read's own status so a caller can tell an empty queue
+# from an unreadable one.
+jg_ready_work_rows() {
+  local home=$1 out rc prios
+  out=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" ready 2>/dev/null); rc=$?
+  prios=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" list --state queued --fields priority 2>/dev/null) || prios=
+  printf '%s\n' "$out" | awk -v p="$prios" '
+    BEGIN {
+      n = split(p, L, "\n")
+      for (i = 1; i <= n; i++) if (L[i] ~ /^  /) {
+        line = L[i]; sub(/^  /, "", line)
+        id = line; sub(/,.*/, "", id)
+        pr = line; sub(/.*,/, "", pr); gsub(/"/, "", pr)
+        prio[id] = (pr ~ /^[0-9]+$/) ? pr : 9
+      }
+    }
+    /^ready\[[0-9]+\]/ { on = 1; next }
+    on && /^  / {
+      sub(/^  /, ""); split($0, f, ","); repo = f[4]; gsub(/"/, "", repo)
+      print ((f[1] in prio) ? prio[f[1]] : 9), f[1], (repo == "" ? "-" : repo); next
+    }
+    { on = 0 }' | sort -k1,1n -k2,2 | awk '{ print $2, $3 }'
+  return "$rc"
+}
+
+# jg_ready_work_ids <home>
+# The ids of jg_ready_work_rows, space-joined in the same order, with its status.
+jg_ready_work_ids() {
+  local rows rc
+  rows=$(jg_ready_work_rows "$1"); rc=$?
+  printf '%s\n' "$rows" | awk 'NF { print $1 }' | paste -sd ' ' -
+  return "$rc"
+}
+
 # Portable mtime; Linux stat lacks -f, macOS stat lacks -c.
 jg_sup_stat_mtime() {
   if [ "$(uname)" = Darwin ]; then
@@ -19,6 +59,17 @@ jg_sup_stat_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
+}
+
+# jg_squad_lead_ready_work <state-dir>
+# Prints the ready backlog ids and returns 0 only for a squad_lead home with some.
+# The main home and a squad_lead with an empty queue stay idle: nothing is invented.
+jg_squad_lead_ready_work() {
+  local home=${JG_HOME:-${1%/*}} marker ids
+  if declare -F jg_compat_marker >/dev/null; then marker=$(jg_compat_marker "$home"); else marker=$home/.jg-squad-lead-home; fi
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  ids=$(jg_ready_work_ids "$home") && [ -n "$ids" ] || return 1
+  printf '%s\n' "$ids"
 }
 
 # jg_supervision_status <state-dir> [grace-seconds]
@@ -35,18 +86,27 @@ jg_sup_stat_mtime() {
 #                         sweep's call at execution time, and a home whose check
 #                         no longer validates needs the watcher precisely so the
 #                         sweep can report the rejection instead of going quiet.
+#   JG_SUP_READY_WORK     count of ready backlog items in a squad_lead home with
+#                         nothing else needing supervision (else 0); jg_ready_work_ids
+#                         owns readiness
 #   JG_SUP_NEEDED         true/false - in-flight work, an X-mode relay poll, a
 #                         registered event source (a source is a wait on an
 #                         external process, not a task, so it has no metadata),
-#                         or a registered custom check
-#   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window
+#                         a registered custom check, or ready backlog work in a
+#                         squad_lead home, whose idle lead only learns of it from
+#                         the watcher's ready-work wake
+#   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window, or
+#                         a live lock-matched watcher still in its first scan (no
+#                         beacon yet) younger than the stall bound; needs
+#                         bin/jg-wake-lib.sh sourced, else only the beacon counts
 #   JG_SUP_BEACON_DESC    human-readable beacon age, for banners ("never" if absent)
 #   JG_SUP_QUEUE_PENDING  true/false - state/.wake-queue has unread records
 # grace-seconds defaults to $JG_GUARD_GRACE, then 300, matching jg-guard.sh.
 # Always returns 0; callers read the vars, or use jg_supervision_unhealthy below.
 jg_supervision_status() {
-  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age pid ready
   JG_SUP_IN_FLIGHT=0
+  JG_SUP_READY_WORK=0
   JG_SUP_NEEDED=false
   JG_SUP_WATCHER_FRESH=false
   JG_SUP_BEACON_DESC=never
@@ -77,6 +137,10 @@ jg_supervision_status() {
     || [ "$JG_SUP_SOURCES" -gt 0 ] \
     || [ "$JG_SUP_CHECKS" -gt 0 ]; then
     JG_SUP_NEEDED=true
+  else
+    # shellcheck disable=SC2034 # Read by callers (jg-turnend-guard.sh) after sourcing.
+    ready=$(jg_squad_lead_ready_work "$state") && [ -n "$ready" ] \
+      && JG_SUP_READY_WORK=$(printf '%s\n' "$ready" | wc -w) && JG_SUP_NEEDED=true
   fi
 
   beat="$state/.last-watcher-beat"
@@ -89,6 +153,35 @@ jg_supervision_status() {
     else
       # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
       JG_SUP_BEACON_DESC=unknown
+    fi
+  elif declare -F jg_watcher_lock_matches_pid >/dev/null; then
+    # The watcher deletes the beacon at cycle start and rewrites it only after
+    # a full scan, so a live watcher in its first scan has none. Treat it as
+    # fresh until the stall bound, the same bound that evicts a stuck holder.
+    pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
+    if jg_pid_alive "$pid" \
+      && jg_watcher_lock_matches_pid "$state" "$JG_WAKE_LIB_DIR/jg-watch.sh" "$pid" "${JG_HOME:-}"; then
+      age=$(jg_watcher_progress_age "$state")
+      if [ "$age" -lt "$(jg_watcher_stall_bound)" ]; then
+        # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
+        JG_SUP_BEACON_DESC="starting (${age}s)"
+        JG_SUP_WATCHER_FRESH=true
+      fi
+    fi
+  fi
+
+  # A cycle that ended on a wake leaves a fresh beacon, but its replacement
+  # clears it at start and writes none until its scan finishes. The hand-off
+  # stamp the ending cycle left (jg-watch.sh) keeps that gap healthy for
+  # JG_WATCHER_HANDOFF_SECS (default 60); a watcher that really died stops
+  # restamping, so it is reported once the stamp is older.
+  if [ "$JG_SUP_WATCHER_FRESH" = false ] && [ ! -e "$beat" ] && [ -e "$state/.last-watcher-handoff" ]; then
+    m=$(jg_sup_stat_mtime "$state/.last-watcher-handoff")
+    age=$(( $(date +%s) - ${m:-0} ))
+    if [ "$age" -lt "${JG_WATCHER_HANDOFF_SECS:-60}" ]; then
+      # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
+      JG_SUP_BEACON_DESC="hand-off (${age}s)"
+      JG_SUP_WATCHER_FRESH=true
     fi
   fi
 

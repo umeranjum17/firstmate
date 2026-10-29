@@ -31,6 +31,7 @@ is "units and the reader copy are written" "$(ls "$units"; ls "$w/data/jg-claude
 jg-claude-accounts-quota.timer
 claude-accounts-quota.sh"
 is "every 5 minutes, for this home" "$(grep -c 'OnUnitActiveSec=5min' "$units/jg-claude-accounts-quota.timer")|$(grep -c "Environment=JG_HOME=$w/fm" "$units/jg-claude-accounts-quota.service")" "1|1"
+is "the pre-rename timer is retired" "$(grep -c -- "--user disable --now fm-claude-accounts-quota.timer" "$w/systemctl.log")" 1
 is "the timer is enabled now" "$(tail -1 "$w/systemctl.log")" "--user enable --now jg-claude-accounts-quota.timer"
 is "the unit's command writes the card file" "$(env -i PATH="$w/bin:$PATH" HOME="$w/home" JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" "$w/data/jg-claude-accounts/claude-accounts-quota.sh" >/dev/null 2>&1; jq -r '.accounts[0] | "\(.five_hour.left)/\(.seven_day.left)"' "$w/home/state/claude-accounts.json")" "50/60"
 : > "$w/systemctl.log"

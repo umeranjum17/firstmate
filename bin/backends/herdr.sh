@@ -370,7 +370,8 @@ jg_backend_herdr_presentation_enabled() {  # <config-dir> [<state-dir>]
 # label (docs/herdr-backend.md "Default task container shape"). The PRIMARY home (no
 # squad_lead marker) resolves to the constant "juggernaut", byte-identical to
 # every pre-existing task's recorded label - no forced migration. A SQUAD_LEAD
-# home resolves to "2ndmate-<squad-lead-id>", so its tasks land in their own
+# home resolves to "lead-<squad-lead-id>" (read as well as the older
+# "2ndmate-<id>" spelling, see jg_backend_herdr_workspace_legacy_label), so its tasks land in their own
 # workspace, obviously distinguishable from the primary's (and from every
 # other squad_lead's) in herdr's spaces sidebar. Read fresh from JG_HOME on
 # every call rather than cached at source time: JG_HOME is the home's own
@@ -384,11 +385,23 @@ jg_backend_herdr_workspace_label() {
   if [ -f "$marker" ]; then
     id=$(tr -d '[:space:]' < "$marker" 2>/dev/null)
     if [ -n "$id" ]; then
-      printf '2ndmate-%s' "$id"
+      printf 'lead-%s' "$id"
       return 0
     fi
   fi
   printf 'juggernaut'
+}
+
+# jg_backend_herdr_workspace_legacy_label: the pre-rename "2ndmate-<id>" form
+# of a squad_lead home's label, empty for the primary home. Live workspaces
+# keep it until closed, so lookups read it; nothing writes it.
+jg_backend_herdr_legacy_of_lead_label() {  # <label>
+  case "$1" in
+    lead-*) printf '2ndmate-%s' "${1#lead-}" ;;
+  esac
+}
+jg_backend_herdr_workspace_legacy_label() {
+  jg_backend_herdr_legacy_of_lead_label "$(jg_backend_herdr_workspace_label)"
 }
 
 # jg_backend_herdr_cli: run `herdr <args...>` scoped to <session>, setting
@@ -798,14 +811,14 @@ jg_backend_herdr_projection_journal_replace_endpoint() {  # <journal> <task-id> 
 
 # jg_backend_herdr_projection_concise_task_label: strip redundant owner
 # prefixes from a task id used only in the presentation workspace label.
-# Removes juggernaut/, 2ndmate-<id>/, and a presentation-level jg- owner
+# Removes juggernaut/, lead-<id>/ (or the older 2ndmate-<id>/), and a presentation-level jg- owner
 # prefix when present. The ordinary task tab remains jg-<id> and is not
 # built by this helper.
 jg_backend_herdr_projection_concise_task_label() {  # <task-id>
   local task=$1
   case "$task" in
     juggernaut/*) task=${task#juggernaut/} ;;
-    2ndmate-*/*) task=${task#*/} ;;
+    lead-*/*|2ndmate-*/*) task=${task#*/} ;;
   esac
   case "$task" in
     jg-*) task=${task#jg-} ;;
@@ -1517,7 +1530,7 @@ jg_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
 # returned by THIS projected create immediately after its owning parent's
 # contiguous child block and before the next parent.
 #
-# <parent-label> is the owning JG_HOME label (juggernaut or 2ndmate-<id>).
+# <parent-label> is the owning JG_HOME label (juggernaut or lead-<id>; the older 2ndmate-<id> is still read).
 # Optional <parent-workspace-id> is that parent's EXACT id, which the caller
 # already resolved from the launching agent's own herdr identity. When given it
 # anchors the owning parent by id, so two workspaces sharing the home label no
@@ -1525,7 +1538,7 @@ jg_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
 # label exactly as before. With a unique label the two select the same
 # workspace, so ordering behavior is unchanged in the ordinary case.
 # New-format └ ... · p:<token> children and, for compatibility only, already
-# adjacent old-format juggernaut/... or 2ndmate-<id>/... projections may extend
+# adjacent old-format juggernaut/... or lead-<id>/... (or 2ndmate-<id>/...) projections may extend
 # the block read-only; they are never renamed or moved.
 #
 # This is presentation-only and always returns success.
@@ -1557,13 +1570,13 @@ jg_backend_herdr_projection_order_best_effort() {  # <session> <created-workspac
       end;
     def is_top_level_parent:
       (.label | type) == "string"
-      and ((.label == "juggernaut") or (.label | test("^2ndmate-[^/]+$")));
+      and ((.label == "juggernaut") or (.label | test("^(lead|2ndmate)-[^/]+$")));
     def is_new_child:
       (.label | type) == "string"
       and (.label | test("^└ .+ · p:[A-Za-z0-9_-]{22}$"));
     def is_legacy_child:
       (.label | type) == "string"
-      and (.label | test("^(juggernaut|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"));
+      and (.label | test("^(juggernaut|(lead|2ndmate)-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"));
     def is_legacy_child_for($owner):
       is_legacy_child and (.label | startswith($owner + "/"));
     def is_child_for($owner):
@@ -1774,16 +1787,17 @@ jg_backend_herdr_server_ensure() {  # <session>
 # which one is the caller's, while the read-only recovery path below keeps its
 # historical first-match behavior.
 jg_backend_herdr_workspace_find_all() {  # <session>
-  local session=$1 label list
+  local session=$1 label legacy list
   label=$(jg_backend_herdr_workspace_label)
+  legacy=$(jg_backend_herdr_workspace_legacy_label)
   list=$(jg_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 0
   # NOTE: the jq variable is $want, NOT $label - `label` is a jq reserved
   # keyword (label/break), so declaring a jq variable named "label" is a
   # compile error that `2>/dev/null` would silently swallow, making this find
   # ALWAYS return empty and every spawn mint a fresh "juggernaut" workspace
   # (the workspace leak).
-  printf '%s' "$list" | jq -r --arg want "$label" \
-    '.result.workspaces[]? | select(.label == $want) | .workspace_id' 2>/dev/null
+  printf '%s' "$list" | jq -r --arg want "$label" --arg old "$legacy" \
+    '.result.workspaces[]? | select(.label == $want or (($old | length) > 0 and .label == $old)) | .workspace_id' 2>/dev/null
 }
 
 # jg_backend_herdr_workspace_find: this HOME's own workspace id inside
@@ -2888,10 +2902,10 @@ jg_backend_herdr_projection_cleanup_exact() {  # <session> <task-pane> <seeded-p
 jg_backend_herdr_projection_parent_workspace_exact() {  # <session> <parent-label>
   local session=$1 parent_label=$2 list
   list=$(jg_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
-  printf '%s' "$list" | jq -er --arg parent_label "$parent_label" '
+  printf '%s' "$list" | jq -er --arg parent_label "$parent_label" --arg old "$(jg_backend_herdr_legacy_of_lead_label "$parent_label")" '
     (.result.workspaces // null) as $spaces
     | select(($spaces | type) == "array")
-    | [$spaces[]? | select(.label == $parent_label)]
+    | [$spaces[]? | select(.label == $parent_label or (($old | length) > 0 and .label == $old))]
     | if length == 1
         and (.[0].workspace_id | type) == "string"
         and (.[0].workspace_id | length) > 0
@@ -2914,13 +2928,14 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
     --arg workspace "$workspace" \
     --arg parent_workspace "$parent_workspace" \
     --arg parent_label "$parent_label" \
+    --arg parent_old "$(jg_backend_herdr_legacy_of_lead_label "$parent_label")" \
     --arg workspace_label "$workspace_label" '
       def is_new_child:
         (.label | type) == "string"
         and (.label | test("^└ .+ · p:[A-Za-z0-9_-]{22}$"));
       def is_legacy_child_for($owner):
         (.label | type) == "string"
-        and (.label | test("^(juggernaut|2ndmate-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"))
+        and (.label | test("^(juggernaut|(lead|2ndmate)-[^/]+)/.+ · p:[A-Za-z0-9_-]{22}$"))
         and (.label | startswith($owner + "/"));
       (.result.workspaces // null) as $spaces
       | select(($spaces | type) == "array")
@@ -2928,7 +2943,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
       | select(([$spaces[]? | select(.workspace_id == $workspace and .label == $workspace_label)] | length) == 1)
       | select(([$spaces[]? | select((.label | type) == "string" and (.label | endswith(" · p:" + $token)))] | length) == 1)
       | select(([$spaces[]? | select((.label | type) == "string" and (.label | endswith(" · p:" + $token)) and .workspace_id == $workspace)] | length) == 1)
-      | select(([$spaces[]? | select(.workspace_id == $parent_workspace and .label == $parent_label)] | length) == 1)
+      | select(([$spaces[]? | select(.workspace_id == $parent_workspace and (.label == $parent_label or (($parent_old | length) > 0 and .label == $parent_old)))] | length) == 1)
       | ([range(0; $spaces | length) | select($spaces[.].workspace_id == $parent_workspace)]) as $parents
       | ([range(0; $spaces | length) | select($spaces[.].workspace_id == $workspace)]) as $children
       | select(($parents | length) == 1 and ($children | length) == 1)
@@ -2936,7 +2951,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
       | ($children[0]) as $child_index
       | select($child_index > $parent_index)
       | reduce range($parent_index + 1; $child_index) as $i
-          (true; . and (($spaces[$i] | is_new_child) or ($spaces[$i] | is_legacy_child_for($parent_label))))
+          (true; . and (($spaces[$i] | is_new_child) or ($spaces[$i] | (is_legacy_child_for($parent_label) or (($parent_old | length) > 0 and is_legacy_child_for($parent_old))))))
       | select(. == true)
     ' >/dev/null 2>&1 || return 1
   tabs=$(jg_backend_herdr_cli "$session" tab list --workspace "$workspace" 2>/dev/null) || return 1

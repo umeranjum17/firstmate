@@ -100,6 +100,9 @@
 #     schemas; a live ledger or cached copy missing either declaration or declaring
 #     an unsupported version is unavailable even when it contains no captain holds.
 #     These schemas also accept v1 summaries from older producers.
+#     ready_work counts the home's queued items that are unblocked and not held, and
+#     idle_with_ready_work is true when a valid home has no active child work while
+#     ready_work is above zero: a lead that should have been woken to dispatch.
 #   squad_lead_landed: {records[],truncated[],unreadable[],partial[]} - the
 #     compatibility landed-work roll-up derived from squad_lead_current. Readable
 #     structured homes are partial, not unreadable, when an unavailable child state
@@ -111,6 +114,8 @@
 #     with the bearings projection so one Recently Landed section has one owner.
 #   contributions: cached owned-contribution coverage; jg-contributions.sh owns it.
 #   squad_lead_guidance: return-channel action note for renderers and bearings.
+#   prompt_approvals[]: the last 20 well-formed records of
+#     state/prompt-approvals.jsonl; bin/jg-prompt-gate-lib.sh owns them.
 #
 # --contribution-input prints only the canonical backlog/tasks ownership pair,
 # without worker observations or cross-home collection, for the home-local poll.
@@ -1041,6 +1046,9 @@ squad_lead_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
             report_path:((.report_path // null) | if . == null then null else trunc(500) end),
             local_note:((.local_note // null) | if . == null then null else trunc(120) end),completion} ]
        | sort_by([(.completion.date // ""), .id]) | reverse) as $landed_all
+    | ([ $queued_all[]
+         | select(.state == "queued" and (.unresolved_blocker_ids | length) == 0
+                  and .hold_reason == null and .hold_bucket == null) ]) as $ready_all
     | ([ $tasks[] | select(.current_state.state == "unknown") ]) as $unknown_children
     | ([ $owned_in_flight[]
          | select(.requires_child_metadata)
@@ -1133,6 +1141,7 @@ squad_lead_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
         reason:$reason,
         invalidity:$invalidity,
         state:$state,
+        ready_work:($ready_all | length),
         active_children:$active_all[:$child_n],
         decisions_open:$decisions_all[:$decisions_n],
         holds:$holds_all[:$queued_n],
@@ -1907,6 +1916,8 @@ squad_lead_current_json() {  # <parent-tasks-json-file> <output-file>
         {id:$id,home:$home,host:($host | if . == "" then null else . end),remote:$remote,registered:$registered,
          spawn_gen:($spawn_gen | if . == "" then null else . end),
          current:{state:$state,reason:(if $summary_valid then null else "structured home state invalid: " + ($summary.reason // "unknown reason") end)},invalidity:$summary.invalidity,
+         ready_work:($summary.ready_work // 0),
+         idle_with_ready_work:($summary_valid and $summary.state == "no_active_work" and ($summary.ready_work // 0) > 0),
          reconcile_inventory:$summary.invalidity,
          provenance:{selected:"structured-home",structured_home:$home,summary_source:$summary_source,summary_valid:$summary_valid,
            trust:(if $summary_valid then "complete" else "partial-structured" end),parent_event_role:"historical-only"},
@@ -2081,8 +2092,11 @@ squad_lead_current_json "$TASKS_JSON_FILE" "$SQUAD_LEAD_CURRENT_JSON_FILE" \
 squad_lead_landed_from_current_json "$SQUAD_LEAD_CURRENT_JSON_FILE" "$SQUAD_LEAD_LANDED_JSON_FILE" \
   || { echo "jg-fleet-snapshot: squad_lead landed projection failed" >&2; exit 1; }
 
+PROMPT_APPROVALS_JSON=$(tail -n 20 "$STATE/prompt-approvals.jsonl" 2>/dev/null \
+  | jq -cR 'fromjson? // empty' | jq -cs .) || PROMPT_APPROVALS_JSON='[]'
 jq -n \
   --arg generated "$SNAPSHOT_NOW" \
+  --argjson prompt_approvals "${PROMPT_APPROVALS_JSON:-[]}" \
   --arg jg_home "$JG_HOME" \
   --arg jg_root "$JG_ROOT" \
   --arg state "$STATE" \
@@ -2117,6 +2131,7 @@ jq -n \
      scout_reports:($scout_reports | map(. + {kind:report_kind(.id)})),
      squad_lead_current:$squad_lead_current,
      squad_lead_landed:$squad_lead_landed,
+     prompt_approvals:$prompt_approvals,
      squad_lead_guidance:{
        note:"For kind=squad_lead, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
      }

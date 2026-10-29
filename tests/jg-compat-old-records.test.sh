@@ -40,6 +40,17 @@ mv "$h/config/firstmate-role" "$h/config/juggernaut-role"
   || fail "the new role file must win once it exists"
 pass "the new role file wins over the old one"
 
+# backlog transition lib: an old caller reads its output variable under set -u
+printf 'spawn_gen=g1\n' > "$h/state/t.meta"
+(
+  set -u
+  # shellcheck disable=SC1090
+  . "$ROOT/bin/fm-backlog-transition-lib.sh"
+  fm_backlog_meta_spawn_gen "$h/state/t.meta" "$h/state" >/dev/null 2>&1
+  [ "$FM_BACKLOG_META_SPAWN_GEN" = g1 ]
+) || fail "an old caller cannot read FM_BACKLOG_META_SPAWN_GEN after the old transition function"
+pass "the old transition lib answers in its old variables"
+
 # squad lead registry
 printf -- '- lead - desc (home: %s; scope: s; projects: p; added 2026-10-14)\n' "$h" > "$h/data/${legacy_lead}s.md"
 reg=$(. "$ROOT/bin/jg-compat.sh"; jg_compat_pick "$h/data/squad_leads.md")
@@ -76,4 +87,65 @@ for pair in "bin/fm-backend.sh:fm_meta_get" "bin/fm-backend.sh:fm_backend_of_met
   (. "$ROOT/$lib" >/dev/null 2>&1; declare -F "$fn" >/dev/null) || fail "$fn is not defined after sourcing $lib"
 done
 pass "old function names answer through the old library paths"
+# every old library path answers to the old name of each function its renamed
+# library defines, including a library that does not load the compatibility
+# layer itself (an OpenCode plugin loaded before the rename calls
+# fm_supervision_needed through bin/fm-supervision-lib.sh)
+for shim in "$ROOT"/bin/fm-*-lib.sh; do
+  missing=$(
+    before=$(compgen -A function)
+    # shellcheck disable=SC1090
+    . "${shim%/*}/jg-${shim##*/fm-}" >/dev/null 2>&1
+    new=$(compgen -A function | grep -vxF "$before" | grep '^jg_' | grep -v '^jg_compat_')
+    # shellcheck disable=SC1090
+    . "$shim" >/dev/null 2>&1
+    for fn in $new; do declare -F "fm_${fn#jg_}" >/dev/null || printf '%s ' "fm_${fn#jg_}"; done
+  )
+  [ -z "$missing" ] || fail "sourcing ${shim##*/} leaves old names undefined: $missing"
+done
+(. "$ROOT/bin/fm-supervision-lib.sh"; declare -F fm_supervision_needed >/dev/null) \
+  || fail "fm_supervision_needed is not defined after sourcing bin/fm-supervision-lib.sh"
+pass "every old library path answers to its library's old function names"
+# an old caller that runs a library as `bash <old path>` reaches the renamed
+# library even though that library is not executable
+[ ! -x "$ROOT/bin/jg-supervision-engine-lib.sh" ] \
+  || fail "bin/jg-supervision-engine-lib.sh is executable, so this case no longer proves anything"
+mkdir -p "$h/host-config"
+bash "$ROOT/bin/fm-supervision-engine-lib.sh" enabled "$h/host-config" opencode 2>/dev/null
+rc=$?
+[ "$rc" -eq 1 ] || fail "the old engine path answered $rc, not 1, for a home without a supervision host"
+printf 'claude claude-haiku-5-5\n' > "$h/host-config/supervision-host"
+bash "$ROOT/bin/fm-supervision-engine-lib.sh" enabled "$h/host-config" opencode 2>/dev/null \
+  || fail "the old engine path did not see the home's supervision host"
+pass "an old caller running a library through bash reaches the renamed library"
+# a per-lead pin left under the old directory name
+mkdir -p "$h/config/${legacy_lead}s/lead1"
+printf 'claude claude-haiku-5-5 low\n' > "$h/config/${legacy_lead}s/lead1/harness"
+[ "$(JG_HOME="$h" JG_CONFIG_OVERRIDE="$h/config" bash "$ROOT/bin/jg-harness.sh" squad-lead-model lead1 2>&1)" = claude-haiku-5-5 ] \
+  || fail "an old config/${legacy_lead}s/<id>/harness pin is not read"
+pass "an old per-lead pin directory is still read"
+# a saved contribution record under the old schema name
+rec='{"schema":"fm-contributions.v1","task":"t","records":[]}'
+prog=$(cat "$ROOT/bin/jg-contributions.jq"; printf '\nvalid_record\n')
+printf '%s' "$rec" | jq -e "$prog" >/dev/null \
+  || fail "a record saved under fm-contributions.v1 is treated as unreadable"
+pass "an old contribution record is still readable"
+# the migrator renames a lead home's markers, header wording and pin directory, and rolls back exactly
+lh=$h/leadhome
+mkdir -p "$lh"/config/"${legacy_lead}"s/l1 "$lh"/state "$lh"/data
+printf 'claude claude-haiku-5-5 low\n' > "$lh/config/${legacy_lead}s/l1/harness"
+printf 'l1\n' > "$lh/.fm-${legacy_lead}-home"
+printf 'schema=fm-%s-parent.v1\nroute=remote\n' "$legacy_lead" > "$lh/.fm-${legacy_lead}-parent"
+printf '# main-authoritative. read-only in %s homes, must not be edited there. Ask the main first%s.\n' "$legacy_lead" mate > "$lh/data/captain-shared.md"
+cp -a "$lh" "$h/leadhome-before"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --apply >/dev/null 2>&1 || fail "migrator apply failed on an old lead home"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --verify >/dev/null 2>&1 || fail "migrator verify failed on an old lead home"
+grep -q '^l1$' "$lh/.jg-squad-lead-home" && grep -q '^schema=jg-squad-lead-parent.v1$' "$lh/.jg-squad-lead-parent" \
+  && grep -q 'read-only in squad_lead homes' "$lh/data/captain-shared.md" \
+  && grep -q 'claude-haiku-5-5' "$lh/config/squad_leads/l1/harness" \
+  && [ ! -e "$lh/.fm-${legacy_lead}-home" ] && [ ! -e "$lh/.fm-${legacy_lead}-parent" ] && [ ! -e "$lh/config/${legacy_lead}s" ] \
+  || fail "the migrator left an old marker, header wording or pin directory"
+bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --rollback >/dev/null 2>&1 || fail "migrator rollback failed"
+diff -r "$h/leadhome-before" "$lh" >/dev/null || fail "rollback did not restore the old lead home"
+pass "the migrator renames old lead records and rolls back exactly"
 printf 'jg-compat-old-records passed\n'

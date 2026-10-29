@@ -18,7 +18,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 mode=apply
 for arg in "$@"; do case $arg in --dry-run) mode=dry ;; *) echo "usage: install.sh [--dry-run]" >&2; exit 2 ;; esac; done
 JG_HOME=${JG_HOME:-$HOME/juggernaut} PORT=${PORT:-4390} SPARE_PORT=${SPARE_PORT:-4395}
-OLD=jg-dashboard.service NEW=jg-dashboard-lookout.service
+OLD="jg-dashboard.service fm-dashboard.service fm-dashboard-lookout.service" NEW=jg-dashboard-lookout.service
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 BIND=${BIND:-$(tailscale ip -4 | head -1)}
 run() { echo "+ $*"; case $mode in *dry) ;; *) "$@" ;; esac; }
@@ -56,6 +56,7 @@ fi
 echo "== 2. swap"
 if [ "$mode" = apply ]; then mkdir -p "$unit_dir"; unit > "$unit_dir/$NEW"; else echo "+ write $unit_dir/$NEW"; fi
 run systemctl --user daemon-reload
-run systemctl --user disable --now "$OLD"
+# A home never installed under a name has no such unit, and fm-* names are what a pre-rename home still runs on this port.
+for old in $OLD; do run systemctl --user disable --now "$old" || true; done
 run systemctl --user enable --now "$NEW"
 echo "== legacy dashboard rollback is unavailable"
