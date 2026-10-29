@@ -580,6 +580,28 @@ test_hook_silent_in_idle_squad_lead_home() {
   pass "jg-turnend-guard: idle-by-default - silent in a squad_lead home with nothing in flight"
 }
 
+# Routed backlog items are routed work: an idle lead whose own backlog has ready
+# (unheld, unblocked) items needs a live watcher, because the watcher's base-cadence
+# scan is what wakes it to dispatch them. An empty or all-held queue stays idle.
+test_hook_blocks_idle_squad_lead_with_ready_backlog() {
+  local dir out status ids
+  dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-ready")
+  mkdir -p "$dir/data" "$dir/config"
+  cp "$ROOT"/bin/jg-*-lib.sh "$ROOT/bin/jg-tasks-axi.sh" "$dir/bin/"
+  tasks() { JG_HOME="$dir" "$dir/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
+  tasks add held-one "held item"; tasks hold held-one --reason "waiting for approval"
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 0 "$status" "a lead whose only backlog item is held must stay idle"
+  [ -z "$out" ] || fail "held-only backlog produced guard output: $out"
+  tasks add zed-low "unprioritized item"; tasks add urgent-one "urgent item" --priority 0
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 2 "$status" "an idle lead with ready backlog work must keep a live watcher"
+  assert_contains "$out" "2 ready backlog item(s) wait for this idle lead" "block banner must name the ready work"
+  ids=$(bash -c '. "$1"; jg_ready_work_ids "$2"' _ "$dir/bin/jg-supervision-lib.sh" "$dir")
+  [ "$ids" = "urgent-one zed-low" ] || fail "ready work must list P0 first, got: $ids"
+  pass "jg-turnend-guard: an idle squad_lead with ready backlog work keeps a watcher (P0 first); held-only stays idle"
+}
+
 # The stop_hook_active loop guard bounds the squad_lead to one forced
 # continuation per turn, exactly as it does for the main primary - no wedged,
 # un-endable session.
@@ -2254,6 +2276,7 @@ test_hook_uses_state_override
 test_hook_loop_guard_allows_retry
 test_hook_blocks_in_squad_lead_own_home
 test_hook_silent_in_idle_squad_lead_home
+test_hook_blocks_idle_squad_lead_with_ready_backlog
 test_hook_squad_lead_loop_guard_allows_retry
 test_hook_squad_lead_reinvoke_recovery_loop
 test_hook_silent_in_squad_lead_child_worktree

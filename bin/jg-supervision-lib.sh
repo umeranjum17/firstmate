@@ -12,6 +12,33 @@
 # live watcher process means per supervision model. The status fields here retain
 # the beacon-age details used in their messages.
 
+_JG_SUP_BIN=${BASH_SOURCE[0]%/*}
+
+# jg_ready_work_ids <home>
+# Prints the ids of <home>'s ready backlog items (tasks-axi ready: queued, not
+# blocked, not held), space-joined, highest priority first (P0 before P4, an
+# unprioritized item last, ties by id). Returns the ready read's own status so a
+# caller can tell an empty queue from an unreadable one.
+jg_ready_work_ids() {
+  local home=$1 out rc prios
+  out=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" ready 2>/dev/null); rc=$?
+  prios=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" list --state queued --fields priority 2>/dev/null) || prios=
+  printf '%s\n' "$out" | awk -v p="$prios" '
+    BEGIN {
+      n = split(p, L, "\n")
+      for (i = 1; i <= n; i++) if (L[i] ~ /^  /) {
+        line = L[i]; sub(/^  /, "", line)
+        id = line; sub(/,.*/, "", id)
+        pr = line; sub(/.*,/, "", pr); gsub(/"/, "", pr)
+        prio[id] = (pr ~ /^[0-9]+$/) ? pr : 9
+      }
+    }
+    /^ready\[[0-9]+\]/ { on = 1; next }
+    on && /^  / { sub(/^  /, ""); split($0, f, ","); print ((f[1] in prio) ? prio[f[1]] : 9), f[1]; next }
+    { on = 0 }' | sort -k1,1n -k2,2 | awk '{ print $2 }' | paste -sd ' ' -
+  return "$rc"
+}
+
 # Portable mtime; Linux stat lacks -f, macOS stat lacks -c.
 jg_sup_stat_mtime() {
   if [ "$(uname)" = Darwin ]; then
@@ -19,6 +46,17 @@ jg_sup_stat_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
+}
+
+# jg_squad_lead_ready_work <state-dir>
+# Prints the ready backlog ids and returns 0 only for a squad_lead home with some.
+# The main home and a squad_lead with an empty queue stay idle: nothing is invented.
+jg_squad_lead_ready_work() {
+  local home=${JG_HOME:-${1%/*}} marker ids
+  if declare -F jg_compat_marker >/dev/null; then marker=$(jg_compat_marker "$home"); else marker=$home/.jg-squad-lead-home; fi
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  ids=$(jg_ready_work_ids "$home") && [ -n "$ids" ] || return 1
+  printf '%s\n' "$ids"
 }
 
 # jg_supervision_status <state-dir> [grace-seconds]
@@ -35,10 +73,15 @@ jg_sup_stat_mtime() {
 #                         sweep's call at execution time, and a home whose check
 #                         no longer validates needs the watcher precisely so the
 #                         sweep can report the rejection instead of going quiet.
+#   JG_SUP_READY_WORK     count of ready backlog items in a squad_lead home with
+#                         nothing else needing supervision (else 0); jg_ready_work_ids
+#                         owns readiness
 #   JG_SUP_NEEDED         true/false - in-flight work, an X-mode relay poll, a
 #                         registered event source (a source is a wait on an
 #                         external process, not a task, so it has no metadata),
-#                         or a registered custom check
+#                         a registered custom check, or ready backlog work in a
+#                         squad_lead home, whose idle lead only learns of it from
+#                         the watcher's ready-work wake
 #   JG_SUP_WATCHER_FRESH  true/false - a watcher beacon within the grace window, or
 #                         a live lock-matched watcher still in its first scan (no
 #                         beacon yet) younger than the stall bound; needs
@@ -48,8 +91,9 @@ jg_sup_stat_mtime() {
 # grace-seconds defaults to $JG_GUARD_GRACE, then 300, matching jg-guard.sh.
 # Always returns 0; callers read the vars, or use jg_supervision_unhealthy below.
 jg_supervision_status() {
-  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age pid
+  local state=$1 grace=${2:-${JG_GUARD_GRACE:-300}} meta source check id beat m age pid ready
   JG_SUP_IN_FLIGHT=0
+  JG_SUP_READY_WORK=0
   JG_SUP_NEEDED=false
   JG_SUP_WATCHER_FRESH=false
   JG_SUP_BEACON_DESC=never
@@ -80,6 +124,10 @@ jg_supervision_status() {
     || [ "$JG_SUP_SOURCES" -gt 0 ] \
     || [ "$JG_SUP_CHECKS" -gt 0 ]; then
     JG_SUP_NEEDED=true
+  else
+    # shellcheck disable=SC2034 # Read by callers (jg-turnend-guard.sh) after sourcing.
+    ready=$(jg_squad_lead_ready_work "$state") && [ -n "$ready" ] \
+      && JG_SUP_READY_WORK=$(printf '%s\n' "$ready" | wc -w) && JG_SUP_NEEDED=true
   fi
 
   beat="$state/.last-watcher-beat"
