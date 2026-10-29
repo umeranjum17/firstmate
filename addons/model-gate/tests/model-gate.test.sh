@@ -116,7 +116,9 @@ jq 'del(.provider["ollama-cloud"].whitelist)' "$w/oc.json" >"$w/oc.tmp" && mv "$
 for _ in 1 2 3 4 5 6; do "$gate" opencode >/dev/null 2>&1 & done; wait
 is "concurrent runs leave valid JSON with the whitelist" "$(jq -c '.provider["ollama-cloud"].whitelist' "$w/oc.json" 2>&1)" '["deepseek-v4.1-flash"]'
 is "concurrent runs leave no lock or temp file" "$(find "$w" -maxdepth 1 \( -name 'oc.json.lock' -o -name 'oc.json.tmp.*' \) | wc -l)" 0
-mkdir "$w/trunc"; printf '#!/bin/sh\n[ "$1" = --arg ] && { printf "{\\"provi"; exit 0; }\nexec /usr/bin/jq "$@"\n' >"$w/trunc/jq"; chmod +x "$w/trunc/jq"
+mkdir "$w/trunc"
+# shellcheck disable=SC2016 # the stub script body is meant literal
+printf '#!/bin/sh\n[ "$1" = --arg ] && { printf "{\\"provi"; exit 0; }\nexec /usr/bin/jq "$@"\n' >"$w/trunc/jq"; chmod +x "$w/trunc/jq"
 jq 'del(.provider["ollama-cloud"].whitelist)' "$w/oc.json" >"$w/oc.tmp" && mv "$w/oc.tmp" "$w/oc.json"
 before=$(cksum <"$w/oc.json")
 PATH=$w/trunc:$PATH "$gate" opencode >/dev/null 2>"$w/log/trunc.err"; rc=$?
