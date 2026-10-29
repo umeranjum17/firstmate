@@ -336,6 +336,29 @@ test_hook_silent_when_no_work_in_flight() {
   pass "jg-turnend-guard: silent no-op with nothing in flight"
 }
 
+test_hook_question_rule_reads_only_the_assistant_reply() {
+  local dir out status tr
+  dir=$(make_primary_dir "$TMP_ROOT/hook-question-reply")
+  tr="$TMP_ROOT/hook-question-reply.jsonl"
+  # Fixture 1: the captain's last message is a question, the assistant's reply is not.
+  printf '%s\n' \
+    '{"type":"user","message":{"role":"user","content":"armored juggernaut shooting maybe?"}}' \
+    '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done. The fix is merged."}]}}' \
+    '{"type":"user","message":{"role":"user","content":"armored juggernaut shooting maybe?"}}' > "$tr"
+  out=$(printf '{"stop_hook_active":false,"transcript_path":"%s"}' "$tr" \
+    | SIGN_OFF_HOME="$TMP_ROOT/no-board" PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 JG_HOME="$dir" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+  case "$out" in *"NOT ON THE BOARD"*) fail "guard quoted the captain's message: $out" ;; esac
+  # Fixture 2: a real assistant reply ending in an unposted question still blocks.
+  printf '%s\n' \
+    '{"type":"user","message":{"role":"user","content":"ok"}}' \
+    '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Should I merge it?"}]}}' > "$tr"
+  out=$(printf '{"stop_hook_active":false,"transcript_path":"%s"}' "$tr" \
+    | SIGN_OFF_HOME="$TMP_ROOT/no-board" PATH="$BLIND_BIN:$PATH" CLAUDECODE=1 JG_HOME="$dir" bash "$dir/bin/jg-turnend-guard.sh" 2>&1); status=$?
+  expect_code 2 "$status" "an assistant reply ending in an unposted question must block"
+  case "$out" in *"Trailing line: Should I merge it?"*) ;; *) fail "wrong trailing line: $out" ;; esac
+  pass "jg-turnend-guard: question rule reads only the assistant reply"
+}
+
 test_hook_blocks_when_fresh_beacon_has_no_live_lock() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-fresh-no-lock")
@@ -2366,6 +2389,7 @@ test_predicate_unregistered_check_needs_nothing
 test_predicate_task_pr_poll_is_not_a_custom_check
 test_predicate_relay_shim_is_not_a_custom_check
 test_hook_silent_when_no_work_in_flight
+test_hook_question_rule_reads_only_the_assistant_reply
 test_hook_blocks_when_fresh_beacon_has_no_live_lock
 test_hook_blocks_source_only_home
 test_hook_blocks_when_dead_lock_has_fresh_beacon
