@@ -32,6 +32,9 @@ _JG_MERGE_OUTCOME_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-pr-lib.sh"
 # shellcheck source=bin/jg-parent-channel-lib.sh
 . "$_JG_MERGE_OUTCOME_LIB_DIR/jg-parent-channel-lib.sh"
+# shellcheck source=bin/jg-board-link-lib.sh
+# shellcheck disable=SC1091
+. "$_JG_MERGE_OUTCOME_LIB_DIR/jg-board-link-lib.sh"
 
 # shellcheck disable=SC2034 # Public result consumed by sourcing callers.
 JG_MERGE_OUTCOME_ALREADY_RECORDED=false
@@ -58,7 +61,7 @@ JG_MERGE_OUTCOME_ALREADY_RECORDED=false
 # than treat it as success: the merge landed and the record did not.
 jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [authority]
   local home=$1 state=$2 id=$3 url=$4 origin=$5
-  local authority=${6-} suffix=
+  local authority=${6-} suffix='' card_link
   local self_rc=0 destination='' line lock status=0
   local provider host path number
   # shellcheck disable=SC2034 # Sourced wake helpers consume these scoped globals.
@@ -80,6 +83,9 @@ jg_merge_outcome_report() {  # <home> <state> <task-id> <pr-url> <origin> [autho
 
   if destination=$(jg_parent_channel_destination "$home" "$state"); then
     line="done [key=merged-$id]: merged $id $JG_PR_URL$suffix"
+    if card_link=$(jg_board_link reports "$(jg_board_merge_key "$JG_PR_URL")" 2>/dev/null); then
+      line="$line card=$card_link"
+    fi
   else
     self_rc=$?
     [ "$self_rc" -eq 1 ] || return 3

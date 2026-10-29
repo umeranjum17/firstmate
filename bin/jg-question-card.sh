@@ -52,6 +52,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-question-lib.sh
 . "$SCRIPT_DIR/jg-question-lib.sh"
+# shellcheck source=bin/jg-board-link-lib.sh
+. "$SCRIPT_DIR/jg-board-link-lib.sh"
 
 usage() {
   awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
@@ -104,7 +106,7 @@ flag_value() {  # <flag> -> the value that follows it
 }
 
 cmd_post() {
-  local title ask_ref before after key board out rc=0
+  local title ask_ref before after key board out link rc=0
   split_board "$@"
   require_signoff
   title=$(flag_value --title)
@@ -129,6 +131,8 @@ cmd_post() {
     [ -n "$key" ] || die "sign-off-axi accepted the card but the board shows no open card; run sign-off-axi status and report this"
   fi
   printf '%s\n' "$key"
+  link=$(jg_board_link decide "$key") && printf 'link: %s\n' "$link" >&2
+  return 0
 }
 
 cmd_keys() {
