@@ -30,17 +30,22 @@ check() { # expected-exit, label, command...
   else printf 'ok - %s\n' "$label"; fi
 }
 text_check() { printf '%s\n' "$1" | bash "$checker"; }
-check 1 'checker refuses CLI mention' text_check 'Review with lavish-axi'
+check 1 'checker refuses publish command' text_check 'lavish-axi review.html'
+check 1 'checker refuses publish verb' text_check 'lavish-axi publish board'
+check 1 'checker refuses publish after separator' text_check 'cd x && lavish-axi .lavish/board.htm'
+check 0 'checker accepts bare package name' text_check 'Installed package lavish-axi 0.4'
+check 0 'checker accepts non-publish subcommand' text_check 'lavish-axi poll'
 check 1 'checker refuses Lavish session URL' text_check 'http://review.example:4387/session/umer'
 check 1 'checker refuses IPv6 HTTPS URL' text_check 'https://[::1]:4387/session/umer'
 check 0 'checker accepts sign-off URL' text_check 'http://review.example:4388/board/umer'
 check 0 'checker accepts unrelated port and prose' text_check 'Lavish was retired; http://review.example:43870/session/umer'
 check 0 'checker accepts empty text' text_check ''
 
-check 0 'uninstalled note keeps previous behavior' "$status" working 'lavish-axi'
+check 0 'uninstalled note keeps previous behavior' "$status" working 'lavish-axi review.html'
 bash "$addons/owner-rules/install.sh" "$JG_HOME" >/dev/null
 check 1 'working note refuses Lavish URL' "$status" working 'http://review.example:4387/session/umer'
-check 1 'done note refuses CLI mention' "$status" 'done' 'lavish-axi'
+check 1 'done note refuses publish command' "$status" 'done' 'lavish-axi review.html'
+check 0 'done note accepts bare package name' "$status" 'done' 'Installed package lavish-axi 0.4'
 check 0 'squad_lead note accepts sign-off URL' "$status" 'done' 'http://review.example:4388/board/umer'
 wait_refused() {
   local out
@@ -82,7 +87,7 @@ encoded_post() {
 }
 cp "$board" "$work/before.json"
 check 1 'merge-card refuses Lavish URL before posting' post 'See http://review.example:4387/session/umer'
-check 1 'merge-card refuses CLI mention before posting' post 'Review with lavish-axi'
+check 1 'merge-card refuses publish command before posting' post 'lavish-axi review.html'
 check 1 'merge-card checks decoded JSON text' encoded_post
 if cmp -s "$board" "$work/before.json"; then echo 'ok - refused posts leave board unchanged'
 else echo 'not ok - refused posts changed board'; fails=$((fails + 1)); fi
