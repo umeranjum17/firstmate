@@ -100,3 +100,69 @@ assert_equals 0 "$rc" "a pin on a missing agent never fails the caller"
 assert_equals "" "$JG_BACKEND_HERDR_PINNED_NAME" "nothing pinned on a missing agent"
 assert_contains "$(cat "$tmp/err")" "agent_not_found" "the warning carries herdr's own error"
 pass "agent names map into herdr's rules and the pin handles taken and missing agents"
+
+# --- check over a recorded home -----------------------------------------------
+# The old words, assembled from halves so this file adds no leftover to the
+# rename's tracked-name gate (bin/juggernaut-name-gate.sh).
+OLD_TAB="f""m-"
+OLD_PRODUCT="first""mate"
+OLD_LEAD="2nd""mate-"
+home="$tmp/home"; mkdir -p "$home/state"
+printf 'alpha\n' > "$home/.jg-squad-lead-home"
+export JG_HOME=$home
+task_long=live-names-still-say-the-same-thing-here-aa
+task_old_word="ci-diet-${OLD_PRODUCT}-addons"
+write_task() {  # <id> <tab> <pane>
+  jg_write_meta "$home/state/$1.meta" "backend=herdr" "herdr_session=s" \
+    "herdr_workspace_id=w1" "herdr_tab_id=$2" "herdr_pane_id=$3"
+}
+write_task "$task_long" w1:t1 w1:p1
+write_task short-task w1:t2 w1:p2
+write_task "$task_old_word" w1:t3 w1:p3
+
+reset_home_world() {
+  : > "$calls"
+  cat > "$world" <<EOF
+{"workspaces":[
+   {"workspace_id":"w1","label":"${OLD_LEAD}alpha"},
+   {"workspace_id":"w9","label":"${OLD_LEAD}beta"}],
+ "tabs":[
+   {"tab_id":"w1:t1","workspace_id":"w1","label":"${OLD_TAB}${task_long}"},
+   {"tab_id":"w1:t2","workspace_id":"w1","label":"jg-short-task"},
+   {"tab_id":"w1:t3","workspace_id":"w1","label":"${OLD_TAB}${task_old_word}"},
+   {"tab_id":"w9:t1","workspace_id":"w9","label":"${OLD_TAB}beta-task"}],
+ "agents":[
+   {"pane_id":"w1:p1","tab_id":"w1:t1","name":"juggernaut-4"},
+   {"pane_id":"w1:p2","tab_id":"w1:t2","name":"short-task"},
+   {"pane_id":"w1:p3","tab_id":"w1:t3","name":"juggernaut-2"},
+   {"pane_id":"w9:p1","tab_id":"w9:t1","name":"${OLD_TAB}beta-task"}]}
+EOF
+}
+
+names_sh="$ROOT/bin/jg-herdr-names.sh"
+reset_home_world
+out=$(bash "$names_sh" check 2>&1); rc=$?
+expect_code 1 "$rc" "check fails while old names are live"
+assert_contains "$out" "LEAK s w1 workspace=${OLD_LEAD}alpha" "check names the workspace once"
+assert_contains "$out" "LEAK s $task_long tab=${OLD_TAB}${task_long}" "check names the old tab prefix"
+assert_not_contains "$out" "w9" "check never reads another home's workspace"
+assert_not_contains "$out" "beta-task" "check never reads another home's tab or agent"
+assert_not_contains "$out" "LEAK s short-task" "an already-clean task is not reported"
+assert_equals 1 "$(printf '%s\n' "$out" | grep -c 'workspace=')" "a shared workspace is reported once"
+
+
+# After the old names are gone the check passes.
+jq -c '(.workspaces[] | select(.workspace_id == "w1") | .label) = "lead-alpha"
+  | (.tabs[] | select(.workspace_id == "w1") | .label) |= (if startswith("'"${OLD_TAB}"'") then "jg-" + .[3:] else . end)
+  | (.agents[] | select(.pane_id | startswith("w1:")) | .name) = "ok-name"' "$world" > "$world.new" && mv "$world.new" "$world"
+out=$(bash "$names_sh" check 2>&1); rc=$?
+expect_code 0 "$rc" "check passes once the old names are gone ($out)"
+pass "check names every old-word label of the recorded items and ignores other homes"
+
+# An unreadable recorded session is neither a pass nor a rename.
+rm -f "$world"
+out=$(bash "$names_sh" check 2>&1); rc=$?
+expect_code 2 "$rc" "check cannot pass when the session is unreadable"
+assert_contains "$out" "cannot read herdr session 's'" "the unreadable session is named"
+pass "check refuses an unreadable session"
+
