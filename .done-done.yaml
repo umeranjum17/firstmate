@@ -11,3 +11,6 @@ journeys:
   ready-backlog-stall:
     command: bash journeys/ready-backlog-stall.sh
     timeout: 45m
+secrets:
+  allow:
+    - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
