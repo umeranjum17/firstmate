@@ -1037,6 +1037,13 @@ The file is read from this home's own configuration directory on every launch, s
 It is not in the inherited configuration set, so no other home, including a Squad Lead home, receives it; create the file in each home that wants it.
 It does not apply to a Squad Lead's own agent, which neither reads nor refuses on it.
 
+### Built-in: workers cannot ask the human
+
+A worker never asks the human directly; its question belongs to its lead.
+So every ship and Recon launch hides the runtime's own ask tool, with or without this file: Claude gets `--disallowedTools=AskUserQuestion`, OpenCode gets `"question":"deny"` in its permission config, and `pi` and `pi-signed` get `ask_user_question` in `--exclude-tools` ahead of any listed names.
+A Squad Lead's agent keeps its tools, and the other runtimes have no ask tool to hide here.
+A dialog that still opens on any runtime is caught by the stuck-worker detector in `bin/jg-stuck-gate-lib.sh`.
+
 ### Runtime support
 
 | Runtime | With a non-empty list |
