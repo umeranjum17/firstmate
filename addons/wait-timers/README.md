@@ -107,6 +107,26 @@ Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
 - The board card is raised from the main home only, even when Main has not
   read its wakes, so it still fires with Main absent.
 
+## Stalled ready backlog
+
+A lead that ignores its ready-work wake (`bin/jg-watch.sh` `ready_work_waits_idle`) is the same ladder with the lead as the stuck party.
+`jg_wait_timers_backlog` runs from a lead home's tick at most every `JG_READY_STALL_POLL_SECS` (default 60), and the watcher's `ready_backlog_stall_state` owns the condition.
+The condition holds while a ready, unheld item could start now and the home has a free lane.
+A free lane is fewer open lanes than `config/lane-target`, or than 4 without a usable one.
+An item whose project's declared capacity is already held cannot start now, so it does not count (`bin/jg-project-capacity-lib.sh`).
+
+| rung | when | who acts |
+|---|---|---|
+| ready work on a free lane | first sight | the existing ready-work wake asks the lead to dispatch |
+| nothing started | `JG_READY_STALL_SECS` (default 900) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
+| still nothing started | every `JG_PROMPT_REALERT_SECS` | both fire again |
+
+- A start is a lane id that was not open before; it ends the episode and re-arms the clock.
+- The condition clearing (no startable ready item, or no free lane) ends the episode, and a reported one is closed with `waiting-timer-cleared`.
+- An unreadable backlog leaves the episode untouched for that poll.
+- There is no board card rung for a stalled backlog.
+- Episode record: `state/.waiting-timers/.ready-backlog`, one tab-separated line holding first-observed time, open lane ids (comma-joined, `-` for none), report key (`waiting-timer-<home>-<lead>-g<generation>-ready-backlog`), first report time (0 before it), and last fire time.
+
 ## Provenance: byte-identical to the fork at the move
 
 Every moved file was compared byte for byte against its fork source at

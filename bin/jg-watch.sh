@@ -146,6 +146,14 @@
 #                          Re-raised while the condition holds, once per
 #                          new ready set and then every READY_WORK_RESURFACE_SECS;
 #                          intake uses HEARTBEAT's base interval, never its backoff
+#   check: ready backlog stalled: <ids> waits with free lanes (<open>/<target> open) and nothing started for <n>s - dispatch them now, P0 first, up to project capacity, or hold each with why it waits; Main was told id=<key>
+#                          the wait-timers chain's stalled-backlog backstop: a
+#                          squad_lead home's ready, startable work sat on a free
+#                          lane with no lane started for JG_READY_STALL_SECS, so
+#                          the lead is woken again and Main gets the same report,
+#                          both re-fired every JG_PROMPT_REALERT_SECS while it
+#                          holds (ready_backlog_stall_state owns the condition;
+#                          addons/wait-timers/README.md owns the rungs)
 #   check: ask-default safe default applied while the captain was unreachable: <ids> ...
 #                          the juggernaut-addons ask-default add-on, when installed,
 #                          applied the recorded safe default of each named ask
@@ -294,6 +302,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
 # shellcheck source=bin/jg-supervision-lib.sh
 . "$SCRIPT_DIR/jg-supervision-lib.sh"
+# shellcheck source=bin/jg-project-capacity-lib.sh
+. "$SCRIPT_DIR/jg-project-capacity-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -3010,6 +3020,61 @@ ready_work_waits_idle() {
   [ "$surfaced_ids" != "$READY_WORK_IDS" ] && return 0
   case "$surfaced_at" in ''|*[!0-9]*) surfaced_at=0 ;; esac
   [ "$(( now - surfaced_at ))" -ge "$READY_WORK_RESURFACE_SECS" ]
+}
+
+# The stalled-backlog condition the wait-timers chain escalates
+# (addons/wait-timers/README.md "Stalled ready backlog"): this squad_lead home
+# has a ready item that could start now and a free lane. A free lane is fewer
+# open lanes than config/lane-target, or than 4 without a usable one; an item
+# could start now unless its project's declared capacity is already held
+# (bin/jg-project-capacity-lib.sh). Sets READY_STALL_IDS (startable ids, P0
+# first), READY_STALL_OPEN, READY_STALL_TARGET, and READY_STALL_LANES (the open
+# lane ids, comma-joined, so the chain can see a start). Returns 0 when the
+# condition holds, 1 when it does not, and 2 when the backlog cannot be read,
+# so an unknown poll never clears or fires an episode.
+ready_backlog_stall_state() {
+  local rows rc id repo proj cfg seen='|' full='|' meta kind
+  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES=''
+  [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
+  rows=$(jg_ready_work_rows "$JG_HOME"); rc=$?
+  [ "$rc" -eq 0 ] || return 2
+  [ -n "$rows" ] || return 1
+  READY_STALL_TARGET=$(lane_target_value) || READY_STALL_TARGET=4
+  READY_STALL_OPEN=$(open_lane_count) || return 2
+  [ "$READY_STALL_OPEN" -lt "$READY_STALL_TARGET" ] || return 1
+  cfg=$(jg_project_capacity_config_dir "$JG_HOME" "$CONFIG" 2>/dev/null) || cfg=
+  while read -r id repo; do
+    [ -n "$id" ] || continue
+    proj="$JG_HOME/projects/$repo"
+    if [ -n "$cfg" ] && [ "$repo" != - ] && [ -d "$proj" ]; then
+      case "$seen" in
+        *"|$repo|"*) ;;
+        *)
+          seen="$seen$repo|"
+          # A declaration or holder count that cannot be read keeps the item:
+          # nothing then starts at all, which is exactly what must escalate.
+          if jg_project_capacity_lookup "$cfg" "$repo" && [ -n "$JG_PROJECT_CAPACITY" ] \
+            && jg_project_capacity_occupants "$(jg_treehouse_project_lock_path "$proj" 2>/dev/null)" "$proj" "$STATE" "" \
+            && [ "$JG_PROJECT_CAPACITY_OCCUPANTS" -ge "$JG_PROJECT_CAPACITY" ]; then
+            full="$full$repo|"
+          fi
+          ;;
+      esac
+      case "$full" in *"|$repo|"*) continue ;; esac
+    fi
+    READY_STALL_IDS="${READY_STALL_IDS:+$READY_STALL_IDS }$id"
+  done <<EOF
+$rows
+EOF
+  [ -n "$READY_STALL_IDS" ] || return 1
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] || continue
+    kind=$(jg_meta_get "$meta" kind 2>/dev/null || true)
+    case "${kind:-ship}" in
+      ship|scout) id=${meta##*/}; READY_STALL_LANES="${READY_STALL_LANES:+$READY_STALL_LANES,}${id%.meta}" ;;
+    esac
+  done
+  return 0
 }
 
 # Records the ready set just surfaced with its epoch, after the wake was

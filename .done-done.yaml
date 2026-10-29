@@ -8,3 +8,9 @@ journeys:
     command: bash addons/tickets-sync/run-stage-proof.sh
   tickets-writeback:
     command: bash journeys/tickets-writeback.sh
+  ready-backlog-stall:
+    command: bash journeys/ready-backlog-stall.sh
+    timeout: 45m
+secrets:
+  allow:
+    - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
