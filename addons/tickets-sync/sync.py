@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from task_rows import toon_rows
 from lane import progress as lane_progress
 import cleanup
+import reconcile
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves here
 for _jg_old, _jg_val in list(os.environ.items()):
@@ -261,7 +262,18 @@ def sync():
                 publish(tid, desired)
         if options.cleanup:
             carded = {d['ticket'] for d in json.loads(run(['sign-off-axi', 'list', str(board), '--json'])).get('decisions', []) if d.get('ticket')}
-            line = cleanup.daily(items, dt.datetime.now(dt.timezone.utc).date(), state, board, home, run, carded)
+            def cards():
+                # Waiting sign-off cards whose source is closed are archived; the rest go to Main in one short list.
+                now = dt.datetime.now(dt.timezone.utc)
+                by_id = {}
+                for it in items: by_id.setdefault(it['row']['id'], []).append(it['row'])
+                ctx = dict(tickets=existing, items={i: r[0] for i, r in by_id.items() if len(r) == 1}, prs={}, run=run)
+                def log(message):
+                    with (state / 'card-reconcile.log').open('a') as out: out.write(f'{now:%Y-%m-%d} {message}\n')
+                dismissed, kept, unclear = reconcile.reconcile(json.loads(run(['sign-off-axi', 'list', str(board), '--json'])).get('decisions', []), ctx, now, board, run, log)
+                (state / 'cards-unclear.txt').write_text(''.join(f'{k} - {t} - {w}\n' for k, t, w in unclear))
+                return f'\ncards: {dismissed} archived, {kept} kept (source open), {len(unclear)} for Main' + ''.join(f'\n  {k} - {t[:70]} - {w}' for k, t, w in unclear[:8]) + (f'\n  +{len(unclear) - 8} more in state/tickets-sync/cards-unclear.txt' if len(unclear) > 8 else '')
+            line = cleanup.daily(items, dt.datetime.now(dt.timezone.utc).date(), state, board, home, run, carded, cards)
             if line: print(line)
             return
         if options.check:

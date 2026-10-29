@@ -204,3 +204,18 @@ grep -q "ticket-cleanup-$(date -u +%F)" "$work/cards.json"
 jq -e '[.decisions[].detail // ""] | any(contains("no-ask-card: main/other")) and (any(contains("no-ask-card: main/ask3")) | not)' "$work/cards.json"
 test -z "$(bash "$work/cleanup.sh")"
 echo 'PASS: the daily clean-up flags, back-fills a quote from the steer record, raises one card and runs once a day'
+
+# The card reconcile (same daily pass) archives a waiting card whose ticket is done, keeps one whose
+# ticket is open, and lists a card with no source to check for Main.
+rm -f "$JG_HOME/state/tickets-sync/cleanup.day"
+raise_card() { sign-off-axi raise "$work/board.json" --key "$1" --ask-ref "$1" --title "$2" --why "Fixture card." --outcome yes=Done --outcome no=Not --recommend yes --recommend-reason ok --default yes "${@:3}" >/dev/null; }
+raise_card closed-source "Is the old history still wanted?" --ticket jg-history-fixture
+raise_card open-source "Is the open ask still wanted?" --ticket "$(ticket_id main/ask3)"
+raise_card no-source "Does the unlinked thing matter?"
+out=$(bash "$work/cleanup.sh")
+grep -q '^cards: 1 archived, [0-9]* kept (source open), 1 for Main' <<<"$out"
+grep -q 'no-source - Does the unlinked thing matter?' <<<"$out"
+sign-off-axi list "$work/board.json" --json > "$work/cards.json"
+jq -e '.decisions | (map(select(.key == "closed-source" and .dismissed)) | length == 1) and (map(select(.key == "open-source" and (.dismissed | not))) | length == 1) and (map(select(.key == "no-source" and (.dismissed | not))) | length == 1)' "$work/cards.json"
+grep -q 'dismissed closed-source (done-elsewhere): ticket .* is done' "$JG_HOME/state/tickets-sync/card-reconcile.log"
+echo 'PASS: the card reconcile archives a closed-source card, keeps an open-source one and lists an unjudged one'
