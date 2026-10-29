@@ -52,7 +52,7 @@ def findings(items, today):
     return out
 
 
-def daily(items, today, state, board, home, run, carded):
+def daily(items, today, state, board, home, run, carded, cards=None):
     """Once a UTC day (carded: ids of tickets an ask card names): back-fill missing quote parts, raise one keep/remove card, return the one board line."""
     day = state / 'cleanup.day'
     if day.exists() and day.read_text() == today.isoformat(): return None
@@ -84,4 +84,4 @@ def daily(items, today, state, board, home, run, carded):
              '--outcome', 'remove=Main closes the flagged tickets on the board and keeps their quotes.',
              '--recommend', 'keep', '--recommend-reason', 'Nothing is lost if they stay.', '--default', 'keep'])
     day.write_text(today.isoformat())
-    return f'tickets-cleanup: flagged {summary}; {filled} quotes back-filled' + (f'; card {card}' if card else '')
+    return f'tickets-cleanup: flagged {summary}; {filled} quotes back-filled' + (f'; card {card}' if card else '') + (cards() if cards else '')
