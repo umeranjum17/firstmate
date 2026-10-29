@@ -94,3 +94,35 @@ nav_case "dropped with empty quote refused" 1 'ui_change=yes\n' "$NB"$'\nNav aft
 nav_case "dropped with captain words passes" 0 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox\nRemoved by captain words: "drop Settings, it is dead"'
 nav_case "CRLF body passes" 0 'ui_change=yes\n' $'Nav before: Home\r\nNav after: Home\r\n'
 pass "nav gate table: every refusal and every pass"
+
+# The TakeOne demo gate: off without config/takeone-demo; on, yes needs a bound PASS
+# receipt with a `takeone receipt:` line, no passes, a missing call warns and passes.
+cfg=$home/config
+dgate() { jg_dod_demo_gate "$cfg" "$home/state" task "$home/state/task.meta" "$head" 2>&1; }
+mkdir -p "$cfg"
+rm -f "$cfg/takeone-demo"
+mkmeta 'demo_call=yes\n'
+rm -f "$rec"
+dgate >/dev/null || fail "demo gate must stay off without config/takeone-demo"
+pass "demo gate is off by default"
+
+: > "$cfg/takeone-demo"
+mkmeta 'demo_call=no\n'
+dgate >/dev/null || fail "demo_call=no must pass"
+mkmeta ''
+out=$(dgate) || fail "missing demo_call must pass: $out"
+assert_contains "$out" "counting it as demo_call=no" "missing demo call did not warn"
+mkmeta 'demo_call=yes\n'
+out=$(dgate) && fail "yes task without a receipt must be refused"
+assert_contains "$out" "merge refused" "no-receipt refusal"
+receipt PASS "$head" $'notes\nfirst-draft receipt: fd-123'
+dgate >/dev/null && fail "a first-draft line must not satisfy the TakeOne gate"
+receipt PASS "$head" $'notes\ntakeone receipt: to-123'
+dgate >/dev/null || fail "yes task with a takeone receipt line must pass"
+receipt FAIL "$head" $'takeone receipt: to-123'
+dgate >/dev/null && fail "a FAIL receipt must be refused"
+receipt PASS 2222222222222222222222222222222222222222 $'takeone receipt: to-123'
+dgate >/dev/null && fail "a receipt for another head must be refused"
+mkmeta 'demo_call=bogus\n'
+dgate >/dev/null && fail "a malformed demo call must be refused"
+pass "demo gate refuses a yes task without a bound takeone receipt line once switched on"

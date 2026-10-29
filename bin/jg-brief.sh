@@ -14,7 +14,7 @@
 # charters still use a single `{TASK}` charter fill. Juggernaut may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--herdr-lab]
+# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab]
 #        jg-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        jg-brief.sh <task-id> --squad-lead {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -47,6 +47,14 @@
 # refuses to merge a yes-task whose completion receipt evidence carries no
 # `first-draft receipt: <ref>` line. A brief without the line (an older brief)
 # warns at spawn and counts as no. No model decides: the gate is a shell check.
+# --demo-call <yes|no> --demo-reason <text> records the per-task product demo-video
+# call as `Demo-video call (TakeOne): <yes|no> - <reason>`: yes when the task ships a
+# demo video of an app, no otherwise. The pair is validated like the design call and
+# refused on --scout and --squad-lead. It takes effect only while the home has the
+# presence flag config/takeone-demo (docs/configuration.md); with the flag absent the
+# pair is accepted and the brief carries no demo line. bin/jg-spawn.sh records demo_call=,
+# and bin/jg-merge-gate-lib.sh's jg_dod_demo_gate refuses to merge a yes-task whose
+# completion receipt evidence carries no `takeone receipt: <ref>` line.
 # --ui-change <yes|no> records on a ship brief whether the task changes the UI, as
 # `UI change (nav-check): <yes|no>`. A yes brief carries the no-silent-removal rule:
 # the PR body lists `Nav before:` and `Nav after:` and any removed screen is named.
@@ -261,6 +269,8 @@ UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 DESIGN_CALL=
 DESIGN_REASON=
+DEMO_CALL=
+DEMO_REASON=
 UI_CHANGE=
 PROJECT_DIR=
 PROJECT_DIR_SET=0
@@ -281,6 +291,8 @@ for a in "$@"; do
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
       design-call) DESIGN_CALL=$a ;;
       design-reason) DESIGN_REASON=$a ;;
+      demo-call) DEMO_CALL=$a ;;
+      demo-reason) DEMO_REASON=$a ;;
       ui-change) UI_CHANGE=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
@@ -310,6 +322,10 @@ for a in "$@"; do
     --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
     --design-reason) want_value="design-reason" ;;
     --design-reason=*) DESIGN_REASON=${a#--design-reason=} ;;
+    --demo-call) want_value="demo-call" ;;
+    --demo-call=*) DEMO_CALL=${a#--demo-call=} ;;
+    --demo-reason) want_value="demo-reason" ;;
+    --demo-reason=*) DEMO_REASON=${a#--demo-reason=} ;;
     --ui-change) want_value="ui-change" ;;
     --ui-change=*) UI_CHANGE=${a#--ui-change=} ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
@@ -350,6 +366,17 @@ if [ -n "$DESIGN_CALL$DESIGN_REASON" ]; then
   esac
   case "$DESIGN_REASON" in
     ''|*[![:print:]]*|' '*) echo "error: --design-reason needs one printable line stating why (first-draft: $DESIGN_CALL)" >&2; exit 1 ;;
+  esac
+fi
+
+if [ -n "$DEMO_CALL$DEMO_REASON" ]; then
+  [ "$KIND" = ship ] || { echo "error: --demo-call and --demo-reason apply only to ship briefs" >&2; exit 1; }
+  case "$DEMO_CALL" in
+    yes|no) ;;
+    *) echo "error: --demo-call must be yes or no (got '$DEMO_CALL')" >&2; exit 1 ;;
+  esac
+  case "$DEMO_REASON" in
+    ''|*[![:print:]]*|' '*) echo "error: --demo-reason needs one printable line stating why (TakeOne: $DEMO_CALL)" >&2; exit 1 ;;
   esac
 fi
 
@@ -832,6 +859,20 @@ The merge is refused without that line."
   DESIGN_SECTION="$DESIGN_SECTION
 "
 fi
+DEMO_SECTION=
+if [ -n "$DEMO_CALL" ] && [ -e "$CONFIG/takeone-demo" ]; then
+  DEMO_SECTION="
+# Demo-video call
+Demo-video call (TakeOne): $DEMO_CALL - $DEMO_REASON"
+  if [ "$DEMO_CALL" = yes ]; then
+    DEMO_SECTION="$DEMO_SECTION
+Make every product demo video for this task with TakeOne; do not record or edit a separate video path.
+Put one line \`takeone receipt: <reference>\` in the evidence file of your completion receipt.
+The merge is refused without that line."
+  fi
+  DEMO_SECTION="$DEMO_SECTION
+"
+fi
 UI_SECTION=
 if [ -n "$UI_CHANGE" ]; then
   UI_SECTION="
@@ -855,7 +896,7 @@ cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-$DESIGN_SECTION$UI_SECTION
+$DESIGN_SECTION$DEMO_SECTION$UI_SECTION
 $HERDR_SECTION
 
 # Setup

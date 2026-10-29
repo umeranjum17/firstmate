@@ -643,6 +643,17 @@ With it present, ship and Recon briefs gain the `# Waiting` section and the fore
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
 The flag is a home-local preference and is not inherited by Squad Lead homes.
 
+## TakeOne demo-video rule (config/takeone-demo)
+
+The optional local, gitignored `config/takeone-demo` presence flag turns on the rule that every product demo video for every app is made with TakeOne.
+Turn it on with `touch config/takeone-demo` and off with `rm config/takeone-demo`.
+It is off by default, until TakeOne is demo-ready.
+With it present, a ship brief scaffolded with `--demo-call yes --demo-reason <text>` tells the worker to make each demo video with TakeOne and to put one `takeone receipt: <reference>` line in the evidence of its completion receipt.
+The merge scripts then refuse a task recorded `demo_call=yes` unless its passing receipt for the merge head carries that line, and an older task with no recorded call warns and counts as no.
+With the flag absent the scaffold accepts the flags without writing a demo line, and the merge scripts skip the check.
+The flag is a home-local preference and is not inherited by Squad Lead homes.
+`bin/jg-brief.sh`'s header owns the flags, and `bin/jg-merge-gate-lib.sh`'s `jg_dod_demo_gate` owns the check.
+
 ## No-mistakes pipeline spend (config/pipeline-spend)
 
 The optional local, gitignored `config/pipeline-spend` presence flag opts this home into recording per-task no-mistakes pipeline spend in `data/pipeline-spend.jsonl` during teardown.

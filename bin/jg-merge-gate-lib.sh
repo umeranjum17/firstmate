@@ -15,7 +15,8 @@
 # its completion receipt (state/<id>.run-receipt.json, the receipts add-on's record)
 # binds the candidate head with verdict PASS and its evidence carries a
 # `first-draft receipt: <ref>` line. design_call=no passes; a record with no
-# design_call (an older task) warns and counts as no.
+# design_call (an older task) warns and counts as no. jg_dod_demo_gate is the same
+# check for TakeOne demo videos, behind the config/takeone-demo switch.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 # The hooks also get FM_HOME (the pre-rename name) because installed add-on hooks and done-done's merge-gate still read it; delete with the S10 shim.
 _jg_d=${BASH_SOURCE[0]%/*}
@@ -74,8 +75,19 @@ jg_merge_post_hook() {  # <config-dir> <home> <id> <meta> <head|-> <pr-url|->
   return 0
 }
 
+# True when the task's completion receipt binds this head with verdict PASS and its
+# evidence carries a `<label>: <ref>` line (the receipts add-on's record).
+_jg_dod_receipt_line() {  # <state> <id> <head> <label>
+  local receipt=$1/$2.run-receipt.json
+  [ -f "$receipt" ] && [ ! -L "$receipt" ] && command -v jq >/dev/null 2>&1 \
+    && jq -se --arg task "$2" --arg head "$3" --arg label "$4" '
+      length == 1 and (.[0] | .task == $task and .head == $head and .verdict == "PASS" and
+      (.evidence | type == "string" and test("(^|\n)" + $label + ": [^[:space:]]")))
+    ' "$receipt" >/dev/null 2>&1
+}
+
 jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
-  local state=$1 id=$2 meta=$3 head=$4 call receipt
+  local state=$1 id=$2 meta=$3 head=$4 call
   [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
   call=$(jg_dod_meta_value "$meta" design_call)
   case $call in
@@ -84,15 +96,30 @@ jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
     yes) ;;
     *) echo "merge refused: design call for $id is malformed ('$call'); expected yes or no"; return 1 ;;
   esac
-  receipt="$state/$id.run-receipt.json"
-  if [ -f "$receipt" ] && [ ! -L "$receipt" ] && command -v jq >/dev/null 2>&1 \
-    && jq -se --arg task "$id" --arg head "$head" '
-      length == 1 and (.[0] | .task == $task and .head == $head and .verdict == "PASS" and
-      (.evidence | type == "string" and test("(^|\n)first-draft receipt: [^[:space:]]")))
-    ' "$receipt" >/dev/null 2>&1; then
-    return 0
-  fi
+  _jg_dod_receipt_line "$state" "$id" "$head" "first-draft receipt" && return 0
   echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  return 1
+}
+
+# jg_dod_demo_gate is the TakeOne demo-video gate both merge paths call. It is off
+# until the home creates the presence flag config/takeone-demo (docs/configuration.md),
+# and then mirrors jg_dod_design_gate: a task recorded demo_call=yes (bin/jg-brief.sh
+# --demo-call) merges only when its PASS completion receipt for this head carries a
+# `takeone receipt: <ref>` evidence line. demo_call=no passes; a record with no
+# demo_call (an older task) warns and counts as no. A shell check decides.
+jg_dod_demo_gate() {  # <config-dir> <state> <id> <meta> <candidate-head>
+  local config=$1 state=$2 id=$3 meta=$4 head=$5 call
+  [ -e "$config/takeone-demo" ] || return 0
+  [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
+  call=$(jg_dod_meta_value "$meta" demo_call)
+  case $call in
+    no) return 0 ;;
+    '') echo "warning: $id has no demo-video call recorded (an older brief); counting it as demo_call=no" >&2; return 0 ;;
+    yes) ;;
+    *) echo "merge refused: demo-video call for $id is malformed ('$call'); expected yes or no"; return 1 ;;
+  esac
+  _jg_dod_receipt_line "$state" "$id" "$head" "takeone receipt" && return 0
+  echo "merge refused: $id is a product demo-video task (TakeOne: yes) and its completion receipt for this head has no 'takeone receipt: <ref>' evidence line; make the video with TakeOne and republish the receipt"
   return 1
 }
 
