@@ -31,6 +31,8 @@ journeys:
     command: bash journeys/watcher-exit-beacon.sh
   stuck-live-captures:
     command: bash journeys/stuck-live-captures.sh
+  tmp-sweep:
+    command: bash journeys/tmp-sweep.sh
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
