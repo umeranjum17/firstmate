@@ -396,6 +396,15 @@ mark_acted() {
   [ "$old" -eq 0 ] || echo "merge-card: sign-off-axi has no feedback command (needs 0.6.1+), so the PR's cards were not marked acted on"
 }
 
+# One deep-link line for a posted card, when the home's board address is known.
+board_link_line() {  # <card-key>
+  local lib="${JG_CODE_ROOT:-${JG_HOME:-}}/bin/jg-board-link-lib.sh" l
+  [ -r "$lib" ] || return 0
+  # shellcheck disable=SC1090
+  l=$(. "$lib" && jg_board_link reports "$1") && echo "merge-card: link: $l"
+  return 0
+}
+
 post() {
   local board='' id wt head pr record key link title about kind media run receipt=null media_dir out rc n=0 f verdict claim
   local claim_id=() judge=() self
@@ -501,6 +510,7 @@ post() {
     out=$(file_card "$board" "$media_dir/card.json" evidence 2>&1) || die "sign-off-axi could not post $key: $out"
     [ -z "$out" ] || printf '%s\n' "$out"
     echo "merge-card: posted text-only $card_key evidence card"
+    board_link_line "$card_key"
     return 0
   fi
   # The gate's verdict for this merge, else run done-done now (a merge the gate never saw). A recorded
@@ -578,6 +588,7 @@ post() {
   printf '%s\n' "$out"
   [ "$rc" -eq 0 ] || die "sign-off-axi could not post $key (exit $rc)"
   echo "merge-card: posted $card_key ($kind, $n media, $about)"
+  board_link_line "$card_key"
   # Tie the evidence folder to the lint row's PR and head.
   printf '%s\t%s\t%s\tcard\tevidence folder %s\n' "$(date -u +%FT%TZ)" "$pr" "$head" "$JG_HOME/data/$id" >> "$JG_HOME/data/checks-gate.log"
 }
