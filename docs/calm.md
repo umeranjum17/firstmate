@@ -1,5 +1,9 @@
 # Calm mode
 
+Calm is now named Stealth mode: the command is `/stealth` and the preference is `config/stealth`.
+The old `/calm` command and `config/calm` file keep working as aliases (read both, write only the new name).
+This page keeps the name Calm in headings and file names, which are unchanged.
+
 Calm is Juggernaut's conversation-only transcript presentation toggle.
 This page is for operators who turn Calm on and need to know what it hides and keeps visible on Pi and on Claude Code, and which file owns each part of that behavior.
 
@@ -11,7 +15,7 @@ This page is for operators who turn Calm on and need to know what it hides and k
 | Claude Code | Available behind that harness's default-off early-access function-hooks flag, as the [Claude Code](#claude-code) section below describes. |
 
 Calm is off by default.
-The last `/calm` choice persists for the effective Juggernaut home across session starts and resumes on either harness.
+The last `/stealth` choice persists for the effective Juggernaut home across session starts and resumes on either harness.
 Both harnesses keep that choice in the one shared preference file that [`configuration.md`](configuration.md#calm-preference-configcalm) owns.
 
 ## Shared preservation rule for assistant text
@@ -123,7 +127,7 @@ It never refuses Pi solely because its version is newer than a previously verifi
 
 When Calm loads, the collapsed-thinking, operational-user-row, and queued-operational-row presentation adapters probe the exact Pi API seam they patch.
 If Pi removes one of those seams, Calm logs a diagnostic naming the unavailable adapter and skips only that adapter.
-`/calm`, the other adapters, and unrelated Pi extensions remain available.
+`/stealth`, the other adapters, and unrelated Pi extensions remain available.
 
 ### Session check for queued inputs
 
@@ -190,16 +194,16 @@ Enabling it is each captain's own explicit opt-in.
 
 Without that exact value, the mod is a complete no-op, even if Claude Code's rollout flag loads the module:
 
-- There is no `/calm` command.
+- There is no `/stealth` command.
 - The mod reads neither the preference nor the transcript.
 - The mod runs no timer and writes no supervision note.
 - Every drawing stays exactly as Claude Code draws it, whatever `config/calm` says.
 
 ### Toggling Calm on Claude Code
 
-With the flag on, the mod registers `/calm`.
-It toggles the same per-home preference Pi's `/calm` uses, so one choice applies on both harnesses.
-The toggle answers with a transient "Calm on" or "Calm off" notice under the prompt rather than a transcript row.
+With the flag on, the mod registers `/stealth`.
+It toggles the same per-home preference Pi's `/stealth` uses, so one choice applies on both harnesses.
+The toggle answers with a transient "Stealth on" or "Stealth off" notice under the prompt rather than a transcript row.
 A preference that cannot be written leaves the current choice unchanged, and the notice says so.
 The mod reads the preference before the first row draws.
 Toggling Calm redraws every hooked row already on screen, so rows drawn before the toggle hide or restore retroactively.
@@ -268,7 +272,7 @@ The doorbell is a plain line naming a record under the home's `state/operational
 Calm reads that record through the mod's file API and hides the doorbell row only when the record holds a current envelope.
 A doorbell-shaped line naming no such record therefore stays visible.
 A verbatim copy of a live doorbell line, pasted back while its record still exists, is treated as Juggernaut's and hides.
-Record verdicts are cached until a drawing invalidation (including a `/calm` toggle), which rechecks pruned records on redraw.
+Record verdicts are cached until a drawing invalidation (including a `/stealth` toggle), which rechecks pruned records on redraw.
 
 ### What stays unchanged on Claude Code
 
@@ -290,7 +294,7 @@ Evidence for 2.1.280 and the record-backed doorbell is also in its [2026-09-25 r
 - Every record write prunes operational-inbox records once they reach about seven days of elapsed age (the boundary is approximate).
   Age alone does not remove a record without a later write.
   Once its record is gone, a doorbell is no longer recognized.
-  It draws as a visible user row after Calm rechecks it (for example on `/calm` toggle or `claude --continue`), and `/debrief` treats it as a captain boundary.
+  It draws as a visible user row after Calm rechecks it (for example on `/stealth` toggle or `claude --continue`), and `/debrief` treats it as a captain boundary.
 - On the main-screen layout (not the fullscreen alternate screen), a toggle redraws the live screen by clearing and reprinting it.
   The terminal's own scrollback keeps the earlier rendering above it.
   The fullscreen layout has no such stale copy.

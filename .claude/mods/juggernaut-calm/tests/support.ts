@@ -9,7 +9,8 @@ import type { On, SessionMessage } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 
 export const HOME = "/fm/home";
-export const PREFERENCE = `${HOME}/config/calm`;
+export const PREFERENCE = `${HOME}/config/stealth`;
+export const LEGACY_PREFERENCE = `${HOME}/config/calm`;
 
 export type Journal = {
   /** Every `$.command.register` name, in order. */
@@ -49,6 +50,8 @@ export type World = {
 export type WorldOptions = {
   /** The stored preference text; absent means no file. */
   preference?: string;
+  /** Seed the pre-rename config/calm file instead of config/stealth. */
+  legacy?: boolean;
   /** Extra environment beside JG_HOME; pass `{}` with `home: undefined` to unset JG_HOME. */
   env?: Record<string, string>;
   /** Function-hooks opt-in value; omitted options default to the active value `1`. */
@@ -77,7 +80,7 @@ export function world(on: On, options: WorldOptions = {}): World {
   let sessionId = "session-1";
   const files = new Map<string, string>();
   const mtimes = new Map<string, number>();
-  if (options.preference !== undefined) files.set(PREFERENCE, options.preference);
+  if (options.preference !== undefined) files.set(options.legacy ? LEGACY_PREFERENCE : PREFERENCE, options.preference);
   const journal: Journal = {
     commands: [],
     toasts: [],
@@ -253,9 +256,9 @@ export function assistantMessage(text: string, requestId = "assistant-1") {
   };
 }
 
-export function calmCommand() {
+export function calmCommand(command = "stealth") {
   return {
-    command: "calm",
+    command,
     args: "",
     origin: { kind: "composer" as const },
     presentation: { layout: "main" as const, isFullscreen: false, columns: 80 },

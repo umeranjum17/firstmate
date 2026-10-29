@@ -190,7 +190,9 @@ export default function (pi: ExtensionAPI) {
 
   const fmHome = process.env.JG_HOME || process.env.JG_ROOT_OVERRIDE || root;
   const configDirectory = process.env.JG_CONFIG_OVERRIDE || resolve(fmHome, "config");
-  const calmPreferencePath = resolve(configDirectory, "calm");
+  const calmPreferencePath = resolve(configDirectory, "stealth");
+  // The pre-rename config/calm file is read while config/stealth is absent and never written.
+  const legacyCalmPreferencePath = resolve(configDirectory, "calm");
   // "max" is the legacy value written by the removed third presentation level, whose
   // behavior is now ordinary Calm; a home upgraded from it restores as on rather than
   // dropping to off. docs/configuration.md owns the persisted value schema.
@@ -199,7 +201,11 @@ export default function (pi: ExtensionAPI) {
     try {
       stored = readFileSync(calmPreferencePath, "utf8").trim();
     } catch {
-      return false;
+      try {
+        stored = readFileSync(legacyCalmPreferencePath, "utf8").trim();
+      } catch {
+        return false;
+      }
     }
     return stored === "on" || stored === "max";
   };
@@ -508,9 +514,9 @@ export default function (pi: ExtensionAPI) {
     if (ui) applyWorkingPresentation(ui);
   });
 
-  pi.registerCommand("calm", {
+  const toggleStealth = {
     description: "Toggle Juggernaut's supported conversation-only transcript presentation.",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: any) => {
       const active = !calmPresentationIsActive();
       persistCalmPreference(active);
       setCalmPresentation(active);
@@ -527,5 +533,8 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.setToolsExpanded(!expanded);
       ctx.ui.setToolsExpanded(expanded);
     },
-  });
+  };
+  pi.registerCommand("stealth", toggleStealth);
+  // The pre-rename name stays as an alias.
+  pi.registerCommand("calm", toggleStealth);
 }
