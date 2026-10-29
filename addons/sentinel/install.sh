@@ -62,4 +62,5 @@ fi
 systemctl --user daemon-reload
 [ "${first:-0}" -eq 0 ] || systemctl --user enable jg-sentinel.service
 systemctl --user restart jg-sentinel.service
+systemctl --user disable --now fm-sentinel.service >/dev/null 2>&1 || true # a pre-rename sentinel would race this one for the same panes
 echo "installed: jg-sentinel for $FMH runs $DEST/bin/jg-sentinel.sh; jg-sentinel.service restarted"
