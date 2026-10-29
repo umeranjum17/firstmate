@@ -2,7 +2,7 @@
 # jg-board-link-lib.sh - the one owner of a board item's deep link.
 #
 # The sign-off board routes by hash: <board-url>?token=<t>#decide/<key>, and
-# likewise #reports, #designs, #waiting and #answered. The board address, token
+# likewise #reports, #evidence, #designs, #waiting and #answered. The board address, token
 # included, is the first line of the file the dashboard front already reads:
 # $JG_SIGNOFF_URL_FILE, else $JG_HOME/state/signoff-board.url (private state).
 #
@@ -10,6 +10,8 @@
 #                                    and return 1 when the URL file, the key or
 #                                    the section is unusable
 #   jg_board_merge_key <pr-url>      the key merge-card gives a PR's evidence card
+#   jg_board_file <home>             the board file merge cards go on ($JG_PROOF_BOARD, else
+#                                    the --board of <home>/config/post-merge), or return 1
 #
 # A caller prints the link on its own line and ignores the return code; a missing
 # board never fails a caller. The link carries the token, so callers send it only
@@ -20,7 +22,7 @@
 
 jg_board_link() {  # <section> <key>
   local section=${1:-} key=${2:-} file url
-  case "$section" in decide|reports|designs|waiting|answered) ;; *) return 1 ;; esac
+  case "$section" in decide|reports|evidence|designs|waiting|answered) ;; *) return 1 ;; esac
   case "$key" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
   file=${JG_SIGNOFF_URL_FILE:-${JG_HOME:-}/state/signoff-board.url}
   [ -f "$file" ] || return 1
@@ -35,4 +37,11 @@ jg_board_merge_key() {  # <pr-url>
   local key=${1#*://}
   key=merge-$(printf '%s' "${key#*/}" | tr -c 'A-Za-z0-9._-' -)
   printf '%s\n' "${key:0:128}"
+}
+
+jg_board_file() {  # <home>
+  local board=${JG_PROOF_BOARD:-}
+  [ -n "$board" ] || board=$(sed -n "s/.*--board[= ]'\{0,1\}\([^' ]*\).*/\1/p" "${JG_CONFIG_OVERRIDE:-${1:-}/config}/post-merge" 2>/dev/null | head -n 1)
+  [ -n "$board" ] || return 1
+  printf '%s\n' "$board"
 }
