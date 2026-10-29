@@ -17,6 +17,8 @@ journeys:
     command: bash journeys/proof-attach.sh
   design-call-gate:
     command: bash journeys/design-call-gate.sh
+  demo-call-gate:
+    command: bash journeys/demo-call-gate.sh
   nav-removal-gate:
     command: bash journeys/nav-removal-gate.sh
   stuck-question-replay:
