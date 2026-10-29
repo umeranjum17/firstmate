@@ -148,4 +148,36 @@ grep -q '^l1$' "$lh/.jg-squad-lead-home" && grep -q '^schema=jg-squad-lead-paren
 bash "$ROOT/bin/jg-migrate.sh" --home "$lh" --rollback >/dev/null 2>&1 || fail "migrator rollback failed"
 diff -r "$h/leadhome-before" "$lh" >/dev/null || fail "rollback did not restore the old lead home"
 pass "the migrator renames old lead records and rolls back exactly"
+# a pool-slot claim written under the old name still names the task that holds the slot
+slot=$h/pool/1
+mkdir -p "$slot/repo"
+printf 'task=other-task\nhome=/x\n' > "$h/pool/1/.fm-slot-owner"
+(
+  . "$ROOT/bin/jg-wake-lib.sh"
+  jg_treehouse_slot_owner_state "$slot/repo" mine-task
+  [ "$JG_TREEHOUSE_SLOT_OWNER" = other ] && [ "$JG_TREEHOUSE_SLOT_OWNER_ID" = other-task ]
+) || fail "an old .fm-slot-owner claim is ignored, so a reassigned slot reads as unclaimed"
+(
+  . "$ROOT/bin/jg-wake-lib.sh"
+  jg_treehouse_slot_owner_claim "$slot/repo" mine-task /y
+  jg_treehouse_slot_owner_state "$slot/repo" mine-task
+  [ "$JG_TREEHOUSE_SLOT_OWNER" = mine ] && [ ! -e "$h/pool/1/.fm-slot-owner" ]
+  jg_treehouse_slot_owner_release "$slot/repo" mine-task
+  jg_treehouse_slot_owner_state "$slot/repo" mine-task
+  [ "$JG_TREEHOUSE_SLOT_OWNER" = absent ]
+) || fail "a new claim must replace the old one and a release must leave the slot unclaimed"
+pass "an old pool-slot claim is read, replaced and released"
+# a squad lead launched before the rename keeps its Stop pointer under the old name
+bh=$h/busyhome
+mkdir -p "$bh/bin" "$bh/state"
+cat > "$bh/writer.sh" <<'W'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$(dirname "$0")/writer.log"
+W
+chmod +x "$bh/writer.sh"
+printf 'writer=%s/writer.sh\nstate=%s/state\nid=lead\ngen=g1\n' "$bh" "$bh" > "$bh/.fm-busy-stop"
+printf '{}' | JG_ROOT_OVERRIDE="$bh" bash "$ROOT/bin/jg-turnend-guard.sh" --claude >/dev/null 2>&1 || true
+grep -q 'apply .*lead idle --gen g1' "$bh/writer.log" 2>/dev/null \
+  || fail "the Stop guard ignores a pointer saved under .fm-busy-stop, so the lead's busy record is never closed"
+pass "the Stop guard honours an old Stop pointer"
 printf 'jg-compat-old-records passed\n'

@@ -43,7 +43,7 @@ jg_stuck_verdict() {
   local buf tail12 line
   buf=$(cat)
   tail12=$(printf '%s\n' "$buf" | grep -v '^[[:space:]]*$' | tail -12)
-  line=$(printf '%s\n' "$tail12" | grep -iE "${JG_STUCK_QUOTA_REGEX:-(you.ve hit your|usage limit|rate.?limit(ed| exceeded| reached)|quota (exceeded|exhausted|reached)|insufficient[_ ]quota|too many requests|credit balance is too low|limit resets)}" | head -1) || true
+  line=$(printf '%s\n' "$tail12" | grep -iE "${JG_STUCK_QUOTA_REGEX:-(you.ve hit your|usage (limit|exceeded)|rate.?limit(ed| exceeded| reached)|quota (exceeded|exhausted|reached)|insufficient[_ ]quota|too many requests|credit balance is too low|limit resets)}" | head -1) || true
   if [ -n "$line" ]; then
     printf 'quota\t%s\n' "$(printf '%s' "$line" | tr -s '[:space:]' ' ' | cut -c1-200)"
     return 0

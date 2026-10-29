@@ -3408,20 +3408,82 @@ jg_backend_herdr_agent_identity_raw() {  # <session> <pane> -> <agent>\t<status>
   printf '%s' "$out" | jq -r '[.result.agent.agent // "", .result.agent.agent_status // ""] | @tsv' 2>/dev/null
 }
 
+# jg_backend_herdr_agent_name_for: the herdr agent name for a task id.
+# Herdr 0.9.1 accepts only 1-32 characters that start with a lowercase letter
+# and continue with lowercase letters, digits, '-' or '_'; any other name is
+# refused invalid_agent_name. A task id is up to 64 characters and may start
+# with a digit, so the id is mapped into that shape. A valid id of 32 or fewer
+# characters is the name unchanged. A longer id keeps its first 27 characters
+# and gains "-<4 hex>" of a checksum of the whole id, so two long ids that
+# share a prefix still get different names. Pure: no herdr call.
+jg_backend_herdr_agent_name_for() {  # <task-id> -> <agent-name>
+  local id=${1:-} name
+  [ -n "$id" ] || return 1
+  name=$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_\n-' '-')
+  case "$name" in
+    [a-z]*) ;;
+    *) name="t-$name" ;;
+  esac
+  [ "${#name}" -le 32 ] || name=$(jg_backend_herdr_agent_name_variant "$name" "$id")
+  printf '%s' "$name"
+}
+
+# jg_backend_herdr_agent_name_variant: <name> cut to 27 characters and made
+# distinct by "-<4 hex>" of a checksum of <salt>, so it stays within the
+# 32-character herdr limit.
+jg_backend_herdr_agent_name_variant() {  # <name> <salt> -> <name>
+  local name=${1:-} salt=${2:-} sum head
+  sum=$(printf '%s' "$salt" | cksum | awk '{ printf "%04x", $1 % 65536 }')
+  head=${name:0:27}
+  while :; do
+    case "$head" in
+      *[-_]) head=${head%?} ;;
+      *) break ;;
+    esac
+  done
+  printf '%s-%s' "$head" "$sum"
+}
+
 # jg_backend_herdr_pin_agent_name: best-effort pin of a pane's agent display
-# name to <name>. Herdr 0.9.1 assigns every agent a random call-sign at start
-# and fresh ones across a server restart, so jg-spawn.sh pins each worker's
-# agent to its task id (the squad_lead id for a squad_lead launch) once the
-# spawn or relaunch has fully succeeded and the agent is live - a rename on
-# an agent-less pane fails agent_not_found, so this never runs at tab-create
-# time. The name arrives as metadata from the caller and is never parsed
-# from a label or title. A rename failure warns and still returns 0: the
-# name is cosmetic and must never fail a spawn or relaunch.
-jg_backend_herdr_pin_agent_name() {  # <session> <pane-id> <name>
-  local session=${1:-} pane=${2:-} name=${3:-}
-  [ -n "$session" ] && [ -n "$pane" ] && [ -n "$name" ] || return 0
-  jg_backend_herdr_cli "$session" agent rename "$pane" "$name" >/dev/null 2>&1 || \
-    echo "warning: herdr agent rename of pane $pane to '$name' failed; the agent keeps its server-assigned name" >&2
+# name to the name derived from <id>. Herdr 0.9.1 assigns every agent a random
+# call-sign at start and fresh ones across a server restart, so jg-spawn.sh
+# pins each worker's agent to its task id (the squad_lead id for a squad_lead
+# launch) once the spawn or relaunch has fully succeeded and the agent is live
+# - a rename on an agent-less pane fails agent_not_found, so this never runs at
+# tab-create time. The id arrives as metadata from the caller and is never
+# parsed from a label or title. Herdr refuses a name it cannot use, so the id
+# goes through jg_backend_herdr_agent_name_for first, and a name another agent
+# in the session already holds (agent_name_taken) is retried once as a variant
+# of the pane id; a taken name whose holder is this very pane already counts as
+# pinned. A failure warns with herdr's own error and still returns 0: the name
+# is cosmetic and must never fail a spawn or relaunch. The name that stuck is
+# left in JG_BACKEND_HERDR_PINNED_NAME (empty when none did).
+# shellcheck disable=SC2034 # JG_BACKEND_HERDR_PINNED_NAME is read by the caller
+jg_backend_herdr_pin_agent_name() {  # <session> <pane-id> <task-id>
+  local session=${1:-} pane=${2:-} id=${3:-} name out code message
+  JG_BACKEND_HERDR_PINNED_NAME=
+  [ -n "$session" ] && [ -n "$pane" ] && [ -n "$id" ] || return 0
+  name=$(jg_backend_herdr_agent_name_for "$id") || return 0
+  if out=$(jg_backend_herdr_cli "$session" agent rename "$pane" "$name" 2>&1); then
+    JG_BACKEND_HERDR_PINNED_NAME=$name
+    return 0
+  fi
+  case "$out" in
+    *agent_name_taken*"pane_id=$pane "*)
+      JG_BACKEND_HERDR_PINNED_NAME=$name
+      return 0
+      ;;
+    *agent_name_taken*)
+      name=$(jg_backend_herdr_agent_name_variant "$name" "$session:$pane")
+      if out=$(jg_backend_herdr_cli "$session" agent rename "$pane" "$name" 2>&1); then
+        JG_BACKEND_HERDR_PINNED_NAME=$name
+        return 0
+      fi
+      ;;
+  esac
+  code=$(printf '%s' "$out" | jq -r '.error.code // empty' 2>/dev/null) || code=
+  message=$(printf '%s' "$out" | jq -r '.error.message // empty' 2>/dev/null | cut -c1-120) || message=
+  echo "warning: herdr agent rename of pane $pane to '$name' failed (${code:-no herdr error}${message:+: $message}); the agent keeps its server-assigned name" >&2
   return 0
 }
 

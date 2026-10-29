@@ -1,0 +1,45 @@
+
+  ┃                                                                                                           New session - 2026-10-29T16:37:38.
+  ┃  Call your question tool right now with one question: Which color? options Red and Blue.                  128Z
+  ┃
+                                                                                                              Context
+     ▣  Build · Beam Free                                                                                     0 tokens
+                                                                                                              0% used
+                                                                                                              $0.00 spent
+
+                                                                                                              LSP
+                                                                                                              LSPs are disabled
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ┃
+  ┃
+  ┃
+  ┃  Build · Beam Free OpenCode                                                                               /tmp/tmp.WY4CvL4waM
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ■■■■⬝⬝⬝⬝ Free usage exceeded, subscribe to Go [retrying in 7h 30m attempt #1]             esc interrupt    • OpenCode 1.18.25
+
