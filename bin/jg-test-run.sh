@@ -545,6 +545,7 @@ list_portable_serial() {
 # balance rather than coverage. That doc owns the refresh procedure.
 portable_serial_weight_hints() {
   cat <<'EOF'
+tests/board-link.test.sh 2000
 tests/jg-afk-inject-e2e.test.sh 41958
 tests/jg-agy-signals-live-e2e.test.sh 53
 tests/jg-backend-tmux-smoke.test.sh 291
