@@ -164,7 +164,7 @@
 #   there, and a squad_lead spawn never projects. Unbounded
 #   blocking on a third-party session lock is never the default. The exact
 #   response-derived new workspace is inserted immediately after its owning
-#   parent (juggernaut or 2ndmate-<id>) contiguous child block. Ordering never
+#   parent (juggernaut or lead-<id>) contiguous child block. Ordering never
 #   authorizes lifecycle cleanup, and any unavailable, ambiguous, or failed
 #   move warns while the spawn continues.
 #   Every projected create, prune, and move captures and verifies the named
