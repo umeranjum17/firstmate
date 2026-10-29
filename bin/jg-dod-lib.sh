@@ -138,12 +138,14 @@
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-merge-gate-lib.sh"
 # Optional merge-card add-on: defines the same two hooks for homes that install it.
 # Optional merge-card add-on: defines jg_dod_merge_gate and jg_merge_post_hook.
-_jg_dod_addons=$(jg_addons_dir "${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")
+_jg_dod_home=${JG_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
+_jg_dod_hooks=$(jg_addon_path "$_jg_dod_home" merge-card/bin/jg-merge-hooks-lib.sh)
 # shellcheck source=/dev/null
-[ ! -r "$_jg_dod_addons/merge-card/bin/jg-merge-hooks-lib.sh" ] || . "$_jg_dod_addons/merge-card/bin/jg-merge-hooks-lib.sh"
+[ ! -r "$_jg_dod_hooks" ] || . "$_jg_dod_hooks"
 # Optional receipts add-on: defines jg_dod_receipt_accept and the jg_receipts_* helpers.
 # shellcheck source=/dev/null
-[ ! -r "$_jg_dod_addons/receipts/bin/jg-receipts-lib.sh" ] || . "$_jg_dod_addons/receipts/bin/jg-receipts-lib.sh"
+_jg_dod_receipts=$(jg_addon_path "$_jg_dod_home" receipts/bin/jg-receipts-lib.sh)
+[ ! -r "$_jg_dod_receipts" ] || . "$_jg_dod_receipts"
 
 jg_brief_worker_role() {  # <state-dir> <task-id> <code-root>
   local state=$1 task_id=$2 root=$3
