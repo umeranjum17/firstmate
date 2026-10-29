@@ -340,7 +340,8 @@ family_for_basename() {
     jg-pi-branch-live-e2e.test.sh|jg-pi-primary-live-e2e.test.sh|\
     jg-omp-primary-live-e2e.test.sh|jg-pr-state-live-e2e.test.sh|\
     jg-sessionstart-hook-live-e2e.test.sh|jg-supervision-host-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-inbox-doorbell-live-e2e.test.sh)
+    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-inbox-doorbell-live-e2e.test.sh|\
+    jg-prompt-gate-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
     jg-backend-tmux-smoke.test.sh|jg-control.test.sh|jg-send-inbox.test.sh|\
@@ -578,6 +579,9 @@ tests/jg-pi-branch-live-e2e.test.sh 48
 tests/jg-pi-primary-live-e2e.test.sh 72
 tests/jg-pi-seeded-home-trust-live-e2e.test.sh 45
 tests/jg-pr-state-live-e2e.test.sh 47
+# Local measurements until a green CI run's timing artifact refreshes them.
+tests/jg-prompt-gate-live-e2e.test.sh 58
+tests/jg-prompt-gate.test.sh 30657
 tests/jg-procevent.test.sh 292297
 tests/jg-public-followup.test.sh 381564
 tests/jg-quota-array-dispatch-live-e2e.test.sh 50

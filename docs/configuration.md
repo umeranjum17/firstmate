@@ -660,6 +660,14 @@ The bound is required rather than cosmetic because churn and pane staleness read
 The flag is a home-local supervision-noise preference and is not inherited by Squad Lead homes, which run their own crew mix.
 [`architecture.md`](architecture.md) owns the triage contract and `bin/jg-watch.sh`'s `signal_turnend_panes_churned` owns the exact evidence and fail-closed boundaries.
 
+## Permission-prompt auto-approval (config/prompt-approve-off)
+
+The watcher treats a worker or Squad Lead pane showing a permission or trust prompt as stuck at once.
+It approves only an OpenCode read it can prove is inside this fleet's own files, and raises a board card and a wake for every other prompt.
+While the same prompt stays on screen it is approved or re-alerted again every 10 minutes (`JG_PROMPT_REALERT_SECS`), with no once-per-prompt latch.
+The optional local, gitignored `config/prompt-approve-off` presence flag turns approval off, so every prompt becomes a card.
+`bin/jg-prompt-gate-lib.sh` owns the roots and the records, and `bin/jg-prompt-gate.py` owns the matcher.
+
 ## Parked-gate wait deferral (config/wedge-defer-parked-gate)
 
 The optional local, gitignored `config/wedge-defer-parked-gate` presence flag opts this home into a default-off second form of wait evidence in the watcher's wedge timer.
