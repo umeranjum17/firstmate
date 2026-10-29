@@ -14,7 +14,7 @@
 # charters still use a single `{TASK}` charter fill. Juggernaut may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--herdr-lab]
+# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--herdr-lab]
 #        jg-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        jg-brief.sh <task-id> --squad-lead {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
@@ -38,6 +38,15 @@
 #   after scaffolding and the caller-supplied repo string cannot reliably
 #   identify this repo. Briefs made without it carry a loud declaration so an
 #   omitted contract cannot be silent.
+# --design-call <yes|no> --design-reason <text> records the per-task first-draft
+# call on a ship brief as `Design call (first-draft): <yes|no> - <reason>`. Juggernaut
+# or the lead judges it per task: yes for bigger redesigns, new screens, landing
+# pages and design options; no for small UI fixes. The two flags go together and
+# are refused on --scout and --squad-lead. bin/jg-spawn.sh records the call in the
+# task record as design_call=, and bin/jg-merge-gate-lib.sh's jg_dod_design_gate
+# refuses to merge a yes-task whose completion receipt evidence carries no
+# `first-draft receipt: <ref>` line. A brief without the line (an older brief)
+# warns at spawn and counts as no. No model decides: the gate is a shell check.
 # For ship tasks, --mode is REQUIRED and shapes the definition of done. Juggernaut
 # resolves it per task at intake (AGENTS.md section 7); data/projects.md holds the
 # captain's standing posture as context, and this script never reads it:
@@ -244,6 +253,8 @@ SHAPE=
 SHAPE_SET=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
+DESIGN_CALL=
+DESIGN_REASON=
 PROJECT_DIR=
 PROJECT_DIR_SET=0
 POS=()
@@ -261,6 +272,8 @@ for a in "$@"; do
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
+      design-call) DESIGN_CALL=$a ;;
+      design-reason) DESIGN_REASON=$a ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -285,6 +298,10 @@ for a in "$@"; do
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
     --project) want_value="project" ;;
     --project=*) PROJECT_DIR=${a#--project=}; PROJECT_DIR_SET=1 ;;
+    --design-call) want_value="design-call" ;;
+    --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
+    --design-reason) want_value="design-reason" ;;
+    --design-reason=*) DESIGN_REASON=${a#--design-reason=} ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -311,6 +328,19 @@ if [ "$KIND" = ship ]; then
 elif [ "$MODE_SET" -eq 1 ]; then
   echo "error: --mode applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
   exit 1
+fi
+
+# The design call is a ship-only pair: a call without its reason (or the reverse)
+# would record a decision nobody can audit.
+if [ -n "$DESIGN_CALL$DESIGN_REASON" ]; then
+  [ "$KIND" = ship ] || { echo "error: --design-call and --design-reason apply only to ship briefs" >&2; exit 1; }
+  case "$DESIGN_CALL" in
+    yes|no) ;;
+    *) echo "error: --design-call must be yes or no (got '$DESIGN_CALL')" >&2; exit 1 ;;
+  esac
+  case "$DESIGN_REASON" in
+    ''|*[![:print:]]*|' '*) echo "error: --design-reason needs one printable line stating why (first-draft: $DESIGN_CALL)" >&2; exit 1 ;;
+  esac
 fi
 
 # A ship branch's prefix is optional per-project cosmetics, not a delivery
@@ -770,6 +800,20 @@ case "$MODE" in
 2. Run \`no-mistakes doctor\`; if it reports the repo is not initialized here, run \`no-mistakes init\`."
     ;;
 esac
+DESIGN_SECTION=
+if [ -n "$DESIGN_CALL" ]; then
+  DESIGN_SECTION="
+# Design call
+Design call (first-draft): $DESIGN_CALL - $DESIGN_REASON"
+  if [ "$DESIGN_CALL" = yes ]; then
+    DESIGN_SECTION="$DESIGN_SECTION
+Produce every design for this task with first-draft (\`first-draft-axi\`); do not hand-draw a separate design path.
+Put one line \`first-draft receipt: <reference>\` in the evidence file of your completion receipt.
+The merge is refused without that line."
+  fi
+  DESIGN_SECTION="$DESIGN_SECTION
+"
+fi
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 DOD=$(jg_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
 
@@ -777,7 +821,7 @@ cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-
+$DESIGN_SECTION
 $HERDR_SECTION
 
 # Setup

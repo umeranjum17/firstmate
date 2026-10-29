@@ -10,6 +10,12 @@
 # add-on defines the same two functions for homes that install it; core owning a
 # copy is what makes them fire without it. Callers supply jg_dod_meta_value;
 # jg_run_timed and jg_timed_out come from bin/jg-timeout-lib.sh, sourced here.
+# jg_dod_design_gate is the first-draft design-call gate both merge paths call:
+# a task recorded design_call=yes (bin/jg-brief.sh --design-call) merges only when
+# its completion receipt (state/<id>.run-receipt.json, the receipts add-on's record)
+# binds the candidate head with verdict PASS and its evidence carries a
+# `first-draft receipt: <ref>` line. design_call=no passes; a record with no
+# design_call (an older task) warns and counts as no.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 # The hooks also get FM_HOME (the pre-rename name) because installed add-on hooks and done-done's merge-gate still read it; delete with the S10 shim.
 _jg_d=${BASH_SOURCE[0]%/*}
@@ -66,4 +72,26 @@ jg_merge_post_hook() {  # <config-dir> <home> <id> <meta> <head|-> <pr-url|->
   [ -z "$out" ] || printf '%s\n' "$out"
   [ "$rc" -eq 0 ] || echo "post-merge hook failed (exit $rc); the merge stands"
   return 0
+}
+
+jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
+  local state=$1 id=$2 meta=$3 head=$4 call receipt
+  [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
+  call=$(jg_dod_meta_value "$meta" design_call)
+  case $call in
+    no) return 0 ;;
+    '') echo "warning: $id has no design call recorded (an older brief); counting it as design_call=no" >&2; return 0 ;;
+    yes) ;;
+    *) echo "merge refused: design call for $id is malformed ('$call'); expected yes or no"; return 1 ;;
+  esac
+  receipt="$state/$id.run-receipt.json"
+  if [ -f "$receipt" ] && [ ! -L "$receipt" ] && command -v jq >/dev/null 2>&1 \
+    && jq -se --arg task "$id" --arg head "$head" '
+      length == 1 and (.[0] | .task == $task and .head == $head and .verdict == "PASS" and
+      (.evidence | type == "string" and test("(^|\n)first-draft receipt: [^[:space:]]")))
+    ' "$receipt" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  return 1
 }
