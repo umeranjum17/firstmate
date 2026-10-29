@@ -79,12 +79,47 @@ jg_model_allowlist_verdict() {
   printf '%s\n' "$out"
 }
 
+# jg_model_not_an_agent <model>: 0 when the id names a model that cannot run an
+# agent turn - image generation, embeddings, speech, video. Such a model answers
+# every turn with a provider error, and the launch is retried at once, so the
+# worker sits in a loop that no list the captain wrote ever excluded. This is the
+# shipped default; JG_ALLOW_NON_AGENT_MODEL=1 lifts it for a deliberate pick.
+jg_model_not_an_agent() {
+  [ "${JG_ALLOW_NON_AGENT_MODEL:-0}" != 1 ] || return 1
+  printf '%s\n' "$1" | grep -qiE '(^|[/_.:-])(image|imagen|nano-banana[a-z0-9.-]*|dall-?e|embeddings?|embed|tts|whisper|veo|sora)([/_.:-]|$)'
+}
+
+# jg_opencode_inherited_model: the model an OpenCode launch with no --model
+# starts on - the one its TUI used last, from its own state file. Empty when
+# there is none or the file cannot be read.
+jg_opencode_inherited_model() {
+  local file=${XDG_STATE_HOME:-${HOME:-}/.local/state}/opencode/model.json
+  [ -r "$file" ] || return 0
+  jq -r '.recent[0] | select(. != null) | "\(.providerID)/\(.modelID)"' "$file" 2>/dev/null || true
+}
+
 # jg_model_allowlist_require <harness> <model>: 0 when the pick may proceed, else
-# the one refusal line on stderr and 1. An empty or `default` model names no
-# provider and is never refused here.
+# the one refusal line on stderr and 1. A model that cannot run an agent turn is
+# refused first. An empty or `default` model names no provider and is never
+# refused by the list; an OpenCode launch with none still starts on the model its
+# TUI used last, so that one is checked as the pick it is.
 jg_model_allowlist_require() {
-  local provider=$1 model=$2 verdict words
-  case $model in '' | default) return 0 ;; esac
+  local provider=$1 model=$2 verdict words inherited
+  case $model in
+  '' | default)
+    [ "$provider" = opencode ] || return 0
+    inherited=$(jg_opencode_inherited_model)
+    if [ -n "$inherited" ] && jg_model_not_an_agent "$inherited"; then
+      printf 'error: opencode would start on %s, the model its TUI used last, which cannot run an agent; pin a model for this launch (--model, or a model token in config/squad-lead-harness or config/crew-harness)\n' "$inherited" >&2
+      return 1
+    fi
+    return 0
+    ;;
+  esac
+  if jg_model_not_an_agent "$model"; then
+    printf 'error: %s model %s cannot run an agent (image, embedding, speech or video model); pick a chat model, or set JG_ALLOW_NON_AGENT_MODEL=1 to launch it anyway\n' "$provider" "$model" >&2
+    return 1
+  fi
   provider=$(jg_model_allowlist_provider "$1" "$model")
   model=${model#"$provider"/}
   IFS=$'\t' read -r verdict words <<<"$(jg_model_allowlist_verdict "$provider" "$model")"

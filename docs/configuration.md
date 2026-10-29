@@ -185,6 +185,11 @@ bin/jg-model-allowlist.sh check codex gpt-5.6-sol      # one pick, exit 0 allowe
 
 The list is local to each home and not inherited by Squad Leads, so a Squad Lead home that should enforce the same limit keeps its own copy.
 
+With no list at all, `bin/jg-spawn.sh` still refuses a model that cannot run an agent: an image, embedding, speech, or video model (a `gemini-3-pro-image-preview`, a `*-embedding`, a `whisper`).
+Such a model fails every turn with a provider error and is retried at once, so the worker never settles.
+An OpenCode launch with no model starts on the model its own TUI used last, so that model is checked the same way and the refusal says to pin one.
+`JG_ALLOW_NON_AGENT_MODEL=1` lets a deliberate pick launch anyway.
+
 ## Pi supervision branch
 
 On a Pi primary, an in-process supervision branch handles eligible task-local wake rows and selected heartbeat reviews.
@@ -2706,6 +2711,8 @@ JG_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/OpenCode wait for an unr
 JG_WATCH_REARM_RETRY_BASE_MS=250   # Pi/OpenCode adapter base delay for continuity restoration retries
 JG_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/OpenCode adapter cap for exponential continuity retry delay
 JG_WATCH_REARM_RETRY_LIMIT=5   # Pi/OpenCode adapter launch-failure retries before surfacing restoration failure
+JG_WATCH_FAILURE_NOTICE_INTERVAL_MS=600000   # OpenCode adapter: the same watcher-failure notice reaches a session at most this often, so a model that fails every turn cannot turn the notice into a prompt loop
+JG_STUCK_ERRLOOP_MIN=3   # watcher: a provider or API error line repeated this many times on a worker's screen records the errors wait source
 JG_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifecycle ledger
 JG_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 JG_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior

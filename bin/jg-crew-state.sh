@@ -1393,6 +1393,22 @@ if [ "$KIND" != squad_lead ]; then
   esac
 fi
 
+# A lead whose runtime fails every turn (the watcher's errors wait source,
+# bin/jg-stuck-gate-lib.sh) is blocked, steadily: its pane never settles and its
+# status log says nothing. The source is rewritten on every sighting and lapses
+# with the cause, so a repaired lead leaves this state within a few polls.
+if [ "$KIND" = squad_lead ]; then
+  ERRORS_SRC="$STATE/.wait-sources/$ID.errors"
+  if [ -f "$ERRORS_SRC" ] && [ ! -L "$ERRORS_SRC" ]; then
+    ERRORS_AT=$(stat -c %Y "$ERRORS_SRC" 2>/dev/null || stat -f %m "$ERRORS_SRC" 2>/dev/null || echo 0)
+    ERRORS_FRESH=${JG_POLL:-15}; ERRORS_FRESH=${ERRORS_FRESH%%.*}
+    ERRORS_FRESH=$(( ${ERRORS_FRESH:-0} * 3 + 30 ))
+    if [ $(( $(date +%s) - ERRORS_AT )) -le "$ERRORS_FRESH" ]; then
+      emit blocked pane "runtime failing every turn: $(head -n 1 "$ERRORS_SRC" | tr '\t' ' ' | cut -c1-200)"
+    fi
+  fi
+fi
+
 # Fall back to the resolved status declaration, but ONLY when its verb maps to a real
 # run-state. A decision-closing event - resolved: (jg-classify-lib.sh's
 # JG_CLASSIFY_RESOLVE_VERB), and any future decision-only sibling - is NOT a state:

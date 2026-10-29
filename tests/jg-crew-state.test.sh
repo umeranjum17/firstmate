@@ -3194,6 +3194,39 @@ test_no_run_idle_pane_custom_paused_verb() {
   pass "no run + idle pane honors the configured paused verb"
 }
 
+# A lead whose runtime fails every turn keeps no settled pane (each failed turn is
+# retried at once), so its current state comes from the watcher's errors wait
+# source and reads blocked on every poll until the cause lapses.
+test_squad_lead_runtime_error_loop_reads_blocked_steadily() {
+  reset_fakes
+  local d; d=$(new_case lead-error-loop)
+  mkdir -p "$d/wt" "$d/state/.wait-sources"
+  make_fakebin "$d" >/dev/null
+  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=squad_lead" "home=$d/wt"
+  printf 'working: reconciling routed items\n' > "$d/state/mate.status"
+  printf 'errors: User not found. (6 times on screen)\n' > "$d/state/.wait-sources/mate.errors"
+  JG_FAKE_AXI_STATUS=""
+  local out i
+  for i in 1 2 3; do
+    JG_FAKE_BUSY=$((i % 2))
+    out=$(run_crew_state "$d" mate)
+    assert_contains "$out" "state: blocked" "a lead in a runtime error loop reads blocked whatever its pane does (poll $i)"
+    assert_contains "$out" "source: pane" "the error loop is read from the pane evidence"
+    assert_contains "$out" "User not found." "the repeated error names the cause"
+  done
+  # The source lapses with the cause: a record nobody rewrote is ignored.
+  touch -d '-10 minutes' "$d/state/.wait-sources/mate.errors"
+  out=$(run_crew_state "$d" mate)
+  assert_contains "$out" "state: working" "a lapsed error source leaves the status-log state"
+  # Another kind of worker is not read this way.
+  jg_write_meta "$d/state/mate.meta" "window=fm:jg-mate" "worktree=$d/wt" "kind=ship"
+  touch "$d/state/.wait-sources/mate.errors"
+  JG_FAKE_BUSY=0
+  out=$(run_crew_state "$d" mate)
+  assert_not_contains "$out" "runtime failing every turn" "only a lead reads blocked from the error source"
+  pass "a lead in a runtime error loop reads blocked on every poll and leaves it when the cause lapses"
+}
+
 # A trailing keyed resolved: event is a decision-CLOSING event, not a run-state
 # verb. It must never become the current state or leak its resolution prose as the
 # detail: a healthy idle squad_lead that just closed a keyed decision falls through
@@ -5891,6 +5924,7 @@ test_no_run_idle_pane_uses_keyed_log
 test_no_run_idle_pane_paused
 test_no_run_idle_pane_custom_paused_verb
 test_no_run_idle_squad_lead_resolved_event_not_state
+test_squad_lead_runtime_error_loop_reads_blocked_steadily
 test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step

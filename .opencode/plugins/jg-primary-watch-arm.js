@@ -26,6 +26,8 @@ const ARM_RETIRE_TIMEOUT_MS = positiveInteger("JG_WATCH_ARM_RETIRE_TIMEOUT_MS", 
 const REARM_RETRY_BASE_MS = positiveInteger("JG_WATCH_REARM_RETRY_BASE_MS", 250);
 const REARM_RETRY_MAX_MS = positiveInteger("JG_WATCH_REARM_RETRY_MAX_MS", 4000);
 const REARM_RETRY_LIMIT = positiveInteger("JG_WATCH_REARM_RETRY_LIMIT", 5);
+const FAILURE_NOTICE_INTERVAL_MS = positiveInteger("JG_WATCH_FAILURE_NOTICE_INTERVAL_MS", 600000);
+const BLOCKED_ARM_NOTICE = "watcher: FAILED - OpenCode cannot arm supervision: ";
 
 let child = null;
 let armStatus = "idle";
@@ -352,7 +354,26 @@ function wakePrompt(reason) {
   return `WATCHER FIRED - drain queued wakes with bin/jg-wake-drain.sh and handle the reported wake. Watcher continuity is plugin-owned.\n\n${reason}`;
 }
 
+// Every failure notice is a prompt whose own turn ends in another session.idle,
+// and a turn whose model call fails (a bad key, a model the provider rejects)
+// ends in several. A notice sent on every idle fed those back into new prompts,
+// about one failed model call a second, flipping the lead between working, done
+// and blocked. The same notice (its first line) now reaches a session at most
+// once per JG_WATCH_FAILURE_NOTICE_INTERVAL_MS (default ten minutes); a
+// different notice goes at once, and a cleared block drops its record.
+const failureNoticeAt = new Map();
+
+function failureNoticeDue(reason) {
+  const key = String(reason).split("\n", 1)[0];
+  const now = Date.now();
+  const last = failureNoticeAt.get(key);
+  if (last !== undefined && now - last < FAILURE_NOTICE_INTERVAL_MS) return false;
+  failureNoticeAt.set(key, now);
+  return true;
+}
+
 function surfaceFailure(paths, client, sessionID, reason) {
+  if (!failureNoticeDue(reason)) return;
   void sendPrompt(paths, client, sessionID, wakePrompt(reason)).catch(() => {
     // OpenCode owns delivery errors; continuity restoration never waits on prompting.
   });
@@ -581,20 +602,16 @@ function armAttempt(status, armChild, includeArmChild, blocked = "") {
   return blocked ? "failed" : status;
 }
 
-// Surface a blocked arm on every idle while the block stays, except the idle
-// that this report's own prompt causes, the same cadence as the turn-end guard.
-let skipBlockedReport = false;
+// Surface a blocked arm on a real idle while the block stays; surfaceFailure
+// owns how often the same notice may repeat, and a block that clears resets it.
 function reportArmOutcome(paths, client, sessionID, blocked) {
   if (!blocked) {
-    skipBlockedReport = false;
+    for (const key of failureNoticeAt.keys()) {
+      if (key.startsWith(BLOCKED_ARM_NOTICE)) failureNoticeAt.delete(key);
+    }
     return;
   }
-  if (skipBlockedReport) {
-    skipBlockedReport = false;
-    return;
-  }
-  skipBlockedReport = true;
-  surfaceFailure(paths, client, sessionID, `watcher: FAILED - OpenCode cannot arm supervision: ${blocked}`);
+  surfaceFailure(paths, client, sessionID, `${BLOCKED_ARM_NOTICE}${blocked}`);
 }
 
 // A TUI resumed onto an existing session (`opencode --session <id>`, as a
