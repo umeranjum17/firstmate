@@ -26,6 +26,8 @@ jg_account_pool_tool() {
   claude) printf '%s\n' claude ;;
   codex) printf '%s\n' codex ;;
   pi | pi-signed) printf '%s\n' pi ;;
+  cursor) printf '%s\n' cursor ;;
+  opencode) printf '%s\n' opencode ;;
   *) return 1 ;;
   esac
 }
@@ -37,7 +39,19 @@ jg_account_pool_store_var() {
   claude) printf '%s\n' CLAUDE_CONFIG_DIR ;;
   codex) printf '%s\n' CODEX_HOME ;;
   pi) printf '%s\n' PI_CODING_AGENT_DIR ;;
+  cursor) printf '%s\n' XDG_CONFIG_HOME ;;
+  opencode) printf '%s\n' OPENCODE_CONFIG_DIR ;;
   *) return 1 ;;
+  esac
+}
+
+# jg_account_pool_extra_vars <tool>: the other path variables the pool may set beside the store
+# variable (Cursor also moves its config, gh and git files; OpenCode its data, state, cache and key
+# file). Names only; values must be absolute paths. Any other variable makes the answer unusable.
+jg_account_pool_extra_vars() {
+  case "$1" in
+  cursor) printf '%s\n' CURSOR_CONFIG_DIR GH_CONFIG_DIR GIT_CONFIG_GLOBAL ;;
+  opencode) printf '%s\n' XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME OPENCODE_CONFIG ;;
   esac
 }
 
@@ -97,12 +111,12 @@ jg_account_pool_want_valid() {
   [ "${#1}" -le 128 ]
 }
 
-# jg_account_pool_select <harness> <config-dir> [<want>]: "id<TAB>var<TAB>folder<TAB>unset names"
+# jg_account_pool_select <harness> <config-dir> [<want>]: "id<TAB>var<TAB>folder<TAB>unset names<TAB>VAR=path ..."
 # for a mapped harness with a usable pool; nothing when the pool is off; an error and non-zero on
 # any refusal, never an ambient login fallback. <want> is a relaunch's --account choice: an id adds
 # --prefer and the answer must be exactly that account; `next` picks plainly.
 jg_account_pool_select() {
-  local harness=$1 config=$2 want=${3:-} tool store_var cfg command state out errf rc id var folder shed reason detail shed_bad=0
+  local harness=$1 config=$2 want=${3:-} extras entry ename evalue allowed tool store_var cfg command state out errf rc id var folder shed reason detail shed_bad=0
   local -a prefer_arg=()
   tool=$(jg_account_pool_tool "$harness") || return 0
   cfg=$(jg_account_pool_config "$config") || return 1
@@ -135,8 +149,18 @@ jg_account_pool_select() {
   fi
   rm -f "$errf"
   id=$(printf '%s' "$out" | jq -r '.id // empty' 2>/dev/null)
-  var=$(printf '%s' "$out" | jq -r 'if (.set | type) == "object" and (.set | length) == 1 then (.set | keys[0]) else empty end' 2>/dev/null)
+  var=$(printf '%s' "$out" | jq -r --arg v "$store_var" 'if (.set | type) == "object" and (.set[$v] | type) == "string" then $v else empty end' 2>/dev/null)
   folder=$(printf '%s' "$out" | jq -r --arg v "$var" 'if $v == "" then empty else (.set[$v] // empty) end' 2>/dev/null)
+  extras=
+  allowed=" $(jg_account_pool_extra_vars "$tool" | tr '\n' ' ')"
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    ename=${entry%%=*} evalue=${entry#*=}
+    case "$allowed" in *" $ename "*) ;; *) shed_bad=1 ;; esac
+    case "$evalue" in /*) ;; *) shed_bad=1 ;; esac
+    case "$evalue" in *[[:space:]]*) shed_bad=1 ;; esac
+    extras="${extras:+$extras }$entry"
+  done < <(printf '%s' "$out" | jq -r --arg v "$store_var" '(.set // {}) | if type == "object" then to_entries[] | select(.key != $v) | "\(.key)=\(.value)" else empty end' 2>/dev/null)
   if ! shed=$(printf '%s' "$out" | jq -r '
       .unset // []
       | if type == "array" and all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*\\z"))
@@ -165,7 +189,7 @@ jg_account_pool_select() {
       fi
       ;;
   esac
-  printf '%s\t%s\t%s\t%s\n' "$id" "$var" "$folder" "$shed"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$var" "$folder" "$shed" "$extras"
 }
 
 # jg_account_pool_recorded_tool <command> <state> <id>: the pool tool of the account a running
@@ -212,7 +236,7 @@ jg_account_pool_rest() {
 
 # The tools a relaunch may move between automatically, fixed in code from the plan's terms review
 # (plan v2 section 3): OpenCode Go is excluded, as is any opencode-go model. Deliberately not config.
-JG_ACCOUNT_POOL_AUTO_TOOLS="claude codex pi"
+JG_ACCOUNT_POOL_AUTO_TOOLS="claude codex pi cursor"
 
 # jg_account_pool_tuple_field <tuple> <index>: field <index> (1-based) of a tab-separated tuple.
 jg_account_pool_tuple_field() { cut -f"$2" <<<"$1"; }
@@ -283,7 +307,7 @@ jg_account_hook_relaunch_pre() {
   [ "${POOL_ACCOUNT_WANT_SET:-0}" = 1 ] || { jg_account_pool_select "$harness" "$config" >/dev/null; return; }
   jg_account_pool_want_valid "$want" || { echo "error: --account takes 'next' or one account id, not '$want'" >&2; return 1; }
   jg_account_pool_tool "$harness" >/dev/null || {
-    echo "error: --account applies to the harnesses whose pool tool exists (claude, codex, pi, pi-signed), not '$harness'" >&2
+    echo "error: --account applies to the harnesses whose pool tool exists (claude, codex, pi, pi-signed, cursor, opencode), not '$harness'" >&2
     return 1
   }
   cfg=$(jg_account_pool_config "$config") || return 1
@@ -341,7 +365,7 @@ jg_account_hook_raw_launch() {
 # refuses a relaunch's --account <want>; a want with no pool refuses too.
 jg_account_hook_spawn_pick() {
   local harness=$1 config=$2 pin=${3:-} want=${4:-}
-  POOL_ACCOUNT='' POOL_ACCOUNT_ID='' POOL_ACCOUNT_VAR='' POOL_ACCOUNT_FOLDER='' POOL_ACCOUNT_UNSET=''
+  POOL_ACCOUNT='' POOL_ACCOUNT_ID='' POOL_ACCOUNT_VAR='' POOL_ACCOUNT_FOLDER='' POOL_ACCOUNT_UNSET='' POOL_ACCOUNT_EXTRA=''
   if [ -n "$pin" ]; then
     [ -z "$want" ] || {
       echo "error: this home pins $harness workers to one account, and the pin wins over --account '$want'; change or remove the pin file, or relaunch without it" >&2
@@ -359,6 +383,7 @@ jg_account_hook_spawn_pick() {
   POOL_ACCOUNT_VAR=$(jg_account_pool_tuple_field "$POOL_ACCOUNT" 2)
   POOL_ACCOUNT_FOLDER=$(jg_account_pool_tuple_field "$POOL_ACCOUNT" 3)
   POOL_ACCOUNT_UNSET=$(jg_account_pool_tuple_field "$POOL_ACCOUNT" 4)
+  POOL_ACCOUNT_EXTRA=$(jg_account_pool_tuple_field "$POOL_ACCOUNT" 5)
   [ "$POOL_ACCOUNT_VAR" != CLAUDE_CONFIG_DIR ] || export CLAUDE_CONFIG_DIR=$POOL_ACCOUNT_FOLDER
 }
 
@@ -376,13 +401,14 @@ jg_account_hook_spawn_line() {
 # pick (no pin) replaces the ambient CLAUDE_CONFIG_DIR forward that chain adds
 # with `env -u <name> ... <VAR>=<folder>`; the picked folder is the only secret-free input.
 jg_account_hook_launch_prefix() {
-  local name prefix=env own
+  local name prefix=env own entry
   [ -n "${POOL_ACCOUNT:-}" ] && [ -z "${2:-}" ] || return 0
   if [ "$1" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
     own="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") "
     LAUNCH=${LAUNCH#"$own"}
   fi
   for name in $POOL_ACCOUNT_UNSET; do prefix="$prefix -u $name"; done
+  for entry in ${POOL_ACCOUNT_EXTRA:-}; do prefix="$prefix ${entry%%=*}=$(shell_quote "${entry#*=}")"; done
   LAUNCH="$prefix $POOL_ACCOUNT_VAR=$(shell_quote "$POOL_ACCOUNT_FOLDER") $LAUNCH"
 }
 
