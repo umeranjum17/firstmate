@@ -21,6 +21,8 @@ journeys:
     command: bash journeys/nav-removal-gate.sh
   stuck-question-replay:
     command: bash journeys/stuck-question-replay.sh
+  worker-no-ask-tool:
+    command: bash journeys/worker-no-ask-tool.sh
 secrets:
   allow:
     - '^key=waiting-timer-[A-Za-z0-9._-]+\]?$'
