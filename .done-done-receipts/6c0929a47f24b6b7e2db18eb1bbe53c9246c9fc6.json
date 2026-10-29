@@ -1,0 +1,53 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "6c0929a47f24b6b7e2db18eb1bbe53c9246c9fc6",
+  "tree": "8442c640587f9177f97f1206b82724c72019dd5c",
+  "claim": "With the TakeOne switch on, a task recorded as a product demo-video task is refused at merge until its receipt carries a takeone receipt line; with the switch off nothing is checked",
+  "result": "pass",
+  "at": "2026-10-29T19:39:03.826Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T193842Z-6c0929a4-4dcfaa/demo-call-gate-transcript.txt",
+      "sha256": "a27ad5faa3726b8b1096c51d03b37e857816fec7cd9e4828e5072f90eb2b271e"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T193842Z-6c0929a4-4dcfaa",
+      "commit": "6c0929a47f24b6b7e2db18eb1bbe53c9246c9fc6",
+      "journey": "demo-call-gate",
+      "command": "bash journeys/demo-call-gate.sh",
+      "tool": "0.6.20",
+      "steps": {
+        "target": {
+          "version": "juggernaut bin/jg-brief.sh and bin/jg-merge-gate-lib.sh at this commit"
+        },
+        "start": "a disposable juggernaut home with the TakeOne switch off",
+        "steps": [
+          "scaffold a yes brief with the switch off and run the gate",
+          "turn the switch on with config/takeone-demo and scaffold briefs with demo call yes, no and none",
+          "run the demo gate on a yes task with no receipt, a receipt without a line, a first-draft line only, and a takeone receipt line",
+          "run the gate on a no task and on a task with no recorded call"
+        ],
+        "result": "with the switch off nothing is checked; with it on, the yes task is refused until its receipt carries a takeone receipt line; the no task passes; the older task warns and passes"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T193842Z-6c0929a4-4dcfaa/demo-call-gate-transcript.txt",
+        "sha256": "a27ad5faa3726b8b1096c51d03b37e857816fec7cd9e4828e5072f90eb2b271e",
+        "verdict": "pass"
+      }
+    ]
+  }
+}
