@@ -41,6 +41,14 @@
 #      turn, and that turn's end re-arms supervision through the primary's own
 #      re-arm owner (docs/watcher-continuity.md).
 #
+# Before step 1, each tick also guards /tmp inodes through bin/jg-tmp-sweep.sh,
+# which owns the policy: a WARNING log line and a primary wake when /tmp inode use
+# reaches JG_TMP_INODE_WARN_PCT (80), repeated at most once per
+# JG_SENTINEL_TMP_REWARN_SECS, and a sweep of stale fleet scratch once per
+# JG_SENTINEL_TMP_SWEEP_SECS (86400; 0 turns the sweep off), whose summary goes
+# to the log. It runs even while no Herdr server is up, and a failure never
+# changes the tick's own result.
+#
 # reconcile, for each local direct report in state/*.meta on the watched Herdr
 # session (bin/jg-session-start.sh also runs it detached at every locked
 # startup, so each home resumes its own lanes):
@@ -81,7 +89,8 @@
 # rule tick uses, so a later session start in that episode skips it.
 #
 # Knobs: JG_SENTINEL_HERDR_SESSION (HERDR_SESSION, else default), JG_SENTINEL_INTERVAL (60),
-# JG_SENTINEL_REWAKE_SECS (1800), JG_GUARD_GRACE (300).
+# JG_SENTINEL_REWAKE_SECS (1800), JG_GUARD_GRACE (300), JG_SENTINEL_TMP_REWARN_SECS (21600),
+# JG_SENTINEL_TMP_SWEEP_SECS (86400).
 # JG_SENTINEL_DRY_RUN=1 with reconcile decides as usual and prints each line to
 # stdout, but runs no jg-control action, takes no lock, and writes nothing to the
 # home; it is refused for tick and loop.
@@ -130,6 +139,8 @@ SESSION=${JG_SENTINEL_HERDR_SESSION:-${HERDR_SESSION:-default}}
 INTERVAL=${JG_SENTINEL_INTERVAL:-60}
 REWAKE=${JG_SENTINEL_REWAKE_SECS:-1800}
 GRACE=${JG_GUARD_GRACE:-300}
+TMP_REWARN=${JG_SENTINEL_TMP_REWARN_SECS:-21600}
+TMP_SWEEP=${JG_SENTINEL_TMP_SWEEP_SECS:-86400}
 LOG="$STATE/.sentinel.log"
 DRY_RUN=${JG_SENTINEL_DRY_RUN:-0}
 case "$DRY_RUN" in 0|1) ;; *) echo "jg-sentinel: JG_SENTINEL_DRY_RUN must be 0 or 1" >&2; exit 2 ;; esac
@@ -424,8 +435,39 @@ reconcile_episode() {  # <episode>
   return "$rc"
 }
 
+# /tmp inode guard: warn at the threshold, sweep stale scratch once a day; never fails the tick.
+tmp_hygiene() {
+  local out now last_try last_ok rc=0
+  now=$(date +%s)
+  out=$("$SCRIPT_DIR/jg-tmp-sweep.sh" check 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    rm -f "$STATE/.sentinel-tmp-warn"
+  elif [ "$rc" -eq 1 ]; then
+    read -r last_try last_ok <"$STATE/.sentinel-tmp-warn" 2>/dev/null || true
+    if [ $(( now - ${last_ok:-0} )) -ge "$TMP_REWARN" ] && [ $(( now - ${last_try:-0} )) -ge 600 ]; then
+      say "WARNING: $out; a daily sweep clears stale scratch, bin/jg-tmp-sweep.sh sweep lists what it would remove"
+      if wake_primary "Warning: $out. Fleet scratch is filling the inode budget; wake acknowledgements and tools fail when it reaches 100%. The sentinel sweeps stale scratch daily; run bin/jg-tmp-sweep.sh sweep to list what it would remove."; then
+        printf '%s %s\n' "$now" "$now" >"$STATE/.sentinel-tmp-warn"
+      else
+        printf '%s %s\n' "$now" "${last_ok:-0}" >"$STATE/.sentinel-tmp-warn"
+      fi
+    fi
+  fi
+  [ "$TMP_SWEEP" -gt 0 ] 2>/dev/null || return 0
+  last_ok=$(cat "$STATE/.sentinel-tmp-sweep" 2>/dev/null)
+  [ $(( now - ${last_ok:-0} )) -ge "$TMP_SWEEP" ] || return 0
+  printf '%s\n' "$now" >"$STATE/.sentinel-tmp-sweep"
+  # In the background: a sweep of a crowded /tmp takes about a minute and must not delay recovery.
+  (
+    rc=0
+    out=$("$SCRIPT_DIR/jg-tmp-sweep.sh" sweep --apply 2>&1) || rc=$?
+    say "tmp sweep (exit $rc): $(printf '%s' "$out" | grep -E '^(removed|inode use|FAILED|jg-tmp-sweep)' | tr '\n' ';')"
+  ) >/dev/null 2>&1 &
+}
+
 tick() {
   local id prev beat woken_beat age last body rc=0
+  tmp_hygiene || true
   id=$(herdr_identity)
   [ -n "$id" ] || return 0
   prev=$(cat "$STATE/.sentinel-herdr-identity" 2>/dev/null)
