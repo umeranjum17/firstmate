@@ -865,6 +865,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "addons/fleet-report/README.md",
+      "audience": "operator-current"
+    },
+    {
       "path": "addons/fleet-stats/README.md",
       "audience": "operator-current"
     },
