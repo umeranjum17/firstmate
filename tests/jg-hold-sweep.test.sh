@@ -201,6 +201,43 @@ test_closed_task_is_not_shown_as_decision() {
   pass "the fleet view does not count a closed task's decisions"
 }
 
+# Runs the watcher's own two tick functions once, as its loop calls them, and
+# queues each wake the way the loop does. Prints one line per tick that fired.
+run_ticks() {
+  PATH="$HOME_DIR/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$HOME_DIR" \
+    JG_STATE_OVERRIDE="$HOME_DIR/state" JG_DATA_OVERRIDE="$HOME_DIR/data" \
+    JG_CONFIG_OVERRIDE="$HOME_DIR/config" JG_CHECK_INTERVAL=1 JG_HEARTBEAT=1 \
+    bash -c '. "$1"
+      if hold_release_tick; then
+        jg_wake_append check hold-release "$HOLD_RELEASE_REASON" && echo "hold-release fired"
+      fi
+      if stale_ask_tick; then
+        jg_wake_append check stale-ask "$STALE_ASK_REASON" && sweep_asks_record && echo "stale-ask fired"
+      fi' _ "$ROOT/bin/jg-watch.sh" 2>&1
+}
+
+test_watcher_ticks_fire() {
+  local out queue
+  make_home ticks
+  queue="$HOME_DIR/state/.wake-queue"
+  add due
+  add fresh
+  ta hold due --reason "reset" --kind future --until "$(day -1)" >/dev/null || fail "hold due"
+  ta hold fresh --reason "reset" --kind future --until "$(day 5)" >/dev/null || fail "hold fresh"
+  printf 'blocked [at=%s]: hung run\n' "$(( $(date +%s) - 6 * 3600 ))" > "$HOME_DIR/state/old.status"
+  out=$(run_ticks)
+  assert_contains "$out" "hold-release fired" "the hold tick did not fire for a past-dated hold"
+  assert_contains "$out" "stale-ask fired" "the ask tick did not fire for a 6h-old blocked line"
+  assert_grep "check	hold-release	check: hold released: due (its --until date $(day -1) arrived)" "$queue" "the released hold queued no wake naming the task and why"
+  ! grep -q "fresh (" "$queue" || fail "a hold with a future date was released"
+  assert_grep "check	stale-ask	check: stale ask, no answer for over 4h: old blocked 6h" "$queue" "the stale blocked line queued no wake"
+  assert_equals "no" "$(ta list --state queued --fields held | grep '^  due,' | sed 's/.*,//')" "the due task is still held after its tick"
+  sleep 1
+  out=$(run_ticks)
+  assert_equals "" "$out" "a second tick re-woke for an already released hold or an already raised ask"
+  pass "the watcher's hold-release and stale-ask ticks fire once and queue their wakes"
+}
+
 test_hold_time_rules
 test_waits_on_rules
 test_date_gate_releases_and_wakes
@@ -209,3 +246,4 @@ test_pr_and_key_refs
 test_stale_asks
 test_closing_a_task_resolves_its_parent_hold
 test_closed_task_is_not_shown_as_decision
+test_watcher_ticks_fire

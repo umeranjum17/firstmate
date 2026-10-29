@@ -3137,6 +3137,29 @@ ask_default_tick() {
   ASK_DEFAULT_REASON="check: ask-default safe default applied while the captain was unreachable:$ids (recorded in data/ask-default/applied.log)"
 }
 
+# Holds that name a date or a ref release themselves and wake this home's
+# Overwatch (bin/jg-hold-sweep.sh owns the release rules). Runs once per
+# CHECK_INTERVAL; sets HOLD_RELEASE_REASON and returns 0 when a hold was released.
+hold_release_tick() {
+  [ "$(age_of "$STATE/.last-hold-sweep")" -ge "$CHECK_INTERVAL" ] || return 1
+  touch "$STATE/.last-hold-sweep"
+  HOLD_RELEASE_REASON=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" holds 2>/dev/null)
+}
+
+# A blocked or needs-decision record nobody answered for config/stale-ask-hours
+# reaches Overwatch again, at the base heartbeat cadence (never its backoff).
+# Sets STALE_ASK_REASON and returns 0 when an ask is due; the caller queues the
+# wake, then sweep_asks_record marks those asks as raised.
+stale_ask_tick() {
+  [ "$(age_of "$STATE/.last-stale-ask-check")" -ge "$HEARTBEAT" ] || return 1
+  touch "$STATE/.last-stale-ask-check"
+  STALE_ASK_REASON=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks 2>/dev/null)
+}
+
+sweep_asks_record() {
+  JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks --record >/dev/null 2>&1 || true
+}
+
 # event_wait_or_sleep: the terminal wait of each supervision cycle. For a home
 # with push-capable windows (herdr), it replaces the blind `sleep POLL` with a
 # bounded wait on the backend's native transition stream, so a crew going
@@ -4265,25 +4288,15 @@ EOF
     fi
   fi
 
-  # Holds that name a date or a ref release themselves and wake this home's
-  # Overwatch (bin/jg-hold-sweep.sh owns the release rules).
-  if [ "$(age_of "$STATE/.last-hold-sweep")" -ge "$CHECK_INTERVAL" ]; then
-    touch "$STATE/.last-hold-sweep"
-    if reason=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" holds 2>/dev/null); then
-      jg_wake_append check hold-release "$reason" || exit 1
-      wake "$reason"
-    fi
+  if hold_release_tick; then
+    jg_wake_append check hold-release "$HOLD_RELEASE_REASON" || exit 1
+    wake "$HOLD_RELEASE_REASON"
   fi
 
-  # A blocked or needs-decision record nobody answered for config/stale-ask-hours
-  # reaches Overwatch again, at the base heartbeat cadence (never its backoff).
-  if [ "$(age_of "$STATE/.last-stale-ask-check")" -ge "$HEARTBEAT" ]; then
-    touch "$STATE/.last-stale-ask-check"
-    if reason=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks 2>/dev/null); then
-      jg_wake_append check stale-ask "$reason" || exit 1
-      JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks --record >/dev/null 2>&1 || true
-      wake "$reason"
-    fi
+  if stale_ask_tick; then
+    jg_wake_append check stale-ask "$STALE_ASK_REASON" || exit 1
+    sweep_asks_record
+    wake "$STALE_ASK_REASON"
   fi
 
   # Asks the ask-default add-on recorded are decided on the check cadence.
