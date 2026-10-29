@@ -3155,6 +3155,25 @@ claude_add_dirs_flag() {  # <kind> <state-dir> <data-dir> <code-root> <task-id>
   printf '%s' "$out"
 }
 
+# OpenCode asks before reading outside its cwd, and a squad_lead's steering
+# inbox and the parent's pending-replies live in the PARENT home's state/. The
+# launch-time OPENCODE_CONFIG_CONTENT grant above is an env var, so a lead
+# restarted by hand (OpenCode's exit banner prints a bare `opencode --session`)
+# loses it and stalls on "Access external directory". The same grant, scoped
+# to exactly those two directories, is therefore also written where OpenCode
+# reads it from the lead's own cwd: <home>/.opencode/opencode.json (verified
+# on 1.18.25; the root .gitignore keeps it out of git). OpenCode matches an
+# outside read on its parent directory, so a single file cannot be granted:
+# the lead's status file shares state/ with watcher internals and is left out.
+opencode_lead_grant_write() {  # <lead-home> <parent-state-dir> <task-id>
+  local home=$1 state_dir=$2 id=$3 state_real
+  state_real=$(cd "$state_dir" && pwd -P) || return 1
+  mkdir -p "$state_real/$id.inbox/handled" "$state_real/pending-replies" "$home/.opencode" || return 1
+  printf '{"permission":{"external_directory":{"%s":"allow","%s":"allow"}}}\n' \
+    "$(json_escape "$state_real/$id.inbox/**")" \
+    "$(json_escape "$state_real/pending-replies/**")" >"$home/.opencode/opencode.json"
+}
+
 resolved_existing_dir() {
   local path=$1
   [ -d "$path" ] || {
@@ -5790,6 +5809,14 @@ case "$LAUNCH" in
     exit 1
   }
   LAUNCH=${LAUNCH//__CLAUDEADDDIRS__/$CLAUDE_ADD_DIRS}
+  ;;
+esac
+case "$HARNESS:$KIND" in
+opencode:squad_lead)
+  opencode_lead_grant_write "$PROJ_ABS" "$STATE" "$ID" || {
+    echo "error: could not write the OpenCode task-channel grant for squad_lead $ID under $PROJ_ABS/.opencode" >&2
+    exit 1
+  }
   ;;
 esac
 case "$HARNESS" in

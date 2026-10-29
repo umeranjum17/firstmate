@@ -838,6 +838,37 @@ test_cursor_failed_catalog_probe_does_not_block_spawn() {
   pass "cursor preserves the requested model when its live catalog is unreachable"
 }
 
+# A hand-restarted OpenCode lead loses the launch env, so the squad_lead spawn
+# also writes the exact-path external_directory grant where OpenCode reads it
+# from the lead's cwd; it names the lead's inbox and pending-replies only.
+test_opencode_squad_lead_writes_exact_channel_grant() {
+  local rec id sm out status cfg state_real
+  id="opencode-lead-grant-z2"
+  rec=$(make_spawn_case opencode-lead-grant opencode "$id")
+  read_case_record "$rec"
+  sm="$CASE_DIR/squad-lead-home"
+  make_seeded_squad_lead_home "$sm" "$id"
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --squad-lead)
+  status=$?
+  expect_code 0 "$status" "squad_lead opencode spawn should succeed"$'\n'"$out"
+  cfg="$sm/.opencode/opencode.json"
+  state_real=$(cd "$HOME_DIR/state" && pwd -P)
+  [ "$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), sort_keys=True))' "$cfg")" = \
+    "$(python3 -c 'import json,sys; print(json.dumps({"permission":{"external_directory":{sys.argv[1]+"/"+sys.argv[2]+".inbox/**":"allow",sys.argv[1]+"/pending-replies/**":"allow"}}}, sort_keys=True))' "$state_real" "$id")" ] \
+    || fail "squad_lead opencode grant is not exactly its inbox and pending-replies: $(cat "$cfg" 2>&1)"
+  pass "a squad_lead opencode launch writes a persistent grant for exactly its inbox and pending-replies"
+
+  id="opencode-ship-grant-z3"
+  rec=$(make_spawn_case opencode-ship-grant opencode "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "ship opencode spawn should succeed"$'\n'"$out"
+  [ ! -e "$PROJ_DIR/.opencode/opencode.json" ] || fail "a ship opencode spawn wrote a persistent grant file"
+  pass "a ship opencode launch writes no grant file"
+}
+
 test_opencode_threads_model_and_effort_variant() {
   local rec id out status launch
   id=profile-opencode-z7
@@ -2458,6 +2489,7 @@ test_grok_omits_invalid_xhigh_reasoning_effort
 test_cursor_threads_model_workspace_and_omits_effort_axis
 test_cursor_refuses_model_absent_from_live_catalog
 test_cursor_failed_catalog_probe_does_not_block_spawn
+test_opencode_squad_lead_writes_exact_channel_grant
 test_opencode_threads_model_and_effort_variant
 test_opencode_without_effort_keeps_launch_config_unchanged
 test_opencode_go_model_takes_per_task_store_when_auth_has_key
