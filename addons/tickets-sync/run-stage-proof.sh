@@ -30,7 +30,7 @@ ln -s "$fork/bin" "$JG_HOME/bin"
 printf '{"schema":2,"items":[]}\n' > "$work/board.json"
 printf '%s\n' "$work/board.json" > "$JG_HOME/config/fleet-board"
 printf '[markdown]\npath="data/backlog.md"\narchive="data/done-archive.md"\ndone_keep=0\n' > "$JG_HOME/.tasks.toml"
-(cd "$JG_HOME"; tasks-axi add stuck 'Umer stuck telescope focus' --repo alpha --priority 1 --body $'release: next\nparent: upkeep' >/dev/null
+(cd "$JG_HOME"; tasks-axi add stuck 'Umer stuck telescope focus' --repo alpha --priority 1 --body $'release: v1\nparent: upkeep' >/dev/null
  tasks-axi start stuck >/dev/null)
 git init -q "$JG_HOME/projects/alpha"
 git -C "$JG_HOME/projects/alpha" remote add origin https://github.com/example/ownvoice.git
