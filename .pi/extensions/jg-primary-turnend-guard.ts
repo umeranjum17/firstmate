@@ -513,8 +513,13 @@ function runCdCheck(command: string): Promise<{ code: number; stderr: string }> 
 }
 
 function runSupervisorWorkCheck(command: string): { code: number; stderr: string } {
-  const script = resolve(process.env.XDG_DATA_HOME || resolve(process.env.HOME ?? "", ".local/share"), "jg-supervisor-guard/jg-supervisor-work-pretool-check.sh");
-  if (!existsSync(script)) return { code: 0, stderr: "" };
+  const dataHome = process.env.XDG_DATA_HOME || resolve(process.env.HOME ?? "", ".local/share");
+  // An add-on installed before the rename still sits under its old data directory and file name.
+  const script = [
+    "jg-supervisor-guard/jg-supervisor-work-pretool-check.sh",
+    "fm-supervisor-guard/fm-supervisor-work-pretool-check.sh",
+  ].map((relative) => resolve(dataHome, relative)).find((candidate) => existsSync(candidate));
+  if (!script) return { code: 0, stderr: "" };
   const result = spawnSync(script, [], { input: JSON.stringify({ tool_input: { command }, cwd: process.cwd() }), encoding: "utf8" });
   if (result.status !== 2) return { code: 0, stderr: "" };
   let reason = result.stderr;

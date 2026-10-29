@@ -68,6 +68,8 @@ esac
 esac
 
 WRITER="${JG_TICKETS_TICKET:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-tickets-sync/tickets-sync/ticket.py}"
+# An add-on installed before the rename still sits under its old data directory.
+[ -f "$WRITER" ] || [ -n "${JG_TICKETS_TICKET:-}" ] || WRITER=${XDG_DATA_HOME:-${HOME:-}/.local/share}/fm-tickets-sync/tickets-sync/ticket.py
 [ -f "$WRITER" ] || exit 0
 [ -e "$CONFIG/fleet-board" ] || exit 0
 

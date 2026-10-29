@@ -195,7 +195,8 @@ jg_compat_function_aliases() {
   for fn in $(compgen -A function); do
     case "$fn" in
       jg_compat_*) continue ;;
-      jg_*) old=fm_${fn#jg_} ;;
+      # The old name also spelled the lead word its old way: jg_root_is_squad_lead_home was fm_root_is_secondmate_home.
+      jg_*) old=fm_${fn#jg_}; old=${old//squad_lead/secondmate} ;;
       squad_lead_*) old=secondmate_${fn#squad_lead_} ;;
       *) continue ;;
     esac

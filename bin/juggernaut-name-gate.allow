@@ -438,3 +438,13 @@ addons/merge-on-green/tests/no-old-receipt-path.test.sh  # inline jg-compat env 
 .agents/skills/firstmate-codexapp/SKILL.md  # old skill name kept as an alias stub until S10
 tests/jg-compat-old-records.test.sh  # builds old-name records to prove the read fallbacks; deleted by S10
 docs/documentation-audiences.json  # classifies the seven retired alias skills by their old paths
+bin/fm-arm-command-policy.mjs  # alias re-export of bin/jg-arm-command-policy.mjs; an add-on installed before the rename passes it as its shell lexer; deleted by S10
+bin/fm-cd-command-policy.mjs  # alias re-export of bin/jg-cd-command-policy.mjs; called by add-ons installed before the rename; deleted by S10
+bin/jg-arm-command-policy.mjs  # names the old fm-watch scripts it still protects; deleted by S10
+bin/jg-arm-pretool-check.sh  # prefilter keeps the old fm-watch name so the guard still sees it; deleted by S10
+bin/jg-captain-hold.sh  # looks for the task-priority add-on under its pre-rename data directory too; deleted by S10
+bin/jg-tasks-axi.sh  # looks for the task-priority add-on under its pre-rename data directory too; deleted by S10
+bin/jg-ticket.sh  # looks for the tickets-sync add-on under its pre-rename data directory too; deleted by S10
+bin/jg-watch.sh  # looks for the fleet-flow add-on under its pre-rename data directory too; deleted by S10
+.pi/extensions/jg-primary-turnend-guard.ts  # looks for the supervisor guard under its pre-rename data directory too; deleted by S10
+.omp/extensions/jg-primary-turnend-guard.ts  # looks for the supervisor guard under its pre-rename data directory too; deleted by S10

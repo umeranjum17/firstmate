@@ -181,7 +181,7 @@ case "$CMD" in
   *"\$'"*|*'$"'*) ;;
   *)
     case "$PREFILTER" in
-      *jg-watch*) ;;
+      *jg-watch*|*fm-watch*) ;;  # fm-watch: pre-rename alias shims still run the watcher
       *) exit 0 ;;
     esac
     ;;

@@ -1019,6 +1019,8 @@ command_hold() {
     [ -z "$origin" ] || body=$(printf 'Origin: %s' "$origin")
     # Optional task-priority add-on: a created task must carry --priority. No-op when not installed.
     priority_check=${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}
+    # An add-on installed before the rename still sits under its old data directory.
+    [ -x "$priority_check" ] || [ -n "${JG_TASK_PRIORITY_CHECK:-}" ] || priority_check=${XDG_DATA_HOME:-${HOME:-}/.local/share}/fm-task-priority/check.sh
     if [ -x "$priority_check" ]; then
       "$priority_check" add "$id" "$title" --kind captain ${priority:+--priority "$priority"} >/dev/null \
         || exit 1

@@ -6,7 +6,7 @@ metadata:
   internal: true
 ---
 
-<!-- maintainers: this is the Juggernaut-internal skill. The public, installer-facing counterpart lives at skills/intel/SKILL.md - deliberately a separate file with no shared code or environment branching. Keep them independent. -->
+<!-- maintainers: this is the Juggernaut-internal skill. The public, installer-facing counterpart lives at skills/stow/SKILL.md - deliberately a separate file with no shared code or environment branching. Keep them independent. -->
 
 # stow
 
@@ -62,6 +62,7 @@ Decay advances only when a pass runs, so a home stowed less often than a clock e
 
 The wall-clock horizons above are this skill's default contract, and a home gets exactly them unless it asks for more.
 A home may opt in to a second, per-pass horizon by creating the local, gitignored `config/intel-pass-horizon` presence flag.
+A home that created the flag under its older name, `config/stow-pass-horizon`, has opted in too: treat either file as the flag.
 While that file is absent nothing else in this section applies: no counter is written, no counter already in a file is read, and every entry decays on its date alone.
 
 Opt in where admission and decay are not commensurable.

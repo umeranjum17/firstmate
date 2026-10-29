@@ -44,12 +44,12 @@ function parseArguments(argv) {
 }
 
 function rawMentionsProtected(command) {
-  return /(?:^|[/\s'"`(])jg-watch(?:-(?:arm|checkpoint))?\.sh\b/.test(normalizeLineContinuations(command));
+  return /(?:^|[/\s'"`(])(?:jg|fm)-watch(?:-(?:arm|checkpoint))?\.sh\b/.test(normalizeLineContinuations(command));
 }
 
 function rawMentionsBroadKill(command) {
   const normalized = normalizeLineContinuations(command);
-  return /jg-watch/.test(normalized) && /\b(?:pkill|kill)\b/.test(normalized);
+  return /(?:jg|fm)-watch/.test(normalized) && /\b(?:pkill|kill)\b/.test(normalized);
 }
 
 function normalizeLineContinuations(source) {
@@ -595,10 +595,15 @@ export function commandPosition(tokens) {
   return { words, index, command, wrappers, prefixAssignments, unresolvedWrapperOption, wrapperPayloads };
 }
 
+// The fm-* names are the pre-rename alias shims, which still exec the renamed
+// watcher scripts, so they are as protected as the jg-* names they run.
 const PROTECTED_SCRIPTS = [
   { relative: "bin/jg-watch-arm.sh", kind: "arm" },
   { relative: "bin/jg-watch-checkpoint.sh", kind: "checkpoint" },
   { relative: "bin/jg-watch.sh", kind: "watch" },
+  { relative: "bin/fm-watch-arm.sh", kind: "arm" },
+  { relative: "bin/fm-watch-checkpoint.sh", kind: "checkpoint" },
+  { relative: "bin/fm-watch.sh", kind: "watch" },
 ];
 
 function protectedIdentity(value, root) {
@@ -611,7 +616,7 @@ function protectedIdentity(value, root) {
 
 function hasUnclassifiableProtectedExpansion(word, root) {
   if (!word?.unquotedExpansion || protectedIdentity(word.value, root)) return false;
-  return /(?:^|\/)jg-watch/.test(word.value);
+  return /(?:^|\/)(?:jg|fm)-watch/.test(word.value);
 }
 
 function shellInvocation(position) {
@@ -718,7 +723,7 @@ function contextWithAssignments(context, words) {
     const value = word.value.slice(word.value.indexOf("=") + 1);
     if (rawMentionsProtected(value) || wordReferencesAny(word, protectedVariables)) protectedVariables.add(name);
     else protectedVariables.delete(name);
-    if (/jg-watch/.test(value) || wordReferencesAny(word, watcherPatterns)) watcherPatterns.add(name);
+    if (/(?:jg|fm)-watch/.test(value) || wordReferencesAny(word, watcherPatterns)) watcherPatterns.add(name);
     else watcherPatterns.delete(name);
     if (wordReferencesAny(word, watcherPids)) watcherPids.add(name);
     else watcherPids.delete(name);
@@ -736,7 +741,7 @@ function nodeHasUnsafeSubstitution(tokens) {
 
 function isWatcherPgrep(position, context) {
   if (!position.command || basename(position.command.value) !== "pgrep") return false;
-  return position.words.slice(position.index + 1).some((word) => /(?:^|\/)jg-watch(?:\.sh)?\b/.test(word.value) || wordReferencesAny(word, context.watcherPatterns));
+  return position.words.slice(position.index + 1).some((word) => /(?:^|\/)(?:jg|fm)-watch(?:\.sh)?\b/.test(word.value) || wordReferencesAny(word, context.watcherPatterns));
 }
 
 function analyzeProgram(command, context, depth = 0) {
@@ -834,7 +839,7 @@ function analyzeProgram(command, context, depth = 0) {
     if (hasUnclassifiableProtectedExpansion(position.command, context.root)) unclassifiableProtected = true;
     const commandName = basename(executable);
     const args = position.words.slice(position.index + 1);
-    if (commandName === "pkill" && args.some((word) => /jg-watch/.test(word.value) || wordReferencesAny(word, nodeContext.watcherPatterns))) broadKill = true;
+    if (commandName === "pkill" && args.some((word) => /(?:jg|fm)-watch/.test(word.value) || wordReferencesAny(word, nodeContext.watcherPatterns))) broadKill = true;
     if (commandName === "kill" && (nodePgrepWatcher || args.some((word) => wordReferencesAny(word, nodeContext.watcherPids)))) broadKill = true;
     if (isWatcherPgrep(position, nodeContext)) pgrepWatcher = true;
     if (hasDynamicExecutionPayload(position, nodeContext) || wordReferencesAny(position.command, nodeContext.protectedVariables)) nodeNestedProtected = true;

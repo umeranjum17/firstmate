@@ -130,6 +130,30 @@ prog=$(cat "$ROOT/bin/jg-contributions.jq"; printf '\nvalid_record\n')
 printf '%s' "$rec" | jq -e "$prog" >/dev/null \
   || fail "a record saved under fm-contributions.v1 is treated as unreadable"
 pass "an old contribution record is still readable"
+# an add-on installed before the rename sources the old scope library and imports the old shell lexer
+(
+  # shellcheck disable=SC1090
+  . "$ROOT/bin/fm-primary-scope-lib.sh"
+  declare -F "fm_root_is_${legacy_lead}_home" >/dev/null
+) || fail "the old scope library does not answer to its old ${legacy_lead} function name"
+(cd "$h" && node -e 'import(process.argv[1]).then((m) => process.exit(typeof m.Lexer === "function" && typeof m.splitProgram === "function" ? 0 : 1), () => process.exit(1))' "$ROOT/bin/fm-arm-command-policy.mjs") \
+  || fail "the old shell lexer path no longer imports"
+pass "an old scope library and shell lexer path still load"
+# the watcher-arm guard still protects the old command names, which run the renamed watcher
+old_arm="bin/fm-watch-arm.sh"
+old_arm+=" &"
+payload=$(jq -nc --arg c "$old_arm" --arg d "$h" '{tool_name:"Bash",tool_input:{command:$c},cwd:$d,session_id:"t"}')
+printf '%s' "$payload" | JG_HOME="$h" "$ROOT/bin/jg-arm-pretool-check.sh" --claude >/dev/null 2>&1
+[ $? -eq 2 ] || fail "a backgrounded old-name watcher arm is not denied"
+pass "the arm guard still denies an old-name watcher command"
+# an add-on installed before the rename sits in the data directory under its old name, and is still run
+xdg=$h/xdg
+mkdir -p "$xdg/fm-tickets-sync/tickets-sync" "$h/config" "$h/state"
+printf 'import os, sys\nopen(os.environ["JG_HOME"] + "/ticket-ran", "w").write(" ".join(sys.argv[1:]))\n' > "$xdg/fm-tickets-sync/tickets-sync/ticket.py"
+: > "$h/config/fleet-board"
+XDG_DATA_HOME=$xdg JG_HOME=$h bash "$ROOT/bin/jg-ticket.sh" t1 --stage "done" >/dev/null 2>&1
+[ "$(cat "$h/ticket-ran" 2>/dev/null)" = "t1 --stage done" ] || fail "an add-on installed under its old data directory is not run"
+pass "an add-on installed under its old data directory is still found"
 # the migrator renames a lead home's markers, header wording and pin directory, and rolls back exactly
 lh=$h/leadhome
 mkdir -p "$lh"/config/"${legacy_lead}"s/l1 "$lh"/state "$lh"/data

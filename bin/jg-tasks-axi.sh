@@ -262,6 +262,8 @@ captain_guard() {  # <tasks-axi args>
 case "${1:-}" in
   add|create)
     PRIORITY_CHECK="${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
+    # An add-on installed before the rename still sits under its old data directory.
+    [ -x "$PRIORITY_CHECK" ] || [ -n "${JG_TASK_PRIORITY_CHECK:-}" ] || PRIORITY_CHECK=${XDG_DATA_HOME:-${HOME:-}/.local/share}/fm-task-priority/check.sh
     if [ -x "$PRIORITY_CHECK" ]; then
       "$PRIORITY_CHECK" ${ARGS[@]+"${ARGS[@]}"} >/dev/null || exit $?
     fi

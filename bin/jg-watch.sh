@@ -2934,6 +2934,8 @@ lane_target_value() {
 open_lane_count() {
   local check counted meta kind count=0
   check=${XDG_DATA_HOME:-$HOME/.local/share}/jg-fleet-flow/jg-flow-check.sh
+  # An add-on installed before the rename still sits under its old data directory and file name.
+  [ -f "$check" ] || check=${XDG_DATA_HOME:-$HOME/.local/share}/fm-fleet-flow/fm-flow-check.sh
   if [ -f "$check" ] && [ -x "$check" ] \
     && counted=$(jg_run_timed "${JG_FLOW_CHECK_TIMEOUT_SECS:-10}" "$check" "$JG_HOME" --summary 2>/dev/null); then
     counted=$(printf '%s\n' "$counted" | awk -F '\t' 'NF == 9 && NR == 1 { print $8 }')

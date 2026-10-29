@@ -845,9 +845,9 @@ Without readable host pressure and available memory, or without `python3`, the g
 The guard's header owns consumer attribution, sample format, and exact output.
 `tests/jg-jev-mem-guard.test.sh` pins app.slice-only judgment, fast-spike waiting, sampling, home-qualified ownership, remote-record exclusion, and once-per-episode dispatch with re-arming after a WAIT; `tests/jg-control-relaunch.test.sh` and `tests/jg-squad-lead-liveness.test.sh` pin admission before agent stop and recovery-budget consumption.
 
-## Stow pass horizon (config/stow-pass-horizon)
+## Intel pass horizon (config/intel-pass-horizon)
 
-`config/stow-pass-horizon` is an optional local, gitignored presence flag that opts this home in to the pass-count decay horizon in the internal [`/intel` skill](../.agents/skills/intel/SKILL.md).
+`config/intel-pass-horizon` (or its older name, `config/stow-pass-horizon`) is an optional local, gitignored presence flag that opts this home in to the pass-count decay horizon in the internal [`/intel` skill](../.agents/skills/intel/SKILL.md).
 Without it a `/intel` pass decays memory entries on their wall-clock horizons alone - 30 days for `aging`, 7 days for `perishable` - which is the default and unchanged behavior.
 
 With it, an entry is also stale after 10 passes (`aging`) or 3 passes (`perishable`) that evaluated it without reinforcing it, whichever horizon it reaches first.
