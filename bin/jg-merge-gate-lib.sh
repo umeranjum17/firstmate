@@ -11,6 +11,7 @@
 # copy is what makes them fire without it. Callers supply jg_dod_meta_value;
 # jg_run_timed and jg_timed_out come from bin/jg-timeout-lib.sh, sourced here.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
+# The hooks also get FM_HOME (the pre-rename name) because installed add-on hooks and done-done's merge-gate still read it; delete with the S10 shim.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
 if [ -r "$_jg_d/jg-compat.sh" ]; then
@@ -44,7 +45,7 @@ jg_dod_merge_gate() {  # <config-dir> <home> <id> <meta> <candidate-head> <pr-ur
     echo "merge refused: JG_MERGE_GATE_TIMEOUT must be a positive number of seconds"; return 1 ;;
   esac
   worktree=$(jg_dod_meta_value "$4" worktree)
-  out=$(jg_run_timed "$seconds" env JG_HOME="$2" "$gate" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
+  out=$(jg_run_timed "$seconds" env JG_HOME="$2" FM_HOME="$2" "$gate" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
   [ -z "$out" ] || printf '%s\n' "$out"
   [ "$rc" -ne 0 ] || return 0
   if jg_timed_out "$rc"; then
@@ -61,7 +62,7 @@ jg_merge_post_hook() {  # <config-dir> <home> <id> <meta> <head|-> <pr-url|->
   [ -x "$hook" ] || { echo "post-merge hook skipped: $hook is not executable"; return 0; }
   case $seconds in ''|0*|*[!0-9]*) seconds=120 ;; esac
   worktree=$(sed -n 's/^worktree=//p' "$4" 2>/dev/null | tail -1)
-  out=$(jg_run_timed "$seconds" env JG_HOME="$2" "$hook" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
+  out=$(jg_run_timed "$seconds" env JG_HOME="$2" FM_HOME="$2" "$hook" "$3" "${worktree:--}" "$5" "$6" 2>&1) || rc=$?
   [ -z "$out" ] || printf '%s\n' "$out"
   [ "$rc" -eq 0 ] || echo "post-merge hook failed (exit $rc); the merge stands"
   return 0
