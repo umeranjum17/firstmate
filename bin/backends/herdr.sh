@@ -395,12 +395,13 @@ jg_backend_herdr_workspace_label() {
 # jg_backend_herdr_workspace_legacy_label: the pre-rename "2ndmate-<id>" form
 # of a squad_lead home's label, empty for the primary home. Live workspaces
 # keep it until closed, so lookups read it; nothing writes it.
-jg_backend_herdr_workspace_legacy_label() {
-  local label
-  label=$(jg_backend_herdr_workspace_label)
-  case "$label" in
-    lead-*) printf '2ndmate-%s' "${label#lead-}" ;;
+jg_backend_herdr_legacy_of_lead_label() {  # <label>
+  case "$1" in
+    lead-*) printf '2ndmate-%s' "${1#lead-}" ;;
   esac
+}
+jg_backend_herdr_workspace_legacy_label() {
+  jg_backend_herdr_legacy_of_lead_label "$(jg_backend_herdr_workspace_label)"
 }
 
 # jg_backend_herdr_cli: run `herdr <args...>` scoped to <session>, setting
@@ -2901,10 +2902,10 @@ jg_backend_herdr_projection_cleanup_exact() {  # <session> <task-pane> <seeded-p
 jg_backend_herdr_projection_parent_workspace_exact() {  # <session> <parent-label>
   local session=$1 parent_label=$2 list
   list=$(jg_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
-  printf '%s' "$list" | jq -er --arg parent_label "$parent_label" '
+  printf '%s' "$list" | jq -er --arg parent_label "$parent_label" --arg old "$(jg_backend_herdr_legacy_of_lead_label "$parent_label")" '
     (.result.workspaces // null) as $spaces
     | select(($spaces | type) == "array")
-    | [$spaces[]? | select(.label == $parent_label)]
+    | [$spaces[]? | select(.label == $parent_label or (($old | length) > 0 and .label == $old))]
     | if length == 1
         and (.[0].workspace_id | type) == "string"
         and (.[0].workspace_id | length) > 0
@@ -2927,6 +2928,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
     --arg workspace "$workspace" \
     --arg parent_workspace "$parent_workspace" \
     --arg parent_label "$parent_label" \
+    --arg parent_old "$(jg_backend_herdr_legacy_of_lead_label "$parent_label")" \
     --arg workspace_label "$workspace_label" '
       def is_new_child:
         (.label | type) == "string"
@@ -2941,7 +2943,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
       | select(([$spaces[]? | select(.workspace_id == $workspace and .label == $workspace_label)] | length) == 1)
       | select(([$spaces[]? | select((.label | type) == "string" and (.label | endswith(" · p:" + $token)))] | length) == 1)
       | select(([$spaces[]? | select((.label | type) == "string" and (.label | endswith(" · p:" + $token)) and .workspace_id == $workspace)] | length) == 1)
-      | select(([$spaces[]? | select(.workspace_id == $parent_workspace and .label == $parent_label)] | length) == 1)
+      | select(([$spaces[]? | select(.workspace_id == $parent_workspace and (.label == $parent_label or (($parent_old | length) > 0 and .label == $parent_old)))] | length) == 1)
       | ([range(0; $spaces | length) | select($spaces[.].workspace_id == $parent_workspace)]) as $parents
       | ([range(0; $spaces | length) | select($spaces[.].workspace_id == $workspace)]) as $children
       | select(($parents | length) == 1 and ($children | length) == 1)
@@ -2949,7 +2951,7 @@ jg_backend_herdr_projection_live_binding_matches() {  # <session> <token> <works
       | ($children[0]) as $child_index
       | select($child_index > $parent_index)
       | reduce range($parent_index + 1; $child_index) as $i
-          (true; . and (($spaces[$i] | is_new_child) or ($spaces[$i] | is_legacy_child_for($parent_label))))
+          (true; . and (($spaces[$i] | is_new_child) or ($spaces[$i] | (is_legacy_child_for($parent_label) or (($parent_old | length) > 0 and is_legacy_child_for($parent_old))))))
       | select(. == true)
     ' >/dev/null 2>&1 || return 1
   tabs=$(jg_backend_herdr_cli "$session" tab list --workspace "$workspace" 2>/dev/null) || return 1
