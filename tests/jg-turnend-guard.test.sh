@@ -1111,6 +1111,60 @@ EOF
   pass ".opencode primary plugin: guard path is anchored to worktree, not directory"
 }
 
+test_opencode_watch_arm_surfaces_a_blocked_arm() {
+  local repo out status
+  repo="$TMP_ROOT/opencode-watch-arm-blocked"
+  mkdir -p "$repo/.opencode/plugins/lib" "$repo/bin" "$repo/state"
+  cp "$ROOT/.opencode/plugins/jg-primary-watch-arm.js" "$repo/.opencode/plugins/"
+  cp "$ROOT/.opencode/plugins/lib/jg-operational-input.js" "$repo/.opencode/plugins/lib/"
+  cp "$ROOT/bin/jg-operational-input.sh" "$repo/bin/"
+  printf 'jg_primary_root_matches() { return 0; }\n' > "$repo/bin/jg-primary-scope-lib.sh"
+  printf 'jg_supervision_needed() { return 0; }\n' > "$repo/bin/jg-supervision-lib.sh"
+  # pid 1 never owns a home lock, so this session cannot arm a home that needs supervision.
+  printf '1\n' > "$repo/state/.lock"
+  # The trailing --session argument makes this process look like a resumed OpenCode TUI.
+  out=$(NODE_NO_WARNINGS=1 PLUGIN="$repo/.opencode/plugins/jg-primary-watch-arm.js" REPO="$repo" \
+    JG_HOME="$repo" JG_ROOT_OVERRIDE="$repo" node --input-type=module - --session ses_resumed 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+
+const prompts = [];
+const client = { session: { promptAsync: async (request) => { prompts.push(request); } } };
+const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+const hooks = await mod.FmPrimaryWatchArm({ client, worktree: process.env.REPO });
+const idle = (sessionID) => hooks.event({ event: { type: "session.idle", properties: { sessionID } } });
+const fail = (message) => { console.error(message, JSON.stringify(prompts)); process.exit(1); };
+const text = (i) => prompts[i]?.body?.parts?.[0]?.text ?? "";
+
+await settle();
+if (prompts.length !== 1 || prompts[0].path.id !== "ses_resumed") fail("a resumed session did not try to arm at load");
+if (!text(0).includes("OpenCode cannot arm supervision: this session does not own the home lock")) fail("the blocked arm was not surfaced");
+await idle("ses_resumed");
+await settle();
+if (prompts.length !== 1) fail("the idle caused by the report's own prompt reported again");
+await idle("ses_resumed");
+await settle();
+if (prompts.length !== 2) fail("a later idle did not report the block that stays");
+
+// A predicate that cannot answer surfaces instead of reading as "not needed".
+writeFileSync(`${process.env.REPO}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.REPO}/bin/jg-supervision-lib.sh`, "jg_supervision_needed() { echo boom >&2; return 127; }\n");
+await idle("ses_resumed");
+await settle();
+await idle("ses_resumed");
+await settle();
+if (prompts.length !== 3 || !text(2).includes("the supervision-needed check could not answer (jg_supervision_needed exited 127)")) {
+  fail("a failing supervision-needed check was not surfaced");
+}
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "OpenCode watch-arm plugin must arm a resumed session and surface a blocked arm"
+  [ -z "$out" ] || fail "OpenCode watch-arm blocked-arm test printed output: $out"
+  pass ".opencode watch-arm plugin: a resumed session arms at load and a blocked arm re-surfaces on each real idle"
+}
+
 test_pi_extension_injects_once_per_logical_agent_run() {
   local repo home ext log out status
   repo="$TMP_ROOT/pi-logical-run-root"
@@ -2298,6 +2352,7 @@ test_tracked_claude_entries_inert_under_grok
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root
 test_codex_hook_ignores_nested_git_root_guard
 test_opencode_plugin_anchors_guard_to_worktree
+test_opencode_watch_arm_surfaces_a_blocked_arm
 test_pi_extension_injects_once_per_logical_agent_run
 test_pi_extension_retries_after_followup_delivery_failure
 test_hook_claude_mode_reblocks_stop_hook_active_when_unhealthy
