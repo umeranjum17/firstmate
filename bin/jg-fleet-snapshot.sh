@@ -1097,7 +1097,7 @@ squad_lead_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
             | ($t.hints.open_decisions // [])[]
             # A decision about a task the backlog has closed is not open: neither
             # the closed task itself, nor a captain-hold relay naming it.
-            | select((.key | capture("^captain-hold-(?<id>.+)-[0-9]+$")?.id // "") as $held
+            | select(((.key // "" | capture("^captain-hold-(?<id>.+)-[0-9]+$") | .id) // "") as $held
                      | $done_ids | index($held) | not)
             | {id:$t.id,key,verb,summary:(.summary | trunc(160)),reason:null,source:"status"} ])) as $decisions_all
     | ([ $queued_all[]
