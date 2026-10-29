@@ -117,5 +117,11 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
   ([.squad_lead_current.records[]? | select(.idle_with_ready_work)]
    | if length == 0 then empty
      else (.[] | "IDLE WITH READY WORK: \(.id) has \(.ready_work) ready backlog item(s) and no worker running; it should be dispatching them (P0 first)."), "" end),
-  .squad_lead_guidance.note
+  .squad_lead_guidance.note,
+  (if ((.prompt_approvals // []) | length) == 0 then empty
+   else "", "## Permission Prompts Auto-Approved",
+     "| At | ID | Window | Path | Root |",
+     "| --- | --- | --- | --- | --- |",
+     (.prompt_approvals[] | "| \(.at | todate) | \(.task) | \(.window) | \(.path) | \(.root) |")
+   end)
 '

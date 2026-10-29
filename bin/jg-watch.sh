@@ -283,6 +283,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-pending-reply-lib.sh"
 # shellcheck source=bin/jg-busy-lib.sh
 . "$SCRIPT_DIR/jg-busy-lib.sh"
+# shellcheck source=bin/jg-prompt-gate-lib.sh
+. "$SCRIPT_DIR/jg-prompt-gate-lib.sh"
 # shellcheck source=bin/jg-watch-progress-lib.sh
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
 # shellcheck source=bin/jg-supervision-lib.sh
@@ -2242,6 +2244,62 @@ captain_call_stale_bound() {  # <window-key> <task>
 # Both records of an ordinary crew wait bound it (see task_captain_call_open
 # above): the status line the worker declared, and the backlog hold juggernaut
 # recorded once the captain took the work in hand.
+# prompt_gate_check: a pane parked on a permission or trust prompt is stuck at
+# once, never left to the wedge timer, and a squad_lead's idle exemption does
+# not cover it. bin/jg-prompt-gate-lib.sh owns the verdict. An approval is
+# re-proved on a fresh capture before Enter is sent, logged, and silent; the
+# same prompt still on screen within a minute of it means the answer did not
+# take, so it becomes a card. Every card is posted and woken once per prompt.
+# Returns 0 while the pane shows a prompt, so the caller skips the stale path.
+prompt_gate_check() {  # <window> <task> [tail40]
+  local w=$1 task=$2 harness backend label key mf meta verdict again h reason card
+  local _r path prompt
+  harness=$(window_harness "$w")
+  jg_prompt_gate_harness "$harness" || return 1
+  backend=$(window_backend "$w")
+  label=$(window_label "$w")
+  key=$(window_key "$w")
+  mf="$STATE/.prompt-$key"
+  meta="$STATE/$task.meta"
+  if [ -n "${3-}" ] && ! printf '%s' "$3" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta" | grep -q .; then
+    rm -f "$mf"
+    return 1
+  fi
+  watcher_capture "$backend" "$w" 200 "$label" || return 1
+  verdict=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
+  if [ -z "$verdict" ]; then
+    rm -f "$mf"
+    return 1
+  fi
+  h=$(printf '%s' "$verdict" | hash_pane)
+  IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
+  if [ "${verdict%%$'\t'*}" = approve ]; then
+    if [ "$(cat "$mf" 2>/dev/null)" = "approved:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
+      verdict=$(printf 'card\tan approval sent under a minute ago did not take\t%s\t%s' "$path" "$prompt")
+    else
+      watcher_capture "$backend" "$w" 200 "$label" || return 0
+      again=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
+      [ "$again" = "$verdict" ] || return 0
+      if jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
+        printf 'approved:%s' "$h" > "$mf"
+        jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt" \
+          || triage_log "prompt approval log write failed: $w $path"
+        triage_log "approved permission prompt ($_r): $w $path"
+        return 0
+      fi
+      verdict=$(printf 'card\tsending the approval key failed\t%s\t%s' "$path" "$prompt")
+    fi
+    h=$(printf '%s' "$verdict" | hash_pane)
+    IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
+  fi
+  [ "$(cat "$mf" 2>/dev/null)" != "card:$h" ] || return 0
+  card=$(SIGN_OFF_FILER=juggernaut-watch jg_prompt_gate_card "$task" "$w" "$_r" "$path" "$prompt" "$h") || card="not posted (sign-off-axi refused or is missing)"
+  printf 'card:%s' "$h" > "$mf"
+  reason="stale: $w (permission prompt: $prompt; path $path; not auto-approved: $_r; card $card)"
+  jg_wake_append stale "$w" "$reason" || exit 1
+  wake "$reason"
+}
+
 surface_nonterminal_stale() {  # <window> <hash>
   local win=$1 h=$2 key task last declared=1 bounded=1 throttled=1 until now
   key=$(window_key "$win")
@@ -3791,11 +3849,13 @@ EOF
     # this guard: reaching it would require backlog reads for windows this gate
     # deliberately skips, putting that read on the ordinary poll hot path.
     if [ "$kind" = squad_lead ] && ! status_is_paused_or_captain_held "$last"; then
+      [ -z "$task" ] || prompt_gate_check "$w" "$task" || true
       continue
     fi
     backend=$(window_backend "$w")
     watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" || continue
     tail40=$WATCHER_CAPTURE
+    if [ -n "$task" ] && prompt_gate_check "$w" "$task" "$tail40"; then continue; fi
     h=$(printf '%s' "$tail40" | hash_pane)
     hf="$STATE/.hash-$key"
     cf="$STATE/.count-$key"

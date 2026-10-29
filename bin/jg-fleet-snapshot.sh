@@ -114,6 +114,8 @@
 #     with the bearings projection so one Recently Landed section has one owner.
 #   contributions: cached owned-contribution coverage; jg-contributions.sh owns it.
 #   squad_lead_guidance: return-channel action note for renderers and bearings.
+#   prompt_approvals[]: the last 20 well-formed records of
+#     state/prompt-approvals.jsonl; bin/jg-prompt-gate-lib.sh owns them.
 #
 # --contribution-input prints only the canonical backlog/tasks ownership pair,
 # without worker observations or cross-home collection, for the home-local poll.
@@ -2090,8 +2092,11 @@ squad_lead_current_json "$TASKS_JSON_FILE" "$SQUAD_LEAD_CURRENT_JSON_FILE" \
 squad_lead_landed_from_current_json "$SQUAD_LEAD_CURRENT_JSON_FILE" "$SQUAD_LEAD_LANDED_JSON_FILE" \
   || { echo "jg-fleet-snapshot: squad_lead landed projection failed" >&2; exit 1; }
 
+PROMPT_APPROVALS_JSON=$(tail -n 20 "$STATE/prompt-approvals.jsonl" 2>/dev/null \
+  | jq -cR 'fromjson? // empty' | jq -cs .) || PROMPT_APPROVALS_JSON='[]'
 jq -n \
   --arg generated "$SNAPSHOT_NOW" \
+  --argjson prompt_approvals "${PROMPT_APPROVALS_JSON:-[]}" \
   --arg jg_home "$JG_HOME" \
   --arg jg_root "$JG_ROOT" \
   --arg state "$STATE" \
@@ -2126,6 +2131,7 @@ jq -n \
      scout_reports:($scout_reports | map(. + {kind:report_kind(.id)})),
      squad_lead_current:$squad_lead_current,
      squad_lead_landed:$squad_lead_landed,
+     prompt_approvals:$prompt_approvals,
      squad_lead_guidance:{
        note:"For kind=squad_lead, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
      }
