@@ -70,8 +70,7 @@
 #          tasks-axi and quota-axi are essential bootstrap tools.
 #          A compatible tasks-axi default backend is silent.
 #          quota-axi is required for the agent-owned dispatch-profile array
-#          procedure in AGENTS.md section 4 and
-#          .agents/skills/quota-array-dispatch/SKILL.md.
+#          procedure in .agents/skills/quota-array-dispatch/SKILL.md.
 #          done-done and sign-off-axi are the published proof and decision tools;
 #          each install line is the exact build its toolchain.versions row names,
 #          never a git install, and that row is their floor too. The locked

@@ -13,7 +13,7 @@ metadata:
 
 Use this reference before creating, seeding, validating, launching, handing backlog to, recovering, pushing inherited local material into, or retiring a persistent Squad Lead, and before editing `data/squad_leads.md`.
 
-Keep the always-inline routing rules in `AGENTS.md` authoritative: route by natural-language `scope:`, local-only projects stay with the main Juggernaut, and Squad Leads are idle by default.
+Keep the routing rules authoritative: `task-dispatch` routes by natural-language `scope:`, and `AGENTS.md` keeps local-only projects with the main Juggernaut and Squad Leads idle by default.
 
 ## Routing table
 
@@ -94,7 +94,7 @@ When the file's tokens do apply, an explicit per-spawn `--model` or `--effort` f
 Because this resolves from config on every spawn, the pin is durable across every respawn (recovery, `/resupply`, restart) exactly like the harness axis itself - e.g. a resolved Squad Lead profile pinning Opus keeps that mate pinned even if the primary's own default model later changes.
 This is Squad Lead-only: operator/scout model resolution is untouched by this file.
 
-This section is the single owner of the Squad Lead sync and inherited-local-material propagation contract; `AGENTS.md` sections 3 and 4 point here.
+This section is the single owner of the Squad Lead sync and inherited-local-material propagation contract; `AGENTS.md` section 6 points here.
 Before a local launch, `jg-spawn.sh --squad-lead` locally fast-forwards the home to the primary Juggernaut checkout's current default-branch commit when it is safe, or reconciles a clean divergence whose complete local result is already present there (e.g. after a squash merge) with `reset --keep`; dirty, uniquely diverged, or in-flight homes launch unchanged with a warning, and a genuine divergence gets the same durable reconciliation record `bin/jg-ff-lib.sh` writes for `/resupply`.
 The locked session-start deferred network stage runs the same bootstrap sweep for every live local Squad Lead home, discovered from `state/<id>.meta` records with `kind=squad_lead` (`data/squad_leads.md` only backfills `home=` for older records).
 That no-fetch path is a purely local fast-forward or redundant-divergence reconcile of tracked files, never an origin fetch, and it never touches the gitignored operational dirs, so a Squad Lead's backlog, projects, and in-flight work are never disturbed; a linked worktree advances immediately, while a standalone clone that lacks the target receives Juggernaut updates through `/resupply`'s origin refresh.
@@ -183,7 +183,7 @@ Treat an inherited queue that carries plans with no matching delivery record as 
 
 ## Backlog handoff
 
-Apply `AGENTS.md` section 10's work-items-only backlog contract before creation or handoff.
+Apply `fleet-records`' work-items-only backlog contract before creation or handoff.
 When a Squad Lead is created for a domain, existing main-backlog items that fall under its scope should become its work instead of staying stranded in the main backlog.
 Scope-matching is Juggernaut's judgment against the Squad Lead's natural-language scope, not a keyword rule.
 Read `data/backlog.md`, pick queued items that fit the new scope, and move them with:

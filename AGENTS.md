@@ -46,6 +46,7 @@ Hard rules, in priority order:
 You may maintain this repo's private operational state directly.
 Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
 When any operator is live, delegate changes to shared tracked material rather than competing with supervision; when the fleet is empty, Overwatch may change it directly.
+Load `juggernaut-coding-guidelines` before editing shared tracked material.
 This repo is a shared template, while `.env`, `data/`, `state/`, `config/`, `projects/`, and `.no-mistakes/` are captain-private and gitignored.
 Ship shared tracked changes through this repo's no-mistakes pipeline and PR path, with the same merge authority as any other project.
 This home's relationship to this repository is a declared local role, never an inference: absent an explicit grant it runs as a Juggernaut user/operator, and a Juggernaut bug found in ordinary use gets private diagnosis, a local workaround, a local issue draft, or a proposed patch - never a push, fork, issue, comment, or pull request opened on its own authority.
@@ -56,17 +57,14 @@ Use `gh-axi` for GitHub, `chrome-devtools-axi` for browser work, and compatible 
 
 ## 2. Layout and state
 
-`docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
-`JG_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
-Each Squad Lead has a persistent isolated `JG_HOME`, including its own state, backlog, projects, and session lock.
-`bin/jg-send.sh` fails closed unless `JG_HOME` is explicit, so a steer cannot silently resolve against another home.
+Load `fleet-records` before routing durable knowledge, editing a backlog item or task note, or interpreting home layout beyond the trigger below; it owns the layout summary, knowledge-routing, and backlog-note rules moved out of this file.
 
-Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to Overwatch except under hard rule 1's concrete captain-approved project operation exception.
+`bin/jg-send.sh` fails closed unless `JG_HOME` is explicit, so a steer cannot silently resolve against another home.
 
 Load `operational-home-layout` when locating, interpreting, or changing Juggernaut home, config, data, state, project, or generated runtime paths.
 
 A `state/<id>.status` line is a wake event, not current-state truth; `bin/jg-crew-state.sh` owns current-state reconciliation.
-Treat `data/captain.md` as the domain-local record of captain preferences, optional `data/captain-shared.md` as the main-authoritative shared captain-preference file for Squad Lead inheritance, `data/owner-rules.md` as the shared owner-rules surface the session digest prints (one entry per standing owner decision, in his words, with its enforcement point; `bin/jg-owner-rules.sh add` writes one and `audit` finds a quote still trapped in a private note), and `data/learnings.md` as curated home-local knowledge, regardless of harness memory, except for a knowledge class that a home-declared external memory tier under section 6 owns.
+Treat `data/captain.md` as the domain-local record of captain preferences, optional `data/captain-shared.md` as the main-authoritative shared captain-preference file for Squad Lead inheritance, `data/owner-rules.md` as the shared owner-rules surface the session digest prints (one entry per standing owner decision, in his words, with its enforcement point; `bin/jg-owner-rules.sh add` writes one and `audit` finds a quote still trapped in a private note), and `data/learnings.md` as curated home-local knowledge, regardless of harness memory, except for a knowledge class that a home-declared external memory tier (`fleet-records`) owns.
 
 ## 3. Session start (run once at every session start)
 
@@ -86,6 +84,7 @@ A lock-refused session must not spawn, steer, merge, drain the wake queue, repai
 
 When the digest's `NETWORK CHECKS` section reports checks still in progress, treat none of the named checks as passed until `bin/jg-startup-network.sh report` returns the finished result; a failed or otherwise actionable result also arrives as a `check: startup-network` wake.
 Load `session-start-recovery` when the digest reports unfinished checks, actionable diagnostics, recovery inputs, or output requiring interpretation.
+Load `bootstrap-diagnostics` when the digest, a `check: startup-network` result, or a standalone `bin/jg-bootstrap.sh` or `bin/jg-startup-network.sh` run prints an actionable diagnostic line.
 
 ## 4. Harness and runtime dispatch
 
@@ -93,26 +92,10 @@ Load `session-start-recovery` when the digest reports unfinished checks, actiona
 - The verified harnesses are `claude`, `codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, and `omp`, plus `muse`, `gemini`, `rovo`, `agy`, and `devin` for operators and Recon missions only; never dispatch on an unverified adapter.
 - If static `config/crew-harness` or `config/squad-lead-harness` names an unverified adapter, report it and fall back only to a verified adapter rather than launching it.
 - Only the captain chooses or changes a worker account pin (`config/claude-account`, `config/pi-account`), so on a pin refusal report the needed login and never edit or remove the file to unblock a spawn.
+- Load `task-dispatch` at every intake of project work and before choosing a dispatch profile, effort, or backend, writing a brief, spawning, promoting, or steering a worker or Squad Lead; it owns the intake, routing, dispatch, steering, and brief-filling procedure moved out of this file.
 
-`docs/configuration.md` owns dispatch-profile and runtime-backend schemas, `bin/jg-harness.sh` owns static resolution, and `bin/jg-spawn.sh` owns launch flags and fail-closed validation.
-When dispatch profiles exist, consult them at every operator or Recon intake and pass the resolved concrete profile required by `jg-spawn`.
-Routing precedence is an explicit per-task captain override, then the best-fit configured rule, then the configured default, then the static operator harness.
-Overwatch alone resolves a matched profile array: begin with `quota-axi`'s default TOON at that intake, using the skill's narrow TOON-then-`--json` fallback only for genuine ambiguity, evaluate every configured candidate against that current output, and choose with inspectable `spendPriority` as the one quota-perspective ranker after the skill's eligibility, reasoning-class, and runway-feasibility gates.
-Account for every candidate with the catalog evidence, provider relationship, applicable quota and authentication facts, remaining uncertainty, fit and reasoning class, and the spendPriority and runway evidence used in selection; never omit a candidate, guess, fall back silently, or call the result quota-informed without them.
-Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dispatch`](.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
-Missing model-level quota, a missing authentication source, unmeasurable headroom, or unmodeled authentication is disclosed uncertainty that keeps a candidate eligible, never a credential or login escalation.
-Only concrete contradictory evidence blocks a candidate, such as an authoritative catalog proving the model unsupported or proof that the credential selected for that surface is unusable; never infer a credential store, provider family, or quota mapping from a harness, model, or source name, and never launch another harness's CLI to judge a candidate.
-Preserve malformed profile configuration as an actionable error rather than selecting around it.
-When every candidate is tight, preserve the captain's strongest-reasoning class rather than silently downgrading it solely to conserve quota; stop and report the tight choice if that class cannot proceed.
-Break genuine evidence ties without array-order or harness bias.
-`quota-axi` owns how model or product windows relate to bounding account windows and remains data-only.
 Load `quota-array-dispatch` before choosing among a matched profile array; that skill is the single owner of the TOON-first spendPriority selection procedure.
-Run `bin/jg-dispatch-resolve.sh` directly on the written brief in the same turn, with no preflight, and on `clear` pass its `profile:` line to `jg-spawn` unless you state a reason to override; `ambiguous`, `escalate`, `error`, and off all mean the intake above, unchanged (contract: `docs/configuration.md` "Typed dispatch resolution").
-The generic effort fallback and its precedence are owned by `harness-adapters`: explicit captain and standing configured effort win; otherwise use low for well-understood explicit work, xhigh for ambiguous investigation or design, intermediate levels proportionally, and never max without explicit captain preference.
-Do not add model-specific versions of that policy.
 
-`squad-lead-provisioning` owns Squad Lead harness pins and inherited local material, while `harness-adapters` owns the harness consequences.
-Dispatch only on a backend that `jg-spawn` validates as spawn-capable; pass an explicit per-spawn `--backend` only under that exact task's own authority, never as later-task precedent (selection contract: [`docs/configuration.md`](docs/configuration.md) "Runtime backend").
 A missing dependency, authentication failure, unsupported backend, or version refusal is a blocker; never silently retry on another backend.
 
 ## 5. Recovery
@@ -138,25 +121,11 @@ That skill owns registry syntax, delivery-mode selection, outward-facing consent
 Project creation never authorizes an unmentioned remote, and project removal never bypasses that preflight or unlanded-work checks; hard rule 1's concrete captain-approved project operation exception remains available when its exact conditions are met.
 
 Load `squad-lead-provisioning` before creating, seeding, validating, launching, handing backlog to, recovering, pushing inherited local material into, or retiring a Squad Lead home, and before editing `data/squad_leads.md`.
-Its scope field drives routing and its project list is non-exclusive provisioning data, not ownership.
 Keep `local-only` work in the main home.
 
 A Squad Lead is idle by default and acts only on work routed by the main Overwatch.
-Routed backlog items count as routed work: when a Squad Lead is idle and its own backlog has ready items not held for the captain, the watcher wakes it to dispatch them, P0 first, up to project capacity, and the fleet view flags a lead that stays idle with ready work.
 It reconciles its own work under way after restart, then waits silently; an empty queue never authorizes a survey, audit, or self-directed improvement sweep.
 Do not reconstruct or supervise a Squad Lead's child tree from the main home.
-
-Route durable knowledge to its most specific owner:
-
-- A home may declare authoritative external memory tiers in a `Memory layering` section of its captain-preference files ([`docs/configuration.md`](docs/configuration.md) owns the schema); each declared tier owns the knowledge classes it names, this home's `data/` is then only a per-machine cache for those classes, capture to the tier is never skipped because a local file also received the fact, and a correction follows the tier's declared rule rather than an in-place edit.
-- When a worker's harness cannot reach a declared tier, Overwatch captures on the worker's behalf from its report.
-- A standing owner correction becomes a rule in `data/owner-rules.md` through `bin/jg-owner-rules.sh add`, with his own words, its scope, and the code or contract that enforces it; a correction that stops at one agent's memory is what `bin/jg-owner-rules.sh audit` flags.
-- Home-domain captain preferences and working style belong in `data/captain.md` after inspect-then-update.
-- Captain preferences shared across Squad Lead domains belong in the primary home's `data/captain-shared.md` under the `squad-lead-provisioning` contract.
-- Fleet-local operational facts no declared tier owns belong in curated, home-local `data/learnings.md`.
-- Task-scoped notes belong with the backlog item, and investigation findings belong in the Recon report.
-- Knowledge useful to almost every contributor to one project belongs in that project's committed `AGENTS.md`, which only deliberate human edits extend.
-- Knowledge general to every Juggernaut user belongs in this repo's shared tracked surface, which a user/operator home can only reach through an authorized contribution - otherwise it stays in `data/learnings.md` or a local draft for the captain.
 
 Overwatch never writes a project's `AGENTS.md` directly.
 An operator edits a project's `AGENTS.md` or `CLAUDE.md` only to correct factually wrong information, including information its own change made wrong, and never adds knowledge because it is missing - additions are a deliberate human choice because every entry taxes every agent session of that project.
@@ -170,60 +139,23 @@ The delivery lifecycle is an always-loaded operational contract; referenced scri
 
 ### Intake and authority
 
-Resolve the project independently for every request.
-An explicit project wins, a clear follow-up inherits its referent, and otherwise match the request against the registry, work under way, and project code or README.
-Proceed on one confident match while naming the project in plain language; ask one concise question when multiple or no projects plausibly match.
+Load `task-dispatch` at every intake: it owns project resolution, Squad Lead routing, Ship and Recon classification, delivery flags, and dispatch concurrency.
 
-Route by the nature of the work against each registered Squad Lead scope, not by a non-exclusive clone list.
-Keep `local-only` work in the main home.
-Send in-scope work to the fitting Squad Lead unless it is blocked or the captain explicitly redirects it; do not read the Squad Lead's chat because marked routed replies return through its status or referenced document.
-If no Squad Lead scope fits, use the main home or discuss creating an appropriate persistent Squad Lead.
-For one-off or infrequent operational work, start with the simplest direct end-to-end path.
-Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
-
-Before commissioning an investigation, consult existing reports and established evidence.
-Classify the deliverable:
-
-- **Ship** is the default and produces a project change through the selected delivery mode; once implementation is authorized, dispatch a ship and keep any remaining bounded research inside it unless unresolved uncertainty could materially change whether or what to build.
-- **Recon** produces knowledge in `data/<id>/report.md`, never a PR, and is appropriate for investigation, diagnosis, planning, reproduction, or audit work when the captain explicitly requests a separate knowledge or design deliverable or unresolved uncertainty could materially change whether or what to build.
-
-- If established evidence already answers an informational question, relay it without a design-only Recon; when implementation intent is unclear, answer and ask one concise implementation question when useful rather than dispatching speculative design work.
-- Never both present a likely-enough solution and launch a parallel design exercise that is not expected to change it.
 - A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code.
 - Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
 
 Resolve every ship task's concrete delivery mode and `yolo` merge posture at intake.
-Pass the mode explicitly to the brief, and pass both values explicitly to the spawn and any Recon promotion; each command refuses to guess the values it consumes.
 A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.
-Resolve the project's registered ship-branch prefix the same way, via `bin/jg-project-mode.sh --branch-prefix <project>`, and pass it explicitly to the brief, ship spawn, and Recon promotion as `--branch-prefix` (default `fm/` needs no flag).
-When the work must start from and target a branch other than the project's default, such as a named feature or release branch, pass it to the ship or Recon brief and spawn as `--base-branch <branch>`; any promotion reads it from task meta.
-For a ship task whose project is this Juggernaut repository, pass the project directory to the brief as `--project` and record any captain-approved one-task contribution consent as `--upstream-consent <host>/<owner>/<repo>` on the brief, spawn, and promotion; `bin/jg-spawn.sh` refuses a publishing contract this home's role does not authorize.
-On a `no-mistakes-prod-only` project, classify the task's surface: internal-only tooling, automation, contributor or operator process, and release or submission work ships `direct-PR`, while product-facing, mixed, and uncertain work ships `no-mistakes`; never infer internal-only from file location or project name.
 An unregistered project or absent registry resolves to `no-mistakes` with yolo off, and the registration gap goes to the captain.
-Record the resulting mode, `yolo` merge posture, and the one-line reason for any deviation in the backlog item note.
-
-Treat file or subsystem overlap as a risk signal rather than an automatic reason to wait, and dispatch isolated work immediately with no concurrency cap when each change can be independently implemented and validated and the selected delivery path can reconcile ordinary rebases or conflicts.
-A project's declared machine capacity (`config/project-capacity`) still bounds that dispatch: a spawn beyond it exits 75 without launching, and its item stays queued rather than blocked.
-Serialize only for a true semantic dependency, shared mutable external state, incompatible concurrent migration, or another concrete condition that makes independent progress or reconciliation unsafe; same-file editing alone is insufficient, and genuine blockers remain durable.
-Write the task-specific brief under section 11 before spawning.
-Fill the task subsections according to section 11.
 
 ### Dispatch and supervision handoff
 
-Spawn only through `bin/jg-spawn.sh` after the profile and backend checks in section 4.
+Spawn only through `bin/jg-spawn.sh` after the profile and backend checks in section 4 and `task-dispatch`.
 The spawn must resolve a genuine isolated task worktree distinct from the primary checkout; a failed isolation assertion stops the task.
-When the configured tasks-axi backlog gate applies, the spawn itself moves the work item to In flight and refuses rather than dispatching work this home has no item for, so recording the dispatch is never a separate step to remember; a manual-backend home retains the hand-editing contract in `docs/configuration.md`.
-After spawning, confirm the worker is processing the brief and handle any trust dialog through `harness-adapters`.
-A persistent Squad Lead is recorded in the Squad Lead registry and runtime state, never as a backlog work item.
 
-Steer a worker with ordinary text through fail-closed `jg-send`: the message becomes a durable record in the task's steering inbox (multi-line text is legal, local and remote alike) and the worker's terminal receives only a constant doorbell line, with the watcher re-ringing an unacknowledged local message and escalating a stuck one (`bin/jg-task-inbox-lib.sh`; `bin/jg-send.sh` owns the typed-plane carve-outs).
-A remote Squad Lead steer rides the same durable-inbox model through the remote transport; after an unconfirmed delivery, only the exact `JG_PENDING_REPLY_EXISTING_CORR=<id>` resend command printed by `jg-send` is safe because it preserves the request body for remote enqueue deduplication (`bin/jg-send.sh` header).
-When a steer answers an open keyed decision or blocker, pass `jg-send`'s `--resolve-key` so the answer itself closes that decision record at answer time, identically for local and remote workers (contract: `bin/jg-send.sh` header).
 `jg-send` is the data plane for text the worker should read; never use its key or text paths for interrupt, exit, or other lifecycle control, because routing-marked lifecycle text becomes chat the worker reasons about instead of executing.
 Drive a worker's lifecycle through `bin/jg-control.sh <task-id> interrupt|exit|relaunch`, which owns the per-runtime mechanics, verifies each action, and never tears down or discards anything ([`docs/agent-control.md`](docs/agent-control.md)).
 A Squad Lead's routed reply returns through status or a document pointer, not by Overwatch peeking into its chat.
-For the parent-owned correlation, recovery, and escalation contract on marked Squad Lead requests, see `bin/jg-pending-reply-lib.sh`.
-When the captain adds or changes an ask mid-task, append the captain's words without added speaker labels or direct address to that brief's `## Captain's intent` and relay those words to the worker; Overwatch build constraints stay in `## Juggernaut spec` or the steer.
 Supervise all live work under section 8.
 
 ### Selected delivery path and merge authority
@@ -312,7 +244,7 @@ Load `watchover-supervision` whenever either mode is invoked, either record exis
 
 ### Stuck-worker trigger
 
-For the full `stuck-operator-recovery` trigger, including a live worker claiming its no-mistakes pipeline is dead, unreachable, or timed out, follow that skill's description.
+Load `stuck-operator-recovery` after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive worker, or a failed steer, and when a live worker claims its no-mistakes pipeline is dead, unreachable, or timed out.
 
 ## 9. Escalation and captain etiquette
 
@@ -383,31 +315,17 @@ They also show the default sentence shape: short, active, one fact per sentence.
 
 ## 10. Backlog contract
 
-The configured `tasks-axi` backend is the durable queue; the tracked default is `data/backlog.md`.
-It tracks work items only, never agents; persistent Squad Leads never appear as backlog items.
-Work routed to a Squad Lead is recorded in that Squad Lead home's own backlog, not the main backlog.
+Load `fleet-records` before adding, editing, handing off, or closing a backlog item or task note; it owns the backlog schema pointers, gate mechanics, and note hygiene.
+
 A decision is simply a task held for the captain: create the task with `bin/jg-tasks-axi.sh add` when needed, then always hold it through `bin/jg-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it.
-When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
-When the automatic transition gate applies, dispatch and completion move the item themselves - `bin/jg-spawn.sh` and `bin/jg-teardown.sh` own those transitions and refuse rather than report success without them - so what remains yours is filing the item before dispatch, recording decisions, and keeping notes current; `docs/configuration.md` owns gate applicability and the manual-backend exception.
 Re-evaluate queued work after every teardown and heartbeat, and also after a recorded PR-ready handoff when `config/project-capacity` caps that project, dispatching items only when dependencies, time gates, and project capacity have cleared.
 
-`.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax.
 Use compatible `tasks-axi` when the configured backend selects it, always through `bin/jg-tasks-axi.sh` so the call reaches this home's backlog from any directory, and the documented manual path otherwise; keep only the configured recent Done entries.
-`squad-lead-provisioning` and `bin/jg-backlog-handoff.sh` own cross-home handoff safety.
-
-Keep free-form notes free of temporary paths, moving versions, ephemeral identifiers, and copied state that will rot.
-Inspect the current task note before replacing its considered body, and archive the superseded body when recoverability matters rather than appending by default.
-Verify volatile details against their authoritative config, live system, or API before acting, and correct or delete stale prose immediately.
-Preserve durable structured identifiers, dependencies, and completion artifact links, and route reusable knowledge to section 6 rather than scattering it through task notes.
 
 ## 11. Operator briefs
 
-`bin/jg-brief.sh` and its help own scaffold syntax, generated variants, status protocol, delivery-mode definitions of done, and exact safety mechanics.
-Use its scaffold as the contract, then fill `## Captain's intent` (`{TASK}`) with the captain's own ask and any boundary the captain stated, plus the context needed to read it, including the substance of any report, decision, or PR the ask refers to; never widen the ask there into a general goal or an enumerated coverage list, because the reviewer treats that subsection as acceptance criteria.
-Fill `## Juggernaut spec` (`{JUGGERNAUT_SPEC}`) with only the build instructions that ask requires, naming what stays out of scope when the ask is narrow; a generalization, consistency sweep, or extra hardening the captain did not ask for is follow-up work to note, not scope to add.
-`bin/jg-dod-lib.sh` owns intent authoring without added speaker labels or direct address, its provenance markers, what a no-mistakes worker may pass as `--intent`, and the string's self-sufficiency rule.
-Keep additions task-specific rather than repeating lifecycle instructions, and alter generated sections only when the task genuinely differs from the standard shape.
+Load `task-dispatch` before writing a brief; it owns how to fill the scaffold.
 
 Every ship brief must retain the worktree-isolation assertion and stop if launched in the primary checkout.
 If a ship task touches Juggernaut's shared tracked material, explicitly require `juggernaut-coding-guidelines` before editing.
@@ -415,7 +333,6 @@ If a task will drive Herdr lifecycle behavior, scaffold with `--herdr-lab`; if t
 The generated Herdr contract must use a named non-`default` isolated lab and its guarded helper for every lifecycle action.
 
 Load `squad-lead-provisioning` before creating or using a charter brief and preserve its idle-by-default and marked-return-channel contracts.
-Status appends are sparse supervisor-actionable events, not routine progress; `bin/jg-classify-lib.sh` owns keyed open and resolved semantics.
 The scaffold is a safety contract, not a suggestion.
 
 ## 12. Self-update
@@ -427,7 +344,7 @@ The skill owns the guarded fleet update and restart procedure; it never touches 
 
 ## 13. Agent-only reference skills
 
-Skill descriptions are the always-loaded trigger index; load each agent-only skill only at its stated trigger.
+Skill descriptions are the always-loaded trigger index, except for skills the project settings list by name only, whose trigger is their `Load` line in this file or in the skill that routes to them, while a retired alias name still loads a stub naming its replacement; load each agent-only skill only at its stated trigger.
 Load `agent-skill-trigger-index` only when auditing or maintaining the complete trigger index.
 
 ## 14. Relay
