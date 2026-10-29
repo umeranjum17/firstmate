@@ -88,7 +88,8 @@ sweep_holds() {
     print id "\t" $(n - 2) "\t" $(n - 1) "\t" $n }')
   while IFS=$'\t' read -r id until kind held; do
     [ -n "$id" ] || continue
-    case "$kind" in -|captain) continue ;; esac
+    # A hold made without --kind reads back as "-"; it is not a captain hold.
+    [ "$kind" != captain ] || continue
     reason=
     if [ "$until" != - ] && [ ! "$until" \> "$today" ]; then
       why="its --until date $until arrived"

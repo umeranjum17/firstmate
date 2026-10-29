@@ -13,13 +13,14 @@
 #
 # Source this file; it defines functions only.
 
-# jg_hold_future_date <text>: print the first YYYY-MM-DD at or after today
-# (UTC) named in the text; return 1 when there is none.
+# jg_hold_future_date <text>: print the first YYYY-MM-DD after today (UTC)
+# named in the text; return 1 when there is none. Today is not future: an
+# --until of today is already released.
 jg_hold_future_date() {
   local today d
   today=$(date -u +%Y-%m-%d)
   for d in $(printf '%s' "$1" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}'); do
-    [ "$d" \< "$today" ] && continue
+    [ "$d" \> "$today" ] || continue
     printf '%s' "$d"
     return 0
   done

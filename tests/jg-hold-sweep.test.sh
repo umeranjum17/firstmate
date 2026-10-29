@@ -54,6 +54,8 @@ test_hold_time_rules() {
   assert_equals "-" "$(held_kind a)" "a refused hold must not be recorded"
   ta hold a --reason "reset was $(day -3)" --kind future >/dev/null || fail "a past date in the reason was refused"
   ta unhold a >/dev/null
+  ta hold a --reason "found on $(day 0)" --kind parked >/dev/null || fail "today's date in the reason was refused"
+  ta unhold a >/dev/null
   ta hold a --reason "wait for the reset on $(day 3)" --kind future --until "$(day 3)" >/dev/null \
     || fail "a dated reason with --until was refused"
   rc=0
@@ -82,13 +84,15 @@ test_waits_on_rules() {
 test_date_gate_releases_and_wakes() {
   local out rc=0
   make_home date-gate
-  add due; add later; add cap
+  add due; add later; add cap; add nokind
   ta hold due --reason "reset" --kind future --until "$(day -1)" >/dev/null || fail "hold due"
   ta hold later --reason "reset" --kind future --until "$(day 5)" >/dev/null || fail "hold later"
+  ta hold nokind --reason "reset" --until "$(day -1)" >/dev/null || fail "hold nokind"
   run "$ROOT/bin/jg-captain-hold.sh" hold cap --reason "pick one" --until "$(day -1)" >/dev/null || fail "hold cap"
   out=$(run "$SWEEP" holds) || rc=$?
   expect_code 0 "$rc" "sweep with a date gate that has arrived"
   assert_contains "$out" "due (its --until date $(day -1) arrived)" "the wake must name the released task and why"
+  assert_contains "$out" "nokind (" "a hold made without --kind must release too"
   assert_not_contains "$out" "later" "a gate in the future must stay held"
   assert_not_contains "$out" "cap" "a captain hold must never be released by date"
   assert_equals "-" "$(held_kind due)" "the released hold must be cleared"
@@ -103,7 +107,7 @@ test_task_ref_releases_when_it_closes() {
   local out rc=0
   make_home task-ref
   add dep; add work
-  ta hold work --reason "needs dep" --kind external --waits-on task:dep >/dev/null || fail "hold work"
+  ta hold work --reason "needs dep" --waits-on task:dep >/dev/null || fail "hold work"
   run "$SWEEP" holds >/dev/null || rc=$?
   expect_code 1 "$rc" "sweep while the dependency is open"
   ta start dep >/dev/null
