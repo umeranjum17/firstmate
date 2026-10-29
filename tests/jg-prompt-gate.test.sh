@@ -144,7 +144,7 @@ test_lib_switch_and_trust_dialogs() {
 # approvable read is approved again, anything else re-alerts Main.
 test_prompt_still_up_is_acted_on_every_interval() {
   command -v tmux >/dev/null 2>&1 || { printf '# skip: tmux not found\n'; return 0; }
-  local lab w=jglab:jg-lead1 i n approvals wakes ack
+  local lab w=jglab:jg-lead1 n approvals wakes ack ack_args
   lab=$("$ROOT/bin/jg-lab-home.sh" create "$TMP_ROOT/lab")
   TMUX_TMPDIR=$("$ROOT/bin/jg-lab-home.sh" tmux-dir "$lab")
   export TMUX_TMPDIR
@@ -160,14 +160,15 @@ test_prompt_still_up_is_acted_on_every_interval() {
     || tmux new-session -d -s jglab -n jg-lead1 -x 220 -y 60 "stty -echo; cat '$1'; exec sleep 999999"; sleep 1; }
   watch_until() {  # <out> <wakes wanted>: rerun the watcher, which exits on each wake
     : > "$1"
-    for i in 1 2 3 4 5 6 7 8; do
+    for _ in 1 2 3 4 5 6 7 8; do
       JG_HOME="$lab" SIGN_OFF_HOME="$lab/signoff" JG_POLL=1 JG_PROMPT_REALERT_SECS=3 \
         JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 timeout 20 "$ROOT/bin/jg-watch.sh" >> "$1" 2>&1
       # Main drains and acknowledges each wake before the watcher is re-armed.
       JG_HOME="$lab" JG_STATE_OVERRIDE="$lab/state" "$ROOT/bin/jg-wake-drain.sh" >/dev/null 2>"$TMP_ROOT/drain.err"
       ack=$(sed -n 's/^WAKE_ACK_REQUIRED: *//p' "$TMP_ROOT/drain.err")
+      read -ra ack_args <<< "${ack#*jg-wake-drain.sh}"
       [ -z "$ack" ] || JG_HOME="$lab" JG_STATE_OVERRIDE="$lab/state" "$ROOT/bin/jg-wake-drain.sh" \
-        ${ack#*jg-wake-drain.sh} >/dev/null 2>&1 || fail "the wake acknowledgement failed: $(cat "$TMP_ROOT/drain.err")"
+        "${ack_args[@]}" >/dev/null 2>&1 || fail "the wake acknowledgement failed: $(cat "$TMP_ROOT/drain.err")"
       [ "$(grep -c "stale: $w (permission prompt" "$1")" -lt "$2" ] || return 0
     done
   }
