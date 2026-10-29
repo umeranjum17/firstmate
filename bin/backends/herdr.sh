@@ -3458,9 +3458,9 @@ jg_backend_herdr_agent_name_variant() {  # <name> <salt> -> <name>
 # pinned. A failure warns with herdr's own error and still returns 0: the name
 # is cosmetic and must never fail a spawn or relaunch. The name that stuck is
 # left in JG_BACKEND_HERDR_PINNED_NAME (empty when none did).
+# shellcheck disable=SC2034 # JG_BACKEND_HERDR_PINNED_NAME is read by the caller
 jg_backend_herdr_pin_agent_name() {  # <session> <pane-id> <task-id>
   local session=${1:-} pane=${2:-} id=${3:-} name out code message
-  # shellcheck disable=SC2034 # read by the caller (jg-herdr-names.sh)
   JG_BACKEND_HERDR_PINNED_NAME=
   [ -n "$session" ] && [ -n "$pane" ] && [ -n "$id" ] || return 0
   name=$(jg_backend_herdr_agent_name_for "$id") || return 0

@@ -8,12 +8,6 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-# The old words, assembled from halves so this test adds no leftover to the
-# rename's tracked-name gate while still naming what the check forbids.
-OLD_TAB="f""m-"
-OLD_LEAD="2nd""mate-"
-OLD_PRODUCT="first""mate"
-
 tmp=$(mktemp -d); trap 'rm -rf -- "$tmp"' EXIT
 fakebin=$(jg_fakebin "$tmp")
 world="$tmp/world.json"
