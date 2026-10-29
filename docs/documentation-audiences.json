@@ -889,6 +889,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "addons/lead-sleep-guard/README.md",
+      "audience": "operator-current"
+    },
+    {
       "path": "addons/lead-wake/README.md",
       "audience": "operator-current"
     },

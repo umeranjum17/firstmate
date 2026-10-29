@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--jg_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [model allow-lists](#model-allow-lists-configmodel-allow-listjson), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and [launch environment hook](#launch-environment-hook-configlaunch-env-hook) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [startup memory budget](#startup-memory-budget-configstartup-memory-budget), and [host memory guard](#host-memory-guard-confighost-memory) |
-| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), and [Calm preference](#calm-preference-configstealth) |
 | Persistent Squad Leads | [Squad Lead routes](#squad-lead-routes-datasquad_leadsmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -394,7 +394,7 @@ Completion refuses to report success until the item is closed, and session start
 
 The same wrapper also refuses to remove or close a `[captain-ask]` row, or to drop its tag through `update` or `edit --title`, unless the row links a merged pull request or a Recon report, or the call carries `--captain-quote '<his words>'`, or `--confirm-card <id>` naming a separate board card that names the row and that `bin/jg-captain-hold.sh answered` finds answered. A recorded answer on the row itself no longer closes it, because a rejected option means redo the options, never cancel. The quote or card lands in the ticket note and in `data/captain-closures.md`; it refuses a raw `hold` of such a row, and an unanswered ask in the archive set blocks a close or prune only when that archive would move it past `done_keep`. The refusal names the row and exits 2. The guard covers only commands run through the wrapper, and the automatic dispatch and completion transitions do not use it ([`bin/jg-tasks-axi.sh`](../bin/jg-tasks-axi.sh) owns the complete refusal list).
 
-When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/jg-spawn.sh`](../bin/jg-spawn.sh); [`tests/jg-backlog-atomicity.test.sh`](../tests/jg-backlog-atomicity.test.sh)).
+When a spawn is interrupted after launch delivery began, its exit path re-reads the paired task record and the backlog row under the same per-task lock as the commit, repairs a row the commit believed it had moved, and reports only what was verified or honestly attempted, never intent phrased as outcome ([`bin/jg-spawn.sh`](../bin/jg-spawn.sh)).
 
 ### Which backlog receives a transition
 
@@ -1259,13 +1259,13 @@ This guarantee also covers raw launch commands, remote Squad Leads, and launches
 Juggernaut provides no configuration or flag to change this value.
 This applies only to agents Juggernaut launches; the captain's own primary Juggernaut session is never given the variable.
 
-[`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/jg-spawn-compact-adviser-disable.test.sh`](../tests/jg-spawn-compact-adviser-disable.test.sh) and [`tests/jg-spawn-compact-adviser-disable-remote.test.sh`](../tests/jg-spawn-compact-adviser-disable-remote.test.sh).
+[`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the delivery mechanics.
 
 ### Git editor setting
 
 Every operator, Recon, and Squad Lead Juggernaut launches starts with `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` in its environment, on a fresh spawn and on a relaunch alike, so git never opens an interactive editor in an unattended worker pane.
 This guarantee also covers raw launch commands and launches filtered by `config/launch-env-allowlist`; it does not depend on the destination environment already containing either variable.
-[`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the delivery mechanics, with focused regression coverage in [`tests/jg-spawn-compact-adviser-disable.test.sh`](../tests/jg-spawn-compact-adviser-disable.test.sh).
+[`jg-spawn.sh --help`](../bin/jg-spawn.sh) owns the delivery mechanics.
 
 ### Commit attribution
 

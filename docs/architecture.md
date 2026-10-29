@@ -298,7 +298,6 @@ Operators never intentionally touch your project clone; [treehouse](https://gith
 The [`jg-spawn.sh` header](../bin/jg-spawn.sh) owns ship/scout durable allocation, failed-launch recovery, worktree isolation, and fresh-base refusal rules, including spawns from linked homes.
 Before any pool copy is allocated, spawn and home seed lease every recorded copy in that project's pool through [`bin/jg-treehouse-protect.py`](../bin/jg-treehouse-protect.py), because treehouse's own liveness is process-based and would show a copy whose task's launching shell has exited as free; the lease, not a process check, keeps a live task's copy from being handed out.
 The script's docstring owns the skip and refusal rules.
-Portable regressions live in [`tests/jg-spawn-pool-base-freshen.test.sh`](../tests/jg-spawn-pool-base-freshen.test.sh) for spawn isolation and base freshness, and [`tests/jg-control-relaunch.test.sh`](../tests/jg-control-relaunch.test.sh) for preserving the recorded copy on relaunch.
 
 The Juggernaut repo has one extra exposure because it can dispatch operators to work on itself.
 Its operating checkout (`JG_ROOT`) and the disposable operator worktrees are all linked git worktrees of the same repository, so the valid discriminator is branch state, not whether the checkout is linked.
@@ -309,7 +308,7 @@ Only a named non-default branch checked out in `JG_ROOT` is a worktree tangle.
 `jg-guard.sh` prints the repair command on the next mutable fleet action, while `bin/jg-session-start.sh` reports the same condition through bootstrap as a `TANGLE:` line at session start.
 If another live session holds the fleet lock, both surfaces keep the alarm but switch to read-only wording with no repair command.
 Ship briefs also tell the operator to verify `pwd -P` and `git rev-parse --show-toplevel` before creating its ship branch (`fm/<id>` by default, or the project's registered prefix), then stop with a blocked status if it landed in the primary checkout.
-Placement is proven only at launch, so `bin/jg-spawn.sh` also exports the task id as `JG_TASK_ID` into every ship and Recon pane, and `bin/jg-test-run.sh` refuses to execute the behavior suite from the primary checkout while that marker is set; the runner's header owns the predicate and [`tests/jg-test-run.test.sh`](../tests/jg-test-run.test.sh) pins it.
+Placement is proven only at launch, so `bin/jg-spawn.sh` also exports the task id as `JG_TASK_ID` into every ship and Recon pane, and `bin/jg-test-run.sh` refuses to execute the behavior suite from the primary checkout while that marker is set; the runner's header owns the predicate.
 
 ## No-mistakes gate authority boundary
 
@@ -435,7 +434,7 @@ A pool worktree is only returned after teardown passes record exclusivity: a con
 The durable Treehouse lease is the only ownership store.
 Allocation and return serialize on one project lock per machine-local Juggernaut tree: every home reachable through local parent links shares that lock, and a home seeded from another machine anchors its own, because a lock taken on this filesystem is neither held nor observable across that boundary.
 Before the worktree is returned, teardown concludes the task's own no-mistakes run when it is parked at a gate, including a run whose head the task copy cannot resolve - the shared runs-ledger continuation proof is the only recognition for that case, so cleanup never orphans a parked run the pipeline advanced past the submitted head.
-[`bin/jg-teardown.sh`](../bin/jg-teardown.sh)'s header owns the landed-work proofs, record-exclusivity check, endpoint-close refusal, PR-discovery fallback, pre-teardown run conclusion, task-owned process and scratch cleanup, and stale-lock recovery procedure; [`tests/jg-teardown-endpoint-safety.test.sh`](../tests/jg-teardown-endpoint-safety.test.sh) and [`tests/jg-squad-lead-safety.test.sh`](../tests/jg-squad-lead-safety.test.sh) pin the slot-collision boundary, while [`tests/jg-teardown.test.sh`](../tests/jg-teardown.test.sh) covers scratch cleanup and interruption recovery.
+[`bin/jg-teardown.sh`](../bin/jg-teardown.sh)'s header owns the landed-work proofs, record-exclusivity check, endpoint-close refusal, PR-discovery fallback, pre-teardown run conclusion, task-owned process and scratch cleanup, and stale-lock recovery procedure; [`tests/jg-teardown.test.sh`](../tests/jg-teardown.test.sh) covers scratch cleanup and interruption recovery.
 
 ## Optional Relay
 
