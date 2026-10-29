@@ -1359,6 +1359,11 @@ This single-provider table is separate from the frozen legacy mapping used by `j
 - Codex `max` is valid when the profile selects `gpt-5.6-luna`, whose installed catalog entry supports that reasoning level.
 - An omitted model or effort means the selected harness uses its own default for that axis.
 - Juggernaut's OpenCode ship, Recon, Squad Lead, and relaunch commands pre-approve tool permissions and external-directory access, including steering inboxes outside the worktree and unrelated scratch paths such as `/tmp`; the grant is not a task-path allowlist or a worktree isolation boundary.
+  A Squad Lead launch also writes `.opencode/opencode.json` in the lead's own home with a persistent `external_directory` allow for exactly its steering inbox and the parent's `pending-replies` directory, so a lead restarted by hand with a bare `opencode --session` keeps access; restart through `bin/jg-control.sh <task-id> relaunch` instead.
+  The same file also lets the lead read the parent home's `bin/`, `docs/`, and `.agents/skills/` and denies OpenCode's edit tool there.
+  That read-only limit is partial: the shell is not sandboxed, so a command can still write to those directories.
+  This adds no new trust, because leads already append to the parent home through the shell for status lines.
+  `data/`, `config/`, `.env`, and `projects/` stay behind OpenCode's prompt.
   This per-launch permission policy is retained with or without model and effort selections; `bin/jg-spawn.sh`'s `launch_template()` owns the exact configuration, and `tests/jg-spawn-dispatch-profile.test.sh` covers its generated launches.
 - OpenCode receives the effort as its default `build` agent's `variant`, keyed to the resolved model, inside the `OPENCODE_CONFIG_CONTENT` JSON its launch already writes (the per-model reasoning-effort field of the config schema, verified on opencode 1.18.32); with no model resolved, the effort is recorded in task metadata but omitted from the launch.
 - A Juggernaut OpenCode launch with a model from a provider other than `opencode` gets its own session store, `juggernaut-<12-hex home token>-<task id>.db`, inside OpenCode's data directory, so concurrent workers stop locking one shared `opencode.db`.
