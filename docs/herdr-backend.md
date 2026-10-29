@@ -160,6 +160,14 @@ The one recovery that does place new work is the control plane's reclaim of a de
 It mints a replacement tab through this section's ordinary placement rules while pinning the herdr session the task's record names ([`agent-control.md`](agent-control.md) "Reclaiming a task whose endpoint is gone").
 
 Existing task operations use recorded endpoint ids and do not move a live task when labels change.
+
+### Live names
+
+Spawn and relaunch pin each worker's Herdr agent to a name derived from its task id, because Herdr assigns a random call-sign at start and again after a server restart.
+Herdr accepts only 1-32 characters that start with a lowercase letter and continue with lowercase letters, digits, `-` or `_`, and keeps agent names unique in the session.
+`jg_backend_herdr_agent_name_for` maps a task id into that shape: an id that already fits is the name, and a longer id keeps its first 27 characters plus a four-hex checksum of the whole id.
+A name another agent holds falls back to a checksum variant of the pane, and a refusal warns with Herdr's own error code.
+`tests/jg-herdr-names.test.sh` pins the mapping and the pin against a fake Herdr that applies the client's name rules.
 The per-home workspace is reused while it has task tabs.
 Closing its last tab can remove the workspace, and the next spawn recreates it.
 
@@ -871,6 +879,7 @@ tests/jg-backend-herdr-eventwait-smoke.test.sh
 tests/jg-control-herdr-smoke.test.sh
 tests/jg-herdr-session-cleanup.test.sh
 tests/jg-herdr-session-cleanup-e2e.test.sh
+tests/jg-herdr-names.test.sh
 tests/jg-herdr-attached-viewer-live-e2e.test.sh
 tests/jg-afk-inject-herdr-e2e.test.sh
 tests/jg-afk-pi-herdr-return-e2e.test.sh
