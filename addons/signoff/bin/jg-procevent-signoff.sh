@@ -67,6 +67,9 @@
 # keyed-answer intake in bin/jg-captain-hold.sh; this adapter maps nothing and
 # closes nothing.
 #
+# Each round also runs jg-board-inputs.sh, which relays every other board input
+# (report verdicts, part comments, text replies) and marks Delivered and Read.
+#
 # Board keys are `jg-<tag>-<task-id>-<stamp>`, where <tag> is a stable digest of
 # JG_HOME and <stamp> is the hold-set stamp in alphanumerics only. The default
 # board is shared by every home on the machine, so the tag keeps one home from
@@ -225,10 +228,18 @@ mark_read() {
   [ "$old" -eq 0 ] || printf 'sign-off-axi has no feedback command (needs 0.6.1+); answered cards were not marked Read\n' >&2
 }
 
+# Relay the board's other inputs (verdicts, comments, replies) to their owners.
+relay_inputs() {
+  local board
+  board=$(signoff status --json 2>/dev/null | jq -r '.board // empty' 2>/dev/null)
+  [ -z "$board" ] || JG_CODE_ROOT="$CODE_ROOT" "$SCRIPT_DIR/jg-board-inputs.sh" relay "$board" || true
+}
+
 cmd_poll() {
   local found
   [ $# -eq 0 ] || usage
   mark_read
+  relay_inputs
   found=$(deliverable)
   if [ -z "$found" ]; then
     signoff wait --json --timeout "$WAIT_SECS" >/dev/null 2>&1
