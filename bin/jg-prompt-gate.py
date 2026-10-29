@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Decide whether a captured pane's permission prompt may be approved.
 
-Usage: python3 jg-prompt-gate.py <harness> [--dir L=PATH]... [--file L=PATH]... [--state-files L=DIR/ID]... < capture
+Usage: python3 jg-prompt-gate.py <harness> [--dir L=PATH]... [--file L=PATH]... [--state-files L=DIR/ID]... [--secret PATH]... < capture
 Prints one tab-separated line:
   none                              no permission dialog is visible
   approve <root> <path> <prompt>    a pending read of <path>, inside the root labelled <root>
+  reject <reason> <path> <prompt>   a dialog naming a secrets path, answered with a rejection
   card <reason> <path|-> <prompt>   a dialog this gate will not answer
 --dir admits a path at or below PATH, --file exactly PATH, and --state-files any
 DIR/ID.<ext> file with one extension (no sibling task, no deeper path).
+--secret marks a path at or below PATH as secret; so is any .env file or folder.
 
 Only OpenCode's "Access external directory" dialog can approve, verified live on
 1.18.25 (.agents/skills/harness-adapters/references/harness/opencode.md). That
@@ -21,6 +23,9 @@ each break, so every reading of each wrap is tried: each reading that exists
 must resolve (symlinks and .. followed) inside a root with no hidden or
 credential-like part below that root, and the dialog
 directory must be the read's own directory. One unprovable step is a card.
+A dialog is rejected instead, whatever the call, when any reading of its
+directory or of a path on the pending tool line is secret: rejecting can only
+stop the worker, never leak a file.
 """
 import itertools
 import os
@@ -29,6 +34,7 @@ import sys
 
 PANEL = "┃"
 WIDE = 12  # deeper text on a line is OpenCode's sidebar, not dialog content
+ENV = re.compile(r"^\.env(\..+)?$")
 CREDENTIAL = re.compile(r"^\.env|credential|secret|token|password|api.?key|^auth\.json$|^id_|\.pem$|\.key$|\.p12$|\.pfx$|\.jks$|^\.ssh$|^\.gnupg$|^\.netrc$", re.I)
 
 
@@ -53,7 +59,39 @@ def readings(chunks):
     return out
 
 
-def opencode(lines, roots):
+def pending_call(rows, top):
+    """(row, wrapped tail) of the newest tool line above the dialog, under the
+    unfinished message footer, or None when that footer is not visible."""
+    k = top - 1
+    while k >= 0 and not rows[k][2]:
+        k -= 1
+    if k < 0 or rows[k][0] or not rows[k][2].startswith("▣"):
+        return None
+    k -= 1
+    while k >= 0 and not rows[k][2]:
+        k -= 1
+    tail = []
+    while k >= 0 and not rows[k][0] and rows[k][1] == 7 and rows[k][2]:
+        tail.insert(0, rows[k][2])
+        k -= 1
+    return k, tail
+
+
+def pending_paths(rows, top):
+    """Every reading of every path on the pending tool line."""
+    call = pending_call(rows, top)
+    if call is None or call[0] < 0 or rows[call[0]][0] or rows[call[0]][1] != 5:
+        return set()
+    chunks = [rows[call[0]][2].split(" ", 1)[-1]] + call[1]
+    return {m for r in readings(chunks) for m in re.findall(r"(?:~|/)[^\s'\"]*", r)}
+
+
+def is_secret(path, secrets):
+    real = os.path.realpath(os.path.expanduser(path))
+    return any(ENV.search(p) for p in real.split(os.sep)) or any(inside(real, "dir", s) for s in secrets)
+
+
+def opencode(lines, roots, secrets=()):
     rows = [split(line) for line in lines]
     top = max((i for i, r in enumerate(rows) if r[0] and r[2] == "△ Permission required"), default=None)
     if top is None:
@@ -75,6 +113,9 @@ def opencode(lines, roots):
         chunks.append(rows[i][2])
         i += 1
     prompt = "Access external directory " + "".join(chunks)
+    hit = next((p for p in sorted(readings(chunks) | pending_paths(rows, top)) if is_secret(p, secrets)), None)
+    if hit:
+        return ("reject", "secrets path", hit, prompt)
     while i < len(rows) and rows[i][0] and not rows[i][2]:
         i += 1
     if i >= len(rows) or rows[i][2] != "Patterns":
@@ -98,20 +139,10 @@ def opencode(lines, roots):
     if not dirs:
         return card("dialog directory and pattern disagree")
 
-    # The pending call: the newest tool line above the dialog, under the
-    # unfinished message footer.
-    k = top - 1
-    while k >= 0 and not rows[k][2]:
-        k -= 1
-    if k < 0 or rows[k][0] or not rows[k][2].startswith("▣"):
+    call = pending_call(rows, top)
+    if call is None:
         return card("pending tool not visible")
-    k -= 1
-    while k >= 0 and not rows[k][2]:
-        k -= 1
-    tail = []
-    while k >= 0 and not rows[k][0] and rows[k][1] == 7 and rows[k][2]:
-        tail.insert(0, rows[k][2])
-        k -= 1
+    k, tail = call
     m = re.match(r"^([⠀-⣿]) Read (\S.*)$", rows[k][2]) if k >= 0 and not rows[k][0] and rows[k][1] == 5 else None
     if not m:
         return card("pending call is not a read", rows[k][2] if k >= 0 else "-")
@@ -178,8 +209,13 @@ def admits(real, kind, root):
 
 
 def parse_roots(args):
-    roots = []
+    roots, secrets = [], []
     for flag, value in zip(args[::2], args[1::2]):
+        if flag == "--secret":
+            if not os.path.isabs(value):
+                raise ValueError(f"bad secret {value}")
+            secrets.append(os.path.realpath(value))
+            continue
         kind = {"--dir": "dir", "--file": "file", "--state-files": "state"}.get(flag)
         label, sep, path = value.partition("=")
         if kind is None or not sep or not os.path.isabs(path):
@@ -194,16 +230,16 @@ def parse_roots(args):
         roots.append((label, kind, path))
     if len(args) % 2:
         raise ValueError("odd root arguments")
-    return roots
+    return roots, secrets
 
 
 def main(argv):
     if len(argv) < 2:
         print(__doc__.strip().splitlines()[2], file=sys.stderr)
         return 2
-    roots = parse_roots(argv[2:])
+    roots, secrets = parse_roots(argv[2:])
     lines = sys.stdin.read().splitlines()
-    verdict = opencode(lines, roots) if argv[1].startswith("opencode") else ("none",)
+    verdict = opencode(lines, roots, secrets) if argv[1].startswith("opencode") else ("none",)
     print("\t".join(v.replace("\t", " ") for v in verdict))
     return 0
 

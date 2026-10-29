@@ -221,7 +221,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=4
+PORTABLE_SERIAL_SHARDS=6
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -546,69 +546,75 @@ list_portable_serial() {
 # balance rather than coverage. That doc owns the refresh procedure.
 portable_serial_weight_hints() {
   cat <<'EOF'
-tests/board-link.test.sh 2000
-tests/jg-afk-inject-e2e.test.sh 41958
-# Local measurement (about 300ms) until the next CI refresh.
-tests/jg-agents-md-floor.test.sh 1000
-tests/jg-agy-signals-live-e2e.test.sh 53
-tests/jg-backend-tmux-smoke.test.sh 291
-tests/jg-backlog-handoff.test.sh 57458
-tests/jg-bearings-board-lavish-live-e2e.test.sh 51
-tests/jg-bearings-board.test.sh 40817
-tests/jg-bootstrap.test.sh 50965
-tests/jg-claude-stop-autoarm-live-e2e.test.sh 73
-tests/jg-codex-continuity-live-e2e.test.sh 108
-tests/jg-codex-hook-layer-live-e2e.test.sh 108
-tests/jg-composer-matrix-live-e2e.test.sh 51
-tests/jg-control.test.sh 72794
-tests/jg-cursor-primary-live-e2e.test.sh 75
-tests/jg-devin-signals-live-e2e.test.sh 49
-tests/jg-fleet-sync.test.sh 40541
-tests/jg-gate-refuse.test.sh 9953
-tests/jg-grok-continuity-live-e2e.test.sh 46
-tests/jg-harness-adapter-instructions-live-e2e.test.sh 72
-tests/jg-herdr-version-floor-live-e2e.test.sh 50
-tests/jg-inbox.test.sh 6062
-tests/jg-launch-prompt-signals-live-e2e.test.sh 50
-tests/jg-mail.test.sh 9684
-tests/jg-muse-signals-live-e2e.test.sh 52
-tests/jg-omp-primary-live-e2e.test.sh 74
-tests/jg-on.test.sh 11473
-tests/jg-opencode-primary-live-e2e.test.sh 47
-tests/jg-pi-branch-live-e2e.test.sh 48
-tests/jg-pi-primary-live-e2e.test.sh 72
-tests/jg-pi-seeded-home-trust-live-e2e.test.sh 45
-tests/jg-pr-state-live-e2e.test.sh 47
-# Local measurements until a green CI run's timing artifact refreshes them.
-tests/jg-prompt-gate-live-e2e.test.sh 58
-tests/jg-prompt-gate.test.sh 30657
-tests/jg-procevent.test.sh 292297
-tests/jg-public-followup.test.sh 381564
-tests/jg-quota-array-dispatch-live-e2e.test.sh 50
-tests/jg-remote-reply.test.sh 140887
-tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 345655
-tests/jg-rovo-signals-live-e2e.test.sh 52
-tests/jg-squad-lead-lifecycle-e2e.test.sh 11268
-tests/jg-send-inbox-doorbell-live-e2e.test.sh 108
-tests/jg-send-inbox.test.sh 41713
-tests/jg-session-start.test.sh 363574
-tests/jg-sessionstart-hook-live-e2e.test.sh 50
-tests/jg-spawn-dispatch-profile.test.sh 197548
-tests/jg-supervision-host-live-e2e.test.sh 75
-# Provisional halves from the completed case timestamps in CI run 40453434558;
-# its unsplit script finished in 1774307ms but the shard timed out before an artifact.
-tests/jg-supervision-host.test.sh 800000
-tests/jg-tangle-guard.test.sh 8501
-tests/jg-tasks-axi.test.sh 2293
-tests/jg-teardown.test.sh 202132
-# Local measurement (about 300ms) until the next CI refresh.
-tests/jg-tokens-retro.test.sh 1000
-tests/jg-turnend-guard.test.sh 34727
-tests/jg-update.test.sh 11894
-tests/jg-wake-daemon-lifecycle-e2e.test.sh 7345
-tests/jg-wake-drain-open-decisions-cursor.test.sh 47677
-tests/jg-watcher-lock.test.sh 1034661
-tests/jg-worker-account-live-e2e.test.sh 3179
+tests/board-link.test.sh 128
+tests/jg-addon-trust.test.sh 138
+tests/jg-afk-inject-e2e.test.sh 42537
+tests/jg-agents-md-floor.test.sh 423
+tests/jg-agy-signals-live-e2e.test.sh 61
+tests/jg-backend-tmux-smoke.test.sh 320
+tests/jg-backlog-handoff.test.sh 74166
+tests/jg-bearings-board-lavish-live-e2e.test.sh 61
+tests/jg-bearings-board.test.sh 50015
+tests/jg-bootstrap.test.sh 83933
+tests/jg-calm-home-links.test.sh 381
+tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
+tests/jg-codex-continuity-live-e2e.test.sh 57
+tests/jg-codex-hook-layer-live-e2e.test.sh 68
+tests/jg-compat-old-records.test.sh 2167
+tests/jg-composer-matrix-live-e2e.test.sh 59
+tests/jg-control.test.sh 91759
+tests/jg-cursor-primary-live-e2e.test.sh 57
+tests/jg-devin-signals-live-e2e.test.sh 65
+tests/jg-escalation-chain.test.sh 120130
+tests/jg-fleet-sync.test.sh 42151
+tests/jg-flow.test.sh 919
+tests/jg-gate-refuse.test.sh 14876
+tests/jg-grok-continuity-live-e2e.test.sh 53
+tests/jg-harness-adapter-instructions-live-e2e.test.sh 57
+tests/jg-herdr-lead-label.test.sh 99
+tests/jg-herdr-version-floor-live-e2e.test.sh 61
+tests/jg-hometag-lead-label.test.sh 393
+tests/jg-inbox.test.sh 8757
+tests/jg-launch-prompt-signals-live-e2e.test.sh 56
+tests/jg-mail.test.sh 10524
+tests/jg-merge-gate-lib.test.sh 83
+tests/jg-muse-signals-live-e2e.test.sh 61
+tests/jg-omp-primary-live-e2e.test.sh 58
+tests/jg-on.test.sh 18857
+tests/jg-opencode-primary-live-e2e.test.sh 56
+tests/jg-owner-rules.test.sh 3036
+tests/jg-pi-branch-live-e2e.test.sh 56
+tests/jg-pi-primary-live-e2e.test.sh 58
+tests/jg-pi-seeded-home-trust-live-e2e.test.sh 85
+tests/jg-pr-state-live-e2e.test.sh 59
+tests/jg-procevent.test.sh 351871
+tests/jg-prompt-gate-live-e2e.test.sh 56
+tests/jg-prompt-gate.test.sh 59264
+tests/jg-public-followup.test.sh 474556
+tests/jg-quota-array-dispatch-live-e2e.test.sh 54
+tests/jg-remote-reply.test.sh 240899
+tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 567728
+tests/jg-rovo-signals-live-e2e.test.sh 57
+tests/jg-self-repo-role.test.sh 9033
+tests/jg-send-inbox-doorbell-live-e2e.test.sh 55
+tests/jg-send-inbox.test.sh 51917
+tests/jg-session-start.test.sh 347046
+tests/jg-sessionstart-hook-live-e2e.test.sh 61
+tests/jg-spawn-dispatch-profile.test.sh 506834
+tests/jg-squad-lead-lifecycle-e2e.test.sh 15675
+tests/jg-supervision-host-live-e2e.test.sh 58
+tests/jg-supervision-host.test.sh 1162449
+tests/jg-tangle-guard.test.sh 12088
+tests/jg-tasks-axi.test.sh 42685
+tests/jg-teardown.test.sh 479995
+tests/jg-tokens-retro.test.sh 407
+tests/jg-turnend-guard.test.sh 42968
+tests/jg-update.test.sh 13448
+tests/jg-wake-daemon-lifecycle-e2e.test.sh 10177
+tests/jg-wake-drain-open-decisions-cursor.test.sh 57982
+tests/jg-watcher-lock.test.sh 1059731
+tests/jg-worker-account-live-e2e.test.sh 70
+tests/juggernaut-axi-serve.test.sh 1635
 EOF
 }
 

@@ -10,9 +10,12 @@
 # state/<id>.<ext> files, state/pending-replies, its recorded worktree and home,
 # the home and state/ folders themselves (not what is below them), and the
 # home's read-only tooling (bin/, docs/, .agents/skills/, AGENTS.md).
-# Every other prompt, including Claude, Pi, omp and Gemini trust dialogs
-# (jg_busy_launch_prompt_parked), is a board card. config/prompt-approve-off
-# turns approval off, so every prompt becomes a card.
+# It rejects any OpenCode dialog naming a secrets path: a .env file, ~/.config,
+# or the data/ or config/ folder of this home, the task's recorded home, or a
+# local parent home. Every other prompt, including Claude, Pi, omp and Gemini
+# trust dialogs (jg_busy_launch_prompt_parked), is left unanswered and rides the
+# wait-timers escalation chain (addons/wait-timers/README.md).
+# config/prompt-approve-off turns approval off; rejection stays on.
 # Every approval is one JSON line in state/prompt-approvals.jsonl, which
 # bin/jg-fleet-snapshot.sh publishes and bin/jg-fleet-view.sh renders.
 
@@ -25,17 +28,23 @@ jg_prompt_gate_harness() {  # <harness>
 }
 
 # jg_prompt_gate_verdict: read a pane capture on stdin and print the gate's
-# verdict line (approve|card <TAB> ...), or nothing when no prompt is visible.
-# A matcher that cannot run is a card, never silence.
+# verdict line (approve|reject|card <TAB> ...), or nothing when no prompt is
+# visible. A matcher that cannot run is a card, never silence.
 jg_prompt_gate_verdict() {  # <harness> <home> <state> <config> <task> <meta>
-  local harness=$1 home=$2 state=$3 config=$4 task=$5 meta=$6 buf out wt lead path prompt
+  local harness=$1 home=$2 state=$3 config=$4 task=$5 meta=$6 buf out wt lead parent h path prompt
+  local secrets=()
   buf=$(cat)
   case "$harness" in
     opencode*)
       printf '%s' "$buf" | grep -q 'Permission required' || return 0
       wt=$(grep '^worktree=' "$meta" 2>/dev/null | cut -d= -f2- || true)
       lead=$(grep '^home=' "$meta" 2>/dev/null | cut -d= -f2- || true)
-      out=$(printf '%s\n' "$buf" | python3 "$_jg_prompt_gate_dir/jg-prompt-gate.py" "$harness" \
+      parent=$(grep '^parent_home=' "$home/.jg-squad-lead-parent" 2>/dev/null | cut -d= -f2- || true)
+      [ -z "${HOME:-}" ] || secrets+=(--secret "$HOME/.config")
+      for h in "$home" "$lead" "$parent"; do
+        case "$h" in /*) secrets+=(--secret "$h/data" --secret "$h/config") ;; esac
+      done
+      out=$(printf '%s\n' "$buf" | python3 "$_jg_prompt_gate_dir/jg-prompt-gate.py" "$harness" "${secrets[@]}" \
         --dir "inbox=$state/$task.inbox" --state-files "state=$state/$task" \
         --dir "pending-replies=$state/pending-replies" \
         ${wt:+--dir "worktree=$wt"} ${lead:+--dir "lead-home=$lead"} \
@@ -55,21 +64,6 @@ jg_prompt_gate_verdict() {  # <harness> <home> <state> <config> <task> <meta>
       printf 'card\ta trust dialog is never auto-approved\t-\t%s launch trust dialog\n' "$harness"
       ;;
   esac
-}
-
-# jg_prompt_gate_card: post the board card for a prompt the gate did not
-# answer and print its key. The card names the pane, the prompt and the path.
-jg_prompt_gate_card() {  # <task> <window> <reason> <path> <prompt> <hash>
-  local why
-  why="Pane $2 ($1) is stuck on: $5. Not auto-approved: $3."
-  [ "${#why}" -le 200 ] || why="${why:0:197}..."
-  "$_jg_prompt_gate_dir/jg-question-card.sh" post --ask-ref "prompt-gate-$1" \
-    --key "prompt-gate-$1-${6:0:8}" --title "Approve the permission prompt this worker is stuck on?" \
-    --why "$why" --detail "Pane: $2. Task: $1. Prompt: $5. Path: $4. Reason: $3." \
-    --outcome yes="Main answers it once in that pane." \
-    --outcome no="Main rejects it and steers the worker." \
-    --recommend no --recommend-reason "Juggernaut could not prove it is a read of the fleet's own files." \
-    --default no --guard security --priority P1 2>/dev/null
 }
 
 # jg_prompt_gate_log: append one approval record.

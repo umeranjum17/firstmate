@@ -39,36 +39,75 @@ the add-on is absent.
 - `tests/jg-wait-timers-tmux-e2e.test.sh` — the live-terminal end-to-end
   journey; moved verbatim, run only against a real terminal session.
 
-## Frozen contract (identical to the fork)
+## Contract
+
+The escalation chain changed this contract after the move below, so the
+provenance table now records history, not the current bytes.
 
 - Entry: `jg_wait_timers_tick` (no arguments; reads `JG_HOME` and `STATE`).
   Called once per watcher poll.
 - `jg_wait_timer_push_delivered <task> <window>` — records that an immediate
   native push already told the owner about this blocked lane, so the poll
   timer skips its duplicate owner wake. Called from the push-transition path.
+- `jg_wait_timer_source_delivered <task> <window> <declaration>` — the same for
+  a wait source the watcher already woke the owner about (a permission prompt,
+  a lead whose own supervision is down).
 - `jg_wait_timer_save <record> <signature> <since> <owner> <parent> <key>
-  <misses>`, `jg_wait_timer_report <status-line>`,
+  <misses> [card] [last]`, `jg_wait_timer_report <status-line>`,
   `jg_wait_timer_owner_delivered` — episode persistence, parent reporting,
   and the post-wake hook the owner alert installs.
-- Environment: `JG_WAIT_ALERT_SECS` (default 300) for the owner recheck,
-  `JG_WAIT_ESCALATE_SECS` (default 900) for escalation; a declared pause
-  rechecks at the pause cadence instead, never the owner-alert threshold.
+- Environment: `JG_WAIT_ALERT_SECS` (default 120) for the owner rung,
+  `JG_WAIT_ESCALATE_SECS` (default 300) for Main's rung, `JG_WAIT_CARD_SECS`
+  (default 600, above the escalation threshold) for the board card, and
+  `JG_PROMPT_REALERT_SECS` (default 600) for how often a reached rung fires
+  again. A declared pause rechecks at the `JG_PAUSE_RESURFACE_SECS` cadence
+  instead and never escalates.
+- Wait sources: the watcher writes `state/.wait-sources/<task>.prompt` for an
+  unanswered permission prompt (rewritten on every sighting; a record older
+  than three polls plus 30 seconds is ignored, so a prompt on a dead pane
+  lapses) and
+  `<task>.supervision` for a Squad Lead with work under way whose own watcher
+  is not running. A wait source outranks an open decision and a pause.
 - Episode record: one tab-separated line per lane at
   `state/.waiting-timers/<task>` holding signature, first-observed time,
-  owner-delivery time, parent-report flag, report key, and miss count. The
-  report key is the wait's identity,
-  `waiting-timer-<home>-<task>-g<generation>-<source key>`: home is a short
-  hash of the Juggernaut home, generation is the arming second, and the source
-  is the open decision key (or the pause key, `herdr-blocked`, `unkeyed`).
-  Owner and escalation lines print `id=<key> source=[<declaration>]`, so the
-  exact unresolved source is named; a resolution closes only the wait it
-  names. The `waiting-timer-` prefix is unchanged for the fork's reserved-key fold.
-- Parent lines: `blocked [key=...]: waiting-timer-overdue: ...` on
-  escalation, `resolved [key=...]: waiting-timer-cleared: ...` when the wait
+  owner-delivery time, Main-rung time (0 before it fires), report key, miss
+  count, board-card time, and last re-fire time. The report key is the wait's
+  identity, `waiting-timer-<home>-<task>-g<generation>-<source key>`: home is
+  a short hash of the Juggernaut home, generation is the arming second, and
+  the source is the open decision key (or the pause key, `herdr-blocked`,
+  `prompt`, `supervision`, `unkeyed`). Every line prints
+  `id=<key> source=[<declaration>]`, so the exact unresolved source is named;
+  a resolution closes only the wait it names. The `waiting-timer-` prefix is
+  unchanged for the fork's reserved-key fold.
+- Parent lines: `blocked [key=...]: waiting-timer-overdue: <task> (<verb>,
+  observed <n>s, since=<epoch>); ...; source=[...]` on escalation and on every
+  re-fire, `resolved [key=...]: waiting-timer-cleared: ...` when the wait
   ends. A top-level wait with no parent escalates as a wake to the top level
   itself, never as a parent report.
 
-## Provenance: byte-identical to the fork
+## Escalation chain
+
+A stuck worker never waits on the captain noticing it.
+Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
+
+| rung | when | who acts |
+|---|---|---|
+| own-fleet read prompt | at once | the watcher approves it (`bin/jg-prompt-gate-lib.sh`) |
+| secrets-path prompt (`.env`, `~/.config`, a home's `data/` or `config/`) | at once | the watcher rejects it and tells the worker why |
+| any other prompt, question, decision, or blocker | first sight, then `JG_WAIT_ALERT_SECS` | the owning home is woken |
+| still open | `JG_WAIT_ESCALATE_SECS` | a lead home reports `waiting-timer-overdue` to Main; Main steers the lead at once, interrupting it first when it is busy mid-turn, naming the worker and its wait |
+| still open | `JG_WAIT_CARD_SECS` | the main home posts a guarded board card, and dismisses it when the wait ends |
+
+- A lead's own supervision not running is a Main wait from lead liveness, so a
+  dead hop never goes silent; a dead lead rides its relaunch.
+- A new supervisor session re-presents every open wait on its first tick, so a
+  relaunched lead re-presents its stuck workers within one cycle.
+- The main home reads only the overdue lines a lead appends to its own
+  `state/<lead>.status`, never the lead's child records.
+- The board card is raised from the main home only, even when Main has not
+  read its wakes, so it still fires with Main absent.
+
+## Provenance: byte-identical to the fork at the move
 
 Every moved file was compared byte for byte against its fork source at
 `0689b4b9d9ab3594f846cfe07c400edfa58244bf`; the sha256 manifest matched
