@@ -40,7 +40,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
 | `jg-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto jg-captain-hold.sh |
 | `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest prints, refusing an entry with no owner words, no scope, or no enforcement point |
-| `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it |
+| `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it; `--route <lead>` names the lead that owns the answer |
 | `jg-proof-attach.sh`      | Find a task's done-done receipt and proof media, refuse a text-only card for UI or video work, and put the proof on the ready, review or merged board card and the PR body |
 | `jg-question-lib.sh`     | Shared question-rule predicate: does a reply end in a question, and does it cite an open board card |
 | `jg-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), Recon, Squad Lead charter, and Herdr-lab briefs, with Captain's intent and Juggernaut spec subsections on ship/scout |
@@ -184,6 +184,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-inbox.sh`            | The captain's out-of-band capture surface: queue notes, ticket and list `[captain-ask]` notes, announce or repair wakes, record primary replies, and emit bounded receipts and readiness JSON |
 | `jg-mail.sh`             | General-purpose mail plane: read unseen IMAP mail, send one SMTP message, or surface new mail as a `check` wake via `poll` (configuration in the home's gitignored `.env`) |
 | `jg-mail.py`             | The IMAP/SMTP engine behind `jg-mail.sh` |
+| `jg-board-answers.sh`    | Standing board-answer check: `arm` registers a watcher check that sends each routed answer straight to its lead's inbox (closing the lead's decision key, archiving the card once the lead acknowledges) and wakes Main only for unrouted answers; `route` records a card's owner |
 | `jg-mail-check.sh`       | Standing received-mail poll: `arm` registers a watcher check that runs `jg-mail.sh poll` on the watcher cadence (new mail still wakes via the poll; the check's own line also wakes unless the poll is a proven no-op), `disarm` removes it |
 | `jg-voice-relay.py`      | Hold the spoken conversation on this host, answer from the records, and hand real work to `jg-inbox.sh` ([voice-relay.md](voice-relay.md)) |
 | `jg-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
