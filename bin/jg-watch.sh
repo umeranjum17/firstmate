@@ -89,11 +89,11 @@
 #                          busy form is a report only: the message stays owed and
 #                          its doorbell rings on the first non-busy poll, so it
 #                          needs no interrupt
-#   stale: <window> (permission prompt: <prompt>; path <path>; not auto-approved: <why>; card <key>)
+#   stale: <window> (permission prompt: <prompt>; path <path>; not answered: <why>)
 #                          a worker or squad_lead pane shows a permission or trust
-#                          prompt that bin/jg-prompt-gate-lib.sh did not approve;
-#                          reported once per prompt, at first sight, with its board
-#                          card (prompt_gate_check)
+#                          prompt that bin/jg-prompt-gate-lib.sh did not approve
+#                          or reject; reported once per prompt, at first sight,
+#                          then escalated by the wait-timers chain (prompt_gate_check)
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
@@ -1327,6 +1327,32 @@ EOF
   wake "$reason"
 }
 
+# lead_supervision_check: a live lead whose own watcher is not running while it
+# has work under way is a dead hop, so its workers' waits would reach nobody.
+# Main owns lead liveness, so the lead is steered to re-arm and the gap becomes
+# a wait source (state/.wait-sources/<id>.supervision) that the wait-timers
+# chain escalates like any other wait. Only the lead home's own supervision
+# state is read (bin/jg-supervision-lib.sh), never a child's records. Returns 0
+# on first detection only; the source clears once the lead is supervised again.
+lead_supervision_check() {  # <meta> <id>
+  local lead_home src="$STATE/.wait-sources/$2.supervision" text
+  lead_home=$(jg_meta_get "$1" home 2>/dev/null || true)
+  case "$lead_home" in /*) [ -d "$lead_home/state" ] || return 1 ;; *) return 1 ;; esac
+  if ! JG_HOME="$lead_home" jg_supervision_unhealthy "$lead_home/state" "$WATCHER_STALE_GRACE"; then
+    rm -f "$src"
+    return 1
+  fi
+  [ ! -f "$src" ] || return 1
+  text="supervision: squad lead $2 has work under way but its own watcher is not running"
+  mkdir -p "$STATE/.wait-sources" && printf '%s\n' "$text" > "$src" || return 1
+  steer_task "$2" "lead-supervision-$2-$(date +%s)" \
+    "Your own supervision is not running while you have work under way, so your workers' waits reach nobody. Re-arm your supervision now and handle your queued notifications." \
+    || triage_log "supervision steer to squad_lead $2 was not recorded"
+  if declare -F jg_wait_timer_source_delivered >/dev/null; then
+    jg_wait_timer_source_delivered "$2" "$(jg_backend_target_of_meta "$1")" "$text" || return 1
+  fi
+}
+
 squad_lead_liveness_tick() {
   local tick_marker="$STATE/.squad-lead-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SQUAD_LEAD_LIVENESS_SECS" ] || return 0
@@ -1374,6 +1400,10 @@ squad_lead_liveness_tick() {
         fi
         ;;
       alive)
+        if lead_supervision_check "$meta" "$id"; then
+          reason="check: squad_lead $id supervision not running while it has work under way; it was told to re-arm, and the wait escalates until it does"
+          notify_key="squad-lead-supervision-$id-$now"
+        fi
         if [ -e "$bound_marker" ] || [ -L "$bound_marker" ]; then
           if ! jg_squad_lead_liveness_ledger_add "$id" rearmed; then
             err="relaunch ledger is unwritable; auto-relaunch stays paused"
@@ -2252,17 +2282,20 @@ captain_call_stale_bound() {  # <window-key> <task>
 # recorded once the captain took the work in hand.
 # prompt_gate_check: a pane parked on a permission or trust prompt is stuck at
 # once, never left to the wedge timer, and a squad_lead's idle exemption does
-# not cover it. bin/jg-prompt-gate-lib.sh owns the verdict. An approval is
-# re-proved on a fresh capture and logged before Enter is sent, and is silent;
-# the same prompt still on screen within a minute of it means the answer did
-# not take, so it becomes a card. There is no per-prompt latch: while the same
-# prompt stays on screen, every JG_PROMPT_REALERT_SECS (default 600) it is
-# approved again if approvable and otherwise its card is re-posted (sign-off
-# keeps one open card per question) and Main is woken again.
-# Returns 0 only after an approval, so the caller skips the stale path for that
-# poll; a pane left on a carded prompt keeps the ordinary stale path.
+# not cover it. bin/jg-prompt-gate-lib.sh owns the verdict, and rung one of the
+# escalation chain is answered here: an approval or a rejection is re-proved on
+# a fresh capture before its key is sent (an approval is logged first), and a
+# rejected worker is steered with the reason. The same prompt still on screen
+# within a minute means the answer did not take. While it stays up it is
+# answered again every JG_PROMPT_REALERT_SECS (default 600).
+# Any prompt left unanswered wakes this home's supervisor once, at first sight,
+# and is recorded as a wait source (state/.wait-sources/<task>.prompt, touched
+# on every sighting) so the wait-timers chain owns every later rung: re-alerts,
+# Main, and the board card (addons/wait-timers/README.md).
+# Returns 0 only after an answer was sent, so the caller skips the stale path
+# for that poll; a pane left on an unanswered prompt keeps the stale path.
 prompt_gate_check() {  # <window> <task> [tail40]
-  local w=$1 task=$2 harness backend label key mf meta verdict again h reason card
+  local w=$1 task=$2 harness backend label key mf src meta verdict again h reason kind act
   local _r path prompt
   harness=$(window_harness "$w")
   jg_prompt_gate_harness "$harness" || return 1
@@ -2270,48 +2303,95 @@ prompt_gate_check() {  # <window> <task> [tail40]
   label=$(window_label "$w")
   key=$(window_key "$w")
   mf="$STATE/.prompt-$key"
+  src="$STATE/.wait-sources/$task.prompt"
   meta="$STATE/$task.meta"
   if [ -n "${3-}" ] && ! printf '%s' "$3" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta" | grep -q .; then
-    rm -f "$mf"
+    rm -f "$mf" "$src"
     return 1
   fi
   watcher_capture "$backend" "$w" 200 "$label" || return 1
   verdict=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
   if [ -z "$verdict" ]; then
-    rm -f "$mf"
+    rm -f "$mf" "$src"
     return 1
   fi
   h=$(printf '%s' "$verdict" | hash_pane)
-  IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
-  if [ "$(cat "$mf" 2>/dev/null)" = "card:$h" ] && [ "$(age_of "$mf")" -lt "$PROMPT_REALERT" ]; then
-    return 1
+  IFS=$'\t' read -r kind _r path prompt <<< "$verdict"
+  if [ "$(cat "$mf" 2>/dev/null)" = "wait:$h" ]; then
+    if [ "$kind" = card ] || [ "$(age_of "$mf")" -lt "$PROMPT_REALERT" ]; then
+      # Rewritten on every sighting: the chain honours the record only while
+      # it is fresh, so a prompt on a pane that died lapses by itself.
+      mkdir -p "$STATE/.wait-sources" && printf 'prompt: %s; path %s\n' "$prompt" "$path" > "$src" || exit 1
+      return 1
+    fi
   fi
-  if [ "${verdict%%$'\t'*}" = approve ]; then
-    if [ "$(cat "$mf" 2>/dev/null)" = "approved:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
-      _r="an approval sent under a minute ago did not take"
+  if [ "$kind" = approve ] || [ "$kind" = reject ]; then
+    act=approval
+    [ "$kind" = approve ] || act=rejection
+    if [ "$(cat "$mf" 2>/dev/null)" = "$kind:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
+      _r="$_r; the $act sent under a minute ago did not take"
     else
       watcher_capture "$backend" "$w" 200 "$label" || return 1
       again=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
       [ "$again" = "$verdict" ] || return 1
-      # ponytail: the re-proof and Enter are two tmux calls, so a dialog
-      # replaced within that one round trip gets the Enter; tmux has no atomic
+      # ponytail: the re-proof and the key are two tmux calls, so a dialog
+      # replaced within that one round trip gets the key; tmux has no atomic
       # capture-and-send, and this is the shortest window it allows.
-      if ! jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt"; then
+      if [ "$kind" = approve ] && ! jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt"; then
         _r="the approval record could not be written"
-      elif jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
-        printf 'approved:%s' "$h" > "$mf"
+      elif [ "$kind" = approve ] && jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
+        printf 'approve:%s' "$h" > "$mf"
         triage_log "approved permission prompt ($_r): $w $path"
         return 0
+      elif [ "$kind" = reject ] && jg_backend_send_key "$backend" "$w" Escape "$label" >/dev/null 2>&1; then
+        printf 'reject:%s' "$h" > "$mf"
+        triage_log "rejected permission prompt ($_r): $w $path"
+        # A key typed right after Escape reads as Alt+key, so the doorbell
+        # waits for the terminal to take the Escape alone.
+        sleep 1
+        steer_task "$task" "prompt-reject-$task-$h-$(date +%s)" \
+          "Supervision rejected your permission prompt ($prompt) because $path is a $_r: .env files, ~/.config, and a home's data/ and config/ hold credentials and private records. Do not retry that access; carry on without it, or append blocked: to your status naming what you need." \
+          || triage_log "rejection steer to $task was not recorded"
+        return 0
       else
-        _r="sending the approval key failed after it was logged"
+        _r="sending the $act key failed"
       fi
     fi
   fi
-  card=$(SIGN_OFF_FILER=juggernaut-watch jg_prompt_gate_card "$task" "$w" "$_r" "$path" "$prompt" "$h") || card="not posted (sign-off-axi refused or is missing)"
-  printf 'card:%s' "$h" > "$mf"
-  reason="stale: $w (permission prompt: $prompt; path $path; not auto-approved: $_r; card $card)"
+  mkdir -p "$STATE/.wait-sources" && printf 'prompt: %s; path %s\n' "$prompt" "$path" > "$src" || exit 1
+  printf 'wait:%s' "$h" > "$mf"
+  reason="stale: $w (permission prompt: $prompt; path $path; not answered: $_r)"
   jg_wake_append stale "$w" "$reason" || exit 1
+  if declare -F jg_wait_timer_source_delivered >/dev/null; then
+    jg_wait_timer_source_delivered "$task" "$w" "$(head -n 1 "$src" | tr '\t' ' ' | cut -c1-300)" || exit 1
+  fi
   wake "$reason"
+}
+
+# steer_task: one supervision steer through the durable inbox. A squad_lead
+# target needs a fire-and-forget id, or jg-send marks it as a request that
+# expects a reply; <seed> makes that id stable for one event.
+steer_task() {  # <task> <seed> <text>
+  local id
+  if [ "$(jg_meta_get "$STATE/$1.meta" kind 2>/dev/null)" = squad_lead ]; then
+    id=$(printf '%s' "$2" | hash_pane | cut -c1-16)
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-send.sh" "$1" --fire-and-forget "$id" "$3" >/dev/null 2>&1
+  else
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-send.sh" "$1" "$3" >/dev/null 2>&1
+  fi
+}
+
+# lead_nudge: tell a squad_lead about a wait it owns. A lead busy mid-turn is
+# interrupted first (bin/jg-control.sh), so the steer is read now rather than
+# after the turn; an idle lead only gets the steer, which rings its doorbell;
+# a dead or unreadable one gets the durable steer alone.
+lead_nudge() {  # <task> <window> <seed> <text>
+  squad_lead_busy_class "$2"
+  if [ "$SQUAD_LEAD_BUSY_CLASS" = busy ]; then
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-control.sh" "$1" interrupt >/dev/null 2>&1 \
+      || triage_log "interrupt of squad_lead $1 failed"
+  fi
+  steer_task "$1" "$3" "$4"
 }
 
 surface_nonterminal_stale() {  # <window> <hash>

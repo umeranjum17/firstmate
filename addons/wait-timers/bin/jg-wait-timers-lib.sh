@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
 # Waiting-state timers, called once per jg-watch.sh poll, independent of pane
-# churn, busy proofs, and stale/wedge suppression. Configuration and defaults:
-# docs/configuration.md "Waiting-state escalation".
+# churn, busy proofs, and stale/wedge suppression. This is the stuck-worker
+# escalation chain; addons/wait-timers/README.md owns its rungs, thresholds and
+# record format.
 # Each recorded task owns one durable episode under state/.waiting-timers/.
-# The effective declaration is an own open blocker/decision, else a declared
-# pause. Admitted Herdr agent.list blocked overrides it immediately, scoped to
-# recorded panes only (admission policy: configuration reference above).
+# The effective declaration is, first to last: admitted Herdr agent.list
+# blocked (recorded panes only, Cursor excluded), an unanswered permission
+# prompt or a Squad Lead whose own supervision is not running (wait sources
+# under state/.wait-sources/, written by jg-watch.sh), an own open
+# blocker/decision, then a declared pause.
 # Time starts at first observation and survives watcher restarts.
 # Changing state/declaration/endpoint clears and re-arms the episode; a paused
 # episode instead keys on window, verb and phase key, so reason-text churn on
 # the same pause re-arms nothing. A paused wait rechecks at the
-# JG_PAUSE_RESURFACE_SECS cadence, never the owner-alert threshold. Parent
-# reports use the existing local/remote parent channel, never a captain alert.
+# JG_PAUSE_RESURFACE_SECS cadence, never the owner-alert threshold, and never
+# escalates. Every other rung, once reached, fires again every
+# JG_PROMPT_REALERT_SECS while the wait stays open, and a new supervisor session
+# re-presents every open wait on its first tick.
+# Parent reports use the existing local/remote parent channel. Only the main
+# home posts a board card, so only what Main cannot settle reaches the captain.
 # An episode key is waiting-timer-<home>-<task>-g<generation>-<source key>, so a
 # resolution names exactly one wait and every report prints its unresolved source.
 # A waiting-timer-* key belongs to this library; it resolves that report when
-# the episode ends. Main has no parent: its overdue wait gets one escalation wake
-# to Main itself, and any human escalation beyond that is judgment.
+# the episode ends.
 # Source through jg-watch.sh; the wake library supplies hashing and wake emission.
 
 # Sibling libraries live in the fork's bin/, not beside this add-on file.
@@ -35,10 +41,10 @@ _JG_WAIT_TIMER_DIR="${SCRIPT_DIR:-${JG_PUSH_TRANSITION_LIB_DIR:-$JG_HOME/bin}}"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$_JG_WAIT_TIMER_DIR/jg-timeout-lib.sh"
 
-jg_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key> <misses>
+jg_wait_timer_save() {  # <record> <signature> <since> <owner> <parent> <key> <misses> [card] [last]
   local file=$1 temp="${1%/*}/.${1##*/}.tmp.$$"
   shift
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@" > "$temp" && mv "$temp" "$file"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6" "${7:-0}" "${8:-0}" > "$temp" && mv "$temp" "$file"
 }
 
 # Stable episode identity: home, task, generation (the arming second) and the
@@ -73,13 +79,13 @@ jg_wait_timer_push_delivered() {  # <task> <window>
   signature=$(printf '%s' "$2|herdr-blocked" | hash_pane)
   if [ -e "$record" ] || [ -L "$record" ]; then
     [ -f "$record" ] && [ ! -L "$record" ] || return 1
-    IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
+    IFS=$'\t' read -r old since owner parent key misses _ _ < "$record" || return 1
     if [ "$old" = "$signature" ]; then
       [ "$owner" -eq 0 ] || return 0
       jg_wait_timer_save "$record" "$signature" "$since" "$now" "$parent" "$key" 0
       return
     fi
-    if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
+    if [ "${parent:-0}" != 0 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
       jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $1 changed state" || return 0
     fi
   fi
@@ -87,19 +93,151 @@ jg_wait_timer_push_delivered() {  # <task> <window>
   jg_wait_timer_save "$record" "$signature" "$now" "$now" 0 "$(jg_wait_timer_key "$1" "$now" herdr-blocked)" 0
 }
 
+# jg-watch.sh already woke this home's supervisor about a wait source it just
+# recorded (an unanswered prompt, a lead whose supervision is down), so the
+# episode records that owner delivery and its later rungs time from it.
+jg_wait_timer_source_delivered() {  # <task> <window> <declaration>
+  local record="$STATE/.waiting-timers/$1" signature now old since owner parent key misses
+  now=$(date +%s) || return 1
+  signature=$(printf '%s' "$2|$3" | hash_pane)
+  if [ -f "$record" ] && [ ! -L "$record" ]; then
+    IFS=$'\t' read -r old since owner parent key misses _ _ < "$record" || return 1
+    if [ "$old" = "$signature" ]; then
+      [ "$owner" -eq 0 ] || return 0
+      jg_wait_timer_save "$record" "$signature" "$since" "$now" "$parent" "$key" 0
+      return
+    fi
+  fi
+  [ ! -L "$record" ] || return 1
+  # A different episode on this task is re-armed by the next tick, which also
+  # resolves any parent report it still holds.
+  [ ! -e "$record" ] || return 0
+  mkdir -p "$STATE/.waiting-timers" || return 1
+  jg_wait_timer_save "$record" "$signature" "$now" "$now" 0 "$(jg_wait_timer_key "$1" "$now" "${3%%:*}")" 0
+}
+
+# Post the board card for a wait Main has not settled; main home only. The text
+# is stable for the wait, so posting again keeps the one open card. The board
+# refuses an id in a title, so the title names the task in plain words.
+jg_wait_timer_card() {  # <task> <card-key> <verb> <source>
+  local words why guard=()
+  words=$(printf '%s' "$1" | tr -cs 'A-Za-z' '\n' | grep -E '^[A-Za-z]{2,}$' | head -6 | paste -sd' ' -) || true
+  why="$1 is stuck on: $4. Its owner and Main were told and have not cleared it."
+  [ "${#why}" -le 200 ] || why="${why:0:197}..."
+  case "$3" in prompt*) guard=(--guard security) ;; esac
+  (cd "$JG_HOME" && SIGN_OFF_FILER=juggernaut-watch "$_JG_WAIT_TIMER_DIR/jg-question-card.sh" post \
+    --ask-ref "waiting-$1" --key "$2" --title "Unblock stuck ${words:-work}?" --why "$why" \
+    --detail "Task $1, wait $3. Card $2. It closes by itself when the wait ends." \
+    --outcome yes="Main clears or answers the wait now." --outcome no="It stays stuck until you steer it." \
+    --recommend yes --recommend-reason "Its owner and Main were alerted and the wait is still open." \
+    --default no ${guard[@]+"${guard[@]}"} --priority P1) >/dev/null 2>&1 \
+    || { echo "waiting timers: board card for $1 was not posted (sign-off-axi refused or is missing)" >&2; return 1; }
+}
+
+jg_wait_timer_card_dismiss() {  # <card-key>
+  command -v sign-off-axi >/dev/null 2>&1 || return 0
+  (cd "$JG_HOME" && sign-off-axi dismiss "$1") >/dev/null 2>&1 || true
+}
+
+# End an episode: resolve its parent report (a lead home) or dismiss its card
+# (the main home), then drop it. Returns 1 when the parent report failed, so the
+# episode is kept and retried next poll.
+jg_wait_timer_end() {  # <record> <task> <parent> <key> <card> <why>
+  if [ "$3" != 0 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
+    jg_wait_timer_report "resolved [key=$4]: waiting-timer-cleared: $2 $6" || return 1
+  fi
+  [ "$5" = 0 ] || jg_wait_timer_card_dismiss "$4-card"
+  rm -f "$1"
+}
+
+# Main's side of a lead's overdue report: a waiting-timer-overdue line the lead
+# appended to this home's state/<lead>.status (its parent channel), never the
+# lead's own child records. On first sight and every <interval> the lead is
+# nudged (interrupted first when busy mid-turn) naming the blocked worker and
+# its wait; at <card-secs> since the worker's wait began the board card is
+# posted, and kept, until the lead resolves the report. One record per open
+# report under state/.waiting-relay/: first-seen, nudged, card times.
+jg_wait_timers_relay() {  # <now> <interval> <card-secs>
+  local now=$1 interval=$2 card_secs=$3 rdir="$STATE/.waiting-relay" meta lead window rows k verb text
+  local r seen='|' first nudged card worker since wverb wsrc
+  mkdir -p "$rdir" || return 1
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    [ "$(jg_meta_get "$meta" kind)" = squad_lead ] || continue
+    lead=${meta##*/}; lead=${lead%.meta}
+    window=$(jg_backend_target_of_meta "$meta")
+    rows=$(status_open_decisions "$STATE/$lead.status")
+    while IFS=$'\t' read -r k verb text; do
+      case "$k" in waiting-timer-*) ;; *) continue ;; esac
+      case "$k" in *[!A-Za-z0-9._-]*) continue ;; esac
+      case "$text" in waiting-timer-overdue:*) ;; *) continue ;; esac
+      seen="$seen$k|"
+      worker=${text#waiting-timer-overdue: }; worker=${worker%% *}
+      wverb=${text#*\(}; wverb=${wverb%%,*}
+      since=$(printf '%s' "$text" | sed -n 's/.*since=\([0-9]\{1,12\}\)).*/\1/p')
+      wsrc=${text##*source=\[}; wsrc=${wsrc%]}
+      r="$rdir/$k"
+      first=$now nudged=0 card=0
+      if [ -f "$r" ] && [ ! -L "$r" ]; then IFS=$'\t' read -r first nudged card < "$r" || true; fi
+      [ -n "$since" ] || since=${first:-$now}
+      if [ "${nudged:-0}" -eq 0 ] || [ $((now - nudged)) -ge "$interval" ]; then
+        if declare -F lead_nudge >/dev/null; then
+          lead_nudge "$lead" "$window" "waiting-relay-$k-$now" "Your worker $worker has been stuck $((now - since))s on: $wsrc. Clear it now: answer it, steer it, or report blocked: with what it needs. Main posts it to the captain's board at $((card_secs / 60)) minutes." \
+            || echo "waiting timers: nudge to squad lead $lead about $worker was not recorded" >&2
+        fi
+        nudged=$now
+      fi
+      if { [ "${card:-0}" -eq 0 ] && [ $((now - since)) -ge "$card_secs" ]; } \
+        || { [ "${card:-0}" -gt 0 ] && [ $((now - card)) -ge "$interval" ]; }; then
+        jg_wait_timer_card "$worker" "$k-card" "$wverb" "$wsrc" || true
+        card=$now
+      fi
+      printf '%s\t%s\t%s\n' "$first" "$nudged" "${card:-0}" > "$r.tmp.$$" && mv "$r.tmp.$$" "$r" || return 1
+    done <<EOF
+$rows
+EOF
+  done
+  for r in "$rdir"/*; do
+    [ -f "$r" ] && [ ! -L "$r" ] || continue
+    k=${r##*/}
+    case "$seen" in *"|$k|"*) continue ;; esac
+    IFS=$'\t' read -r first nudged card < "$r" || true
+    [ "${card:-0}" = 0 ] || jg_wait_timer_card_dismiss "$k-card"
+    rm -f "$r" || return 1
+  done
+}
+
 jg_wait_timers_tick() {
-  local alert=${JG_WAIT_ALERT_SECS:-300} escalate=${JG_WAIT_ESCALATE_SECS:-900}
+  local alert=${JG_WAIT_ALERT_SECS:-120} escalate=${JG_WAIT_ESCALATE_SECS:-300} card_secs=${JG_WAIT_CARD_SECS:-600}
+  local interval=${JG_PROMPT_REALERT_SECS:-600}
   local paused_alert=${JG_PAUSE_RESURFACE_SECS:-$JG_PAUSE_RESURFACE_SECS_DEFAULT}
-  local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main
+  local meta task backend window session native sessions='|' blocked='|' unknown='|' rows actor=Main lead=''
   local dir="$STATE/.waiting-timers" now record declaration verb signature old since owner parent key misses age reason until bound rc
-  local pause_key threshold dkey src source
-  for native in "$alert" "$escalate"; do
+  local pause_key threshold dkey src source card last wsrc fresh session_id fired every level pending=''
+  for native in "$alert" "$escalate" "$card_secs" "$interval"; do
     case "$native" in ''|*[!0-9]*|0* ) echo "waiting timers: thresholds must be positive decimal seconds" >&2; return 1 ;; esac
     [ "${#native}" -le 9 ] || { echo "waiting timers: threshold exceeds nine digits" >&2; return 1; }
   done
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
+  [ "$card_secs" -gt "$escalate" ] || { echo "waiting timers: the board card must be later than escalation" >&2; return 1; }
   now=$(date +%s) || return 1
-  [ ! -e "$JG_HOME/.jg-squad-lead-home" ] || actor='owning lead'
+  fresh=$(( ${POLL:-15} * 3 + 30 ))
+  if [ -e "$JG_HOME/.jg-squad-lead-home" ]; then actor='owning lead'; lead=1; fi
+  mkdir -p "$dir" || return 1
+  # A new supervisor session (a restart or a lead's relaunch) re-presents every
+  # wait already past its owner alert on its first ticks, so nothing it was told
+  # before is lost with the old session.
+  session_id=$(cat "$STATE/.lock" "$STATE/.lock-session" 2>/dev/null | hash_pane) || return 1
+  if [ -f "$dir/.presented" ] && [ "$(cat "$dir/.presented")" != "$session_id" ]; then
+    for record in "$dir"/*; do
+      [ -f "$record" ] && [ ! -L "$record" ] || continue
+      IFS=$'\t' read -r old since owner parent key misses card last < "$record" || continue
+      case "$owner" in ''|*[!0-9]*) continue ;; esac
+      [ "$owner" -gt 1 ] || continue
+      jg_wait_timer_save "$record" "$old" "$since" "$owner" "${parent:-0}" "$key" "${misses:-0}" "${card:-0}" 1 || return 1
+    done
+  fi
+  [ "$(cat "$dir/.presented" 2>/dev/null)" = "$session_id" ] || printf '%s\n' "$session_id" > "$dir/.presented" || return 1
   # One bounded native read per recorded session, not one per lane. A session whose
   # read fails is unknown for this poll: its lanes keep their episodes untouched
   # while every other lane is still monitored.
@@ -144,18 +282,20 @@ jg_wait_timers_tick() {
 $rows
 EOF
   done
-  # Removed tasks also end their parent report, even when cleanup removed the
-  # status log and metadata before the next poll.
+  # Removed tasks also end their parent report and card, even when cleanup
+  # removed the status log and metadata before the next poll.
   for record in "$dir"/*; do
     [ -f "$record" ] || continue
     task=${record##*/}
     [ ! -L "$record" ] || { echo "waiting timers: symlink episode $record" >&2; return 1; }
     [ ! -f "$STATE/$task.meta" ] || continue
-    IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
-    if [ "$parent" = 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
-      jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task removed" || continue
-    fi
-    rm -f "$record" || return 1
+    IFS=$'\t' read -r old since owner parent key misses card last < "$record" || return 1
+    jg_wait_timer_end "$record" "$task" "${parent:-0}" "$key" "${card:-0}" removed || continue
+  done
+  for src in "$STATE"/.wait-sources/*; do
+    [ -f "$src" ] || continue
+    task=${src##*/}; task=${task%.*}
+    [ -f "$STATE/$task.meta" ] || rm -f "$src" || return 1
   done
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
@@ -165,12 +305,23 @@ EOF
     if [ "$(jg_backend_of_meta "$meta")" = herdr ]; then
       case "$unknown" in *"|${window%%:*}|"*) continue ;; esac
     fi
-    declaration=''; dkey=''
+    declaration=''; dkey=''; wsrc=''
     if [ "$(jg_meta_get "$meta" harness)" != cursor ]; then
       case "$blocked" in
         *"|$window|"*) [ -z "$window" ] || declaration=herdr-blocked ;;
       esac
     fi
+    # Wait sources the watcher records: an unanswered permission prompt (kept
+    # only while the prompt gate still sees it, so a dead pane's prompt lapses)
+    # and a Squad Lead whose own supervision is not running.
+    for src in prompt supervision; do
+      [ -z "$declaration" ] || break
+      record="$STATE/.wait-sources/$task.$src"
+      [ -f "$record" ] && [ ! -L "$record" ] || continue
+      [ "$src" != prompt ] || [ "$(age_of "$record")" -lt "$fresh" ] || continue
+      declaration=$(head -n 1 "$record" | tr '\t' ' ' | cut -c1-300)
+      [ -z "$declaration" ] || wsrc=$src
+    done
     if [ -z "$declaration" ]; then
       rows=$(status_own_open_decisions "$STATE/$task.status")
       while IFS=$'\t' read -r old verb native; do
@@ -191,21 +342,26 @@ EOF
       declaration=''
     fi
     record="$dir/$task"
-    src=$dkey
+    src=${dkey:-$wsrc}
     if [ -z "$src" ] && status_is_paused "$declaration"; then src=$(_jg_decision_key "$declaration") || src=default; fi
     [ "$declaration" != herdr-blocked ] || src=herdr-blocked
-    old=''; since=$now; owner=0; parent=0; misses=0; key=$(jg_wait_timer_key "$task" "$now" "$src") || return 1
+    old=''; since=$now; owner=0; parent=0; misses=0; card=0; last=0; key=$(jg_wait_timer_key "$task" "$now" "$src") || return 1
     if [ -e "$record" ] || [ -L "$record" ]; then
       [ -f "$record" ] && [ ! -L "$record" ] || { echo "waiting timers: invalid episode $record" >&2; return 1; }
-      IFS=$'\t' read -r old since owner parent key misses < "$record" || return 1
-      case "$since:$owner:$parent:$key" in
+      IFS=$'\t' read -r old since owner parent key misses card last < "$record" || return 1
+      case "$since:$owner:$parent:$key:$card:$last" in
         *[!0-9A-Za-z._:-]*) echo "waiting timers: corrupt episode $record" >&2; return 1 ;;
       esac
       case "$since" in ''|*[!0-9]*) echo "waiting timers: invalid episode time $record" >&2; return 1 ;; esac
       [ "${#since}" -le 12 ] && [ -n "$key" ] || { echo "waiting timers: corrupt episode identity $record" >&2; return 1; }
       case "$owner" in ''|*[!0-9]*) echo "waiting timers: invalid owner time $record" >&2; return 1 ;; esac
       [ "${#owner}" -le 12 ] || return 1
-      case "$parent" in 0|1) ;; *) echo "waiting timers: invalid episode levels $record" >&2; return 1 ;; esac
+      card=${card:-0}; last=${last:-0}
+      # parent: 0 none, 1 an escalation from before its time was kept, else its time.
+      for native in "$parent" "$card" "$last"; do
+        case "$native" in ''|*[!0-9]*) echo "waiting timers: invalid episode levels $record" >&2; return 1 ;; esac
+        [ "${#native}" -le 12 ] || { echo "waiting timers: invalid episode levels $record" >&2; return 1; }
+      done
       misses=${misses:-0}
       case "$misses" in 0|1) ;; *) echo "waiting timers: invalid episode misses $record" >&2; return 1 ;; esac
       if [ "$owner" -eq 1 ]; then owner=0; fi
@@ -214,43 +370,41 @@ EOF
       # A paused episode keys on window, verb and phase key, not the full
       # declaration line: a worker refreshing its pause prose (or the [at=]
       # stamp moving) is the same wait, so its original observation time and
-      # the one owner recheck per episode survive the rewrite. A different
-      # phase key is a different wait and re-arms.
+      # its owner rechecks survive the rewrite. A different phase key is a
+      # different wait and re-arms.
       pause_key=$(_jg_decision_key "$declaration") || pause_key=default
       signature=$(printf '%s' "$window|$(status_line_verb "$declaration")|$pause_key" | hash_pane)
     else
       signature=$(printf '%s' "$window|$declaration" | hash_pane)
     fi
-    age=$((now - since))
     if [ -z "$declaration" ] && [ -n "$old" ] && [ "$misses" -eq 0 ]; then
-      jg_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 || return 1
+      jg_wait_timer_save "$record" "$old" "$since" "$owner" "$parent" "$key" 1 "$card" "$last" || return 1
       continue
     fi
     if [ -z "$declaration" ] || [ "$old" != "$signature" ]; then
-      if [ "$parent" -eq 1 ] && [ -e "$JG_HOME/.jg-squad-lead-home" ]; then
-        jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $task changed state" || continue
+      if [ -n "$old" ]; then
+        jg_wait_timer_end "$record" "$task" "$parent" "$key" "$card" "changed state" || continue
       fi
-      rm -f "$record" || return 1
       [ -n "$declaration" ] || continue
-      since=$now; owner=0; parent=0; misses=0; key=$(jg_wait_timer_key "$task" "$now" "$src") || return 1
-      mkdir -p "$dir" || return 1
+      since=$now; owner=0; parent=0; misses=0; card=0; last=0; key=$(jg_wait_timer_key "$task" "$now" "$src") || return 1
       jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
     elif [ "$misses" -ne 0 ]; then
       misses=0
-      jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+      jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" "$card" "$last" || return 1
     fi
     age=$((now - since))
     verb=$(status_line_verb "$declaration")
+    [ -z "$wsrc" ] || verb=$wsrc
     [ "$declaration" != herdr-blocked ] || verb=herdr-blocked
     # An open decision names its key so the recipient clears the right one.
     [ -z "$dkey" ] || verb="$verb key=$dkey"
     # A declared pause is an expected wait, so its owner recheck rides the
     # JG_PAUSE_RESURFACE_SECS cadence (the same bound the stale path uses),
-    # never the blocked/decision owner-alert threshold.
+    # never the blocked/decision owner-alert threshold, and it never escalates.
     # Every report prints the exact unresolved source, not just the episode.
     source=$(printf '%s' "$declaration" | tr '\t\n' '  ' | cut -c1-160)
-    threshold=$alert
-    status_is_paused "$declaration" && threshold=$paused_alert
+    threshold=$alert every=$interval
+    if status_is_paused "$declaration"; then threshold=$paused_alert every=$paused_alert; fi
     if [ "$age" -ge "$threshold" ] && [ "$owner" -eq 0 ]; then
       reason="check: waiting-state $task ($verb, observed ${age}s, level=owner; $actor must recheck and unblock) id=$key source=[$source]"
       if ! jg_wake_queued_keys check | grep -Fx "$key-owner" >/dev/null; then
@@ -264,11 +418,13 @@ EOF
       JG_WAKE_POST_OUTPUT_ACTION=jg_wait_timer_owner_delivered
       wake "$reason"
     fi
-    if ! status_is_paused "$declaration" && [ "$owner" -gt 1 ] && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$parent" -eq 0 ]; then
-      if [ -e "$JG_HOME/.jg-squad-lead-home" ] || [ -L "$JG_HOME/.jg-squad-lead-home" ]; then
-        jg_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s); owning lead has not cleared the wait; Main must unblock or steer the lead; source=[$source]" || continue
-        parent=1
-        jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+    [ "$owner" -gt 1 ] || continue
+    if ! status_is_paused "$declaration" && [ "$parent" -eq 0 ] \
+      && [ "$((now - owner))" -ge "$((escalate - alert))" ] && [ "$age" -ge "$escalate" ]; then
+      if [ -n "$lead" ]; then
+        jg_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s, since=$since); owning lead has not cleared the wait; Main must unblock or steer the lead; source=[$source]" || continue
+        parent=$now
+        jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" "$card" "$last" || return 1
       else
         # The reason line's leading word is the wake kind every consumer
         # classifies by, so it must read "check:" like the kind this row is
@@ -276,11 +432,39 @@ EOF
         # all, and the escalation then reaches nobody.
         reason="check: waiting-state $task ($verb, observed ${age}s, level=main; Main must unblock it now) id=$key source=[$source]"
         jg_wake_append check "$key-escalation" "$reason" || return 1
-        parent=1
-        jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" || return 1
+        parent=$now
+        jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" "$card" "$last" || return 1
         wake "$reason"
       fi
     fi
+    # Only the main home posts a card: what Main cannot settle reaches the captain.
+    if [ -z "$lead" ] && ! status_is_paused "$declaration" && [ "$parent" -gt 0 ] && [ "$card" -eq 0 ] && [ "$age" -ge "$card_secs" ]; then
+      jg_wait_timer_card "$task" "$key-card" "$verb" "$source" || true
+      card=$now
+      jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" "$card" "$last" || return 1
+    fi
+    # Every rung reached fires again while the wait stays open.
+    fired=$owner
+    for native in "$parent" "$card" "$last"; do [ "$native" -le "$fired" ] || fired=$native; done
+    [ "$last" -eq 1 ] || [ "$((now - fired))" -ge "$every" ] || continue
+    last=$now
+    jg_wait_timer_save "$record" "$signature" "$since" "$owner" "$parent" "$key" "$misses" "$card" "$last" || return 1
+    level=owner
+    if [ "$parent" -gt 0 ] && [ -n "$lead" ]; then
+      jg_wait_timer_report "blocked [key=$key]: waiting-timer-overdue: $task ($verb, observed ${age}s, since=$since); still not cleared; Main must unblock or steer the lead; source=[$source]" || true
+    elif [ "$parent" -gt 0 ]; then
+      level=main
+      [ "$card" -eq 0 ] || jg_wait_timer_card "$task" "$key-card" "$verb" "$source" || true
+    fi
+    reason="check: waiting-state $task ($verb, observed ${age}s, level=$level; still open, $actor must recheck and unblock) id=$key source=[$source]"
+    if ! jg_wake_queued_keys check | grep -Fx "$key-$level-again" >/dev/null; then
+      jg_wake_append check "$key-$level-again" "$reason" || return 1
+    fi
+    [ -n "$pending" ] || pending=$reason
   done
+  if [ -z "$lead" ]; then jg_wait_timers_relay "$now" "$interval" "$card_secs" || return 1; fi
+  # Re-fires queue their rows first and wake once, so every open wait is
+  # re-presented in one cycle.
+  [ -z "$pending" ] || wake "$pending"
   return 0
 }
