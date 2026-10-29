@@ -110,10 +110,10 @@ log "stop"
 for h in "$L" "$M"; do kill "$(cat "$h/watcher.pid" 2>/dev/null)" 2>/dev/null || true; done
 wait
 
-cp "$M/state/lead1.status" "$OUT/main-parent-channel-lead1.status"
+# Only records that show the outcome go in the evidence folder: done-done refuses an empty
+# or duplicate file, so the board recorder and the watchers' stderr are checked below instead.
+cp "$M/state/lead1.status" "$OUT/main-parent-channel-lead1.txt"
 cp "$M/sent" "$OUT/main-steers-to-lead.txt" 2>/dev/null || : > "$OUT/main-steers-to-lead.txt"
-cp "$M/cards" "$OUT/main-board-cards.txt" 2>/dev/null || : > "$OUT/main-board-cards.txt"
-cp "$L/data/backlog.md" "$OUT/lead-backlog.md"
 
 # Checks, each against the recorded files above.
 check() {  # <label> <command...>
@@ -121,6 +121,7 @@ check() {  # <label> <command...>
   shift
   if "$@"; then echo "PASS $label"; else echo "FAIL $label"; fi
 }
+quiet() { ! [ -s "$1" ] && ! [ -s "$2" ]; }  # <file> <file>: both absent or empty
 between() { [ -n "$1" ] && [ "$1" -ge "$2" ] && [ "$1" -lt "$3" ]; }  # <value> <low> <high>
 t1=0
 first_at=$(sed -n 's/.*waiting-timer-backlog-overdue: .*since=\([0-9]*\)).*/\1/p' "$M/state/lead1.status" | head -n 1)
@@ -136,13 +137,12 @@ t2=$(printf '%s\n' "$times" | sed -n 2p)
   check "Main steered the lead about its ready backlog" grep -q 'jg-send lead1 --fire-and-forget [0-9a-f]* You have ready backlog work and a free lane' "$OUT/main-steers-to-lead.txt"
   check "the report re-fired 10 minutes later" between "$((${t2:-0} - t1))" 600 720
   check "Main steered the lead again on the re-fire" [ "$(grep -c 'You have ready backlog work' "$OUT/main-steers-to-lead.txt")" -ge 2 ]
-  check "no board card was posted" [ ! -s "$OUT/main-board-cards.txt" ]
+  check "no board card was posted" [ ! -s "$M/cards" ]
   check "holding the item closed Main's report" grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\].*waiting-timer-cleared: lead1 ready backlog: no ready work waits on a free lane now' "$M/state/lead1.status"
+  check "neither watcher wrote to stderr" quiet "$L/err" "$M/err"
 } | tee "$OUT/checks.txt"
 fails=0
 grep -q '^FAIL' "$OUT/checks.txt" && fails=1
-cp "$L/err" "$OUT/lead-watcher-stderr.txt"
-cp "$M/err" "$OUT/main-watcher-stderr.txt"
 
 cat > "$OUT/steps.json" <<J
 {"target":{"version":"juggernaut $(git -C "$REPO" rev-parse HEAD)"},
