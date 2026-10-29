@@ -300,6 +300,8 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-prompt-gate-lib.sh"
 # shellcheck source=bin/jg-watch-progress-lib.sh
 . "$SCRIPT_DIR/jg-watch-progress-lib.sh"
+# shellcheck source=bin/jg-stuck-gate-lib.sh
+. "$SCRIPT_DIR/jg-stuck-gate-lib.sh"
 # shellcheck source=bin/jg-supervision-lib.sh
 . "$SCRIPT_DIR/jg-supervision-lib.sh"
 # shellcheck source=bin/jg-project-capacity-lib.sh
@@ -3472,6 +3474,9 @@ watcher_cleanup() {
   jg_check_output_cleanup
   jg_capture_output_cleanup
   jg_custom_check_snapshot_cleanup
+  # A cycle that ends on a wake hands over to the next one through the arm
+  # script; this stamp lets jg-supervision-lib.sh bridge that gap briefly.
+  if [ "$owns_lock" -eq 1 ]; then touch "$STATE/.last-watcher-handoff" 2>/dev/null || true; fi
   if [ "$owns_lock" -eq 1 ] \
     && ! jg_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
       downtime "$CLEANUP_LOCK_BOUND"; then
@@ -4009,11 +4014,15 @@ EOF
     # deliberately skips, putting that read on the ordinary poll hot path.
     if [ "$kind" = squad_lead ] && ! status_is_paused_or_captain_held "$last"; then
       [ -z "$task" ] || prompt_gate_check "$w" "$task" || true
+      if watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")"; then
+        stuck_gate_check "$w" "$task" "$key" "$WATCHER_CAPTURE" "$kind"
+      fi
       continue
     fi
     backend=$(window_backend "$w")
     watcher_capture "$(window_backend "$w")" "$w" 40 "$(window_label "$w")" || continue
     tail40=$WATCHER_CAPTURE
+    stuck_gate_check "$w" "$task" "$key" "$tail40" "$kind"
     if [ -n "$task" ] && prompt_gate_check "$w" "$task" "$tail40"; then continue; fi
     h=$(printf '%s' "$tail40" | hash_pane)
     hf="$STATE/.hash-$key"

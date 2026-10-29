@@ -633,6 +633,10 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "tests/captures/claude-askuserquestion/picker.txt",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "tests/captures/opencode-badge-wrap/40-empty.txt",
       "audience": "maintainer-verification"
     },

@@ -140,6 +140,25 @@ backdate_backlog() {  # <home> <secs>
 
 TRUST=$'Quick safety check: Is this a project you created or one you trust?\n  1. Yes, I trust this folder\n  2. No, exit\nEnter to confirm'
 
+test_watcher_handoff_gap_is_not_a_dead_watcher() {
+  local m lh
+  m=$(home handoff)
+  lh="$m/lead-home"
+  mkdir -p "$lh/state"
+  printf 'kind=ship\n' > "$lh/state/child.meta"
+  lead_meta "$m" lead1 1 "$lh"
+  # The lead's last cycle just ended on a wake: no beacon, no lock, a fresh hand-off stamp.
+  touch "$lh/state/.last-watcher-handoff"
+  LIVENESS=1 PANES=1 cycle "$m"
+  ! grep -q 'supervision not running' "$m/events" || fail "a watcher between two cycles was reported not running: $(cat "$m/events")"
+  [ ! -e "$m/state/.wait-sources/lead1.supervision" ] || fail "the hand-off gap became a wait"
+  # A watcher that stopped restamping is dead once the grace has passed.
+  touch -d '-5 minutes' "$lh/state/.last-watcher-handoff"
+  LIVENESS=1 PANES=1 cycle "$m"
+  grep -q 'check: squad_lead lead1 supervision not running' "$m/events" || fail "a truly dead watcher was not reported: $(cat "$m/events") $(cat "$m/err")"
+  pass "a lead between two watcher cycles raises no alarm; one whose watcher stopped does"
+}
+
 test_lead_idle_is_steered_without_interrupt() {
   local m
   m=$(home lead-idle)
@@ -408,7 +427,119 @@ test_stalled_backlog_quiet_when_project_is_at_capacity() {
   pass "an item whose project is at capacity cannot start, so it never arms the chain"
 }
 
+# Pane renderings per harness: the claude one is captured from a real Claude
+# Code worker (tests/captures/claude-askuserquestion); the rest are the dialog hints each
+# harness documents, pinned here so the harness-neutral matcher is exercised
+# per adapter. The live guard in the verification record refreshes them.
+verdict() {  # <pane-text> -> "kind" or "none"
+  local out
+  out=$(printf '%s\n' "$1" | bash -c '. "$1/jg-stuck-gate-lib.sh"; jg_stuck_verdict' _ "$FORK/bin")
+  [ -n "$out" ] || out=none
+  printf '%s' "${out%%$'\t'*}"
+}
+
+test_stuck_verdict_table() {
+  local row harness want text got fixture
+  fixture=$(cat "$ROOT/tests/captures/claude-askuserquestion/picker.txt")
+  while IFS='|' read -r harness want text; do
+    got=$(verdict "$(printf '%b' "$text")")
+    [ "$got" = "$want" ] || fail "$harness: wanted $want, got $got for: $text"
+  done <<'TABLE'
+pi|question|How should I resolve the review finding?\n  1. Fix now\n  2. Defer\n↑↓ navigate · Enter select · Esc cancel
+pi-signed|question|How should I resolve the review finding?\n  1. Fix now\n  2. Defer\n↑↓ navigate · Enter select · Esc cancel
+omp|question|Pick a database\n❯ 1. sqlite\n  2. postgres\nenter to select · esc to cancel
+opencode|question|Which approach?\n  Fast\n  Safe\n⇆ select  enter confirm  esc dismiss
+codex|question|Question 1/1\n  1. Yes\n  2. No\nPress enter to confirm or esc to go back
+gemini|question|Choose an option\n  1. Continue\nEnter to submit · Esc to cancel
+kimi|question|Select one\n  a) first\nPress Enter to select, Esc to skip
+cursor|question|Which file?\n  1. a.ts\nenter to select · esc to cancel
+claude-quota|quota|⎿ You've hit your limit · resets 3pm\n> 
+codex-quota|quota|■ You've hit your usage limit. Upgrade or try again at 9:41 PM.\n> 
+pi-quota|quota|Error: 429 Too Many Requests - rate limit exceeded\n> 
+opencode-quota|quota|Error: insufficient_quota - You exceeded your current quota\n> 
+claude-idle|none|● Done. All checks pass.\n\n> 
+worker-prose|none|I will press Enter to select the file, then continue.\n> 
+code-output|none|ok - 12 tests passed\nEnter the value of x\n> 
+TABLE
+  [ "$(verdict "$fixture")" = question ] || fail "the real Claude AskUserQuestion capture was not detected"
+  # A question scrolled off the bottom 12 lines is gone, so it is not stuck.
+  got=$(verdict "$(printf '%s\n' "$fixture"; seq 1 30)")
+  [ "$got" = none ] || fail "a dialog scrolled out of view still read as stuck"
+  pass "the stuck-cause matcher reads a question, a quota wall, or nothing for each harness rendering"
+}
+
+test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
+  local m kind want pane
+  for kind in question quota; do
+    m=$(home "chain-$kind")
+    printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nharness=pi\n' > "$m/state/w1.meta"
+    printf 'working [at=1]: on it\n' > "$m/state/w1.status"
+    prime_status_seen "$m/state" "$m/state/w1.status"
+    if [ "$kind" = question ]; then pane=$(cat "$ROOT/tests/captures/claude-askuserquestion/picker.txt")
+    else pane=$'working...\nYou\'ve hit your usage limit. Try again at 9:41 PM.'; fi
+    printf '%s\n' "$pane" > "$m/panes/1"
+    PANES=1 cycle "$m"
+    [ -f "$m/state/.wait-sources/w1.$kind" ] || fail "$kind was not recorded as a wait source"
+    PANES=1 cycle "$m"; backdate "$m" w1 3
+    PANES=1 cycle "$m"
+    grep -q "check: waiting-state w1 ($kind, .*level=owner" "$m/events" || fail "$kind did not reach the owner rung: $(cat "$m/events")"
+    backdate "$m" w1 5
+    PANES=1 cycle "$m"
+    grep -q "check: waiting-state w1 ($kind, .*level=main" "$m/events" || fail "$kind did not reach Main: $(cat "$m/events")"
+    backdate "$m" w1 5
+    PANES=1 cycle "$m"; PANES=1 cycle "$m"
+    grep -q -- "--key waiting-timer-[0-9a-f]*-w1-.*-$kind-card" "$m/cards" || fail "$kind never became a board card: $(cat "$m/cards" 2>&1)"
+    printf 'working...\n> \n' > "$m/panes/1"
+    PANES=1 cycle "$m"; PANES=1 cycle "$m"
+    [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
+  done
+  pass "a question dialog and a provider quota wall climb owner, Main and the board, and clear with the cause"
+}
+
+test_silent_worker_climbs_whatever_it_declared() {
+  local m w n=0 hold
+  m=$(home silent)
+  # id:status line:pane, one worker each; ld is an idle lead.
+  hold=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%MZ)
+  for w in "sb:blocked [at=1]: waiting on the vendor" "sp:paused [at=1]: waiting on CI" "sf:paused [at=1]: waiting on CI until $hold" \
+    "sd:done [at=1]: finished" "ld:working [at=1]: on it" "sw:working [at=1]: on it"; do
+    n=$((n + 1))
+    printf 'kind=ship\nbackend=tmux\nwindow=fake:%s\nharness=claude\n' "$n" > "$m/state/${w%%:*}.meta"
+    printf '%s\n' "${w#*:}" > "$m/state/${w%%:*}.status"
+    prime_status_seen "$m/state" "$m/state/${w%%:*}.status"
+  done
+  printf 'kind=squad_lead\nmode=squad_lead\nbackend=tmux\nwindow=fake:5\nharness=claude\nhome=%s\n' "$m/lead-home" > "$m/state/ld.meta"
+  PANES='1 2 3 4 5 6' cycle "$m"
+  # Everything has been silent for 20 minutes except the worker with fresh progress.
+  for n in 1 2 3 4 5; do touch -d '-20 minutes' "$m/state/.silent-seen-fake_$n"; done
+  for w in sb sp sf sd ld; do touch -d '-20 minutes' "$m/state/$w.status"; prime_status_seen "$m/state" "$m/state/$w.status"; done
+  # A cycle that ends on a wake skips the rest of its poll, so repeat until both are recorded.
+  for n in 1 2 3 4 5 6 7 8; do
+    [ -e "$m/state/.wait-sources/sb.silent" ] && [ -e "$m/state/.wait-sources/sp.silent" ] || PANES='1 2 3 4 5 6' cycle "$m"
+  done
+  for w in sb sp; do
+    grep -q '^silent: no status line or pane change' "$m/state/.wait-sources/$w.silent" 2>/dev/null || fail "$w silent 20 minutes raised no silent source: $(ls -a "$m/state/.wait-sources" 2>&1; ls -la --time-style=+%T "$m"/state/.silent-* ; cat "$m/err")"
+  done
+  for w in sf sd ld sw; do
+    [ ! -e "$m/state/.wait-sources/$w.silent" ] || fail "$w was flagged silent"
+  done
+  backdate "$m" sp 3
+  for n in 1 2 3 4; do grep -q 'waiting-state sp (silent, .*level=owner' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
+  grep -q 'check: waiting-state sp (silent, .*level=owner' "$m/events" || fail "a silent paused worker never reached the owner rung: $(cat "$m/events")"
+  # One wake ends a cycle, so give the other silent worker's rung its own cycles.
+  backdate "$m" sp 5
+  for n in 1 2 3 4; do grep -q 'waiting-state sp (silent, .*level=main' "$m/events" || PANES='1 2 3 4 5 6' cycle "$m"; done
+  grep -q 'check: waiting-state sp (silent, .*level=main' "$m/events" || fail "a silent paused worker never reached Main: $(cat "$m/events"; cat "$m/state/.waiting-timers/sp")"
+  printf 'working [at=2]: back\n' >> "$m/state/sp.status"
+  for n in 1 2 3 4 5 6 7 8; do [ ! -e "$m/state/.wait-sources/sp.silent" ] || PANES='1 2 3 4 5 6' cycle "$m"; done
+  [ ! -e "$m/state/.wait-sources/sp.silent" ] || fail "a status line did not end the silence"
+  pass "a silent blocked or paused worker climbs the chain; a dated pause, a finished worker, an idle lead and a worker with fresh progress do not"
+}
+
 test_lead_idle_is_steered_without_interrupt
+test_stuck_verdict_table
+test_question_and_quota_ride_the_chain_whatever_the_terminal_says
+test_silent_worker_climbs_whatever_it_declared
 test_busy_lead_is_interrupted_first
 test_lead_stuck_on_a_prompt_reaches_the_board
 test_dead_lead_still_reaches_the_board_and_relaunch_represents
@@ -420,3 +551,4 @@ test_stalled_backlog_wakes_the_lead_and_main_and_refires
 test_stalled_backlog_quiet_when_work_starts_in_time
 test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item
 test_stalled_backlog_quiet_when_project_is_at_capacity
+test_watcher_handoff_gap_is_not_a_dead_watcher

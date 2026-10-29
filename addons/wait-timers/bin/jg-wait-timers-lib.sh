@@ -394,11 +394,11 @@ EOF
     # Wait sources the watcher records: an unanswered permission prompt (kept
     # only while the prompt gate still sees it, so a dead pane's prompt lapses)
     # and a Squad Lead whose own supervision is not running.
-    for src in prompt supervision; do
+    for src in prompt question quota silent supervision; do
       [ -z "$declaration" ] || break
       record="$STATE/.wait-sources/$task.$src"
       [ -f "$record" ] && [ ! -L "$record" ] || continue
-      [ "$src" != prompt ] || [ "$(age_of "$record")" -lt "$fresh" ] || continue
+      [ "$src" = supervision ] || [ "$(age_of "$record")" -lt "$fresh" ] || continue
       declaration=$(head -n 1 "$record" | tr '\t' ' ' | cut -c1-300)
       [ -z "$declaration" ] || wsrc=$src
     done

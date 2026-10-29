@@ -170,6 +170,19 @@ jg_supervision_status() {
     fi
   fi
 
+  # A cycle that ended on a wake has no beacon until the next scan finishes.
+  # The hand-off stamp it left (jg-watch.sh) keeps that gap healthy for
+  # JG_WATCHER_HANDOFF_SECS (default 60); a watcher that really died stops
+  # restamping, so it is reported once the stamp is older.
+  if [ "$JG_SUP_WATCHER_FRESH" = false ] && [ ! -e "$beat" ] && [ -e "$state/.last-watcher-handoff" ]; then
+    m=$(jg_sup_stat_mtime "$state/.last-watcher-handoff")
+    age=$(( $(date +%s) - ${m:-0} ))
+    if [ "$age" -lt "${JG_WATCHER_HANDOFF_SECS:-60}" ]; then
+      JG_SUP_BEACON_DESC="hand-off (${age}s)"
+      JG_SUP_WATCHER_FRESH=true
+    fi
+  fi
+
   # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
   [ -s "$state/.wake-queue" ] && JG_SUP_QUEUE_PENDING=true
   return 0
