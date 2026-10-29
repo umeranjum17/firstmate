@@ -130,10 +130,10 @@ The shared orchestrator behavior lives in [`AGENTS.md`](../AGENTS.md).
 Edit it like any prompt when the fleet is empty.
 While tasks are in flight, dispatch shared-repo edits to an operator.
 
-## Calm preference (config/calm)
+## Calm preference (config/stealth)
 
-The Pi Calm extension and the Claude Code Calm mod share the local, gitignored `config/calm` preference under the effective Juggernaut home.
-One `/calm` choice therefore applies on either harness.
+The Pi Calm extension and the Claude Code Calm mod share the local, gitignored `config/stealth` preference under the effective Juggernaut home.
+One `/stealth` choice therefore applies on either harness.
 Both resolve the home in this order: `JG_HOME`, `JG_ROOT_OVERRIDE`, then the tracked code root derived from their own path under it.
 When `JG_CONFIG_OVERRIDE` is present for tests or specialized setup, it selects the config directory directly.
 
@@ -146,6 +146,8 @@ When `JG_CONFIG_OVERRIDE` is present for tests or specialized setup, it selects 
 | Absent, unreadable, or unrecognized | Defaults to off. |
 
 Both written values end with one newline.
+Stealth was named Calm before; a home with only the old `config/calm` file reads it until the first `/stealth` toggle, which writes `config/stealth` and never touches `config/calm` again.
+The old `/calm` command stays as an alias on both harnesses.
 `max` is a legacy value from a removed third presentation level.
 Its behavior is now ordinary Calm, so it is still read as `on`.
 A home upgraded from `max` keeps Calm on rather than dropping to off.

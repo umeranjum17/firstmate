@@ -54,6 +54,7 @@ import {
   type CalmShipRasterPalette,
 } from "../lib/jg-calm-ship-raster.ts";
 import {
+  calmLegacyPreferencePath,
   calmPreferencePath,
   parseCalmPreference,
   classifyRestoredTranscript,
@@ -77,8 +78,9 @@ import {
   type HostHealth,
 } from "../lib/jg-branch-notes.ts";
 
-/** The slash command the mod serves, the same name as Pi's `/calm`. */
-const CALM_COMMAND = "calm";
+/** The slash command the mod serves, the same name as Pi's `/stealth`; `/calm` is the old alias. */
+const CALM_COMMAND = "stealth";
+const CALM_COMMAND_ALIAS = "calm";
 
 // One module environment holds one Calm state; a hot reload starts a fresh one, the
 // same as a new Pi extension lifetime.
@@ -158,15 +160,17 @@ async function readTheme($: EngineInterface): Promise<unknown> {
 }
 
 async function load($: EngineInterface): Promise<void> {
-  preferencePath = calmPreferencePath(
-    {
-      JG_HOME: await $.env.get("JG_HOME"),
-      JG_ROOT_OVERRIDE: await $.env.get("JG_ROOT_OVERRIDE"),
-      JG_CONFIG_OVERRIDE: await $.env.get("JG_CONFIG_OVERRIDE"),
-    },
-    $.plugin.root,
+  const home = {
+    JG_HOME: await $.env.get("JG_HOME"),
+    JG_ROOT_OVERRIDE: await $.env.get("JG_ROOT_OVERRIDE"),
+    JG_CONFIG_OVERRIDE: await $.env.get("JG_CONFIG_OVERRIDE"),
+  };
+  preferencePath = calmPreferencePath(home, $.plugin.root);
+  // The old config/calm file is read only while config/stealth does not exist yet.
+  calm = parseCalmPreference(
+    (await readText($, preferencePath)) ??
+      (await readText($, calmLegacyPreferencePath(home, $.plugin.root))),
   );
-  calm = parseCalmPreference(await readText($, preferencePath));
   palette = CALM_SHIP_RASTER_PALETTES[calmShipPaletteFamily(await readTheme($))];
   try {
     const restored = classifyRestoredTranscript(await $.session.messages());
@@ -376,12 +380,16 @@ export const register: Register = (on) => {
     await startNotes($).catch(() => undefined);
     await $.command.register({
       name: CALM_COMMAND,
-      description: "Toggle Juggernaut's Calm transcript presentation and working ship.",
+      description: "Toggle Juggernaut's Stealth transcript presentation and working ship.",
+    });
+    await $.command.register({
+      name: CALM_COMMAND_ALIAS,
+      description: "Old name of /stealth: toggle Juggernaut's Stealth presentation and working ship.",
     });
     return next(e);
   });
 
-  on("command.run", { command: CALM_COMMAND }, async ($, e, next) => {
+  for (const command of [CALM_COMMAND, CALM_COMMAND_ALIAS]) on("command.run", { command }, async ($, e, next) => {
     if (!(await isActivated($))) return next(e);
     await ensureLoaded($);
     const active = !calm;
@@ -391,13 +399,13 @@ export const register: Register = (on) => {
       await $.fs.write(preferencePath ?? "", serializeCalmPreference(active));
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      $.ui.toast(`Calm unchanged: could not save ${preferencePath ?? "the preference"} (${reason})`);
+      $.ui.toast(`Stealth unchanged: could not save ${preferencePath ?? "the preference"} (${reason})`);
       return {};
     }
     calm = active;
     if (!calm) sites.clear();
     invalidateDrawings($);
-    $.ui.toast(active ? "Calm on" : "Calm off");
+    $.ui.toast(active ? "Stealth on" : "Stealth off");
     // No `text`: the toggle leaves no output row in the transcript, as on Pi.
     return {};
   });
