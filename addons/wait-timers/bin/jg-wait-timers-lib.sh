@@ -170,15 +170,31 @@ jg_wait_timers_relay() {  # <now> <interval> <card-secs>
     while IFS=$'\t' read -r k verb text; do
       case "$k" in waiting-timer-*) ;; *) continue ;; esac
       case "$k" in *[!A-Za-z0-9._-]*) continue ;; esac
-      case "$text" in waiting-timer-overdue:*) ;; *) continue ;; esac
+      case "$text" in waiting-timer-overdue:*|waiting-timer-backlog-overdue:*) ;; *) continue ;; esac
       seen="$seen$k|"
+      r="$rdir/$k"
+      first=$now nudged=0 card=0
+      if [ -f "$r" ] && [ ! -L "$r" ]; then IFS=$'\t' read -r first nudged card < "$r" || true; fi
+      # A stalled ready backlog is the lead's own dispatch, so Main steers the
+      # lead on every interval and never posts a card for it.
+      case "$text" in
+        waiting-timer-backlog-overdue:*)
+          wsrc=${text#*\(}; wsrc=${wsrc%%); Main must*}
+          if [ "${nudged:-0}" -eq 0 ] || [ $((now - nudged)) -ge "$interval" ]; then
+            if declare -F lead_nudge >/dev/null; then
+              lead_nudge "$lead" "$window" "waiting-relay-$k-$now" "You have ready backlog work and a free lane, and nothing has started ($wsrc). Dispatch it now, P0 first, up to project capacity, or hold each item with the reason it waits." \
+                || echo "waiting timers: nudge to squad lead $lead about its ready backlog was not recorded" >&2
+            fi
+            nudged=$now
+          fi
+          printf '%s\t%s\t0\n' "$first" "$nudged" > "$r.tmp.$$" && mv "$r.tmp.$$" "$r" || return 1
+          continue
+          ;;
+      esac
       worker=${text#waiting-timer-overdue: }; worker=${worker%% *}
       wverb=${text#*\(}; wverb=${wverb%%,*}
       since=$(printf '%s' "$text" | sed -n 's/.*since=\([0-9]\{1,12\}\)).*/\1/p')
       wsrc=${text##*source=\[}; wsrc=${wsrc%]}
-      r="$rdir/$k"
-      first=$now nudged=0 card=0
-      if [ -f "$r" ] && [ ! -L "$r" ]; then IFS=$'\t' read -r first nudged card < "$r" || true; fi
       [ -n "$since" ] || since=${first:-$now}
       if [ "${nudged:-0}" -eq 0 ] || [ $((now - nudged)) -ge "$interval" ]; then
         if declare -F lead_nudge >/dev/null; then
@@ -205,6 +221,68 @@ EOF
     [ "${card:-0}" = 0 ] || jg_wait_timer_card_dismiss "$k-card"
     rm -f "$r" || return 1
   done
+}
+
+# A lead home's stalled ready backlog (README "Stalled ready backlog"): ready
+# work and a free lane, and nothing started for JG_READY_STALL_SECS. The
+# watcher's ready_backlog_stall_state owns the condition; this owns the rungs.
+# One episode at state/.waiting-timers/.ready-backlog: since, open lane ids
+# (- for none), key, first report time (0 before it), last fire time. A new lane id is a
+# start, so it ends the episode and re-arms the clock; the condition clearing
+# ends it. Each fire wakes this lead and reports to Main, again every
+# <interval>; Main's relay steers the lead and never posts a card for it.
+jg_wait_timers_backlog() {  # <now> <interval>
+  local now=$1 interval=$2 stall=${JG_READY_STALL_SECS:-900} every=${JG_READY_STALL_POLL_SECS:-60}
+  local record="$STATE/.waiting-timers/.ready-backlog" mark="$STATE/.waiting-timers/.ready-backlog-checked"
+  local rc since='' lanes='' key='' reported=0 last=0 id lead age report reason
+  case "$stall" in ''|*[!0-9]*|0*) echo "waiting timers: JG_READY_STALL_SECS must be positive decimal seconds" >&2; return 1 ;; esac
+  case "$every" in ''|*[!0-9]*) echo "waiting timers: JG_READY_STALL_POLL_SECS must be decimal seconds" >&2; return 1 ;; esac
+  declare -F ready_backlog_stall_state >/dev/null || return 0
+  [ ! -e "$mark" ] || [ "$(age_of "$mark")" -ge "$every" ] || return 0
+  touch "$mark" || return 1
+  lead=$(jg_parent_channel_home_id "$JG_HOME") || return 0
+  if [ -f "$record" ] && [ ! -L "$record" ]; then
+    IFS=$'\t' read -r since lanes key reported last < "$record" || since=
+    case "$since:${reported:-0}:${last:-0}" in *[!0-9:]*|:*) since= ;; esac
+    case "$key" in waiting-timer-*[!A-Za-z0-9._-]*|'') since= ;; waiting-timer-*) ;; *) since= ;; esac
+  fi
+  rc=0; ready_backlog_stall_state || rc=$?
+  [ "$rc" -ne 2 ] || return 0
+  if [ -n "$since" ] && [ "$rc" -eq 0 ]; then
+    for id in ${READY_STALL_LANES//,/ }; do
+      case ",$lanes," in *",$id,"*) ;; *) rc=3; break ;; esac
+    done
+  fi
+  if [ -n "$since" ] && [ "$rc" -ne 0 ]; then
+    if [ "${reported:-0}" -gt 0 ]; then
+      reason="the lead started work"
+      [ "$rc" -eq 3 ] || reason="no ready work waits on a free lane now"
+      jg_wait_timer_report "resolved [key=$key]: waiting-timer-cleared: $lead ready backlog: $reason" || return 0
+    fi
+    rm -f "$record" || return 1
+    since=
+  fi
+  [ "$rc" -ne 1 ] || return 0
+  if [ -z "$since" ]; then
+    since=$now reported=0 last=0
+    key=$(jg_wait_timer_key "$lead" "$now" ready-backlog) || return 1
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\n' "$since" "${READY_STALL_LANES:--}" "$key" "$reported" "$last" > "$record.tmp.$$" \
+    && mv "$record.tmp.$$" "$record" || return 1
+  age=$((now - since))
+  [ "$age" -ge "$stall" ] || return 0
+  [ "$reported" -eq 0 ] || [ $((now - last)) -ge "$interval" ] || return 0
+  report="blocked [key=$key]: waiting-timer-backlog-overdue: $lead (ready work $READY_STALL_IDS, free lanes $READY_STALL_OPEN/$READY_STALL_TARGET open, nothing started for ${age}s, since=$since); Main must steer the lead to dispatch it"
+  jg_wait_timer_report "$report" || return 0
+  [ "$reported" -gt 0 ] || reported=$now
+  last=$now
+  printf '%s\t%s\t%s\t%s\t%s\n' "$since" "${READY_STALL_LANES:--}" "$key" "$reported" "$last" > "$record.tmp.$$" \
+    && mv "$record.tmp.$$" "$record" || return 1
+  reason="check: ready backlog stalled: $READY_STALL_IDS waits with free lanes ($READY_STALL_OPEN/$READY_STALL_TARGET open) and nothing started for ${age}s - dispatch them now, P0 first, up to project capacity, or hold each with why it waits; Main was told id=$key"
+  if ! jg_wake_queued_keys check | grep -Fx "$key-stall" >/dev/null; then
+    jg_wake_append check "$key-stall" "$reason" || return 1
+  fi
+  wake "$reason"
 }
 
 jg_wait_timers_tick() {
@@ -465,6 +543,8 @@ EOF
     [ -n "$pending" ] || pending=$reason
   done
   if [ -z "$lead" ]; then jg_wait_timers_relay "$now" "$interval" "$card_secs" || return 1; fi
+  # Its own fire wakes once, after every lane's re-fire rows are queued.
+  if [ -n "$lead" ]; then jg_wait_timers_backlog "$now" "$interval" || return 1; fi
   # Re-fires queue their rows first and wake once, so every open wait is
   # re-presented in one cycle.
   [ -z "$pending" ] || wake "$pending"

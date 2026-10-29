@@ -75,6 +75,7 @@ cycle() {  # <home> [absent]
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
     JG_SQUAD_LEAD_LIVENESS_SECS="${LIVENESS:-99999999}" JG_BUSY_TURN_MAX_SECS=999999 JG_STALE_ESCALATE_SECS=999999 \
     JG_SQUAD_LEAD_WAKE_STALL_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 JG_WAIT_CARD_SECS=6 \
+    JG_READY_STALL_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
   wait_for_exit "$pid" 40 || rc=$?
@@ -110,6 +111,31 @@ overdue_report() {  # <main> <lead> <worker> <age>
   printf 'blocked [key=waiting-timer-0000aaaa-%s-g%s-q]: waiting-timer-overdue: %s (needs-decision key=q, observed %ss, since=%s); owning lead has not cleared the wait; Main must unblock or steer the lead; source=[needs-decision [key=q]: pick a database]\n' \
     "$3" "$since" "$3" "$4" "$since" >> "$1/state/$2.status"
   prime_status_seen "$1/state" "$1/state/$2.status"
+}
+
+# A lead home bound to <main> on the local parent channel, with a backlog.
+lead_home() {  # <name> <main> -> lead home path
+  local l
+  l=$(home "$1")
+  mkdir -p "$l/data"
+  printf 'lead1\n' > "$l/.jg-squad-lead-home"
+  printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$2" > "$l/.jg-squad-lead-parent"
+  printf '%s\n' "$l"
+}
+
+backlog() {  # <home> <tasks-axi args...>
+  local h=$1
+  shift
+  JG_HOME="$h" "$FORK/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"
+}
+
+# Move the stalled-backlog episode's start and last fire back by <secs>.
+backdate_backlog() {  # <home> <secs>
+  local f="$1/state/.waiting-timers/.ready-backlog" since lanes key reported last
+  IFS=$'\t' read -r since lanes key reported last < "$f"
+  [ "$reported" -eq 0 ] || reported=$((reported - $2))
+  [ "$last" -eq 0 ] || last=$((last - $2))
+  printf '%s\t%s\t%s\t%s\t%s\n' "$((since - $2))" "$lanes" "$key" "$reported" "$last" > "$f"
 }
 
 TRUST=$'Quick safety check: Is this a project you created or one you trust?\n  1. Yes, I trust this folder\n  2. No, exit\nEnter to confirm'
@@ -282,6 +308,106 @@ test_main_absent_board_card_still_fires() {
   pass "with Main absent and its wakes unread, the board card still fires"
 }
 
+test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
+  local m l f
+  m=$(home backlog-main)
+  l=$(lead_home backlog-lead "$m")
+  lead_meta "$m" lead1 1 "$l"
+  printf '2\n' > "$l/config/lane-target"
+  backlog "$l" add alpha "first item" --priority 1
+  f="$m/state/lead1.status"
+  cycle "$l"
+  [ -f "$l/state/.waiting-timers/.ready-backlog" ] || fail "ready work on a free lane armed no episode: $(cat "$l/err")"
+  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before the lead had 15 minutes"
+  backdate_backlog "$l" 800
+  cycle "$l"
+  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before 15 minutes passed"
+  backdate_backlog "$l" 200
+  cycle "$l"
+  grep -q '^blocked \[key=waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-backlog-overdue: lead1 (ready work alpha, free lanes 0/2 open, nothing started for [0-9]*s' "$f" \
+    || fail "a stalled backlog did not reach Main: $(cat "$f") $(cat "$l/err")"
+  grep -q '^check: ready backlog stalled: alpha waits with free lanes (0/2 open)' "$l/events" || fail "the lead was not woken again: $(cat "$l/events")"
+  cycle "$l"
+  [ "$(grep -c 'waiting-timer-backlog-overdue' "$f")" -eq 1 ] || fail "the stall re-fired inside the interval"
+  backdate_backlog "$l" 901
+  cycle "$l"
+  [ "$(grep -c 'waiting-timer-backlog-overdue' "$f")" -eq 2 ] || fail "the stall did not re-fire after the interval: $(cat "$f")"
+  [ "$(grep -c '^check: ready backlog stalled' "$l/events")" -eq 2 ] || fail "the lead was not woken on the re-fire"
+  # The report itself is Main's event; the next cycle's relay steers the lead.
+  PANES=1 cycle "$m"
+  grep -q 'lead1' "$m/events" || fail "the report raised no Main event: $(cat "$m/events")"
+  PANES=1 cycle "$m"
+  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} You have ready backlog work and a free lane, and nothing has started (ready work alpha' "$m/sent" \
+    || fail "Main did not steer the lead about its stalled backlog: $(cat "$m/sent" 2>&1) $(cat "$m/err")"
+  [ ! -s "$m/cards" ] || fail "a stalled backlog posted a board card: $(cat "$m/cards")"
+  backlog "$l" hold alpha --reason "waits on the vendor"
+  cycle "$l"
+  grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-cleared: lead1 ready backlog: no ready work' "$f" \
+    || fail "a held item left Main's report open: $(cat "$f")"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "the episode outlived the condition"
+  PANES=1 cycle "$m"
+  PANES=1 cycle "$m"
+  [ -z "$(ls "$m/state/.waiting-relay/" 2>/dev/null)" ] || fail "Main kept relaying a cleared stall"
+  pass "a ready item on a free lane with nothing started for 15 minutes wakes the lead and Main, re-fires every interval, and clears when held"
+}
+
+test_stalled_backlog_quiet_when_work_starts_in_time() {
+  local m l
+  m=$(home start-main)
+  l=$(lead_home start-lead "$m")
+  printf '2\n' > "$l/config/lane-target"
+  backlog "$l" add alpha "first item"
+  backlog "$l" add beta "second item"
+  cycle "$l"
+  backdate_backlog "$l" 1000
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$l/state/w1.meta"
+  : > "$l/state/w1.status"
+  prime_status_seen "$l/state" "$l/state/w1.status"
+  PANES=1 cycle "$l"
+  [ ! -e "$m/state/lead1.status" ] || ! grep -q 'waiting-timer-backlog-overdue' "$m/state/lead1.status" \
+    || fail "a lead that started work was escalated"
+  IFS=$'\t' read -r since lanes _ _ _ < "$l/state/.waiting-timers/.ready-backlog"
+  [ "$lanes" = w1 ] && [ $(($(date +%s) - since)) -lt 60 ] || fail "a start did not re-arm the clock: $since $lanes"
+  pass "a lead that starts work in time is never escalated, and the start re-arms the clock"
+}
+
+test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item() {
+  local m l
+  m=$(home full-main)
+  l=$(lead_home full-lead "$m")
+  printf '1\n' > "$l/config/lane-target"
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$l/state/w1.meta"
+  : > "$l/state/w1.status"
+  prime_status_seen "$l/state" "$l/state/w1.status"
+  backlog "$l" add alpha "first item"
+  PANES=1 cycle "$l"
+  PANES=1 cycle "$l"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "a home with no free lane armed a stall"
+  rm -f "$l/state/w1.meta" "$l/state/w1.status"
+  backlog "$l" hold alpha --reason "waits on the vendor"
+  cycle "$l"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "a held item armed a stall"
+  pass "no free lane, or only a held item, never arms the stalled-backlog chain"
+}
+
+test_stalled_backlog_quiet_when_project_is_at_capacity() {
+  local m l
+  m=$(home cap-main)
+  l=$(lead_home cap-lead "$m")
+  git init -q "$l/projects/proj"
+  printf 'proj 1\n' > "$m/config/project-capacity"
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nproject=%s\n' "$l/projects/proj" > "$l/state/w1.meta"
+  : > "$l/state/w1.status"
+  prime_status_seen "$l/state" "$l/state/w1.status"
+  backlog "$l" add alpha "capped item" --repo proj
+  PANES=1 cycle "$l"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "an item whose project is at capacity armed a stall"
+  backlog "$l" add beta "uncapped item"
+  PANES=1 cycle "$l"
+  [ -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "an uncapped item on a free lane armed no stall: $(cat "$l/err")"
+  pass "an item whose project is at capacity cannot start, so it never arms the chain"
+}
+
 test_lead_idle_is_steered_without_interrupt
 test_busy_lead_is_interrupted_first
 test_lead_stuck_on_a_prompt_reaches_the_board
@@ -290,3 +416,7 @@ test_lead_supervision_not_running_is_a_main_wait
 test_worker_dead_prompt_and_question_differ
 test_two_hops_stuck_at_once
 test_main_absent_board_card_still_fires
+test_stalled_backlog_wakes_the_lead_and_main_and_refires
+test_stalled_backlog_quiet_when_work_starts_in_time
+test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item
+test_stalled_backlog_quiet_when_project_is_at_capacity

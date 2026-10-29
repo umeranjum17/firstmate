@@ -14,12 +14,13 @@
 
 _JG_SUP_BIN=${BASH_SOURCE[0]%/*}
 
-# jg_ready_work_ids <home>
-# Prints the ids of <home>'s ready backlog items (tasks-axi ready: queued, not
-# blocked, not held), space-joined, highest priority first (P0 before P4, an
-# unprioritized item last, ties by id). Returns the ready read's own status so a
-# caller can tell an empty queue from an unreadable one.
-jg_ready_work_ids() {
+# jg_ready_work_rows <home>
+# Prints one "<id> <repo>" line per ready backlog item of <home> (tasks-axi
+# ready: queued, not blocked, not held), highest priority first (P0 before P4,
+# an unprioritized item last, ties by id); <repo> is "-" for an item that names
+# none. Returns the ready read's own status so a caller can tell an empty queue
+# from an unreadable one.
+jg_ready_work_rows() {
   local home=$1 out rc prios
   out=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" ready 2>/dev/null); rc=$?
   prios=$(JG_HOME="$home" "$_JG_SUP_BIN/jg-tasks-axi.sh" list --state queued --fields priority 2>/dev/null) || prios=
@@ -34,8 +35,20 @@ jg_ready_work_ids() {
       }
     }
     /^ready\[[0-9]+\]/ { on = 1; next }
-    on && /^  / { sub(/^  /, ""); split($0, f, ","); print ((f[1] in prio) ? prio[f[1]] : 9), f[1]; next }
-    { on = 0 }' | sort -k1,1n -k2,2 | awk '{ print $2 }' | paste -sd ' ' -
+    on && /^  / {
+      sub(/^  /, ""); split($0, f, ","); repo = f[4]; gsub(/"/, "", repo)
+      print ((f[1] in prio) ? prio[f[1]] : 9), f[1], (repo == "" ? "-" : repo); next
+    }
+    { on = 0 }' | sort -k1,1n -k2,2 | awk '{ print $2, $3 }'
+  return "$rc"
+}
+
+# jg_ready_work_ids <home>
+# The ids of jg_ready_work_rows, space-joined in the same order, with its status.
+jg_ready_work_ids() {
+  local rows rc
+  rows=$(jg_ready_work_rows "$1"); rc=$?
+  printf '%s\n' "$rows" | awk 'NF { print $1 }' | paste -sd ' ' -
   return "$rc"
 }
 
