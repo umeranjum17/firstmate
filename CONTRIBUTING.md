@@ -141,6 +141,8 @@ Pushing a new head to a pull request cancels that pull request's still-running C
 Draft pull requests skip `CI` and `Add-ons CI` until they are marked ready for review, and a push to `main` runs only the repo invariants because the pull request already ran the full suite.
 A fork can set the repository variable `JG_CI_SKIP_PUSH` to `1` to skip the push run of `CI`, and `JG_CI_SKIP_MACOS` to `1` to skip the stock macOS Bash job, without a tracked edit that drifts from upstream.
 Each skip is a job-level condition, so a skipped job reports success rather than leaving the pull request pending, and with neither variable set every job runs on upstream and on every fork exactly as before.
+`JG_CI_SKIP_MACOS` is currently set to `1` on `umeranjum17/juggernaut` because no macOS runner starts, so the stock macOS Bash job is skipped and `CI required` passes without it (`bin/jg-ci-required.sh` accepts that skip under the variable).
+To turn the job back on, run `gh variable delete JG_CI_SKIP_MACOS --repo umeranjum17/juggernaut`, or set it to `0`.
 Use `bin/jg-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
 Those sleeps look like recoverable overhead - `jg-watch-triage.test.sh` alone issues about 1,900 of them, each paying a flat ~100ms scheduler wake-up penalty on macOS - but they are not overhead added to the clock; they are how a test waits for a subject that only moves on `jg-watch.sh`'s own one-second `JG_POLL` cadence.
