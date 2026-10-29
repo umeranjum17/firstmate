@@ -191,25 +191,28 @@ jg_compat_mirror_vars() {  # <JG_ prefix>
 # the old nested-supervisor word for squad_lead_*). A shim that loads a library
 # calls this once afterwards; a name already defined is left alone.
 jg_compat_function_aliases() {
-  local fn old
+  local fn old olds
   for fn in $(compgen -A function); do
     case "$fn" in
       jg_compat_*) continue ;;
-      # The old name also spelled the lead word its old way: jg_root_is_squad_lead_home was fm_root_is_secondmate_home.
-      jg_*) old=fm_${fn#jg_}; old=${old//squad_lead/secondmate} ;;
-      squad_lead_*) old=secondmate_${fn#squad_lead_} ;;
+      # A name that also carries the lead word is aliased in both spellings:
+      # jg_root_is_squad_lead_home was fm_root_is_secondmate_home.
+      jg_*) olds=fm_${fn#jg_}; case "$olds" in *squad_lead*) olds="$olds ${olds//squad_lead/secondmate}" ;; esac ;;
+      squad_lead_*) olds=secondmate_${fn#squad_lead_} ;;
       *) continue ;;
     esac
-    declare -F "$old" >/dev/null 2>&1 && continue
-    case "$fn" in
-      # The role resolver answers in variables; an old caller reads them under their old prefix.
-      jg_role_*) eval "$old() { local _jg_rc=0; $fn \"\$@\" || _jg_rc=\$?; jg_compat_mirror_vars JG_ROLE; return \$_jg_rc; }" ;;
-      # The backlog transition lib answers in variables too (the receipt writer reads FM_BACKLOG_META_SPAWN_GEN).
-      jg_backlog_*) eval "$old() { local _jg_rc=0; $fn \"\$@\" || _jg_rc=\$?; jg_compat_mirror_vars JG_BACKLOG; return \$_jg_rc; }" ;;
-      # The registry readers take the registry path first; an old caller may still name the old file.
-      squad_lead_registry_*) eval "$old() { local _jg_p=\${1-}; [ \$# -eq 0 ] || shift; _jg_p=\$(jg_compat_pick_new \"\$_jg_p\"); $fn \"\$_jg_p\" \"\$@\"; }" ;;
-      *) eval "$old() { $fn \"\$@\"; }" ;;
-    esac
+    for old in $olds; do
+      declare -F "$old" >/dev/null 2>&1 && continue
+      case "$fn" in
+        # The role resolver answers in variables; an old caller reads them under their old prefix.
+        jg_role_*) eval "$old() { local _jg_rc=0; $fn \"\$@\" || _jg_rc=\$?; jg_compat_mirror_vars JG_ROLE; return \$_jg_rc; }" ;;
+        # The backlog transition lib answers in variables too (the receipt writer reads FM_BACKLOG_META_SPAWN_GEN).
+        jg_backlog_*) eval "$old() { local _jg_rc=0; $fn \"\$@\" || _jg_rc=\$?; jg_compat_mirror_vars JG_BACKLOG; return \$_jg_rc; }" ;;
+        # The registry readers take the registry path first; an old caller may still name the old file.
+        squad_lead_registry_*) eval "$old() { local _jg_p=\${1-}; [ \$# -eq 0 ] || shift; _jg_p=\$(jg_compat_pick_new \"\$_jg_p\"); $fn \"\$_jg_p\" \"\$@\"; }" ;;
+        *) eval "$old() { $fn \"\$@\"; }" ;;
+      esac
+    done
   done
 }
 
