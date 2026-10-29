@@ -101,6 +101,8 @@ outcome=$(jq -r '.outcome // empty' <<<"${receipt:-null}")
 label=$([ "$PR" = - ] || printf '%s' "${PR#*://}" | awk -F/ 'NF >= 5 { printf "%s #%s", $3, $5 }')
 case $KIND in ready) verb="Ready for review" ;; review) verb="Needs review" ;; *) verb="Merged" ;; esac
 title=${outcome:-${label:-$ID}: $verb}
+# sign-off wants text in both fields of the run's receipt.
+[ -z "$receipt" ] || receipt=$(jq -c --arg o "${outcome:-$title}" '.outcome = ($o[:1000]) | .evidence = (if (.evidence // "") == "" then "sealed done-done run \(.run_id)" else .evidence end)' <<<"$receipt")
 n=0
 out_dir=$DIR/proof-card
 if [ -z "$card_done" ]; then
