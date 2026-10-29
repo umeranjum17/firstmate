@@ -1447,6 +1447,40 @@ ROWS
   pass "jg-brief.sh: --branch-prefix is refused on scout and squad_lead scaffolds"
 }
 
+# The design call (first-draft yes/no plus a reason) is a ship-only pair: yes adds
+# the receipt instruction, no records the call, and any half-set or misplaced
+# pair is refused before a brief is written.
+test_design_call_field() {
+  local home brief out status
+  home="$TMP_ROOT/design-call-home"
+  mkdir -p "$home/data"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-yes some-proj --mode direct-PR \
+    --design-call yes --design-reason "new landing page" >/dev/null || fail "design-call yes scaffold failed"
+  brief=$(cat "$home/data/brief-design-yes/brief.md")
+  assert_contains "$brief" "Design call (first-draft): yes - new landing page" "yes call line missing"
+  assert_contains "$brief" "first-draft receipt: <reference>" "yes call must ask for the receipt line"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-no some-proj --mode direct-PR \
+    --design-call no --design-reason "one-line copy fix" >/dev/null || fail "design-call no scaffold failed"
+  brief=$(cat "$home/data/brief-design-no/brief.md")
+  assert_contains "$brief" "Design call (first-draft): no - one-line copy fix" "no call line missing"
+  assert_not_contains "$brief" "first-draft receipt: <reference>" "no call must not ask for a receipt"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-none some-proj --mode direct-PR >/dev/null \
+    || fail "scaffold without a design call failed"
+  assert_not_contains "$(cat "$home/data/brief-design-none/brief.md")" "Design call (first-draft)" "omitted flag wrote a call"
+  for args in "--design-call yes" "--design-reason why" "--design-call maybe --design-reason why"; do
+    # shellcheck disable=SC2086  # args is an intentional word-split arg list
+    out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-bad some-proj --mode direct-PR $args 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "expected a refusal for: $args"
+    assert_absent "$home/data/brief-design-bad/brief.md" "refused scaffold wrote a brief ($args)"
+  done
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-scout some-proj --scout --design-call no --design-reason why 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted a design call"
+  assert_contains "$out" "apply only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --design-call records yes/no with a reason and refuses misuse"
+}
+
 # A branch prefix is embedded verbatim into a `git checkout -b` command in the
 # generated brief, so a space or a leading dash could corrupt or hijack that
 # command; both must be rejected loudly rather than silently accepted.
@@ -1604,3 +1638,4 @@ test_branch_prefix_is_refused_where_it_does_not_apply
 test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_operator_scaffolds_forbid_pool_administration
+test_design_call_field
