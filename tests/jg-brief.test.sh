@@ -1447,6 +1447,39 @@ ROWS
   pass "jg-brief.sh: --branch-prefix is refused on scout and squad_lead scaffolds"
 }
 
+# The UI change flag (nav-check yes/no) is ship-only: yes adds the no-silent-removal
+# rule and the Nav lines, no records the call, anything else is refused.
+test_ui_change_field() {
+  local home brief out status
+  home="$TMP_ROOT/ui-change-home"
+  mkdir -p "$home/data"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-yes some-proj --mode direct-PR --ui-change yes >/dev/null \
+    || fail "ui-change yes scaffold failed"
+  brief=$(cat "$home/data/brief-ui-yes/brief.md")
+  assert_contains "$brief" "UI change (nav-check): yes" "yes line missing"
+  assert_contains "$brief" "never removes or renames an existing menu, tab or screen" "rule missing"
+  assert_contains "$brief" "Nav before:" "Nav before instruction missing"
+  assert_contains "$brief" "Nav after:" "Nav after instruction missing"
+  assert_contains "$brief" "must name each removed screen" "design-option rule missing"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-no some-proj --mode direct-PR --ui-change no >/dev/null \
+    || fail "ui-change no scaffold failed"
+  brief=$(cat "$home/data/brief-ui-no/brief.md")
+  assert_contains "$brief" "UI change (nav-check): no" "no line missing"
+  assert_not_contains "$brief" "Nav before:" "no must not carry the Nav rule"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-none some-proj --mode direct-PR >/dev/null \
+    || fail "scaffold without ui-change failed"
+  assert_not_contains "$(cat "$home/data/brief-ui-none/brief.md")" "UI change (nav-check)" "omitted flag wrote a line"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-bad some-proj --mode direct-PR --ui-change maybe 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "expected a refusal for --ui-change maybe"
+  assert_absent "$home/data/brief-ui-bad/brief.md" "refused scaffold wrote a brief"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-scout some-proj --scout --ui-change yes 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted --ui-change"
+  assert_contains "$out" "applies only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --ui-change records yes/no, carries the nav rule, and refuses misuse"
+}
+
 # The design call (first-draft yes/no plus a reason) is a ship-only pair: yes adds
 # the receipt instruction, no records the call, and any half-set or misplaced
 # pair is refused before a brief is written.
@@ -1639,3 +1672,4 @@ test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_operator_scaffolds_forbid_pool_administration
 test_design_call_field
+test_ui_change_field

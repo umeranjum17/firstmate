@@ -1697,6 +1697,10 @@ case "$PROVIDER" in
     merge_status=0
     if declare -F jg_dod_receipt_accept >/dev/null; then jg_dod_receipt_accept "$STATE" "$ID" "$META" "$JG_PR_MERGE_HEAD" >&2 || exit 1; fi
     if declare -F jg_dod_design_gate >/dev/null; then jg_dod_design_gate "$STATE" "$ID" "$META" "$JG_PR_MERGE_HEAD" >&2 || exit 1; fi
+    if declare -F jg_dod_nav_gate >/dev/null; then
+      nav_body=$(gh pr view "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" --json body -q .body 2>/dev/null) || nav_body=
+      jg_dod_nav_gate "$ID" "$META" "$nav_body" >&2 || exit 1
+    fi
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$JG_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?
@@ -1758,6 +1762,10 @@ case "$PROVIDER" in
     fi
     if declare -F jg_dod_receipt_accept >/dev/null; then jg_dod_receipt_accept "$STATE" "$ID" "$META" "$JG_PR_MERGE_HEAD" >&2 || exit 1; fi
     if declare -F jg_dod_design_gate >/dev/null; then jg_dod_design_gate "$STATE" "$ID" "$META" "$JG_PR_MERGE_HEAD" >&2 || exit 1; fi
+    if declare -F jg_dod_nav_gate >/dev/null; then
+      nav_body=$(GITLAB_HOST="$JG_PR_HOST" glab mr view "$PR_NUMBER" -R "$PROJECT_URL" 2>/dev/null) || nav_body=
+      jg_dod_nav_gate "$ID" "$META" "$nav_body" >&2 || exit 1
+    fi
     GITLAB_HOST="$JG_PR_HOST" glab mr merge "$PR_NUMBER" -R "$PROJECT_URL" \
       --sha "$JG_PR_MERGE_HEAD" --yes "$@" "${gitlab_merge_args[@]+"${gitlab_merge_args[@]}"}" || merge_status=$?
     if [ "$merge_status" -ne 0 ]; then

@@ -68,3 +68,29 @@ gate >/dev/null && fail "a receipt for another head must be refused"
 mkmeta 'design_call=bogus\n'
 gate >/dev/null && fail "a malformed call must be refused"
 pass "design gate refuses a yes task without a bound first-draft receipt line"
+
+# The UI-change nav gate: a table of PR bodies against a ui_change=yes task.
+navgate() { jg_dod_nav_gate task "$home/state/task.meta" "$1" 2>&1; }
+nav_case() {  # <label> <want-exit> <ui_change meta> <body> [<needle in output>]
+  local out rc=0
+  mkmeta "$3"
+  out=$(navgate "$4") || rc=$?
+  [ "$rc" = "$2" ] || fail "nav gate '$1': want exit $2, got $rc: $out"
+  [ -z "${5:-}" ] || assert_contains "$out" "$5" "nav gate '$1' output"
+}
+NB=$'Nav before: Home, Inbox, Settings'
+nav_case "no passes" 0 'ui_change=no\n' "no lines at all"
+nav_case "older task warns" 0 '' "no lines at all" "counting it as ui_change=no"
+nav_case "malformed refused" 1 'ui_change=maybe\n' "$NB" "malformed"
+nav_case "no nav lines refused" 1 'ui_change=yes\n' "just prose" "no 'Nav before"
+nav_case "before only refused" 1 'ui_change=yes\n' "$NB" "no 'Nav before"
+nav_case "after only refused" 1 'ui_change=yes\n' "Nav after: Home" "no 'Nav before"
+nav_case "same items pass" 0 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox, Settings'
+nav_case "added item passes" 0 'ui_change=yes\n' "$NB"$'\nNav after: settings; inbox, HOME, Reports'
+nav_case "bulleted lines pass" 0 'ui_change=yes\n' $'- Nav before: Home\n- Nav after: Home, New'
+nav_case "dropped item refused" 1 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox' "settings"
+nav_case "renamed item refused" 1 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox, Preferences' "settings"
+nav_case "dropped with empty quote refused" 1 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox\nRemoved by captain words:   ' "settings"
+nav_case "dropped with captain words passes" 0 'ui_change=yes\n' "$NB"$'\nNav after: Home, Inbox\nRemoved by captain words: "drop Settings, it is dead"'
+nav_case "CRLF body passes" 0 'ui_change=yes\n' $'Nav before: Home\r\nNav after: Home\r\n'
+pass "nav gate table: every refusal and every pass"

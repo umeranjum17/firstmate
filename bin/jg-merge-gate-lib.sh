@@ -95,3 +95,37 @@ jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
   echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
   return 1
 }
+
+# jg_dod_nav_gate is the no-silent-removal gate for a UI change (bin/jg-brief.sh
+# --ui-change). A task recorded ui_change=yes merges only when its PR body (or, for a
+# local-only landing, its commit messages) carries a `Nav before: a, b, c` line and a
+# `Nav after: ...` line, and every item of before is still in after unless a
+# `Removed by captain words: <quote>` line is present. ui_change=no passes; a record
+# with no ui_change (an older task) warns and counts as no. A shell check decides.
+jg_dod_nav_gate() {  # <id> <meta> <text>
+  local id=$1 meta=$2 text=$3 call before after item removed=''
+  [ -n "$id" ] && [ -f "$meta" ] || return 0
+  call=$(jg_dod_meta_value "$meta" ui_change)
+  case $call in
+    no) return 0 ;;
+    '') echo "warning: $id has no UI change recorded (an older brief); counting it as ui_change=no" >&2; return 0 ;;
+    yes) ;;
+    *) echo "merge refused: UI change for $id is malformed ('$call'); expected yes or no"; return 1 ;;
+  esac
+  _jg_nav_line() {  # <label>: the last `<label>: <value>` line of the text, value only
+    printf '%s\n' "$text" | tr -d '\r' | sed -n -E "s/^[[:space:]]*([-*][[:space:]]+)?$1:[[:space:]]*(.*[^[:space:]])[[:space:]]*\$/\\2/Ip" | tail -1
+  }
+  before=$(_jg_nav_line 'Nav before'); after=$(_jg_nav_line 'Nav after')
+  if [ -z "$before" ] || [ -z "$after" ]; then
+    echo "merge refused: $id is a UI change and its PR body has no 'Nav before: <items>' and 'Nav after: <items>' lines listing the menus, tabs and screens"
+    return 1
+  fi
+  _jg_nav_items() { printf '%s\n' "$1" | tr ';,' '\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | sed '/^$/d' | tr '[:upper:]' '[:lower:]'; }
+  while IFS= read -r item; do
+    _jg_nav_items "$after" | grep -qxF -- "$item" || removed="$removed${removed:+, }$item"
+  done < <(_jg_nav_items "$before")
+  [ -n "$removed" ] || return 0
+  if [ -n "$(_jg_nav_line 'Removed by captain words')" ]; then return 0; fi
+  echo "merge refused: $id is a UI change and its PR body drops from Nav before ($removed) with no 'Removed by captain words: <quote>' line; a UI change never removes an existing menu, tab or screen unless the captain's own words ask for it"
+  return 1
+}
