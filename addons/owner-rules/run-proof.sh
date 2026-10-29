@@ -51,7 +51,7 @@ post() {
   cat "$work/parent/state/umer.status"
   grep -qF 'http://review.example:4388/board/umer' "$work/parent/state/umer.status"
   post 'See http://review.example:4387/session/umer' 1 'A merge-card Lavish link is refused before posting.'
-  post 'Review with lavish-axi' 1 'A merge-card CLI mention is refused before posting.'
+  post 'lavish-axi review.html' 1 'A merge-card publish command is refused before posting.'
   cmp "$board" "$work/before.json"
   echo 'Refused merge-card posts left the private board byte-for-byte unchanged.'
   post 'See http://review.example:4388/board/umer' 0 'A merge-card sign-off link is posted.'
@@ -61,4 +61,4 @@ post() {
   echo 'The real sign-off writer holds exactly one clean card.'
 } > "$evidence/publication.txt" 2>&1
 cat "$evidence/publication.txt"
-jq -n --arg version "$head" '{target:{version:$version},start:"An isolated squad_lead home has owner-rules enabled and a private empty sign-off board.",steps:["Send a Lavish link through the real squad_lead report helper and inspect the refusal and absent status file.","Send a sign-off link through that helper and read the appended status.","Post a Lavish link and a CLI mention through merge-card and compare the unchanged board.","Post a clean sign-off link through merge-card and inspect the single card with sign-off-axi list."],result:"SquadLead notes and merge-card posts refuse Lavish content and point to the sign-off board; clean sign-off links pass both real publishing commands."}' > "$evidence/steps.json"
+jq -n --arg version "$head" '{target:{version:$version},start:"An isolated squad_lead home has owner-rules enabled and a private empty sign-off board.",steps:["Send a Lavish link through the real squad_lead report helper and inspect the refusal and absent status file.","Send a sign-off link through that helper and read the appended status.","Post a Lavish link and a publish command through merge-card and compare the unchanged board.","Post a clean sign-off link through merge-card and inspect the single card with sign-off-axi list."],result:"SquadLead notes and merge-card posts refuse Lavish content and point to the sign-off board; clean sign-off links pass both real publishing commands."}' > "$evidence/steps.json"

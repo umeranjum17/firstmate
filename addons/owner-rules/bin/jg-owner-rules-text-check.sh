@@ -2,7 +2,7 @@
 # Read proposed publication text on stdin. Exit 1 for Lavish, 0 for clean text;
 # grep/read errors keep their own diagnostics and exit code. No command/file interception.
 set -u
-pattern='https?://[^/[:space:]?#]+:4387([/?#[:space:]"<>)]|$)|(^|[^[:alnum:]_-])lavish-axi([^[:alnum:]_-]|$)'
+pattern='https?://[^/[:space:]?#]+:4387([/?#[:space:]"<>)]|$)|(^|[;&|(`]|[$][(])[[:space:]]*lavish-axi[[:space:]]+(publish([^[:alnum:]_-]|$)|[^[:space:]]*[.]html?([^[:alnum:]_-]|$))'
 if grep -Ei "$pattern" >/dev/null; then
   echo 'owner-rules: Lavish publication refused; use the sign-off board (sign-off-axi) instead' >&2
   exit 1
