@@ -1614,6 +1614,63 @@ SH
   pass "cycle-exit ledger links a verified successor and remains size-capped"
 }
 
+# A cycle that ends on an actionable wake leaves a fresh beacon: the arm
+# restarts it, and until the next scan finishes no other process proves a
+# watcher ran. The replacement still starts with no beacon and publishes one
+# only after a full scan, so it never announces recovery while checks block.
+test_actionable_exit_leaves_a_fresh_beacon() (
+  local dir state fakebin beat seeded exited stamp arm='' i
+  dir=$(make_case actionable-exit-beacon)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  beat="$state/.last-watcher-beat"
+  export JG_HOME="$dir" JG_STATE_OVERRIDE="$state" JG_POLL=0.2 JG_SIGNAL_GRACE=0 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999
+  # shellcheck source=/dev/null
+  . "$LIB"
+  trap '[ -z "$arm" ] || kill -KILL "$arm" 2>/dev/null || true; wait 2>/dev/null || true' EXIT
+  # The previous cycle's beacon is ten minutes old, far past the guard grace.
+  stamp=$(( $(date +%s) - 600 ))
+  touch -t "$(date -d "@$stamp" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$stamp" +%Y%m%d%H%M.%S)" "$beat"
+  seeded=$(jg_path_age "$beat")
+  printf 'done: first scan event\n' > "$state/task.status"
+  PATH="$fakebin:$PATH" "$WATCH_ARM" > "$dir/exit.out" 2>&1 &
+  arm=$!
+  wait_for_exit "$arm" 100 || fail "watcher did not exit on the actionable signal: $(cat "$dir/exit.out")"
+  arm=''
+  grep -q '^signal:' "$dir/exit.out" || fail "actionable signal missing: $(cat "$dir/exit.out")"
+  [ ! -e "$state/.watch.lock/pid" ] || fail "exited watcher kept the singleton lock"
+  [ -e "$beat" ] || fail "an actionable exit left no beacon (before: $seeded s, after: absent)"
+  exited=$(jg_path_age "$beat")
+  [ "$exited" -lt 60 ] || fail "the beacon an actionable exit left is stale (${exited}s)"
+  printf '# beacon age: seeded %ss -> after actionable exit %ss\n' "$seeded" "$exited"
+  # The replacement clears it and publishes again only once its scan finishes.
+  cat > "$state/hold.check.sh" <<SH
+#!/usr/bin/env bash
+: > "$dir/holding"
+while [ ! -e "$dir/release" ]; do sleep 0.1; done
+SH
+  chmod 0700 "$state/hold.check.sh"
+  "$ROOT/bin/jg-check-register.sh" hold >/dev/null || fail "register hold check"
+  rm -f "$state/task.status"
+  drain_and_ack "$state" || fail "could not acknowledge the first cycle's wake"
+  JG_CHECK_INTERVAL=0 PATH="$fakebin:$PATH" "$WATCH_ARM" > "$dir/replace.out" 2>&1 &
+  arm=$!
+  for ((i=0; i<100; i++)); do
+    [ ! -e "$dir/holding" ] || break
+    sleep 0.1
+  done
+  [ -e "$dir/holding" ] || fail "the replacement never reached its blocked check: $(cat "$dir/replace.out")"
+  [ ! -e "$beat" ] || fail "the replacement inherited the exit beacon while its checks blocked"
+  : > "$dir/release"
+  for ((i=0; i<100; i++)); do
+    [ -e "$beat" ] && break
+    sleep 0.1
+  done
+  [ -e "$beat" ] || fail "the replacement never published a beacon after its scan"
+  printf '# beacon age: replacement blocked absent -> after scan %ss\n' "$(jg_path_age "$beat")"
+  pass "an actionable exit leaves a fresh beacon and the replacement still publishes only after its scan"
+)
+
 test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
   local dir state fakebin armout armpid watcher_pid i status
   dir=$(make_case stopped-watcher)
@@ -1887,3 +1944,4 @@ test_arm_fails_fast_when_child_stands_down_for_a_dead_holder
 test_arm_fails_loud_when_no_fresh_watcher_confirmable
 test_cycle_exit_ledger_links_successor_and_stays_bounded
 test_stopped_watcher_is_live_but_stale_then_exit_is_classified
+test_actionable_exit_leaves_a_fresh_beacon

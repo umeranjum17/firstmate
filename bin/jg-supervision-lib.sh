@@ -170,8 +170,9 @@ jg_supervision_status() {
     fi
   fi
 
-  # A cycle that ended on a wake has no beacon until the next scan finishes.
-  # The hand-off stamp it left (jg-watch.sh) keeps that gap healthy for
+  # A cycle that ended on a wake leaves a fresh beacon, but its replacement
+  # clears it at start and writes none until its scan finishes. The hand-off
+  # stamp the ending cycle left (jg-watch.sh) keeps that gap healthy for
   # JG_WATCHER_HANDOFF_SECS (default 60); a watcher that really died stops
   # restamping, so it is reported once the stamp is older.
   if [ "$JG_SUP_WATCHER_FRESH" = false ] && [ ! -e "$beat" ] && [ -e "$state/.last-watcher-handoff" ]; then
