@@ -1514,6 +1514,41 @@ test_design_call_field() {
   pass "jg-brief.sh: --design-call records yes/no with a reason and refuses misuse"
 }
 
+# The TakeOne demo-video call is a ship-only pair like the design call, and takes
+# effect only while the home has config/takeone-demo: off, the pair is validated and
+# the brief carries no demo line; on, yes adds the receipt instruction.
+test_demo_call_field() {
+  local home brief out status args
+  home="$TMP_ROOT/demo-call-home"
+  mkdir -p "$home/data" "$home/config"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-off some-proj --mode direct-PR \
+    --demo-call yes --demo-reason "launch video" >/dev/null || fail "demo-call scaffold with the switch off failed"
+  assert_not_contains "$(cat "$home/data/brief-demo-off/brief.md")" "Demo-video call" "switch off must not write a demo line"
+  : > "$home/config/takeone-demo"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-yes some-proj --mode direct-PR \
+    --demo-call yes --demo-reason "launch video" >/dev/null || fail "demo-call yes scaffold failed"
+  brief=$(cat "$home/data/brief-demo-yes/brief.md")
+  assert_contains "$brief" "Demo-video call (TakeOne): yes - launch video" "yes call line missing"
+  assert_contains "$brief" "takeone receipt: <reference>" "yes call must ask for the receipt line"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-no some-proj --mode direct-PR \
+    --demo-call no --demo-reason "no video in this task" >/dev/null || fail "demo-call no scaffold failed"
+  brief=$(cat "$home/data/brief-demo-no/brief.md")
+  assert_contains "$brief" "Demo-video call (TakeOne): no - no video in this task" "no call line missing"
+  assert_not_contains "$brief" "takeone receipt: <reference>" "no call must not ask for a receipt"
+  for args in "--demo-call yes" "--demo-reason why" "--demo-call maybe --demo-reason why"; do
+    # shellcheck disable=SC2086  # args is an intentional word-split arg list
+    out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-bad some-proj --mode direct-PR $args 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "expected a refusal for: $args"
+    assert_absent "$home/data/brief-demo-bad/brief.md" "refused scaffold wrote a brief ($args)"
+  done
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-scout some-proj --scout --demo-call no --demo-reason why 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted a demo-video call"
+  assert_contains "$out" "apply only to ship briefs" "scout refusal did not explain why"
+  pass "jg-brief.sh: --demo-call records yes/no with a reason behind config/takeone-demo and refuses misuse"
+}
+
 # A branch prefix is embedded verbatim into a `git checkout -b` command in the
 # generated brief, so a space or a leading dash could corrupt or hijack that
 # command; both must be rejected loudly rather than silently accepted.
@@ -1672,4 +1707,5 @@ test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_operator_scaffolds_forbid_pool_administration
 test_design_call_field
+test_demo_call_field
 test_ui_change_field

@@ -35,6 +35,7 @@ A blocked item waits for the owner: only he can make that call.
 
 | Item | Type | The ask, or the finding it came from | State | Link |
 |---|---|---|---|---|
+| `followup-first-draft-to-open-design` | follow-up (P2) | The owner, 29 Oct 2026: "move first draft to this open design thing, the new one". The design-call rule and its merge check currently name first-draft; move them to the new open-design tool once it is named, keeping the receipt-line gate shape. Not started: it was out of scope of the TakeOne rule. | queued, held on the owner naming the tool | - |
 | `fm-acct-f4-cursor-go` | captain-ask (P1) | Workers should reach the Cursor and OpenCode Go subscriptions through the account pool, under the owner's earlier decisions on automatic account management. | queued, held on two account-pool items in another repository merging | - |
 | `herdr-guard-ipad-check` | verify (P1) | The Herdr guard still needs its iPad check: an iPad muxr session must keep working with the guard live. | held, needs a muxr window | - |
 | `slice-lead-wake-b` | captain-ask (P2) | The owner: "Whatever is in original kuns repo stays in firstmate, only our customizations and extra stuff moves to addons." The policy seam landed upstream; what remains is the ring text and the fork-side step, which needs a working review route. | held | [step A](https://github.com/umeranjum17/firstmate-addons/pull/109) |
