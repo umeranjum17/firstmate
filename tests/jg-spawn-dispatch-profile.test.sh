@@ -840,9 +840,10 @@ test_cursor_failed_catalog_probe_does_not_block_spawn() {
 
 # A hand-restarted OpenCode lead loses the launch env, so the squad_lead spawn
 # also writes the exact-path external_directory grant where OpenCode reads it
-# from the lead's cwd; it names the lead's inbox and pending-replies only.
+# from the lead's cwd; it names the lead's inbox, pending-replies, and the
+# parent's read-only bin/, docs/ and .agents/skills/ only.
 test_opencode_squad_lead_writes_exact_channel_grant() {
-  local rec id sm out status cfg state_real
+  local rec id sm out status cfg state_real root_real
   id="opencode-lead-grant-z2"
   rec=$(make_spawn_case opencode-lead-grant opencode "$id")
   read_case_record "$rec"
@@ -854,10 +855,19 @@ test_opencode_squad_lead_writes_exact_channel_grant() {
   expect_code 0 "$status" "squad_lead opencode spawn should succeed"$'\n'"$out"
   cfg="$sm/.opencode/opencode.json"
   state_real=$(cd "$HOME_DIR/state" && pwd -P)
+  root_real=$(cd "$ROOT" && pwd -P)
   [ "$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), sort_keys=True))' "$cfg")" = \
-    "$(python3 -c 'import json,sys; print(json.dumps({"permission":{"external_directory":{sys.argv[1]+"/"+sys.argv[2]+".inbox/**":"allow",sys.argv[1]+"/pending-replies/**":"allow"}}}, sort_keys=True))' "$state_real" "$id")" ] \
-    || fail "squad_lead opencode grant is not exactly its inbox and pending-replies: $(cat "$cfg" 2>&1)"
-  pass "a squad_lead opencode launch writes a persistent grant for exactly its inbox and pending-replies"
+    "$(python3 -c '
+import json,os,sys
+st,i,rt=sys.argv[1:4]
+ext={st+"/"+i+".inbox/**":"allow",st+"/pending-replies/**":"allow"}
+edit={}
+for d in ("bin","docs",".agents/skills"):
+    ext[rt+"/"+d+"/**"]="allow"
+    edit["*/"+os.path.basename(rt)+"/"+d+"/**"]="deny"
+print(json.dumps({"permission":{"external_directory":ext,"edit":edit}}, sort_keys=True))' "$state_real" "$id" "$root_real")" ] \
+    || fail "squad_lead opencode grant is not exactly its channels plus read-only tooling: $(cat "$cfg" 2>&1)"
+  pass "a squad_lead opencode launch writes a persistent grant for its channels and read-only parent tooling"
 
   id="opencode-ship-grant-z3"
   rec=$(make_spawn_case opencode-ship-grant opencode "$id")
