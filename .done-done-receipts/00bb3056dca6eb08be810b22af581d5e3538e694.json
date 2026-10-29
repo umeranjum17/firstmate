@@ -1,0 +1,53 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "00bb3056dca6eb08be810b22af581d5e3538e694",
+  "tree": "2e37bee2d01ada8314754b5fb290095d1818a87e",
+  "claim": "A captain-asked ticket cannot be closed, cancelled or deleted without the captain's quoted words or an answered confirm card, and the words are recorded",
+  "result": "pass",
+  "at": "2026-10-29T19:39:20.545Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261029T193906Z-00bb3056-b2c4b6/captain-close-gate-transcript.txt",
+      "sha256": "ae1350e38d513a742e7d3e2cf142eba035b226be91221f5ea8125e8a2d9ee516"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261029T193906Z-00bb3056-b2c4b6",
+      "commit": "00bb3056dca6eb08be810b22af581d5e3538e694",
+      "journey": "captain-close-gate",
+      "command": "bash journeys/captain-close-gate.sh",
+      "tool": "0.6.20",
+      "steps": {
+        "target": {
+          "version": "juggernaut bin/jg-tasks-axi.sh and bin/jg-captain-ask-lib.sh at this commit"
+        },
+        "start": "a disposable juggernaut home with a real tasks-axi backlog",
+        "steps": [
+          "try to cancel and close a captain-asked ticket with no words, a blank quote and an unanswered card",
+          "close one with a quote and one with an answered confirm card",
+          "remove an ordinary ticket"
+        ],
+        "result": "the captain-asked ticket stays until his words or an answered card are given, and the words are recorded; an ordinary ticket is unaffected"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261029T193906Z-00bb3056-b2c4b6/captain-close-gate-transcript.txt",
+        "sha256": "ae1350e38d513a742e7d3e2cf142eba035b226be91221f5ea8125e8a2d9ee516",
+        "verdict": "pass",
+        "seen": "I read all 9 result blocks and the 2-line record. The gate refuses close, cancel and delete without a quote or an answered card (no words, blank quote, unanswered card-2, self-answer, card-1 naming another ticket). It allows the quoted and answered-card closes, and the record logs the quote and the card. The outcome is shown."
+      }
+    ]
+  }
+}
