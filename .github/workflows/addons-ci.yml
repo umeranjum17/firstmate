@@ -180,6 +180,9 @@ jobs:
       - name: Fleet pulse test
         run: bash fleet-pulse/tests/chat-tsv.test.sh
       # Stub byokit-accounts and a throwaway config: nothing real is touched.
+      - name: Fleet report test
+        run: bash fleet-report/tests/fleet-report.test.sh
+
       - name: Account pool test
         run: bash account-pool/tests/account-pool.test.sh
       # Fixture registry and readings only: no network, no login copy, no real model CLI.
