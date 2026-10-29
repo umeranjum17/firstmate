@@ -221,7 +221,9 @@ jg_wait_timers_tick() {
   [ "$escalate" -gt "$alert" ] || { echo "waiting timers: escalation must be later than owner alert" >&2; return 1; }
   [ "$card_secs" -gt "$escalate" ] || { echo "waiting timers: the board card must be later than escalation" >&2; return 1; }
   now=$(date +%s) || return 1
-  fresh=$(( ${POLL:-15} * 3 + 30 ))
+  # POLL may be fractional (sleep accepts 0.2); whole seconds are enough here.
+  fresh=${POLL:-15}; fresh=${fresh%%.*}
+  fresh=$(( ${fresh:-0} * 3 + 30 ))
   if [ -e "$JG_HOME/.jg-squad-lead-home" ]; then actor='owning lead'; lead=1; fi
   mkdir -p "$dir" || return 1
   # A new supervisor session (a restart or a lead's relaunch) re-presents every
