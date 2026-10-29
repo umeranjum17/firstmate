@@ -439,7 +439,7 @@ verdict() {  # <pane-text> -> "kind" or "none"
 }
 
 test_stuck_verdict_table() {
-  local row harness want text got fixture
+  local harness want text got fixture
   fixture=$(cat "$ROOT/tests/captures/claude-askuserquestion/picker.txt")
   while IFS='|' read -r harness want text; do
     got=$(verdict "$(printf '%b' "$text")")

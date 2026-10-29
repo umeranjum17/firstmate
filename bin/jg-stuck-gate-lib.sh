@@ -44,7 +44,7 @@ stuck_source_set() {  # <task> <source> [text]
 
 # stuck_gate_check: one poll of one window. <tail40> is its capture.
 stuck_gate_check() {  # <window> <task> <key> <tail40> <kind>
-  local w=$1 task=$2 key=$3 tail40=$4 kind=$5 verdict h seen last declared until okf
+  local task=$2 key=$3 tail40=$4 kind=$5 verdict h seen last declared until okf
   [ -n "$task" ] || return 0
   verdict=$(printf '%s' "$tail40" | jg_stuck_verdict)
   stuck_source_set "$task" question ''

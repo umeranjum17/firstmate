@@ -178,6 +178,7 @@ jg_supervision_status() {
     m=$(jg_sup_stat_mtime "$state/.last-watcher-handoff")
     age=$(( $(date +%s) - ${m:-0} ))
     if [ "$age" -lt "${JG_WATCHER_HANDOFF_SECS:-60}" ]; then
+      # shellcheck disable=SC2034 # Read by callers (jg-guard.sh) after sourcing.
       JG_SUP_BEACON_DESC="hand-off (${age}s)"
       JG_SUP_WATCHER_FRESH=true
     fi
