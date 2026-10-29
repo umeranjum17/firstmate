@@ -1630,6 +1630,11 @@ test_operator_scaffolds_forbid_pool_administration() {
       "$mode ship brief gave the prohibition no exit for a genuine second-checkout need"
   done
 
+  assert_grep "no verify skill" "$home/data/brief-pool-no-mistakes/brief.md" \
+    "ship brief did not require the proof line to say no verify skill"
+  assert_grep "Commit nothing afterward" "$home/data/brief-pool-no-mistakes/brief.md" \
+    "ship brief did not forbid commits after the final-head done-done run"
+
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-pool-scout alpha --scout >/dev/null 2>&1 \
     || fail "jg-brief.sh --scout exited non-zero"
   brief="$home/data/brief-pool-scout/brief.md"
