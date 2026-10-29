@@ -547,6 +547,8 @@ portable_serial_weight_hints() {
   cat <<'EOF'
 tests/board-link.test.sh 2000
 tests/jg-afk-inject-e2e.test.sh 41958
+# Local measurement (about 300ms) until the next CI refresh.
+tests/jg-agents-md-floor.test.sh 1000
 tests/jg-agy-signals-live-e2e.test.sh 53
 tests/jg-backend-tmux-smoke.test.sh 291
 tests/jg-backlog-handoff.test.sh 57458
