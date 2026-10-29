@@ -381,6 +381,7 @@ jg_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id> [ki
       if [ "$kind" = squad_lead ]; then
         printf '%s\n' "$state/$id.claude-settings.json"
         printf '%s\n' "$wt/.jg-busy-stop"
+        printf '%s\n' "$wt/.fm-busy-stop"
       else
         printf '%s\n' "$wt/.claude/settings.local.json"
       fi

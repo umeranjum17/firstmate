@@ -146,6 +146,8 @@ done
 record_parent_stop_state() {
   local status=$? pointer="$JG_ROOT/.jg-busy-stop" key value writer='' state='' id='' gen='' verdict=idle event=stop
   [ "$CLAUDE_MODE" -eq 1 ] || return 0
+  # A home launched before the rename carries the pointer under its old name.
+  [ -e "$pointer" ] || pointer="$JG_ROOT/.fm-busy-stop"
   [ -f "$pointer" ] && [ ! -L "$pointer" ] || return 0
   while IFS='=' read -r key value; do
     case "$key" in

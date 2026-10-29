@@ -1766,6 +1766,8 @@ jg_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home>
     printf 'home=%s\n' "$home"
   } > "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
   mv -f "$tmp" "$marker" 2>/dev/null || { rm -f "$tmp"; return 1; }
+  # A claim written before the rename is superseded, so it cannot resurface after a release.
+  rm -f "$(dirname "$marker")/.fm-slot-owner" 2>/dev/null || true
 }
 
 # Read the claim on a pool slot and compare it with a task id.
@@ -1783,6 +1785,8 @@ jg_treehouse_slot_owner_state() {  # <worktree> <task-id>
   JG_TREEHOUSE_SLOT_OWNER_ID=
   JG_TREEHOUSE_SLOT_OWNER_HOME=
   marker=$(jg_treehouse_slot_owner_marker "$worktree") || return 0
+  # A claim written before the rename lives under the old name until the slot is next claimed.
+  marker=$(jg_compat_pick "$marker")
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
     JG_TREEHOUSE_SLOT_OWNER=absent
     return 0
@@ -1814,7 +1818,7 @@ jg_treehouse_slot_owner_release() {  # <worktree> <task-id>
   jg_treehouse_slot_owner_state "$worktree" "$id"
   [ "$JG_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
   marker=$(jg_treehouse_slot_owner_marker "$worktree") || return 0
-  rm -f "$marker" 2>/dev/null || true
+  rm -f "$marker" "$(dirname "$marker")/.fm-slot-owner" 2>/dev/null || true
 }
 
 jg_canonical_existing_dir() {  # <path>
