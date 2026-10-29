@@ -938,6 +938,8 @@ $ASK_USER_BLOCK
    Juggernaut's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a juggernaut reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
 
+8. When the merge gate needs done-done proof, run done-done once at your final head with a clean tree and confirm \`merge-card receipt <id> <head>\` exits 0, where <head> is the commit you will push. Commit nothing afterward, not even the receipt, because any later commit moves the PR head and voids the proof. If you must commit again, rerun done-done at the new head. The PR proof line must name the done-done run and say 'no verify skill'.
+
 $WAIT_BLOCK$INBOX_SECTION
 
 # Project memory
