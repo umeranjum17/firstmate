@@ -20,9 +20,18 @@ tmux new-session -d -s lab -n pi -x 150 -y 45 -c "$T/work" "pi --model openai-co
 tmux new-window -t lab -n codex -c "$T/work" "codex --model gpt-5.6-luna -c model_reasoning_effort=low --dangerously-bypass-approvals-and-sandbox"
 tmux new-window -t lab -n opencode -c "$T/work" \
   "OPENCODE_CONFIG_CONTENT='{\"permission\":{\"*\":\"allow\"}}' opencode --model opencode/beam-free --prompt '$ASK'"
-sleep 15
-tmux send-keys -t lab:codex Enter   # trust this folder
-sleep 10
+# Clear codex's start-up dialogs by what is on screen (never a blind Enter: its update dialog's
+# default is "Update now", which runs npm install -g): skip an update, trust the scratch folder.
+for _ in $(seq 1 40); do
+  pane=$(tmux capture-pane -p -t lab:codex)
+  case "$pane" in
+    *"Update available"*) tmux send-keys -t lab:codex Escape ;;
+    *"Trust and continue"*) tmux send-keys -t lab:codex Enter ;;
+    *"OpenAI Codex (v"*) break ;;
+  esac
+  sleep 1
+done
+sleep 3
 tmux send-keys -t lab:codex '/plan' Enter
 sleep 3
 tmux send-keys -t lab:codex "$ASK" Enter
