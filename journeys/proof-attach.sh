@@ -43,4 +43,10 @@ printf '## Checks\nscreen: none\noutcome: Parser is faster\n' > "$T/body"
 printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","run_id":"20261029T000000Z-01234567-ab","started_at":"1","files":["out.txt"]}' "$HEAD" > "$JG_HOME/data/lib-ok/.done-done/runs/r.json"
 step "non-UI work with a sealed receipt is allowed text-only" 0 lib-ok https://github.com/acme/app/pull/8
 printf '== board\n%s\n' "$(sign-off-axi list "$B" --json --full | jq -c '.decisions[] | {key, media: (.media // [] | length)}')" >> "$LOG"
+cat > "$OUT/steps.json" <<'J'
+{"target":{"version":"juggernaut bin/jg-proof-attach.sh at this commit"},
+ "start":"a disposable home and an empty sign-off board, with the real sign-off-axi and merge-card",
+ "steps":["attach a ready card for UI work that has a real screenshot","attach a ready card for UI work that has no media","attach a ready card for screen-free work that has a sealed receipt"],
+ "result":"the screenshot card is posted with one media file, the text-only UI card is refused with the fix named, and the screen-free card is posted text-only"}
+J
 exit "$fails"
