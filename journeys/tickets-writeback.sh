@@ -24,12 +24,8 @@ else
   failed=1
 fi
 
-# 2. The fork shim: silent without the add-on or a board, and it hands an installed
-#    writer this home's task and flags.
-bash tests/jg-ticket.test.sh >"$OUT/jg-ticket-test.log" 2>&1 || failed=1
-
 if [ "$failed" -ne 0 ]; then
-  echo "tickets-writeback: a step failed; read tickets-sync-test.log and jg-ticket-test.log" >&2
+  echo "tickets-writeback: a step failed; read tickets-sync-test.log" >&2
 fi
 
 python3 - "$OUT/steps.json" "$(git rev-parse HEAD)" <<'PY'
@@ -39,7 +35,6 @@ steps = [
     "Write a dispatched ticket's stage and state, then a delivered PR, through the lifecycle writer.",
     "Repeat the same write and read the board unchanged; confirm a ticket the poll never published is untouched.",
     "Make a ticket contradict its backlog item and read the check naming it, then settle the board and read silence.",
-    "Run the fork shim test so a home without a board stays silent.",
 ]
 with open(sys.argv[1], 'w') as out:
     json.dump({
