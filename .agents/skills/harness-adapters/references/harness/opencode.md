@@ -17,6 +17,7 @@ Verified on 2026-06-11 across versions 1.15.7 through 1.17.6, with busy-queue be
 | Model discovery | Run `opencode models [provider]` to list available provider/model identifiers. |
 | Trust dialog | For Juggernaut-generated launches, see the [OpenCode launch permission policy](../../../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson). |
 | Resume by hand | A bare `opencode --session <id>` (the exit banner's resume command) carries no launch env, so it loses the permission grant; a Squad Lead's persistent `.opencode/opencode.json` keeps its inbox and pending-replies access (verified on 1.18.25: OpenCode loads that file from the cwd, and matches an outside read on its parent directory, so only directories can be granted, never one file). Prefer `../../../bin/jg-control.sh <task-id> relaunch`. |
+| Permission prompt | Without that grant, such as after a hand restart, an outside path renders "△ Permission required" and "← Access external directory <dir>" over "Allow once   Allow always   Reject"; Enter selects the highlighted "Allow once". The same dialog serves a Read, a Write, and a bash `rm`, so only the pending tool line above it names the call; `../../../bin/jg-prompt-gate.py` owns what supervision may answer. |
 | Marker | None; OpenCode publishes no identity marker, so `../../../bin/jg-harness.sh` identifies it from process ancestry. |
 
 OpenCode can auto-upgrade in the background, and the running TUI can exit mid-task.

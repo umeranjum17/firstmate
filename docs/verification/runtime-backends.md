@@ -549,6 +549,21 @@ ok - unseeded path without --approve still prompts on Trust project folder?
 
 Portable launch-command coverage lives in `tests/jg-spawn-dispatch-profile.test.sh` (`test_pi_seeded_squad_lead_preapproves_project_trust`, `test_pi_worker_launch_omits_seeded_home_approve`, `test_pi_approve_probe_omits_unsupported_flag`).
 
+## Permission-prompt gate
+
+`bin/jg-prompt-gate.py` reads OpenCode's rendered "Access external directory" dialog, which is identical for a Read, a Write, and a bash `rm`, so it also reads the pending tool line above the dialog.
+Verified 2026-10-29 on OpenCode 1.18.25 with `opencode/glm-5.3-flash-free`, on a Squad Lead hand-restarted with `opencode --continue` and no launch grant.
+
+```sh
+JG_PROMPT_GATE_LIVE=1 bash tests/jg-prompt-gate-live-e2e.test.sh
+```
+
+```
+# opencode 1.18.25, model opencode/glm-5.3-flash-free
+ok - a hand-restarted lead's inbox read is approved, logged, and shown in the fleet view
+ok - a read outside the fleet's roots is a card and a wake, never an approval
+```
+
 ## Launch-prompt backstop signatures
 
 `bin/jg-busy-lib.sh`'s launch-prompt backstop (`jg_busy_launch_prompt_parked`) reclassifies a launch whose busy record is still pinned at the jg-spawn seed as `unknown launch-prompt`, rather than `busy jg-spawn`, when the captured pane matches that harness's own recognized trust, sign-in, or first-run dialog.

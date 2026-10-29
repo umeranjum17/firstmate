@@ -340,7 +340,8 @@ family_for_basename() {
     jg-pi-branch-live-e2e.test.sh|jg-pi-primary-live-e2e.test.sh|\
     jg-omp-primary-live-e2e.test.sh|jg-pr-state-live-e2e.test.sh|\
     jg-sessionstart-hook-live-e2e.test.sh|jg-supervision-host-live-e2e.test.sh|\
-    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-inbox-doorbell-live-e2e.test.sh)
+    jg-quota-array-dispatch-live-e2e.test.sh|jg-send-inbox-doorbell-live-e2e.test.sh|\
+    jg-prompt-gate-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
     jg-backend-tmux-smoke.test.sh|jg-control.test.sh|jg-send-inbox.test.sh|\

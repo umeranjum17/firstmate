@@ -14,10 +14,12 @@ Only OpenCode's "Access external directory" dialog can approve, verified live on
 dialog is identical for Read, Write and a bash rm, so the call it serves is
 read off the screen above it: the one pending tool line must be a Read, and the
 whole current turn back to the last finished message footer must hold nothing
-but finished reads and thoughts. Every other shape is a card.
+but finished reads and thoughts, and no other call may be pending anywhere on
+screen. Every other shape is a card.
 OpenCode wraps a long path over several lines and may have dropped a space at
 each break, so every reading of each wrap is tried: each reading that exists
-must resolve (symlinks and .. followed) inside a root, and the dialog
+must resolve (symlinks and .. followed) inside a root with no hidden or
+credential-like part below that root, and the dialog
 directory must be the read's own directory. One unprovable step is a card.
 """
 import itertools
@@ -27,7 +29,7 @@ import sys
 
 PANEL = "┃"
 WIDE = 12  # deeper text on a line is OpenCode's sidebar, not dialog content
-CREDENTIAL = re.compile(r"^\.env|credential|secret|token|password|^auth\.json$|\.pem$|\.key$|^\.ssh$|^\.gnupg$|^\.netrc$", re.I)
+CREDENTIAL = re.compile(r"^\.env|credential|secret|token|password|api.?key|^auth\.json$|^id_|\.pem$|\.key$|\.p12$|\.pfx$|\.jks$|^\.ssh$|^\.gnupg$|^\.netrc$", re.I)
 
 
 def split(line):
@@ -119,6 +121,7 @@ def opencode(lines, roots):
 
     # The rest of this step, up to the footer of the message before it: every
     # call above that footer had finished before this step began.
+    head = k
     for k in range(k - 1, -2, -1):
         if k < 0:
             return card("start of the turn is not visible", shown)
@@ -131,6 +134,12 @@ def opencode(lines, roots):
         if tool and not (tool.groups() == ("→", "Read") or (tool.group(1) == "+" and tool.group(2).startswith("Thought"))):
             return card("another tool call is in this turn", shown)
 
+    # Model text can forge that footer and end the scan early, so a call still
+    # pending anywhere on screen is a card too.
+    for j, (panel, _, text, _) in enumerate(rows[:top]):
+        if j != head and not panel and (re.match(r"^[⠀-⣿] ", text) or text.startswith(("$ ", "← "))):
+            return card("another call is pending on screen", shown)
+
     existing = [t for t in targets if os.path.exists(t)]
     if not existing:
         return card("read path does not exist", shown)
@@ -142,8 +151,10 @@ def opencode(lines, roots):
         real = os.path.realpath(t)
         if any(CREDENTIAL.search(part) for part in real.split(os.sep)):
             return card("credential-like path", real)
-        label = next((lab for lab, kind, root in roots if inside(real, kind, root)), None)
+        label = next((lab for lab, kind, root in roots if admits(real, kind, root)), None)
         if label is None:
+            if any(inside(real, kind, root) for _, kind, root in roots):
+                return card("hidden or credential-like path", real)
             return card("outside this fleet's own roots", real)
         labels.add(label)
     return ("approve", ",".join(sorted(labels)), shown, prompt)
@@ -158,6 +169,14 @@ def inside(real, kind, root):
     return os.path.dirname(real) == directory and re.fullmatch(re.escape(task) + r"\.[A-Za-z0-9_-]+", os.path.basename(real)) is not None
 
 
+def admits(real, kind, root):
+    """Inside the root, and nothing below it is hidden or credential-like."""
+    if not inside(real, kind, root):
+        return False
+    below = os.path.relpath(real, root) if kind == "dir" else os.path.basename(real)
+    return not any(p.startswith(".") and p != "." or CREDENTIAL.search(p) for p in below.split(os.sep))
+
+
 def parse_roots(args):
     roots = []
     for flag, value in zip(args[::2], args[1::2]):
@@ -169,6 +188,9 @@ def parse_roots(args):
             path = os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
         else:
             path = os.path.realpath(path)
+        # A corrupt record naming / or the user's home would admit almost anything.
+        if kind == "dir" and inside(os.path.realpath(os.path.expanduser("~")), "dir", path):
+            raise ValueError(f"root too broad {flag} {value}")
         roots.append((label, kind, path))
     if len(args) % 2:
         raise ValueError("odd root arguments")

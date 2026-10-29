@@ -89,6 +89,11 @@
 #                          busy form is a report only: the message stays owed and
 #                          its doorbell rings on the first non-busy poll, so it
 #                          needs no interrupt
+#   stale: <window> (permission prompt: <prompt>; path <path>; not auto-approved: <why>; card <key>)
+#                          a worker or squad_lead pane shows a permission or trust
+#                          prompt that bin/jg-prompt-gate-lib.sh did not approve;
+#                          reported once per prompt, at first sight, with its board
+#                          card (prompt_gate_check)
 #   stale: <window> (pane vanished, state pruned: no task record owns it and
 #   the backend confirms it is gone)
 #                          a vanished pane's orphaned per-pane markers were
@@ -2247,10 +2252,12 @@ captain_call_stale_bound() {  # <window-key> <task>
 # prompt_gate_check: a pane parked on a permission or trust prompt is stuck at
 # once, never left to the wedge timer, and a squad_lead's idle exemption does
 # not cover it. bin/jg-prompt-gate-lib.sh owns the verdict. An approval is
-# re-proved on a fresh capture before Enter is sent, logged, and silent; the
-# same prompt still on screen within a minute of it means the answer did not
-# take, so it becomes a card. Every card is posted and woken once per prompt.
-# Returns 0 while the pane shows a prompt, so the caller skips the stale path.
+# re-proved on a fresh capture and logged before Enter is sent, and is silent;
+# the same prompt still on screen within a minute of it means the answer did
+# not take, so it becomes a card, which then stays that prompt's answer. Every
+# card is posted and woken once per prompt.
+# Returns 0 only after an approval, so the caller skips the stale path for that
+# poll; a pane left on a carded prompt keeps the ordinary stale path.
 prompt_gate_check() {  # <window> <task> [tail40]
   local w=$1 task=$2 harness backend label key mf meta verdict again h reason card
   local _r path prompt
@@ -2273,26 +2280,28 @@ prompt_gate_check() {  # <window> <task> [tail40]
   fi
   h=$(printf '%s' "$verdict" | hash_pane)
   IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
+  [ "$(cat "$mf" 2>/dev/null)" != "card:$h" ] || return 1
   if [ "${verdict%%$'\t'*}" = approve ]; then
     if [ "$(cat "$mf" 2>/dev/null)" = "approved:$h" ] && [ "$(age_of "$mf")" -lt 60 ]; then
-      verdict=$(printf 'card\tan approval sent under a minute ago did not take\t%s\t%s' "$path" "$prompt")
+      _r="an approval sent under a minute ago did not take"
     else
-      watcher_capture "$backend" "$w" 200 "$label" || return 0
+      watcher_capture "$backend" "$w" 200 "$label" || return 1
       again=$(printf '%s' "$WATCHER_CAPTURE" | jg_prompt_gate_verdict "$harness" "$JG_HOME" "$STATE" "$CONFIG" "$task" "$meta")
-      [ "$again" = "$verdict" ] || return 0
-      if jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
+      [ "$again" = "$verdict" ] || return 1
+      # ponytail: the re-proof and Enter are two tmux calls, so a dialog
+      # replaced within that one round trip gets the Enter; tmux has no atomic
+      # capture-and-send, and this is the shortest window it allows.
+      if ! jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt"; then
+        _r="the approval record could not be written"
+      elif jg_backend_send_key "$backend" "$w" Enter "$label" >/dev/null 2>&1; then
         printf 'approved:%s' "$h" > "$mf"
-        jg_prompt_gate_log "$STATE" "$task" "$w" "$harness" "$_r" "$path" "$prompt" \
-          || triage_log "prompt approval log write failed: $w $path"
         triage_log "approved permission prompt ($_r): $w $path"
         return 0
+      else
+        _r="sending the approval key failed after it was logged"
       fi
-      verdict=$(printf 'card\tsending the approval key failed\t%s\t%s' "$path" "$prompt")
     fi
-    h=$(printf '%s' "$verdict" | hash_pane)
-    IFS=$'\t' read -r _ _r path prompt <<< "$verdict"
   fi
-  [ "$(cat "$mf" 2>/dev/null)" != "card:$h" ] || return 0
   card=$(SIGN_OFF_FILER=juggernaut-watch jg_prompt_gate_card "$task" "$w" "$_r" "$path" "$prompt" "$h") || card="not posted (sign-off-axi refused or is missing)"
   printf 'card:%s' "$h" > "$mf"
   reason="stale: $w (permission prompt: $prompt; path $path; not auto-approved: $_r; card $card)"
