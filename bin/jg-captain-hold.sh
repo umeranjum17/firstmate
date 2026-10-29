@@ -30,6 +30,7 @@
 #   jg-captain-hold.sh binding <source-id>
 #   jg-captain-hold.sh complete <origin-id> (--none | <task-id>...)
 #   jg-captain-hold.sh verify <origin-id>
+#   jg-captain-hold.sh settle <task-id>
 #   jg-captain-hold.sh answered <task-id>
 #   jg-captain-hold.sh open <task-id> [--identity] [--distinguish-absent]
 #   jg-captain-hold.sh diverged
@@ -57,6 +58,8 @@
 # `complete` and `verify` check. The reason may hold parentheses and line breaks:
 # tasks-axi refuses them, so `hold` escapes them where it writes the reason and
 # readers decode them (bin/jg-hold-reason-lib.sh owns the encoding).
+# A reason that names an upcoming YYYY-MM-DD date without `--until` is refused
+# (exit 2): prose releases nothing (bin/jg-hold-release-lib.sh owns the rule).
 # `--until` records the captain's own deferral date through `tasks-axi hold
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
@@ -202,6 +205,9 @@
 # the task's last status line - and on a 0 bounds repeated alarms from new pane
 # hashes for the decision.
 #
+# `settle` is run by bin/jg-tasks-axi.sh after every `done`/`close`: a closed
+# task whose captain hold was never answered publishes the `resolved` parent
+# line for its hold, so a closed task cannot stay open on the parent channel.
 # `answered` is the read-only predicate bin/jg-tasks-axi.sh asks before it lets a
 # `[captain-ask]` row leave the backlog: exit 0 when the task body carries a
 # recorded captain answer (an evidence-only `reconciled` record or an open hold-set stamp does not count),
@@ -280,6 +286,9 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 # shellcheck source=bin/jg-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/jg-parent-channel-lib.sh"
+# shellcheck source=bin/jg-hold-release-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/jg-hold-release-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -984,6 +993,7 @@ command_hold() {
       *) fail "--until must be a YYYY-MM-DD date: $until" ;;
     esac
   fi
+  jg_hold_reason_guard "$reason" "$until" || exit 2
   hold_set=${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   case "$hold_set" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) : ;;
@@ -2063,6 +2073,22 @@ EOF
   done
 }
 
+# A captain-held task closed without an answer (a plain `tasks-axi done`, cancelled
+# or void) must not leave its parent decision open. Publishes the matching
+# `resolved` line for a closed task whose hold was never answered. A no-op for
+# any other task and in a main home.
+command_settle() {  # <task-id>
+  local show body
+  [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+  task_show "$1" || return 0
+  show=$TASK_SHOW_OUTPUT
+  [ "$(show_field "$show" state)" = "done" ] || return 0
+  [ "$(show_field_value "$show" hold_kind)" = captain ] || return 0
+  body=$(show_field "$show" body)
+  [ -n "$(body_hold_set_timestamp "$(decode_shown_value "$body")")" ] || return 0
+  publish_parent_hold "$1" "$(( $(resolution_record_count "$body") + 1 ))" resolved "closed without an answer"
+}
+
 command_answered() {  # <task-id>
   local show body
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
@@ -2157,6 +2183,7 @@ case "${1:-}" in
   binding) shift; command_binding "$@" ;;
   complete) shift; command_complete "$@" ;;
   verify) shift; command_verify "$@" ;;
+  settle) shift; command_settle "$@" ;;
   answered) shift; command_answered "$@" ;;
   open) shift; command_open "$@" ;;
   diverged) shift; command_diverged "$@" ;;

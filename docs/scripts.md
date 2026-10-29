@@ -38,6 +38,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`jg-backlog-handoff.sh`](../bin/jg-backlog-handoff.sh) | Move queued backlog items into a Squad Lead home; its header owns route-specific wake outcomes and retries |
 | `jg-backlog-receive.sh`  | Idempotently ingest one confined remote handoff outbox through tasks-axi             |
 | `jg-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
+| `jg-hold-sweep.sh`       | Release holds whose date or waited-on work has closed, and flag asks left unanswered past the stale-ask threshold |
+| `jg-hold-release-lib.sh` | Hold-time rules: refuse an upcoming date without `--until`, and store `--waits-on` refs |
 | `jg-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto jg-captain-hold.sh |
 | `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest prints, refusing an entry with no owner words, no scope, or no enforcement point |
 | `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it; `--route <lead>` names the lead that owns the answer |

@@ -154,6 +154,15 @@
 #                          both re-fired every JG_PROMPT_REALERT_SECS while it
 #                          holds (ready_backlog_stall_state owns the condition;
 #                          addons/wait-timers/README.md owns the rungs)
+#   check: hold released: <id> (<why>), ...
+#                          a non-captain hold reached its --until date or its
+#                          [waits-on=REF] ref closed and was released
+#                          (bin/jg-hold-sweep.sh holds, every CHECK_INTERVAL)
+#   check: stale ask, no answer for over <N>h: <task> <verb> <age>h: <note>; ...
+#                          blocked or needs-decision records still open after
+#                          config/stale-ask-hours (default 4), raised again each
+#                          window until answered (bin/jg-hold-sweep.sh asks,
+#                          every HEARTBEAT, independent of its backoff)
 #   check: ask-default safe default applied while the captain was unreachable: <ids> ...
 #                          the juggernaut-addons ask-default add-on, when installed,
 #                          applied the recorded safe default of each named ask
@@ -4252,6 +4261,27 @@ EOF
       reason=$READY_WORK_REASON
       jg_wake_append check ready-work "$reason" || exit 1
       record_ready_work_surfaced
+      wake "$reason"
+    fi
+  fi
+
+  # Holds that name a date or a ref release themselves and wake this home's
+  # Overwatch (bin/jg-hold-sweep.sh owns the release rules).
+  if [ "$(age_of "$STATE/.last-hold-sweep")" -ge "$CHECK_INTERVAL" ]; then
+    touch "$STATE/.last-hold-sweep"
+    if reason=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" holds 2>/dev/null); then
+      jg_wake_append check hold-release "$reason" || exit 1
+      wake "$reason"
+    fi
+  fi
+
+  # A blocked or needs-decision record nobody answered for config/stale-ask-hours
+  # reaches Overwatch again, at the base heartbeat cadence (never its backoff).
+  if [ "$(age_of "$STATE/.last-stale-ask-check")" -ge "$HEARTBEAT" ]; then
+    touch "$STATE/.last-stale-ask-check"
+    if reason=$(JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks 2>/dev/null); then
+      jg_wake_append check stale-ask "$reason" || exit 1
+      JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE JG_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/jg-hold-sweep.sh" asks --record >/dev/null 2>&1 || true
       wake "$reason"
     fi
   fi

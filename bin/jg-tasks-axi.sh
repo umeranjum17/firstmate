@@ -66,6 +66,12 @@
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
 #     (JG_TASK_PRIORITY_CHECK overrides the path); when it is not installed this
 #     does nothing.
+#   - `hold` whose reason names an upcoming YYYY-MM-DD date without --until,
+#     since prose releases nothing; and `hold --waits-on task:<id>|pr:<url>|
+#     key:<slug>` on a captain-kind hold or with a malformed ref. A valid
+#     --waits-on is stored as a "[waits-on=REF]" reason token, which
+#     bin/jg-hold-sweep.sh reads to release the hold when the ref closes
+#     (bin/jg-hold-release-lib.sh owns the rules).
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
@@ -287,6 +293,11 @@ case "${1:-}" in
     ;;
 esac
 CLOSE_NOTE_ARGS=()
+# shellcheck source=bin/jg-hold-release-lib.sh disable=SC1091
+. "$SCRIPT_DIR/jg-hold-release-lib.sh"
+case "${1:-}" in
+  hold) jg_hold_rewrite_args || exit 2 ;;
+esac
 captain_guard ${ARGS[@]+"${ARGS[@]}"}
 if [ "${#CLOSE_NOTE_ARGS[@]}" -gt 0 ]; then
   case " ${ARGS[*]} " in *" --note "*) ;; *) ARGS+=("${CLOSE_NOTE_ARGS[@]}") ;; esac
@@ -296,6 +307,14 @@ case "${1:-}" in
     set -o pipefail
     tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
     exit $?
+    ;;
+esac
+case "${1:-}" in
+  done|close)
+    tasks-axi ${ARGS[@]+"${ARGS[@]}"} || exit $?
+    # A closed captain call must not stay open on the parent channel.
+    "$SCRIPT_DIR/jg-captain-hold.sh" settle "${ARGS[1]:-}" >/dev/null 2>&1 || true
+    exit 0
     ;;
 esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

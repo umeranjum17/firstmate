@@ -731,6 +731,8 @@ test_squad_lead_no_projects_charter() {
     "squad_lead charter did not close a quietly ended routed-work phase"
   assert_grep 'use the same key on its later' "$brief" \
     "squad_lead charter did not supersede working phases with later states"
+  assert_grep 'Decide asks that are free, reversible, and inside this charter yourself' "$brief" \
+    "squad_lead charter lost the rule that a lead decides free reversible in-scope asks"
   if grep -nE '^-[[:space:]]*$' "$brief" >/dev/null; then
     fail "project-less charter left a stray empty project bullet"
   fi

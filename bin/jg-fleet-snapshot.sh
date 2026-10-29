@@ -1091,8 +1091,14 @@ squad_lead_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
             name:(($work.title // null) | if . == null then null else trunc(70) end),
             source:.current_state.source,
             doing:((.current_state.detail // "") | trunc(120))} ]) as $active_all
+    | ([ $backlog.records[]? | select(.structured and .state == "done") | .id ]) as $done_ids
     | ($captain_holds_all
-       + ([ $tasks[] as $t | ($t.hints.open_decisions // [])[]
+       + ([ $tasks[] as $t | select($done_ids | index($t.id) | not)
+            | ($t.hints.open_decisions // [])[]
+            # A decision about a task the backlog has closed is not open: neither
+            # the closed task itself, nor a captain-hold relay naming it.
+            | select((.key | capture("^captain-hold-(?<id>.+)-[0-9]+$")?.id // "") as $held
+                     | $done_ids | index($held) | not)
             | {id:$t.id,key,verb,summary:(.summary | trunc(160)),reason:null,source:"status"} ])) as $decisions_all
     | ([ $queued_all[]
          | select((.unresolved_blocker_ids | length) > 0 or (.hold_reason != null and .hold_kind != null))

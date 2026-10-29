@@ -1147,6 +1147,14 @@ When the file is absent, worker launches do not add a board address and retain t
 Malformed or unreadable values refuse the launch before the worker starts.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
 
+## Holds and asks that clear themselves (config/stale-ask-hours)
+
+The watcher runs `bin/jg-hold-sweep.sh` on its check cadence in every home, so a hold or an unanswered ask cannot sit unnoticed.
+A non-captain hold releases and wakes this home's Overwatch when its `--until` date arrives or when the task, PR, or status key named by `--waits-on` closes; a captain hold is never released this way.
+A hold reason that names an upcoming date without `--until` is refused when the hold is made.
+The optional local, gitignored `config/stale-ask-hours` holds one positive integer, default 4: a `blocked` or `needs-decision` record still open that long raises a check wake, again each window until it is answered or escalated.
+The script header owns the exact rules.
+
 ## Lane floor (config/lane-target)
 
 The optional local, gitignored `config/lane-target` holds one positive integer: the number of open lanes this home keeps working while ready backlog work exists.

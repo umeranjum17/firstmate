@@ -422,6 +422,7 @@ portable_parallel_weight_hints() {
 tests/jg-brief.test.sh 10594
 tests/jg-captain-hold-lifecycle.test.sh 343658
 tests/jg-crew-state.test.sh 82058
+tests/jg-hold-sweep.test.sh 32594
 tests/jg-pr-merge.test.sh 300199
 tests/jg-x-mode.test.sh 29896
 EOF
