@@ -15,5 +15,6 @@ for _ in 1 2 3 4 5 6; do "$REPO/addons/model-gate/bin/jg-model-gate" opencode >>
 wait
 cp "$T/oc/opencode.json" "$OUT/after.json"
 { echo "bytes: $(wc -c <"$T/oc/opencode.json")"; jq -c . "$T/oc/opencode.json"; echo "leftover lock/tmp files: $(find "$T/oc" \( -name '*.lock' -o -name '*.tmp.*' \) | wc -l)"; } | tee "$OUT/result.txt"
+jq -n --arg v "$(git -C "$REPO" rev-parse --short HEAD)" --arg r "$(jq -c . "$T/oc/opencode.json")" '{target: {version: $v}, start: "an opencode.json with a deepseek provider and no whitelist, and an allow-list naming m1", steps: ["start six jg-model-gate opencode runs at the same moment", "wait for all six to finish"], result: ("opencode.json is valid JSON with the whitelist set: " + $r)}' >"$OUT/steps.json"
 jq -e '.provider.deepseek.whitelist == ["m1"] and .plugin == ["keep-me"]' "$T/oc/opencode.json" >/dev/null &&
   [ "$(find "$T/oc" \( -name '*.lock' -o -name '*.tmp.*' \) | wc -l)" -eq 0 ]
