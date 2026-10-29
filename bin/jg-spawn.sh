@@ -4959,7 +4959,7 @@ if [ "$KIND" = squad_lead ]; then
       ;;
     esac
     case "$HARNESS" in
-    claude*) rm -f "$WT/.jg-busy-stop" ;;
+    claude*) rm -f "$WT/.jg-busy-stop" "$WT/.fm-busy-stop" ;;
     esac
   fi
 fi
@@ -5039,6 +5039,7 @@ BUSY_GEN=
         printf 'id=%s\n' "$ID"
         printf 'gen=%s\n' "$BUSY_GEN"
       } >"$WT/.jg-busy-stop"
+      rm -f "$WT/.fm-busy-stop"
       exclude_path '.jg-busy-stop'
     else
       stop_turnend=
