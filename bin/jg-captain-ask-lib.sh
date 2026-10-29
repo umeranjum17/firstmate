@@ -19,6 +19,9 @@ guard_captain_ask() {  # <id>
   captain_ask_row "$1"
   [ -n "$CAPTAIN_ASK_SHOW" ] || return 0
   "$SCRIPT_DIR/jg-captain-hold.sh" answered "$1" && return 0
+  # A Recon delivers its report instead of an answer or a PR.
+  if printf '%s\n' "$CAPTAIN_ASK_SHOW" | grep -q "^  links: .*report:data/$1/report\.md" \
+    && [ -s "$DATA/$1/report.md" ]; then return 0; fi
   for pr in $(printf '%s\n' "$CAPTAIN_ASK_SHOW" | sed -n 's/^  links: //p' | grep -o 'pr:[^" ,]*' | sed 's/^pr://'); do
     [ "$(gh pr view "$pr" --json state -q .state 2>/dev/null)" = MERGED ] && return 0
   done

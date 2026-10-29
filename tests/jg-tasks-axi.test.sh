@@ -299,6 +299,12 @@ EOF
   wrapper_from_code "$dir" update ca-2 --pr https://github.com/o/r/pull/2 >/dev/null
   (PATH="$bin:$PATH" wrapper_from_code "$dir" "done" ca-2 >/dev/null 2>&1) || fail "done with a merged PR among several links was refused"
   wrapper_from_code "$dir" rm plain-1 >/dev/null 2>&1 || fail "an untagged item was refused"
+  wrapper_from_code "$dir" add recon-1 "[captain-ask] recon" >/dev/null
+  wrapper_from_code "$dir" update recon-1 --report data/recon-1/report.md >/dev/null
+  (cd "$dir/home" && tasks-axi "done" recon-1 --no-prune >/dev/null)
+  expect_captain_refusal "$dir" recon-1 rm recon-1
+  mkdir -p "$dir/home/data/recon-1" && echo findings > "$dir/home/data/recon-1/report.md"
+  wrapper_from_code "$dir" rm recon-1 >/dev/null 2>&1 || fail "a done Recon with its report was refused"
   pass "jg-tasks-axi.sh keeps [captain-ask] items until answered or merged and leaves other items alone"
 }
 
