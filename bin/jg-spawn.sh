@@ -694,6 +694,30 @@ fi
 if ! KEEP_AI_TRAILERS=$(jg_config_source_present "$CONFIG/keep-ai-trailers"); then
   exit 1
 fi
+# Token saver (docs/configuration.md "Token saver"): unless config/token-saver-off
+# is present, Claude launches keep the globally installed ponytail plugin off,
+# run the learn-from-mistakes poll guard in report-only mode, and cap Bash output
+# at config/bash-output-max when this home sets it. The off switch drops all three.
+if ! TOKEN_SAVER_OFF=$(jg_config_source_present "$CONFIG/token-saver-off"); then
+  exit 1
+fi
+BASH_OUTPUT_MAX=
+if [ "$TOKEN_SAVER_OFF" = 0 ] && [ -f "$CONFIG/bash-output-max" ]; then
+  BASH_OUTPUT_MAX=$(tr -d '[:space:]' <"$CONFIG/bash-output-max")
+  case "$BASH_OUTPUT_MAX" in
+    [1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]|1[0-4][0-9][0-9][0-9][0-9]|150000) ;;
+    *)
+      echo "error: config/bash-output-max must hold one whole number from 1000 to 150000" >&2
+      exit 1
+      ;;
+  esac
+fi
+# The settings keys, without surrounding commas; empty when the switch is off.
+CLAUDE_TOKEN_KEYS=
+if [ "$TOKEN_SAVER_OFF" = 0 ]; then
+  CLAUDE_TOKEN_KEYS='"enabledPlugins":{"ponytail@ponytail":false}'
+  [ -z "$BASH_OUTPUT_MAX" ] || CLAUDE_TOKEN_KEYS="$CLAUDE_TOKEN_KEYS,\"env\":{\"BASH_MAX_OUTPUT_LENGTH\":\"$BASH_OUTPUT_MAX\"}"
+fi
 SUB_HOME_MARKER=".jg-squad-lead-home"
 if [ -e "$STATE" ] || [ -L "$STATE" ]; then
   jg_backlog_directory_present "$STATE" "state directory" || {
@@ -3076,6 +3100,16 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+# The learn-from-mistakes poll guard hook file when the installed package has
+# one (0.12.0 and later); nonzero otherwise, so the guard is simply absent.
+lfm_poll_guard_path() {
+  local bin guard
+  bin=$(command -v learn-from-mistakes-axi 2>/dev/null) || return 1
+  guard=$(perl -MCwd=abs_path -e 'my $b = abs_path(shift) // exit 1; $b =~ s{/[^/]+/[^/]+$}{}; print "$b/src/tokens/poll.mjs"' "$bin") || return 1
+  [ -f "$guard" ] || return 1
+  printf '%s\n' "$guard"
+}
+
 # rovo confines every file-tool operation (open_files, create_file, grep, ...)
 # to its worktree by default; toolPermissions.allowedExternalPaths
 # (~/.rovo/config.yml) is the only lift, and it must be granted at launch
@@ -5078,12 +5112,22 @@ BUSY_GEN=
       j_stop=$(json_escape "${stop_turnend}$busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
       stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\"}]}],"
     fi
-    hooks_json="\"hooks\":{\"UserPromptSubmit\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_submit\"}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
+    # The learn-from-mistakes poll guard (0.12.0+) runs report-only: its deny
+    # output is discarded, so a would-be block is only logged to its
+    # fired.jsonl for `learn-from-mistakes-axi tokens guard status`. It is
+    # absent when the token saver is off or the installed package has no guard.
+    guard_entries=
+    if [ "$TOKEN_SAVER_OFF" = 0 ] && poll_guard=$(lfm_poll_guard_path); then
+      j_guard=$(json_escape "node $(shell_quote "$poll_guard") >/dev/null 2>&1 || true")
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"Bash|Edit|Write|MultiEdit|NotebookEdit\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\"}]}],\"SessionStart\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\"}]}],"
+    fi
+    hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_submit\"}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = squad_lead ]; then
       session_keys='"feedbackDrafts":"off",'
       if [ "$KEEP_AI_TRAILERS" != 1 ]; then
         session_keys='"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false},'
       fi
+      [ -z "$CLAUDE_TOKEN_KEYS" ] || session_keys="$session_keys$CLAUDE_TOKEN_KEYS,"
       printf '{%s%s}\n' "$session_keys" "$hooks_json" >"$STATE_REAL/$ID.claude-settings.json"
     else
       mkdir -p "$WT/.claude"
@@ -5761,11 +5805,12 @@ case "$LAUNCH" in
   if [ "$KIND" = squad_lead ]; then
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$(shell_quote "$STATE_REAL/$ID.claude-settings.json")}
   else
-    claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION__}'"
+    claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION____CLAUDETOKENKEYS__}'"
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$claude_settings}
   fi
   ;;
 esac
+LAUNCH=${LAUNCH//__CLAUDETOKENKEYS__/${CLAUDE_TOKEN_KEYS:+,$CLAUDE_TOKEN_KEYS}}
 if [ "$KEEP_AI_TRAILERS" = 1 ]; then
   LAUNCH=${LAUNCH//__CLAUDEATTRIBUTION__/}
 else

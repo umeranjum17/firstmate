@@ -1729,7 +1729,7 @@ test_claude_forwards_juggernaut_config_dir_when_set() {
   status=$?
   expect_code 0 "$status" "claude spawn with CLAUDE_CONFIG_DIR set should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}'" \
+  assert_contains "$launch" "CLAUDE_CONFIG_DIR='$CASE_DIR/claude-work' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions $(claude_worker_add_dirs "$HOME_DIR" "$id")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false},\"enabledPlugins\":{\"ponytail@ponytail\":false}}'" \
     "claude launch did not forward juggernaut's CLAUDE_CONFIG_DIR to the operator pane"
   pass "claude forwards juggernaut's CLAUDE_CONFIG_DIR so the operator uses the same credential store"
 }
@@ -1968,6 +1968,64 @@ test_claude_squad_lead_launch_carries_the_attribution_policy() {
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy "$launch" "claude squad_lead"
   pass "a claude squad_lead launch carries the attribution-off policy too"
+}
+
+# Token saver (docs/configuration.md "Token saver"): ponytail stays off by
+# default, config/bash-output-max adds the Bash output cap, a value out of range
+# stops the launch, and config/token-saver-off drops every token key.
+test_claude_token_saver_settings() {
+  local rec id sm out status settings
+  id=profile-claude-token-saver-z41
+  rec=$(make_spawn_case profile-claude-token-saver claude "$id")
+  read_case_record "$rec"
+  printf '8000\n' > "$HOME_DIR/config/bash-output-max"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "claude spawn with config/bash-output-max should succeed"$'\n'"$out"
+  settings=$(claude_settings_json_arg "$(cat "$LAUNCH_LOG")")
+  printf '%s' "$settings" | jq -e '.enabledPlugins == {"ponytail@ponytail":false} and .env == {"BASH_MAX_OUTPUT_LENGTH":"8000"}' >/dev/null \
+    || fail "the claude launch settings lack the token saver keys: $settings"
+  pass "a claude launch keeps ponytail off and carries this home's Bash output cap"
+
+  id=profile-claude-token-saver-sm-z42
+  rec=$(make_spawn_case profile-claude-token-saver-sm claude "$id")
+  read_case_record "$rec"
+  printf '8000\n' > "$HOME_DIR/config/bash-output-max"
+  sm="$CASE_DIR/squad-lead-home"
+  make_seeded_squad_lead_home "$sm" "$id"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$sm" --squad-lead)
+  status=$?
+  expect_code 0 "$status" "squad_lead claude spawn should succeed"$'\n'"$out"
+  settings=$(claude_settings_json_arg "$(cat "$LAUNCH_LOG")")
+  printf '%s' "$settings" | jq -e '.enabledPlugins == {"ponytail@ponytail":false} and .env == {"BASH_MAX_OUTPUT_LENGTH":"8000"} and (.hooks | has("UserPromptSubmit"))' >/dev/null \
+    || fail "the squad_lead settings file lacks the token saver keys: $settings"
+  [ ! -e "$sm/config/bash-output-max" ] || fail "config/bash-output-max must stay a one-home trial, not be inherited"
+  pass "a claude squad_lead's settings file carries the token saver keys, and the cap is not inherited"
+
+  id=profile-claude-token-saver-bad-z43
+  rec=$(make_spawn_case profile-claude-token-saver-bad claude "$id")
+  read_case_record "$rec"
+  printf '200000\n' > "$HOME_DIR/config/bash-output-max"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an out-of-range config/bash-output-max must stop the launch"
+  assert_contains "$out" "config/bash-output-max must hold one whole number from 1000 to 150000" \
+    "an out-of-range cap did not name the problem"
+  pass "an out-of-range config/bash-output-max stops the launch with the reason"
+
+  id=profile-claude-token-saver-off-z44
+  rec=$(make_spawn_case profile-claude-token-saver-off claude "$id")
+  read_case_record "$rec"
+  printf '8000\n' > "$HOME_DIR/config/bash-output-max"
+  : > "$HOME_DIR/config/token-saver-off"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "claude spawn with config/token-saver-off should succeed"$'\n'"$out"
+  settings=$(claude_settings_json_arg "$(cat "$LAUNCH_LOG")")
+  printf '%s' "$settings" | jq -e '(has("enabledPlugins") | not) and (has("env") | not) and .feedbackDrafts == "off"' >/dev/null \
+    || fail "config/token-saver-off left token saver keys in the launch settings: $settings"
+  pass "config/token-saver-off drops the ponytail override and the Bash output cap"
 }
 
 test_active_dispatch_profile_does_not_block_squad_lead_launch() {
@@ -2344,7 +2402,7 @@ claude_expected_launch() {  # <launch> <home> <id> <permission-flag>
   [ "$(printf '%s' "$doorbell" | "$ROOT/bin/jg-operational-input.sh" doorbell-kind)" = launch-brief ] \
     || doorbell="not a launch-brief doorbell"
   quoted="'$(printf '%s' "$doorbell" | sed "s/'/'\\\\''/g")'"
-  printf '%s' "export GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true; export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(jg_test_launch_git_prefix "$1")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
+  printf '%s' "export GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true; export COMPACT_ADVISER_DISABLE=1; $(task_inbox_export "$2" "$3")$(jg_test_launch_git_prefix "$1")env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude $4 $(claude_worker_add_dirs "$2" "$3")--settings '{\"feedbackDrafts\":\"off\",\"attribution\":{\"commit\":\"\",\"pr\":\"\",\"sessionUrl\":false},\"enabledPlugins\":{\"ponytail@ponytail\":false}}' $CLAUDE_CONTROL_CHANNEL_FLAG $quoted"
 }
 
 test_claude_permission_mode_bypass_matches_absent_launch() {
@@ -2548,6 +2606,7 @@ test_claude_squad_lead_launch_omits_task_control_channel_authority
 test_claude_long_launch_is_delivered_intact
 test_claude_operator_launch_carries_the_attribution_policy
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
+test_claude_token_saver_settings
 test_keep_ai_trailers_reaches_squad_lead_crew_launches
 test_claude_squad_lead_launch_carries_the_attribution_policy
 test_active_dispatch_profile_does_not_block_squad_lead_launch
