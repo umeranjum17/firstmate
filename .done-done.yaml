@@ -21,6 +21,8 @@ journeys:
     command: bash journeys/demo-call-gate.sh
   nav-removal-gate:
     command: bash journeys/nav-removal-gate.sh
+  captain-close-gate:
+    command: bash journeys/captain-close-gate.sh
   stuck-question-replay:
     command: bash journeys/stuck-question-replay.sh
   worker-no-ask-tool:
