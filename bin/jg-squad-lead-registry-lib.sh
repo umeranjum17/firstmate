@@ -29,6 +29,15 @@ SQUAD_LEAD_REGISTRY_MATCH_REMOTE=0
 SQUAD_LEAD_REGISTRY_ERROR=
 
 squad_lead_registry_lock_path() { printf '%s/.squad-lead-registry.lock\n' "$1"; }
+
+# Dormant lead (bin/jg-squad-lead-dormant.sh): the sweep's record says the lead
+# is stopped with no open work. Its home, backlog, lease and records all stay.
+squad_lead_dormant_record() { printf '%s/.squad-lead-dormant-%s\n' "$1" "$2"; }
+squad_lead_dormant() {  # <state-dir> <id>
+  local rec
+  rec=$(squad_lead_dormant_record "$1" "$2")
+  [ -f "$rec" ] && [ "$(awk 'NR == 1 { print $1 }' "$rec" 2>/dev/null)" = dormant ]
+}
 squad_lead_reply_lifecycle_lock_path() { printf '%s/.remote-reply-lifecycle-%s.lock\n' "$1" "$2"; }
 
 squad_lead_registry_parse_line() {

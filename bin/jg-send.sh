@@ -570,6 +570,14 @@ fi
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
 [ -z "$TARGET_META" ] || jg_parked_refuse_meta "$TARGET_META" "$TARGET_TASK_ID" send || exit 1
 
+# Dormant-lead wake (bin/jg-squad-lead-dormant.sh): routed work relaunches a
+# stopped lead before delivery. A wake that cannot relaunch leaves delivery and
+# recovery to the durable path below, never a second way to lose a send.
+if [ -n "$TARGET_TASK_ID" ]; then
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-squad-lead-dormant.sh" wake "$TARGET_TASK_ID" >/dev/null \
+    || echo "jg-send: dormant squad_lead $TARGET_TASK_ID could not be relaunched before delivery; the message still lands durably and liveness recovery relaunches the lead" >&2
+fi
+
 # Validate the answerer-closes request before any durable mutation or send: the
 # target must have a task ledger in THIS home, the send must carry an answer
 # message, and every named key must be open right now in that ledger per the

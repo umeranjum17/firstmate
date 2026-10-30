@@ -245,6 +245,9 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 # from identical evidence through an identical path.
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
+# Dormant-lead record reader: a stopped lead is not probed or relaunched here either.
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # jg-timing-lib.sh is inert unless JG_TIMING_LOG names a file, which only the
 # deferred network stage sets, so an ordinary bootstrap run records nothing.
 # shellcheck source=bin/jg-timing-lib.sh disable=SC1091
@@ -790,6 +793,10 @@ squad_lead_liveness_sweep() {
     # liveness probe and no session-start relaunch - one line names the skip.
     # No-op without the add-on checkout.
     jg_parked_skip_meta "$meta" "$id" bootstrap-liveness && continue
+    if squad_lead_dormant "$STATE" "$id"; then
+      echo "SQUAD_LEAD_LIVENESS: squad_lead $id: skipped: dormant with no open work"
+      continue
+    fi
     remote_host=$(jg_meta_get "$meta" remote_host)
     label=$id
     [ -z "$remote_host" ] || label="$id@$remote_host"

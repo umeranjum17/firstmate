@@ -342,6 +342,9 @@ _jg_alerts_lib=$(jg_addon_path "$JG_HOME" alerts/bin/jg-model-outage-lib.sh)
 _jg_wait_timers_lib=$(jg_addon_path "$JG_HOME" wait-timers/bin/jg-wait-timers-lib.sh)
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
+# Dormant-lead record reader: this tick skips a lead bin/jg-squad-lead-dormant.sh stopped.
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
 [ ! -r "$_jg_wait_timers_lib" ] || . "$_jg_wait_timers_lib"
 
@@ -1371,6 +1374,11 @@ squad_lead_liveness_tick() {
   local tick_marker="$STATE/.squad-lead-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SQUAD_LEAD_LIVENESS_SECS" ] || return 0
   touch "$tick_marker" || return 1
+  # Dormant rule first: settle the leads with no open work, then probe. A lead
+  # stopped in this same tick is skipped as dormant by the loop below rather
+  # than being relaunched straight back.
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-squad-lead-dormant.sh" sweep >/dev/null 2>&1 \
+    || triage_log "squad_lead dormant sweep reported a failure; the liveness tick continues"
   local now=$(( $(date +%s) )) meta id kind
   local bound_marker attempts notify_key reason queued err first_reason='' failed=0
   for meta in "$STATE"/*.meta; do
@@ -1380,6 +1388,10 @@ squad_lead_liveness_tick() {
     id=${meta##*/}
     id=${id%.meta}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
+    if squad_lead_dormant "$STATE" "$id"; then
+      triage_log "squad_lead $id liveness skipped: dormant with no open work (bin/jg-squad-lead-dormant.sh)"
+      continue
+    fi
     # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # liveness probe and no auto-relaunch - one triage line names the skip.
     # No-op without the add-on checkout.

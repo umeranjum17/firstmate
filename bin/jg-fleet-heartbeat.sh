@@ -28,7 +28,9 @@
 #          GAP      ready work with lanes free (working below the target, or
 #                   none working when no target is set), or an open wait;
 #          IDLE     no working lane and no ready work;
-#          MOVING   otherwise.
+#          MOVING   otherwise;
+#          DORMANT  stopped by bin/jg-squad-lead-dormant.sh with no open work;
+#                   it wakes when work is routed to it, so it is no gap.
 #        A remote Squad Lead is UNREAD, and a registered home that is not a
 #        directory is STALLED.
 # check  Prints one line per home that turns GAP or STALLED, again every
@@ -60,6 +62,10 @@ die() { printf 'jg-fleet-heartbeat: %s\n' "$1" >&2; exit "${2:-1}"; }
 home_row() {
   local id=$1 home=$2 st meta kind last working=0 target=- ready='?' waits=0 age why verdict
   [ -d "$home" ] || { printf '%s\tSTALLED\t0\t-\t?\t0\t-\thome %s is not a directory\n' "$id" "$home"; return; }
+  if [ "$id" != overwatch ] && squad_lead_dormant "$STATE" "$id"; then
+    printf '%s\tDORMANT\t0\t-\t-\t0\t-\tno open work; stopped, wakes on routed work\n' "$id"
+    return
+  fi
   st=$home/state
   for meta in "$st"/*.meta; do
     [ -f "$meta" ] || continue
