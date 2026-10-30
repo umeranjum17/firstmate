@@ -18,7 +18,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `jg-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
 | `jg-comms-feed.sh`       | Export every fleet message across Main and its Squad Lead homes as one read-only, live, append-only JSONL feed for a channel-style reader |
-| `jg-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
+| `jg-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view, including the Overwatch KPI scorecard |
 | `jg-fleet-heartbeat.sh`  | One no-model pass over this home and every local Squad Lead home: working lanes against the lane target, ready backlog, open waits and supervision age, as a MOVING, IDLE, GAP or STALLED verdict per home; bootstrap arms it on a primary home unless `config/fleet-heartbeat-off` exists, and `arm` registers a watcher check that wakes Main when a home turns GAP or STALLED and re-fires until it recovers; the same check names a lane whose work is done while its worker still answers, so the lead lands it and closes it |
 | `jg-design-gate.sh`      | The no-model design gate: `size` applies the small-tweak rule (at most 40 changed UI lines, no new UI file), and `handroll` writes the lead's or Main's approval that a small UI tweak needs to merge; the asking worker cannot write it |
 | `jg-flow.sh`             | Shim for the fleet-flow add-on: read fleet lifecycle and wait metrics as JSON ([reader reference](fleet-ledger.md#reading-lifecycle-metrics)) |
@@ -45,7 +45,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest prints, refusing an entry with no owner words, no scope, or no enforcement point |
 | `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it; `--route <lead>` names the lead that owns the answer |
 | `jg-proof-attach.sh`      | Find a task's done-done receipt and proof media, refuse a text-only card for UI or video work, and put the proof on the ready, review or merged board card and the PR body |
-| `jg-overwatch-kpi.sh`    | Record each typed captain message, tag it new work, decision answer, feedback, or micromanagement, and refuse a feedback or micromanagement tag without a link to a ticket or PR on this repository |
+| `jg-overwatch-kpi.sh`    | Record each typed captain message, tag it new work, decision answer, feedback, or micromanagement, refuse a feedback or micromanagement tag without a link to a ticket or PR on this repository, and report the misses per day and per week against a target of zero |
 | `jg-question-lib.sh`     | Shared question-rule predicate: does a reply end in a question, and does it cite an open board card |
 | `jg-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), Recon, Squad Lead charter, and Herdr-lab briefs, with Captain's intent and Juggernaut spec subsections on ship/scout |
 | [`jg-dod-lib.sh`](../bin/jg-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
