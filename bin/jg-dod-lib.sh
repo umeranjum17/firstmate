@@ -24,7 +24,10 @@
 # contract line so brief, spawn record, and worker instructions agree.
 # Callers of the gate are bin/jg-crew-state.sh (current-state done),
 # bin/jg-pr-check.sh (PR registration), and bin/jg-inactive-reconcile.sh
-# (squad_lead ledger-first publish of a child done). A ship `done:` is not
+# (squad_lead ledger-first publish of a child done). A design task's done is refused
+# first while its first-draft rule is unmet: jg_design_done_gate (bin/jg-merge-gate-lib.sh)
+# resolves the `first-draft receipt: <ref>` line in its completion receipt and needs
+# that run record to prove a make or refine of every option the change presents. A ship `done:` is not
 # accepted while the named head exists only in the worker's disposable copy,
 # except when the done names a pull request whose live forge head is exactly
 # that copy's HEAD: the push that opened the PR can leave no remote-tracking
@@ -820,8 +823,16 @@ jg_dod_forge_pr_head_live() {  # <provider> <host> <path> <number> <url>
 # recorded pr_head stands in, so every caller binds the receipt to the same
 # candidate. The receipts add-on (jg_receipts_accept_done) uses the head it is given.
 jg_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> <run-output> [<forge-head>]]
-  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit recorded_head
+  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} run_out=${9:-} forge_head=${10:-} url sha gerrit recorded_head design_head
   jg_dod_should_gate_ship_done "$kind" "$mode" "$line" || return 0
+  # The captain's first-draft rule (bin/jg-merge-gate-lib.sh owns it): a design task
+  # reaches done only when its completion receipt names a first-draft record that made
+  # or refined every option it presents. The refusal prints the option by name, so the
+  # done is not accepted and the lane stops here instead of warning.
+  if [ -n "$state" ] && [ -n "$id" ] && [ -n "$meta" ]; then
+    design_head=$(git -C "${wt:-/nonexistent}" rev-parse HEAD 2>/dev/null) || design_head=''
+    jg_design_done_gate "$state" "$id" "$meta" "$design_head" || return 1
+  fi
   url=$(jg_dod_pr_url_from_done_note "$(status_line_note "$line")") || url=
   if [ -z "$forge_head" ] && [ -n "$url" ] && [ -n "$meta" ] && [ -f "$meta" ] \
     && [ "$(jg_dod_meta_value "$meta" pr)" = "$url" ] \

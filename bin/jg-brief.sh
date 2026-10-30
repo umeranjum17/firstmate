@@ -891,12 +891,13 @@ if [ -n "$DESIGN_CALL" ]; then
 Design call (first-draft): $DESIGN_CALL - $DESIGN_REASON"
   if [ "$DESIGN_CALL" = yes ]; then
     DESIGN_SECTION="$DESIGN_SECTION
-Produce every design for this task with first-draft (\`first-draft-axi\`); do not hand-draw a separate design path.
-Put one line \`first-draft receipt: <reference>\` in the evidence file of your completion receipt.
-The merge is refused without that line."
+Make every design option for this task with first-draft (\`first-draft-axi make\` or \`refine\`); never hand-write option HTML.
+Save the JSON run record that \`make\` or \`refine\` prints, and put one line \`first-draft receipt: <the run record file>\` in the evidence file of your completion receipt; the gate resolves that reference and reads the record. Name several records comma-separated when more than one run made the options.
+A \`first-draft-axi judge\` run is not a receipt: it scores a page and makes none, so a judge-only record, a reference that does not resolve, and an option the record does not list are all refused.
+Done is refused while any option you present has no make or refine record (\`bin/jg-merge-gate-lib.sh\`'s jg_design_done_gate), and so is a board post: post design options only after \`bin/jg-design-gate.sh board <run record> <options folder or file>\` passes."
   else
     DESIGN_SECTION="$DESIGN_SECTION
-A hand-rolled change stays a small tweak only while its UI files change at most 40 lines and it adds no new UI file; past that the merge needs the first-draft receipt line (\`bin/jg-design-gate.sh\`).
+A hand-rolled change stays a small tweak only while its UI files change at most 40 lines and it adds no new UI file; past that, or once it presents design options, every option must be made or refined by first-draft and named by a \`first-draft receipt: <run record file>\` line, exactly as on a yes task (\`bin/jg-design-gate.sh\`).
 A small tweak that touches UI files merges only after your lead or Main approves the hand-roll; you never approve it yourself."
   fi
   DESIGN_SECTION="$DESIGN_SECTION
