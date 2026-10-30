@@ -41,6 +41,8 @@
 # arm    Writes state/fleet-heartbeat.check.sh and binds it with
 #        jg-check-register.sh. disarm retires it with jg-check-unregister.sh.
 #        A Squad Lead home refuses arm: the primary home reads it.
+#        bin/jg-bootstrap.sh arms it on every primary home's session start
+#        unless config/fleet-heartbeat-off exists.
 set -u
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

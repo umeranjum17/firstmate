@@ -1770,6 +1770,13 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     "$SCRIPT_DIR/jg-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
   fi
+  # A primary home always runs the fleet heartbeat, so a stalled or idle home
+  # wakes Main without anyone arming it; config/fleet-heartbeat-off opts out.
+  if local_phase && [ ! -e "$(jg_compat_marker "$JG_HOME")" ] \
+    && [ ! -e "$CONFIG/fleet-heartbeat-off" ] && [ "$STATE" = "$JG_HOME/state" ] && [ -d "$STATE" ]; then
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-fleet-heartbeat.sh" arm >/dev/null 2>&1 \
+      || echo "MISSING: the fleet heartbeat could not be armed; idle or stalled homes will not wake Main"
+  fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"

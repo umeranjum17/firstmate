@@ -562,6 +562,28 @@ SH
   pass "bootstrap requires git with an install instruction"
 }
 
+test_bootstrap_arms_the_fleet_heartbeat_on_a_primary_home() {
+  local case_dir fakebin out
+  for case_dir in primary opted-out lead; do
+    case_dir="$TMP_ROOT/fleet-heartbeat-$case_dir"
+    mkdir -p "$case_dir/home/config" "$case_dir/home/state"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  done
+  : > "$TMP_ROOT/fleet-heartbeat-opted-out/home/config/fleet-heartbeat-off"
+  printf 'lead1\n' > "$TMP_ROOT/fleet-heartbeat-lead/home/.jg-squad-lead-home"
+  for case_dir in primary opted-out lead; do
+    case_dir="$TMP_ROOT/fleet-heartbeat-$case_dir"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    assert_not_contains "$out" "fleet heartbeat could not be armed" "arming the fleet heartbeat failed: $out"
+  done
+  assert_present "$TMP_ROOT/fleet-heartbeat-primary/home/state/fleet-heartbeat.check.sh" "bootstrap left a primary home without the fleet heartbeat"
+  assert_absent "$TMP_ROOT/fleet-heartbeat-opted-out/home/state/fleet-heartbeat.check.sh" "config/fleet-heartbeat-off did not opt out"
+  assert_absent "$TMP_ROOT/fleet-heartbeat-lead/home/state/fleet-heartbeat.check.sh" "a Squad Lead home armed the primary's fleet heartbeat"
+  pass "bootstrap arms the fleet heartbeat on a primary home unless it opts out"
+}
+
 test_orca_backend_gates_orca_tool_only_when_selected() {
   local case_dir fakebin out missing_orca
   missing_orca="MISSING: orca (install: brew install orca  # or the platform's package manager)"
@@ -1423,3 +1445,4 @@ test_network_phases_record_per_step_elapsed_times
 test_tasks_axi_verdict_handoff_is_consumed_once
 test_crew_dispatch_active_rules_are_verbose_bootstrap_info
 test_crew_dispatch_validation
+test_bootstrap_arms_the_fleet_heartbeat_on_a_primary_home

@@ -137,7 +137,7 @@
 #                          status, unless afk is active
 #   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - dispatch them now, P0 first, up to project capacity
 #   check: ready work waiting with no worker working: <ids> - dispatch them now, P0 first, up to project capacity
-#                          a squad_lead home's base-cadence scan found dispatchable
+#                          a primary or squad_lead home's base-cadence scan found dispatchable
 #                          queued work (jg-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
 #                          positive integer, fewer open lanes than that target;
@@ -2976,8 +2976,9 @@ warn_invalid_lane_target_once() {
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
 }
 
-# Base-cadence idle-lead check: 0 when this is a squad_lead home, its backlog has
-# dispatchable queued work, and the home sits below its lane floor. With
+# Base-cadence idle-home check: 0 when this home (primary or squad_lead) has
+# dispatchable queued work and sits below its lane floor, so ready work is
+# started without anyone asking. With
 # config/lane-target naming a positive integer N, the floor is fewer than N open
 # lanes, and a home with working workers but free slots is exactly the 5 Oct
 # stall that the no-worker-working rule missed. Otherwise (no usable target, or
@@ -2994,7 +2995,6 @@ ready_work_waits_idle() {
   local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
   READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
   ready_rc=$?
   if [ -z "$READY_WORK_IDS" ]; then
