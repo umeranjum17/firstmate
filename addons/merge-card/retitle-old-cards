@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Retitle legacy generic merge evidence cards without editing the board file.
 # Usage: retitle-old-cards [--apply] <board.json>
+# A card titled with the generic sentence - bare, or carrying only a repo/PR prefix - is
+# re-posted under an outcome sentence taken from its pull request's own title, then the old
+# card is archived. Its about, link and run record move to the replacement unchanged; nothing
+# is deleted, and a card whose PR title cannot be read is reported and left as it is.
 # Dry-run is the default; --apply posts a replacement card then archives the old card.
 set -euo pipefail
 
 die() { printf 'retitle-old-cards: %s\n' "$*" >&2; exit 1; }
+
+self=$(cd "$(dirname "$0")" && pwd -P)/merge-card
+[ -x "$self" ] || die "$self is missing"
 
 apply=0
 if [ "${1:-}" = --apply ]; then apply=1; shift; fi
@@ -16,13 +23,14 @@ command -v sign-off-axi >/dev/null || die 'sign-off-axi is required'
 
 cards=$(sign-off-axi list "$board" --json --full) || die "sign-off-axi could not list $board"
 jq -e '.decisions | type == "array"' <<<"$cards" >/dev/null || die 'sign-off-axi returned no decisions array'
-old_title='Internal change passed its checks'
 mapped=0
 skipped=0
 changed=0
 
 while IFS= read -r card; do
   key=$(jq -r '.key // empty' <<<"$card")
+  old_title=$(jq -r '.title // empty' <<<"$card")
+  bash "$self" generic-title "$old_title" || continue
   identity=$(jq -r '
     def by_link:
       try (.link | capture("^https?://github\\.com/(?<owner>[^/]+)/(?<repo>[^/]+)/pull/(?<number>[0-9]+)(?:[/?#].*)?$")
@@ -43,7 +51,13 @@ while IFS= read -r card; do
     skipped=$((skipped + 1))
     continue
   }
-  title="$repo #$number: internal change passed its checks"
+  # The replacement title is the pull request's own outcome sentence, never invented here.
+  title=$(bash "$self" title "https://github.com/$owner/$repo/pull/$number" || true)
+  if [ -z "$title" ]; then
+    printf 'skip: %s (the title of %s #%s could not be read)\n' "$key" "$repo" "$number"
+    skipped=$((skipped + 1))
+    continue
+  fi
   mapped=$((mapped + 1))
   printf '%s\t%s -> %s\n' "$key" "$old_title" "$title"
   [ "$apply" -eq 1 ] || continue
@@ -63,7 +77,7 @@ while IFS= read -r card; do
   rm -f -- "$message"
   trap - EXIT
   changed=$((changed + 1))
-done < <(jq -c --arg title "$old_title" '.decisions[] | select(.title == $title and .dismissed != true)' <<<"$cards")
+done < <(jq -c '.decisions[] | select(.dismissed != true)' <<<"$cards")
 
 if [ "$apply" -eq 1 ]; then
   printf 'retitled %s card(s); skipped %s\n' "$changed" "$skipped"

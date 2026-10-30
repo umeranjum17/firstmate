@@ -167,11 +167,12 @@ printf '%s\n' "$*" >>"$DD_POOL_LOG"
 jq -n --arg id "${POOL_ID:-acct1}" --arg f "$POOL_FOLDER" '{ok: true, id: $id, set: {CLAUDE_CONFIG_DIR: $f}, unset: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]}'
 STUB
 
-# The stub gh: a PR's Checks body and branch, as `gh pr view --json body,headRefName` gives them.
+# The stub gh: a PR's Checks body, own title and branch, as `gh pr view --json ...` gives them.
 cat > "$work/bin/gh" <<'STUB' || exit 1
 #!/usr/bin/env bash
 case " $* " in *" --jq .headRefOid "*) printf '%s\n' "${GH_HEAD:-}"; exit 0 ;; esac
 case " $* " in *" --jq .body "*) cat "$GH_BODY"; exit 0 ;; esac
+case " $* " in *" --jq .title "*) if [ -n "${GH_TITLE:-}" ]; then cat "$GH_TITLE"; fi; exit 0 ;; esac
 jq -n --rawfile body "$GH_BODY" '{body: $body, headRefName: "fm/older"}'
 STUB
 
@@ -671,17 +672,22 @@ is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
 is "two PRs: two live cards" "$(jq -r '[.items[] | select(.dismissed != true) | .key | sub("-[0-9a-f]{12}$"; "")] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
 
-# A screen-free PR's card is titled with its repo and PR number.
+# A screen-free PR's card is titled with the PR's own outcome sentence, trailing scaffolding trimmed.
 GH_BODY=$work/titled-body.md
-export GH_BODY
+GH_TITLE=$work/titled-title.txt
+printf '[design-ux] Retire the old sign-off card\n' >"$GH_TITLE"
+export GH_BODY GH_TITLE
 checks titled shot.png && printf 'screen: none\n' >> "$home/data/titled/checks.md" && cp "$shot" "$home/data/titled/shot.png" && cp "$home/data/titled/checks.md" "$GH_BODY"
 mk_run titled 20261020T000000Z-titled0001 0
 jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 SO_CAPTURE=$work/card-titled
 export SO_CAPTURE
 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
-is "internal title names repo and PR" "$(jq -r .title "$work/card-titled/card.json")" "muxr #1012: internal change passed its checks"
+is "internal title is the PR's outcome sentence" "$(jq -r .title "$work/card-titled/card.json")" "Retire the old sign-off card"
+bash "$here/../merge-card" generic-title "$(jq -r .title "$work/card-titled/card.json")" && no "internal title passes the generic-title refusal" || ok "internal title passes the generic-title refusal"
 GH_BODY=$work/pr-body.md
+GH_TITLE=
+export GH_BODY GH_TITLE
 
 # A merge hook passes head `-` for a PR: a screen-free PR still finds its sealed run at the PR head, from gh.
 GH_BODY=$work/headdash-body.md
