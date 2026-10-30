@@ -20,6 +20,10 @@
 #
 # The verdict criteria are owned by bin/jg-branch-prompt.sh ("Verdict: routine
 # or captain"); --silent true is legal only for a routine outcome.
+# bin/jg-live-claim.sh owns the fixed-means-live rule and is applied to the
+# summary before it is stored: a summary that reports a user-visible fix as done
+# is recorded as `merged-not-released: ...` unless it carries the released ref
+# and where it is observable, or states the truth itself.
 # --wake defaults to the wake reason the host recorded for the turn.
 #
 # Only the branch actor of a live host turn may report: JG_SUPERVISION_ACTOR
@@ -109,6 +113,19 @@ fi
 if [ "$SILENT" = true ] && [ "$VERDICT" != routine ]; then
   echo "invalid report: --silent true requires the routine verdict" >&2
   exit 2
+fi
+
+# The fixed-means-live rule (bin/jg-live-claim.sh owns it): a summary that
+# reports a user-visible fix as done carries the released ref and where it is
+# observable, or reaches the captain plainly as merged-not-released.
+if [ -x "$SCRIPT_DIR/jg-live-claim.sh" ]; then
+  LIVE_RC=0
+  LIVE_SUMMARY=$("$SCRIPT_DIR/jg-live-claim.sh" 'done' "$SUMMARY") || LIVE_RC=$?
+  case "$LIVE_RC" in
+    0|3)
+      if [ -n "$LIVE_SUMMARY" ]; then SUMMARY=$LIVE_SUMMARY; fi
+      ;;
+  esac
 fi
 
 [ "${JG_SUPERVISION_ACTOR:-}" = branch ] \
