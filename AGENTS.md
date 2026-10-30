@@ -146,7 +146,7 @@ Load `task-dispatch` at every intake: it owns project resolution, Squad Lead rou
 
 Resolve every ship task's concrete delivery mode and `yolo` merge posture at intake.
 A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.
-An unregistered project or absent registry resolves to `no-mistakes` with yolo off, and the registration gap goes to the captain.
+An unregistered project or absent registry resolves to `direct-PR` with yolo off, and the registration gap goes to the captain; `bin/jg-project-mode.sh` owns the fallback.
 
 ### Dispatch and supervision handoff
 
