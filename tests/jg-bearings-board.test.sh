@@ -188,6 +188,53 @@ extract_payload() {  # <board-path>
     | sed '1d;$d'
 }
 
+test_refresh_rebuilds_from_the_board_it_already_serves() {
+  local home data board decision out
+  home=$(make_home refresh)
+  data="$home/payload.json"
+  board="$home/.lavish/bearings-board.html"
+  write_valid_payload "$data"
+  printf '## Queued\n' > "$home/data/backlog.md"
+  ( cd "$home" && tasks-axi add hold-me "a captain call the board shows" >/dev/null 2>&1 ) \
+    || fail "the refresh test could not add its task"
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" hold hold-me \
+    --reason "captain must choose" >/dev/null || fail "the refresh test could not hold its task"
+  jq '.captains_call += [{"key":"hold-me","type":"decision","repo":"sample",
+        "title":"Held call","options":[{"value":"yes","label":"Yes"}]}]' "$data" > "$data.tmp" \
+    && mv "$data.tmp" "$data"
+  out=$(run_board "$home" build "$data" 2>&1) || fail "the refresh build failed: $out"
+  extract_payload "$board" | jq -e '[.captains_call[].key] | index("hold-me") != null' >/dev/null \
+    || fail "the open captain call was dropped before it was answered"
+
+  decision="$home/captain-decision.txt"
+  printf 'Yes.\n' > "$decision"
+  JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/jg-captain-hold.sh" answer hold-me \
+    --decision-file "$decision" >/dev/null || fail "the refresh test could not answer its hold"
+
+  out=$(run_board "$home" refresh 2>&1) || fail "refresh failed against a live board: $out"
+  assert_contains "$out" "board: $board" "refresh did not rebuild the board it serves: $out"
+  assert_contains "$out" "dropped-landed-card: hold-me" \
+    "refresh did not report dropping the answered card: $out"
+  extract_payload "$board" | jq -e '[.captains_call[].key] | index("hold-me") == null' >/dev/null \
+    || fail "refresh kept a card whose captain call had already closed"
+  extract_payload "$board" | jq -e '.generated == "2026-08-19T00:00Z"' >/dev/null \
+    || fail "refresh composed a new payload instead of reusing the served one"
+  pass "refresh rebuilds the served board and drops the card whose call closed"
+}
+
+test_refresh_without_a_board_is_a_quiet_no_op() {
+  local home out rc
+  home=$(make_home refresh-none)
+  out=$(run_board "$home" refresh 2>&1); rc=$?
+  [ "$rc" -eq 0 ] || fail "refresh on a home with no board must succeed quietly (rc=$rc): $out"
+  [ -z "$out" ] || fail "refresh on a home with no board printed: $out"
+  assert_absent "$home/.lavish/bearings-board.html" \
+    "refresh on a home with no board must not create one"
+  pass "refresh is a quiet no-op for a home that serves no board"
+}
+
 test_path_is_stable_and_home_scoped() {
   local home
   home=$(make_home path)
@@ -770,6 +817,8 @@ test_build_refuses_a_nondecision_reconcile_value() {
 }
 
 test_path_is_stable_and_home_scoped
+test_refresh_rebuilds_from_the_board_it_already_serves
+test_refresh_without_a_board_is_a_quiet_no_op
 test_build_refuses_malformed_payloads_before_touching_the_board
 test_charted_kind_is_optional_and_accepts_both_values
 test_build_injects_binds_then_arms

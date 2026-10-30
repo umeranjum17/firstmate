@@ -9,6 +9,7 @@
 #
 # Usage:
 #   jg-bearings-board.sh build <data.json>
+#   jg-bearings-board.sh refresh
 #   jg-bearings-board.sh path
 #
 # build      Validate the payload, drop the Captain's Call cards whose subject
@@ -34,6 +35,14 @@
 #            line, so a rebuild states what it removed instead of quietly
 #            shrinking Captain's Call.
 # path       Print the stable board path for this home.
+# refresh    Rebuild the board this home already serves from the payload that
+#            board carries, so a landing drops its cards without composing a
+#            new payload. The standard reconcile choice this script injected is
+#            removed first, because the validator reserves that value for the
+#            injection and build adds it back. A home with no board is a quiet
+#            success, and build's own validation and live-session proof still
+#            decide the rebuild. This is the rebuild the landing procedure
+#            requires.
 #
 # A LIVE SESSION IS PROVED, NEVER ASSUMED. `lavish-axi <file>` exits 0 even
 # when it refuses to reopen a session the captain ended from the browser,
@@ -477,8 +486,31 @@ command_build() {
   fi
 }
 
+command_refresh() {
+  local board data
+  [ "$#" -eq 0 ] || { usage >&2; exit 2; }
+  board=$(board_path)
+  [ -f "$board" ] && [ ! -L "$board" ] || return 0
+  data=$(umask 077; mktemp "${TMPDIR:-/tmp}/jg-bearings-refresh.XXXXXX") \
+    || fail "cannot stage the board payload"
+  # shellcheck disable=SC2064 # $data is this call's path; expand it now.
+  trap "rm -f -- '$data'" EXIT INT TERM
+  if ! sed -n '/<script id="bearings-data" type="application\/json">/,/<\/script>/p' "$board" \
+      | sed '1d;$d' \
+      | jq 'if .captains_call then .captains_call |= map(
+              if .type == "decision"
+              then .options = [.options[] | select(.value != "reconcile")]
+              else . end)
+            else . end' > "$data" 2>/dev/null \
+      || ! jq empty "$data" 2>/dev/null; then
+    fail "the live board carries no readable payload: $board"
+  fi
+  command_build "$data"
+}
+
 case "${1-}" in
   build) shift; command_build "$@" ;;
+  refresh) shift; command_refresh "$@" ;;
   path) board_path ;;
   -h|--help|help) usage ;;
   *) usage >&2; exit 2 ;;

@@ -3611,10 +3611,15 @@ if [ "$KIND" = ship ] && [ -n "$PR_URL" ] \
   echo "warning: an open public loop with nothing owed is still recorded in the consent-holding home while cleaning up ship task $ID. Hand it on with bin/jg-public-followup.sh rechain or close it with retire --reason." >&2
 fi
 
-# Non-blocking: the legacy Relay link is not guarded as a refusal.
+# A lightweight Relay link is an uncleared public commitment: the asker is owed
+# a final outcome reply, and cleanup removes the record that makes it
+# reconcilable. A later retry that fails again rings through the relay poll
+# (state/x-followup-held), so this refusal is a wait, not a dead end.
 X_REQUEST=$(grep '^x_request=' "$META" 2>/dev/null | tail -1 | cut -d= -f2- || true)
-if [ -n "$X_REQUEST" ]; then
-  echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
+if [ -n "$X_REQUEST" ] && [ "$FORCE" != "--force" ]; then
+  echo "REFUSED: task $ID still carries an uncleared Relay request link ($X_REQUEST), so its asker is owed a final reply." >&2
+  echo "Post it with bin/jg-x-followup.sh $ID --final --text-file <path>, clear the link with bin/jg-x-followup.sh --clear $ID, or use --force after explicit discard approval." >&2
+  exit 1
 fi
 
 if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != squad_lead ] && [ "$FORCE" != "--force" ]; then

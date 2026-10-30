@@ -2992,7 +2992,7 @@ warn_invalid_lane_target_once() {
 # held or in flight) cannot reset the re-raise window. Intake is independent of
 # the heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
-  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
+  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc freed
   READY_WORK_IDS=
   READY_WORK_REASON=
   READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
@@ -3035,7 +3035,34 @@ ready_work_waits_idle() {
   esac
   [ "$surfaced_ids" != "$READY_WORK_IDS" ] && return 0
   case "$surfaced_at" in ''|*[!0-9]*) surfaced_at=0 ;; esac
+  # A place freed since this set was surfaced makes the wake actionable now, so
+  # the resurface window does not hold it back. bin/jg-teardown.sh and
+  # bin/jg-pr-check.sh write state/.capacity-freed; this read is the contract.
+  freed=$(cat "$STATE/.capacity-freed" 2>/dev/null) || freed=
+  case "$freed" in ''|*[!0-9]*) freed=0 ;; esac
+  [ "$freed" -gt "$surfaced_at" ] && return 0
   [ "$(( now - surfaced_at ))" -ge "$READY_WORK_RESURFACE_SECS" ]
+}
+
+# A launch refused for host memory leaves state/admission-refused and nothing
+# retries it. The newest sampler verdict is the measurement admission reads, so
+# fire once per record the moment it admits launches again; a home with no
+# sampler stays silent rather than inventing one. bin/jg-jev-mem-guard.sh owns
+# the verdict and the record.
+admission_retry_waits_memory() {
+  local record epoch task verdict seen
+  record=$(cat "$STATE/admission-refused" 2>/dev/null) || return 1
+  [ -n "$record" ] || return 1
+  epoch=$(printf '%s\n' "$record" | cut -f1)
+  task=$(printf '%s\n' "$record" | cut -f2)
+  verdict=$(awk -F '\t' 'NF >= 5 && $5 != "" { v = $5 } END { print v }' \
+    "$STATE/host-memory.tsv" 2>/dev/null) || verdict=
+  case "$verdict" in OK|UNKNOWN) ;; *) return 1 ;; esac
+  ADMISSION_RETRY_KEY="$epoch:$task"
+  seen=$(cat "$STATE/.admission-retry-surfaced" 2>/dev/null) || seen=
+  [ "$seen" != "$ADMISSION_RETRY_KEY" ] || return 1
+  ADMISSION_RETRY_REASON="check: host memory admits launches again, so retry the launch of ${task:-a queued task} refused at ${epoch} (bin/jg-spawn.sh clears the refusal record on success)"
+  return 0
 }
 
 # The stalled-backlog condition the wait-timers chain escalates
@@ -3231,6 +3258,29 @@ event_wait_or_sleep() {
       _event_cap_fails=0
       ;;
   esac
+}
+
+# A confirmed merge owns its own cleanup. bin/jg-teardown.sh runs without
+# --force, so its own gates (unlanded work, an incomplete captain-call
+# inventory, an owed public reply, an uncleared Relay link) stay in charge; a
+# refusal becomes one wake naming it rather than leaving the task half landed.
+# Both steps run detached so this cycle keeps supervising. The board is rebuilt
+# from the payload it already carries, which drops the cards that just landed.
+post_merge_cleanup() {  # <id>
+  local id=$1 started="$STATE/.post-merge-cleanup-$1.started" log="$STATE/.post-merge-cleanup-$1.log"
+  ( set -C; : > "$started" ) 2>/dev/null || return 0
+  (
+    local line
+    if ! env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+        "$SCRIPT_DIR/jg-teardown.sh" "$id" > "$log" 2>&1; then
+      line=$(grep -m1 '^REFUSED' "$log" 2>/dev/null) || line=
+      jg_wake_append check "post-merge-cleanup-$id" \
+        "check: cleanup after the merge of $id was refused: ${line:-see $log}" \
+        || triage_log "cleanup refusal for $id could not be queued"
+    fi
+    env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/jg-bearings-board.sh" refresh >/dev/null 2>&1 || true
+  ) </dev/null >/dev/null 2>&1 &
 }
 
 # --- Main entry: the runtime below runs only when this file is executed as a
@@ -3438,6 +3488,22 @@ home_summary_refresh_detached() {
   JG_HOME_SUMMARY_IF_IDLE=1 \
     "$SCRIPT_DIR/jg-home-summary-refresh.sh" --best-effort </dev/null >/dev/null 2>&1 &
   HOME_SUMMARY_PID=$!
+}
+
+# A ship's ready report records its PR without waiting on Main: jg-pr-check.sh
+# --from-status owns which line counts and runs the named-head gate, then arms
+# the merge poll, posts the ready card, and moves the ticket to review. A line
+# it refuses or skips records nothing and still wakes Main as before.
+ready_pr_record() {  # <status-file>
+  local id=${1##*/} out
+  case "$id" in *.status) id=${id%.status} ;; *) return 0 ;; esac
+  [ -f "$STATE/$id.meta" ] || return 0
+  if out=$(jg_run_timed "$CHECK_TIMEOUT" env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/jg-pr-check.sh" --from-status "$id" 2>&1); then
+    [ -z "$out" ] || triage_log "recorded the ready PR of $id"
+  else
+    triage_log "the ready PR of $id was not recorded: $(printf '%s\n' "$out" | tail -n 1)"
+  fi
 }
 
 RECONCILE_REQUEST_PID=
@@ -3731,6 +3797,7 @@ EOF
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
           fi
+          [ "$(jg_meta_get "$STATE/$id.meta" kind)" = scout ] || post_merge_cleanup "$id"
           wake "$reason"
         fi
         pr_poll_control_release || exit 1
@@ -3936,6 +4003,7 @@ EOF
       while IFS=$(printf '\t') read -r sf sig f; do
         [ -n "$sf" ] || continue
         reportable_signal_path "$f" || continue
+        ready_pr_record "$f"
         file_reason="$reason"
         case " $JG_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
         jg_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
@@ -4288,6 +4356,13 @@ EOF
       reason=$READY_WORK_REASON
       jg_wake_append check ready-work "$reason" || exit 1
       record_ready_work_surfaced
+      wake "$reason"
+    fi
+    # A refused launch becomes retryable on the same base-cadence clock.
+    if admission_retry_waits_memory; then
+      reason=$ADMISSION_RETRY_REASON
+      jg_wake_append check admission-retry "$reason" || exit 1
+      printf '%s' "$ADMISSION_RETRY_KEY" > "$STATE/.admission-retry-surfaced" || true
       wake "$reason"
     fi
   fi

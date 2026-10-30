@@ -6,6 +6,7 @@ description: >-
   Also use on an "x-mode-error ..." check wake to report the Relay configuration blocker instead of answering a mention.
   Also use on milestone and terminal wakes for a Relay-linked task before posting completion follow-ups, using typed promised-final reconciliation when registered and --final otherwise.
   Also use on a "public-followup ..." check wake, and whenever a promised final public reply must be created, reconciled, or delivered.
+  Also use on an "x-followup-held <task-id>" check wake, which retries a follow-up the relay could not accept yet.
   Loaded only when Relay is enabled.
 user-invocable: false
 metadata:
@@ -21,6 +22,7 @@ The full mention is stashed locally; this skill acts on any request it carries a
 This runs only when Relay is on (the user dropped `FMX_PAIRING_TOKEN` into `.env`; see AGENTS.md "Relay").
 If you ever see an `x-mention` wake without Relay configured, do nothing.
 A `check:` wake can also carry `x-mode-error ...` instead of `x-mention <request_id>` - that is a poll or relay configuration problem, not a mention to answer.
+An `x-followup-held <task-id>` wake means a follow-up failed with its link kept (the relay could not accept it yet): post it again with `bin/jg-x-followup.sh <task-id> --final --text-file <path>` (or without `--final` for a mid-task update), or clear the link with `bin/jg-x-followup.sh --clear <task-id>` when nothing is owed.
 Report it directly to the captain as a Relay configuration blocker and do not treat it as a mention to answer.
 
 ## The asker is your own captain - answer autonomously
@@ -241,6 +243,7 @@ This skill's own responsibility during the mention-handling turn is linking the 
 - If due, it composes a short, public-safe update and posts it with `bin/jg-x-followup.sh <task-id> --text-file <path>` (or stdin), which posts via the relay's follow-up endpoint; a successful non-final post increments the counter and keeps the link so a later milestone can still post against it.
   When the update carries one real visual artifact, add `--image <path>`; the helper forwards it to `bin/jg-x-reply.sh --followup` so the same image contract used for ordinary replies applies here too.
 - On a terminal wake (PR merged / Recon report / local merge / failed), Juggernaut posts the task's **final** outcome ("done, here's the result"; for a failure, an honest "this one didn't pan out") with `bin/jg-x-followup.sh <task-id> --final --text-file <path>` only when no promised-final public commitment is registered for that work. When the promised-final procedure above applies, `bin/jg-public-followup.sh consume` and `deliver` own the terminal reply and clear the legacy link at the validated receipt boundary, so do not call `jg-x-followup.sh --final` for the same outcome. If delivery reports that link cleanup needs reconciliation, do not post anything else; `bin/jg-x-followup.sh --clear <task-id>` is the clear-only recovery command in the bound work home.
+  `bin/jg-teardown.sh` refuses a task that still carries an uncleared lightweight Relay link, so a merge cleanup cannot retire the record before the asker hears the outcome.
 - Every follow-up is held to the exact same public-safety bar as every reply here: outcomes only, no task ids, internals, captain-private material, or secrets. Past the window, past the cap, or on the relay's own rejection of an exhausted binding, a follow-up attempt is skipped silently and the link is cleared - never treated as a failure worth retrying.
 - If either a follow-up's platform or explicit budget cannot be authoritatively resolved from per-request context, inbox payload, or relay answer, `bin/jg-x-followup.sh` does NOT post it: the fail-safe holds it (the link is kept, exit non-zero) rather than use a local default. This is a retryable hold - a later milestone wake retries it once both values are recoverable.
 

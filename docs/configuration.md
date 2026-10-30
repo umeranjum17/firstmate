@@ -839,7 +839,7 @@ These controls reduce risk but cannot guarantee avoidance of an out-of-memory ki
 - At the wait or alert level, local `bin/jg-spawn.sh` launches and `bin/jg-control.sh relaunch` refuse to start a new agent and record the reason in `state/admission-refused`, which remains in local state and is not shown by Lookout.
   A refused fresh spawn leaves the task queued; a relaunch refused by its initial admission check leaves the existing agent and task record untouched.
   The replacement launch checks admission again after the old agent stops, so pressure rising between those checks can still prevent replacement; this is not a memory reservation.
-  Retry once pressure eases; admission does not automatically retry a queued spawn.
+  Retry once pressure eases; admission never retries a queued spawn itself, and the watcher raises one `check: host memory admits launches again ...` wake per refusal record as soon as the newest sample admits launches, so the retry does not wait on a memory.
   Admission gates agent launches, not builds or other heavy subprocesses started by already-running agents; it imposes no per-agent or fleet memory limit.
 - At the alert level, the sampler attempts one automatic `jg-control.sh <task-id> interrupt` per episode if the top consumer is a task this home owns, passing the resolved home and selected state explicitly; it never exits, kills, or discards that task.
   Before latching the episode or dispatching an interrupt, it queues a durable `check: host memory ALERT` wake naming the consumer and planned interrupt attempt (or the ownership skip), then records the attempt in `state/host-memory-interrupts.tsv`.
@@ -1176,7 +1176,7 @@ It is primary-authoritative inherited configuration, so one value in the main ho
 
 An open lane is a `state/<task>.meta` whose `kind` is `ship` or `scout`; a Squad Lead endpoint's own meta is not a lane of that home.
 
-In every home, primary or Squad Lead, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default).
+In every home, primary or Squad Lead, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default), and at once when `bin/jg-teardown.sh` or `bin/jg-pr-check.sh` frees a project place and stamps `state/.capacity-freed`, because that is what makes an already-surfaced set startable.
 Ready intake uses the base heartbeat interval independently of idle-heartbeat backoff and runs before an away heartbeat can end the cycle; held and future-dated work stays excluded by the backlog's ready query.
 When the ready set empties on a successful read - every named item since held or in flight - the check withdraws the queued ready-work row, so a notification whose condition no longer holds stops being presented instead of repeating until an acknowledgement that may never come, and it re-raises from scratch only when the condition holds again.
 That empty observation keeps the resurface record, so a transient empty set cannot reset the `JG_READY_WORK_RESURFACE_SECS` window and replay the identical set inside it.
@@ -2028,6 +2028,7 @@ Add `--image <path>` there too when a completion follow-up should carry an image
 - The relay itself rejects a follow-up past its own cap or window with HTTP 409 and may include `{"error":"followup_unavailable"}` in the response body; the client surfaces any follow-up 409 as a distinguishable exit code and uses the body marker only for a sharper diagnostic.
 - `jg-x-followup.sh` treats that exit exactly like a locally-detected expiry - clearing the link and skipping quietly rather than retrying - so an older single-follow-up relay or an already-exhausted binding degrades gracefully.
 - It treats `jg-x-reply.sh`'s fail-safe refusal (exit 8: platform or explicit budget unresolved) differently: that is a retryable hold, so the link is KEPT and the follow-up is retried once both values can be recovered, never posted with a local default.
+  `bin/jg-x-followup.sh` records that hold in `state/x-followup-held/<id>`, and the next `bin/jg-x-poll.sh` cycle raises one `x-followup-held <task-id>` wake and drops the marker, so the retry is a durable wake rather than agent memory; a retry that fails again records a new hold.
 - Past-window relay rejections are only guaranteed while the expired binding row still exists on the relay side; after its cleanup sweep, a very-late follow-up call may instead see a benign no-op 200, which is why the local window and cap pruning remains the primary guard.
 
 **Split replies by platform**
@@ -2149,6 +2150,8 @@ Unreconciled terminal results ride the existing 30-second relay poll rather than
 
 The session-start digest separately prints a "Public commitments" subsection from disk when, and only when, this home is relay-active and still holds an open public loop (a reply still owed, or a delivered loop with nothing owed), so compaction and restart are non-events.
 `bin/jg-teardown.sh` refuses to clean up a task while this home still owes a public reply for exactly that work, unless `--force` carries explicit discard approval.
+It refuses the same way while a task still carries an uncleared lightweight Relay link, because cleanup removes the record that makes that reply reconcilable.
+`bin/jg-x-poll.sh` raises an `x-followup-held <task-id>` wake once per recorded hold (`state/x-followup-held/`), so a held follow-up is retried on the relay's own cadence instead of waiting on a milestone wake that may never come.
 
 `JG_PF_RETRY_BACKOFF_SECS` (default 900) sets the next-attempt time recorded with a retryable delivery error.
 See [verification/public-followup.md](verification/public-followup.md) for the current maintainer evidence behind restart recovery, failed terminal outcomes, retained-loop disposition, and the relay-disabled zero-overhead guarantee.

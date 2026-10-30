@@ -888,6 +888,79 @@ test_github_open_unqueued_outcome_refuses() {
   pass "jg-pr-merge refuses a GitHub merge call that leaves the PR open and unqueued"
 }
 
+# The merge path owns its own cleanup: teardown runs without --force so its
+# gates stay in charge, a refusal becomes one queued wake, and an armed board is
+# rebuilt from the payload it serves. The wrapper is exercised through the same
+# sourced functions the watcher runs, with the two child scripts recorded.
+test_post_merge_cleanup_tears_down_then_rebuilds_the_board() {
+  local case_dir fork log
+  case_dir=$(make_case post-merge)
+  fork="$case_dir/fork"
+  log="$case_dir/post-merge.log"
+  mkdir -p "$fork"
+  cp -a "$ROOT/bin" "$fork/"
+  cat > "$fork/bin/jg-teardown.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'teardown %s\n' "$*" >> "$POST_MERGE_LOG"
+if [ "${POST_MERGE_TEARDOWN_RC:-0}" -ne 0 ]; then
+  echo "REFUSED: task $1 still carries an uncleared Relay request link (req-1)." >&2
+  exit 1
+fi
+SH
+  cat > "$fork/bin/jg-bearings-board.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'board %s\n' "$*" >> "$POST_MERGE_LOG"
+SH
+  chmod +x "$fork/bin/"*
+  : > "$log"
+  post_merge() {  # <teardown-rc>
+    POST_MERGE_LOG="$log" POST_MERGE_TEARDOWN_RC="$1" \
+      JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
+      JG_CONFIG_OVERRIDE="$case_dir/home/config" \
+      bash -c '. "$1"; post_merge_cleanup task-x1' _ "$fork/bin/jg-watch.sh"
+    for _ in $(seq 1 100); do
+      grep -q 'board refresh' "$log" 2>/dev/null && break
+      sleep 0.05
+    done
+  }
+  post_merge 1 || fail "post-merge cleanup must not block the watcher cycle"
+  assert_grep 'teardown task-x1' "$log" \
+    "a confirmed merge must run teardown without --force: $(cat "$log")"
+  assert_grep 'board refresh' "$log" \
+    "the board must be rebuilt after the cleanup attempt: $(cat "$log")"
+  [ "$(grep -c 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" 2>/dev/null || true)" = 1 ] \
+    || fail "a refused cleanup must become exactly one wake: $(cat "$case_dir/state/.wake-queue" 2>&1)"
+  grep 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" \
+    | grep -q 'uncleared Relay request link' \
+    || fail "the cleanup wake must carry the refusal's own reason"
+  : > "$log"
+  post_merge 1 || fail "a second cleanup call must not block either"
+  assert_no_grep 'teardown task-x1' "$log" \
+    "a second cleanup call started a second teardown: $(cat "$log")"
+  pass "a confirmed merge runs teardown, turns a refusal into one wake, and rebuilds the board"
+}
+
+test_pr_check_from_status_records_only_the_ready_report() {
+  local case_dir out
+  case_dir=$(make_case from-status)
+  add_glab_mock "$case_dir"
+  from_status() {
+    PATH="$case_dir/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$case_dir/home" \
+      JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-pr-check.sh" --from-status task-x1 2>&1
+  }
+  printf 'done [at=1]: PR %s\n' "$MR_URL" > "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: a no-mistakes handoff line must be a quiet no-op: $out"
+  [ -z "$out" ] && assert_no_grep 'pr=' "$case_dir/state/task-x1.meta" \
+    "from-status: a line without checks green recorded a PR in no-mistakes mode"
+  printf 'done [at=2]: PR %s checks green\n' "$MR_URL" >> "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: the ready report was refused: $out"
+  assert_grep "pr=$MR_URL" "$case_dir/state/task-x1.meta" "from-status: the ready report recorded no PR: $out"
+  assert_present "$case_dir/state/task-x1.check.sh" "from-status: the ready report armed no merge poll"
+  out=$(from_status) || fail "from-status: a recorded PR must be a no-op: $out"
+  [ -z "$out" ] || fail "from-status: an already recorded PR was recorded again: $out"
+  pass "jg-pr-check --from-status records the mode's ready report once and ignores other lines"
+}
+
 # GitHub reports mergeable=UNKNOWN for a short while after a push or a base
 # branch change while it recomputes mergeability. When that is the only
 # failing condition, the gate re-reads and re-checks every live condition on
@@ -4580,3 +4653,5 @@ test_required_partial_reads_report_all_failures
 
 test_allow_red_refused_on_forgejo
 test_allow_missing_refused_on_forgejo
+test_pr_check_from_status_records_only_the_ready_report
+test_post_merge_cleanup_tears_down_then_rebuilds_the_board

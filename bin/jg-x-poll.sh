@@ -23,6 +23,9 @@
 #   a terminal result bin/jg-public-followup.sh consume refused -> print its
 #       "public-followup rejected <event-id> ..." line, with the specific
 #       reason, at least once
+#   a follow-up that failed with its link kept -> print one
+#       "x-followup-held <task-id>" line and drop that marker, so a retryable
+#       hold rings instead of waiting on a later milestone wake
 #
 # The public-followup line rides here rather than on a new poll of its own: this
 # check only exists in a home that opted into the relay, and it is an O(1)
@@ -107,6 +110,19 @@ if jg_pf_dir_has_entry "$PF_WAKES"; then
     [ -n "$PF_WAKE_LINE" ] || continue
     printf '%s\n' "$PF_WAKE_LINE" || continue
     rm -f -- "$PF_WAKE" 2>/dev/null || true
+  done
+fi
+
+# A follow-up held with its link kept (bin/jg-x-followup.sh) rings here so
+# Juggernaut retries it instead of waiting for a later milestone wake. Dropping
+# the marker after the raise makes this at-least-once, exactly like a rejection
+# wake above: a retry that fails again records a new hold.
+X_HELD_DIR="$STATE/x-followup-held"
+if [ -d "$X_HELD_DIR" ] && [ ! -L "$X_HELD_DIR" ]; then
+  for X_HELD in "$X_HELD_DIR"/*; do
+    [ -f "$X_HELD" ] && [ ! -L "$X_HELD" ] || continue
+    printf 'x-followup-held %s\n' "${X_HELD##*/}" || continue
+    rm -f -- "$X_HELD" 2>/dev/null || true
   done
 fi
 
