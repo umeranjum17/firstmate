@@ -17,6 +17,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-fleet-snapshot.sh`   | Print structured fleet snapshot JSON and refresh only its parent-side remote-ledger cache (schema `jg-fleet-snapshot.v1`) |
 | `jg-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `jg-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
+| `jg-comms-feed.sh`       | Export every fleet message across Main and its Squad Lead homes as one read-only, live, append-only JSONL feed for a channel-style reader |
 | `jg-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
 | `jg-fleet-heartbeat.sh`  | One no-model pass over this home and every local Squad Lead home: working lanes against the lane target, ready backlog, open waits and supervision age, as a MOVING, IDLE, GAP or STALLED verdict per home; `arm` registers a watcher check that wakes Main when a home turns GAP or STALLED and re-fires until it recovers |
 | `jg-flow.sh`             | Shim for the fleet-flow add-on: read fleet lifecycle and wait metrics as JSON ([reader reference](fleet-ledger.md#reading-lifecycle-metrics)) |
