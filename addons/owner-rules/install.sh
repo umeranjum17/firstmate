@@ -12,6 +12,8 @@ DRY=0
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 f=$(cd "$1" && pwd -P)/config/owner-rules
 MG=${f%owner-rules}merge-gate PREV=$MG.pre-owner-rules MARK='# jg-owner-rules merge gate'
+# The gate the retired add-ons clone wrote; its previous gate sits at the same PREV, so it is rewritten in place.
+LEGACY_MARK='# fm-owner-rules merge gate'
 if [ "$DRY" -eq 1 ]; then echo "would write: $f"; echo "would write: $MG (owner-rules gate, then the previous gate)"; echo "dry run: nothing written"; exit 0; fi
 printf '%s\n' 'owner-rules add-on installed: brief-inherit runs owner-rules/bin/jg-owner-rules-lib.sh at brief creation; config/merge-gate runs owner-rules/bin/jg-owner-rules-gate.sh' > "$f"
 # 0 when this gate already runs the owner-rules gate, directly or behind another add-on's chain: follow the
@@ -30,6 +32,7 @@ gate_runs_owner_rules() {  # gate_runs_owner_rules <gate file>
 }
 if [ -e "$MG" ] || [ -L "$MG" ]; then
   if grep -qxF "$MARK" "$MG" 2>/dev/null; then :
+  elif grep -qxF "$LEGACY_MARK" "$MG" 2>/dev/null; then echo "repointed: $MG ran the retired add-ons clone; it now runs this checkout's owner-rules gate"
   elif gate_runs_owner_rules "$MG"; then echo "kept: $MG already runs the owner-rules gate behind another add-on's chain"
   elif [ -e "$PREV" ] || [ -L "$PREV" ]; then echo "error: $MG is not ours and $PREV exists; move one aside and rerun" >&2; exit 1
   else mv "$MG" "$PREV"; fi
