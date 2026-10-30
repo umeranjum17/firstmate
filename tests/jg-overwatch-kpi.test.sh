@@ -140,7 +140,7 @@ test_landed_asks_the_forge_and_the_backlog() {
   fakebin="$TMP_ROOT/fakebin"
   printf '#!/bin/sh\nprintf "number: 41\\nmerged: yes\\n"\n' > "$fakebin/gh-axi"
   chmod +x "$fakebin/gh-axi"
-  in_home "$home" "$SCRIPT_DIR_TASKS" add export-fix-q1 "add CSV export" >/dev/null 2>&1 \
+  in_home "$home" "$SCRIPT_DIR_TASKS" add export-fix-q1 "[feature] add CSV export" --body "users cannot export their data without it" >/dev/null 2>&1 \
     || fail "creating the backlog ticket failed"
   in_home "$home" "$SCRIPT_DIR_TASKS" 'done' export-fix-q1 >/dev/null 2>&1 \
     || fail "closing the backlog ticket failed"
