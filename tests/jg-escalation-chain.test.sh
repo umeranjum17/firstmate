@@ -253,8 +253,10 @@ test_dead_lead_still_reaches_the_board_and_relaunch_represents() {
   PANES='' cycle "$m"
   grep -q '^jg-send lead1 .*Your worker w1' "$m/sent" || fail "a dead lead got no durable steer"
   ! grep -q '^jg-control' "$m/sent" || fail "a dead lead was interrupted"
-  grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
-    || fail "a dead lead's stuck worker never reached the board: $(cat "$m/cards" 2>&1)"
+  ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
+    || fail "a worker's question went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "an unsettled wait was not recorded for Main to decide"
   # The relaunched lead re-presents its open waits on its first cycle.
   l=$(home dead-lead)
   printf 'lead1\n' > "$l/.jg-squad-lead-home"
@@ -336,8 +338,11 @@ test_two_hops_stuck_at_once() {
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
   grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" || fail "the stuck lead got no card: $(cat "$m/cards" 2>&1)"
-  grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" || fail "its stuck worker got no card: $(cat "$m/cards" 2>&1)"
-  pass "a lead stuck on a prompt and its stuck worker each reach the board"
+  ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
+    || fail "its stuck worker's question reached the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "its stuck worker's wait was not recorded for Main to decide"
+  pass "a lead stuck on a prompt reaches the board, and its worker's question goes to Main"
 }
 
 test_main_absent_board_card_still_fires() {
@@ -352,9 +357,12 @@ test_main_absent_board_card_still_fires() {
   PANES=1 cycle "$m" absent
   PANES=1 cycle "$m" absent
   grep -q 'level=main' "$m/events" || fail "Main's rung never fired: $(cat "$m/events")"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-w1-.*-dep-card' "$m/cards" || fail "no card while Main was absent: $(cat "$m/cards" 2>&1) $(cat "$m/err")"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-w1-.*-dep-card' "$m/cards" 2>/dev/null \
+    || fail "a wait Main had not settled went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the unsettled wait was not recorded for Main while it was absent"
   [ -s "$m/state/.wake-queue" ] || fail "the fixture did not keep Main's wakes unread"
-  pass "with Main absent and its wakes unread, the board card still fires"
+  pass "with Main absent and its wakes unread, the unsettled wait is recorded for Main"
 }
 
 test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
@@ -394,8 +402,10 @@ test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
   IFS=$'\t' read -r first nudged card < "$relay"
   printf '%s\t%s\t%s\n' "$((first - 4000))" "$nudged" "$card" > "$relay"
   PANES=1 CARD_SECS=3600 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card .*--title Start the stalled lead backlog?' "$m/cards" \
-    || fail "a stalled backlog never reached the board: $(cat "$m/cards" 2>&1) $(cat "$m/err")"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card' "$m/cards" 2>/dev/null \
+    || fail "a lead's own park-or-retry call went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "a stalled backlog was not recorded for Main to decide"
   backlog "$l" hold alpha --reason "waits on the vendor"
   cycle "$l"
   grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-cleared: lead1 ready backlog: no ready work' "$f" \
@@ -404,7 +414,8 @@ test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
   PANES=1 CARD_SECS=3600 cycle "$m"
   PANES=1 CARD_SECS=3600 cycle "$m"
   [ -z "$(ls "$m/state/.waiting-relay/" 2>/dev/null)" ] || fail "Main kept relaying a cleared stall"
-  grep -q '^dismiss waiting-timer-.*-ready-backlog-card' "$m/cards" || fail "the card stayed after the lead held the item"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded backlog wait disappeared when the item was held"
   pass "a ready item on a free lane with nothing started for 10 minutes wakes the lead and Main, re-fires every interval, reaches the board, and clears when held"
 }
 
@@ -498,7 +509,10 @@ test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_bo
   IFS=$'\t' read -r first nudged card < "$relay"
   printf '%s\t%s\t%s\n' "$((first - 4000))" "$nudged" "$card" > "$relay"
   PANES=1 CARD_SECS=3600 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card ' "$m/cards" || fail "the idle lead's backlog never reached the board: $(cat "$m/cards" 2>&1)"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card' "$m/cards" 2>/dev/null \
+    || fail "the idle lead's backlog went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the idle lead's backlog was not recorded for Main to decide"
   # A lane that starts work ends it: the report closes and the card goes.
   printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$l/state/w2.meta"
   : > "$l/state/w2.status"
@@ -507,8 +521,9 @@ test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_bo
   grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\].*waiting-timer-cleared: lead1 ready backlog: the lead started work' "$f" || fail "a start left Main's report open: $(cat "$f")"
   PANES=1 CARD_SECS=3600 cycle "$m"
   PANES=1 CARD_SECS=3600 cycle "$m"
-  grep -q '^dismiss waiting-timer-.*-ready-backlog-card' "$m/cards" || fail "the card stayed after the lead started work"
-  pass "an idle lead at its lane floor with no worker working is woken again, reported to Main, steered, carded, and cleared when it starts work"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded backlog wait disappeared when the lead started work"
+  pass "an idle lead at its lane floor with no worker working is woken again, reported to Main, steered, recorded for Main, and cleared when it starts work"
 }
 
 test_green_unmerged_pr_climbs_lead_main_and_the_board() {
@@ -540,8 +555,10 @@ test_green_unmerged_pr_climbs_lead_main_and_the_board() {
   # The card follows the wait's own start, so age the report the lead filed.
   sed -i "s/^\(blocked.*since=\)[0-9]*/\1$(($(date +%s) - 4000))/" "$f"
   PANES=1 CARD_SECS=60 cycle "$m"; PANES=1 CARD_SECS=60 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card .*--title Merge the green signoff PR? --why https://github.com/octo/widgets/pull/7 is green and unmerged under yolo' "$m/cards" \
-    || fail "the green PR never reached the board: $(cat "$m/cards" 2>&1) $(cat "$m/err")"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card' "$m/cards" 2>/dev/null \
+    || fail "a green unmerged PR went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Merge the green' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the green unmerged PR was not recorded for Main to decide"
   # The merge ends it: the forge answers merged, the source goes, the report closes, the card is dismissed.
   forge "$l" MERGED false UNKNOWN aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   PANES=1 cycle "$l"; PANES=1 cycle "$l"
@@ -567,8 +584,10 @@ test_green_unmerged_pr_in_the_main_home_wakes_main_then_the_board() {
   grep -q 'check: waiting-state signoff (greenpr, .*level=main' "$m/events" || fail "Main's own rung never fired: $(cat "$m/events")"
   backdate "$m" signoff 10
   PANES=1 CARD_SECS=6 cycle "$m"; PANES=1 CARD_SECS=6 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card .*--title Merge the green signoff PR?' "$m/cards" \
-    || fail "a green PR in the main home never reached the board: $(cat "$m/cards" 2>&1)"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card' "$m/cards" 2>/dev/null \
+    || fail "a green PR in the main home went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Merge the green' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "a green PR in the main home was not recorded for Main to decide"
   pass "a green ready PR under yolo in the main home wakes Main, fires Main's rung, and reaches the board"
 }
 
@@ -710,12 +729,15 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
     grep -q "check: waiting-state w1 ($kind, .*level=main" "$m/events" || fail "$kind did not reach Main: $(cat "$m/events")"
     backdate "$m" w1 5
     PANES=1 cycle "$m"; PANES=1 cycle "$m"
-    grep -q -- "--key waiting-timer-[0-9a-f]*-w1-.*-$kind-card" "$m/cards" || fail "$kind never became a board card: $(cat "$m/cards" 2>&1)"
+    ! grep -q -- "--key waiting-timer-[0-9a-f]*-w1-.*-$kind-card" "$m/cards" 2>/dev/null \
+      || fail "$kind went to the captain's board: $(cat "$m/cards" 2>&1)"
+    grep -q "^- Ask: Unblock stuck" "$m/data/overwatch-decisions.md" 2>/dev/null \
+      || fail "$kind was not recorded for Main to decide"
     printf 'working...\n> \n' > "$m/panes/1"
     PANES=1 cycle "$m"; PANES=1 cycle "$m"
     [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
   done
-  pass "a question dialog, a provider quota wall and a repeating provider error climb owner, Main and the board, and clear with the cause"
+  pass "a question dialog, a provider quota wall and a repeating provider error climb owner and Main, are recorded for Main to decide, and clear with the cause"
 }
 
 test_silent_worker_climbs_whatever_it_declared() {

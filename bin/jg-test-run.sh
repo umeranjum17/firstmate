@@ -557,6 +557,7 @@ tests/jg-backlog-handoff.test.sh 74166
 tests/jg-bearings-board-lavish-live-e2e.test.sh 61
 tests/jg-bearings-board.test.sh 50015
 tests/jg-board-answers.test.sh 2206
+tests/jg-board-gate.test.sh 437
 tests/jg-bootstrap.test.sh 83933
 tests/jg-calm-home-links.test.sh 381
 tests/jg-chat-answer-card.test.sh 1030

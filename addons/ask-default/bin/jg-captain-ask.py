@@ -59,6 +59,14 @@ def row_for(card, since, url):
             card['reason'], card['default']]
 
 
+# The board's must categories (bin/jg-ask-gate-lib.sh). The card carries this
+# mapping in its detail field, so the board gate counts it as a must ask and its
+# re-triage leaves it alone. An owner-only ask is a must by construction.
+MUST_CATEGORY = {'login': 'credential-login', '2fa': 'credential-login',
+                 'physical-grant': 'physical-device', 'own-device-test': 'physical-device',
+                 'destructive-ok': 'discard-unlanded'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('add', 'done', 'list', 'post', 'install'))
@@ -95,6 +103,7 @@ def main():
             require(card['id'] == args.id and args.url in ('done', 'release'), 'ask identity or close mode differs')
             command = ['sign-off-axi', 'raise', '--key', args.text, '--ask-ref', args.id,
                        '--title', card['question'], '--about', '\n'.join(card['context']), '--why', '\n'.join(card['context']),
+                       '--detail', 'must: ' + MUST_CATEGORY[card['owner_must']],
                        '--close', args.url, '--recommend', card['recommend'].lower(),
                        '--recommend-reason', card['reason'], '--default', card['default'].lower()]
             for label, outcome in card['options']:

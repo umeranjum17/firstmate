@@ -109,7 +109,7 @@ Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
 | secrets-path prompt (`.env`, `~/.config`, a home's `data/` or `config/`) | at once | the watcher rejects it and tells the worker why |
 | any other prompt, question, decision, or blocker | first sight, then `JG_WAIT_ALERT_SECS` | the owning home is woken |
 | still open | `JG_WAIT_ESCALATE_SECS` | a lead home reports `waiting-timer-overdue` to Main; Main steers the lead at once, interrupting it first when it is busy mid-turn, naming the worker and its wait |
-| still open | `JG_WAIT_CARD_SECS` | the main home posts a guarded board card, and dismisses it when the wait ends |
+| still open | `JG_WAIT_CARD_SECS` | the main home posts a guarded board card, and dismisses it when the wait ends; a wait that is not a credential or login ask is recorded for Main to decide instead, because the board takes only a must ask (`bin/jg-ask-gate-lib.sh`) |
 
 - A lead's own supervision not running is a Main wait from lead liveness, so a
   dead hop never goes silent; a dead lead rides its relaunch.
@@ -148,7 +148,7 @@ An item whose project's declared capacity is already held cannot start now, so i
 | ready work that could start | first sight | the existing ready-work wake asks the lead to dispatch |
 | nothing started | `JG_READY_STALL_SECS` (default 600) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main naming the lead and the ready task ids, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
 | still nothing started | every `JG_PROMPT_REALERT_SECS` | both fire again |
-| still open | `JG_WAIT_CARD_SECS` after Main's watcher first saw the report | the main home posts a guarded board card, and dismisses it when the report is resolved |
+| still open | `JG_WAIT_CARD_SECS` after Main's watcher first saw the report | the stalled backlog is recorded for Main to decide, not posted: a lead's own park-or-retry call is never the captain's |
 
 - A start is a lane id that was not open before; it ends the episode and re-arms the clock.
 - The condition clearing (no startable ready item, a worker provably working at the floor, or a free lane gone) ends the episode, and a reported one is closed with `waiting-timer-cleared`.

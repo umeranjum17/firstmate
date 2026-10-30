@@ -119,11 +119,11 @@ test_failed_delivery_is_retried_and_reported_once() {
 test_question_card_route_records_the_owner() {
   local d out
   d=$(setup card)
-  out=$(run "$d" "$CARD" post --route muxr --decision-key use-key --title Q-for-muxr --ask-ref m1)
+  out=$(run "$d" "$CARD" post --route muxr --decision-key use-key --title Q-for-muxr --ask-ref m1 --must design-pick)
   assert_equals $'lead=muxr\ndecision=use-key' "$(cat "$d/home/state/board-routes/$out")" "the route was not recorded under the printed card key"
-  out=$(run "$d" "$CARD" post --route ghost --title Q2 --ask-ref m1) && fail "a route to an unknown lead was accepted"
+  out=$(run "$d" "$CARD" post --route ghost --title Q2 --ask-ref m1 --must design-pick) && fail "a route to an unknown lead was accepted"
   [ "$(jq '.items | length' "$d/so/.sign-off/decisions.json")" = 1 ] || fail "a refused route still posted a card"
-  run "$d" "$CARD" post --decision-key x --title Q3 --ask-ref m1 > /dev/null && fail "--decision-key without --route was accepted"
+  run "$d" "$CARD" post --decision-key x --title Q3 --ask-ref m1 --must design-pick > /dev/null && fail "--decision-key without --route was accepted"
   pass "jg-question-card post --route records the owning lead and refuses an unknown one before posting"
 }
 

@@ -156,7 +156,7 @@ test_question_rule_blocks_until_a_card_is_cited() {
     return 0
   }
   local key
-  key=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 \
+  key=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 --must design-pick \
     --title "Should the fix merge now?" --why "The fix is green and in scope." \
     --outcome yes="It merges once the captain says so." --outcome no="It waits for his review." \
     --recommend yes --recommend-reason "His word is the merge call." --default no 2>/dev/null)
@@ -168,7 +168,7 @@ test_question_rule_blocks_until_a_card_is_cited() {
   assert_equals 0 "$rc" "a reply citing an open board card was still flagged"
 
   local again
-  again=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 \
+  again=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 --must design-pick \
     --title "Should the fix merge now?" --why "The fix is green and in scope." \
     --outcome yes="It merges once the captain says so." --outcome no="It waits for his review." \
     --recommend yes --recommend-reason "His word is the merge call." --default no 2>/dev/null)

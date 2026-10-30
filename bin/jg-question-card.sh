@@ -28,6 +28,10 @@
 #        the answer straight to that lead and closes its decision <slug>
 #        (default: the card key). Cards Main files for a lead name it. Neither
 #        flag reaches sign-off-axi.
+#        --must <category> is the gate (bin/jg-ask-gate-lib.sh): it is written
+#        into the card's detail field as "must: <category>", and on the
+#        when-it-matters leash a post with none is refused and recorded for
+#        Overwatch (bin/jg-board-gate.sh route) instead of posted.
 # answer Record the captain's chat answer on its card, in the same turn he gave
 #        it: sign-off-axi has no command for this, so the line sign-off-axi
 #        itself writes for a board answer is appended to the board's answers log
@@ -68,6 +72,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-question-lib.sh
 . "$SCRIPT_DIR/jg-question-lib.sh"
+# shellcheck source=bin/jg-ask-gate-lib.sh
+. "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 # shellcheck source=bin/jg-board-link-lib.sh
 . "$SCRIPT_DIR/jg-board-link-lib.sh"
 
@@ -89,6 +95,7 @@ split_board() {
   BOARD=''
   ROUTE=''
   DECISION_KEY=''
+  MUST=''
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -107,6 +114,11 @@ split_board() {
         [ $# -gt 0 ] || die "--decision-key needs a key"
         DECISION_KEY=$1
         ;;
+      --must)
+        shift
+        [ $# -gt 0 ] || die "--must needs a category ($(jg_ask_categories_words))"
+        MUST=$1
+        ;;
       *) ARGS+=("$1") ;;
     esac
     shift
@@ -119,6 +131,16 @@ has_flag() {  # <flag>  -> 0 when the remaining arguments carry it
     [ "$arg" = "$want" ] && return 0
   done
   return 1
+}
+
+set_detail() {  # <value>: keep exactly one --detail pair in ARGS
+  local out=() i=0
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    if [ "${ARGS[$i]}" = --detail ]; then i=$((i + 2)); continue; fi
+    out+=("${ARGS[$i]}")
+    i=$((i + 1))
+  done
+  ARGS=(${out[@]+"${out[@]}"} --detail "$1")
 }
 
 flag_value() {  # <flag> -> the value that follows it
@@ -134,13 +156,31 @@ flag_value() {  # <flag> -> the value that follows it
 }
 
 cmd_post() {
-  local title ask_ref before after key board out link rc=0
+  local title ask_ref before after key board out link rc=0 refusal rec filer detail
   split_board "$@"
   require_signoff
   title=$(flag_value --title)
   ask_ref=$(flag_value --ask-ref)
   [ -n "$title" ] || die "refused: post needs --title \"<the one question>\"; it is the card's title"
   [ -n "$ask_ref" ] || die "refused: post needs --ask-ref <the owner message or hold this question answers>; sign-off-axi requires it for a new Decide card"
+
+  # The board gate (bin/jg-ask-gate-lib.sh): the card's detail field carries its
+  # must category, and under the when-it-matters leash no other ask is posted.
+  if [ -n "$MUST" ]; then
+    detail=$(flag_value --detail)
+    [ "$(jg_ask_card_category "$detail")" = "$MUST" ] || detail="${detail:+$detail }must: $MUST"
+    set_detail "$detail"
+  else
+    MUST=$(jg_ask_card_category "$(flag_value --detail)")
+  fi
+  if ! refusal=$(jg_ask_gate_refusal "$MUST" "$BOARD"); then
+    filer=$(flag_value --filer)
+    rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$title" --filer "${filer:-${SIGN_OFF_FILER:-unknown}}" --ref "$ask_ref" 2>&1) \
+      || rec=''
+    printf '%s\n' "$refusal" >&2
+    [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
+    exit 1
+  fi
 
   [ -z "$DECISION_KEY" ] || [ -n "$ROUTE" ] || die "refused: --decision-key only closes a lead's decision, so it needs --route <lead>"
   # Check the lead first: a refused route must not leave an unrouted card behind.
