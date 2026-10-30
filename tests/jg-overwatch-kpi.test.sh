@@ -102,11 +102,14 @@ test_a_miss_needs_a_link_to_code_work() {
 }
 
 test_scorecard_counts_misses_and_excludes_the_old_ones() {
-  local home="$TMP_ROOT/score" now day ago_old ago_week
+  local home="$TMP_ROOT/score" now day ago_week ago_old
   make_home "$home"
   now=$(date +%s)
   day=$(date -u -d "@$now" +%F 2>/dev/null || date -u -r "$now" +%F)
-  ago_week=$(date -u -d "@$((now - 2 * 86400))" +%F 2>/dev/null || date -u -r "$((now - 2 * 86400))" +%F)
+  # One miss two days back is inside the trailing week; one ten days back is
+  # outside it, so the scorecard must leave the older one out entirely.
+  ago_week=$((now - 2 * 86400))
+  ago_old=$((now - 10 * 86400))
   submit "$home" "why is the export PR still not open?"
   in_home "$home" "$KPI" tag feedback https://github.com/acme/juggernaut/pull/41 >/dev/null \
     || fail "tagging a miss failed"
@@ -115,7 +118,7 @@ test_scorecard_counts_misses_and_excludes_the_old_ones() {
     || fail "tagging a miss failed"
   # Two misses this week but not today, and one older than the week, which the
   # scorecard must leave out of the live counts entirely.
-  jq -cn --argjson e "$((now - 2 * 86400))" '{seq: 3, epoch: $e, text: "chased again"}, {tag: 3, epoch: $e, kind: "feedback", link: "https://github.com/acme/juggernaut/pull/43"}, {seq: 4, epoch: ($e - 8 * 86400), text: "old chase"}, {tag: 4, epoch: ($e - 8 * 86400), kind: "feedback", link: "https://github.com/acme/juggernaut/pull/44"}' \
+  jq -cn --argjson week "$ago_week" --argjson old "$ago_old" '{seq: 3, epoch: $week, text: "chased again"}, {tag: 3, epoch: $week, kind: "feedback", link: "https://github.com/acme/juggernaut/pull/43"}, {seq: 4, epoch: $old, text: "old chase"}, {tag: 4, epoch: $old, kind: "feedback", link: "https://github.com/acme/juggernaut/pull/44"}' \
     >> "$home/data/overwatch-kpi.jsonl"
   local card
   card=$(in_home "$home" "$KPI" scorecard --json) || fail "the scorecard refused to run"
