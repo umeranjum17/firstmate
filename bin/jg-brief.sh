@@ -14,9 +14,12 @@
 # charters still use a single `{TASK}` charter fill. Juggernaut may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab]
+# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab] [--medium <mobile|web|desktop|cli|backend>]
 #        jg-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        jg-brief.sh <task-id> --squad-lead {<project>...|--no-projects}
+#   --medium names the project's medium at intake, so the brief can carry this
+#   home's stack advice from config/preferred-stack.json. It is a recommendation,
+#   never a gate, and is optional.
 #   --scout writes the scout contract instead: the deliverable is a report at
 #   data/<task-id>/report.md (no branch, no push, no PR) and the worktree is scratch.
 #   It offers the Lavish review loop only when `jg-bootstrap.sh lavish-compatible`
@@ -220,6 +223,8 @@ esac
 . "$SCRIPT_DIR/jg-dod-lib.sh"
 # shellcheck source=bin/jg-role-lib.sh
 . "$SCRIPT_DIR/jg-role-lib.sh"
+# shellcheck source=bin/jg-preferred-stack-lib.sh
+. "$SCRIPT_DIR/jg-preferred-stack-lib.sh"
 PAUSED_VERB=${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}
 IFS= read -r -d '' OPERATOR_PAUSE_INSTRUCTIONS <<EOF || true
    Use \`$PAUSED_VERB: {why}\` - never \`blocked:\` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
@@ -282,6 +287,7 @@ RISK=
 RISK_SET=0
 PROJECT_DIR=
 PROJECT_DIR_SET=0
+MEDIUM=
 POS=()
 want_value=
 for a in "$@"; do
@@ -297,6 +303,7 @@ for a in "$@"; do
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
+      medium) MEDIUM=$a ;;
       design-call) DESIGN_CALL=$a ;;
       design-reason) DESIGN_REASON=$a ;;
       demo-call) DEMO_CALL=$a ;;
@@ -327,6 +334,8 @@ for a in "$@"; do
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
     --project) want_value="project" ;;
     --project=*) PROJECT_DIR=${a#--project=}; PROJECT_DIR_SET=1 ;;
+    --medium) want_value=medium ;;
+    --medium=*) MEDIUM=${a#--medium=} ;;
     --design-call) want_value="design-call" ;;
     --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
     --design-reason) want_value="design-reason" ;;
@@ -923,6 +932,15 @@ The merge is refused without the two lines, or with a dropped item and no quote.
   UI_SECTION="$UI_SECTION
 "
 fi
+# The home's stack and layout advice (config/preferred-stack.json and
+# config/architecture.json) is a recommendation the brief carries and the worker
+# may override; a project that already has its own stack or layout wins. The
+# medium comes from intake because a manifest cannot reveal it reliably; the
+# language is read from an existing project's manifest.
+STACK_SECTION=$(jg_stack_section "$CONFIG" "$MEDIUM" "$PROJECT_DIR")
+STACK_BLOCK=
+[ -z "$STACK_SECTION" ] || STACK_BLOCK="$STACK_SECTION"$'\n'
+
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
 RISK_SECTION=
 if [ -n "$RISK" ]; then
@@ -938,6 +956,7 @@ You are a operator: an autonomous worker agent managed by juggernaut. Work on yo
 $TASK_SECTION
 $DESIGN_SECTION$DEMO_SECTION$UI_SECTION$RISK_SECTION
 $HERDR_SECTION
+$STACK_BLOCK
 
 # Setup
 $SETUP_BASE

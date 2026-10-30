@@ -1631,6 +1631,51 @@ test_branch_prefix_command_is_shell_safe() {
   pass "jg-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands"
 }
 
+# config/preferred-stack.json and config/architecture.json are advice, never a
+# gate. A new project's brief carries the home's stack for its medium, an
+# existing project keeps the stack and layout it already has, and a malformed
+# file warns once and still lets the brief build.
+test_preferred_stack_is_advice_never_a_gate() {
+  local home brief out status newproj existing
+  home="$TMP_ROOT/stack-home"
+  newproj="$TMP_ROOT/stack-new"
+  existing="$TMP_ROOT/stack-existing"
+  mkdir -p "$home/data" "$home/config" "$newproj" "$existing"
+  cat > "$home/config/preferred-stack.json" <<'EOF'
+{
+  "rules": [
+    { "when": "A phone app.", "use": { "medium": "mobile", "stack": "React Native" }, "why": "One codebase, two stores." }
+  ],
+  "default": { "stack": "", "why": "Pick what fits this project." }
+}
+EOF
+  cp "$ROOT/docs/examples/architecture.json" "$home/config/architecture.json"
+  echo '{"dependencies":{"react-native":"0.79"}}' > "$existing/package.json"
+
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-stack-new-a1 some-proj --mode direct-PR \
+    --medium mobile --project "$newproj" >/dev/null 2>&1 || fail "new mobile brief failed to scaffold"
+  brief="$home/data/brief-stack-new-a1/brief.md"
+  # shellcheck disable=SC2016 # The expected brief text contains a literal backtick.
+  assert_grep 'Stack for `mobile`: **React Native**' "$brief" "new mobile brief did not name the configured stack"
+  assert_grep "never a gate" "$brief" "brief did not mark the stack advice as a recommendation"
+
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-stack-existing-a2 some-proj --mode direct-PR \
+    --medium mobile --project "$existing" >/dev/null 2>&1 || fail "existing-project brief failed to scaffold"
+  brief="$home/data/brief-stack-existing-a2/brief.md"
+  assert_grep "already uses React Native" "$brief" "existing project's own stack was not kept"
+  # shellcheck disable=SC2016 # Literal backticks must remain unexpanded.
+  assert_no_grep 'Stack for `mobile`' "$brief" "existing project was told to change to the home's stack"
+
+  printf '{oops' > "$home/config/preferred-stack.json"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-stack-bad-a3 some-proj --mode direct-PR \
+    --medium mobile --project "$newproj" 2>&1); status=$?
+  expect_code 0 "$status" "a malformed preferred-stack.json must never fail a brief"
+  assert_contains "$out" "PREFERRED_STACK: invalid config/preferred-stack.json - malformed JSON" \
+    "a malformed preferred-stack.json did not warn"
+  assert_present "$home/data/brief-stack-bad-a3/brief.md" "a malformed preferred-stack.json blocked the brief"
+  pass "jg-brief.sh: preferred stack is advice, an existing project wins, a malformed file warns"
+}
+
 test_worker_role_scope
 
 # Rule 2 governs file edits rather than pool administration, so every operator
@@ -1792,3 +1837,4 @@ test_delivery_risk_reason() {
   pass "jg-brief.sh: --risk states the no-mistakes risk, is refused elsewhere, and config/delivery-risk-loose turns it off"
 }
 test_delivery_risk_reason
+test_preferred_stack_is_advice_never_a_gate

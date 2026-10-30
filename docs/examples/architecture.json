@@ -1,0 +1,44 @@
+{
+  "rules": [
+    {
+      "when": "The project is written in JavaScript.",
+      "use": {
+        "language": "javascript",
+        "layout": "`src/` for source, `test/` mirroring it, `bin/` for executables, one entry file at the package root.",
+        "practices": "Small single-purpose modules, no build step without a measured need, a test beside the module it covers, never commit `node_modules`."
+      },
+      "why": "Node resolves from the package root, so a shallow documented tree beats a deep one."
+    },
+    {
+      "when": "The project is written in TypeScript.",
+      "use": {
+        "language": "typescript",
+        "layout": "`src/` for source, `test/` mirroring it, shared types in `src/types/` only when more than one module uses them.",
+        "practices": "`strict` on, no `any` at a trust boundary, types beside their implementation, one compile target."
+      },
+      "why": "Strict types with colocated declarations stop the type surface drifting from the code."
+    },
+    {
+      "when": "The project is written in Python.",
+      "use": {
+        "language": "python",
+        "layout": "`<package>/` for the importable package, `tests/` for tests, one `pyproject.toml` at the root for packaging and tool config.",
+        "practices": "An isolated virtualenv, type hints on public functions, `ruff` for lint and format, no logic in `__init__.py`."
+      },
+      "why": "One pyproject plus a real package directory is the layout every tool already expects."
+    },
+    {
+      "when": "The project is written in Go.",
+      "use": {
+        "language": "go",
+        "layout": "`cmd/<binary>/` for entry points, `internal/` for private packages, `pkg/` only for genuinely reusable code.",
+        "practices": "Return errors rather than panicking, accept interfaces and return structs, table-driven `_test.go` beside the package."
+      },
+      "why": "`internal/` makes the public surface a deliberate choice rather than an accident."
+    }
+  ],
+  "default": {
+    "layout": "",
+    "why": "No layout is preferred. Follow the best practice for the language in use, then add a rule above when a layout should hold across projects."
+  }
+}
