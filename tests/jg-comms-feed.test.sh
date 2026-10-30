@@ -81,6 +81,19 @@ test_a_steer_and_its_reply_land_in_order_once_each() {
     "$before"*) : ;;
     *) fail "the feed rewrote or reordered earlier lines" ;;
   esac
+  # A pass that carries prior state and emits one new message must not lose a
+  # cursor key: the NEXT unchanged pass is where a lost key re-emits what the
+  # feed already recorded, so run one and hold the line count.
+  run "$d" "$FEED_SH" sync > /dev/null || fail "fourth sync failed"
+  [ "$(wc -l < "$d/home/state/comms-feed.jsonl")" = 5 ] \
+    || fail "an incremental pass repeated messages:"$'\n'"$(feed "$d")"
+  [ -z "$(feed "$d" | jq -r '[.ts, .from, .kind, .text] | @tsv' | sort | uniq -d)" ] \
+    || fail "the feed holds the same message twice:"$'\n'"$(feed "$d")"
+  # The cursor is one "key<TAB>value" per line. A value that swallowed another
+  # key (a newline lost between passes) shows up here as an extra field, which is
+  # what silently re-emits already-recorded messages two passes later.
+  awk -F'\t' 'NF != 2 { print "malformed cursor line: " $0; bad = 1 } END { exit (bad ? 1 : 0) }' \
+    "$d/home/state/.comms-feed-cursor" || fail "the cursor lost a key onto another line"
   pass "a steer and its reply land in the feed in order, once each, append-only"
 }
 

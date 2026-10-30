@@ -186,6 +186,10 @@ cf_has() {  # <key> -> true when it is already recorded, this pass included
 }
 
 cf_defer() {  # <key> <value>; written once this pass's messages are durable
+  # The value read from the cursor file ends without a newline ($(cat) strips
+  # it), so open a line before the first append or this key would glue itself
+  # onto the last recorded one and corrupt both.
+  [ -z "$CF_ALL" ] || [ "${CF_ALL: -1}" = $'\n' ] || CF_ALL="$CF_ALL"$'\n'
   PENDING="$PENDING$1"$'\t'"$2"$'\n'
   CF_ALL="$CF_ALL$1"$'\t'"$2"$'\n'
 }
