@@ -64,8 +64,9 @@
 #   - `add` (or `create`) whose item does not say what kind of work it is and
 #     why: the title must start with a type tag, one of [captain-ask],
 #     [feature], [design-ux], [security] or [blocker], and the first line of
-#     --body or --body-file must be a one-line justification (the captain's own
-#     words for [captain-ask]). Anything else - refactors, extra proof, tooling,
+#     --body or --body-file must be a one-line summary (the captain's own
+#     words for [captain-ask]), followed by short Captain, Ask, Why and Done when
+#     lines. Anything else - refactors, extra proof, tooling,
 #     follow-ups - belongs in a report, not the backlog. The local presence flag
 #     config/backlog-intake-loose in this home turns the check off;
 #   - `add`/`create` of a [captain-ask] item with a --priority other than 0, or
@@ -77,6 +78,10 @@
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
 #     (JG_TASK_PRIORITY_CHECK overrides the path); when it is not installed this
 #     does nothing.
+# Ticket keys (bin/jg-ticket-key.sh owns the contract): a key such as JG-101 given where a
+# task id goes is resolved to its slug before tasks-axi runs, `show` prints the key under
+# the id, `list --keys` puts each row's key first, and a successful `add` keys the new
+# ticket when the home has a registered prefix.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
@@ -190,6 +195,24 @@ for arg in "$@"; do
 done
 
 [ -z "$cap_next" ] || fail "--captain-quote and --confirm-card each need a value"
+
+# A ticket key names its slug wherever a task id goes; a title or any other value is left alone.
+TICKET_KEY="$SCRIPT_DIR/jg-ticket-key.sh"
+LIST_KEYS=0
+_jg_keyed=()
+for _jg_arg in ${ARGS[@]+"${ARGS[@]}"}; do
+  case "$_jg_arg" in
+    --keys) [ "${1:-}" = list ] && { LIST_KEYS=1; continue; } ;;
+    [A-Z][A-Z]-[0-9]*|[A-Z][A-Z][A-Z]-[0-9]*|[A-Z][A-Z][A-Z][A-Z]-[0-9]*)
+      case "${1:-}" in add|create) ;; *)
+        _jg_slug=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$TICKET_KEY" resolve "$_jg_arg" 2>/dev/null) && _jg_arg=$_jg_slug ;;
+      esac ;;
+  esac
+  _jg_keyed+=("$_jg_arg")
+done
+ARGS=(${_jg_keyed[@]+"${_jg_keyed[@]}"})
+unset _jg_keyed _jg_arg _jg_slug
+key_tool() { JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$TICKET_KEY" "$@"; }
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/jg-bootstrap.sh for the install command"
 
 JG_BACKLOG_TRANSITION_ERROR=
@@ -370,8 +393,20 @@ fi
 case "${1:-}" in
   show|view|list)
     set -o pipefail
-    tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
+    if [ "${1:-}" = list ] && [ "$LIST_KEYS" = 1 ]; then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire | key_tool annotate
+    elif [ "${1:-}" = list ]; then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
+    else
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire | key_tool annotate-show
+    fi
     exit $?
+    ;;
+  add|create)
+    tasks-axi ${ARGS[@]+"${ARGS[@]}"}
+    _jg_rc=$?
+    [ "$_jg_rc" -ne 0 ] || key_tool sync >&2 || true
+    exit "$_jg_rc"
     ;;
 esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}
