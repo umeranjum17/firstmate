@@ -44,6 +44,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest prints, refusing an entry with no owner words, no scope, or no enforcement point |
 | `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it; `--route <lead>` names the lead that owns the answer |
 | `jg-proof-attach.sh`      | Find a task's done-done receipt and proof media, refuse a text-only card for UI or video work, and put the proof on the ready, review or merged board card and the PR body |
+| `jg-overwatch-kpi.sh`    | Record each typed captain message, tag it new work, decision answer, feedback, or micromanagement, and refuse a feedback or micromanagement tag without a link to a ticket or PR on this repository |
 | `jg-question-lib.sh`     | Shared question-rule predicate: does a reply end in a question, and does it cite an open board card |
 | `jg-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), Recon, Squad Lead charter, and Herdr-lab briefs, with Captain's intent and Juggernaut spec subsections on ship/scout |
 | [`jg-dod-lib.sh`](../bin/jg-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |

@@ -66,6 +66,12 @@ The guard finds the transcript's last human message, takes the open cards cited 
 The banner names `bin/jg-question-card.sh answer <key> --words "<his words>"`, which appends his exact words to the board's answers log so the card reads as answered; the board-answers check then carries a routed card's answer to its lead.
 It is charged once per distinct answer, recorded in `state/.chat-answer-flagged`, and covers Main and lead homes alike.
 
+## Overwatch KPI rule
+
+The captain should come only for a major decision only he can take or to file new work, so every captain message is tagged in the turn it arrives.
+At the same boundary, after the question rule, the guard blocks while the newest captain message `bin/jg-overwatch-kpi.sh` recorded is untagged, with one exit-2 banner naming its `tag` command.
+It is charged once per message, recorded in `state/.overwatch-kpi-flagged`, and a primary whose harness has no prompt hook records nothing, so it is never blocked.
+
 ## Guard predicates
 
 The turn-end guard checks primary scope first, then supervision need, then watcher health.

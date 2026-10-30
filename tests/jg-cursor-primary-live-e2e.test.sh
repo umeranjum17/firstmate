@@ -69,6 +69,8 @@ git -C "$HOME_DIR" -c user.email=fmtest@example.invalid -c user.name=fmtest \
   || harness_fail "the working tree ships no .cursor/hooks.json; there is nothing to verify"
 
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/data" "$HOME_DIR/config"
+# The prompts are scripted, not a captain's, so the Overwatch KPI does not count them.
+printf 'off\n' > "$HOME_DIR/config/overwatch-kpi"
 # A unique token the session-start digest must carry into model context.
 printf '# Captain\n\nLive marker: %s\n' "$MARKER" > "$HOME_DIR/data/captain.md"
 printf '# Backlog\n\n- live probe\n' > "$HOME_DIR/data/backlog.md"

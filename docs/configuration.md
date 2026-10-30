@@ -369,6 +369,12 @@ The primary-authoritative propagation contract, including removal of a mate's lo
 `config/supervision-host` is local to each home and not inherited, because each home's engine and model are its own choice.
 While the home runs the host, main's lease-checked commands also take the per-task lease lock, so a claim by the host's engine cannot race a mutation main already started (`bin/jg-lease-lib.sh`).
 
+## Overwatch KPI (config/overwatch-kpi)
+
+Every captain message a Claude or Cursor primary receives is recorded and must be tagged in the turn it arrives; `bin/jg-overwatch-kpi.sh` owns the ledger, the kinds, and the link a miss needs, and [turnend-guard.md](turnend-guard.md#overwatch-kpi-rule) owns the turn-end refusal.
+It is on by default.
+A local `config/overwatch-kpi` reading `off` stops recording, which is for a lab whose prompts are scripted rather than typed by a captain.
+
 ## Backlog backend (.tasks.toml / config/backlog-backend)
 
 The tracked `.tasks.toml` pins the default `tasks-axi` markdown backend to `data/backlog.md`, with `done_keep = 10` and an archive at `data/done-archive.md`.

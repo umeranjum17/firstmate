@@ -35,6 +35,11 @@
         "type": "command",
         "command": "\"$CURSOR_PROJECT_DIR\"/bin/jg-host-mirror.sh hook cursor",
         "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "\"$CURSOR_PROJECT_DIR\"/bin/jg-overwatch-kpi.sh hook cursor",
+        "timeout": 10
       }
     ],
     "afterAgentResponse": [

@@ -71,6 +71,8 @@ SH
 chmod +x "$PROJECT/bin/tool-logger.sh"
 
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/config" "$HOME_DIR/data"
+# The prompt is scripted, not a captain's, so the Overwatch KPI does not count it.
+printf 'off\n' > "$HOME_DIR/config/overwatch-kpi"
 printf 'project=fixture\nwindow=fixture\nbackend=tmux\n' > "$HOME_DIR/state/task.meta"
 # A numeric pid above the supported OS pid range is a demonstrably dead prior
 # harness owner under jg_harness_pid_alive, matching the reproduced incident.
