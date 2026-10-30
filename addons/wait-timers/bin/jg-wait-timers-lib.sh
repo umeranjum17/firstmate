@@ -121,7 +121,7 @@ jg_wait_timer_source_delivered() {  # <task> <window> <declaration>
 # is stable for the wait, so posting again keeps the one open card. The board
 # refuses an id in a title, so the title names the task in plain words.
 jg_wait_timer_card() {  # <task> <card-key> <verb> <source> [title] [why]
-  local words why guard=() title pr
+  local words why guard=() must=() title pr
   words=$(printf '%s' "$1" | tr -cs 'A-Za-z' '\n' | grep -E '^[A-Za-z]{2,}$' | head -6 | paste -sd' ' -) || true
   title=${5:-"Unblock stuck ${words:-work}?"}
   why=${6:-"$1 is stuck on: $4. Its owner and Main were told and have not cleared it."}
@@ -132,13 +132,17 @@ jg_wait_timer_card() {  # <task> <card-key> <verb> <source> [title] [why]
       why=${6:-"$pr is green and unmerged under yolo. Its owner and Main were told and have not merged it."} ;;
   esac
   [ "${#why}" -le 200 ] || why="${why:0:197}..."
-  case "$3" in prompt*) guard=(--guard security) ;; esac
+  # The board gate takes only a must ask (bin/jg-ask-gate-lib.sh). A worker stuck
+  # on a prompt is waiting on a credential or login, which is one; every other
+  # wait is Main's to settle, so the gate records it there and the board stays
+  # the captain's alone.
+  case "$3" in prompt*) guard=(--guard security); must=(--must credential-login) ;; esac
   (cd "$JG_HOME" && SIGN_OFF_FILER=juggernaut-watch "$_JG_WAIT_TIMER_DIR/jg-question-card.sh" post \
     --ask-ref "waiting-$1" --key "$2" --title "$title" --why "$why" \
     --detail "Task $1, wait $3. Card $2. It closes by itself when the wait ends." \
     --outcome yes="Main clears or answers the wait now." --outcome no="It stays stuck until you steer it." \
     --recommend yes --recommend-reason "Its owner and Main were alerted and the wait is still open." \
-    --default no ${guard[@]+"${guard[@]}"} --priority P1) >/dev/null 2>&1 \
+    --default no ${guard[@]+"${guard[@]}"} ${must[@]+"${must[@]}"} --priority P1) >/dev/null 2>&1 \
     || { echo "waiting timers: board card for $1 was not posted (sign-off-axi refused or is missing)" >&2; return 1; }
 }
 

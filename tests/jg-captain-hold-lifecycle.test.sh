@@ -662,7 +662,7 @@ signoff_hold() {  # <home> <task-id> <addons-dir> <log> <stub-status>
     JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     SIGNOFF_LOG="$log" SIGNOFF_STATUS="$status" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Route the card" \
-    --reason "captain must decide" --repo sample
+    --must design-pick --reason "captain must decide" --repo sample
 }
 
 # A hold that creates a task runs the task-priority add-on check when installed:
