@@ -81,7 +81,7 @@ ok - retention creates no false teardown refusal and pending no longer prunes
 ok - expiry escalation is pinned by FMX_NOW_OVERRIDE
 ok - brief fails explicitly when typed deliverable keys are unavailable
 ok - pre-change registrations are open loops and un-rechainable, never a crash
-ok - teardown reports an unreconciled legacy Relay link
+ok - teardown refuses an unreconciled legacy Relay link
 ok - squad lead promotion matches teardown parent resolution
 ok - a public loop bound to a remote squad lead home delivers and retires
 ok - delivered remote registrations skip offline collection routes

@@ -41,6 +41,12 @@
 #       recoverable rather than posting with a local default.
 #       On any other post failure: leaves the link in place so it can be
 #       retried, exit non-zero.
+#
+# A retryable hold is recorded in state/x-followup-held/<task-id> so it outlives
+# this process: bin/jg-x-poll.sh raises that marker once on its next cycle, which
+# is what makes a held follow-up retry itself instead of waiting on agent memory.
+# A successful post, an explicit --clear, and an exhausted binding all remove the
+# marker, so a marker that is gone means nothing is held.
 #     Window or cap already exhausted: clears the link, posts nothing, exit 0
 #       (silent skip).
 #     Not linked: nothing to do, exit 0.
@@ -213,6 +219,16 @@ case "$ID" in
   ''|.*|*[!A-Za-z0-9._-]*) echo "jg-x-followup: unsafe task id: $ID" >&2; exit 2 ;;
 esac
 
+HELD_DIR="$STATE/x-followup-held"
+held_mark() {  # <task-id> <request-id> <reason>
+  fmx_private_artifact_dir_prepare "$HELD_DIR" >/dev/null 2>&1 || return 0
+  printf '%s\t%s\n' "$2" "$3" \
+    | fmx_private_artifact_publish_stdin "$HELD_DIR" "$1" 600 >/dev/null 2>&1 || true
+}
+held_clear() {  # <task-id>
+  rm -f -- "$HELD_DIR/$1" 2>/dev/null || true
+}
+
 META="$STATE/$ID.meta"
 if [ -e "$META" ] || [ -L "$META" ]; then
   jg_backlog_record_present "$META" "task record" "$STATE" \
@@ -226,6 +242,7 @@ if [ "$MODE" = clear ]; then
     fmx_meta_link_clear "$META" \
       || { echo "jg-x-followup: could not clear the link in state/$ID.meta" >&2; exit 1; }
   fi
+  held_clear "$ID"
   printf '%s\n' "$ID"
   exit 0
 fi
@@ -269,6 +286,7 @@ if [ "$COUNT" -ge "$MAX_COUNT" ]; then
 fi
 
 if [ "$EXPIRED" = 1 ]; then
+  held_clear "$ID"
   fmx_meta_link_clear "$META" || echo "jg-x-followup: warning: could not clear the elapsed link in state/$ID.meta" >&2
   if [ "$MODE" = check ]; then
     exit 1
@@ -303,6 +321,7 @@ post_rc=$?
 
 case "$post_rc" in
   0)
+    held_clear "$ID"
     NEWCOUNT=$((COUNT + 1))
     if [ "$FINAL" = 1 ] || [ "$NEWCOUNT" -ge "$MAX_COUNT" ]; then
       if ! fmx_meta_link_clear "$META"; then
@@ -326,6 +345,7 @@ case "$post_rc" in
     # the follow-up can post once both values are recoverable. Never clear the
     # link here.
     echo "jg-x-followup: follow-up for $ID held: reply context lacks an authoritative platform or explicit budget; left the link in place to retry once both values are recoverable" >&2
+    held_mark "$ID" "$RID" "reply context lacks an authoritative platform or explicit budget"
     exit 1
     ;;
   9)
@@ -343,6 +363,7 @@ case "$post_rc" in
     # Post failed for another reason (network, auth, transport): leave the link
     # so juggernaut can retry on a later pass.
     echo "jg-x-followup: follow-up post failed for $ID; left the link in place to retry" >&2
+    held_mark "$ID" "$RID" "the follow-up post failed"
     exit 1
     ;;
 esac

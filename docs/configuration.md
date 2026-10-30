@@ -1990,6 +1990,7 @@ Add `--image <path>` there too when a completion follow-up should carry an image
 - The relay itself rejects a follow-up past its own cap or window with HTTP 409 and may include `{"error":"followup_unavailable"}` in the response body; the client surfaces any follow-up 409 as a distinguishable exit code and uses the body marker only for a sharper diagnostic.
 - `jg-x-followup.sh` treats that exit exactly like a locally-detected expiry - clearing the link and skipping quietly rather than retrying - so an older single-follow-up relay or an already-exhausted binding degrades gracefully.
 - It treats `jg-x-reply.sh`'s fail-safe refusal (exit 8: platform or explicit budget unresolved) differently: that is a retryable hold, so the link is KEPT and the follow-up is retried once both values can be recovered, never posted with a local default.
+  `bin/jg-x-followup.sh` records that hold in `state/x-followup-held/<id>`, and the next `bin/jg-x-poll.sh` cycle raises one `x-followup-held <task-id>` wake and drops the marker, so the retry is a durable wake rather than agent memory; a retry that fails again records a new hold.
 - Past-window relay rejections are only guaranteed while the expired binding row still exists on the relay side; after its cleanup sweep, a very-late follow-up call may instead see a benign no-op 200, which is why the local window and cap pruning remains the primary guard.
 
 **Split replies by platform**
@@ -2111,6 +2112,8 @@ Unreconciled terminal results ride the existing 30-second relay poll rather than
 
 The session-start digest separately prints a "Public commitments" subsection from disk when, and only when, this home is relay-active and still holds an open public loop (a reply still owed, or a delivered loop with nothing owed), so compaction and restart are non-events.
 `bin/jg-teardown.sh` refuses to clean up a task while this home still owes a public reply for exactly that work, unless `--force` carries explicit discard approval.
+It refuses the same way while a task still carries an uncleared lightweight Relay link, because cleanup removes the record that makes that reply reconcilable.
+`bin/jg-x-poll.sh` raises an `x-followup-held <task-id>` wake once per recorded hold (`state/x-followup-held/`), so a held follow-up is retried on the relay's own cadence instead of waiting on a milestone wake that may never come.
 
 `JG_PF_RETRY_BACKOFF_SECS` (default 900) sets the next-attempt time recorded with a retryable delivery error.
 See [verification/public-followup.md](verification/public-followup.md) for the current maintainer evidence behind restart recovery, failed terminal outcomes, retained-loop disposition, and the relay-disabled zero-overhead guarantee.
