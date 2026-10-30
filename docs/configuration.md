@@ -374,6 +374,16 @@ While the home runs the host, main's lease-checked commands also take the per-ta
 The tracked `.tasks.toml` pins the default `tasks-axi` markdown backend to `data/backlog.md`, with `done_keep = 10` and an archive at `data/done-archive.md`.
 A home may instead select another tasks-axi adapter such as Beads through its own `.tasks.toml` or `TASKS_AXI_BACKEND`; Juggernaut still uses only tasks-axi verbs for routine backlog reads and mutations, and the adapter maps `start` and evidence-bearing `done` transitions to its native statuses and evidence fields.
 
+### Backlog intake (config/backlog-intake-loose)
+
+`bin/jg-tasks-axi.sh add` files only work that says what it is and why it matters.
+The title starts with a type tag: `[captain-ask]`, `[feature]`, `[design-ux]`, `[security]` or `[blocker]`.
+The first line of the body is a one-line justification; for `[captain-ask]` it is the captain's own words.
+Anything else, such as refactors, extra proof, tooling or review follow-ups, goes in a report instead of the backlog.
+An item without both is refused before it reaches the backlog, and the refusal names what is missing.
+`juggernaut-axi ticket` takes the justification as `--why`.
+The optional local, gitignored presence flag `config/backlog-intake-loose` turns the check off for that home.
+
 ### Captain holds on Beads
 
 Captain-hold row creation is owned by [`bin/jg-captain-hold.sh`](../bin/jg-captain-hold.sh) `hold`: when no work item exists, it creates an ordinary backlog row (`--kind captain` metadata; Beads native type `task`) and then applies the captain hold.

@@ -44,8 +44,10 @@ commands:
   message <task-id> <text>
                          append a steering message to one known task (text of
                          at most 8 KiB, not starting with / or $)
-  ticket <title> [--repo <name>] [--kind <ship|scout|docs>] [--priority <0-3>]
-                         queue a new ticket (never starts work)
+  ticket <title> --why <text> [--repo <name>] [--kind <ship|scout|docs>] [--priority <0-3>]
+                         queue a new ticket (never starts work); the title starts
+                         with a type tag and --why says why it is worth doing
+                         (bin/jg-tasks-axi.sh owns that intake rule)
 
   serve [--port <n>] [--reads-per-minute <n>]
                          opt-in loopback (127.0.0.1) read-only HTTP API; needs an
@@ -199,6 +201,7 @@ cmd_ticket() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo|--kind|--priority) [ $# -ge 2 ] || die "$1 needs a value"; args+=("$1" "$2"); shift ;;
+      --why) [ $# -ge 2 ] || die "$1 needs a value"; args+=(--body "$2"); shift ;;
       -*) die "unknown ticket argument: $1" ;;
       *) [ -z "$title" ] || die "ticket takes one title"; title=$1 ;;
     esac

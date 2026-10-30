@@ -61,6 +61,13 @@
 #     no longer closes a ticket the captain asked for, because a rejected option is a reason to redo
 #     it, never to cancel. The quote or card is recorded in the ticket note (`done`) and in
 #     data/captain-closures.md; both flags are consumed here and never reach tasks-axi.
+#   - `add` (or `create`) whose item does not say what kind of work it is and
+#     why: the title must start with a type tag, one of [captain-ask],
+#     [feature], [design-ux], [security] or [blocker], and the first line of
+#     --body or --body-file must be a one-line justification (the captain's own
+#     words for [captain-ask]). Anything else - refactors, extra proof, tooling,
+#     follow-ups - belongs in a report, not the backlog. The local presence flag
+#     config/backlog-intake-loose in this home turns the check off;
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
@@ -258,9 +265,38 @@ captain_guard() {  # <tasks-axi args>
       ;;
   esac
 }
+# Strict intake: a new item names its type and why it is worth doing (see the
+# header), so the backlog holds asked-for or user-facing work, not busy work.
+intake_check() {  # <tasks-axi add args...>
+  local title body='' mint=0 positional=()
+  [ ! -e "$JG_HOME/config/backlog-intake-loose" ] || return 0
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --body) body=${2-}; shift ;;
+      --body=*) body=${1#--body=} ;;
+      --body-file) body=$(cat -- "${2-}" 2>/dev/null); shift ;;
+      --body-file=*) body=$(cat -- "${1#--body-file=}" 2>/dev/null) ;;
+      --mint) mint=1 ;;
+      --kind|--repo|--blocked-by|--pr|--report|--priority|--prefix) shift ;;
+      -*) ;;
+      *) positional+=("$1") ;;
+    esac
+    shift
+  done
+  if [ "$mint" = 1 ]; then title=${positional[0]-}; else title=${positional[1]-}; fi
+  case "$title" in
+    '[captain-ask]'*|'[feature]'*|'[design-ux]'*|'[security]'*|'[blocker]'*) ;;
+    *) fail "a new item needs a type: start the title with [captain-ask], [feature], [design-ux], [security] or [blocker]; other work goes in a report, not the backlog" ;;
+  esac
+  body=${body%%$'\n'*}
+  [ -n "${body//[[:space:]]/}" ] \
+    || fail "a new item needs a justification: make the first line of --body say why it is worth doing (the captain's words for [captain-ask])"
+}
 # Optional task-priority add-on: a new task must carry a priority. No-op when not installed.
 case "${1:-}" in
   add|create)
+    intake_check ${ARGS[@]+"${ARGS[@]}"}
     PRIORITY_CHECK="${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
     if [ -x "$PRIORITY_CHECK" ]; then
       "$PRIORITY_CHECK" ${ARGS[@]+"${ARGS[@]}"} >/dev/null || exit $?
