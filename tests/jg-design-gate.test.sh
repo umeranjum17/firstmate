@@ -35,7 +35,11 @@ jg_dod_meta_value() { sed -n "s/^$2=//p" "$1" | tail -1; }
 printf 'worktree=%s\nbase_branch=main\ndesign_call=no\n' "$repo" > "$lead/state/w1.meta"
 out=$(JG_HOME=$lead jg_dod_design_gate "$lead/state" w1 "$lead/state/w1.meta" "$head" 2>&1) && fail "oversize hand-rolled work merged: $out"
 assert_contains "$out" "past the small-tweak size" "oversize merge refusal"
-jq -n --arg h "$head" '{schema:1,task:"w1",head:$h,verdict:"PASS",evidence:"first-draft receipt: run.json",at:1}' > "$lead/state/w1.run-receipt.json"
+# The receipt is resolved: a make run record that lists the generated page, never a
+# bare reference the gate cannot read.
+jq -n --arg f "$repo/designs/option-1.html" '{made:{command:"make",files:[{file:$f}]}}' > "$lead/state/w1-fd.json"
+jq -n --arg h "$head" --arg e "first-draft receipt: $lead/state/w1-fd.json" \
+  '{schema:1,task:"w1",head:$h,verdict:"PASS",evidence:$e,at:1}' > "$lead/state/w1.run-receipt.json"
 JG_HOME=$lead jg_dod_design_gate "$lead/state" w1 "$lead/state/w1.meta" "$head" >/dev/null 2>&1 || fail "oversize work with a first-draft receipt was refused"
 pass "a change past the size rule needs first-draft whatever its design call"
 
