@@ -35,6 +35,26 @@ def evidence(source, item, row):
     return stage, terminal or bool(explicit), link
 
 
+def assignee(source, item, lead):
+    """Who owns a ticket, from this home's own records, never typed by hand: the owning lead alone while no worker runs
+    the ticket, and that worker's model and tool (its harness as the record names it) while one does. Work with no
+    owning lead says so plainly, so the board can tell no owner from a feed that never carried the field."""
+    if not lead: return {'lead': 'unassigned', 'live': False}
+    state = source / 'state'
+    meta = state / (item + '.meta')
+    props = dict(line.split('=', 1) for line in meta.read_text().splitlines() if '=' in line) if meta.exists() else {}
+    status = state / (item + '.status')
+    last = next((line for line in reversed(status.read_text().splitlines()) if line.strip()), '') if status.exists() else ''
+    verb = re.match(r'^(?:\d+\s+)?([a-z-]+)\b', last)
+    live = bool(props.get('window') or props.get('endpoint')) and not (state / (item + '.exit')).exists() \
+        and (verb[1] if verb else '') not in ('done', 'failed')
+    who = {'lead': lead, 'live': live}
+    if live:
+        for field, key in (('model', 'model'), ('harness', 'tool')):
+            if props.get(field): who[key] = props[field]
+    return who
+
+
 def newest_event(source, item, row):
     """Newest status [at=] stamp; else noon-UTC of backlog closed/created; None when unknown."""
     status = source / 'state' / (item + '.status')

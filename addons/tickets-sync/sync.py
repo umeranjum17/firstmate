@@ -22,7 +22,7 @@ import xml.etree.ElementTree as xml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from task_rows import toon_rows
-from lane import progress as lane_progress
+from lane import progress as lane_progress, assignee as lane_assignee
 import cleanup
 import reconcile
 from hierarchy import UPKEEP, INTERNAL, parents as request_parents, title as request_title
@@ -74,8 +74,43 @@ def register_icon(board, project, registry):
     registry[project.lower()] = digest
     return None
 
+UNOWNED = dict(lead='unassigned', live=False)
+
 def ticket_id(home, item):
     return "jg-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
+
+def feed_path(board):
+    # sign-off keeps its ticket feed beside the board: decisions.json -> decisions.tickets.jsonl.
+    return Path(re.sub(r'\.json$', '', str(board)) + '.tickets.jsonl')
+
+def feed_records(text):
+    """The newest feed line per ticket, as written; a torn or empty line is skipped."""
+    records = {}
+    for line in text.splitlines():
+        try: record = json.loads(line) if line.strip() else None
+        except ValueError: continue
+        if record and record.get('id'): records[record['id']] = record
+    return records
+
+def write_assignee(path, tid, record, desired, ends_with_newline):
+    """Append the ticket's own record again, its fields as this pass sets them, carrying the assignee the board shows.
+    sign-off's writer takes no assignee field and its format lets another program append lines in the same shape, one
+    JSON object and a newline per write, so the newest line is the whole record and every other field reads as before."""
+    line = dict(record)
+    for key, value in desired.items():
+        if key == 'assignee': continue
+        if key == 'pr':
+            if value: line['prs'] = [value]
+            else: line.pop('prs', None)
+        elif key in ('hold', 'asked'): line[key] = value == 'yes'
+        elif key == 'last-event-at': line['last_event_at'] = int(value)
+        elif value == '': line.pop(key, None)
+        else: line[key] = value
+    line.update(id=tid, assignee=desired['assignee'], at=dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, 'w') as feed:
+        feed.write(('' if ends_with_newline else '\n') + json.dumps(line) + '\n')
+    return line
 
 def sync():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -122,6 +157,12 @@ def sync():
         ordered = list(homes.items())
         if resume.get('home') in homes: ordered = ordered[list(homes).index(resume['home']):]
         existing = {t['id']: t for t in json.loads(run(['sign-off-axi', 'ticket', str(board), '--json']))['tickets']}
+        feed_file = feed_path(board)
+        feed_text = feed_file.read_text() if feed_file.exists() else ''
+        feed, feed_ends = feed_records(feed_text), not feed_text or feed_text.endswith('\n')
+        # The board's own read drops the assignee, so the feed's newest line per ticket is what the pass compares against.
+        for tid, record in feed.items():
+            if tid in existing and record.get('assignee') is not None: existing[tid]['assignee'] = record['assignee']
         # One open ticket per piece of work is the board's own rule, so the sync must not fight it: a source item whose
         # work the board already tracks under another id is left alone instead of failing the whole pass as a twin.
         def work_key(t):
@@ -140,7 +181,7 @@ def sync():
             temp = path.with_suffix('.tmp'); temp.write_text(json.dumps(value)); temp.replace(path)
         seen = set()
         def publish(tid, desired, derived=()):
-            nonlocal changed
+            nonlocal changed, feed_ends
             seen.add(tid)
             if options.check:
                 if options.cleanup: return
@@ -153,6 +194,7 @@ def sync():
             old = existing.get(tid, {})
             def settled(key, value):
                 stored = old.get({'pr': 'prs', 'last-event-at': 'last_event_at'}.get(key, key))
+                if key == 'assignee': return stored == value
                 # The board stores an absent field as null, and derives a grouping row's roll-up.
                 if stored is None: stored = [] if key == 'pr' else ''
                 if key == 'pr': value = [value] if value else []
@@ -167,8 +209,12 @@ def sync():
                 if ledger.get(tid) != digest: ledger[tid] = digest; save(ledger_file, ledger)
                 return
             args = ['sign-off-axi', 'ticket', str(board), '--id', tid]
-            for key, value in desired.items(): args += ['--' + key, str(value)]
+            for key, value in desired.items():
+                if key != 'assignee': args += ['--' + key, str(value)]
             run(args); changed += 1
+            if 'assignee' in desired:
+                feed[tid] = write_assignee(feed_file, tid, feed.get(tid, {}), desired, feed_ends)
+                feed_ends = True
             updated = dict(old)
             for key, value in desired.items():
                 if key == 'pr': updated['prs'] = [value] if value else []
@@ -182,10 +228,10 @@ def sync():
             if name not in homes or not sep or not item: raise RuntimeError('--close requires a registered HOME/ITEM')
 
         upkeep_id = ticket_id('fleet', ':upkeep')
-        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued'), ('progress',))
+        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued', assignee=UNOWNED), ('progress',))
         for tid, old in existing.items():
             if tid.startswith('jg-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
-                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done'), ('progress',))
+                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done', assignee=UNOWNED), ('progress',))
             elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
                 publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
         for name, source in ordered:
@@ -277,7 +323,7 @@ def sync():
                 if parent in tasks and ticket_id(name, parent) not in ledger:
                     required.add(parent); ids.append(parent)
                 parent_id = ticket_id(name, parent) if parent in tasks else '' if root_ask else upkeep_id
-                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=release_value[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no')
+                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=release_value[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no', assignee=lane_assignee(source, item, name))
                 if item not in parents:
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
