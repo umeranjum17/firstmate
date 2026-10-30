@@ -6,7 +6,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work=$(mktemp -d "${JG_TICKETS_TEST_ROOT:-${TMPDIR:-/tmp}}/tickets-sync-skip.XXXXXX")
 trap 'echo "retained fixture: $work"' EXIT
-fork=${JG_TEST_FORK:-$HOME/juggernaut}
+fork=${JG_TEST_FORK:-$(cd "$root/.." && pwd -P)}
 export HOME=$work/user XDG_DATA_HOME=$work/xdg SIGN_OFF_HOME=$work/signoff
 export JG_HOME=$work/main
 mkdir -p "$HOME" "$JG_HOME"/{data,config,state}
