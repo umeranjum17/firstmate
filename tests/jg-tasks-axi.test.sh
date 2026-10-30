@@ -477,7 +477,7 @@ test_wrapper_refuses_untyped_or_unjustified_items() {
   rc=0
   out=$(wrapper_from_code "$dir" add --mint "export a report" --body "users ask for it" 2>&1) || rc=$?
   expect_code 2 "$rc" "minted add with no type tag"
-  assert_no_grep "in-1\|in-2\|export a report" "$dir/home/data/backlog.md" "a refused add still reached the backlog"
+  ! grep -q "in-1\|in-2\|export a report" "$dir/home/data/backlog.md" || fail "a refused add still reached the backlog"
   printf '\nusers lose work without it\n' > "$dir/why.md"
   rc=0
   wrapper_from_code "$dir" add in-3 "[security] lock the token file" --body-file "$dir/why.md" >/dev/null 2>&1 || rc=$?
