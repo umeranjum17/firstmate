@@ -59,7 +59,7 @@ printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$M" > "$
 printf 'kind=squad_lead\nmode=squad_lead\nbackend=tmux\nwindow=fake:1\nharness=claude\nhome=%s\n' "$L" > "$M/state/lead1.meta"
 : > "$M/state/lead1.status"
 printf '4\n' > "$L/config/lane-target"
-JG_HOME="$L" "$FORK/bin/jg-tasks-axi.sh" add alpha "ship the routed fix" --priority 1 >/dev/null || { echo "fixture: backlog add failed"; exit 1; }
+JG_HOME="$L" "$FORK/bin/jg-tasks-axi.sh" add alpha "[feature] ship the routed fix" --priority 1 --body "users wait on the routed fix" >/dev/null || { echo "fixture: backlog add failed"; exit 1; }
 
 START=$(date +%s)
 stamp() { printf '+%4ss' "$(( $(date +%s) - START ))"; }
