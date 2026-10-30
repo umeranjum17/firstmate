@@ -62,12 +62,30 @@ edit() {
 # opencode [--remove] [--dry-run]: the provider layer. The list goes into opencode's own per-provider whitelist for the
 # providers the list names, and nothing else; one line when it changes or repairs that file, nothing when it is already
 # right. The fleet check runs it every pass, so an opencode update or a config rewrite cannot silently unlock every model.
+# The shared config is one file every OpenCode lane reads, so it is written in one place only: under a lock, from a
+# temp file beside it, checked for a non-empty JSON object, then renamed over it. Anything else is refused and the
+# original stays.
 opencode_conf() {
-  local mode=set dry=0 a p wl conf work old
+  local mode=set dry=0 a conf n=0 rc
   for a in "$@"; do case $a in --remove) mode=del ;; --dry-run) dry=1 ;; *) die "usage: jg-model-gate opencode [--remove] [--dry-run]" ;; esac; done
   conf=${OPENCODE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json}
   [ -f "$conf" ] && [ -r "$LIST" ] || return 0
-  work=$(mktemp "${TMPDIR:-/tmp}/opencode-model-gate.XXXXXX") || die "cannot write beside $conf"
+  # mkdir lock; a lock whose owner pid is gone is stale and taken over.
+  until mkdir -- "$conf.lock" 2>/dev/null; do
+    kill -0 "$(cat -- "$conf.lock/pid" 2>/dev/null)" 2>/dev/null || { rm -rf -- "$conf.lock"; continue; }
+    n=$((n + 1)); [ "$n" -le 300 ] || die "cannot lock $conf (held by pid $(cat -- "$conf.lock/pid" 2>/dev/null))"
+    sleep 0.1
+  done
+  echo $$ >"$conf.lock/pid"
+  ( opencode_apply "$mode" "$dry" "$conf" ); rc=$?
+  rm -rf -- "$conf.lock"
+  return $rc
+}
+opencode_apply() {
+  local mode=$1 dry=$2 conf=$3 p wl work old
+  work=$(mktemp "$conf.tmp.XXXXXX") || die "cannot write beside $conf"
+  # shellcheck disable=SC2064 # expand now: $work is local and gone when the trap fires
+  trap "rm -f -- '$work' '$work.tmp'" EXIT
   cp -p "$conf" "$work"
   while IFS= read -r p; do
     jq -e --arg p "$p" '.provider[$p] != null' "$work" >/dev/null 2>&1 || continue
@@ -83,9 +101,10 @@ opencode_conf() {
       say restored "the opencode whitelist for $p to $wl (was $old); list: $LIST"
     fi
   done < <(jq -r 'keys[]' "$LIST")
-  if cmp -s "$conf" "$work"; then rm -f -- "$work"; return 0; fi
-  [ "$dry" = 0 ] || { say would-write "$conf"; rm -f -- "$work"; return 0; }
-  cp -p "$conf" "$conf.bak-model-gate-$(date +%s)"
+  cmp -s "$conf" "$work" && return 0
+  [ "$dry" = 0 ] || { say would-write "$conf"; return 0; }
+  [ -s "$work" ] && jq -e 'type == "object"' "$work" >/dev/null 2>&1 || die "refusing to write $conf: the new content is empty or not a JSON object; $conf is unchanged"
+  cp -p "$conf" "$conf.bak-model-gate-$(date +%s)-$$" || die "cannot back up $conf; it is unchanged"
   chmod --reference="$conf" "$work" 2>/dev/null || true
   mv -f -- "$work" "$conf"
 }
