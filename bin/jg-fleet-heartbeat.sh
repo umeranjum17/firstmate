@@ -37,7 +37,13 @@
 #        JG_FLEET_HEARTBEAT_REFIRE_SECS (default 600) while it stays there, and
 #        one line when it recovers; the watcher turns each line into a wake for
 #        Main. An unchanged healthy fleet prints nothing.
-#        State: state/.fleet-heartbeat/<home> (verdict, since, last fired).
+#        A finished lane that was never closed is reported the same way:
+#        `fleet heartbeat: <home> lane <id> is done but still open - land it and
+#        close it`, once and again only after the re-fire window. The proof is the
+#        lane's authoritative current state (bin/jg-crew-state.sh, local reads only):
+#        done while its worker endpoint still answers, which is work nobody landed.
+#        State: state/.fleet-heartbeat/<home> (verdict, since, last fired) and
+#        state/.fleet-heartbeat/lane-<home>-<id> for a reported lane.
 # arm    Writes state/fleet-heartbeat.check.sh and binds it with
 #        jg-check-register.sh. disarm retires it with jg-check-unregister.sh.
 #        A Squad Lead home refuses arm: the primary home reads it.
@@ -119,8 +125,45 @@ cmd_rows() {
   done < "$reg"
 }
 
+# 0 when lane <id> in <home> is authoritatively done while its worker endpoint still
+# answers: the work finished but nobody landed and closed the lane (owner rule 12).
+# One jg-crew-state.sh read per lane, local sources only (JG_CREW_STATE_NO_FORGE).
+lane_done_but_open() {  # <id> <home>
+  local line state src last
+  [ -f "$2/state/$1.meta" ] || return 1
+  # Cheap pre-filter: only a lane whose log already says done can be finished, so
+  # the authoritative read runs for those alone.
+  last=$(grep -E '^done[ :[]' "$2/state/$1.status" 2>/dev/null | tail -1)
+  [ -n "$last" ] || return 1
+  line=$(env JG_HOME="$2" JG_STATE_OVERRIDE="$2/state" JG_DATA_OVERRIDE="${JG_DATA_OVERRIDE:-$2/data}" \
+    JG_CREW_STATE_NO_FORGE=1 "${JG_CREW_STATE_BIN:-$SCRIPT_DIR/jg-crew-state.sh}" "$1" 2>/dev/null) || true
+  case "$line" in state:*) ;; *) return 1 ;; esac
+  state=${line#state: }; state=${state%% *}
+  src=${line#*source: }; src=${src%% *}
+  [ "$state" = "done" ] && [ "$src" = pane ]
+}
+
+# cmd_check's second half: one line per finished-but-open lane, on the same
+# first-sighting and re-fire cadence as a home verdict.
+check_open_lanes() {  # <home-label> <home-dir>
+  local label=$1 home=$2 meta id rec old since fired
+  for meta in "$home"/state/*.meta; do
+    [ -f "$meta" ] || continue
+    id=${meta##*/}; id=${id%.meta}
+    lane_done_but_open "$id" "$home" || continue
+    rec=$DIR/lane-$label-$id old='' since=$NOW fired=0
+    [ ! -f "$rec" ] || IFS=$'\t' read -r old since fired < "$rec"
+    if [ "$old" != open ] || [ "$fired" -eq 0 ] || [ $((NOW - fired)) -ge "$REFIRE_SECS" ]; then
+      printf 'fleet heartbeat: %s lane %s is done but still open - land it and close it\n' "$label" "$id"
+      fired=$NOW
+    fi
+    printf 'open\t%s\t%s\n' "$since" "$fired" > "$rec.tmp" && mv -f -- "$rec.tmp" "$rec"
+  done
+}
+
 cmd_check() {
-  local dir=$STATE/.fleet-heartbeat rows id verdict working target ready waits age why rec old since fired
+  local dir=$STATE/.fleet-heartbeat rows id verdict working target ready waits age why rec old since fired reg line
+  DIR=$dir
   mkdir -p "$dir" || die "cannot write $dir"
   rows=$(cmd_rows)
   while IFS=$'\t' read -r id verdict working target ready waits age why; do
@@ -140,6 +183,15 @@ cmd_check() {
   done <<EOF
 $rows
 EOF
+  check_open_lanes overwatch "$JG_HOME"
+  reg=$(jg_compat_pick "$JG_HOME/data/squad_leads.md")
+  [ -f "$reg" ] || return 0
+  while IFS= read -r line; do
+    squad_lead_registry_parse_line "$line" || continue
+    [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 0 ] || continue
+    [ -d "$SQUAD_LEAD_REGISTRY_HOME" ] || continue
+    check_open_lanes "$SQUAD_LEAD_REGISTRY_ID" "$SQUAD_LEAD_REGISTRY_HOME"
+  done < "$reg"
 }
 
 cmd_arm() {
