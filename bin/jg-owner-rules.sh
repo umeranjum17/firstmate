@@ -97,6 +97,11 @@ seed_entries() {
 - Enforced by: bin/jg-owner-rules.sh; bin/jg-session-start.sh
 - Owner's words: "also these corrections I make should be in juggernaut not just in your memory the whole system should understand these things"
 
+## 2026-10-30 - A correction leaves a rule or a ticket in the turn it lands
+- Scope: every owner correction, in every project
+- Enforced by: bin/jg-turnend-guard.sh; bin/jg-owner-correction.sh
+- Owner's words: "I don't want these feedbacks as one time fix this need to go into juggernaut as feedback so it doesn't repeat again"
+
 ## 2026-10-25 - Questions go on the board
 - Scope: every captain-facing reply that asks him something
 - Enforced by: bin/jg-turnend-guard.sh; bin/jg-question-card.sh

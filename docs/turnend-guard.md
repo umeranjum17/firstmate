@@ -17,7 +17,7 @@ Do not infer this guard's scope, loop safety, or compatibility tradeoffs for tho
 | Question | Start here |
 | --- | --- |
 | What the guard enforces | [Current invariant](#current-invariant) |
-| The question rule at the turn boundary | [Question rule](#question-rule) |
+| The question rule, and a correction no rule or ticket captured | [Question rule](#question-rule) and [Owner-correction capture rule](#owner-correction-capture-rule) |
 | Which sessions are in scope and what counts as supervision need | [Primary scope](#primary-scope) and [supervision need](#supervision-need) |
 | How the turn-end check and the mid-turn pull warning judge watcher health | [Strict watcher check at the turn boundary](#strict-watcher-check-at-the-turn-boundary) and [pull-warning verdict by supervision model](#pull-warning-verdict-by-supervision-model) |
 | Away and quiet mode | [Away and quiet mode daemon ownership](#away-and-quiet-mode-daemon-ownership) |
@@ -71,6 +71,21 @@ It is charged once per distinct answer, recorded in `state/.chat-answer-flagged`
 The captain should come only for a major decision only he can take or to file new work, so every captain message is tagged in the turn it arrives.
 At the same boundary, after the question rule, the guard blocks while the newest captain message `bin/jg-overwatch-kpi.sh` recorded is untagged, with one exit-2 banner naming its `tag` command.
 It is charged once per message, recorded in `state/.overwatch-kpi-flagged`, and a primary whose harness has no prompt hook records nothing, so it is never blocked.
+
+## Owner-correction capture rule
+
+The owner's standing rule (`data/owner-rules.md`) is that a correction he gives in chat must not stay a one-time fix, so the turn that follows one must leave something the whole system reads.
+At the same boundary, after the KPI rule, the guard asks `bin/jg-owner-correction.sh` whether the recorded correction is captured, and blocks once per correction when it is not.
+The correction is the newest captain message whose newest KPI tag kind is `feedback` or `micromanagement`.
+That tag is the record this fleet already keeps for "he told us how to work", so the trigger is that record and never the guard's reading of his tone, and the KPI rule above has already required it.
+
+Either artefact captures it, and both are commands that already exist:
+
+- A rule: `data/owner-rules.md` was written at or after the correction, which `bin/jg-owner-rules.sh add` does.
+- A ticket: the backlog holds a row created on or after the correction's UTC date, or `data/ticket-counters.tsv` was written at or after it, which `bin/jg-tasks-axi.sh add` does.
+
+A turn that writes either artefact ends normally, and the charge (`state/.owner-correction-flagged`) keeps every harness bounded to one block per correction; a home whose harness records no captain message records no correction, exactly as for the KPI rule.
+The check ships from this repository's own `bin/` with the guard, so a home that fast-forwards gets both, and a home whose guard runs without `bin/jg-owner-correction.sh` - or whose copy cannot answer - is never read as "nothing pending": the guard prints a `THIS HOME HAS NOT PICKED UP OWNER-CORRECTION CAPTURE` banner once (`state/.owner-correction-unavailable`) instead of pretending it ran.
 
 ## Guard predicates
 
@@ -591,6 +606,8 @@ That warning uses `bin/jg-supervision-instructions.sh --repair-line`, so it alwa
 - Typed field precedence.
 - Malformed input.
 - Exactly-one-path safety.
+
+`tests/jg-owner-correction.test.sh` covers the correction rule: an uncaptured correction is flagged once with both exact commands named, an owner rule ends the turn, an enforcement ticket ends the turn, new work is never read as a correction, and a home without the shared check says so once.
 
 `tests/jg-turnend-foreign-owner-arm-fix.test.sh` runs the extracted isolated executable reproduction against real auto-arm and turn-end guard scripts.
 It proves that a live foreign owner still prevents arming while repeated non-owner Stops receive a diagnostic and exit safely.

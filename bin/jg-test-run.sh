@@ -591,6 +591,7 @@ tests/jg-omp-primary-live-e2e.test.sh 58
 tests/jg-on.test.sh 18857
 tests/jg-opencode-primary-live-e2e.test.sh 56
 tests/jg-overwatch-kpi.test.sh 1388
+tests/jg-owner-correction.test.sh 1388
 tests/jg-owner-rules.test.sh 3036
 tests/jg-pi-branch-live-e2e.test.sh 56
 tests/jg-pi-primary-live-e2e.test.sh 58

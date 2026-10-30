@@ -143,6 +143,7 @@ Load `task-dispatch` at every intake: it owns project resolution, Squad Lead rou
 
 - A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code.
 - Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
+- An owner correction is never a one-time fix: the turn that follows one must leave an owner rule (`bin/jg-owner-rules.sh add`) or an enforcement ticket, and the turn-end guard flags it otherwise ([`docs/turnend-guard.md`](docs/turnend-guard.md)).
 
 Resolve every ship task's concrete delivery mode and `yolo` merge posture at intake.
 A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.
