@@ -1,14 +1,14 @@
 # Tickets sync
 
 Run `JG_HOME=<fleet-home> bash tickets-sync/install.sh` from merged main to register the existing watcher's poll; `--dry-run` writes nothing.
-Requires Python 3.11+, gh-axi, tasks-axi, sign-off-axi 0.6.9+ and Juggernaut's backlog libraries; the board comes from `config/fleet-board`.
+Requires Python 3.11+, gh-axi, tasks-axi, sign-off-axi 0.9.10+ and Juggernaut's backlog libraries; the board comes from `config/fleet-board`.
 Backlogs stay read-only: archive headings are normalized in retained copies under `state/tickets-sync/` before tasks-axi reads them.
 Open work and seven days of completed work are backfilled by stable home/item hashes; lane status and linked GitHub PR state supply queued (0), building (30), review/CI (65), merging (90), and done (100) progress, plus the matching `--stage` word and `--last-event-at` from the newest status `[at=]` stamp or backlog created/closed day (omitted when unknown).
-Parked homes and held items stay On hold; completion clears hold.
+Parked homes and held items stay On hold, always with the reason the board needs: the item's own `hold_reason`, or the parking that holds a whole home; completion clears hold.
 Confirmed `parent: <item id>` wins even for captain-tagged work.
 Unparented captain asks are roots, titled with their stored quote or plain recorded title; other work joins a unique same-project ask sharing a specific brief phrase, or the single fleet-wide `Not from your asks (fleet upkeep)` root.
 Legacy placeholder records move under that root as earlier grouping history; internal home names are cleared from project fields.
-Each poll uses a field-hash ledger and a 20-second cursor budget; mid-pass continue notes go to `state/tickets-sync/progress.log` (check stdout wakes Main). A finished pass with changes prints one summary; failures print on stderr. `sync.py --audit` runs the full ticket list separately.
+Each poll uses a field-hash ledger and a 20-second cursor budget; mid-pass continue notes go to `state/tickets-sync/progress.log` (check stdout wakes Main). A finished pass with changes prints one summary; one ticket the board refuses prints a single `tickets-sync: skipped <id>: <home>/<item>: <reason>` line and the rest of the pass still runs; failures that stop the pass print on stderr. `sync.py --audit` runs the full ticket list separately.
 Every ticket line carries an `assignee` the board shows, built from this home's own records and never typed: `lead` is the owning lead (the home itself, or the Squad Lead the work came from) with `live: true` and the running worker's `model` and `tool` (its `harness`) while one runs the ticket, the lead alone when none does, and `lead: unassigned` for work no lead owns (the upkeep root and earlier grouping rows). sign-off's writer takes no assignee field, so the poll appends that line itself, in the shape the feed's format lets another program write, as the whole ticket record: every other field keeps its name, type and meaning, and a feed from an older version still reads.
 Public titles cap at 160 characters and omit bookkeeping tags, priority prefixes and URLs; release and delivery PR use their own ticket fields.
 Full request context is cached by source-file revision so truncated list bodies cannot hide a confirmed parent; the watcher budget also covers filling this cache.
