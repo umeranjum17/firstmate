@@ -225,7 +225,10 @@ jg_compat_claims_root() {  # <new-root>
 # The add-ons checkout a home already has. Exported here so every caller's
 # ${JG_ADDONS_DIR:-<home>/projects/juggernaut-addons} default resolves to the
 # directory that exists, without touching each of the 23 call sites.
-if [ -z "${JG_ADDONS_DIR-}" ]; then
+# Only for a checkout with no in-repo addons/: the retired clone holds only
+# fm- names, so pinning it there hid every jg- add-on (bin/jg-addons-dir-lib.sh
+# gives JG_ADDONS_DIR priority) and left the wait ladder unloaded.
+if [ -z "${JG_ADDONS_DIR-}" ] && [ ! -d "$(cd "${BASH_SOURCE[0]%/*}/.." 2>/dev/null && pwd)/addons" ]; then
   _jg_addons_root=${JG_HOME:-$(cd "${BASH_SOURCE[0]%/*}/.." 2>/dev/null && pwd)}
   if [ -n "${_jg_addons_root-}" ] && [ -d "$_jg_addons_root/projects/firstmate-addons" ] \
     && [ ! -d "$_jg_addons_root/projects/juggernaut-addons" ]; then
