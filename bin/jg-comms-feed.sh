@@ -176,6 +176,11 @@ cf_cursor() {  # <key> [<out-var>] -> the last recorded value; out-var avoids a 
 }
 
 cf_has() {  # <key> -> true when it is already recorded, this pass included
+  # ponytail: O(n^2) substring scan over the recorded keys, which costs ~21s on a
+  # first pass over a board of 2,400 cards and ~10ms per new message after that.
+  # An associative set would make it linear, but declare -A needs bash 4 and this
+  # repo still runs on stock macOS bash 3.2 (see bin/jg-wake-lib.sh), so the
+  # ceiling is paid once per source history rather than carried as a version fork.
   case $'\n'"$CF_ALL" in *$'\n'"$1"$'\t'*) return 0 ;; esac
   return 1
 }
