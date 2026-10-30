@@ -246,6 +246,7 @@ jg_taxi_stream_from_wire() {
 captain_guard() {  # <tasks-axi args>
   local prune_state="done" no_prune=0 keep_arg='' keep_next=0 sub=''
   local verb id='' value=0 title_next=0 state_next=0 has_title=0 new_title='' arg
+  local reason='' reason_next=0 reason_given=0
   [ "${1:-}" = task ] && shift
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
@@ -253,18 +254,21 @@ captain_guard() {  # <tasks-axi args>
   for arg in "$@"; do
     if [ "$arg" = --json ]; then continue; fi
     if [ "$value" = 1 ]; then value=0; continue; fi
+    if [ "$reason_next" = 1 ]; then reason_next=0; reason=$arg; reason_given=1; continue; fi
     if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
     if [ "$state_next" = 1 ]; then state_next=0; prune_state=$arg; continue; fi
     if [ "$keep_next" = 1 ]; then keep_next=0; keep_arg=$arg; continue; fi
     case "$arg" in
       --no-prune) no_prune=1 ;;
+      --reason) reason_next=1 ;;
+      --reason=*) reason=${arg#--reason=}; reason_given=1 ;;
       --keep) keep_next=1 ;;
       --keep=*) keep_arg=${arg#--keep=} ;;
       --state) state_next=1 ;;
       --state=*) prune_state=${arg#--state=} ;;
       --title) title_next=1; has_title=1 ;;
       --title=*) has_title=1; new_title=${arg#--title=} ;;
-      --pr|--report|--note|--reason|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
+      --pr|--report|--note|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
       -*) ;;
       *) id=${id:-$arg} ;;
     esac
@@ -281,7 +285,13 @@ captain_guard() {  # <tasks-axi args>
       esac
       ;;
     rm|delete) guard_captain_ask_close "$id" ;;
-    hold) guard_captain_ask_hold "$id" ;;
+    hold)
+      # A hold without a reason is a hold nobody can read: refuse it here so the
+      # ticket the board renders never shows one with nothing beside it.
+      if [ "$reason_given" = 1 ] && [ -z "${reason//[[:space:]]/}" ]; then
+        fail "a hold needs a non-blank --reason \"<why this waits>\"; nothing was held"
+      fi
+      guard_captain_ask_hold "$id" ;;
     update|edit)
       if [ "$has_title" = 1 ]; then
         case "$new_title" in

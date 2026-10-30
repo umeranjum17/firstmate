@@ -582,6 +582,7 @@ tests/jg-harness-adapter-instructions-live-e2e.test.sh 57
 tests/jg-herdr-lead-label.test.sh 99
 tests/jg-herdr-names.test.sh 1061
 tests/jg-herdr-version-floor-live-e2e.test.sh 61
+tests/jg-hold-reason-gate.test.sh 1608
 tests/jg-hometag-lead-label.test.sh 393
 tests/jg-inbox.test.sh 8757
 tests/jg-launch-prompt-signals-live-e2e.test.sh 56

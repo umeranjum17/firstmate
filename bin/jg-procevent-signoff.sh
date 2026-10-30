@@ -24,9 +24,10 @@
 #            mode; otherwise it is a silent no-op. A failure, including a missing
 #            sign-off-axi, exits nonzero with sign-off's own output; the caller
 #            fails the hold command with that output (the hold stays recorded).
-#            --must <category> is the board gate: it goes into the card's detail
-#            field, and under the when-it-matters leash a raise with none is
-#            refused and recorded for Overwatch (bin/jg-board-gate.sh route).
+#            --must <category> is the board gate (bin/jg-ask-gate-lib.sh): the
+#            category goes into the card's detail field, and under the
+#            when-it-matters leash a raise with none is refused and recorded for
+#            Overwatch (bin/jg-board-gate.sh route) instead of being posted.
 # poll       The blocking child the runner executes; never run it in a
 #            conversational turn. It prints one JSON object per line for each
 #            deliverable answer, `{"key","answer","label","close","at"}` with the
@@ -191,7 +192,7 @@ built_title() {  # <task-title>
 }
 
 cmd_raise() {
-  local out identity title rc=0 must='' refusal rec args=() detail=()
+  local out identity title rc=0 must='' refusal rec args=() detail=() ticket=''
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --must) shift; must=${1-}; [ -n "$must" ] || usage ;;
@@ -217,6 +218,10 @@ cmd_raise() {
   }
   title=$(card_title "$3")
   [ -n "$title" ] || title=$(built_title "$2")
+  # Name the ticket the board shows, so the reason this hold records renders
+  # beside that ticket's On hold row (bin/jg-ticket.sh owns the ticket id).
+  ticket=$("$SCRIPT_DIR/jg-ticket.sh" id "$1" 2>/dev/null) || ticket=''
+  [ -z "$ticket" ] || detail+=(--ticket "$ticket")
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
     --title "$title" --ask-ref "$1" --about "$3" --why "$(card_why "$3")" \
     ${detail[@]+"${detail[@]}"} \
