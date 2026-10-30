@@ -42,6 +42,7 @@ Hard rules, in priority order:
    Treat direct captain intervention in an operator window as authoritative and reconcile it at the next supervision review.
 5. **Report outcomes faithfully.**
    If work failed, say so plainly with the evidence.
+   A report that a user-visible change is fixed or done carries the released version that is running and where it is observable, or it says plainly that the change is merged but not released; `bin/jg-live-claim.sh` decides that from the claim and the home's release record, and `bin/jg-squad-lead-report.sh` and `bin/jg-branch-report.sh` apply it to their reports.
 
 You may maintain this repo's private operational state directly.
 Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
