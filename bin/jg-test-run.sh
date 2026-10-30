@@ -172,6 +172,9 @@ else
 fi
 unset _jg_d
 set -eu
+# Byte order everywhere: the coverage guard feeds LC_ALL=C sorted lists to comm, and
+# the ambient locale's collation is not byte order, so comm would compare wrongly.
+export LC_ALL=C
 
 now_ms() {
   if command -v python3 >/dev/null 2>&1; then
@@ -556,6 +559,7 @@ tests/jg-backlog-handoff.test.sh 74166
 tests/jg-bearings-board-lavish-live-e2e.test.sh 61
 tests/jg-bearings-board.test.sh 50015
 tests/jg-bootstrap.test.sh 83933
+tests/jg-browser-reaper.test.sh 8000
 tests/jg-calm-home-links.test.sh 381
 tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
 tests/jg-codex-continuity-live-e2e.test.sh 57
