@@ -20,8 +20,9 @@
 // The successor pipeline never waits for the model to read it: a follow-up
 // queued while main is streaming joins the running run without ever raising
 // before_agent_start, so waiting on that event stalls every later close.
-// Consumption is tracked only so a replacement can replay a follow-up Pi had
-// not consumed. An idle main consumes at before_agent_start; a streaming main
+// Consumption is tracked so a replacement can replay a follow-up Pi had not
+// consumed and so this process never delivers the same finished wake reason
+// twice. An idle main consumes at before_agent_start; a streaming main
 // consumes at the user message_start carrying the exact wake text; either
 // event finishes the pending record, and a still-unconsumed record rides the
 // replacement handoff.
@@ -217,6 +218,24 @@ function replacementCoordinatorFor(handoff: string): ReplacementCoordinator {
   return created;
 }
 const replacementCoordinator = replacementCoordinatorFor(actionableHandoff);
+// Wake reasons this process has already delivered and finished, most recent
+// last. A finished row leaves no pending record behind, so without this the
+// next arm close carrying the same reason is indistinguishable from a first
+// delivery: a producer that re-derives a row it still tracks (the watcher's own
+// queue resurface, or a prune notice for a pane still listed) then queues a
+// second copy, and Pi delivers each queued follow-up as its own turn, so one
+// stale row costs one wasted turn per boundary until the producer stops.
+// Process-scoped and never persisted: a replacement process starts empty, so a
+// row that was genuinely left unhandled still replays through the handoff.
+const settledWakeMessages = new Set<string>();
+const settledWakeMessagesCapacity = 512;
+function rememberSettledWake(message: string): void {
+  settledWakeMessages.delete(message);
+  settledWakeMessages.add(message);
+  if (settledWakeMessages.size <= settledWakeMessagesCapacity) return;
+  const oldest = settledWakeMessages.values().next().value;
+  if (oldest !== undefined) settledWakeMessages.delete(oldest);
+}
 const armReadiness = new WeakMap<ChildProcess, Promise<boolean>>();
 const armClose = new WeakMap<ChildProcess, Promise<void>>();
 const retiringGenerations = new Set<SessionGeneration>();
@@ -799,6 +818,16 @@ export default function (pi: ExtensionAPI) {
       }
     }
     if (!repairFailed) {
+      // A row this process already delivered and finished is settled. Retire the
+      // repeated reason without a second emission, so one stale row cannot cost
+      // a turn per boundary; the arm restoration above already ran, so
+      // continuity is not traded for the suppression. A delivery carrying a
+      // restoration failure still goes out below: a continuity alarm outranks
+      // duplicate noise. See settledWakeMessages.
+      if (settledWakeMessages.has(pending.message)) {
+        appendExtensionLog(`settled duplicate wake reason=${pending.message.slice(0, 120)}`);
+        return true;
+      }
       const branchDelivery = offerWakeToBranch(message);
       if (branchDelivery) {
         try {
@@ -854,6 +883,7 @@ export default function (pi: ExtensionAPI) {
     const index = owner.pendingActionables.findIndex((item) => item.token === pending.token);
     if (index >= 0) owner.pendingActionables.splice(index, 1);
     owner.cleanupFailure = "";
+    rememberSettledWake(pending.message);
   }
 
   function surfaceCleanupFailure(

@@ -68,7 +68,7 @@ So a running Pi process whose replacement did not load this extension is reporte
 
 A main follow-up counts as delivered once Pi accepts it, never once the model reads it.
 The reason is that a follow-up queued while main is streaming joins the running run without a `before_agent_start`.
-The extension header owns how consumption is observed and why it only decides what a replacement replays.
+The extension header owns how consumption is observed and what follows from it, including that this process never delivers the same finished wake reason twice.
 
 ### omp session replacement
 
