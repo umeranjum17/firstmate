@@ -792,6 +792,63 @@ for c in "$work"/card-*/card.json; do
   if jq -e 'has("filed")' "$c" >/dev/null; then no "no filed field: $c"; else ok "no filed field: $(basename "$(dirname "$c")")"; fi
 done
 
+# The receipt question, both sides, with temp data folders and no mocks: a head with a sealed clean run
+# passes, and a head with no run refuses. A fake head has no done-done receipt, so the run scan decides.
+sealed_pass=20261031T000000Z-sealed0001
+mkdir -p "$home/data/receipt-pass/.done-done/runs" "$home/data/receipt-none"
+jq -n --arg c "$head_c" --arg id "$sealed_pass" \
+  '{schema:1, run_id:$id, commit:$c, dirty:false, exit:0, started_at:"2026-10-31T00:00:00.000Z", files:[{path:"\($id)/shot.png"}]}' \
+  >"$home/data/receipt-pass/.done-done/runs/$sealed_pass.json"
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt receipt-pass "$head_c"
+is "receipt: a sealed clean run at the head passes" "$?" 0
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt-json receipt-pass "$head_c" >"$work/receipt-pass.json" 2>/dev/null
+is "receipt: the pass carries the sealed run" "$?" 0
+is "receipt: the pass names the sealed run" "$(jq -r .run_id "$work/receipt-pass.json")" "$sealed_pass"
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt receipt-none "$head_c"
+is "receipt: a head with no run refuses" "$?" 1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt-json receipt-none "$head_c" >"$work/receipt-none.out" 2>/dev/null
+is "receipt: a head with no run prints no receipt" "$?" 1
+is "receipt: a refusing head prints nothing" "$(cat "$work/receipt-none.out")" ""
+
+# done-done's own receipt answers first: when it holds one at the head, no run record is needed at all.
+# The real done-done reads a temp evidence root holding a real receipt, in a temp lane worktree at that head.
+if command -v done-done >/dev/null; then
+  ddstore=$work/ddone
+  dd_ev=$ddstore/e2e
+  ddlane=$work/ddlane
+  mkdir -p "$dd_ev/.done-done/receipts" "$ddlane" "$home/state"
+  [ -d "$home/.git" ] || git init -q "$home"
+  printf 'app: e2e\nevidence:\n  root: %s\n' "$dd_ev" >"$home/.done-done.yaml"
+  cp "$home/.done-done.yaml" "$ddlane/.done-done.yaml"
+  git init -q "$ddlane"
+  git -C "$ddlane" -c user.email=e2e@example.invalid -c user.name=e2e commit -q --allow-empty -m 'the merge head'
+  dd_head=$(git -C "$ddlane" rev-parse HEAD)
+  dd_tree=$(git -C "$ddlane" rev-parse "$dd_head^{tree}")
+  printf 'the proof the judge read\n' >"$ddlane/proof.log"
+  dd_sha=$(if command -v sha256sum >/dev/null; then sha256sum "$ddlane/proof.log" | awk '{print $1}'; else shasum -a 256 "$ddlane/proof.log" | awk '{print $1}'; fi)
+  jq -n --arg head "$dd_head" --arg tree "$dd_tree" --arg p "$ddlane/proof.log" --arg sha "$dd_sha" '
+    {schema:2, repo:"e2e", head:$head, tree:$tree, claim:"a stopped worker moves to the next live route",
+     result:"pass", at:"2026-10-31T00:00:00.000Z", files:[{path:$p, sha256:$sha}],
+     runs:[{run_id:"20261031T000000Z-ddreceipt01-abcdef", commit:$head, journey:null, command:"bash drive.sh", tool:"0.6.24",
+            steps:{target:{version:"e2e 1"}, start:"a stopped worker", steps:["the worker stops", "the next live route starts"], result:"the next live route runs"}}],
+     judge:{route:"claude-code", model:"claude-haiku-5-5", independence:"session-only",
+            verdicts:[{path:$p, sha256:$sha, verdict:"pass"}]}}' >"$dd_ev/.done-done/receipts/$dd_head.json"
+  printf 'worktree=%s\n' "$ddlane" >"$home/state/receipt-ddone.meta"
+  mkdir -p "$home/data/receipt-ddone"
+  JG_HOME=$home "$here/../merge-card" receipt-json receipt-ddone "$dd_head" >"$work/receipt-ddone.json" 2>"$work/receipt-ddone.err"
+  is "done-done receipt: the head passes without a run record" "$?" 0
+  is "done-done receipt: no run record is needed" "$(ls -d "$home/data/receipt-ddone/.done-done" 2>/dev/null)" ""
+  is "done-done receipt: the receipt names its run" "$(jq -r .run_id "$work/receipt-ddone.json")" 20261031T000000Z-ddreceipt01-abcdef
+  is "done-done receipt: the receipt covers the head" "$(jq -r .commit "$work/receipt-ddone.json")" "$dd_head"
+  is "done-done receipt: the receipt names its evidence" "$(jq -c .files "$work/receipt-ddone.json")" '["proof.log"]'
+  JG_HOME=$home "$here/../merge-card" receipt receipt-ddone "$dd_head"
+  is "done-done receipt: receipt agrees" "$?" 0
+  JG_HOME=$home "$here/../merge-card" receipt receipt-ddone "b18d2598a4852810412964192ec0713c5914b961"
+  is "done-done receipt: another head still refuses" "$?" 1
+else
+  ok "done-done receipt: skipped, no done-done on PATH"
+fi
+
 if [ "$fails" -eq 0 ]; then
   echo "merge-card e2e: all assertions held"
 else
