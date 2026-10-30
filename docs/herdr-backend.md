@@ -167,9 +167,11 @@ Spawn and relaunch pin each worker's Herdr agent to a name derived from its task
 Herdr accepts only 1-32 characters that start with a lowercase letter and continue with lowercase letters, digits, `-` or `_`, and keeps agent names unique in the session.
 `jg_backend_herdr_agent_name_for` maps a task id into that shape: an id that already fits is the name, and a longer id keeps its first 27 characters plus a four-hex checksum of the whole id.
 A name another agent holds falls back to a checksum variant of the pane, and a refusal warns with Herdr's own error code.
+`bin/jg-herdr-names.sh migrate` moves one home's live items to the current names, addressing each by the session, workspace, tab, and pane id in its own task records and never by a name search.
+Run it again after a server restart to restore the agent names.
 `bin/jg-herdr-names.sh check` reads the same recorded items and exits 1 while a workspace label, tab label, or agent name still shows a pre-rename word, so a leftover is a failing command and not a sighting.
 A task id or Squad Lead id that itself contains an old word is an identity chosen at dispatch and is not a leak; the generated prefix around it is.
-`tests/jg-herdr-names.test.sh` pins the mapping, the pin, and the check against a fake Herdr that applies the client's name rules.
+`tests/jg-herdr-names.test.sh` pins the mapping, the pin, and both commands against a fake Herdr that applies the client's name rules.
 The per-home workspace is reused while it has task tabs.
 Closing its last tab can remove the workspace, and the next spawn recreates it.
 

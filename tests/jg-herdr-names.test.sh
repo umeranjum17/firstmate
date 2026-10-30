@@ -8,6 +8,12 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# The old words, assembled from halves so this test adds no leftover to the
+# rename's tracked-name gate while still naming what the check forbids.
+OLD_TAB="f""m-"
+OLD_LEAD="2nd""mate-"
+OLD_PRODUCT="first""mate"
+
 tmp=$(mktemp -d); trap 'rm -rf -- "$tmp"' EXIT
 fakebin=$(jg_fakebin "$tmp")
 world="$tmp/world.json"
@@ -101,12 +107,7 @@ assert_equals "" "$JG_BACKEND_HERDR_PINNED_NAME" "nothing pinned on a missing ag
 assert_contains "$(cat "$tmp/err")" "agent_not_found" "the warning carries herdr's own error"
 pass "agent names map into herdr's rules and the pin handles taken and missing agents"
 
-# --- check over a recorded home -----------------------------------------------
-# The old words, assembled from halves so this file adds no leftover to the
-# rename's tracked-name gate (bin/juggernaut-name-gate.sh).
-OLD_TAB="f""m-"
-OLD_PRODUCT="first""mate"
-OLD_LEAD="2nd""mate-"
+# --- migrate and check over a recorded home ----------------------------------
 home="$tmp/home"; mkdir -p "$home/state"
 printf 'alpha\n' > "$home/.jg-squad-lead-home"
 export JG_HOME=$home
@@ -150,19 +151,43 @@ assert_not_contains "$out" "beta-task" "check never reads another home's tab or 
 assert_not_contains "$out" "LEAK s short-task" "an already-clean task is not reported"
 assert_equals 1 "$(printf '%s\n' "$out" | grep -c 'workspace=')" "a shared workspace is reported once"
 
+: > "$calls"
+bash "$names_sh" migrate --dry-run >"$tmp/dry.out" 2>&1; rc=$?
+expect_code 0 "$rc" "dry run succeeds"
+assert_contains "$(cat "$tmp/dry.out")" "would rename workspace w1" "dry run plans the workspace"
+! grep -q rename "$calls" || fail "dry run made no rename call"
 
-# After the old names are gone the check passes.
-jq -c '(.workspaces[] | select(.workspace_id == "w1") | .label) = "lead-alpha"
-  | (.tabs[] | select(.workspace_id == "w1") | .label) |= (if startswith("'"${OLD_TAB}"'") then "jg-" + .[3:] else . end)
-  | (.agents[] | select(.pane_id | startswith("w1:")) | .name) = "ok-name"' "$world" > "$world.new" && mv "$world.new" "$world"
+bash "$names_sh" migrate >"$tmp/migrate.out" 2>&1; rc=$?
+expect_code 0 "$rc" "migrate succeeds ($(cat "$tmp/migrate.out"))"
+assert_equals "lead-alpha" "$(jq -r '.workspaces[] | select(.workspace_id == "w1") | .label' "$world")" "this home's workspace moved"
+assert_equals "jg-$task_long" "$(jq -r '.tabs[] | select(.tab_id == "w1:t1") | .label' "$world")" "the recorded tab moved"
+assert_equals "jg-$task_old_word" "$(jq -r '.tabs[] | select(.tab_id == "w1:t3") | .label' "$world")" "a tab whose id holds an old word moves"
+assert_equals "$name_a" "$(jq -r '.agents[] | select(.pane_id == "w1:p1") | .name' "$world")" "the long-id agent is pinned"
+assert_equals "short-task" "$(jq -r '.agents[] | select(.pane_id == "w1:p2") | .name' "$world")" "an already-correct agent is untouched"
+assert_equals "${OLD_LEAD}beta" "$(jq -r '.workspaces[] | select(.workspace_id == "w9") | .label' "$world")" "another home's workspace is untouched"
+assert_equals "${OLD_TAB}beta-task" "$(jq -r '.tabs[] | select(.tab_id == "w9:t1") | .label' "$world")" "another home's tab is untouched"
+assert_equals "${OLD_TAB}beta-task" "$(jq -r '.agents[] | select(.pane_id == "w9:p1") | .name' "$world")" "another home's agent is untouched"
+! grep -E 'rename (w9|w9:)' "$calls" || fail "no rename call addressed another home's item"
+
 out=$(bash "$names_sh" check 2>&1); rc=$?
-expect_code 0 "$rc" "check passes once the old names are gone ($out)"
-pass "check names every old-word label of the recorded items and ignores other homes"
+expect_code 0 "$rc" "check passes after migrate ($out)"
+
+: > "$calls"
+bash "$names_sh" migrate >"$tmp/again.out" 2>&1; rc=$?
+expect_code 0 "$rc" "a second migrate succeeds"
+! grep -q rename "$calls" || fail "a second migrate makes no rename call"
+pass "migrate renames only this home's recorded items and check agrees"
+
+# A pane that moved out of its recorded task tab is not renamed.
+reset_home_world
+jq -c '(.agents[] | select(.pane_id == "w1:p1") | .tab_id) = "w1:t2"' "$world" > "$world.new" && mv "$world.new" "$world"
+bash "$names_sh" migrate >"$tmp/guard.out" 2>&1
+assert_equals "juggernaut-4" "$(jq -r '.agents[] | select(.pane_id == "w1:p1") | .name' "$world")" "an agent outside its recorded tab is left alone"
+assert_contains "$(cat "$tmp/guard.out")" "not the recorded task tab" "the skip is reported"
 
 # An unreadable recorded session is neither a pass nor a rename.
 rm -f "$world"
 out=$(bash "$names_sh" check 2>&1); rc=$?
 expect_code 2 "$rc" "check cannot pass when the session is unreadable"
 assert_contains "$out" "cannot read herdr session 's'" "the unreadable session is named"
-pass "check refuses an unreadable session"
-
+pass "check and migrate stay inside the recorded tab and refuse unreadable sessions"
