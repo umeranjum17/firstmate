@@ -6,8 +6,9 @@
 # Each recorded task owns one durable episode under state/.waiting-timers/.
 # The effective declaration is, first to last: admitted Herdr agent.list
 # blocked (recorded panes only, Cursor excluded), an unanswered permission
-# prompt or a Squad Lead whose own supervision is not running (wait sources
-# under state/.wait-sources/, written by jg-watch.sh), an own open
+# prompt, a Squad Lead whose own supervision is not running, or a green PR left
+# unmerged under yolo (wait sources under state/.wait-sources/, written by
+# jg-watch.sh and jg_wait_timers_green_pr), an own open
 # blocker/decision, then a declared pause.
 # Time starts at first observation and survives watcher restarts.
 # Changing state/declaration/endpoint clears and re-arms the episode; a paused
@@ -120,10 +121,16 @@ jg_wait_timer_source_delivered() {  # <task> <window> <declaration>
 # is stable for the wait, so posting again keeps the one open card. The board
 # refuses an id in a title, so the title names the task in plain words.
 jg_wait_timer_card() {  # <task> <card-key> <verb> <source> [title] [why]
-  local words why guard=() title
+  local words why guard=() title pr
   words=$(printf '%s' "$1" | tr -cs 'A-Za-z' '\n' | grep -E '^[A-Za-z]{2,}$' | head -6 | paste -sd' ' -) || true
   title=${5:-"Unblock stuck ${words:-work}?"}
   why=${6:-"$1 is stuck on: $4. Its owner and Main were told and have not cleared it."}
+  case "$3" in
+    greenpr)
+      pr=${4#greenpr: }; pr=${pr%% *}
+      title=${5:-"Merge the green ${words:-work} PR?"}
+      why=${6:-"$pr is green and unmerged under yolo. Its owner and Main were told and have not merged it."} ;;
+  esac
   [ "${#why}" -le 200 ] || why="${why:0:197}..."
   case "$3" in prompt*) guard=(--guard security) ;; esac
   (cd "$JG_HOME" && SIGN_OFF_FILER=juggernaut-watch "$_JG_WAIT_TIMER_DIR/jg-question-card.sh" post \
@@ -160,7 +167,7 @@ jg_wait_timer_end() {  # <record> <task> <parent> <key> <card> <why>
 # report under state/.waiting-relay/: first-seen, nudged, card times.
 jg_wait_timers_relay() {  # <now> <interval> <card-secs>
   local now=$1 interval=$2 card_secs=$3 rdir="$STATE/.waiting-relay" meta lead window rows k verb text
-  local r seen='|' first nudged card worker since wverb wsrc
+  local r seen='|' first nudged card worker since wverb wsrc ask
   mkdir -p "$rdir" || return 1
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
@@ -208,7 +215,9 @@ jg_wait_timers_relay() {  # <now> <interval> <card-secs>
       [ -n "$since" ] || since=${first:-$now}
       if [ "${nudged:-0}" -eq 0 ] || [ $((now - nudged)) -ge "$interval" ]; then
         if declare -F lead_nudge >/dev/null; then
-          lead_nudge "$lead" "$window" "waiting-relay-$k-$now" "Your worker $worker has been stuck $((now - since))s on: $wsrc. Clear it now: answer it, steer it, or report blocked: with what it needs. Main posts it to the captain's board at $((card_secs / 60)) minutes." \
+          ask="Clear it now: answer it, steer it, or report blocked: with what it needs."
+          [ "$wverb" != greenpr ] || ask="Merge it now with bin/jg-pr-merge.sh, or record a hold with the reason it waits."
+          lead_nudge "$lead" "$window" "waiting-relay-$k-$now" "Your worker $worker has been stuck $((now - since))s on: $wsrc. $ask Main posts it to the captain's board at $((card_secs / 60)) minutes." \
             || echo "waiting timers: nudge to squad lead $lead about $worker was not recorded" >&2
         fi
         nudged=$now
@@ -309,6 +318,79 @@ jg_wait_timers_backlog() {  # <now> <interval>
   wake "$reason"
 }
 
+# A recorded ready PR that is green at its head and unmerged under yolo is one
+# more wait source (README "Green PR left unmerged"): once it has stayed so for
+# JG_GREEN_PR_SECS, <task>.greenpr is rewritten on every tick and the existing
+# per-task ladder takes over. The source clears on a merge (the poll retires
+# or the forge answers not open), a new head (the clock re-arms), a pause or
+# captain hold on the task, or yolo off. Only GitHub is read; any other forge,
+# an unreadable answer, or a missing gh stays quiet. State: .green-pr/<task>
+# holds checked, since, head, url; a forge read runs at most every
+# JG_GREEN_PR_POLL_SECS, and an answer older than three reads lapses.
+jg_wait_timer_green_pr_read() {  # <pr-url> -> head on stdout; 0 green, 1 not green, 2 unreadable
+  local row prstate draft merge head
+  declare -F jg_pr_url_parse >/dev/null && jg_pr_url_parse "$1" && [ "$JG_PR_PROVIDER" = github ] || return 1
+  command -v gh >/dev/null 2>&1 || return 2
+  row=$(jg_run_timed 20 gh pr view "$JG_PR_NUMBER" --repo "$JG_PR_PATH" --json state,isDraft,mergeStateStatus,headRefOid \
+    --jq '[.state, (.isDraft | tostring), .mergeStateStatus, .headRefOid] | @tsv' 2>/dev/null) || return 2
+  IFS=$'\t' read -r prstate draft merge head <<<"$row"
+  case "$head" in ''|*[!0-9a-f]*) return 2 ;; esac
+  [ "$prstate" = OPEN ] && [ "$draft" = false ] && [ "$merge" = CLEAN ] || return 1
+  printf '%s\n' "$head"
+}
+
+jg_wait_timers_green_pr() {  # <now>
+  local now=$1 dir="$STATE/.green-pr" every=${JG_GREEN_PR_POLL_SECS:-120} stall=${JG_GREEN_PR_SECS:-900}
+  local meta id kind url rec checked since head live rc declared until
+  case "$stall" in ''|*[!0-9]*|0*) echo "waiting timers: JG_GREEN_PR_SECS must be positive decimal seconds" >&2; return 1 ;; esac
+  case "$every" in ''|*[!0-9]*) echo "waiting timers: JG_GREEN_PR_POLL_SECS must be decimal seconds" >&2; return 1 ;; esac
+  mkdir -p "$dir" || return 1
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    id=${meta##*/}; id=${id%.meta}
+    rec="$dir/$id"
+    url=$(jg_meta_get "$meta" pr); kind=$(jg_meta_get "$meta" kind)
+    case "${kind:-ship}" in ship) ;; *) url= ;; esac
+    [ "$(jg_meta_get "$meta" yolo)" = on ] && [ -f "$STATE/$id.check.sh" ] || url=
+    if [ -n "$url" ]; then
+      declared=$(status_declared_wait_line "$STATE/$id.status")
+      if status_is_captain_held "$declared" \
+        || { status_is_paused "$declared" && { until=$(status_paused_until "$declared") || until=$((now + 1)); [ "$now" -lt "$until" ]; }; } \
+        || { declare -F task_captain_call_open >/dev/null && task_captain_call_open "$id"; }; then url=; fi
+    fi
+    if [ -z "$url" ]; then rm -f "$rec" "$STATE/.wait-sources/$id.greenpr"; continue; fi
+    checked=0 since=$now head=
+    if [ -f "$rec" ] && [ ! -L "$rec" ]; then
+      IFS=$'\t' read -r checked since head live < "$rec" || checked=0
+      case "$checked:$since" in *[!0-9:]*|:*) checked=0 since=$now head= ;; esac
+      [ "$live" = "$url" ] || { checked=0 since=$now head=; }
+    fi
+    if [ "$checked" -eq 0 ] || [ $((now - checked)) -ge "$every" ]; then
+      rc=0; live=$(jg_wait_timer_green_pr_read "$url") || rc=$?
+      case "$rc" in
+        0) [ "$live" = "$head" ] || since=$now
+           printf '%s\t%s\t%s\t%s\n' "$now" "$since" "$live" "$url" > "$rec.tmp.$$" && mv "$rec.tmp.$$" "$rec" || return 1
+           checked=$now head=$live ;;
+        1) rm -f "$rec" "$STATE/.wait-sources/$id.greenpr"; continue ;;
+        *) [ "$checked" -gt 0 ] || continue ;;
+      esac
+    fi
+    # An answer that was never refreshed (the forge stopped answering) lapses.
+    if [ $((now - checked)) -le $((every * 3)) ] && [ $((now - since)) -ge "$stall" ]; then
+      mkdir -p "$STATE/.wait-sources" \
+        && printf 'greenpr: %s is green at %s and unmerged under yolo; merge it (bin/jg-pr-merge.sh) or record a hold with a reason\n' "$url" "${head:0:8}" \
+          > "$STATE/.wait-sources/$id.greenpr" || return 1
+    else
+      rm -f "$STATE/.wait-sources/$id.greenpr"
+    fi
+  done
+  for rec in "$dir"/*; do
+    [ -f "$rec" ] || continue
+    [ -f "$STATE/${rec##*/}.meta" ] || rm -f "$rec" "$STATE/.wait-sources/${rec##*/}.greenpr"
+  done
+  return 0
+}
+
 jg_wait_timers_tick() {
   local alert=${JG_WAIT_ALERT_SECS:-120} escalate=${JG_WAIT_ESCALATE_SECS:-300} card_secs=${JG_WAIT_CARD_SECS:-600}
   local interval=${JG_PROMPT_REALERT_SECS:-600}
@@ -401,6 +483,7 @@ EOF
     task=${src##*/}; task=${task%.*}
     [ -f "$STATE/$task.meta" ] || rm -f "$src" || return 1
   done
+  jg_wait_timers_green_pr "$now" || return 1
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     task=${meta##*/}; task=${task%.meta}
@@ -418,7 +501,7 @@ EOF
     # Wait sources the watcher records: an unanswered permission prompt (kept
     # only while the prompt gate still sees it, so a dead pane's prompt lapses)
     # and a Squad Lead whose own supervision is not running.
-    for src in prompt question quota errors silent supervision; do
+    for src in prompt question quota errors silent supervision greenpr; do
       [ -z "$declaration" ] || break
       record="$STATE/.wait-sources/$task.$src"
       [ -f "$record" ] && [ ! -L "$record" ] || continue

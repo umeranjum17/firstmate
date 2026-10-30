@@ -61,6 +61,13 @@ case "${1:-}" in
     { grep -Fxv "$2" "$log.open" 2>/dev/null || true; } > "$log.tmp"; mv "$log.tmp" "$log.open" ;;
 esac
 SH
+  # The forge read: prints the recorded answer (state, draft, merge state, head) or fails.
+  cat > "$h/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+printf 'gh %s\n' "$*" >> "$JG_HOME/gh.log"
+[ -s "$JG_HOME/gh-answer" ] || exit 1
+cat "$JG_HOME/gh-answer"
+SH
   chmod +x "$h/fakebin/"*
   printf '%s\n' "$h"
 }
@@ -76,7 +83,7 @@ cycle() {  # <home> [absent]
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
     JG_SQUAD_LEAD_LIVENESS_SECS="${LIVENESS:-99999999}" JG_BUSY_TURN_MAX_SECS=999999 JG_STALE_ESCALATE_SECS=999999 \
     JG_SQUAD_LEAD_WAKE_STALL_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 JG_WAIT_CARD_SECS="${CARD_SECS:-6}" \
-    JG_READY_STALL_POLL_SECS=0 \
+    JG_READY_STALL_POLL_SECS=0 JG_GREEN_PR_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
   wait_for_exit "$pid" "${CYCLE_POLLS:-40}" || rc=$?
@@ -137,6 +144,28 @@ backdate_backlog() {  # <home> <secs>
   [ "$reported" -eq 0 ] || reported=$((reported - $2))
   [ "$last" -eq 0 ] || last=$((last - $2))
   printf '%s\t%s\t%s\t%s\t%s\n' "$((since - $2))" "$lanes" "$key" "$reported" "$last" > "$f"
+}
+
+# A ship task whose PR is recorded ready: pr=, yolo and an armed merge poll.
+pr_task() {  # <home> <id> <yolo> [head]
+  local pr=https://github.com/octo/widgets/pull/7
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\npr=%s\nyolo=%s\n' "$pr" "$3" > "$1/state/$2.meta"
+  printf 'done [at=1]: PR %s\n' "$pr" > "$1/state/$2.status"
+  prime_status_seen "$1/state" "$1/state/$2.status"
+  : > "$1/state/$2.check.sh"
+  touch "$1/state/.last-check"
+  forge "$1" OPEN false CLEAN "${4:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+}
+
+forge() {  # <home> <state> <draft> <merge-state> <head>
+  printf '%s\t%s\t%s\t%s\n' "$2" "$3" "$4" "$5" > "$1/gh-answer"
+}
+
+# Move the green-PR clock back by <secs>, as if the PR had waited unmerged.
+backdate_green() {  # <home> <task> <secs>
+  local f="$1/state/.green-pr/$2" checked since head url
+  IFS=$'\t' read -r checked since head url < "$f"
+  printf '%s\t%s\t%s\t%s\n' "$checked" "$((since - $3))" "$head" "$url" > "$f"
 }
 
 TRUST=$'Quick safety check: Is this a project you created or one you trust?\n  1. Yes, I trust this folder\n  2. No, exit\nEnter to confirm'
@@ -482,6 +511,112 @@ test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_bo
   pass "an idle lead at its lane floor with no worker working is woken again, reported to Main, steered, carded, and cleared when it starts work"
 }
 
+test_green_unmerged_pr_climbs_lead_main_and_the_board() {
+  local m l f
+  m=$(home green-main)
+  l=$(lead_home green-lead "$m")
+  lead_meta "$m" lead1 1 "$l"
+  pr_task "$l" signoff on
+  f="$m/state/lead1.status"
+  PANES=1 cycle "$l"
+  [ -f "$l/state/.green-pr/signoff" ] || fail "a green ready PR under yolo was not recorded: $(cat "$l/err")"
+  [ ! -e "$l/state/.wait-sources/signoff.greenpr" ] || fail "the PR raised a wait before it had waited 15 minutes"
+  backdate_green "$l" signoff 1000
+  PANES=1 cycle "$l"
+  grep -q '^greenpr: https://github.com/octo/widgets/pull/7 is green at aaaaaaaa and unmerged under yolo' "$l/state/.wait-sources/signoff.greenpr"     || fail "a PR green for 15 minutes was not handed to the chain: $(cat "$l/err")"
+  PANES=1 cycle "$l"; backdate "$l" signoff 3
+  PANES=1 cycle "$l"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=owner.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$l/events" \
+    || fail "the lead was not woken naming the PR: $(cat "$l/events")"
+  backdate "$l" signoff 5
+  PANES=1 cycle "$l"
+  grep -q 'waiting-timer-overdue: signoff (greenpr, observed [0-9]*s.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$f" \
+    || fail "Main was not told which PR waits: $(cat "$f" 2>&1) $(cat "$l/err")"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} Your worker signoff has been stuck .*on: greenpr: https://github.com/octo/widgets/pull/7 .*Merge it now with bin/jg-pr-merge.sh, or record a hold' "$m/sent" \
+    || fail "Main did not steer the lead to merge: $(cat "$m/sent" 2>&1)"
+  [ ! -s "$m/cards" ] || fail "a card was posted before its time"
+  # The card follows the wait's own start, so age the report the lead filed.
+  sed -i "s/^\(blocked.*since=\)[0-9]*/\1$(($(date +%s) - 4000))/" "$f"
+  PANES=1 CARD_SECS=60 cycle "$m"; PANES=1 CARD_SECS=60 cycle "$m"
+  grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card .*--title Merge the green signoff PR? --why https://github.com/octo/widgets/pull/7 is green and unmerged under yolo' "$m/cards" \
+    || fail "the green PR never reached the board: $(cat "$m/cards" 2>&1) $(cat "$m/err")"
+  # The merge ends it: the forge answers merged, the source goes, the report closes, the card is dismissed.
+  forge "$l" MERGED false UNKNOWN aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  PANES=1 cycle "$l"; PANES=1 cycle "$l"
+  [ ! -e "$l/state/.wait-sources/signoff.greenpr" ] && [ ! -e "$l/state/.waiting-timers/signoff" ] || fail "the wait outlived the merge"
+  grep -q '^resolved \[key=waiting-timer-.*-signoff-.*-greenpr\].*waiting-timer-cleared: signoff' "$f" || fail "the merge left Main's report open: $(cat "$f")"
+  PANES=1 CARD_SECS=3600 cycle "$m"; PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^dismiss waiting-timer-.*-signoff-.*-greenpr-card' "$m/cards" || fail "the card stayed after the merge"
+  pass "a green ready PR left unmerged under yolo wakes its lead, tells Main with the PR, steers the lead, reaches the board, and clears on merge"
+}
+
+test_green_unmerged_pr_in_the_main_home_wakes_main_then_the_board() {
+  local m
+  m=$(home green-solo)
+  pr_task "$m" signoff on
+  PANES=1 cycle "$m"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"; PANES=1 cycle "$m"; backdate "$m" signoff 3
+  PANES=1 cycle "$m"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=owner; Main must recheck and unblock) id=.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$m/events" \
+    || fail "Main was not woken naming the PR: $(cat "$m/events")"
+  backdate "$m" signoff 5
+  PANES=1 cycle "$m"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=main' "$m/events" || fail "Main's own rung never fired: $(cat "$m/events")"
+  backdate "$m" signoff 10
+  PANES=1 CARD_SECS=6 cycle "$m"; PANES=1 CARD_SECS=6 cycle "$m"
+  grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card .*--title Merge the green signoff PR?' "$m/cards" \
+    || fail "a green PR in the main home never reached the board: $(cat "$m/cards" 2>&1)"
+  pass "a green ready PR under yolo in the main home wakes Main, fires Main's rung, and reaches the board"
+}
+
+test_green_pr_stays_quiet_unless_it_is_green_unmerged_and_unheld_under_yolo() {
+  local m n
+  # yolo off: the captain merges, so nothing escalates.
+  m=$(home green-off)
+  pr_task "$m" signoff off
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.green-pr/signoff" ] || fail "a PR without yolo was tracked"
+  # A pending, red, draft or unreadable PR is not green.
+  for n in "OPEN false BLOCKED" "OPEN false UNSTABLE" "OPEN true CLEAN" "CLOSED false CLEAN"; do
+    m=$(home "green-$(printf '%s' "$n" | tr -c 'A-Za-z' -)")
+    pr_task "$m" signoff on
+    # shellcheck disable=SC2086
+    forge "$m" $n aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    PANES=1 cycle "$m"
+    [ ! -e "$m/state/.green-pr/signoff" ] || fail "'$n' was treated as green"
+  done
+  m=$(home green-unread)
+  pr_task "$m" signoff on
+  rm -f "$m/gh-answer"
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.green-pr/signoff" ] && [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "an unreadable forge answer was treated as green"
+  # A recorded hold with a reason ends it; a new head re-arms the clock.
+  m=$(home green-held)
+  pr_task "$m" signoff on
+  PANES=1 cycle "$m"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.wait-sources/signoff.greenpr" ] || fail "fixture: the wait never started"
+  printf 'paused [at=2]: waiting for the vendor to confirm the release window\n' >> "$m/state/signoff.status"
+  prime_status_seen "$m/state" "$m/state/signoff.status"
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "a recorded pause with a reason did not clear the wait"
+  printf 'done [at=3]: PR https://github.com/octo/widgets/pull/7\n' >> "$m/state/signoff.status"
+  prime_status_seen "$m/state" "$m/state/signoff.status"
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.green-pr/signoff" ] && [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "the clock did not restart from zero after the pause ended"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.wait-sources/signoff.greenpr" ] || fail "the wait did not return after the pause ended and 15 minutes passed"
+  forge "$m" OPEN false CLEAN bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "a new head did not re-arm the clock"
+  pass "a PR is quiet without yolo, when not green or unreadable, and under a recorded pause, which restarts the clock when it ends; a new head re-arms the clock"
+}
+
 test_stalled_backlog_quiet_when_project_is_at_capacity() {
   local m l
   m=$(home cap-main)
@@ -689,3 +824,6 @@ test_ship_ready_line_goes_through_the_pr_check
 test_watcher_handoff_gap_is_not_a_dead_watcher
 test_ready_work_wakes_the_primary_home_too
 test_memory_refused_launch_reraises_when_admission_clears
+test_green_unmerged_pr_climbs_lead_main_and_the_board
+test_green_unmerged_pr_in_the_main_home_wakes_main_then_the_board
+test_green_pr_stays_quiet_unless_it_is_green_unmerged_and_unheld_under_yolo
