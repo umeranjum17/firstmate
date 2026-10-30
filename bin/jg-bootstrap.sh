@@ -1777,6 +1777,13 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-fleet-heartbeat.sh" arm >/dev/null 2>&1 \
       || echo "MISSING: the fleet heartbeat could not be armed; idle or stalled homes will not wake Main"
   fi
+  # The board gate: only a must ask reaches the captain's board, and a merge
+  # lands with its Evidence card. Same primary-home guard as the fleet heartbeat.
+  if local_phase && [ ! -e "$(jg_compat_marker "$JG_HOME")" ] \
+    && [ "$STATE" = "$JG_HOME/state" ] && [ -d "$STATE" ]; then
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-board-gate.sh" arm >/dev/null 2>&1 \
+      || echo "MISSING: the board gate could not be armed; non-must asks stay on the board and merges go unproven"
+  fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"
