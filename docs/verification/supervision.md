@@ -878,3 +878,17 @@ Observed output:
 ```
 
 The safe command-channel contract is covered without a notification by `tests/jg-daemon.test.sh`: the summary reaches both `$1` and stdin, every channel is process-group bounded, and a failed channel falls through.
+
+## Owner-correction capture at the turn boundary, 2026-10-30
+
+`bin/jg-turnend-guard.sh` refuses a turn that ends after a recorded owner correction with neither a new `data/owner-rules.md` entry nor an enforcement ticket, as [`../turnend-guard.md`](../turnend-guard.md) "Owner-correction capture rule" specifies.
+`bash tests/jg-owner-correction.test.sh`, built from the owner's words "I don't want these feedbacks as one time fix this need to go into juggernaut as feedback so it doesn't repeat again", fails on its first case against the guard before the change (`not ok - a turn that followed an owner correction with neither artefact ended (expected '2', got '0')`) and passes all four cases against it.
+The flag's command lines for that case:
+
+```text
+●  HE CORRECTED THE FLEET, AND NOTHING CAPTURED IT
+●    <repo>/bin/jg-owner-rules.sh add --words "<his exact words>" --scope "<where it applies>" --enforce "<script or contract that enforces it>"
+●    <repo>/bin/jg-tasks-axi.sh add <id> "[feature] <what changes>" --body "<summary of what changes and why>"
+```
+
+`tests/jg-turnend-guard.test.sh` and `tests/jg-overwatch-kpi.test.sh` pass unchanged.
