@@ -940,6 +940,27 @@ SH
   pass "a confirmed merge runs teardown, turns a refusal into one wake, and rebuilds the board"
 }
 
+test_pr_check_from_status_records_only_the_ready_report() {
+  local case_dir out
+  case_dir=$(make_case from-status)
+  add_glab_mock "$case_dir"
+  from_status() {
+    PATH="$case_dir/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$case_dir/home" \
+      JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-pr-check.sh" --from-status task-x1 2>&1
+  }
+  printf 'done [at=1]: PR %s\n' "$MR_URL" > "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: a no-mistakes handoff line must be a quiet no-op: $out"
+  [ -z "$out" ] && assert_no_grep 'pr=' "$case_dir/state/task-x1.meta" \
+    "from-status: a line without checks green recorded a PR in no-mistakes mode"
+  printf 'done [at=2]: PR %s checks green\n' "$MR_URL" >> "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: the ready report was refused: $out"
+  assert_grep "pr=$MR_URL" "$case_dir/state/task-x1.meta" "from-status: the ready report recorded no PR: $out"
+  assert_present "$case_dir/state/task-x1.check.sh" "from-status: the ready report armed no merge poll"
+  out=$(from_status) || fail "from-status: a recorded PR must be a no-op: $out"
+  [ -z "$out" ] || fail "from-status: an already recorded PR was recorded again: $out"
+  pass "jg-pr-check --from-status records the mode's ready report once and ignores other lines"
+}
+
 # GitHub reports mergeable=UNKNOWN for a short while after a push or a base
 # branch change while it recomputes mergeability. When that is the only
 # failing condition, the gate re-reads and re-checks every live condition on
@@ -4632,4 +4653,5 @@ test_required_partial_reads_report_all_failures
 
 test_allow_red_refused_on_forgejo
 test_allow_missing_refused_on_forgejo
+test_pr_check_from_status_records_only_the_ready_report
 test_post_merge_cleanup_tears_down_then_rebuilds_the_board

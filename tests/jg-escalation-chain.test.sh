@@ -398,6 +398,18 @@ test_stalled_backlog_quiet_when_work_starts_in_time() {
   pass "a lead that starts work in time is never escalated, and the start re-arms the clock"
 }
 
+test_ship_ready_line_goes_through_the_pr_check() {
+  local m
+  m=$(home ready-pr)
+  printf 'kind=ship\nmode=direct-PR\nbackend=tmux\nwindow=fake:1\nworktree=%s/gone\n' "$m" > "$m/state/w1.meta"
+  printf 'done [at=1]: PR https://gitlab.example/g/p/-/merge_requests/3\n' > "$m/state/w1.status"
+  PANES=1 cycle "$m"
+  grep -q 'the ready PR of w1 was not recorded: error: ' \
+    "$m/state/.watch-triage.log" || fail "the watcher did not run the ready line through jg-pr-check: $(cat "$m/state/.watch-triage.log" 2>&1)"
+  grep -q '^signal:.*w1.status' "$m/events" || fail "a refused ready line must still wake Main: $(cat "$m/events")"
+  pass "a ship's ready line runs through jg-pr-check's named-head gate and still wakes Main"
+}
+
 # A stand-in for jg-crew-state.sh that reports every lane as working on its pane.
 working_crew_state() {  # <home> -> path
   printf '#!/usr/bin/env bash\nprintf "state: working source: pane\\n"\n' > "$1/fakebin/crew-state-working"
@@ -640,5 +652,6 @@ test_stalled_backlog_quiet_when_work_starts_in_time
 test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item
 test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_board
 test_stalled_backlog_quiet_when_project_is_at_capacity
+test_ship_ready_line_goes_through_the_pr_check
 test_watcher_handoff_gap_is_not_a_dead_watcher
 test_ready_work_wakes_the_primary_home_too
