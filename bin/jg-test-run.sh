@@ -172,9 +172,6 @@ else
 fi
 unset _jg_d
 set -eu
-# Byte order everywhere: the coverage guard feeds LC_ALL=C sorted lists to comm, and
-# the ambient locale's collation is not byte order, so comm would compare wrongly.
-export LC_ALL=C
 
 now_ms() {
   if command -v python3 >/dev/null 2>&1; then
@@ -1810,7 +1807,11 @@ if [ "$LIST_LANES" -eq 1 ]; then
 fi
 
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
-  run_coverage_guard
+  # LC_ALL=C for this call only: the guard writes byte-ordered lists and compares them
+  # with comm, whose collation is the ambient locale's, so the two must agree here and
+  # nowhere else - the locale must never leak into a suite, where a test that counts
+  # characters instead of bytes would start failing.
+  LC_ALL=C run_coverage_guard
   exit $?
 fi
 
