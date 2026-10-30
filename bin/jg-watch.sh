@@ -2992,7 +2992,7 @@ warn_invalid_lane_target_once() {
 # held or in flight) cannot reset the re-raise window. Intake is independent of
 # the heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
-  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
+  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc freed
   READY_WORK_IDS=
   READY_WORK_REASON=
   READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
@@ -3035,7 +3035,34 @@ ready_work_waits_idle() {
   esac
   [ "$surfaced_ids" != "$READY_WORK_IDS" ] && return 0
   case "$surfaced_at" in ''|*[!0-9]*) surfaced_at=0 ;; esac
+  # A place freed since this set was surfaced makes the wake actionable now, so
+  # the resurface window does not hold it back. bin/jg-teardown.sh and
+  # bin/jg-pr-check.sh write state/.capacity-freed; this read is the contract.
+  freed=$(cat "$STATE/.capacity-freed" 2>/dev/null) || freed=
+  case "$freed" in ''|*[!0-9]*) freed=0 ;; esac
+  [ "$freed" -gt "$surfaced_at" ] && return 0
   [ "$(( now - surfaced_at ))" -ge "$READY_WORK_RESURFACE_SECS" ]
+}
+
+# A launch refused for host memory leaves state/admission-refused and nothing
+# retries it. The newest sampler verdict is the measurement admission reads, so
+# fire once per record the moment it admits launches again; a home with no
+# sampler stays silent rather than inventing one. bin/jg-jev-mem-guard.sh owns
+# the verdict and the record.
+admission_retry_waits_memory() {
+  local record epoch task verdict seen
+  record=$(cat "$STATE/admission-refused" 2>/dev/null) || return 1
+  [ -n "$record" ] || return 1
+  epoch=$(printf '%s\n' "$record" | cut -f1)
+  task=$(printf '%s\n' "$record" | cut -f2)
+  verdict=$(awk -F '\t' 'NF >= 5 && $5 != "" { v = $5 } END { print v }' \
+    "$STATE/host-memory.tsv" 2>/dev/null) || verdict=
+  case "$verdict" in OK|UNKNOWN) ;; *) return 1 ;; esac
+  ADMISSION_RETRY_KEY="$epoch:$task"
+  seen=$(cat "$STATE/.admission-retry-surfaced" 2>/dev/null) || seen=
+  [ "$seen" != "$ADMISSION_RETRY_KEY" ] || return 1
+  ADMISSION_RETRY_REASON="check: host memory admits launches again, so retry the launch of ${task:-a queued task} refused at ${epoch} (bin/jg-spawn.sh clears the refusal record on success)"
+  return 0
 }
 
 # The stalled-backlog condition the wait-timers chain escalates
@@ -4329,6 +4356,13 @@ EOF
       reason=$READY_WORK_REASON
       jg_wake_append check ready-work "$reason" || exit 1
       record_ready_work_surfaced
+      wake "$reason"
+    fi
+    # A refused launch becomes retryable on the same base-cadence clock.
+    if admission_retry_waits_memory; then
+      reason=$ADMISSION_RETRY_REASON
+      jg_wake_append check admission-retry "$reason" || exit 1
+      printf '%s' "$ADMISSION_RETRY_KEY" > "$STATE/.admission-retry-surfaced" || true
       wake "$reason"
     fi
   fi

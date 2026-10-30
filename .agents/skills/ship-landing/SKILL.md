@@ -26,7 +26,8 @@ On a confirmed merge of a ship task, `bin/jg-watch.sh` runs `bin/jg-teardown.sh 
 A refusal becomes one `check: cleanup after the merge of <id> was refused: ...` wake, so the work to unblock it lands on you rather than on a memory: settle the gate the refusal names, then tear the task down yourself.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority.
-After successful teardown, record completion, retain only the configured recent Done history, and re-evaluate queued work whose blockers and time gates have cleared.
+After successful teardown, record completion and retain only the configured recent Done history.
+Re-evaluating queued work is not yours to remember: teardown stamps the freed place, and the watcher's ready-work check re-raises the same ready set at once in every home, main included.
 
 A Squad Lead is persistent and an empty queue is healthy.
 Retire one only on an explicit captain or main Juggernaut decision, after loading `squad-lead-provisioning`; its home must contain no work under way, and forced discard still requires explicit captain authority.
