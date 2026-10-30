@@ -41,7 +41,14 @@ SH
   cat > "$1/fakebin/sign-off-axi" <<'SH'
 #!/usr/bin/env bash
 printf '%s %s\n' "$(date +%s)" "$*" >> "$JG_HOME/cards"
-case "${1:-}" in list) printf '{"decisions":[]}\n' ;; esac
+case "${1:-}" in
+  raise) shift; while [ $# -gt 1 ]; do [ "$1" = --key ] && printf '%s\n' "$2" >> "$JG_HOME/open-cards"; shift; done ;;
+  dismiss) [ -f "$JG_HOME/open-cards" ] && { grep -vxF "$2" "$JG_HOME/open-cards" > "$JG_HOME/open-cards.new"; mv "$JG_HOME/open-cards.new" "$JG_HOME/open-cards"; } ;;
+  list) printf '{"decisions":['
+        [ -f "$JG_HOME/open-cards" ] && sed 's/.*/{"key":"&"}/' "$JG_HOME/open-cards" | paste -sd, -
+        printf ']}\n' ;;
+esac
+exit 0
 SH
   chmod +x "$1/fakebin/"*
 }
