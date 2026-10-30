@@ -493,6 +493,29 @@ test_wrapper_refuses_untyped_or_unjustified_items() {
   pass "jg-tasks-axi.sh add refuses an item without a type tag or a justification, unless the home opts out"
 }
 
+# Owner asks come first: a [captain-ask] item is filed at priority 0 and nothing lowers it.
+test_wrapper_keeps_captain_asks_at_top_priority() {
+  local dir out rc
+  dir=$(make_split ask-first)
+  wrapper_from_code "$dir" add ask-1 "[captain-ask] rename the board" >/dev/null || fail "a captain ask was refused"
+  grep -q "ask-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "a captain ask with no priority was not filed at 0"
+  rc=0
+  out=$(wrapper_from_code "$dir" add ask-2 "[captain-ask] later please" --priority 2 2>&1) || rc=$?
+  expect_code 2 "$rc" "captain ask filed below priority 0"
+  assert_contains "$out" "top priority" "the refusal did not say why"
+  assert_no_grep "ask-2" "$dir/home/data/backlog.md" "a refused captain ask still reached the backlog"
+  rc=0
+  wrapper_from_code "$dir" update ask-1 --priority 3 >/dev/null 2>&1 || rc=$?
+  expect_code 2 "$rc" "lowering a captain ask"
+  grep -q "ask-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "a refused update still lowered the captain ask"
+  wrapper_from_code "$dir" add side-1 "side work" --priority 3 >/dev/null || fail "ordinary add failed"
+  wrapper_from_code "$dir" update side-1 --priority 2 >/dev/null || fail "an ordinary item could not be reprioritized"
+  wrapper_from_code "$dir" update side-1 --title "[captain-ask] side work he asked for" >/dev/null \
+    || fail "retitling an item into a captain ask failed"
+  grep -q "side-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "an item retitled into a captain ask kept its lower priority"
+  pass "jg-tasks-axi.sh files a captain ask at priority 0 and refuses to lower it"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -503,6 +526,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_refusals
   test_wrapper_refuses_add_start
   test_wrapper_refuses_untyped_or_unjustified_items
+  test_wrapper_keeps_captain_asks_at_top_priority
   test_wrapper_single_home
   test_wrapper_captain_ask_guard
   test_captain_ask_guard_gaps

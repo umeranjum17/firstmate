@@ -68,6 +68,10 @@
 #     words for [captain-ask]). Anything else - refactors, extra proof, tooling,
 #     follow-ups - belongs in a report, not the backlog. The local presence flag
 #     config/backlog-intake-loose in this home turns the check off;
+#   - `add`/`create` of a [captain-ask] item with a --priority other than 0, or
+#     `update`/`edit` that would set one on a [captain-ask] row (or retitle a
+#     row to [captain-ask] with one): an owner ask is top priority. Such an add
+#     or retitle without --priority gets --priority 0 added;
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
@@ -265,42 +269,78 @@ captain_guard() {  # <tasks-axi args>
       ;;
   esac
 }
-# Strict intake: a new item names its type and why it is worth doing (see the
-# header), so the backlog holds asked-for or user-facing work, not busy work.
-intake_check() {  # <tasks-axi add args...>
-  local title body='' mint=0 positional=()
-  [ ! -e "$JG_HOME/config/backlog-intake-loose" ] || return 0
+# Reads an add/update argument list: ITEM_TITLE (add's title, or update's --title),
+# ITEM_BODY, ITEM_PRIORITY, and ITEM_ID (update's id).
+item_args() {  # <tasks-axi add|update args...>
+  local verb=$1 mint=0 positional=()
+  ITEM_TITLE='' ITEM_BODY='' ITEM_PRIORITY='' ITEM_ID=''
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --body) body=${2-}; shift ;;
-      --body=*) body=${1#--body=} ;;
-      --body-file) body=$(cat -- "${2-}" 2>/dev/null); shift ;;
-      --body-file=*) body=$(cat -- "${1#--body-file=}" 2>/dev/null) ;;
+      --body) ITEM_BODY=${2-}; shift ;;
+      --body=*) ITEM_BODY=${1#--body=} ;;
+      --body-file) ITEM_BODY=$(cat -- "${2-}" 2>/dev/null); shift ;;
+      --body-file=*) ITEM_BODY=$(cat -- "${1#--body-file=}" 2>/dev/null) ;;
+      --title) ITEM_TITLE=${2-}; shift ;;
+      --title=*) ITEM_TITLE=${1#--title=} ;;
+      --priority) ITEM_PRIORITY=${2-}; shift ;;
+      --priority=*) ITEM_PRIORITY=${1#--priority=} ;;
       --mint) mint=1 ;;
-      --kind|--repo|--blocked-by|--pr|--report|--priority|--prefix) shift ;;
+      --kind|--repo|--blocked-by|--pr|--report|--prefix) shift ;;
       -*) ;;
       *) positional+=("$1") ;;
     esac
     shift
   done
-  if [ "$mint" = 1 ]; then title=${positional[0]-}; else title=${positional[1]-}; fi
-  case "$title" in
+  case "$verb" in
+    add|create) if [ "$mint" = 1 ]; then ITEM_TITLE=${positional[0]-}; else ITEM_TITLE=${positional[1]-}; fi ;;
+    *) ITEM_ID=${positional[0]-} ;;
+  esac
+}
+# Strict intake: a new item names its type and why it is worth doing (see the
+# header), so the backlog holds asked-for or user-facing work, not busy work.
+intake_check() {
+  local body
+  [ ! -e "$JG_HOME/config/backlog-intake-loose" ] || return 0
+  case "$ITEM_TITLE" in
     '[captain-ask]'*|'[feature]'*|'[design-ux]'*|'[security]'*|'[blocker]'*) ;;
     *) fail "a new item needs a type: start the title with [captain-ask], [feature], [design-ux], [security] or [blocker]; other work goes in a report, not the backlog" ;;
   esac
-  body=${body%%$'\n'*}
+  body=${ITEM_BODY%%$'\n'*}
   [ -n "${body//[[:space:]]/}" ] \
     || fail "a new item needs a justification: make the first line of --body say why it is worth doing (the captain's words for [captain-ask])"
 }
-# Optional task-priority add-on: a new task must carry a priority. No-op when not installed.
+# Owner asks come first: a [captain-ask] item sits at priority 0, so `ready`
+# offers it before any other work, and nothing lowers it (see the header).
+captain_ask_first() {
+  local ask=0
+  case "$ITEM_TITLE" in '[captain-ask]'*) ask=1 ;; esac
+  if [ "$ask" = 0 ] && [ -n "$ITEM_ID" ] && [ -n "$ITEM_PRIORITY" ] && [ "$ITEM_PRIORITY" != 0 ]; then
+    captain_ask_row "$ITEM_ID"
+    [ -z "$CAPTAIN_ASK_SHOW" ] || ask=1
+  fi
+  [ "$ask" = 1 ] || return 0
+  case "$ITEM_PRIORITY" in
+    '') ARGS+=(--priority 0) ;;
+    0) ;;
+    *) fail "a [captain-ask] item is top priority and stays at 0; drop --priority $ITEM_PRIORITY" ;;
+  esac
+}
+# New and edited items: strict intake and owner asks first, then the optional
+# task-priority add-on (a new task must carry a priority; no-op when not installed).
 case "${1:-}" in
   add|create)
-    intake_check ${ARGS[@]+"${ARGS[@]}"}
+    item_args ${ARGS[@]+"${ARGS[@]}"}
+    intake_check
+    captain_ask_first
     PRIORITY_CHECK="${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
     if [ -x "$PRIORITY_CHECK" ]; then
       "$PRIORITY_CHECK" ${ARGS[@]+"${ARGS[@]}"} >/dev/null || exit $?
     fi
+    ;;
+  update|edit)
+    item_args ${ARGS[@]+"${ARGS[@]}"}
+    captain_ask_first
     ;;
 esac
 # Public-followup values cross into tasks-axi's own schema; everything else passes
