@@ -3233,6 +3233,29 @@ event_wait_or_sleep() {
   esac
 }
 
+# A confirmed merge owns its own cleanup. bin/jg-teardown.sh runs without
+# --force, so its own gates (unlanded work, an incomplete captain-call
+# inventory, an owed public reply, an uncleared Relay link) stay in charge; a
+# refusal becomes one wake naming it rather than leaving the task half landed.
+# Both steps run detached so this cycle keeps supervising. The board is rebuilt
+# from the payload it already carries, which drops the cards that just landed.
+post_merge_cleanup() {  # <id>
+  local id=$1 started="$STATE/.post-merge-cleanup-$1.started" log="$STATE/.post-merge-cleanup-$1.log"
+  ( set -C; : > "$started" ) 2>/dev/null || return 0
+  (
+    local line
+    if ! env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+        "$SCRIPT_DIR/jg-teardown.sh" "$id" > "$log" 2>&1; then
+      line=$(grep -m1 '^REFUSED' "$log" 2>/dev/null) || line=
+      jg_wake_append check "post-merge-cleanup-$id" \
+        "check: cleanup after the merge of $id was refused: ${line:-see $log}" \
+        || triage_log "cleanup refusal for $id could not be queued"
+    fi
+    env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/jg-bearings-board.sh" refresh >/dev/null 2>&1 || true
+  ) </dev/null >/dev/null 2>&1 &
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -3438,6 +3461,22 @@ home_summary_refresh_detached() {
   JG_HOME_SUMMARY_IF_IDLE=1 \
     "$SCRIPT_DIR/jg-home-summary-refresh.sh" --best-effort </dev/null >/dev/null 2>&1 &
   HOME_SUMMARY_PID=$!
+}
+
+# A ship's ready report records its PR without waiting on Main: jg-pr-check.sh
+# --from-status owns which line counts and runs the named-head gate, then arms
+# the merge poll, posts the ready card, and moves the ticket to review. A line
+# it refuses or skips records nothing and still wakes Main as before.
+ready_pr_record() {  # <status-file>
+  local id=${1##*/} out
+  case "$id" in *.status) id=${id%.status} ;; *) return 0 ;; esac
+  [ -f "$STATE/$id.meta" ] || return 0
+  if out=$(jg_run_timed "$CHECK_TIMEOUT" env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/jg-pr-check.sh" --from-status "$id" 2>&1); then
+    [ -z "$out" ] || triage_log "recorded the ready PR of $id"
+  else
+    triage_log "the ready PR of $id was not recorded: $(printf '%s\n' "$out" | tail -n 1)"
+  fi
 }
 
 RECONCILE_REQUEST_PID=
@@ -3731,6 +3770,7 @@ EOF
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
           fi
+          [ "$(jg_meta_get "$STATE/$id.meta" kind)" = scout ] || post_merge_cleanup "$id"
           wake "$reason"
         fi
         pr_poll_control_release || exit 1
@@ -3936,6 +3976,7 @@ EOF
       while IFS=$(printf '\t') read -r sf sig f; do
         [ -n "$sf" ] || continue
         reportable_signal_path "$f" || continue
+        ready_pr_record "$f"
         file_reason="$reason"
         case " $JG_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
         jg_wake_append signal "$(basename "$f")" "$file_reason" || exit 1

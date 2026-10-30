@@ -21,6 +21,8 @@ For any custom `state/<id>.check.sh` you write yourself, keep it an ordinary sin
 Retire a custom check only through `bin/jg-check-unregister.sh <id>` (or `bin/jg-teardown.sh` for a spawned task); never hand-compose an `rm` with `$STATE`/`$ID`.
 
 Tear down a ship task only after landing is confirmed.
+On a confirmed merge of a ship task, `bin/jg-watch.sh` runs `bin/jg-teardown.sh <id>` itself, without `--force`, and then rebuilds an armed board (`bin/jg-bearings-board.sh refresh`).
+A refusal becomes one `check: cleanup after the merge of <id> was refused: ...` wake, so the work to unblock it lands on you rather than on a memory: settle the gate the refusal names, then tear the task down yourself.
 A teardown refusal for uncommitted or unlanded work is a stop-and-investigate result, never an obstacle to bypass.
 Never force teardown without explicit discard authority.
 After successful teardown, record completion, retain only the configured recent Done history, and re-evaluate queued work whose blockers and time gates have cleared.
