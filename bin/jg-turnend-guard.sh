@@ -278,6 +278,27 @@ if [ -n "$CHAT_KEYS" ]; then
   fi
 fi
 
+# --- the Overwatch KPI rule -------------------------------------------------
+# Every captain message is tagged in the turn it arrives; bin/jg-overwatch-kpi.sh
+# owns the ledger, the kinds, and the link a miss needs. The block is charged
+# once per message (the seq in $STATE/.overwatch-kpi-flagged), which keeps every
+# harness bounded; a message left untagged still counts as a miss.
+KPI_PENDING=$("$SCRIPT_DIR/jg-overwatch-kpi.sh" pending 2>/dev/null) || KPI_PENDING=
+KPI_SEQ=${KPI_PENDING%%$'\t'*}
+if [ -n "$KPI_PENDING" ] && [ "$KPI_SEQ" != "$(cat "$STATE/.overwatch-kpi-flagged" 2>/dev/null)" ]; then
+  printf '%s\n' "$KPI_SEQ" > "$STATE/.overwatch-kpi-flagged" 2>/dev/null || true
+  {
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    printf '●  CAPTAIN MESSAGE NOT TAGGED - OVERWATCH KPI\n'
+    printf '●  Tag it now: new-work, decision-answer, feedback, or micromanagement.\n'
+    printf '●  Feedback and micromanagement are misses: link a Juggernaut ticket or PR that changes code so it stops.\n'
+    printf '●    %s/jg-overwatch-kpi.sh tag <kind> [<ticket id or PR URL>]\n' "$SCRIPT_DIR"
+    printf '●  Message: %.120s\n' "${KPI_PENDING#*$'\t'}"
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  } >&2
+  exit 2
+fi
+
 # --- the actual predicate ----------------------------------------------------
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"
