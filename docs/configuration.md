@@ -1162,7 +1162,7 @@ It is primary-authoritative inherited configuration, so one value in the main ho
 
 An open lane is a `state/<task>.meta` whose `kind` is `ship` or `scout`; a Squad Lead endpoint's own meta is not a lane of that home.
 
-In a Squad Lead home, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default).
+In every home, primary or Squad Lead, a scan whose home sits below the floor with `jg-tasks-axi.sh ready` work raises one check wake naming the open and target counts and the first ready ids, re-raised while the condition holds every `JG_READY_WORK_RESURFACE_SECS` (1800 by default).
 Ready intake uses the base heartbeat interval independently of idle-heartbeat backoff and runs before an away heartbeat can end the cycle; held and future-dated work stays excluded by the backlog's ready query.
 When the ready set empties on a successful read - every named item since held or in flight - the check withdraws the queued ready-work row, so a notification whose condition no longer holds stops being presented instead of repeating until an acknowledgement that may never come, and it re-raises from scratch only when the condition holds again.
 That empty observation keeps the resurface record, so a transient empty set cannot reset the `JG_READY_WORK_RESURFACE_SECS` window and replay the identical set inside it.
@@ -1171,6 +1171,9 @@ The wake asks the lead to dispatch the ready items, P0 first, up to the project'
 A malformed value is reported once in the watcher's triage log and then treated as absent, never as a number; `bin/jg-watch.sh`'s header owns the exact reason lines.
 
 The floor is a floor, not a cap: it never asks a home to stop working above its target.
+A primary home also runs the fleet heartbeat (`bin/jg-fleet-heartbeat.sh`) by default: bootstrap arms it on every session start, and it wakes Main when any home turns GAP or STALLED.
+The optional local, gitignored presence flag `config/fleet-heartbeat-off` opts a home out, and bootstrap then leaves the check unarmed.
+
 If ready work still waits on a free lane, or at the floor with no worker provably working, and nothing starts for 10 minutes, the lead is woken again and Main is told, every 10 minutes while that holds, and Main posts a board card if it stays open; [`addons/wait-timers/README.md`](../addons/wait-timers/README.md) "Stalled ready backlog" owns that backstop.
 
 ## Launch environment hook (config/launch-env-hook)

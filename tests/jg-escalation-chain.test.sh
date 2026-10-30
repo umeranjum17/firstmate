@@ -612,6 +612,18 @@ test_silent_worker_climbs_whatever_it_declared() {
   pass "a silent blocked or paused worker climbs the chain; a dated pause, a finished worker, an idle lead and a worker with fresh progress do not"
 }
 
+test_ready_work_wakes_the_primary_home_too() {
+  local m
+  m=$(home ready-main)
+  mkdir -p "$m/data"
+  backlog "$m" add alpha "first item" --priority 1
+  cycle "$m"
+  grep -q '^check: ready work waiting with no worker working: alpha' "$m/events" \
+    || fail "a primary home with ready work and no worker got no wake: $(cat "$m/events")"
+  [ ! -e "$m/state/.waiting-timers/.ready-backlog" ] || fail "a primary home with no parent armed a lead escalation"
+  pass "ready work with no worker working wakes the primary home, not only a lead"
+}
+
 test_lead_idle_is_steered_without_interrupt
 test_stuck_verdict_table
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says
@@ -629,3 +641,4 @@ test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item
 test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_board
 test_stalled_backlog_quiet_when_project_is_at_capacity
 test_watcher_handoff_gap_is_not_a_dead_watcher
+test_ready_work_wakes_the_primary_home_too
