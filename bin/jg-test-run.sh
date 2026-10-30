@@ -595,6 +595,7 @@ tests/jg-owner-rules.test.sh 3036
 tests/jg-pi-branch-live-e2e.test.sh 56
 tests/jg-pi-primary-live-e2e.test.sh 58
 tests/jg-pi-seeded-home-trust-live-e2e.test.sh 85
+tests/jg-pi-wake-replay.test.sh 1500
 tests/jg-pr-state-live-e2e.test.sh 59
 tests/jg-procevent.test.sh 351871
 tests/jg-project-mode.test.sh 164
