@@ -633,7 +633,39 @@ test_ready_work_wakes_the_primary_home_too() {
   grep -q '^check: ready work waiting with no worker working: alpha' "$m/events" \
     || fail "a primary home with ready work and no worker got no wake: $(cat "$m/events")"
   [ ! -e "$m/state/.waiting-timers/.ready-backlog" ] || fail "a primary home with no parent armed a lead escalation"
-  pass "ready work with no worker working wakes the primary home, not only a lead"
+  # The same set must not ring again inside the resurface window, but a place
+  # freed since it surfaced makes it startable now, so the stamp re-raises it.
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c '^check: ready work waiting' "$m/events")" = 1 ] \
+    || fail "the same ready set rang again inside the resurface window: $(cat "$m/events")"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  printf '%s\n' "$(($(date +%s) + 10))" > "$m/state/.capacity-freed"
+  cycle "$m"
+  [ "$(grep -c '^check: ready work waiting' "$m/events")" = 2 ] \
+    || fail "a freed place did not re-raise the same ready set: $(cat "$m/events")"
+  pass "ready work with no worker working wakes the primary home, not only a lead, and a freed place re-raises it"
+}
+
+test_memory_refused_launch_reraises_when_admission_clears() {
+  local m
+  m=$(home admit-retry)
+  # The verdict comes from the newest sampler row, which this home's own sampler
+  # writes; one refusal record rings once, and a cleared record stops ringing.
+  printf '%s\tqueued-1\thost memory under pressure\n' "$(date +%s)" > "$m/state/admission-refused"
+  PANES=1 cycle "$m"
+  grep -q '^check: host memory admits launches again, so retry the launch of queued-1' "$m/events" \
+    || fail "an admitting sample did not raise the retry wake: $(cat "$m/events" 2>&1)"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c 'host memory admits launches again' "$m/events")" = 1 ] \
+    || fail "one refusal record rang twice: $(cat "$m/events")"
+  rm -f "$m/state/admission-refused"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c 'host memory admits launches again' "$m/events")" = 1 ] \
+    || fail "a cleared refusal record rang again: $(cat "$m/events")"
+  pass "a memory-refused launch rings once while its record stands, and stops when it clears"
 }
 
 test_lead_idle_is_steered_without_interrupt
@@ -655,3 +687,4 @@ test_stalled_backlog_quiet_when_project_is_at_capacity
 test_ship_ready_line_goes_through_the_pr_check
 test_watcher_handoff_gap_is_not_a_dead_watcher
 test_ready_work_wakes_the_primary_home_too
+test_memory_refused_launch_reraises_when_admission_clears
