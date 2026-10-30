@@ -41,9 +41,9 @@
 #      turn, and that turn's end re-arms supervision through the primary's own
 #      re-arm owner (docs/watcher-continuity.md).
 #
-# Before step 1, each tick also guards /tmp inodes through bin/jg-tmp-sweep.sh,
-# which owns the policy: a WARNING log line and a primary wake when /tmp inode use
-# reaches JG_TMP_INODE_WARN_PCT (80), repeated at most once per
+# Before step 1, each tick also guards /tmp pressure through bin/jg-tmp-sweep.sh,
+# which owns the policy: a WARNING log line and a primary wake when /tmp space or
+# inode use reaches JG_TMP_WARN_PCT (80), repeated at most once per
 # JG_SENTINEL_TMP_REWARN_SECS, and a sweep of stale fleet scratch once per
 # JG_SENTINEL_TMP_SWEEP_SECS (86400; 0 turns the sweep off), whose summary goes
 # to the log. It runs even while no Herdr server is up, and a failure never
@@ -435,7 +435,7 @@ reconcile_episode() {  # <episode>
   return "$rc"
 }
 
-# /tmp inode guard: warn at the threshold, sweep stale scratch once a day; never fails the tick.
+# /tmp pressure guard: warn at the threshold, sweep stale scratch once a day; never fails the tick.
 tmp_hygiene() {
   local out now last_try last_ok rc=0
   now=$(date +%s)
@@ -461,7 +461,7 @@ tmp_hygiene() {
   (
     rc=0
     out=$("$SCRIPT_DIR/jg-tmp-sweep.sh" sweep --apply 2>&1) || rc=$?
-    say "tmp sweep (exit $rc): $(printf '%s' "$out" | grep -E '^(removed|inode use|FAILED|jg-tmp-sweep)' | tr '\n' ';')"
+    say "tmp sweep (exit $rc): $(printf '%s' "$out" | grep -E '^(removed|space use|inode use|FAILED|jg-tmp-sweep)' | tr '\n' ';')"
   ) >/dev/null 2>&1 &
 }
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# jg-tmp-sweep.sh - /tmp inode guard: report inode pressure and sweep stale fleet scratch.
+# jg-tmp-sweep.sh - /tmp pressure guard: report space and inode use and sweep stale fleet scratch.
 #
-# A tmpfs /tmp has a fixed inode budget, and fleet tooling leaks many small
-# entries into it (mktemp dirs, per-home agent scratch, tool caches). When the
-# inodes run out, wake acknowledgements and tools fail even with free space.
+# A tmpfs /tmp has a fixed size and a fixed inode budget, and fleet tooling
+# leaks many small entries into it (mktemp dirs, per-home agent scratch, tool
+# caches). Either limit running out breaks wake acknowledgements and tools.
 # bin/jg-sentinel.sh tick calls both modes below; this script owns the policy.
 #
 # Usage:
 #   jg-tmp-sweep.sh check [--root DIR] [--warn-pct N]
-#       Print the inode use of the filesystem holding DIR; exit 1 at or above N
-#       percent (default JG_TMP_INODE_WARN_PCT, else 80), 0 below it, 2 when the
-#       use cannot be read.
+#       Print the space and inode use of the filesystem holding DIR; exit 1 when
+#       either reaches N percent (default JG_TMP_WARN_PCT, else 80), 0 below
+#       both, 2 when a use cannot be read.
 #   jg-tmp-sweep.sh sweep [--dry-run | --apply] [--root DIR] [--min-age-days N]
 #       List (default, --dry-run) or remove (--apply) stale entries; see below.
 #
@@ -37,7 +37,7 @@
 set -u
 
 ROOT=${JG_TMP_ROOT:-/tmp}
-WARN_PCT=${JG_TMP_INODE_WARN_PCT:-80}
+WARN_PCT=${JG_TMP_WARN_PCT:-80}
 MIN_AGE_DAYS=${JG_TMP_SWEEP_MIN_AGE_DAYS:-2}
 
 usage() { sed -n '2,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -69,16 +69,24 @@ case "$ROOT" in *[*?[]*|*$'\n'*|*//*|*/./*|*/../*|*/.|*/..) die "root has a glob
 [ -d "$ROOT" ] && [ ! -L "$ROOT" ] || die "root is not a real directory: $ROOT"
 [ "$ROOT" != / ] || die "refusing to sweep /"
 
-# "<used-percent> <used> <total>" for the filesystem holding ROOT; fails when unreadable.
-inode_use() {
-  df -Pi "$ROOT" 2>/dev/null | awk 'NR==2 && $2 ~ /^[0-9]+$/ && $2 > 0 { printf "%d %d %d\n", $3 * 100 / $2, $3, $2; ok = 1 } END { exit ok ? 0 : 1 }'
+# "<used-percent> <human use>" for the filesystem holding ROOT in inodes (i) or KiB (k);
+# fails when unreadable, and a filesystem that reports no inode limit is 0 percent, unlimited.
+fs_use() {
+  df -P"$1" "$ROOT" 2>/dev/null | awk -v unit="$1" 'NR == 2 {
+    if ($2 == "0") { print "0 unlimited"; exit }
+    if ($2 !~ /^[0-9]+$/) exit 1
+    if (unit == "i") printf "%d %s of %s\n", $3 * 100 / $2, $3, $2
+    else printf "%d %.1fG of %.0fG\n", $3 * 100 / $2, $3 / 1048576, $2 / 1048576
+  }'
 }
 
 if [ "$MODE" = check ]; then
-  use=$(inode_use) || die "cannot read inode use of $ROOT"
-  read -r pct used total <<<"$use"
-  printf '%s inodes %s%% used (%s of %s)\n' "$ROOT" "$pct" "$used" "$total"
-  [ "$pct" -lt "$WARN_PCT" ]
+  iu=$(fs_use i) || die "cannot read inode use of $ROOT"
+  su=$(fs_use k) || die "cannot read space use of $ROOT"
+  ipct=${iu%% *}; spct=${su%% *}
+  printf '%s space %s%% used (%s), inodes %s%% used (%s)\n' \
+    "$ROOT" "$spct" "${su#* }" "$ipct" "${iu#* }"
+  [ "$ipct" -lt "$WARN_PCT" ] && [ "$spct" -lt "$WARN_PCT" ]
   exit $?
 fi
 
@@ -168,7 +176,7 @@ old_entries() {  # <dir>: NUL-separated children whose own mtime is older than t
   find -P "$1" -mindepth 1 -maxdepth 1 ! -newermt "$CUTOFF_STAMP" -print0 2>/dev/null
 }
 
-before=$(inode_use) || before="? ? ?"
+before=$(fs_use i) || before="? ?"; before_space=$(fs_use k) || before_space=
 OTHER_PREFIXES=; ALLOWED=0; CONSIDERED=0; CONTAINERS=
 for entry in "$ROOT"/* "$ROOT"/.[!.]*; do
   [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -204,7 +212,7 @@ done <<EOF
 $CONTAINERS
 EOF
 RECENT=$((ALLOWED - CONSIDERED))
-after=$(inode_use) || after="? ? ?"
+after=$(fs_use i) || after="? ?"; after_space=$(fs_use k) || after_space=
 
 verb="would remove"; [ "$APPLY" = 0 ] || verb="removed"
 printf '%s %d entries older than %s days (cutoff %s UTC)\n' "$verb" "$REMOVED" "$MIN_AGE_DAYS" "$CUTOFF_STAMP"
@@ -215,6 +223,9 @@ printf '%s\n' "$OTHER_PREFIXES" | grep -v '^$' | sort | uniq -c | sort -rn | hea
 printf '\n'
 read -r b _ <<<"$before"
 read -r a _ <<<"$after"
+read -r bs _ <<<"$before_space"
+read -r as _ <<<"$after_space"
 printf 'inode use of %s: %s%% before, %s%% after\n' "$ROOT" "$b" "$a"
+printf 'space use of %s: %s%% before, %s%% after\n' "$ROOT" "$bs" "$as"
 [ "$FAILED" -eq 0 ] || exit 1
 exit 0

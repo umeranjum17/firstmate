@@ -13,7 +13,7 @@ touch "$R/tmp.stale/sub/f" "$R/claude-accounts.stale" "$R/claude-1000/old-sessio
 touch -d '5 days ago' "$R/tmp.stale/sub/f" "$R/tmp.stale/sub" "$R/tmp.stale" "$R/claude-accounts.stale" \
   "$R/claude-1000/old-session/f" "$R/claude-1000/old-session" "$R/plan-other/f" "$R/plan-other"
 {
-  echo "== inode check"; "$REPO/bin/jg-tmp-sweep.sh" check --root "$R" --warn-pct 0; echo "exit $? (1 = at or over the threshold)"
+  echo "== pressure check (space and inodes)"; "$REPO/bin/jg-tmp-sweep.sh" check --root "$R" --warn-pct 0; echo "exit $? (1 = at or over the threshold)"
   echo "== dry run"; "$REPO/bin/jg-tmp-sweep.sh" sweep --root "$R"
   echo "== listing after dry run"; (cd "$R" && find . | sort)
   echo "== real run"; "$REPO/bin/jg-tmp-sweep.sh" sweep --apply --root "$R"
@@ -29,7 +29,7 @@ cat "$LOG"
 cat >"$OUT/steps.json" <<'J'
 {"target":{"version":"juggernaut bin/jg-tmp-sweep.sh at this commit"},
  "start":"a disposable folder standing in for /tmp with stale and fresh entries, a stale claude-1000 session folder and an off-allowlist stale folder",
- "steps":["check the folder's inode use against a 0 percent threshold","dry-run the sweep and list the folder","run the sweep for real and list the folder","run the sweep behavior test"],
+ "steps":["check the folder's space and inode use against a 0 percent threshold","dry-run the sweep and list the folder","run the sweep for real and list the folder","run the sweep behavior test"],
  "result":"the dry run removes nothing; the real run removes only the three stale allowlisted entries and keeps the fresh entry, the claude-1000 folder and the stale off-allowlist folder; the four behavior checks pass"}
 J
 find "$T" -type d -exec chmod u+rwx {} + 2>/dev/null

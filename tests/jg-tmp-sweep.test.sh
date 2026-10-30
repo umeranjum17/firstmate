@@ -83,6 +83,9 @@ pass "sweep removes the stale entries and keeps live, lane-owned, symlinked and 
 # --- check, argument and root safety ----------------------------------------
 "$SWEEP" check --root "$R" --warn-pct 101 >/dev/null; expect_code 0 $? "check below the threshold"
 "$SWEEP" check --root "$R" --warn-pct 0 >/dev/null; expect_code 1 $? "check at or over the threshold"
+got=$("$SWEEP" check --root "$R" --warn-pct 101 2>&1)
+assert_contains "$got" "space " "check reports space use"
+assert_contains "$got" "inodes " "check reports inode use"
 "$SWEEP" sweep --root / >/dev/null 2>&1; expect_code 2 $? "root /"
 ln -s "$R" "$T/rootlink"
 "$SWEEP" sweep --root "$T/rootlink" >/dev/null 2>&1; expect_code 2 $? "symlinked root"
@@ -93,7 +96,7 @@ pass "check thresholds and unsafe roots"
 # --- sentinel tick: warns at the threshold and sweeps once a day ------------
 mkdir -p "$R/tmp.again"
 old "$R/tmp.again"
-export JG_TMP_ROOT=$R JG_TMP_INODE_WARN_PCT=0
+export JG_TMP_ROOT=$R JG_TMP_WARN_PCT=0
 JG_HOME=$H "$ROOT/bin/jg-sentinel.sh" tick >/dev/null 2>&1
 log=$H/state/.sentinel.log
 for _ in $(seq 40); do
