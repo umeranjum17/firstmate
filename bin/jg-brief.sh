@@ -165,6 +165,11 @@
 # regular file, or text carrying its own "Delivery contract: mode=" line (which
 # a later scout promotion could not outrank), stops the scaffold before
 # anything is written. SquadLead charters never take it.
+# The home's owner rules (data/owner-rules.md, bin/jg-owner-rules.sh) are
+# appended just before that, as "# Owner rules", so every ship and scout worker
+# reads them; an absent file or one with no entries adds nothing. Top-level
+# headings and any "Delivery contract: mode=" line are dropped from the copy so
+# the appended text cannot shadow a machine-read line.
 # Refuses to overwrite an existing brief.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
@@ -511,8 +516,15 @@ _bi=$(jg_addon_path "${JG_HOME:-$SCRIPT_DIR/..}" brief-inherit/bin/jg-brief-inhe
 # shellcheck disable=SC1090 # The optional add-on source is installed outside this repository.
 [ ! -f "$_bi" ] || { . "$_bi" && jg_brief_inherit_shared "$CONFIG" "$KIND"; }
 
-# Append the include as the last section of a ship or scout scaffold.
+# Append the owner rules, then the include, as the last sections of a ship or
+# scout scaffold.
 append_brief_include() {
+  local rules
+  rules=$(sed -n '/^## /,$p' "$DATA/owner-rules.md" 2>/dev/null | grep -Ev '^(# |Delivery contract: mode=)' || true)
+  [ -z "$rules" ] || printf '\n%s\n%s\n\n%s\n' \
+    '# Owner rules' \
+    "Standing decisions the owner gave the fleet, in his own words; each binds this task." \
+    "$rules" >> "$BRIEF"
   [ -n "$BRIEF_INCLUDE_BODY" ] || return 0
   printf '\n%s\n%s\n%s\n' \
     '# Home brief additions' \

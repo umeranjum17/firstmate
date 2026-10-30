@@ -1058,7 +1058,7 @@ print_file_or_absent "$(jg_compat_pick "$DATA/squad_leads.md")" "data/squad_lead
 print_file_or_absent "$DATA/captain.md" "data/captain.md"
 print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in squad_lead homes)"
 print_file_or_absent "$DATA/learnings.md" "data/learnings.md"
-print_file_or_absent "$DATA/owner-rules.md" "data/owner-rules.md (the shared owner rules every session reads; bin/jg-owner-rules.sh writes it)"
+print_file_or_absent "$DATA/owner-rules.md" "data/owner-rules.md (the shared owner rules every session reads; main-authoritative, read-only in squad_lead homes; bin/jg-owner-rules.sh writes it)"
 
 # --- 9. closing reminder -----------------------------------------------
 stage next-step

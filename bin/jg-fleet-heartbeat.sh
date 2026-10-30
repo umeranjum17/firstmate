@@ -34,7 +34,9 @@
 # check  Prints one line per home that turns GAP or STALLED, again every
 #        JG_FLEET_HEARTBEAT_REFIRE_SECS (default 600) while it stays there, and
 #        one line when it recovers; the watcher turns each line into a wake for
-#        Main. An unchanged healthy fleet prints nothing.
+#        Main. An unchanged healthy fleet prints nothing. It also reads
+#        `jg-owner-rules.sh homes` and treats each Squad Lead whose owner rules
+#        are MISSING or STALE the same way, as home `<id>.owner-rules`.
 #        State: state/.fleet-heartbeat/<home> (verdict, since, last fired).
 # arm    Writes state/fleet-heartbeat.check.sh and binds it with
 #        jg-check-register.sh. disarm retires it with jg-check-unregister.sh.
@@ -114,19 +116,21 @@ cmd_rows() {
 cmd_check() {
   local dir=$STATE/.fleet-heartbeat rows id verdict working target ready waits age why rec old since fired
   mkdir -p "$dir" || die "cannot write $dir"
-  rows=$(cmd_rows)
+  rows=$(cmd_rows
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-owner-rules.sh" homes 2>/dev/null \
+      | awk -F '\t' '{ printf "%s.owner-rules\t%s\t-\t-\t-\t-\t-\towner rules %s\n", $1, $2, $3 }')
   while IFS=$'\t' read -r id verdict working target ready waits age why; do
     [ -n "$id" ] || continue
     rec=$dir/$id old='' since=$NOW fired=0
     [ ! -f "$rec" ] || IFS=$'\t' read -r old since fired < "$rec"
     [ "$old" = "$verdict" ] || since=$NOW fired=0
     case "$verdict" in
-      GAP|STALLED)
+      GAP|STALLED|MISSING|STALE)
         if [ "$fired" -eq 0 ] || [ $((NOW - fired)) -ge "$REFIRE_SECS" ]; then
           printf 'fleet heartbeat: %s %s for %ss - %s\n' "$id" "$verdict" "$((NOW - since))" "$why"
           fired=$NOW
         fi ;;
-      *) case "$old" in GAP|STALLED) printf 'fleet heartbeat: %s %s again\n' "$id" "$verdict" ;; esac ;;
+      *) case "$old" in GAP|STALLED|MISSING|STALE) printf 'fleet heartbeat: %s %s again\n' "$id" "$verdict" ;; esac ;;
     esac
     printf '%s\t%s\t%s\n' "$verdict" "$since" "$fired" > "$rec.tmp" && mv -f -- "$rec.tmp" "$rec"
   done <<EOF

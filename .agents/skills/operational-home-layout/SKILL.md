@@ -57,6 +57,7 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   backlog.md         task queue, dependencies, history
   captain.md         this home's domain-local captain preferences and working style; LOCAL, gitignored, canonical even if harness memory mirrors it, and updated with inspect-then-update
   captain-shared.md  main-authoritative shared captain preferences propagated read-only to squad lead homes; LOCAL, gitignored, owned by squad-lead-provisioning
+  owner-rules.md     main-authoritative owner rules (bin/jg-owner-rules.sh) propagated read-only to squad lead homes like captain-shared.md; LOCAL, gitignored
   learnings.md       fleet-local operational facts and gotchas; LOCAL, gitignored; dated, evidence-backed, curated, and updated with inspect-then-update - rewrite and prune rather than append forever, the same contract as captain.md; created lazily, absent until this home has a learning to store
   projects.md        thin fleet navigation registry recording each project's standing delivery posture and optional ship-branch prefix; juggernaut-private, parsed by jg-project-mode.sh (section 6)
   squad_leads.md      local and remote squad lead routing table; Juggernaut-private, maintained by the squad lead seed helpers (section 6)

@@ -6,6 +6,7 @@
 #   jg-owner-rules.sh add --words "<the owner's own words>" --scope <scope> \
 #     --enforce <where it is enforced> [--date YYYY-MM-DD] [--title <one line>]
 #   jg-owner-rules.sh audit [--fail] [--source <file-or-directory>]...
+#   jg-owner-rules.sh homes [--fail]
 #
 # The surface is $DATA/owner-rules.md: one entry per standing owner decision,
 # each carrying the owner's verbatim words, the date, the scope, and the code or
@@ -34,6 +35,16 @@
 #         want checked into a notes file and point a source at it.
 #         ponytail: verbatim quote matching only, add paraphrase scoring if a
 #         real correction is ever missed this way.
+# homes   One TSV row per Squad Lead in $DATA/squad_leads.md: id, verdict, why.
+#         The surface is main-authoritative and reaches each Squad Lead home as a
+#         read-only copy through the same propagation as data/captain-shared.md
+#         (bin/jg-config-inherit-lib.sh). Verdicts: CURRENT (same bytes as this
+#         home's surface, or neither has one), MISSING (this home has rules and
+#         the lead has none), STALE (the lead's copy differs, or this home has
+#         none and the lead still holds one), UNREAD (a remote lead, or a home
+#         that is not a directory). Exit 0 by default; --fail exits 1 when any
+#         lead is MISSING or STALE. bin/jg-fleet-heartbeat.sh check wakes Main
+#         on those rows; bin/jg-config-push.sh converges them.
 #
 # Entry format, machine-readable by this command and readable as prose:
 #   ## 2026-10-25 - Questions go on the board
@@ -70,6 +81,8 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$JG_ROOT}}"
 DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 CONFIG="${JG_CONFIG_OVERRIDE:-$JG_HOME/config}"
 SURFACE="$DATA/owner-rules.md"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+[ ! -r "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh" ] || . "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 
 usage() {
   awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
@@ -312,6 +325,35 @@ cmd_audit() {
   exit 0
 }
 
+cmd_homes() {
+  local fail=0 reg line copy verdict why bad=0
+  case "${1:-}" in --fail) fail=1 ;; '') ;; *) die "unknown argument: $1" ;; esac
+  declare -F squad_lead_registry_parse_line >/dev/null || die "bin/jg-squad-lead-registry-lib.sh is missing"
+  reg=$(jg_compat_pick "$DATA/squad_leads.md")
+  [ -f "$reg" ] || return 0
+  while IFS= read -r line; do
+    squad_lead_registry_parse_line "$line" || continue
+    copy=$SQUAD_LEAD_REGISTRY_HOME/data/owner-rules.md
+    if [ "$SQUAD_LEAD_REGISTRY_REMOTE" -eq 1 ]; then
+      verdict=UNREAD why="remote home on $SQUAD_LEAD_REGISTRY_HOST"
+    elif [ ! -d "$SQUAD_LEAD_REGISTRY_HOME" ]; then
+      verdict=UNREAD why="home $SQUAD_LEAD_REGISTRY_HOME is not a directory"
+    elif [ -f "$SURFACE" ] && [ ! -f "$copy" ]; then
+      verdict=MISSING why="no data/owner-rules.md; run bin/jg-config-push.sh"
+    elif [ -f "$SURFACE" ] && ! cmp -s "$SURFACE" "$copy"; then
+      verdict=STALE why="data/owner-rules.md differs from the primary; run bin/jg-config-push.sh"
+    elif [ ! -f "$SURFACE" ] && [ -e "$copy" ]; then
+      verdict=STALE why="the primary has no owner rules but the lead holds a copy; run bin/jg-config-push.sh"
+    else
+      verdict=CURRENT why="same owner rules as the primary"
+    fi
+    case "$verdict" in MISSING|STALE) bad=1 ;; esac
+    printf '%s\t%s\t%s\n' "$SQUAD_LEAD_REGISTRY_ID" "$verdict" "$why"
+  done < "$reg"
+  [ "$fail" -eq 1 ] && [ "$bad" -eq 1 ] && exit 1
+  return 0
+}
+
 [ $# -ge 1 ] || usage
 cmd=$1
 shift
@@ -319,6 +361,7 @@ case "$cmd" in
   init) cmd_init "$@" ;;
   add) cmd_add "$@" ;;
   audit) cmd_audit "$@" ;;
+  homes) cmd_homes "$@" ;;
   -h|--help|help) usage ;;
   *) usage ;;
 esac

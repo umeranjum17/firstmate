@@ -176,7 +176,57 @@ test_question_rule_blocks_until_a_card_is_cited() {
   pass "an unfiled question is flagged once, and a cited open card clears it"
 }
 
+test_lead_homes_get_read_only_owner_rules_and_a_gap_is_reported() {
+  local d out rc mode
+  d="$TMP_ROOT/leads"
+  mkdir -p "$d/main/data" "$d/bare/data" "$d/old/data"
+  JG_HOME="$d/main" JG_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1 || fail "init failed"
+  printf '# Owner rules\n\nan older generation\n' > "$d/old/data/owner-rules.md"
+  {
+    printf -- '- bare - a lead with no rules (home: %s; scope: b; projects: b; added 2026-10-30)\n' "$d/bare"
+    printf -- '- old - a lead with a stale copy (home: %s; scope: o; projects: o; added 2026-10-30)\n' "$d/old"
+    printf -- '- far - a remote lead (host: box; root: /r; home: /r/h; scope: f; projects: f; added 2026-10-30)\n'
+  } > "$d/main/data/squad_leads.md"
+
+  out=$(JG_HOME="$d/main" "$RULES" homes 2>&1) || fail "homes failed: $out"
+  assert_contains "$out" "$(printf 'bare\tMISSING')" "a lead home without the rules was not reported"
+  assert_contains "$out" "$(printf 'old\tSTALE')" "a lead home with a stale copy was not reported"
+  assert_contains "$out" "$(printf 'far\tUNREAD')" "a remote lead was not marked unread"
+  JG_HOME="$d/main" "$RULES" homes --fail >/dev/null 2>&1; rc=$?
+  assert_equals 1 "$rc" "homes --fail passed a fleet with a missing and a stale copy"
+
+  for lead in bare old; do
+    bash -c '. "$1/bin/jg-config-inherit-lib.sh"; propagate_squad_lead_inheritance "$2" "$3"' _ "$ROOT" "$d/main" "$d/$lead" >/dev/null 2>&1 \
+      || fail "propagation into $lead failed"
+    cmp -s "$d/main/data/owner-rules.md" "$d/$lead/data/owner-rules.md" || fail "$lead did not receive the primary owner rules"
+    mode=$(perl -e 'printf "%o", (stat $ARGV[0])[2] & 07777' "$d/$lead/data/owner-rules.md")
+    assert_equals 444 "$mode" "$lead's owner rules are not read-only"
+  done
+  out=$(JG_HOME="$d/main" "$RULES" homes --fail 2>&1) || fail "homes --fail refused a converged fleet: $out"
+  assert_not_contains "$out" "MISSING" "a converged lead is still reported missing"
+  assert_not_contains "$out" "STALE" "a converged lead is still reported stale"
+  pass "lead homes get read-only owner rules, and a missing or stale copy is reported"
+}
+
+test_worker_brief_carries_the_owner_rules() {
+  local home brief
+  home="$TMP_ROOT/brief"
+  mkdir -p "$home/data"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" no-rules proj --mode direct-PR >/dev/null 2>&1 || fail "brief without rules failed"
+  assert_equals 0 "$(grep -c "^# Owner rules" "$home/data/no-rules/brief.md")" "a home with no owner rules added an empty section"
+  JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" "$RULES" init >/dev/null 2>&1 || fail "init failed"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" with-rules proj --mode direct-PR >/dev/null 2>&1 || fail "brief with rules failed"
+  brief="$home/data/with-rules/brief.md"
+  assert_equals 1 "$(grep -c "^# Owner rules" "$brief")" "the worker brief does not carry the owner rules"
+  assert_grep "posting questions will be stricter way of working" "$brief" "the worker brief dropped the owner's words"
+  assert_equals 1 "$(grep -c '^# Task' "$brief")" "the owner rules section shadowed the Task heading"
+  assert_equals 1 "$(grep -c '^Delivery contract: mode=' "$brief")" "the owner rules section added a delivery contract line"
+  pass "the worker brief carries the owner rules"
+}
+
 test_add_refuses_an_entry_it_cannot_enforce
 test_seeded_surface_and_added_entry
 test_audit_flags_a_correction_left_in_a_private_note
 test_question_rule_blocks_until_a_card_is_cited
+test_lead_homes_get_read_only_owner_rules_and_a_gap_is_reported
+test_worker_brief_carries_the_owner_rules

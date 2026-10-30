@@ -6,7 +6,8 @@
 #   jg-remote-inherit.sh absent <allowlisted-relative-path> 0 <empty-sha256> <generation>
 #
 # Only the inherited-material allowlist is writable or removable. Writes are
-# atomic ordinary-file replacements. data/captain-shared.md is read-only and is
+# atomic ordinary-file replacements. Each shared data/ file (data/captain-shared.md,
+# data/owner-rules.md) is read-only and is
 # quarantined before removal or before replacing bytes not last published here.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
@@ -159,9 +160,10 @@ dest_matches_last_published() {
 
 quarantine_shared() {
   local reason=$1 quarantine stamp base n=0
-  [ "$REL" = data/captain-shared.md ] && [ -f "$DEST" ] || return 0
+  case "$REL" in data/*) ;; *) return 0 ;; esac
+  [ -f "$DEST" ] || return 0
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  base="$HOME_REAL/data/captain-shared.md.remote-quarantine-$stamp-$$"
+  base="$HOME_REAL/$REL.remote-quarantine-$stamp-$$"
   quarantine=$base
   while [ -e "$quarantine" ] || [ -L "$quarantine" ]; do
     n=$((n + 1))
@@ -183,7 +185,7 @@ case "$COMMAND" in
     [ "$ACTUAL_HASH" = "$EXPECTED_HASH" ] || die "inherited material digest does not match its commitment"
     commit_generation
     if [ -f "$DEST" ] && cmp -s "$TMP" "$DEST"; then
-      [ "$REL" != data/captain-shared.md ] || chmod 444 "$DEST"
+      case "$REL" in data/*) chmod 444 "$DEST" ;; esac
       printf 'unchanged: %s\n' "$REL"
       exit 0
     fi
@@ -191,7 +193,7 @@ case "$COMMAND" in
     chmod 600 "$TMP" || die "cannot secure inherited material"
     mv -f -- "$TMP" "$DEST" || die "cannot publish inherited material"
     TMP=
-    [ "$REL" != data/captain-shared.md ] || chmod 444 "$DEST"
+    case "$REL" in data/*) chmod 444 "$DEST" ;; esac
     printf 'pushed: %s\n' "$REL"
     ;;
   absent)

@@ -32,8 +32,9 @@
 # so a primary that opts out opts every squad_lead home out too, while each
 # home's config/supervision-host engine line stays its own.
 # It also pushes
-# the one primary-authoritative shared captain-preference file,
-# data/captain-shared.md, into each squad_lead home's data/ as a read-only copy.
+# the primary-authoritative shared data files, data/captain-shared.md and the
+# owner rules in data/owner-rules.md, into each squad_lead home's data/ as
+# read-only copies.
 # Shared-captain convergence records the SHA-256 of the last successfully
 # published destination generation beside that copy. A destination whose bytes
 # still match that receipt is replaced quietly when the primary source advances.
@@ -80,8 +81,9 @@
 # shellcheck source=bin/jg-role-lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jg-role-lib.sh"
 
-# The one shared data file in this inheritance contract. There is deliberately
-# no shared learnings file.
+# The shared data files in this inheritance contract, each propagated the same
+# way. There is deliberately no shared learnings file.
+JG_SHARED_DATA_FILES="captain-shared.md owner-rules.md"
 JG_SHARED_CAPTAIN_FILE="captain-shared.md"
 JG_SHARED_CAPTAIN_REL="data/$JG_SHARED_CAPTAIN_FILE"
 JG_SHARED_CAPTAIN_MODE="444"
@@ -124,14 +126,16 @@ jg_config_inherit_item_session_scoped() {  # <item>
 
 # The complete declared inherited-material set as home-relative paths, one per
 # line, in propagation order: every JG_INHERITABLE_CONFIG item under config/,
-# then the one shared data file. This is what remote senders and receivers
+# then each shared data file. This is what remote senders and receivers
 # derive from, so both ends of a transfer agree by construction.
 jg_config_inherit_items() {
   local item
   for item in $JG_INHERITABLE_CONFIG; do
     printf 'config/%s\n' "$item"
   done
-  printf '%s\n' "$JG_SHARED_CAPTAIN_REL"
+  for item in $JG_SHARED_DATA_FILES; do
+    printf 'data/%s\n' "$item"
+  done
 }
 
 jg_config_source_present() {
@@ -523,7 +527,14 @@ copy_shared_captain_file() {
   return 1
 }
 
+# <src-data> <dest-data> [file]: converge one shared data file (default
+# captain-shared.md). The helpers above read JG_SHARED_CAPTAIN_FILE, so the
+# locals below scope every one of them to <file> for this call. Only
+# captain-shared.md carries a required header; owner-rules.md is written by
+# bin/jg-owner-rules.sh.
 propagate_shared_captain_preferences() {
+  local JG_SHARED_CAPTAIN_FILE=${3:-$JG_SHARED_CAPTAIN_FILE}
+  local JG_SHARED_CAPTAIN_REL="data/$JG_SHARED_CAPTAIN_FILE"
   local src_data=$1 dest_data=$2 src dest src_hash dest_hash dest_parent dest_home
   local quarantine inherited_hash reason rc missing
   [ -n "$src_data" ] || return 1
@@ -541,7 +552,7 @@ propagate_shared_captain_preferences() {
       record_inheritable_config_result "$JG_SHARED_CAPTAIN_REL" error "$reason"
       return 1
     fi
-    if ! missing=$(shared_captain_header_valid "$src"); then
+    if [ "$JG_SHARED_CAPTAIN_FILE" = captain-shared.md ] && ! missing=$(shared_captain_header_valid "$src"); then
       reason="primary source header missing required main-authoritative warning"
       [ -z "$missing" ] || reason="$reason: missing \"$missing\""
       warn_inheritable_config_error "$JG_SHARED_CAPTAIN_REL" "$src" "$reason"
@@ -655,14 +666,16 @@ propagate_shared_captain_preferences() {
 }
 
 propagate_squad_lead_inheritance() {
-  local src_home=$1 dest_home=$2 src_config=${3:-} src_data=${4:-} rc
+  local src_home=$1 dest_home=$2 src_config=${3:-} src_data=${4:-} rc file
   [ -n "$src_home" ] || return 1
   [ -n "$dest_home" ] || return 1
   [ -n "$src_config" ] || src_config="$src_home/config"
   [ -n "$src_data" ] || src_data="$src_home/data"
   rc=0
   propagate_inheritable_config "$src_config" "$dest_home/config" "$src_home" || rc=1
-  propagate_shared_captain_preferences "$src_data" "$dest_home/data" || rc=1
+  for file in $JG_SHARED_DATA_FILES; do
+    propagate_shared_captain_preferences "$src_data" "$dest_home/data" "$file" || rc=1
+  done
   return "$rc"
 }
 

@@ -107,7 +107,24 @@ test_arm_registers_a_check_the_watcher_trusts_only_on_a_primary_home() {
   pass "arm registers a trusted check only on a primary home"
 }
 
+test_check_wakes_on_a_lead_without_current_owner_rules() {
+  local d out
+  d=$(setup rules)
+  printf '# Owner rules\n\n## 2026-10-30 - keep moving\n' > "$d/main/data/owner-rules.md"
+  mkdir -p "$d/leads/quiet/data" "$d/leads/dead/data"
+  printf '# Owner rules\n' > "$d/leads/quiet/data/owner-rules.md"
+  cp "$d/main/data/owner-rules.md" "$d/leads/dead/data/owner-rules.md"
+  out=$(hb "$d" check)
+  assert_contains "$out" "fleet heartbeat: gappy.owner-rules MISSING" "a lead without the owner rules must wake Main"
+  assert_contains "$out" "fleet heartbeat: quiet.owner-rules STALE" "a lead with a stale copy must wake Main"
+  assert_not_contains "$out" "dead.owner-rules" "a current copy must stay silent"
+  cp "$d/main/data/owner-rules.md" "$d/leads/quiet/data/owner-rules.md"
+  assert_contains "$(hb "$d" check)" "fleet heartbeat: quiet.owner-rules CURRENT again" "a converged copy must report recovery"
+  pass "check wakes Main on a lead without current owner rules"
+}
+
 test_rows_give_every_home_one_verdict
 test_an_open_wait_is_a_gap_and_filled_lanes_are_moving
 test_check_wakes_on_a_gap_refires_and_reports_recovery_once
 test_arm_registers_a_check_the_watcher_trusts_only_on_a_primary_home
+test_check_wakes_on_a_lead_without_current_owner_rules

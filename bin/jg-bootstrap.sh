@@ -584,7 +584,7 @@ squad_lead_sync() {
   # Inheritance propagation: push the primary-authoritative local inheritance
   # surface into every VALIDATED live squad_lead home swept above.
   # FF_SEEN_HOMES is exactly that set, and jg-config-inherit-lib.sh owns the
-  # declared config items plus data/captain-shared.md.
+  # declared config items plus its shared data files.
   # After a successful push that changes allowlisted config/* for an already-
   # running home, send its literal-content reread instruction pointer so the
   # live agent does not keep applying stale defaults. Spawn/respawn already

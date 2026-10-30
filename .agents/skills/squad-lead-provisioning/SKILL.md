@@ -125,6 +125,7 @@ A destination matching neither the primary bytes nor that recorded generation is
 The helper rejects unsafe directories, symlinked or nonordinary source or destination artifacts, and hardlinked destination files.
 Between propagation runs, the Squad Lead copy is filesystem read-only; the helper may make its owned destination writable only around a guarded update and restores read-only mode on success, unchanged bytes, and recoverable failure paths.
 Never copy any Squad Lead `data/captain-shared.md` back into the primary.
+`data/owner-rules.md` follows this same contract with no required header, so every Squad Lead session start and brief prints the primary's owner rules; `bin/jg-owner-rules.sh homes` reports a lead whose copy is missing or stale, and `bin/jg-config-push.sh` converges it.
 Keep each home's `data/captain.md` domain-local.
 After first propagation to an existing home, trim that home's local `data/captain.md` by hand to domain-specific content plus pointers to `data/captain-shared.md`; do not automate or silently delete private content.
 Keep every `data/learnings.md` fully local by captain decision; route fleet-general machinery facts into tracked documentation through the normal Juggernaut repo path rather than inventing shared learnings propagation.

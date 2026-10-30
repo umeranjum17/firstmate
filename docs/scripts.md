@@ -18,7 +18,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `jg-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
 | `jg-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
-| `jg-fleet-heartbeat.sh`  | One no-model pass over this home and every local Squad Lead home: working lanes against the lane target, ready backlog, open waits and supervision age, as a MOVING, IDLE, GAP or STALLED verdict per home; `arm` registers a watcher check that wakes Main when a home turns GAP or STALLED and re-fires until it recovers |
+| `jg-fleet-heartbeat.sh`  | One no-model pass over this home and every local Squad Lead home: working lanes against the lane target, ready backlog, open waits and supervision age, as a MOVING, IDLE, GAP or STALLED verdict per home; `arm` registers a watcher check that wakes Main when a home turns GAP or STALLED, or a Squad Lead's owner rules are MISSING or STALE (`jg-owner-rules.sh homes`), and re-fires until it recovers |
 | `jg-flow.sh`             | Shim for the fleet-flow add-on: read fleet lifecycle and wait metrics as JSON ([reader reference](fleet-ledger.md#reading-lifecycle-metrics)) |
 | `jg-task-outcome.sh`     | Append one durable per-task outcome row (models, timestamps, outcome, PR) at teardown ([per-model statistics](fleet-ledger.md#per-model-statistics)) |
 | `jg-model-stats.sh`      | Shim for the fleet-stats add-on: read per-model merge rate, time-to-merge, first-pass and rework statistics as JSON ([per-model statistics](fleet-ledger.md#per-model-statistics)) |
@@ -40,7 +40,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-backlog-receive.sh`  | Idempotently ingest one confined remote handoff outbox through tasks-axi             |
 | `jg-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
 | `jg-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto jg-captain-hold.sh |
-| `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest prints, refusing an entry with no owner words, no scope, or no enforcement point |
+| `jg-owner-rules.sh`      | Seed, extend, and audit the shared owner-rules surface the session digest and every ship and scout brief print, refusing an entry with no owner words, no scope, or no enforcement point; `homes` reports each Squad Lead whose read-only copy is MISSING or STALE |
 | `jg-question-card.sh`    | Post the board card for a question to the owner through sign-off-axi and print its key so the reply can cite it; `--route <lead>` names the lead that owns the answer |
 | `jg-proof-attach.sh`      | Find a task's done-done receipt and proof media, refuse a text-only card for UI or video work, and put the proof on the ready, review or merged board card and the PR body |
 | `jg-question-lib.sh`     | Shared question-rule predicate: does a reply end in a question, and does it cite an open board card |
