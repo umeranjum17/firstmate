@@ -1163,7 +1163,7 @@ The wake asks the lead to dispatch the ready items, P0 first, up to the project'
 A malformed value is reported once in the watcher's triage log and then treated as absent, never as a number; `bin/jg-watch.sh`'s header owns the exact reason lines.
 
 The floor is a floor, not a cap: it never asks a home to stop working above its target.
-If ready work still waits on a free lane and nothing starts for 15 minutes, the lead is woken again and Main is told, every 10 minutes while that holds; [`addons/wait-timers/README.md`](../addons/wait-timers/README.md) "Stalled ready backlog" owns that backstop.
+If ready work still waits on a free lane, or at the floor with no worker provably working, and nothing starts for 10 minutes, the lead is woken again and Main is told, every 10 minutes while that holds, and Main posts a board card if it stays open; [`addons/wait-timers/README.md`](../addons/wait-timers/README.md) "Stalled ready backlog" owns that backstop.
 
 ## Launch environment hook (config/launch-env-hook)
 
