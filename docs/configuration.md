@@ -375,6 +375,9 @@ Every captain message a Claude or Cursor primary receives is recorded and must b
 It is on by default.
 A local `config/overwatch-kpi` reading `off` stops recording, which is for a lab whose prompts are scripted rather than typed by a captain.
 
+`jg-overwatch-kpi.sh scorecard` reports the misses - feedback and micromanagement messages - per calendar day and per trailing week against a target of zero, with the link each one carries.
+The fleet view prints that scorecard on every render from the local ledger alone, so a render makes no network call; `scorecard --landed` adds whether each linked PR merged or each linked backlog ticket closed.
+
 ## Backlog backend (.tasks.toml / config/backlog-backend)
 
 The tracked `.tasks.toml` pins the default `tasks-axi` markdown backend to `data/backlog.md`, with `done_keep = 10` and an archive at `data/done-archive.md`.

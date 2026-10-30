@@ -10,6 +10,7 @@ set -u
 
 KPI="$ROOT/bin/jg-overwatch-kpi.sh"
 GUARD="$ROOT/bin/jg-turnend-guard.sh"
+SCRIPT_DIR_TASKS="$ROOT/bin/jg-tasks-axi.sh"
 TMP_ROOT=$(jg_test_tmproot jg-overwatch-kpi)
 jg_git_identity fmtest fmtest@example.invalid
 
@@ -100,6 +101,62 @@ test_a_miss_needs_a_link_to_code_work() {
   pass "a miss is refused without a code link and accepted with a PR or MR on this repository"
 }
 
+test_scorecard_counts_misses_and_excludes_the_old_ones() {
+  local home="$TMP_ROOT/score" now day ago_old ago_week
+  make_home "$home"
+  now=$(date +%s)
+  day=$(date -u -d "@$now" +%F 2>/dev/null || date -u -r "$now" +%F)
+  ago_week=$(date -u -d "@$((now - 2 * 86400))" +%F 2>/dev/null || date -u -r "$((now - 2 * 86400))" +%F)
+  submit "$home" "why is the export PR still not open?"
+  in_home "$home" "$KPI" tag feedback https://github.com/acme/juggernaut/pull/41 >/dev/null \
+    || fail "tagging a miss failed"
+  submit "$home" "is it merged yet?"
+  in_home "$home" "$KPI" tag micromanagement https://github.com/acme/juggernaut/pull/42 >/dev/null \
+    || fail "tagging a miss failed"
+  # Two misses this week but not today, and one older than the week, which the
+  # scorecard must leave out of the live counts entirely.
+  jq -cn --argjson e "$((now - 2 * 86400))" '{seq: 3, epoch: $e, text: "chased again"}, {tag: 3, epoch: $e, kind: "feedback", link: "https://github.com/acme/juggernaut/pull/43"}, {seq: 4, epoch: ($e - 8 * 86400), text: "old chase"}, {tag: 4, epoch: ($e - 8 * 86400), kind: "feedback", link: "https://github.com/acme/juggernaut/pull/44"}' \
+    >> "$home/data/overwatch-kpi.jsonl"
+  local card
+  card=$(in_home "$home" "$KPI" scorecard --json) || fail "the scorecard refused to run"
+  assert_equals "$day 1 1 2" "$(printf '%s' "$card" | jq -r '.day | "\(.date) \(.feedback) \(.micromanagement) \(.total)"')" \
+    "the day scorecard is wrong: $card"
+  assert_equals "1 2 3" "$(printf '%s' "$card" | jq -r '.week | "\(.micromanagement) \(.feedback) \(.total)"')" \
+    "the week scorecard is wrong: $card"
+  assert_equals "3" "$(printf '%s' "$card" | jq -r '.misses | length')" \
+    "the scorecard listed a miss older than its week"
+  assert_contains "$(in_home "$home" "$KPI" scorecard)" "target 0" "the scorecard does not name the target"
+  pass "the scorecard counts the day and the week against the target and leaves older misses out"
+}
+
+test_landed_asks_the_forge_and_the_backlog() {
+  local home="$TMP_ROOT/landed" fakebin
+  make_home "$home"
+  jg_test_tasks_toml "$home/.tasks.toml"
+  mkdir -p "$home/data" "$TMP_ROOT/fakebin"
+  fakebin="$TMP_ROOT/fakebin"
+  printf '#!/bin/sh\nprintf "number: 41\\nmerged: yes\\n"\n' > "$fakebin/gh-axi"
+  chmod +x "$fakebin/gh-axi"
+  in_home "$home" "$SCRIPT_DIR_TASKS" add export-fix-q1 "add CSV export" >/dev/null 2>&1 \
+    || fail "creating the backlog ticket failed"
+  in_home "$home" "$SCRIPT_DIR_TASKS" 'done' export-fix-q1 >/dev/null 2>&1 \
+    || fail "closing the backlog ticket failed"
+  submit "$home" "stop shipping the export without the CSV column"
+  in_home "$home" "$KPI" tag feedback https://github.com/acme/juggernaut/pull/41 >/dev/null \
+    || fail "tagging a PR-linked miss failed"
+  submit "$home" "and the export ticket is still open?"
+  in_home "$home" "$KPI" tag micromanagement export-fix-q1 >/dev/null \
+    || fail "tagging a backlog-linked miss failed"
+  local card
+  card=$(PATH="$fakebin:$PATH" in_home "$home" "$KPI" scorecard --landed) \
+    || fail "the landed scorecard refused to run"
+  assert_contains "$card" "pull/41  landed: yes" "the merged PR was not reported as landed"
+  assert_contains "$card" "export-fix-q1  landed: yes" "the done backlog ticket was not reported as landed"
+  pass "a miss reports whether its linked PR merged or its backlog ticket closed"
+}
+
 test_hook_records_only_typed_captain_messages
 test_guard_refuses_an_untagged_message_once
 test_a_miss_needs_a_link_to_code_work
+test_scorecard_counts_misses_and_excludes_the_old_ones
+test_landed_asks_the_forge_and_the_backlog

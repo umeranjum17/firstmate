@@ -3,7 +3,8 @@
 #
 # This command intentionally does not parse fleet state itself.
 # It shells out to jg-fleet-snapshot.sh --json and renders that stable
-# structured contract for humans.
+# structured contract for humans. Its Overwatch KPI section comes from the
+# local scorecard in bin/jg-overwatch-kpi.sh, so a render makes no network call.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -49,8 +50,12 @@ esac
 command -v jq >/dev/null 2>&1 || { echo "jg-fleet-view: jq not found" >&2; exit 1; }
 
 SNAPSHOT=$("$SCRIPT_DIR/jg-fleet-snapshot.sh" --json) || exit $?
+# The Overwatch KPI reads the local ledger only, so it renders without a network
+# call; the per-miss landed verdict stays in `jg-overwatch-kpi.sh scorecard --landed`.
+KPI=$("$SCRIPT_DIR/jg-overwatch-kpi.sh" scorecard --json 2>/dev/null) || KPI='{}'
 
-printf '%s\n' "$SNAPSHOT" | jq -r '
+printf '%s\n' "$SNAPSHOT" | jq -r --argjson kpi "$KPI" '
+  def kpi_n($v): if $v == null then 0 else $v end;
   def dash($v): if $v == null or $v == "" then "-" else $v end;
   def endpoint_exists($t):
     if $t.endpoint.exists == null then "unknown"
@@ -85,6 +90,12 @@ printf '%s\n' "$SNAPSHOT" | jq -r '
   "",
   "Schema: \(.schema)",
   "Home: \(.jg_home)",
+  "",
+  "## Overwatch KPI (target 0 misses)",
+  "Day \($kpi.day.date // "-"): \(kpi_n($kpi.day.feedback)) feedback, \(kpi_n($kpi.day.micromanagement)) micromanagement.",
+  "Week \($kpi.week.start // "-") to \($kpi.week.end // "-"): \(kpi_n($kpi.week.feedback)) feedback, \(kpi_n($kpi.week.micromanagement)) micromanagement.",
+  (if (($kpi.misses // []) | length) == 0 then "No miss in the last week."
+   else ([$kpi.misses[] | "miss #\(.seq) \(.date) \(.kind) \(.link)"] | join("; ")) end),
   "",
   "## Under Way",
   (if (.tasks | length) == 0 then
