@@ -39,6 +39,7 @@ newhome() {  # <name>
   home=$d/$1; state=$home/state
   mkdir -p "$state" "$home/config" "$home/data"
   printf 'manual\n' > "$home/config/backlog-backend"
+  : > "$home/config/backlog-intake-loose"  # bare fixture items for wake cases
   printf 'lead-1\n' > "$home/.jg-squad-lead-home"
 }
 # watch <addons-dir> <out> [wait-seconds]: run the real watcher; it exits on a wake.

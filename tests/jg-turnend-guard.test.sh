@@ -587,6 +587,7 @@ test_hook_blocks_idle_squad_lead_with_ready_backlog() {
   local dir out status ids
   dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-ready")
   mkdir -p "$dir/data" "$dir/config"
+  : > "$dir/config/backlog-intake-loose"  # bare fixture items for the ready-work case
   cp "$ROOT"/bin/jg-*-lib.sh "$ROOT/bin/jg-tasks-axi.sh" "$dir/bin/"
   tasks() { JG_HOME="$dir" "$dir/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
   tasks add held-one "held item"; tasks hold held-one --reason "waiting for approval"

@@ -26,6 +26,9 @@ RING_TEXT=${RING_TEXT:-Wake row 7 is still queued in this home. Run bin/jg-wake-
 newhome() {  # <name>: a fresh squad_lead home; sets dir state fakebin out
   dir=$(make_case "$1"); state=$dir/state; fakebin=$dir/fakebin; out=$dir/watch.out
   mkdir -p "$dir/data" "$dir/config"; printf '%s\n' "$1" > "$dir/.jg-squad-lead-home"
+  # These cases add bare fixture items for wake behavior, so this home opts out of
+  # the strict backlog intake that slice 3 turned on by default.
+  : > "$dir/config/backlog-intake-loose"
 }
 tasks() { JG_HOME="$dir" "$TASKS" "$@" >/dev/null || fail "fixture: tasks $*"; }
 ack() { ack_stopped_cycle "$state" >/dev/null || fail "could not acknowledge the cycle"; }
