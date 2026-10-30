@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Forced-limit: A=70%/B=40%; quota-axi --json Claude row matches jg-model-pool (not ambient 11%).
+# Multi-account: workers A=70%/B=40%, Main's own login reserved at 5%; quota-axi --json, the quota wake and the dashboard agree.
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
 for _jg_old in $(compgen -v FM_ 2>/dev/null || true); do
@@ -20,8 +20,7 @@ trap 'rm -rf -- "$w"' EXIT
 mkdir -p "$w/home/config" "$w/home/state" "$w/a" "$w/b" "$w/pool" "$w/bin" "$w/log"
 fails=0
 is() { if [ "$2" = "$3" ]; then echo "ok - $1"; else echo "not ok - $1: got [$2], want [$3]"; fails=$((fails + 1)); fi; }
-pct() { jq -r '[.providers[]|select(.provider=="claude")|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining]|first' <<<"$1"; }
-pid() { jq -r '[.providers[]|select(.provider=="claude")|.pool.id]|first' <<<"$1"; }
+row_pct() { jq -r --arg p "$2" --arg k "$3" '[.providers[]|select(.provider==$p and (.accountKey // "default")==$k)|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining]|first' <<<"$1"; }
 
 cat >"$w/bin/quota-axi-real" <<'SH'
 #!/usr/bin/env bash
@@ -52,8 +51,8 @@ reading() {
   jq -n --argjson at "$now" --arg a pa_umer_a --arg b pa_umer_b --arg fa "$w/a" --arg fb "$w/b" \
     --argjson h1 "$1" --argjson d1 "$2" --argjson h2 "$3" --argjson d2 "$4" \
     '{schema:1,generated_at:$at,accounts:[
-      {id:$a,name:"Umer A",folder:$fa,five_hour:{left:$h1},seven_day:{left:$d1},read_at:$at,problem:null},
-      {id:$b,name:"Umer B",folder:$fb,five_hour:{left:$h2},seven_day:{left:$d2},read_at:$at,problem:null}]}' \
+      {id:$a,name:"Umer A",folder:$fa,five_hour:{left:$h1},seven_day:{left:$d1,resets_at:"2030-01-02T00:00:00Z"},read_at:$at,problem:null},
+      {id:$b,name:"Umer B",folder:$fb,five_hour:{left:$h2},seven_day:{left:$d2,resets_at:"2030-01-02T00:00:00Z"},read_at:$at,problem:null}]}' \
     >"$w/pool/claude-accounts.json"
   cp "$w/pool/claude-accounts.json" "$w/home/state/claude-accounts.json"
 }
@@ -65,27 +64,40 @@ run_json() {
     JG_QUOTA_AXI_POOL_ATTEMPTED="${1:-[]}" "$wrap" --json 2>"$w/err"); rc=$?
 }
 
+# Multi-account journey: Main's own login (found, 5% left) is reserved; workers A=70 and B=40 hold the room.
+# One view feeds dispatch (this wrapper), the quota wake, and the dashboard.
 reading 70 70 40 40
+jq '.accounts += [{id:"found-main",name:"default",folder:"main",five_hour:{left:5},seven_day:{left:5,resets_at:"2030-01-02T00:00:00Z"},read_at:.generated_at,problem:null}]' \
+  "$w/pool/claude-accounts.json" >"$w/x" && mv "$w/x" "$w/home/state/claude-accounts.json"
+jq '.accounts += [{id:"found-main",name:"",provider:"claude",folder:"main",found:true}]' "$w/registry.json" >"$w/x" && mv "$w/x" "$w/registry.json"
 run_json '[]'
 is "exit 0" "$rc" 0
-is "Claude row A=70 not ambient 11" "$(pct "$out")" 70
-is "pool id A" "$(pid "$out")" pa_umer_a
-is "codex passthrough" "$(jq -r '[.providers[]|select(.provider=="codex")|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining]|first' <<<"$out")" 50
-pick=$(printf '%s' "$(jq -nc --arg p "$w/home/config/account-pool" '{v:1,purpose:"work",pool_config:$p,capabilities:["text"],attempted:[]}')" \
-  | env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" TMPDIR="$w" JG_HOME="$w/home" \
-    JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" JG_MODEL_POOL_FLOOR=15 \
-    JG_ACCOUNT_POOL_REST_FLOOR=15 JG_CLAUDE_ACCOUNTS_FRESH=999999 "$helper" pick --json 2>/dev/null)
-is "jg-model-pool picks A" "$(jq -r .id <<<"$pick")" pa_umer_a
-run_json '["pa_umer_a"]'
-is "after A attempted, Claude row B=40" "$(pct "$out")" 40
-is "pool id B" "$(pid "$out")" pa_umer_b
-rm -f "$w/home/config/account-pool"
+is "schema 6" "$(jq -r .schemaVersion <<<"$out")" 6
+is "Claude default row is the best worker A=70, not ambient 11" "$(row_pct "$out" claude default)" 70
+is "worker B row" "$(row_pct "$out" claude pa_umer_b)" 40
+is "Main's login shown apart, reserved" "$(jq -r '[.providers[]|select(.provider=="claude" and .accountKey=="main")|"\(.account.reserved):\(.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining)"]|first' <<<"$out")" true:5
+is "codex passthrough" "$(row_pct "$out" codex default)" 50
+# shellcheck source=../../../bin/jg-quota-axi-lib.sh disable=SC1091
+. "$addons/../bin/jg-quota-axi-lib.sh"
+jg_quota_json_valid <<<"$out" && echo "ok - snapshot valid for dispatch" || { echo "not ok - snapshot valid for dispatch"; fails=$((fails + 1)); }
+is "dispatch binds a Claude candidate to A=70" "$(jq -r "$JG_QUOTA_ROW_JQ"'quota_row(.; "claude"; "")|.quotaSemantics.effectiveAvailability[0].effectivePercentRemaining' <<<"$out")" 70
+# The quota wake's own classifier, taken from its script so the test cannot drift from it.
+# shellcheck disable=SC1090
+. <(sed -n '/^condition_status()/,/^}/p' "$addons/../bin/jg-procevent-quota.sh")
+export DEFAULT_THRESHOLD=20
+is "quota wake: Claude healthy while a worker has room" "$(condition_status "$out" claude)" healthy
+lookout=$(JG_HOME="$w/home" JG_CLAUDE_ACCOUNTS_REGISTRY="$w/registry.json" python3 -c '
+import importlib.machinery as m, json, sys
+mod = m.SourceFileLoader("l", sys.argv[1]).load_module()
+print(json.dumps(mod.quota_doc(sys.argv[2])))' "$addons/lookout-adapter/lookout-juggernaut" "$w/home")
+is "dashboard lists A, B and reserved Main" "$(jq -r '[.[].account]|unique|join(",")' <<<"$lookout")" "Umer A (pa_umer_a),Umer B (pa_umer_b),default (Main, reserved)"
+reading 0 0 0 0
 run_json '[]'
-is "no pool ambient 11" "$(pct "$out")" 11
-printf 'state=%s\ncommand=%s\n' "$w/pool" "$w/bin/pool-cmd" >"$w/home/config/account-pool"
-reading 10 10 5 5
+is "all workers drained: Claude default reads exhausted, not ambient" "$(jq -r '[.providers[]|select(.provider=="claude" and .accountKey=="default")|.quotaSemantics.effectiveAvailability[0].runway.status]|first' <<<"$out")" exhausted_now
+is "quota wake: Claude exhausted when no worker has room" "$(condition_status "$out" claude)" exhausted
+rm -f "$w/home/state/claude-accounts.json" "$w/pool/claude-accounts.json" "$w/registry.json" "$w/home/config/account-pool"
 run_json '[]'
-is "under floor Claude unknown" "$(jq -r '[.providers[]|select(.provider=="claude")|.quotaSemantics.status]|first' <<<"$out")" unknown
+is "no registered accounts and no pool: ambient 11" "$(row_pct "$out" claude default)" 11
 ver=$(env -i PATH="$w/bin:/usr/bin:/bin" HOME="$w" JG_QUOTA_AXI_REAL="$w/bin/quota-axi-real" "$wrap" --version 2>/dev/null) || true
 is "version passthrough" "$ver" "quota-axi 0.1.54 (stub)"
 

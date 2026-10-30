@@ -2,7 +2,7 @@
 
 ## User outcome
 
-Dispatch `quota-axi --json` Claude runway matches `jg-model-pool`'s account reading. Install over an existing foreign `~/.local/bin/quota-axi` symlink records its resolved target as upstream and restores that link on uninstall.
+Dispatch `quota-axi --json` reports every registered Claude and Codex account: `default` is the worker with the most room, Main's own login is a separate reserved `main` row, and the quota wake and Lookout dashboard read the same view. Install over an existing foreign `~/.local/bin/quota-axi` symlink records its resolved target as upstream and restores that link on uninstall.
 
 ## Drive
 
@@ -12,4 +12,4 @@ Dispatch `quota-axi --json` Claude runway matches `jg-model-pool`'s account read
 
 ## Capture
 
-`result.log` and `steps.json` under `$DONE_DONE_EVIDENCE_ROOT` (screen: none). Assert A=70 then B=40 after A attempted; ambient without pool; unknown under floor; refuse with no upstream; install records resolved upstream and original link target; reinstall keeps them; uninstall restores the original link. For the recursion journey, assert the reader's run finishes, calls the upstream once and the pool tool never, and that the depth guard is what stopped the delegated call.
+`result.log` and `steps.json` under `$DONE_DONE_EVIDENCE_ROOT` (screen: none). Assert default=A=70 beside B=40 and reserved Main=5; the quota wake healthy, then exhausted when every worker is drained; Lookout lists all three accounts; ambient with no registered accounts and no pool; refuse with no upstream; install records resolved upstream and original link target; reinstall keeps them; uninstall restores the original link. For the recursion journey, assert the reader's run finishes, calls the upstream once and the pool tool never, and that the depth guard is what stopped the delegated call.

@@ -92,6 +92,23 @@ def home_names(home):
     return names
 
 
+def quota_doc(home):
+    """Every registered Claude and Codex account's windows from the one quota view; Main's own login is named apart."""
+    view = os.environ.get('JG_QUOTA_VIEW') or os.path.join(HERE, '../claude-accounts/bin/jg-quota-view')
+    done = subprocess.run(['bash', view], env=dict(os.environ, JG_HOME=home), capture_output=True, text=True, timeout=30)
+    if done.returncode:
+        raise RuntimeError('jg-quota-view failed: ' + done.stderr.strip()[-300:])
+    rows = []
+    for provider, group in json.loads(done.stdout)['providers'].items():
+        for acct in group['workers'] + ([group['reserved']] if group['reserved'] else []):
+            label = '%s (%s)' % (acct['name'] or acct['id'], 'Main, reserved' if acct is group['reserved'] else acct['id'])  # ids tell same-named accounts apart
+            for window, left, reset in (('5h', acct['five_hour'], acct['five_hour_resets_at']), ('week', acct['seven_day'], acct['resets_at'])):
+                if left is not None and reset:
+                    rows.append({'account': label, 'provider': provider, 'window': window, 'used_pct': 100 - left,
+                                 'resets_at': iso(reset), 'runway_hours': None})
+    return rows
+
+
 def build_fleet(home, build=True, proc='/proc', flow_json=None):
     data = refresh(home, build, flow_json)
     now = data['at']
@@ -132,7 +149,7 @@ def build_fleet(home, build=True, proc='/proc', flow_json=None):
                             'state': 'working' if state in ('working', 'resolved') else 'waiting' if waits else 'idle',
                             'started_at': iso(started), 'last_activity_at': iso(updated)})
     return {'schema': 'lookout.fleet.v1', 'generated_at': iso(time.time()), 'name': 'Juggernaut fleet',
-            'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers, 'quota': [],
+            'hosts': [host], 'homes': homes, 'lanes': lanes, 'workers': workers, 'quota': quota_doc(home),
             'merges': merges, 'releases': [], 'incidents': []}
 
 
