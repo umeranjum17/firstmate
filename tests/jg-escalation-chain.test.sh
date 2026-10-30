@@ -24,6 +24,7 @@ done
 home() {  # <name> -> home path
   local h="$TMP_ROOT/$1"
   mkdir -p "$h/state" "$h/config" "$h/home" "$h/tmp" "$h/fakebin" "$h/panes"
+  : > "$h/config/backlog-intake-loose"
   jg_test_track_watcher_state "$h/state"
   cat > "$h/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
