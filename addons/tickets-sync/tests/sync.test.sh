@@ -31,7 +31,7 @@ cp "$JG_HOME/.tasks.toml" "$work/parked/.tasks.toml"
  tasks-axi add upkeep 'Umer maintenance' --repo alpha --priority 2 --body 'parent: upkeep' >/dev/null
  tasks-axi add held 'Umer paused item' --repo alpha --priority 1 --body 'parent: missing' >/dev/null
  tasks-axi hold held --reason 'Umer parked this item' --kind parked >/dev/null
- tasks-axi add voice 'Umer voice practice' --repo ownvoice --priority 2 >/dev/null
+ tasks-axi add voice 'Umer voice practice' --repo ownvoice --priority 2 --body 'release: soon' >/dev/null
  tasks-axi add take 'Umer takes' --repo takeone --priority 2 >/dev/null
  tasks-axi add inferred 'Umer telescope focus regression' --repo alpha --priority 1 >/dev/null
  tasks-axi add internal 'Umer internal maintenance' --repo herdr --priority 2 --body 'parent: upkeep' >/dev/null
@@ -107,6 +107,8 @@ sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq
 printf 'done [at=1700000200]: ready to merge\n' >> "$JG_HOME/state/long.status"
 "$JG_HOME/state/tickets-sync.check.sh"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 90 and .ticket.stage == "merging" and .ticket.last_event_at == 1700000200'
+# A timing word in the release field is no release: the board keeps none.
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/voice)" --json | jq -e '(.ticket.release // "") == ""'
 printf 'cancelled [at=1700000300]: Umer cancelled this task\n' >> "$JG_HOME/state/long.status"
 "$JG_HOME/state/tickets-sync.check.sh"
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e '.ticket.progress == 100 and .ticket.state == "done" and .ticket.stage == "done" and .ticket.last_event_at == 1700000300'
@@ -123,8 +125,11 @@ test "$source_before" = "$(sha256sum "$JG_HOME/data/backlog.md" "$work/parked/da
 sign-off-axi ticket "$work/board.json" --id "$child" --json > "$work/closed.json"
 jq -e '.ticket | .progress == 100 and .hold == false and (.prs | index("https://github.com/example/alpha/pull/1") != null)' "$work/closed.json"
 before=$(sha256sum "$work/board.tickets.jsonl")
-"$JG_HOME/state/tickets-sync.check.sh"
+"$JG_HOME/state/tickets-sync.check.sh" > "$work/steady.out"
 test "$before" = "$(sha256sum "$work/board.tickets.jsonl")"
+# sign-off reports an absent field as null and a grouping row's progress as its children's
+# roll-up, so a settled board must publish nothing: a republish every check is the defect.
+grep -q 'tickets changed' "$work/steady.out" && { echo "FAIL: settled board republished rows: $(cat "$work/steady.out")"; exit 1; }
 sign-off-axi ticket "$work/board.json" --id "$parent" --json | jq -e '.ticket.progress == 100'
 echo 'PASS: completed sync stays idempotent; epic progress rolls up from its child'
 
