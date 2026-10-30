@@ -42,10 +42,10 @@
 # task first when no work item exists to hold (--title required to create; the
 # optional --origin records provenance in the new task's body and supplies the
 # default repo from that origin's metadata). Prefer holding the work item the
-# question gates over minting a new row. `--must <category>` is the board gate:
-# on the when-it-matters leash an armed sign-off card needs a must category, and
-# a hold with none is recorded for Overwatch (bin/jg-board-gate.sh route)
-# instead of held. Creating a missing row uses
+# question gates over minting a new row. `--must <category>` is the board gate
+# (bin/jg-ask-gate-lib.sh): on the when-it-matters leash an armed sign-off card
+# needs a must category, and a hold with none is refused and recorded for
+# Overwatch (bin/jg-board-gate.sh route) instead of held. Creating a missing row uses
 # `tasks-axi add --kind captain`: that kind is backlog metadata, and the Beads
 # adapter maps it to native issue type `task`. Captain holds have no due
 # semantics (`--until` is the optional hold deferral), so the create waives
@@ -980,7 +980,11 @@ command_hold() {
     shift
   done
   validate_slug task-id "$id"
-  [ -n "$reason" ] || fail "reason must not be empty"
+  # A hold carries a reason, in words a reader can act on: the board renders it
+  # beside the ticket, so a blank one is refused before anything is recorded.
+  if [ -z "${reason//[[:space:]]/}" ]; then
+    fail 'hold needs --reason "<what the captain has to decide>"; nothing was recorded'
+  fi
   # bin/jg-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(jg_hold_reason_encode "$reason") || fail "could not encode the hold reason"
   if [ -n "$origin" ]; then

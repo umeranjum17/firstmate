@@ -7,6 +7,7 @@ Install after merge: install HOME writes HOME/config/jg-captain-ask.sh as a shim
 """
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -104,6 +105,7 @@ def main():
             command = ['sign-off-axi', 'raise', '--key', args.text, '--ask-ref', args.id,
                        '--title', card['question'], '--about', '\n'.join(card['context']), '--why', '\n'.join(card['context']),
                        '--detail', 'must: ' + MUST_CATEGORY[card['owner_must']],
+                       '--ticket', 'jg-' + hashlib.sha256(f'main/{args.id}'.encode()).hexdigest()[:32],
                        '--close', args.url, '--recommend', card['recommend'].lower(),
                        '--recommend-reason', card['reason'], '--default', card['default'].lower()]
             for label, outcome in card['options']:
