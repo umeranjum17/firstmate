@@ -34,3 +34,23 @@ chmod 775 "$addons/fleet-flow/bin/jg-flow.sh"
 run_flow | grep -q refusing || fail "a group-writable add-on must be refused"
 
 pass "jg-addons-dir-lib.sh: an add-on outside the checkout that others can write is refused as absent"
+
+# A home that still carries the retired pre-fold clone (fm- names only) must resolve jg- add-ons from the
+# checkout's own addons/; only a checkout without addons/ falls back to the clone.
+resolve() {  # <checkout> <home>: where the wait ladder library resolves
+  # shellcheck disable=SC2016 # single quotes are deliberate: the inner shell expands them.
+  env -u JG_ADDONS_DIR JG_HOME="$2" bash -c \
+    '. "$1/bin/jg-compat.sh"; . "$1/bin/jg-addons-dir-lib.sh"; jg_addon_path "$JG_HOME" wait-timers/bin/jg-wait-timers-lib.sh' _ "$1" 2>&1
+}
+co="$WORK/checkout"
+mkdir -p "$co/bin" "$co/addons/wait-timers/bin" "$WORK/oldhome/projects/firstmate-addons/wait-timers/bin"
+cp "$ROOT/bin/jg-compat.sh" "$ROOT/bin/jg-addons-dir-lib.sh" "$co/bin/"
+: > "$co/addons/wait-timers/bin/jg-wait-timers-lib.sh"
+: > "$WORK/oldhome/projects/firstmate-addons/wait-timers/bin/fm-wait-timers-lib.sh"
+got=$(resolve "$co" "$WORK/oldhome")
+[ "$got" = "$co/addons/wait-timers/bin/jg-wait-timers-lib.sh" ] || fail "a checkout with addons/ must not resolve into the retired clone: $got"
+rm -rf -- "$WORK/checkout/addons"
+got=$(resolve "$co" "$WORK/oldhome")
+[ "$got" = "$WORK/oldhome/projects/firstmate-addons/wait-timers/bin/jg-wait-timers-lib.sh" ] || fail "a checkout without addons/ must still use the clone: $got"
+
+pass "jg-compat.sh: the retired add-on clone never hides a checkout's own addons/"
