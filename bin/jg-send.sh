@@ -50,6 +50,12 @@
 # ordinary record by the worker's acknowledgement move into handled/.
 # bin/jg-task-inbox-lib.sh owns the record format, doorbell line, and retry and
 # escalation policy for ordinary and fire-and-forget records.
+# Ordering on this plane is the contract: the record is written BEFORE anything
+# tries to reach the agent at all, so the message survives a slow, refused, or
+# impossible delivery. Waking a dormant squad_lead is therefore asynchronous
+# (jg_send_wake_dormant_lead): a relaunch waits for the replacement agent to
+# come up, and a send that waited with it would hold the caller for minutes and,
+# if the caller gave up first, leave the message unrecorded.
 # The composer pre-check before the ring is ADVISORY only: when
 # the composer visibly holds pending text the ring is skipped with a notice and
 # the watcher re-rings an ordinary record later; no composer verdict is
@@ -276,6 +282,8 @@ fi
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-task-inbox-lib.sh
 . "$SCRIPT_DIR/jg-task-inbox-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 
@@ -551,6 +559,22 @@ MARK_FROM_JUGGERNAUT=0
 PENDING_REPLY_CORR=
 PENDING_REPLY_CREATED=0
 TARGET_TASK_ID=
+# jg_send_wake_dormant_lead: relaunch a dormant squad_lead whose work this send
+# carries (bin/jg-squad-lead-dormant.sh). Waking is ASYNCHRONOUS on purpose: the
+# relaunch waits for the replacement agent to come up, so a send that waited with
+# it would hold the caller for minutes - and a caller that gives up first would
+# leave the message unrecorded, which is the one outcome this plane forbids. The
+# inbox record written before this call IS the delivery, so the wake only shortens
+# the time until the lead reads it; a wake that never lands is covered by the
+# dormant sweep, which relaunches a lead that gained work by any route. Detached
+# the same way bin/jg-session-start.sh detaches its sentinel.
+jg_send_wake_dormant_lead() { # <task-id>
+  ( set -m
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      nohup "$SCRIPT_DIR/jg-squad-lead-dormant.sh" wake "$1" >/dev/null 2>&1 </dev/null &
+  ) || true
+}
+
 jg_send_known_undelivered_cleanup() {
   [ -n "$PENDING_REPLY_CORR" ] || return 0
   if [ "$PENDING_REPLY_CREATED" = 1 ]; then
@@ -569,14 +593,6 @@ fi
 # shellcheck source=bin/jg-parked-homes-lib.sh
 . "$SCRIPT_DIR/jg-parked-homes-lib.sh"
 [ -z "$TARGET_META" ] || jg_parked_refuse_meta "$TARGET_META" "$TARGET_TASK_ID" send || exit 1
-
-# Dormant-lead wake (bin/jg-squad-lead-dormant.sh): routed work relaunches a
-# stopped lead before delivery. A wake that cannot relaunch leaves delivery and
-# recovery to the durable path below, never a second way to lose a send.
-if [ -n "$TARGET_TASK_ID" ]; then
-  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-squad-lead-dormant.sh" wake "$TARGET_TASK_ID" >/dev/null \
-    || echo "jg-send: dormant squad_lead $TARGET_TASK_ID could not be relaunched before delivery; the message still lands durably and liveness recovery relaunches the lead" >&2
-fi
 
 # Validate the answerer-closes request before any durable mutation or send: the
 # target must have a task ledger in THIS home, the send must carry an answer
@@ -1122,6 +1138,12 @@ else
       jg_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       jg_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
     fi
+    # The record is durable: now wake a dormant lead, without waiting for it.
+    WAKE_STARTED=0
+    if [ -n "$TARGET_TASK_ID" ] && squad_lead_dormant "$STATE" "$TARGET_TASK_ID"; then
+      jg_send_wake_dormant_lead "$TARGET_TASK_ID"
+      WAKE_STARTED=1
+    fi
     # Ring the doorbell, best-effort: no ring outcome changes the exit status,
     # because the watcher owns loss detection from here, either through its
     # bounded re-ring ladder or direct unavailable-endpoint recovery.
@@ -1143,7 +1165,7 @@ else
     case "$ring_rc" in
     1) echo "jg-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry. To ring now, submit the pending text with 'jg-send.sh $INBOX_TASK_ID --key Enter' (or clear the composer); the next ring then lands." >&2 ;;
     2) echo "jg-send: doorbell did not reach $T${JG_TASK_INBOX_RING_REASON:+ ($JG_TASK_INBOX_RING_REASON)}; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
-    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-operator-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
+    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-operator-recovery), and the watcher will not re-ring a dead pane${WAKE_STARTED:+ - its squad lead was woken and drains the inbox when it comes up}" >&2 ;;
     esac
     exit 0
   fi
