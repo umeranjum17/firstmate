@@ -1315,15 +1315,41 @@ host_memory_surface_queued() {
 # excludes declared external waits, and defers rows a live branch is handling.
 # The ordinary arm owner delivers the reason, never a synthetic keyboard ring.
 own_queue_resurface() {
-  local row epoch seq kind key reason now previous observed_at observed_key row_key idle
-  row=$(squad_lead_oldest_queue_row "$JG_WAKE_QUEUE")
-  if [ -z "$row" ]; then
-    rm -f "$STATE/.own-wake-progress"
-    return 0
-  fi
-  IFS=$'\t' read -r epoch seq kind key reason <<EOF
+  local row epoch seq kind key reason now previous observed_at observed_key row_key idle task file
+  while :; do
+    row=$(squad_lead_oldest_queue_row "$JG_WAKE_QUEUE")
+    if [ -z "$row" ]; then
+      rm -f "$STATE/.own-wake-progress"
+      return 0
+    fi
+    IFS=$'\t' read -r epoch seq kind key reason <<EOF
 $row
 EOF
+    # Cleanup can race a scan's queue append. A removed log is not a new
+    # signal; retain any row whose task still has a record (including links).
+    case "$kind:$key" in
+      signal:*.status|signal:*.turn-ended)
+        file=${key##*/}; task=${file%.*}
+        if [ ! -e "$STATE/$file" ] && [ ! -L "$STATE/$file" ] \
+          && [ ! -e "$STATE/$task.meta" ] && [ ! -L "$STATE/$task.meta" ] \
+          && [ ! -e "$STATE/$task.status" ] && [ ! -L "$STATE/$task.status" ] \
+          && [ ! -e "$STATE/$task.inbox" ] && [ ! -L "$STATE/$task.inbox" ]; then
+          jg_wake_withdraw signal "$key" || return 1
+          continue
+        fi
+        ;;
+      stale:*)
+        # Retire legacy prune notices too. A current owner retains its alarm.
+        task=$(window_key "$key")
+        if pruned_panes_seen "$task" && [ ! -e "$STATE/.tracked-$task" ] \
+          && ! jg_backend_meta_for_window "$key" "$STATE" >/dev/null 2>&1; then
+          jg_wake_withdraw stale "$key" || return 1
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
   row_key="$epoch-$seq"
   jg_epoch_seconds_to now
   previous=$(cat "$STATE/.own-wake-progress" 2>/dev/null) || previous=
@@ -2091,18 +2117,10 @@ clear_pause_tracking() {  # <window-key>
 # A window any meta references is never pruned here regardless of liveness:
 # the record's fate belongs to juggernaut's record reconciliation, and its gone
 # agent already has wedge_dead_record's bounded once-only report. The prune
-# removes every marker the key owns, including the sidecar itself, and emits
-# at most one final notice for that key.
-#
-# Removing the sidecar is not enough to make the notice once-only: a later poll
-# can write the same .tracked- sidecar again for a record race (the poll still
-# saw a record this sweep did not), and a re-armed watcher then prunes and
-# announces the same vanished window over and over (observed live: one pane
-# announced three times). state/.pruned-panes is the durable memory of keys
-# whose notice was already emitted. It is written before the notice, never
-# cleared by clear_pause_tracking, and bounded by key count so it cannot grow
-# without limit. A later prune of a remembered key still clears any re-created
-# markers but stays silent; a different window key gets its own notice.
+# removes every marker the key owns, including the sidecar itself.
+# state/.pruned-panes remembers confirmed absences so old queued prune notices
+# can be retired even after their sidecar is gone. It is bounded by key count.
+# Pruning is silent: an absent endpoint with no owner is not a task alarm.
 pruned_panes_seen() {  # <key>
   [ -s "$STATE/.pruned-panes" ] && grep -qxF -- "$1" "$STATE/.pruned-panes"
 }
@@ -2115,7 +2133,7 @@ pruned_panes_record() {  # <key>
 }
 
 phantom_pane_prune() {
-  local tracked key w backend verdict reason
+  local tracked key w backend verdict
   for tracked in "$STATE"/.tracked-*; do
     [ -e "$tracked" ] || continue
     key=${tracked##*/.tracked-}
@@ -2124,6 +2142,8 @@ phantom_pane_prune() {
     jg_backend_meta_for_window "$w" "$STATE" >/dev/null 2>&1 && continue
     [ "$(jg_backend_target_absent "$backend" "$w")" = absent ] || continue
     clear_pause_tracking "$key"
+    # Withdraw before removing the sidecar, so a failed queue write is retried.
+    jg_wake_withdraw stale "$w" || exit 1
     # The sidecar is removed LAST: a failed marker removal leaves it behind so
     # the next cycle retries the whole prune, while a removed sidecar with
     # markers left behind would strand the orphans unfindable.
@@ -2131,13 +2151,8 @@ phantom_pane_prune() {
       "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" \
       "$STATE/.activity-$key" "$STATE/.activity-observed-$key" "$STATE/.activity-observed-$key.next" || continue
     rm -f "$tracked" || continue
-    # A sidecar re-created after this key's notice (a later poll, a record race,
-    # a re-armed watcher) was pruned silently above; never announce it twice.
-    pruned_panes_seen "$key" && continue
     pruned_panes_record "$key" || true
-    reason="stale: $w (pane vanished, state pruned: no task record owns it and the backend confirms it is gone)"
-    jg_wake_append stale "$w" "$reason" || exit 1
-    wake "$reason"
+    triage_log "pruned absent unowned pane: $w"
   done
 }
 
@@ -3577,13 +3592,10 @@ watcher_cleanup() {
     echo "watcher: recovery state could not be persisted; retaining stale lock evidence" >&2
     cleanup_status=1
   fi
-  # A cycle that delivered an actionable wake proved a live watcher scanned up
-  # to it, but this cycle cleared the predecessor's beacon at start and exits
-  # before the end-of-scan touch. Without this stamp a busy home never has a
-  # beacon, so every reader calls it unsupervised. Written only after the lock
-  # is released, so an arm never sees a dying holder with a fresh beacon, and
-  # only on a delivered wake, so a killed or evicted watcher leaves none. The
-  # replacement still clears it at start and republishes after its full scan.
+  # A delivered wake proves scan progress even though it exits before the
+  # end-of-scan touch. Stamp only after releasing the lock, so an arm cannot
+  # attach to a dying holder. Killed/evicted cycles never renew the beacon;
+  # their predecessor's timestamp ages normally and PID checks still apply.
   if [ "$owns_lock" -eq 1 ] && [ -n "${JG_WATCH_DELIVERED_REASON:-}" ]; then
     touch "$STATE/.last-watcher-beat" 2>/dev/null || true
   fi
@@ -3595,7 +3607,8 @@ watcher_stop_signals
 # ${BASHPID:-$$} from this same main shell). Read directly, never via a command
 # substitution, so it matches the stored holder pid for the self-eviction check.
 WATCHER_PID=${BASHPID:-$$}
-rm -f "$STATE/.last-watcher-beat" || exit 1
+# Retain the last proven scan through handoff. Do not renew it until this
+# cycle makes progress: a stalled successor must still age past grace.
 printf '%s\n' "$JG_HOME" > "$WATCH_LOCK/jg-home" || true
 printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
@@ -3857,6 +3870,8 @@ while :; do
   if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure || triage_log "host memory sampler failed to restart"; fi
   host_memory_surface_queued
   if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi
+  # Remove confirmed orphan endpoints before replaying their old queue rows.
+  phantom_pane_prune
   own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
 
   # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
@@ -4342,12 +4357,6 @@ EOF
     fi
   done < <(recorded_windows)
 
-  # Phantom-pane prune: a pane the backend confirms gone, whose window no task
-  # record references, has its per-pane markers pruned (see phantom_pane_prune)
-  # instead of lingering until a reused key inherits them or a vanished pane's
-  # classification escalates forever.
-  phantom_pane_prune
-
   # Ready intake must not inherit idle heartbeat backoff (up to two hours),
   # nor be starved by away-mode heartbeats. Keep its base cadence independent.
   if [ "$(age_of "$STATE/.last-ready-work-check")" -ge "$HEARTBEAT" ]; then
@@ -4412,10 +4421,9 @@ EOF
     fi
   fi
 
-  # Confirm liveness only after a complete supervision scan. In particular a
-  # replacement must not inherit its predecessor's beacon or announce recovery
-  # while its task checks are still blocked. Actionable wakes exit above and
-  # leave their own beacon in watcher_cleanup, after the lock is released.
+  # Renew liveness only after a complete supervision scan. The predecessor's
+  # beacon stays readable during handoff but keeps its original age while
+  # checks block. Actionable wakes stamp in watcher_cleanup after lock release.
   touch "$STATE/.last-watcher-beat" || exit 1
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
