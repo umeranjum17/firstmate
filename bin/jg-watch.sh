@@ -3999,6 +3999,14 @@ EOF
     fi
   fi
 
+  # Keep the fleet comms feed current, on for every install with no flag to set.
+  # The exporter owns its own cursor and lock and returns at once when nothing
+  # moved, so a cycle pays one cheap process here; its failure is absorbed so a
+  # feed problem can never stall supervision.
+  if [ -f "$SCRIPT_DIR/jg-comms-feed.sh" ] && [ ! -L "$SCRIPT_DIR/jg-comms-feed.sh" ]; then
+    "$SCRIPT_DIR/jg-comms-feed.sh" sync >/dev/null 2>&1 || true
+  fi
+
   run_due_checks
   if [ -n "$signal_wake" ]; then
     wake "$signal_wake"

@@ -17,6 +17,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-fleet-snapshot.sh`   | Print structured fleet snapshot JSON and refresh only its parent-side remote-ledger cache (schema `jg-fleet-snapshot.v1`) |
 | `jg-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `jg-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
+| `jg-comms-feed.sh`       | Export every fleet message across Main and its Squad Lead homes as one read-only, live, append-only JSONL feed for a channel-style reader |
 | `jg-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
 | `jg-fleet-heartbeat.sh`  | One no-model pass over this home and every local Squad Lead home: working lanes against the lane target, ready backlog, open waits and supervision age, as a MOVING, IDLE, GAP or STALLED verdict per home; bootstrap arms it on a primary home unless `config/fleet-heartbeat-off` exists, and `arm` registers a watcher check that wakes Main when a home turns GAP or STALLED and re-fires until it recovers |
 | `jg-design-gate.sh`      | The no-model design gate: `size` applies the small-tweak rule (at most 40 changed UI lines, no new UI file), and `handroll` writes the lead's or Main's approval that a small UI tweak needs to merge; the asking worker cannot write it |
