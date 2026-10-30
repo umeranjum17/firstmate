@@ -108,12 +108,13 @@ jg_design_size() {  # <worktree> <base-branch> <head>: prints `design|tweak <ui-
 }
 
 jg_design_main_home() {  # <home>: the main home it reports to, following local squad lead parents
-  local h=$1 hop
-  for hop in 1 2 3 4 5 6 7 8; do
+  local h=$1 depth=0
+  while [ "$depth" -lt 8 ]; do
     [ -e "$(jg_compat_marker "$h")" ] || { printf '%s\n' "$h"; return 0; }
     declare -F jg_squad_lead_parent_record_parse >/dev/null || return 1
     jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$h")" && [ "$JG_SQUAD_LEAD_PARENT_ROUTE" = local ] || return 1
     h=$JG_SQUAD_LEAD_PARENT_HOME
+    depth=$((depth + 1))
   done
   return 1
 }
