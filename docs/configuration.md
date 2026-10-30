@@ -643,6 +643,14 @@ With it present, ship and Recon briefs gain the `# Waiting` section and the fore
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
 The flag is a home-local preference and is not inherited by Squad Lead homes.
 
+## Design gate (always on)
+
+Every design rule is a shell check on recorded files, never a model judgment.
+A change is a small tweak, which a worker may hand-roll, when its UI files change at most 40 lines and it adds no new UI file.
+A small tweak that touches UI files merges only after the task's lead or Main writes a hand-roll approval; the asking worker never can.
+Past that size, or briefed with `--design-call yes`, the change is design work and merges only with a first-draft receipt line.
+`bin/jg-design-gate.sh`'s header owns the contract, and `bin/jg-merge-gate-lib.sh`'s `jg_dod_design_gate` runs it on both merge paths.
+
 ## TakeOne demo-video rule (config/takeone-demo)
 
 The optional local, gitignored `config/takeone-demo` presence flag turns on the rule that every product demo video for every app is made with TakeOne.

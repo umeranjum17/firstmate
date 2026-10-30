@@ -855,6 +855,10 @@ Design call (first-draft): $DESIGN_CALL - $DESIGN_REASON"
 Produce every design for this task with first-draft (\`first-draft-axi\`); do not hand-draw a separate design path.
 Put one line \`first-draft receipt: <reference>\` in the evidence file of your completion receipt.
 The merge is refused without that line."
+  else
+    DESIGN_SECTION="$DESIGN_SECTION
+A hand-rolled change stays a small tweak only while its UI files change at most 40 lines and it adds no new UI file; past that the merge needs the first-draft receipt line (\`bin/jg-design-gate.sh\`).
+A small tweak that touches UI files merges only after your lead or Main approves the hand-roll; you never approve it yourself."
   fi
   DESIGN_SECTION="$DESIGN_SECTION
 "
