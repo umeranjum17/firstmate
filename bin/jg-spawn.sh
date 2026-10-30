@@ -3614,10 +3614,12 @@ if [ "$KIND" = ship ]; then
   # disagrees with it would tell the worker to open a pull request a Gerrit
   # server does not have, or to publish a change to a forge that is not Gerrit.
   if [ "$BRIEF_FORGE" != "$STANDING_FORGE" ]; then
+    risk_scaffold=
+    [ "$MODE" != no-mistakes ] || risk_scaffold=" --risk <release|security|migration|large-change|shared-protocol|fork-repo>"
     if [ "$STANDING_FORGE" = none ]; then
-      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE"
+      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE$risk_scaffold"
     else
-      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE --forge $STANDING_FORGE"
+      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE --forge $STANDING_FORGE$risk_scaffold"
     fi
     echo "error: forge mismatch for $ID: $PROJ_NAME is registered forge=$STANDING_FORGE but $SOURCE_BRIEF records forge=$BRIEF_FORGE; keep the filled ## Captain's intent and ## Juggernaut spec bodies, remove $SOURCE_BRIEF, re-scaffold it with $forge_scaffold, then re-fill those two subsections, so the worker's publication matches the project's forge" >&2
     exit 1

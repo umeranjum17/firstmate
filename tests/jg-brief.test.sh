@@ -197,6 +197,7 @@ EOF
 test_ship_modes_generate_clean_briefs() {
   local home id mode brief status
   home="$TMP_ROOT/ship-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   write_registry "$home"
 
   for id_mode in "brief-nomistakes-a1:no-mistakes" "brief-directpr-a2:direct-PR" "brief-localonly-a3:local-only"; do
@@ -231,6 +232,7 @@ test_ship_modes_generate_clean_briefs() {
 test_forge_selection_renders_correct_cli() {
   local home brief out rc
   home="$TMP_ROOT/forge-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-forge-default some-proj --mode direct-PR >/dev/null 2>&1 \
@@ -305,6 +307,7 @@ ROWS
 test_ship_mode_is_required_and_closed_set() {
   local home id out status label flag expect
   home="$TMP_ROOT/mode-required-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id=0
   while IFS='|' read -r label flag expect; do
@@ -331,6 +334,7 @@ ROWS
 test_ship_mode_is_explicit_not_registry() {
   local home brief
   home="$TMP_ROOT/explicit-over-registry-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   write_registry "$home"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-explicit-a5 direct-proj --mode no-mistakes >/dev/null 2>&1 \
     || fail "explicit no-mistakes brief on a direct-PR project should scaffold"
@@ -354,6 +358,7 @@ test_ship_mode_is_explicit_not_registry() {
 test_delivery_flags_are_refused_where_they_do_not_apply() {
   local home out status label args expect
   home="$TMP_ROOT/refused-flags-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   while IFS='|' read -r label args expect; do
     [ -n "$label" ] || continue
@@ -374,6 +379,7 @@ ROWS
 test_faster_paths_use_configured_authority_without_stacked_review() {
   local home id brief
   home="$TMP_ROOT/configured-authority-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   write_registry "$home"
   id="brief-direct-authority-a4"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" direct-proj --mode direct-PR >/dev/null 2>&1
@@ -406,6 +412,7 @@ test_faster_paths_use_configured_authority_without_stacked_review() {
 test_pr_based_dod_requires_non_draft() {
   local home mode id brief
   home="$TMP_ROOT/draft-dod-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   for mode in no-mistakes direct-PR local-only; do
     id="brief-draft-$mode"
@@ -433,6 +440,7 @@ test_pr_based_dod_requires_non_draft() {
 test_no_mistakes_dod_wording() {
   local home id brief spelling
   home="$TMP_ROOT/wording-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-wording-b1"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1
@@ -489,6 +497,7 @@ test_no_mistakes_dod_wording() {
 test_no_mistakes_dod_green_detection() {
   local home id brief
   home="$TMP_ROOT/green-detection-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-green-b1"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1
@@ -512,6 +521,7 @@ test_no_mistakes_dod_green_detection() {
 test_ask_user_escalation_format() {
   local home id brief mode other_id other_brief
   home="$TMP_ROOT/ask-user-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-ask-user-d1"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1
@@ -568,6 +578,7 @@ test_ask_user_escalation_format() {
 test_ship_project_memory_wording() {
   local home id brief
   home="$TMP_ROOT/project-memory-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-memory-c1"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1
@@ -591,6 +602,7 @@ test_ship_project_memory_wording() {
 test_herdr_lab_contract_is_explicit_and_complete() {
   local home id brief
   home="$TMP_ROOT/herdr-lab-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-herdr-lab-d1"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" juggernaut --mode no-mistakes --herdr-lab >/dev/null 2>&1
@@ -622,6 +634,7 @@ test_herdr_lab_contract_is_explicit_and_complete() {
 test_herdr_lab_contract_quotes_foreign_juggernaut_path() {
   local home id brief foreign_root helper
   home="$TMP_ROOT/herdr-lab-foreign-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   foreign_root="$TMP_ROOT/juggernaut helper's root"
   mkdir -p "$home/data"
   id="brief-herdr-lab-foreign-d2"
@@ -639,6 +652,7 @@ test_herdr_lab_contract_quotes_foreign_juggernaut_path() {
 test_herdr_lab_omission_is_loud_for_ship_and_scout() {
   local home id brief
   home="$TMP_ROOT/herdr-gate-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   for kind in ship scout; do
     id="brief-herdr-gate-$kind"
@@ -666,6 +680,7 @@ test_herdr_lab_omission_is_loud_for_ship_and_scout() {
 test_documented_global_replace_leaves_the_herdr_gate_intact() {
   local home id brief kind count content filled body spec
   home="$TMP_ROOT/task-fill-site-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   body='Restart the herdr session, then profile it'
   spec='Use the isolated lab helper for every lifecycle call'
@@ -702,6 +717,7 @@ test_documented_global_replace_leaves_the_herdr_gate_intact() {
 test_squad_lead_no_projects_charter() {
   local home brief status
   home="$TMP_ROOT/no-projects-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   # The deliberate --no-projects signal scaffolds a valid project-less charter for
@@ -754,6 +770,7 @@ test_squad_lead_no_projects_charter() {
 test_squad_lead_marked_request_reporting_contract() {
   local home brief
   home="$TMP_ROOT/marked-request-reporting-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   JG_HOME="$home" JG_CLASSIFY_PAUSED_VERB=paused \
     JG_SQUAD_LEAD_CHARTER='Handle routed domain work.' \
@@ -894,6 +911,7 @@ test_squad_lead_directory_paths_are_absolute_and_output_is_stable() {
 test_herdr_lab_contract_applies_to_scouts_but_not_squad_leads() {
   local home brief status=0
   home="$TMP_ROOT/herdr-kind-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" herdr-scout juggernaut --scout --herdr-lab >/dev/null 2>&1
   brief="$home/data/herdr-scout/brief.md"
@@ -910,6 +928,7 @@ test_herdr_lab_contract_applies_to_scouts_but_not_squad_leads() {
 test_pause_verb_override_renders_all_brief_scaffolds() {
   local home kind id brief append now epoch templates template line signals
   home="$TMP_ROOT/pause-verb-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   for kind in ship:no-mistakes ship:direct-PR ship:local-only scout squad_lead; do
@@ -997,6 +1016,7 @@ SIGNALS
 test_ship_and_scout_teach_validation_round_pause() {
   local home kind id brief
   home="$TMP_ROOT/validation-round-pause-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data" "$home/config"
   : > "$home/config/wait-no-turns"
 
@@ -1031,6 +1051,7 @@ test_ship_and_scout_teach_validation_round_pause() {
 test_scout_and_squad_lead_load_decision_hold_policy() {
   local home scout charter
   home="$TMP_ROOT/decision-policy-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   JG_HOME="$home" JG_ROOT_OVERRIDE="$ROOT" \
     "$ROOT/bin/jg-brief.sh" sample-investigation sample --scout >/dev/null 2>&1
@@ -1116,6 +1137,7 @@ test_scout_and_squad_lead_scaffold() {
 test_workers_wait_without_spending_turns() {
   local home id brief
   home="$TMP_ROOT/wait-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data" "$home/config"
   : > "$home/config/wait-no-turns"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-wait-ship some-proj --mode no-mistakes >/dev/null 2>&1 \
@@ -1158,6 +1180,7 @@ test_workers_wait_without_spending_turns() {
 test_wait_no_turns_absent_keeps_the_previous_brief() {
   local home brief
   home="$TMP_ROOT/wait-off"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   [ ! -e "$home/config/wait-no-turns" ]
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-wait-off some-proj --mode no-mistakes >/dev/null 2>&1 \
@@ -1175,6 +1198,7 @@ test_wait_no_turns_absent_keeps_the_previous_brief() {
 test_worker_role_scope() {
   local kind home brief
   home="$TMP_ROOT/worker-role"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   for kind in no-mistakes direct-PR local-only scout; do
     if [ "$kind" = scout ]; then
       JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$kind" arbitrary-project-name --scout >/dev/null || fail "scout scaffold failed"
@@ -1201,6 +1225,7 @@ test_worker_role_scope() {
 test_home_brief_include_is_appended_last() {
   local home config brief kind out rc last_heading task_count
   home="$TMP_ROOT/include-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   config="$home/config"
   mkdir -p "$config"
 
@@ -1258,6 +1283,7 @@ test_home_brief_include_is_appended_last() {
 test_brief_include_works_without_add_on() {
   local home addons brief last_heading
   home="$TMP_ROOT/no-add-on-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   addons="$TMP_ROOT/no-add-on-empty"
   mkdir -p "$home/config" "$addons"
   printf '%s\n' 'Prefer small commits.' > "$home/config/brief-include.md"
@@ -1277,6 +1303,7 @@ test_brief_include_works_without_add_on() {
 test_base_branch_is_rendered_and_bounded() {
   local home out rc brief base meta_base
   home="$TMP_ROOT/base-branch-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   # shellcheck source=bin/jg-dod-lib.sh
   . "$ROOT/bin/jg-dod-lib.sh"
@@ -1347,6 +1374,7 @@ test_base_branch_is_rendered_and_bounded() {
 test_ship_branch_prefix_defaults_to_legacy_fm() {
   local home id mode brief
   home="$TMP_ROOT/branch-prefix-default-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   for id_mode in "brief-branch-nm-e1:no-mistakes" "brief-branch-dp-e2:direct-PR" "brief-branch-lo-e3:local-only"; do
     id=${id_mode%%:*}
@@ -1366,6 +1394,7 @@ test_ship_branch_prefix_defaults_to_legacy_fm() {
 test_ship_branch_prefix_override_is_consistent_across_modes() {
   local home id brief
   home="$TMP_ROOT/branch-prefix-override-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   id="brief-branch-override-nm-e4"
@@ -1414,6 +1443,7 @@ test_ship_branch_prefix_override_is_consistent_across_modes() {
 test_ship_branch_prefix_empty_override_yields_bare_task_id() {
   local home id brief
   home="$TMP_ROOT/branch-prefix-bare-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   id="brief-branch-bare-e7"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" "$id" some-proj --mode local-only --branch-prefix '' >/dev/null 2>&1
@@ -1431,6 +1461,7 @@ test_ship_branch_prefix_empty_override_yields_bare_task_id() {
 test_branch_prefix_is_refused_where_it_does_not_apply() {
   local home out status label args expect
   home="$TMP_ROOT/branch-prefix-refused-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   while IFS='|' read -r label args expect; do
     [ -n "$label" ] || continue
@@ -1452,6 +1483,7 @@ ROWS
 test_ui_change_field() {
   local home brief out status
   home="$TMP_ROOT/ui-change-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-ui-yes some-proj --mode direct-PR --ui-change yes >/dev/null \
     || fail "ui-change yes scaffold failed"
@@ -1486,6 +1518,7 @@ test_ui_change_field() {
 test_design_call_field() {
   local home brief out status
   home="$TMP_ROOT/design-call-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-design-yes some-proj --mode direct-PR \
     --design-call yes --design-reason "new landing page" >/dev/null || fail "design-call yes scaffold failed"
@@ -1520,6 +1553,7 @@ test_design_call_field() {
 test_demo_call_field() {
   local home brief out status args
   home="$TMP_ROOT/demo-call-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data" "$home/config"
   JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-demo-off some-proj --mode direct-PR \
     --demo-call yes --demo-reason "launch video" >/dev/null || fail "demo-call scaffold with the switch off failed"
@@ -1555,6 +1589,7 @@ test_demo_call_field() {
 test_branch_prefix_value_is_validated() {
   local home out status
   home="$TMP_ROOT/branch-prefix-validated-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-branchval-g1 some-proj --mode no-mistakes --branch-prefix 'bad prefix/' 2>&1)
@@ -1575,6 +1610,7 @@ test_branch_prefix_value_is_validated() {
 test_branch_prefix_command_is_shell_safe() {
   local home id prefix marker brief command repo branch
   home="$TMP_ROOT/branch-prefix-shell-safe-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   marker="$TMP_ROOT/branch-prefix-shell-safe-marker"
   id='brief-branch-safe-g3'
   prefix="\$(touch\${IFS}$marker)"
@@ -1603,6 +1639,7 @@ test_worker_role_scope
 test_operator_scaffolds_forbid_pool_administration() {
   local home id brief mode ship_rule scout_rule
   home="$TMP_ROOT/pool-admin-home"
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
   mkdir -p "$home/data"
 
   for mode in no-mistakes direct-PR local-only; do
@@ -1714,3 +1751,44 @@ test_operator_scaffolds_forbid_pool_administration
 test_design_call_field
 test_demo_call_field
 test_ui_change_field
+
+# No-mistakes is for real risk: the brief states which risk, and the local
+# presence flag config/delivery-risk-loose is the only way to skip the question.
+test_delivery_risk_reason() {
+  local home brief out status
+  home="$TMP_ROOT/delivery-risk-home"
+  mkdir -p "$home/data"
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-missing some-proj --mode no-mistakes 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a no-mistakes brief with no --risk should be refused"
+  assert_contains "$out" "states its risk with --risk" "the refusal did not name the flag"
+  assert_contains "$out" "direct-PR" "the refusal did not offer the direct-PR route"
+  assert_absent "$home/data/brief-risk-missing/brief.md" "refused no-mistakes scaffold wrote a brief"
+
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-yes some-proj --mode no-mistakes --risk security >/dev/null 2>&1 \
+    || fail "a no-mistakes brief with --risk security should scaffold"
+  brief=$(cat "$home/data/brief-risk-yes/brief.md")
+  assert_contains "$brief" "Delivery risk (no-mistakes): security" "the brief did not record the risk reason"
+
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-direct some-proj --mode direct-PR >/dev/null 2>&1 \
+    || fail "a direct-PR brief needs no risk reason"
+  assert_not_contains "$(cat "$home/data/brief-risk-direct/brief.md")" "Delivery risk" "a direct-PR brief carried a risk line"
+
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-bad some-proj --mode no-mistakes --risk because 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unlisted --risk value should be refused"
+  assert_contains "$out" "must be one of" "an unlisted --risk value did not explain the list"
+  assert_absent "$home/data/brief-risk-bad/brief.md" "refused unknown-risk scaffold wrote a brief"
+
+  out=$(JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-scout some-proj --scout --risk security 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "scout accepted --risk"
+  assert_contains "$out" "applies only to ship briefs" "scout refusal did not explain why"
+
+  mkdir -p "$home/config" && : > "$home/config/delivery-risk-loose"
+  JG_HOME="$home" "$ROOT/bin/jg-brief.sh" brief-risk-loose some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "config/delivery-risk-loose should turn the risk question off"
+  assert_not_contains "$(cat "$home/data/brief-risk-loose/brief.md")" "Delivery risk" "loose mode wrote a risk line"
+  pass "jg-brief.sh: --risk states the no-mistakes risk, is refused elsewhere, and config/delivery-risk-loose turns it off"
+}
+test_delivery_risk_reason
