@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # owner-rules e2e: the real jg-brief.sh of a juggernaut checkout that carries the brief-inherit seam.
 # Usage: owner-rules/tests/owner-rules.test.sh <juggernaut-checkout>
-# Proves a no-owner-ask refusal, a no-risk-reason refusal and a clean pass (brief written), plus the
+# Proves a no-owner-ask refusal, a no-parent refusal and a clean pass (brief written), plus the
 # exemptions and the no-op when the add-on is not installed.
 # jg-compat shim (slice S4, deleted by S10): an old FM_* name still resolves
 # here, so an unmigrated shell, unit, pane or record keeps this script working.
@@ -27,6 +27,9 @@ no() { printf 'not ok - %s\n' "$1"; fails=$((fails + 1)); }
 is() { if [ "$2" = "$3" ]; then ok "$1"; else no "$1: got [$2], want [$3]"; fi; }
 
 home=$work/home; mkdir -p "$home/config" "$home/data" "$home/state"
+# bin/jg-brief.sh owns the no-mistakes risk reason (--risk); this home answers it up front
+# so these cases exercise the add-on's owner, hierarchy and design rules only.
+: > "$home/config/delivery-risk-loose"
 cat > "$home/data/backlog.md" <<'BL'
 # Backlog
 
@@ -52,15 +55,6 @@ cat > "$home/data/backlog.md" <<'BL'
   Main13 asked for this.
 - [ ] no-ask - Plain title (repo: sample) (kind: ship)
   Nothing names an owner.
-- [ ] risky - [captain-ask] Rotate keys (repo: sample) (kind: ship)
-  risk: security
-- [ ] two-risks - [captain-ask] Both (repo: sample) (kind: ship)
-  risk: security
-  risk: release
-- [ ] bad-risk - [captain-ask] Not listed (repo: sample) (kind: ship)
-  risk: because
-- [ ] fork-pr - [captain-ask] A fork change (repo: sample) (kind: ship)
-  risk: fork-repo
 - [ ] bad-design - [captain-ask] Vague design flag (repo: sample) (kind: ship)
   design: maybe
 ## Done
@@ -74,7 +68,6 @@ brief() {
   printf '%s%src=%s\n' "$out" "${out:+$'\n'}" "$rc"
 }
 ASK='owner-rules: no owner ask: name the [captain-ask] item or the MainNNN order this lane serves (add it to the backlog item for no-ask)'
-RISK='owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for with-ask; use direct-PR plus a done-done check'
 PARENT='owner-rules: no valid parent: add parent: <backlog item id> or parent: upkeep to the backlog item for orphan'
 
 # not installed: no check, even for an entry with no owner ask
@@ -91,21 +84,13 @@ is "refusal: no valid parent" "$(brief orphan --mode direct-PR)" "$PARENT
 rc=1"
 is "refusal: missing parent id" "$(brief bad-parent --mode direct-PR | tail -1)" "rc=1"
 [ ! -e "$home/data/orphan" ] && ok "parent refusal wrote no brief" || no "parent refusal left data/orphan"
-is "refusal 2: no-mistakes without a risk reason" "$(brief with-ask --mode no-mistakes)" "$RISK
-rc=1"
-[ ! -e "$home/data/with-ask" ] && ok "refusal 2 wrote no brief" || no "refusal 2 left data/with-ask"
-is "refusal 2: two risk lines" "$(brief two-risks --mode no-mistakes | tail -1)" "rc=1"
-is "refusal 2: unlisted reason" "$(brief bad-risk --mode no-mistakes | tail -1)" "rc=1"
 
 is "pass: [captain-ask] title, direct-PR" "$(brief with-ask --mode direct-PR)" "rc=0"
 [ -s "$home/data/with-ask/brief.md" ] && ok "pass wrote the brief" || no "pass wrote no brief"
 is "pass: MainNNN body with existing parent id" "$(brief with-main --mode direct-PR)" "rc=0"
 is "pass: upkeep parent" "$(brief upkeep --mode direct-PR)" "rc=0"
 is "pass: scouts keep parent exemption" "$(brief scout-parentless --scout)" "rc=0"
-is "pass: no-mistakes with one listed risk" "$(brief risky --mode no-mistakes)" "rc=0"
-is "pass: no-mistakes with risk: fork-repo" "$(brief fork-pr --mode no-mistakes)" "rc=0"
-[ -s "$home/data/fork-pr/brief.md" ] && ok "fork-repo pass wrote the brief" || no "fork-repo pass wrote no brief"
-is "pass: scout is exempt from the risk rule" "$(brief with-ask-longer --scout)" "rc=0"
+is "pass: scout is exempt from the owner and parent rules" "$(brief with-ask-longer --scout)" "rc=0"
 is "pass: prefix id does not match a longer id" "$(brief with-ask --scout | tail -1)" "rc=1"
 JG_HOME=$home JG_ADDONS_DIR=$addons JG_SQUAD_LEAD_CHARTER=x bash "$FM/bin/jg-brief.sh" sm --squad-lead --no-projects >/dev/null 2>&1 \
   && ok "pass: squad_lead charter is exempt" || no "squad_lead charter refused"
@@ -143,7 +128,7 @@ for q in quotes:
         print("unmatched: " + q)
 PY
 )
-is "skill quotes all six refusals" "$(printf '%s\n' "$unmatched" | head -1)" "6"
+is "skill quotes all five refusals" "$(printf '%s\n' "$unmatched" | head -1)" "5"
 is "every refusal quoted in the skill is emitted by the brief or the gate" "$(printf '%s\n' "$unmatched" | tail -n +2)" ""
 
 [ "$fails" -eq 0 ] && echo "PASS owner-rules" || { echo "FAIL owner-rules: $fails"; exit 1; }

@@ -10,10 +10,10 @@ Three brief-time rules are enforced when a lane's brief is created, not left as 
    Owner asks are epic roots; scout lanes and squad lead charters are exempt from this rule.
    `bin/jg-owner-rules-tree.sh <backlog-file>` prints each parent chain and lists items with absent,
    missing, or cyclic parents.
-3. **Risk reason.** A ship lane in `--mode no-mistakes` needs one body line `risk: <reason>` with reason
-   one of `release`, `security`, `migration`, `large-change`, `shared-protocol`, `fork-repo` (any PR to the
-   Juggernaut fork, whose required check "PR must be raised via no-mistakes" demands it). Otherwise use direct-PR plus a
-   done-done check. Scouts are exempt; squad lead charters are exempt from the brief-time rules.
+3. **Risk reason (now core).** The no-mistakes risk reason is `bin/jg-brief.sh`'s own rule: `--risk <reason>`
+   is required for `--mode no-mistakes`, and a lane with no such risk briefs direct-PR plus a done-done check
+   (docs/configuration.md "Delivery risk"). This add-on no longer checks it, so one rule has one owner.
+   Scouts are exempt; squad lead charters are exempt from the brief-time rules.
 
 A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-line reason on stderr.
 

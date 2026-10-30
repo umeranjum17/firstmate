@@ -443,6 +443,14 @@ Run every routine Juggernaut backlog command through [`bin/jg-tasks-axi.sh`](../
 Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
+## Delivery risk (config/delivery-risk-loose)
+
+No-mistakes is for real risk, so a no-mistakes ship brief states which risk it answers: `bin/jg-brief.sh --mode no-mistakes` requires `--risk <release|security|migration|large-change|shared-protocol|fork-repo>`.
+A task that names none of those ships as `--mode direct-PR` with a done-done check, which is the faster route and needs no pipeline.
+The brief records the reason on a `Delivery risk (no-mistakes): <reason>` line, and a value outside the list is refused.
+`--risk` is refused on a `--scout` brief and on a `--squad-lead` charter.
+The local presence flag `config/delivery-risk-loose` turns the question off for this home; an unlisted value is still refused.
+
 ## Runtime backend (config/backend / JG_BACKEND)
 
 For spawn-capable adapters, the runtime session-provider backend controls where task windows/endpoints are created, captured, sent to, watched, and killed.

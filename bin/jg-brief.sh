@@ -55,6 +55,12 @@
 # pair is accepted and the brief carries no demo line. bin/jg-spawn.sh records demo_call=,
 # and bin/jg-merge-gate-lib.sh's jg_dod_demo_gate refuses to merge a yes-task whose
 # completion receipt evidence carries no `takeone receipt: <ref>` line.
+# --risk <reason> states why this task needs the no-mistakes pipeline, as one of
+# release, security, migration, large-change, shared-protocol or fork-repo. It is
+# required on a no-mistakes ship brief and refused elsewhere: no-mistakes is for
+# real risk, and a task with no such risk ships as direct-PR with a done-done
+# check. The local presence flag config/delivery-risk-loose turns the check off
+# (docs/configuration.md "Delivery risk").
 # --ui-change <yes|no> records on a ship brief whether the task changes the UI, as
 # `UI change (nav-check): <yes|no>`. A yes brief carries the no-silent-removal rule:
 # the PR body lists `Nav before:` and `Nav after:` and any removed screen is named.
@@ -272,6 +278,8 @@ DESIGN_REASON=
 DEMO_CALL=
 DEMO_REASON=
 UI_CHANGE=
+RISK=
+RISK_SET=0
 PROJECT_DIR=
 PROJECT_DIR_SET=0
 POS=()
@@ -294,6 +302,7 @@ for a in "$@"; do
       demo-call) DEMO_CALL=$a ;;
       demo-reason) DEMO_REASON=$a ;;
       ui-change) UI_CHANGE=$a ;;
+      risk) RISK=$a; RISK_SET=1 ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -328,6 +337,8 @@ for a in "$@"; do
     --demo-reason=*) DEMO_REASON=${a#--demo-reason=} ;;
     --ui-change) want_value="ui-change" ;;
     --ui-change=*) UI_CHANGE=${a#--ui-change=} ;;
+    --risk) want_value=risk ;;
+    --risk=*) RISK=${a#--risk=}; RISK_SET=1 ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -353,6 +364,25 @@ if [ "$KIND" = ship ]; then
   esac
 elif [ "$MODE_SET" -eq 1 ]; then
   echo "error: --mode applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
+  exit 1
+fi
+
+# No-mistakes is for real risk, so a no-mistakes ship brief states that risk with
+# --risk; a task that names none takes the direct-PR route with a done-done check
+# instead. The local presence flag config/delivery-risk-loose turns the check off.
+if [ "$KIND" = ship ]; then
+  if [ "$RISK_SET" -eq 1 ]; then
+    case "$RISK" in
+      release|security|migration|large-change|shared-protocol|fork-repo) ;;
+      *) echo "error: --risk must be one of release, security, migration, large-change, shared-protocol, fork-repo (got '$RISK')" >&2; exit 1 ;;
+    esac
+  fi
+  if [ "$MODE" = no-mistakes ] && [ "$RISK_SET" -eq 0 ] && [ ! -e "$CONFIG/delivery-risk-loose" ]; then
+    echo "error: a no-mistakes ship brief states its risk with --risk <release|security|migration|large-change|shared-protocol|fork-repo>; a task with no such risk ships as --mode direct-PR with a done-done check" >&2
+    exit 1
+  fi
+elif [ "$RISK_SET" -eq 1 ]; then
+  echo "error: --risk applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
   exit 1
 fi
 
@@ -894,13 +924,19 @@ The merge is refused without the two lines, or with a dropped item and no quote.
 "
 fi
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
+RISK_SECTION=
+if [ -n "$RISK" ]; then
+  RISK_SECTION="
+# Delivery risk
+Delivery risk (no-mistakes): $RISK"
+fi
 DOD=$(jg_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
 
 cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-$DESIGN_SECTION$DEMO_SECTION$UI_SECTION
+$DESIGN_SECTION$DEMO_SECTION$UI_SECTION$RISK_SECTION
 $HERDR_SECTION
 
 # Setup
