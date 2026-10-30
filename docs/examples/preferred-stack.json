@@ -1,0 +1,33 @@
+{
+  "rules": [
+    {
+      "when": "The project is a phone or tablet app installed on a device.",
+      "use": { "medium": "mobile", "stack": "" },
+      "why": "Set the mobile stack here to make the preference explicit; empty falls back to the default below."
+    },
+    {
+      "when": "The project is a browser-facing site or web app.",
+      "use": { "medium": "web", "stack": "" },
+      "why": "Name the web stack you want maintained instead of letting each task pick one."
+    },
+    {
+      "when": "The project installs as a desktop application.",
+      "use": { "medium": "desktop", "stack": "" },
+      "why": "A desktop stack is a long-lived commitment, so record it once here."
+    },
+    {
+      "when": "The project is a command-line tool.",
+      "use": { "medium": "cli", "stack": "" },
+      "why": "CLI tools get rewritten most often; a written preference stops the churn."
+    },
+    {
+      "when": "The project is a server, service, or API.",
+      "use": { "medium": "backend", "stack": "" },
+      "why": "A backend runtime is the costliest to change later, so record the intent up front."
+    }
+  ],
+  "default": {
+    "stack": "",
+    "why": "No stack is preferred. Pick the stack that fits the project, then write it into the rule above when it should hold for the next one."
+  }
+}

@@ -1469,6 +1469,30 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 
 Squad Lead homes inherit this file from the primary, so a Squad Lead's own operators apply the same dispatch profile behavior.
 
+## Preferred stack and architecture (config/preferred-stack.json, config/architecture.json)
+
+Two optional local, gitignored files record a preference and never a gate.
+`config/preferred-stack.json` names a stack per medium (`mobile`, `web`, `desktop`, `cli`, `backend`);
+`config/architecture.json` names a folder layout and practices per language.
+Both use the `config/crew-dispatch.json` rule shape: every entry carries `when` (the case it applies to), `use` (the recommendation) and `why` (one line of reasoning), and both may set a `default` used when no rule matches.
+
+Neither file can refuse anything: a build never fails because a project uses a different stack or layout.
+An existing project always wins.
+The brief reads the project's own manifest for its language and detects the stack it already uses, so an existing project is told to keep what it has.
+
+`bin/jg-brief.sh` renders both into a brief when intake passes `--medium`; the language comes from the project's own manifest, so `--project <dir>` is what makes the layout advice apply.
+`bin/jg-preferred-stack-lib.sh` owns the read and the rendered wording.
+
+See [`docs/examples/preferred-stack.json`](examples/preferred-stack.json) and [`docs/examples/architecture.json`](examples/architecture.json) for neutral starting points to copy into local `config/`.
+Set the stack your own install should use for new work, for example `"stack": "React Native"` in the `mobile` rule.
+
+**Validation**
+
+- A malformed JSON file, an unknown medium, or an unknown language is reported once on stderr as `PREFERRED_STACK: invalid config/<file> - <reason>; using the neutral default`, and the brief then carries no advice from that file.
+- It is never a hard failure and never stops a brief, a spawn, or a build. A missing file is silent.
+
+Squad Lead homes inherit both files from the primary, so a Squad Lead's operators see the same advice.
+
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/jg-dispatch-resolve.sh` resolves one concrete operator or Recon profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that Juggernaut otherwise reasons out in its own context becomes one short tool turn.
