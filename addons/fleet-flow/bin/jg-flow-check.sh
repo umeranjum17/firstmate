@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Home flow check (flow playbook R1-R3). Read-only, local files only (runs inside the
 # watcher's 30 s check window, so no GitHub call).
-# Usage: jg-flow-check.sh <home>              lines for the lead, at most 5, only new or age-doubled ones
+# Usage: jg-flow-check.sh <home>              lines for the lead, at most 5, each ringing once per rung of the RUNG_HOURS ladder
 #        jg-flow-check.sh <home> --can-start  exit 0 when the lead may start a lane, 1 otherwise (prints why)
 #        jg-flow-check.sh <home> --target     P50/P85 lane hours from lanes landed in 14 days
 #        jg-flow-check.sh <home> --summary    one TSV row for Main's pulse:
@@ -42,7 +42,7 @@ _slot = os.path.basename(os.path.dirname(home))
 name = os.environ.get(f'JG_SLOT_{_slot}_NAME') or NAMES.get(_slot, _slot)
 # Per-home cap override: config/lane-caps lines '<home> <cap>'.
 CAP = next((int(l.split()[1]) for l in open(f'{MAIN}/config/lane-caps') if l.split()[:1] == [name]), CAP) if os.path.exists(f'{MAIN}/config/lane-caps') else CAP
-NOW = int(time.time())
+NOW = int(os.environ.get('JG_FLOW_NOW') or time.time())  # JG_FLOW_NOW: fixture clock for the test
 
 def birth(p):
     try:
@@ -199,12 +199,12 @@ if mode == '--can-start':
     for w in why: print(w)
     sys.exit(1 if why else 0)
 
-out = []  # (key, age_seconds, text)
+out = []  # (key, age_seconds or None, text); the key is identity only, see the guard below
 for L in land:
     if not L['captain']:
         out.append((f'land {L["t"]}', NOW - L['since'], f'{L["t"]} lead {h(NOW - L["since"])} land it: merge if green (bin/jg-pr-merge.sh), then bin/jg-teardown.sh'))
 if count_n > HARD:
-    out.append((f'over-cap', count_n, f'home lead {count_n}/{HARD} over hard cap: start nothing; land nearest-to-merge, stop the oldest with a learned note'))
+    out.append(('over-cap', None, f'home lead {count_n}/{HARD} over hard cap: start nothing; land nearest-to-merge, stop the oldest with a learned note'))
 for L in lanes:
     clock = 1800 if L['verb'] == 'needs-decision' else 7200
     # failed = stopped on purpose, kept for an unlanded-work refusal; no one waits on it, the red age rule still surfaces it
@@ -232,7 +232,7 @@ for L in lanes:
             stat = subprocess.run(['git', '-C', wt, 'diff', '--shortstat', base, head], capture_output=True, text=True, timeout=3).stdout if base else ''
             cache[k] = sum(int(n) for n in re.findall(r'(\d+) insertion', stat))
         if cache[k] >= 1000:
-            out.append((f'split {L["t"]}', cache[k], f'{L["t"]} worker {cache[k]} added lines: split before review (limit 1000)'))
+            out.append((f'split {L["t"]}', None, f'{L["t"]} worker {cache[k]} added lines: split before review (limit 1000)'))
     except Exception:
         pass
 try:
@@ -242,7 +242,7 @@ except OSError:
 for L in lanes:
     n = sum(1 for l in lines(f'{D}/{L["t"]}/brief.md') if l.startswith('attempt:'))
     if n >= 3:
-        out.append((f'budget {L["t"]}', n, f'{L["t"]} lead {n} attempts: budget spent; really different method with a new budget, or stop'))
+        out.append((f'budget {L["t"]}', None, f'{L["t"]} lead {n} attempts: budget spent; really different method with a new budget, or stop'))
 live = {L['t'] for L in lanes}
 for sp in glob.glob(f'{S}/*.status'):
     t = os.path.basename(sp)[:-7]
@@ -252,22 +252,40 @@ for sp in glob.glob(f'{S}/*.status'):
         out.append((f'key {t} {k}', NOW - at, f'{t} lead {h(NOW - at)} key {k} has no live lane: write resolved [key={k}] or re-raise it'))
 # Floor nudge moved into Juggernaut's watcher (config/lane-target, afd00e42); no pull line here.
 
-# Nudge-fatigue guard: print a line only when new or its age doubled.
+# Nudge-fatigue guard. A line is keyed by stable identity only (its kind and lane or item, never its text, age, count
+# or any number that moves between polls) and rings once per rung of a fixed ladder. The text may carry the live age;
+# the key never does. The record keeps the highest rung per key, so two lanes that trade places in one wake, or a
+# line that drops out for a poll and returns, ring nothing new at a rung they already rang.
+# Lines whose subject has no age of its own (over-cap, split, budget) climb the ladder by the time since first sighting.
+RUNG_HOURS = (1, 2, 4, 8, 16, 32, 64, 128, 256)  # the named escalation rungs, in hours of waiting
+RUNGS = tuple(r * 3600 for r in RUNG_HOURS)
+FORGET_AFTER = 86400  # a key unseen this long is forgotten, so a fresh episode rings from its first rung again
+
+def rung_of(secs):
+    return sum(secs >= r for r in RUNGS)
+
 last_p = f'{S}/.flow.last'
 try: last = json.load(open(last_p))
 except Exception: last = {}
 new, shown = {}, 0
 for key, age, text in out:
     prev = last.get(key)
+    if not isinstance(prev, dict): prev = {'rung': rung_of(prev), 'seen': NOW} if isinstance(prev, (int, float)) and prev > 0 else None
     if key == 'pull':  # floor: repeat every 30 min while slots are free and ready work waits
-        if shown < 5 and (prev is None or NOW - prev >= 1800):
-            print(f'flow: {text}'); shown += 1; new[key] = NOW
+        if shown < 5 and (prev is None or NOW - prev['seen'] >= 1800):
+            print(f'flow: {text}'); shown += 1; new[key] = {'rung': 0, 'seen': NOW}
         elif prev is not None:
             new[key] = prev
         continue
-    if shown < 5 and (prev is None or age >= 2 * max(prev, 1)):
-        print(f'flow: {text}'); shown += 1; new[key] = age
-    elif prev is not None:
+    first = prev['first'] if prev else NOW
+    rung = rung_of(NOW - first if age is None else age)
+    if os.environ.get('JG_FLOW_KEYS'): print(f'flow-key: {key} rung={rung}', file=sys.stderr)  # test proof: the derived key
+    if shown < 5 and (prev is None or rung > prev['rung']):
+        print(f'flow: {text}'); shown += 1; new[key] = {'rung': rung, 'seen': NOW, 'first': first}
+    else:
+        new[key] = {**(prev or {'rung': rung, 'first': first}), 'seen': NOW}
+for key, prev in last.items():
+    if key not in new and isinstance(prev, dict) and NOW - prev.get('seen', 0) < FORGET_AFTER:
         new[key] = prev
 try:
     json.dump(new, open(last_p, 'w'))

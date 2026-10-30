@@ -43,6 +43,7 @@ Any other park names `(resume-on: YYYY-MM-DD | PR URL | captain)`; without it th
 Moved from Main's `config/jg-flow-check.sh` (sha256 `6e353c9e...4ed2`) in the first commit, then changed.
 Install with `fleet-flow/install.sh [--dry-run]`: it copies the check to `${XDG_DATA_HOME:-~/.local/share}/jg-fleet-flow/jg-flow-check.sh`, is idempotent, and `--dry-run` writes nothing.
 Main's `config/jg-flow-check.sh` then becomes a symlink to that copy, not an exec shim, because `bin/jg-flow.sh` reads its stage-clock policy from that file's text.
+Wake lines are keyed by identity only (kind and lane or item) and ring once per rung of the `RUNG_HOURS` ladder (1, 2, 4 ... 256 h); the live age lives in the text, never in the key. `tests/jg-flow-wake-key.test.sh` proves it.
 Test: `tests/jg-flow-check.test.sh` drives the real check over a fixture Main home and lead homes with stub `jg-tasks-axi.sh` and `jg-crew-state.sh`, including the live-lanes-and-kept-copies cases.
 
 ## Install (operator, after merge)

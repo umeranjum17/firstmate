@@ -137,6 +137,8 @@ jobs:
       # Fixture Main and lead homes with stub jg-tasks-axi.sh and jg-crew-state.sh: lane slots and dry.
       - name: Home flow check test
         run: bash fleet-flow/tests/jg-flow-check.test.sh
+      - name: Home flow check wake key test
+        run: bash fleet-flow/tests/jg-flow-wake-key.test.sh
       # The real guard installers in a throwaway HOME; commands run the way Codex runs them: nothing real is touched.
       - name: Kill guard Main allowance and CLI journeys
         run: |
