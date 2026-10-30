@@ -155,9 +155,9 @@ jg_supervision_status() {
       JG_SUP_BEACON_DESC=unknown
     fi
   elif declare -F jg_watcher_lock_matches_pid >/dev/null; then
-    # The watcher deletes the beacon at cycle start and rewrites it only after
-    # a full scan, so a live watcher in its first scan has none. Treat it as
-    # fresh until the stall bound, the same bound that evicts a stuck holder.
+    # The first-ever cycle has no predecessor beacon until its first full
+    # scan. Treat that live holder as fresh until the stall bound, the same
+    # bound that evicts a stuck holder. Successors retain the previous beacon.
     pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
     if jg_pid_alive "$pid" \
       && jg_watcher_lock_matches_pid "$state" "$JG_WAKE_LIB_DIR/jg-watch.sh" "$pid" "${JG_HOME:-}"; then
