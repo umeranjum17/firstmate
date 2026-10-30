@@ -50,18 +50,18 @@ chmod +x "$FM/config/merge-gate"
 cp "$FM/config/merge-gate" "$d/orig-gate"
 
 out=$("$SRC/install.sh" --dry-run "$FM")
-has "dry run lists the gate move" "$out" "would move: $FM/config/merge-gate"
+has "dry run describes the single merge gate" "$out" "would write: $FM/config/merge-gate (one entry point"
 check "dry run left the gate alone" "$(cmp -s "$FM/config/merge-gate" "$d/orig-gate" && echo same)" same
 out=$("$SRC/install.sh" "$FM")
 has "install chains the previous gate" "$out" "kept: previous merge gate chained"
-check "previous gate kept aside" "$(cmp -s "$FM/config/merge-gate.pre-owner-guard" "$d/orig-gate" && echo same)" same
+check "previous gate kept aside" "$(cmp -s "$FM/config/merge-gate.pre-chain" "$d/orig-gate" && echo same)" same
 cp "$FM/config/merge-gate" "$d/our-gate"
 out=$("$SRC/install.sh" "$FM")
 has "second install keeps the gate" "$out" "kept: $FM/config/merge-gate already runs"
-check "second install changed nothing" "$(cmp -s "$FM/config/merge-gate" "$d/our-gate" && cmp -s "$FM/config/merge-gate.pre-owner-guard" "$d/orig-gate" && echo same)" same
+check "second install changed nothing" "$(cmp -s "$FM/config/merge-gate" "$d/our-gate" && cmp -s "$FM/config/merge-gate.pre-chain" "$d/orig-gate" && echo same)" same
 cp "$d/orig-gate" "$FM/config/merge-gate" # a shim rewritten over ours, then install rerun
 "$SRC/install.sh" "$FM" >/dev/null
-check "re-chain after the gate is rewritten over ours" "$(cmp -s "$FM/config/merge-gate" "$d/our-gate" && cmp -s "$FM/config/merge-gate.pre-owner-guard" "$d/orig-gate" && echo same)" same
+check "re-chain after the gate is rewritten over ours" "$(cmp -s "$FM/config/merge-gate" "$d/our-gate" && cmp -s "$FM/config/merge-gate.pre-chain" "$d/orig-gate" && echo same)" same
 
 git init -q -b main "$d/work"
 git -C "$d/work" remote add origin https://github.com/acme/widget.git
@@ -139,7 +139,7 @@ mv "$d/patterns.off" "$FM/config/owner-details-patterns"
 
 "$SRC/install.sh" --uninstall "$FM" >/dev/null
 check "uninstall restores the previous gate" "$(cmp -s "$FM/config/merge-gate" "$d/orig-gate" && echo same)" same
-check "uninstall drops the aside copy" "$([ -e "$FM/config/merge-gate.pre-owner-guard" ] && echo there || echo gone)" gone
+check "uninstall drops the aside copy" "$([ -e "$FM/config/merge-gate.pre-chain" ] && echo there || echo gone)" gone
 rm -f "$FM/config/merge-gate"
 "$SRC/install.sh" "$FM" >/dev/null
 "$SRC/install.sh" --uninstall "$FM" >/dev/null

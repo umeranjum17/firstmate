@@ -81,7 +81,7 @@ Two add-ons wire in by hand:
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card gate "$@"\n' > "$JG_HOME/config/merge-gate"
 printf '#!/bin/sh\nexec <this-clone>/merge-card/merge-card post --board <board.json> "$@"\n' > "$JG_HOME/config/post-merge"
 chmod +x "$JG_HOME/config/merge-gate" "$JG_HOME/config/post-merge"
-owner-guard/install.sh "$JG_HOME"   # re-chain: the owner-details merge scan runs first, then the shim
+owner-guard/install.sh "$JG_HOME"   # the single config/merge-gate runs the owner-details scan, then the shim
 ```
 
 `tailscale-resilience` installs as a systemd user timer; copy the unit from its Details section. The dormant and fork-hook add-ons install nothing.
@@ -136,7 +136,7 @@ pipeline-quota-failover/install.sh --restore             # removes the wrapper a
 "$JG_HOME/bin/jg-check-unregister.sh" 0-nm-drain         # then rm "$JG_HOME/state/0-nm-drain.check.sh" ~/.local/share/jg-nm-drain -r
 "$JG_HOME/bin/jg-check-unregister.sh" fleet-stall        # then rm "$JG_HOME/state/fleet-stall.check.sh" ~/.local/share/jg-fleet-stall -r
 "$JG_HOME/bin/jg-check-unregister.sh" zai-quota          # then rm "$JG_HOME/state/zai-quota.check.sh"
-rm "$JG_HOME/config/merge-gate" "$JG_HOME/config/post-merge"                    # merge-card (with owner-guard: its config/merge-gate.pre-owner-guard instead of merge-gate)
+rm "$JG_HOME/config/merge-gate" "$JG_HOME/config/post-merge"                    # merge-card (with an add-on installed, the shim is kept at config/merge-gate.pre-chain; uninstalling the add-on gives it back)
 owner-guard/install.sh --uninstall "$JG_HOME"            # owner-guard: also restores the home's previous config/merge-gate
 repo-guard/install.sh --uninstall                       # repo-guard: puts the real gh and gh-axi back; an extended allow-list stays
 pane-titles/uninstall.sh "$JG_HOME"                      # pane-titles: restores the home's previous launch-env-hook
@@ -234,7 +234,8 @@ printf '#!/bin/sh\nexec <addons>/merge-card/merge-card post --board <board.json>
 chmod +x $JG_HOME/config/merge-gate $JG_HOME/config/post-merge
 ```
 
-With `owner-guard` installed, rerun `owner-guard/install.sh "$JG_HOME"` after rewriting the gate shim, so the owner-details merge scan is chained back in front of it (see [owner-guard](../owner-guard/README.md)).
+With `owner-guard` installed, rerun `owner-guard/install.sh "$JG_HOME"` after rewriting the gate shim, so the owner-details merge scan runs in front of it again (see [owner-guard](../owner-guard/README.md)).
+The two add-ons that share `config/merge-gate` write one file holding both checks, in the order the owner-details scan, then the owner-rules proof gate, then the home's own shim; `lib/merge-gate-lib.sh` owns that file, and for one release `config/merge-gate.pre-owner-guard` and `config/merge-gate.pre-owner-rules` stay as symlinks to it.
 
 Test: `merge-card/tests/merge-card-e2e.sh` drives the real script end to end against a task folder holding a retained PNG, with a stub `done-done` placed earlier on `PATH` (one accepting `--citation-base`, one rejecting it, and one that lies about supporting it), and asserts the recorded verdict, the invocation the stub saw, and that the card's media resolves in each case.
 
