@@ -143,6 +143,7 @@ t2=$(printf '%s\n' "$times" | sed -n 2p)
   check "holding the item dismissed the board card" grep -q 'dismiss waiting-timer-.*-ready-backlog-card' "$M/cards"
   check "holding the item closed Main's report" grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\].*waiting-timer-cleared: lead1 ready backlog: no ready work waits to start now' "$M/state/lead1.status"
   check "neither watcher wrote to stderr" quiet "$L/err" "$M/err"
+  for f in "$L/err" "$M/err"; do [ -s "$f" ] && { echo "stderr of ${f#"$T"/}:"; head -n 20 "$f"; }; done
 } | tee "$OUT/checks.txt"
 fails=0
 grep -q '^FAIL' "$OUT/checks.txt" && fails=1
