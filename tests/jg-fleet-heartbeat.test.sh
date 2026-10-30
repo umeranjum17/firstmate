@@ -107,6 +107,35 @@ test_arm_registers_a_check_the_watcher_trusts_only_on_a_primary_home() {
   pass "arm registers a trusted check only on a primary home"
 }
 
+# Rule 12: a lead lands finished work and closes the lane. A lane whose work is
+# done while its worker still answers is work nobody closed, so the heartbeat
+# names it once, re-fires it after the window, and stays quiet once it is gone.
+test_check_names_a_finished_lane_nobody_closed() {
+  local d out stub
+  d=$(setup closed)
+  stub="$d/crew-state.sh"
+  cat > "$stub" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  q1) printf 'state: done \302\267 source: pane \302\267 idle at its prompt\n' ;;
+  *)  printf 'state: working \302\267 source: run-step \302\267 execution active\n' ;;
+esac
+SH
+  chmod +x "$stub"
+  out=$(JG_CREW_STATE_BIN="$stub" hb "$d" check)
+  assert_contains "$out" "fleet heartbeat: quiet lane q1 is done but still open - land it and close it" \
+    "a finished lane whose worker still answers must be named"
+  assert_equals "$(JG_CREW_STATE_BIN="$stub" hb "$d" check | grep -c 'lane q1')" 0 \
+    "the same open lane inside the re-fire window is silent"
+  assert_contains "$(JG_CREW_STATE_BIN="$stub" JG_FLEET_HEARTBEAT_REFIRE_SECS=0 hb "$d" check)" "lane q1" \
+    "an open lane still open after the window must re-fire"
+  rm -f "$d/leads/quiet/state/q1.meta"
+  assert_not_contains "$(JG_CREW_STATE_BIN="$stub" JG_FLEET_HEARTBEAT_REFIRE_SECS=0 hb "$d" check)" "lane q1" \
+    "a closed lane must be silent"
+  pass "check names a finished lane nobody closed, re-fires it, and goes quiet once it is closed"
+}
+test_check_names_a_finished_lane_nobody_closed
+
 test_rows_give_every_home_one_verdict
 test_an_open_wait_is_a_gap_and_filled_lanes_are_moving
 test_check_wakes_on_a_gap_refires_and_reports_recovery_once
