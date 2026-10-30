@@ -99,6 +99,7 @@ wait_until() {  # <deadline-seconds-from-start> <command...>
 fired_twice() { [ "$(overdue)" -ge 2 ]; }
 resolved() { grep -q 'waiting-timer-cleared: lead1 ready backlog' "$M/state/lead1.status"; }
 carded() { grep -q 'ready-backlog-card' "$M/cards" 2>/dev/null; }
+dismissed() { grep -q 'dismiss waiting-timer-.*-ready-backlog-card' "$M/cards" 2>/dev/null; }
 steered_twice() { [ "$(grep -c 'You have ready backlog work' "$M/sent" 2>/dev/null)" -ge 2 ]; }
 
 : > "$OUT/timeline.txt"
@@ -113,6 +114,7 @@ log "Main has steered the lead $(grep -c 'You have ready backlog work' "$M/sent"
 JG_HOME="$L" "$FORK/bin/jg-tasks-axi.sh" hold alpha --reason "waits on the vendor" >/dev/null
 log "the lead holds alpha with its reason"
 wait_until 2100 resolved
+wait_until 2250 dismissed
 sleep 40
 log "stop"
 : > "$T/stop"
