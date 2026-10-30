@@ -310,7 +310,8 @@ family_for_basename() {
       printf '%s\n' pure-contract-unit
       ;;
     jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
-    jg-mail.test.sh|jg-watcher-lock.test.sh|jg-watch-handoff.test.sh)
+    jg-mail.test.sh|jg-watcher-lock.test.sh|jg-watch-handoff.test.sh|\
+    jg-pi-wake-replay.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     jg-afk-inject-herdr-e2e.test.sh|jg-backend-herdr-presentation-e2e.test.sh|\
