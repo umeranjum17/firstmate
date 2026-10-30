@@ -1,0 +1,7 @@
+# Licences this home may adopt, one per line; `#` starts a comment.
+# Copy it to config/licences-allowlist to widen or narrow the list without editing this file.
+MIT
+Apache-2.0
+BSD-2-Clause
+BSD-3-Clause
+ISC
