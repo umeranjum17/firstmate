@@ -41,6 +41,7 @@ sed -i "/^- \[x\] parent /s/$(date +%F)/2000-01-01/g" "$JG_HOME/data/backlog.md"
 printf '\n## Done\n- [x] recent - Umer shipped feature (repo: alpha) (done %s)\n- [x] old - Umer historical work (repo: alpha) (done 2000-01-01)\n' "$(date +%F)" >> "$JG_HOME/data/backlog.md"
 git init -q "$JG_HOME/projects/alpha"
 git -C "$JG_HOME/projects/alpha" remote add origin https://github.com/example/alpha-app.git
+printf 'window=default:w9:p1\nendpoint_task_id=long\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n' > "$JG_HOME/state/long.meta"
 printf 'working [at=1700000000]: building Umer release\n' > "$JG_HOME/state/long.status"
 sign-off-axi ticket "$work/board.json" --id jg-legacy-fixture --title 'Needs a parent · alpha' --progress 17 --asked yes >/dev/null
 sign-off-axi ticket "$work/board.json" --id jg-history-fixture --title 'Umer historical maintenance' --project main --progress 100 --asked no >/dev/null
@@ -80,6 +81,17 @@ jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "jg-history-fixture") |
 jq -e --arg inferred "$(ticket_id main/inferred)" --arg parent "$parent" '.tickets[] | select(.id == $inferred) | .parent == $parent' "$work/first.json"
 # herdr is an internal home: no ticket project label and no icon wake line.
 jq -e --arg internal "$(ticket_id main/internal)" '.tickets[] | select(.id == $internal) | (.project // "") == ""' "$work/first.json"
+# The feed record carries the assignee the board shows: the owning lead with the live worker's model and tool, the lead
+# alone while no worker runs the ticket, and a plain unassigned for work no lead owns. Read from the feed sign-off keeps.
+feed_assignee() { jq -s --arg id "$1" 'map(select(.id == $id)) | last | .assignee' "$work/board.tickets.jsonl"; }
+feed_assignee "$(ticket_id main/long)" | jq -e '.lead == "main" and .live == true and .model == "ollama-cloud/deepseek-v4.1-flash" and .tool == "pi"'
+feed_assignee "$(ticket_id main/voice)" | jq -e '.lead == "main" and .live == false and .model == null and .tool == null'
+feed_assignee "$upkeep" | jq -e '.lead == "unassigned" and .live == false'
+# The added field takes nothing away: the feed's newest line for the live ticket reads back as the same record.
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e \
+  --slurpfile feed <(jq -s --arg id "$(ticket_id main/long)" 'map(select(.id == $id)) | last' "$work/board.tickets.jsonl") \
+  '.ticket.title == $feed[0].title and .ticket.progress == $feed[0].progress and .ticket.stage == $feed[0].stage and .ticket.state == $feed[0].state and .ticket.last_event_at == $feed[0].last_event_at'
+echo 'PASS: the feed record carries the live lead, model and tool, the lead alone, and an explicit unassigned'
 # Board wins over a drifted ledger that already recorded project cleared.
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/internal)" --project herdr >/dev/null
 python3 - <<PY
