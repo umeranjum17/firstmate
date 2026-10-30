@@ -108,7 +108,7 @@ test_cleaned_lane() (
     start_cycle "$dir"
     wait_file "$dir/state/.last-watcher-beat"
     for ((i=0; i<35; i++)); do
-      [ ! -s "$dir/watch.out" ] || fail "cleaned lane raised an alarm: $(cat "$dir/watch.out")"
+      [ ! -s "$dir/watch.out" ] || fail "cleaned lane raised an alarm in cycle $cycle: $(cat "$dir/watch.out")"
       sleep 0.1
     done
     kill "$pid"
