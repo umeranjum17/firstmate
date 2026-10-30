@@ -15,7 +15,9 @@
 # its completion receipt (state/<id>.run-receipt.json, the receipts add-on's record)
 # binds the candidate head with verdict PASS and its evidence carries a
 # `first-draft receipt: <ref>` line. design_call=no passes; a record with no
-# design_call (an older task) warns and counts as no. jg_dod_demo_gate is the same
+# design_call (an older task) warns and counts as no. A task past the small-tweak size
+# rule is design work whatever its call, and a smaller UI change needs the lead's or
+# Main's hand-roll approval; bin/jg-design-gate.sh owns that contract. jg_dod_demo_gate is the same
 # check for TakeOne demo videos, behind the config/takeone-demo switch.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 # The hooks also get FM_HOME (the pre-rename name) because installed add-on hooks and done-done's merge-gate still read it; delete with the S10 shim.
@@ -41,6 +43,8 @@ else
 fi
 set -u
 
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+[ ! -r "$_jg_d/jg-squad-lead-parent-lib.sh" ] || . "$_jg_d/jg-squad-lead-parent-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-timeout-lib.sh"
 
@@ -86,18 +90,62 @@ _jg_dod_receipt_line() {  # <state> <id> <head> <label>
     ' "$receipt" >/dev/null 2>&1
 }
 
+# The size rule (bin/jg-design-gate.sh owns it): UI files are matched by name, and a
+# change is a small tweak when they change at most 40 lines and none is new.
+JG_DESIGN_UI_RE='[.](html?|css|scss|sass|less|svg|jsx|tsx|vue|svelte|astro)$'
+JG_DESIGN_TWEAK_LINES=40
+
+jg_design_size() {  # <worktree> <base-branch> <head>: prints `design|tweak <ui-lines> <new-ui-files>`
+  local wt=$1 base=${2:-main} head=$3 ref mb lines new
+  [ -d "$wt" ] && git -C "$wt" cat-file -e "$head^{commit}" 2>/dev/null || return 2
+  ref=origin/$base
+  git -C "$wt" rev-parse -q --verify "$ref^{commit}" >/dev/null || ref=$base
+  mb=$(git -C "$wt" merge-base "$ref" "$head" 2>/dev/null) || return 2
+  lines=$(git -C "$wt" diff --numstat --no-renames "$mb" "$head" \
+    | awk -F'\t' -v re="$JG_DESIGN_UI_RE" 'tolower($3) ~ re && $1 != "-" { n += $1 + $2 } END { print n + 0 }')
+  new=$(git -C "$wt" diff --name-only --no-renames --diff-filter=A "$mb" "$head" | grep -ciE "$JG_DESIGN_UI_RE")
+  if [ "$new" -gt 0 ] || [ "$lines" -gt "$JG_DESIGN_TWEAK_LINES" ]; then echo "design $lines $new"; else echo "tweak $lines $new"; fi
+}
+
+jg_design_main_home() {  # <home>: the main home it reports to, following local squad lead parents
+  local h=$1 hop
+  for hop in 1 2 3 4 5 6 7 8; do
+    [ -e "$(jg_compat_marker "$h")" ] || { printf '%s\n' "$h"; return 0; }
+    declare -F jg_squad_lead_parent_record_parse >/dev/null || return 1
+    jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$h")" && [ "$JG_SQUAD_LEAD_PARENT_ROUTE" = local ] || return 1
+    h=$JG_SQUAD_LEAD_PARENT_HOME
+  done
+  return 1
+}
+
+jg_design_handroll_ok() {  # <state> <id>: the lead or Main approved hand-rolling this small UI change
+  local f=$1/design-approvals/$2.handroll.json
+  [ -f "$f" ] && [ ! -L "$f" ] && jq -e --arg id "$2" '.schema == 1 and .task == $id and (.by | type == "string" and length > 0)' "$f" >/dev/null 2>&1
+}
+
 jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
-  local state=$1 id=$2 meta=$3 head=$4 call
+  local state=$1 id=$2 meta=$3 head=$4 call size
   [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
   call=$(jg_dod_meta_value "$meta" design_call)
   case $call in
-    no) return 0 ;;
-    '') echo "warning: $id has no design call recorded (an older brief); counting it as design_call=no" >&2; return 0 ;;
-    yes) ;;
+    no|yes) ;;
+    '') echo "warning: $id has no design call recorded (an older brief); counting it as design_call=no" >&2 ;;
     *) echo "merge refused: design call for $id is malformed ('$call'); expected yes or no"; return 1 ;;
   esac
+  size=$(jg_design_size "$(jg_dod_meta_value "$meta" worktree)" "$(jg_dod_meta_value "$meta" base_branch)" "$head") \
+    || { [ "$call" = yes ] || echo "warning: cannot measure the UI change of $id at $head; using its design call" >&2; }
+  if [ "$call" != yes ] && [ "${size%% *}" != design ]; then
+    case $size in ''|'tweak 0 0') return 0 ;; esac
+    jg_design_handroll_ok "$state" "$id" && return 0
+    echo "merge refused: $id hand-rolls a small UI change (${size#tweak }: UI lines, new UI files) with no hand-roll approval; its lead or Main runs bin/jg-design-gate.sh handroll $id"
+    return 1
+  fi
   _jg_dod_receipt_line "$state" "$id" "$head" "first-draft receipt" && return 0
-  echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  if [ "$call" = yes ]; then
+    echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  else
+    echo "merge refused: $id changes ${size#design } (UI lines, new UI files), past the small-tweak size, and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  fi
   return 1
 }
 
