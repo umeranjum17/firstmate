@@ -30,7 +30,9 @@ jg_owner_rules_design() {
 }
 
 jg_owner_rules_check() {
-  local data=$1 id=$2 mode=$3 kind=$4 entry title parent exists
+  # $3 (the delivery mode) is part of the caller contract; the risk reason it
+  # used to read is bin/jg-brief.sh --risk now, so this check never needs it.
+  local data=$1 id=$2 kind=$4 entry title parent exists
   [ "$kind" != squad_lead ] || return 0
   # Entry = the "- [.] <id> - <title>" line and its indented body, up to the next item or heading.
   entry=$(awk -v id="$id" '
