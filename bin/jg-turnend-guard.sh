@@ -248,6 +248,36 @@ if [ -n "$QUESTION_TEXT" ] && jg_question_asks "$QUESTION_TEXT" \
   question_block "$(jg_question_tail "$QUESTION_TEXT")"
 fi
 
+# --- the chat-answer rule ---------------------------------------------------
+# The opposite case: the captain answered a posted question in chat ("if I
+# answer you directly here you should reconcile the decisions instead of keep
+# stale data"). A turn that ends while that card still waits is flagged, once per
+# distinct answer, and the banner names the deterministic path that records his
+# words on the card. Main and lead homes pass this guard alike.
+chat_answer_block() {  # <keys, one per line> <his words>
+  {
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    printf '●  HE ANSWERED IN CHAT, BUT THE BOARD CARD IS STILL WAITING
+'
+    printf '●  Record his words on the card in the same turn, or the board keeps stale data:
+'
+    printf '%s\n' "$1" | while IFS= read -r key; do
+      printf '●    %s/jg-question-card.sh answer %s --words "<his exact words>"\n' "$SCRIPT_DIR" "$key"
+    done
+    printf '●  His words: %s\n' "${2:0:200}"
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  } >&2
+  exit 2
+}
+
+CHAT_KEYS=$(jg_question_chat_answered_keys "$PAYLOAD")
+if [ -n "$CHAT_KEYS" ]; then
+  CHAT_WORDS=$(jg_question_chat_words "$PAYLOAD")
+  if jg_question_first_sighting "$STATE" "$(printf '%s|%s' "$CHAT_KEYS" "$CHAT_WORDS" | tr '\n' ' ')" .chat-answer-flagged; then
+    chat_answer_block "$CHAT_KEYS" "$CHAT_WORDS"
+  fi
+fi
+
 # --- the actual predicate ----------------------------------------------------
 # shellcheck source=bin/jg-wake-lib.sh
 . "$SCRIPT_DIR/jg-wake-lib.sh"

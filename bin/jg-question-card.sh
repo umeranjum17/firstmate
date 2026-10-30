@@ -6,6 +6,7 @@
 #   jg-question-card.sh post --ask-ref <ref> --title "<one question>" [sign-off-axi raise flags...]
 #   jg-question-card.sh post --board <decisions.json> ... (the same flags)
 #   jg-question-card.sh post --route <lead> [--decision-key <slug>] ... (the same flags)
+#   jg-question-card.sh answer <card-key> --words "<the captain's words>" [--board <decisions.json>]
 #   jg-question-card.sh keys
 #
 # The owner's rule (2026-10-25): "if you ask questions as well make sure they
@@ -27,6 +28,15 @@
 #        the answer straight to that lead and closes its decision <slug>
 #        (default: the card key). Cards Main files for a lead name it. Neither
 #        flag reaches sign-off-axi.
+# answer Record the captain's chat answer on its card, in the same turn he gave
+#        it: sign-off-axi has no command for this, so the line sign-off-axi
+#        itself writes for a board answer is appended to the board's answers log
+#        (answer = his exact words, label "Answered in chat"). The card then
+#        reads as answered, and the board-answers check (bin/jg-board-answers.sh)
+#        carries it to the lead that owns a routed card, or skips the wake for an
+#        unrouted one since Main heard it first. Refused for a key that is not an
+#        open card. bin/jg-turnend-guard.sh flags a turn that ends after a chat
+#        answer while its card still waits, in Main and lead homes alike.
 # keys   Print the key of every card still open on the board.
 #
 # The board is the one sign-off-axi reads: the explicit --board file, else the
@@ -159,6 +169,40 @@ cmd_post() {
   return 0
 }
 
+cmd_answer() {
+  local key='' words='' board log close at state seen
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --words) shift; [ $# -gt 0 ] || die "--words needs the captain's words"; words=$1 ;;
+      --board) shift; [ $# -gt 0 ] || die "--board needs a value"; BOARD=$1 ;;
+      -*) die "answer: unknown flag $1" ;;
+      *) [ -z "$key" ] || die "answer takes one card key"; key=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$key" ] || die "answer needs a card key (jg-question-card.sh keys lists them)"
+  [ -n "$words" ] || die "refused: answer needs --words \"<the captain's exact words>\""
+  require_signoff
+  jg_question_open_keys | grep -qxF -- "$key" || die "refused: '$key' is not a card still open on the board"
+  [ -n "${BOARD:-}" ] || BOARD=$(jg_question_board)
+  [ -n "$BOARD" ] || BOARD=$HOME/.sign-off/decisions.json
+  [ -f "$BOARD" ] || die "no board file at $BOARD"
+  log=$(jg_question_answers_log "$BOARD")
+  close=$(jq -r --arg k "$key" '[(.items // .decisions // [])[]? | select(.key == $k) | .close][0] // "done"' "$BOARD" 2>/dev/null)
+  [ -n "$close" ] || close="done"
+  at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  jq -cn --arg k "$key" --arg a "$words" --arg c "$close" --arg at "$at" \
+    '{key: $k, answer: $a, label: "Answered in chat", close: $c, at: $at}' >> "$log" \
+    || die "cannot write the answer to $log"
+  # Main heard this answer first: an unrouted card needs no wake saying so.
+  state=${JG_STATE_OVERRIDE:-${JG_HOME:-}/state}
+  seen=$state/.board-answers-seen
+  if [ -n "${JG_HOME:-${JG_STATE_OVERRIDE:-}}" ] && [ -f "$seen" ] && [ ! -f "$state/board-routes/$key" ]; then
+    printf '%s\t%s\n' "$key" "$at" >> "$seen"
+  fi
+  printf 'answered: %s\n' "$key"
+}
+
 cmd_keys() {
   require_signoff
   jg_question_open_keys
@@ -169,6 +213,7 @@ cmd=$1
 shift
 case "$cmd" in
   post) cmd_post "$@" ;;
+  answer) cmd_answer "$@" ;;
   keys) cmd_keys ;;
   -h|--help|help) usage ;;
   *) usage ;;

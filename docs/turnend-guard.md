@@ -61,6 +61,11 @@ The flag is one exit-2 banner naming `bin/jg-question-card.sh post`, which posts
 Every open board key comes from sign-off-axi's own `list --json` (`bin/jg-question-lib.sh`), never from a private copy of the board.
 It is charged once per distinct trailing question, recorded in `state/.question-flagged`, so a harness is never wedged in a loop; a payload without a readable transcript is not flagged at all.
 
+The opposite case is the chat answer: the captain answers a posted question directly in chat while its card still waits on the board.
+The guard finds the transcript's last human message, takes the open cards cited by the assistant text just before it, and flags the turn when any is still open.
+The banner names `bin/jg-question-card.sh answer <key> --words "<his words>"`, which appends his exact words to the board's answers log so the card reads as answered; the board-answers check then carries a routed card's answer to its lead.
+It is charged once per distinct answer, recorded in `state/.chat-answer-flagged`, and covers Main and lead homes alike.
+
 ## Guard predicates
 
 The turn-end guard checks primary scope first, then supervision need, then watcher health.
