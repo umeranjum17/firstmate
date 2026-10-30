@@ -420,8 +420,6 @@ EOF
 portable_parallel_weight_hints() {
   cat <<'EOF'
 tests/jg-brief.test.sh 10594
-tests/jg-design-gate-first-draft.test.sh 1000
-
 tests/jg-captain-hold-lifecycle.test.sh 343658
 tests/jg-crew-state.test.sh 82058
 tests/jg-pr-merge.test.sh 300199
@@ -566,6 +564,7 @@ tests/jg-compat-old-records.test.sh 2167
 tests/jg-composer-matrix-live-e2e.test.sh 59
 tests/jg-control.test.sh 91759
 tests/jg-cursor-primary-live-e2e.test.sh 57
+tests/jg-design-gate-first-draft.test.sh 680
 tests/jg-devin-signals-live-e2e.test.sh 65
 tests/jg-escalation-chain.test.sh 120130
 tests/jg-fleet-sync.test.sh 42151
