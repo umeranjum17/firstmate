@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/jg-squad-lead-dormant.test.sh - a Squad Lead with no open work is stopped
 # persist-first and marked dormant, the fleet heartbeat reads it dormant, and any
-# routed work relaunches it first (bin/jg-squad-lead-dormant.sh).
+# routed work records the message before it wakes the lead (bin/jg-squad-lead-dormant.sh).
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -71,15 +71,23 @@ test_dormant_lead_reads_dormant_and_routed_work_wakes_it() {
   assert_equals "$(rec_word "$d")" "" "the dormant record drops when the lead wakes"
   pass "a dormant lead reads dormant and routed work wakes it"
 }
-test_routed_send_relaunches_the_lead_before_delivery() {
-  local d
+test_routed_send_records_then_wakes_the_lead() {
+  local d rec i=0
   d=$(setup send)
   printf 'dormant 1\n' > "$d/main/state/.squad-lead-dormant-lead"
   env JG_HOME="$d/main" JG_STATE_OVERRIDE="$d/main/state" FAKE_CONTROL_LOG="$LOG" \
-    "$ROOT/bin/jg-send.sh" lead "hello lead" > /dev/null 2>&1
-  assert_equals "$(cat "$LOG")" "lead relaunch" "jg-send relaunches a dormant lead before it delivers"
+    "$ROOT/bin/jg-send.sh" lead "hello lead" > /dev/null 2>&1 \
+    || fail "a routed send to a dormant lead should record the message and exit 0"
+  set -- "$d"/main/state/lead.inbox/*.msg
+  rec=''
+  [ -f "$1" ] && rec=$1
+  [ -n "$rec" ] || fail "the routed send did not record the message in the lead's inbox"
+  # The relaunch waits for the replacement agent to come up, so the send detaches
+  # it: the record above is the delivery, and the wake lands in the background.
+  while [ "$i" -lt 100 ] && [ "$(rec_word "$d")" = dormant ]; do sleep 0.1; i=$((i + 1)); done
+  assert_equals "$(cat "$LOG")" "lead relaunch" "a routed send relaunches the dormant lead"
   assert_equals "$(rec_word "$d")" "" "the wake clears the dormant record"
-  pass "a routed send relaunches the lead before delivery"
+  pass "a routed send records the message first and wakes the lead in the background"
 }
 test_a_lead_with_open_work_or_recent_activity_is_left_alone() {
   local d
@@ -98,5 +106,5 @@ test_a_lead_with_open_work_or_recent_activity_is_left_alone() {
 }
 test_idle_lead_is_asked_then_stopped_and_marked_dormant
 test_dormant_lead_reads_dormant_and_routed_work_wakes_it
-test_routed_send_relaunches_the_lead_before_delivery
+test_routed_send_records_then_wakes_the_lead
 test_a_lead_with_open_work_or_recent_activity_is_left_alone
