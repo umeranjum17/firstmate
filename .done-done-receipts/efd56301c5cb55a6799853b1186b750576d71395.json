@@ -1,0 +1,77 @@
+{
+  "schema": 2,
+  "repo": "juggernaut",
+  "head": "efd56301c5cb55a6799853b1186b750576d71395",
+  "tree": "58c708ee92621781d49d3349d6c4c4c460e5051e",
+  "claim": "A ready PR that sits green and unmerged under yolo now climbs the ordinary wait ladder: its owning lead is woken naming the PR, the lead reports it to Main, Main steers the lead to merge or record a hold, and the board card \"Merge the green ... PR?\" follows; a merge clears the wait, closes Main's report and dismisses the card, and nothing fires inside the first 15 minutes.",
+  "skill": "done-done-verify-juggernaut-addons",
+  "result": "pass",
+  "at": "2026-10-30T10:39:29.256Z",
+  "files": [
+    {
+      "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/green-pr-ladder.txt",
+      "sha256": "c56daedb4d482cdd486315f7532dc40284dd85140d38c6099e41a6da425e86e2"
+    },
+    {
+      "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/main-steer-to-lead.txt",
+      "sha256": "63c937adab45dec573e9e463af1a63e8bee85ed15c825c4a62c3022f4085c581"
+    },
+    {
+      "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/board-calls.txt",
+      "sha256": "4395a67d33798f6d3a5455d0bdabd28e60a0115382e5a144d866e13f6af48f2c"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "20261030T103649Z-efd56301-4430e0",
+      "commit": "efd56301c5cb55a6799853b1186b750576d71395",
+      "journey": null,
+      "command": null,
+      "tool": "0.6.24",
+      "steps": {
+        "target": {
+          "version": "juggernaut efd56301, the watcher and the waiting-timer add-on in this task's isolated copy"
+        },
+        "start": "A lab lead home with one ship task whose metadata holds pr=https://github.com/octo/widgets/pull/7 and yolo=on, an armed merge poll, and a fake forge that answers OPEN, not a draft, merge state CLEAN at head aaaaaaaa",
+        "steps": [
+          "Run one real watcher tick in the lead home and read the recorded green-PR clock",
+          "Move the clock past JG_GREEN_PR_SECS and run another tick",
+          "Let the ladder's owner rung fire, then its Main rung",
+          "Run Main's ticks so it steers the lead to merge",
+          "Age the lead's report and run Main's ticks so the board card is raised",
+          "Have the forge answer MERGED and run the lead's and Main's ticks again"
+        ],
+        "result": "The green PR is recorded at its head; inside the 15 minutes nothing escalates; after 15 minutes the greenpr wait source is armed, the owning lead is woken naming the PR, the lead reports it to Main, Main steers the lead to merge with bin/jg-pr-merge.sh or record a hold, the board card 'Merge the green signoff PR?' is raised, and the merge clears the source, closes Main's report and dismisses the card"
+      }
+    }
+  ],
+  "judge": {
+    "route": "claude-code",
+    "model": "claude-haiku-5-5",
+    "independence": "session-only",
+    "author": {
+      "agent": "claude",
+      "model": "claude-haiku-5-5"
+    },
+    "verdicts": [
+      {
+        "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/green-pr-ladder.txt",
+        "sha256": "c56daedb4d482cdd486315f7532dc40284dd85140d38c6099e41a6da425e86e2",
+        "verdict": "pass",
+        "seen": "I read all entries in green-pr-ladder.txt: start, forge state, thresholds, ticks 1 through 7, the lab clock adjustments, and the result line. Tick 1 records the green PR at 0 seconds and says it escalates nowhere, which fits the 15-minute gate. Tick 4 shows rung 1 waking the owning lead naming pull/7. Tick 5 shows the lead reporting to Main. Main tick 2 shows the steer to the lead, and Main tick 4 shows the board card 'Merge the green signoff PR?' raised. The forge then answers MERGED at head aaaaaaaa, tick 7 shows the wait cleared, Main's report is resolved, and the card is dismissed. The main weakness is that the escalations were forced by moving timers back, so the 15-minute quiet period is shown only by tick 1 and the substitution, not by real wall-clock time."
+      },
+      {
+        "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/main-steer-to-lead.txt",
+        "sha256": "63c937adab45dec573e9e463af1a63e8bee85ed15c825c4a62c3022f4085c581",
+        "verdict": "pass",
+        "seen": "I read the single entry in main-steer-to-lead.txt. It is a jg-send to lead1 that names the stuck signoff and pull/7 at head aaaaaaaa. It tells the lead to merge with bin/jg-pr-merge.sh or record a hold with a reason, which matches the outcome's Main steer step."
+      },
+      {
+        "path": "<evidence root>/20261030T103649Z-efd56301-4430e0/board-calls.txt",
+        "sha256": "4395a67d33798f6d3a5455d0bdabd28e60a0115382e5a144d866e13f6af48f2c",
+        "verdict": "pass",
+        "seen": "I read both entries in board-calls.txt. The first is a raise call with title 'Merge the green signoff PR?' and the PR URL in --why. It says the card closes by itself when the wait ends. The second is a dismiss call for the same card key. This matches the outcome's card step and its dismissal after the merge."
+      }
+    ]
+  }
+}
