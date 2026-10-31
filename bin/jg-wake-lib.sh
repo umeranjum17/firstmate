@@ -2357,6 +2357,14 @@ jg_wake_append_locked() {
   else
     JG_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
     JG_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+    # #fleet: the same event, in plain words, on the fleet chat channel. This is
+    # the call site that already records the wake, so the channel needs no scan
+    # of its own; a chat problem can never fail a wake.
+    if [ -x "$JG_WAKE_LIB_DIR/jg-chat.sh" ]; then
+      JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+        "$JG_WAKE_LIB_DIR/jg-chat.sh" note '#fleet' "${clean_key%.status}" - wake - \
+        "$kind: $clean_key $clean_payload" >/dev/null 2>&1 || true
+    fi
   fi
   return "$status"
 }
