@@ -75,9 +75,18 @@ SH
 # One watcher cycle; Main drains and acknowledges its wakes unless absent.
 # While Main is absent the next cycle is the successor the arm path starts
 # over its unread wakes, which keeps supervising instead of re-announcing them.
+#
+# A cycle is bounded by the watcher's own work, not by a fixed delay: it ends
+# when the watcher exits on the wake it reported, or after the four scans the old
+# four-second budget covered on an idle runner (a quiet cycle can never report a
+# wake, and the watcher stamps its liveness beacon after each complete scan).
+# A loaded runner then waits for the scans it started instead of being cut short
+# inside one of them and losing the wake that scan was about to report.
 cycle() {  # <home> [absent]
-  local h=$1 rc=0 seq gen pid successor=0
+  local h=$1 rc=0 seq gen pid successor=0 mark
   [ "${2:-}" != absent ] || successor=1
+  mark="$h/tmp/cycle-mark"
+  touch "$mark"
   env -u JG_TASK_ID JG_WATCH_HANDLING_SUCCESSOR="$successor" HOME="$h/home" TMPDIR="$h/tmp" PATH="$h/fakebin:$PATH" \
     JG_HOME="$h" JG_STATE_OVERRIDE="$h/state" JG_CONFIG_OVERRIDE="$h/config" JG_ADDONS_DIR="$FORK/addons" \
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
@@ -86,7 +95,7 @@ cycle() {  # <home> [absent]
     JG_READY_STALL_POLL_SECS=0 JG_GREEN_PR_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
-  wait_for_exit "$pid" "${CYCLE_POLLS:-40}" || rc=$?
+  wait_for_scan "$pid" "$h/state" "$mark" "${CYCLE_SCANS:-4}" "${CYCLE_POLLS:-600}" || rc=$?
   case "$rc" in 0|124) ;; *) fail "watcher failed ($rc): $(cat "$h/err")" ;; esac
   cat "$h/out" >> "$h/events"
   [ "${2:-}" != absent ] || return 0
@@ -94,6 +103,63 @@ cycle() {  # <home> [absent]
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9]*\) --recovery-generation .*/\1/p' "$h/ack")
   gen=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([^ ]*\)$/\1/p' "$h/ack")
   [ -z "$seq" ] || JG_HOME="$h" JG_STATE_OVERRIDE="$h/state" "$FORK/bin/jg-wake-drain.sh" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
+}
+
+# A cycle stops at its first wake, so a home holding two open waits can report
+# the other one first. Repeat bounded cycles until the wanted line is visible;
+# the caller's assertion still reports the miss with its full evidence.
+cycle_until() {  # <home> <extended-regex> [absent]
+  local h=$1 want=$2 absent=${3:-} n=0
+  while [ "$n" -lt "${CYCLE_TRIES:-8}" ]; do
+    n=$((n + 1))
+    cycle "$h" "$absent"
+    grep -qE "$want" "$h/events" && return 0
+  done
+  return 0
+}
+
+# Wait for one owned watcher cycle: return its exit status when it reports a
+# wake, or 124 after stopping it once <scans> complete scans have stamped the
+# beacon or <limit> polls passed without them.
+wait_for_scan() {  # <pid> <state> <mark> <scans> <limit>
+  local pid=$1 state=$2 mark=$3 want=${4:-4} limit=${5:-600} i=0 seen=0
+  while [ "$i" -lt "$limit" ]; do
+    is_live_non_zombie "$pid" || break
+    if [ "$state/.last-watcher-beat" -nt "$mark" ]; then
+      seen=$((seen + 1))
+      [ "$seen" -lt "$want" ] || break
+      # Restamp the mark from the beacon so only a later scan counts again.
+      mark="$mark.$seen"
+      cp -p "$state/.last-watcher-beat" "$mark" 2>/dev/null || touch "$mark"
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if is_live_non_zombie "$pid"; then
+    kill -TERM "$pid" 2>/dev/null || true
+    i=0
+    while [ "$i" -lt 20 ] && is_live_non_zombie "$pid"; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+    if is_live_non_zombie "$pid"; then
+      printf 'wait_for_scan: owned pid %s survived TERM; sending KILL\n' "$pid" >&2
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+    return 124
+  fi
+  wait "$pid"
+}
+
+# Make every terminal read in <home> cost <secs> of wall clock, the way a loaded
+# CI runner's does, so a scan takes longer than any fixed cycle delay.
+slow_panes() {  # <home> <secs>
+  local t="$1/fakebin/tmux"
+  mv "$t" "$t.real"
+  # shellcheck disable=SC2016 # the wrapper expands its own arguments when run
+  printf '#!/usr/bin/env bash\nsleep %s\nexec "$(dirname "$0")/tmux.real" "$@"\n' "$2" > "$t"
+  chmod +x "$t"
 }
 
 lead_meta() {  # <home> <id> <pane> <lead-home> [harness]
@@ -318,8 +384,10 @@ test_worker_dead_prompt_and_question_differ() {
   touch -d '-10 minutes' "$m/state/.wait-sources/wd.prompt"
   PANES='1 2' cycle "$m"
   grep -q '^stale: fake:1 (permission prompt' "$m/events" || fail "a worker on a prompt did not wake Main at first sight"
+  # The prompt on pane 1 is still an open wait at Main's rung, and a cycle stops
+  # at its first wake, so the question's own rung is reached on a later scan.
   backdate "$m" wq 10
-  PANES='1 2' cycle "$m"
+  PANES='1 2' cycle_until "$m" 'waiting-state wq \(needs-decision key=q, .*level=owner'
   grep -q 'check: waiting-state wq (needs-decision key=q, .*level=owner' "$m/events" || fail "an open question did not reach its owner: $(cat "$m/events")"
   PANES='1 2' cycle "$m"
   ! grep -q 'waiting-state wd ' "$m/events" || fail "a dead worker's lapsed prompt rode the chain"
@@ -708,6 +776,26 @@ TABLE
   pass "the stuck-cause matcher reads a question, a quota wall, a repeated provider error, or nothing for each harness rendering"
 }
 
+# A loaded runner reads its panes slower than any fixed cycle delay allows, so a
+# cycle must be bounded by its own scan. The wake is found on the last pane read,
+# which is where a fixed four-second budget used to kill the cycle before it
+# could report anything.
+test_a_slow_scan_reports_the_wake_it_found() {
+  local m n
+  m=$(home slow-scan)
+  for n in 1 2 3; do
+    printf 'kind=ship\nbackend=tmux\nwindow=fake:%s\nharness=claude\n' "$n" > "$m/state/w$n.meta"
+    : > "$m/state/w$n.status"
+    prime_status_seen "$m/state" "$m/state/w$n.status"
+  done
+  printf '%s\n' "$TRUST" > "$m/panes/3"
+  slow_panes "$m" 2.5
+  PANES='1 2 3' cycle "$m"
+  grep -q '^stale: fake:3 (permission prompt' "$m/events" \
+    || fail "a wake found on the last pane of a slow scan was lost: $(cat "$m/events")"
+  pass "a cycle waits for the scan that finds its wake, however slow the runner is"
+}
+
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
   local m kind want pane
   for kind in question quota errors; do
@@ -828,6 +916,9 @@ test_memory_refused_launch_reraises_when_admission_clears() {
 
 test_lead_idle_is_steered_without_interrupt
 test_stuck_verdict_table
+# A cycle is bounded by the scan, not by a fixed delay: the wake found on the
+# last pane of a slow scan still reaches the queue.
+test_a_slow_scan_reports_the_wake_it_found
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says
 test_silent_worker_climbs_whatever_it_declared
 test_busy_lead_is_interrupted_first
