@@ -140,9 +140,64 @@ test_arm_registers_a_check_the_watcher_trusts() {
   pass "arm writes a check the watcher accepts; disarm removes it"
 }
 
+test_a_store_response_wakes_its_owner_without_any_board_entry() {
+  local d out
+  d=$(setup store)
+  # A comment on a card is not a decision answer, so it is not in the answers
+  # file at all. It reaches the owner through the store row alone.
+  run "$d" "$ROOT/bin/jg-chat.sh" respond --act comment --on "$KEY" --owner muxr \
+    --subject "the chat backend" muxr "the parser needs a guard" >/dev/null ||
+    fail "the store refused the response"
+  out=$(run "$d" "$BA" check)
+  [ -f "$d/home/state/muxr.inbox/001.msg" ] || fail "a store response did not wake its owner: $out"
+  assert_contains "$(cat "$d/home/state/muxr.inbox/001.msg")" "the captain commented" "the wake line is wrong"
+  assert_equals read "$(run "$d" "$ROOT/bin/jg-chat.sh" log --view message |
+    jq -r -s '.[] | select(.on == "'"$KEY"'") | .status')" \
+    "delivering the response did not move its row to read"
+  out=$(run "$d" "$BA" check)
+  [ -z "$out" ] || fail "a delivered store response was reported twice: $out"
+  [ ! -f "$d/home/state/muxr.inbox/002.msg" ] || fail "a delivered store response woke its owner twice"
+  pass "a response recorded in the store wakes its owner once, with no board entry behind it"
+}
+
+test_one_wake_moves_only_its_own_store_row() {
+  local d
+  d=$(setup rows)
+  run "$d" "$ROOT/bin/jg-chat.sh" respond --act approve --on "$KEY" muxr "yes" >/dev/null
+  run "$d" "$ROOT/bin/jg-chat.sh" respond --act refine --on "${KEY}-two" --subject "second" muxr "tighter" >/dev/null
+  # A lead this home cannot reach keeps its own row waiting while the first one moves.
+  run "$d" "$ROOT/bin/jg-chat.sh" respond --act answer --on ghost-card ghost-lead "hello" >/dev/null
+  run "$d" "$BA" check >/dev/null
+  assert_equals "read read sent" "$(run "$d" "$ROOT/bin/jg-chat.sh" log --view message |
+    jq -r -s '[.[] | select(.from == "captain")] | sort_by(.at) | map(.status) | join(" ")')" \
+    "one delivery moved another agent's waiting row"
+  pass "each wake moves only its own store row; an unreachable owner keeps its row waiting"
+}
+
+test_a_moved_board_says_so_once_instead_of_going_quiet() {
+  local d out
+  d=$(setup moved)
+  rm -f "$d/so/.sign-off/decisions.json"
+  out=$(run "$d" "$BA" check)
+  case "$out" in
+    *"board answers cannot be read"*) : ;;
+    *) fail "a missing board went quiet instead of reporting: $out" ;;
+  esac
+  out=$(run "$d" "$BA" check)
+  [ -z "$out" ] || fail "a missing board was reported on every pass: $out"
+  # And a store response still wakes its owner while the board is unreadable.
+  run "$d" "$ROOT/bin/jg-chat.sh" respond --act comment --on card-x muxr "still works" >/dev/null
+  out=$(run "$d" "$BA" check)
+  [ -f "$d/home/state/muxr.inbox/001.msg" ] || fail "a missing board silenced a store response too: $out"
+  pass "a moved board reports once and never silences a response the store already holds"
+}
+
 test_routed_answer_reaches_the_lead_and_closes_its_decision
 test_card_archives_after_the_lead_acknowledges
 test_unrouted_answer_wakes_main_with_the_answer_first
 test_failed_delivery_is_retried_and_reported_once
 test_question_card_route_records_the_owner
 test_arm_registers_a_check_the_watcher_trusts
+test_a_store_response_wakes_its_owner_without_any_board_entry
+test_one_wake_moves_only_its_own_store_row
+test_a_moved_board_says_so_once_instead_of_going_quiet

@@ -10,6 +10,8 @@
 #                                   record a response, deliver nothing
 #   jg-chat.sh read <lead-id|task-id|thread|->      print unread, then mark read
 #   jg-chat.sh mark <working|done> <lead-id|task-id|thread|->
+#   jg-chat.sh mark-row <thread> <at> <read|working|replied|done>
+#                                                  move ONE message, by its time
 #   jg-chat.sh reply <lead-id|task-id|thread|-> <text...>
 #   jg-chat.sh log [<thread>] [--json] [--view message]
 #                                                  the reader; --view message is
@@ -179,6 +181,28 @@ chat_append() { # <thread> <from|-> <to|-> <kind> <status|-> <text> [<extra-json
 
 # Move a thread's captain rows from the states that precede <state>, stamping
 # the new state and, when replying, the epoch of the answering row.
+# Move one message, named by the thread it is in and the time it was recorded.
+# A delivery path that wakes one response at a time moves only that one, so two
+# pending responses in the same agent's thread are never both marked by one wake.
+chat_mark_row() { # <thread> <at> <read|working|replied|done>
+  local thread=$1 at=$2 new=$3 now tmp rc=0
+  case "$new" in read | working | replied | done) ;; *) printf 'jg-chat: cannot move a status to %s\n' "$new" >&2; return 1 ;; esac
+  [ -f "$STORE" ] || return 0
+  now=$(date +%s)
+  jg_lock_acquire_wait "$LOCK" || return 1
+  tmp=$(mktemp "${STORE}.XXXXXX") || { jg_lock_release "$LOCK"; return 1; }
+  jq -c --arg thread "$thread" --argjson at "$at" --arg new "$new" --argjson now "$now" '
+    if .thread == $thread and .at == $at and .status != null
+    then .status = $new | .status_at = ((.status_at // {}) + {($new): $now})
+    else . end' "$STORE" > "$tmp" || rc=1
+  if [ "$rc" -eq 0 ]; then
+    mv -f "$tmp" "$STORE" || rc=1
+  fi
+  [ "$rc" -eq 0 ] || rm -f -- "$tmp"
+  jg_lock_release "$LOCK"
+  return "$rc"
+}
+
 chat_mark() { # <thread> <read|working|replied|done> [<reply-epoch>]
   local thread=$1 new=$2 reply=${3:-} from now tmp rc=0
   case "$new" in
@@ -406,6 +430,11 @@ case "$verb" in
   mark)
     [ $# -eq 2 ] || usage
     chat_mark "$(chat_thread "$2")" "$1" || die "cannot move the status to $1"
+    ;;
+  mark-row)
+    [ $# -eq 3 ] || usage
+    case "$2" in '' | *[!0-9]*) die 'mark-row takes the time the message was recorded' ;; esac
+    chat_mark_row "$1" "$2" "$3" || die "cannot move the status to $3"
     ;;
   reply)
     [ $# -ge 2 ] || usage

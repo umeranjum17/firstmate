@@ -10,8 +10,19 @@
 # route  Record that <lead> (a task id in this home) owns the card; written by
 #        `jg-question-card.sh post --route <lead> [--decision-key <slug>]`. The
 #        decision key defaults to the card key.
-# check  One deterministic pass, no model. Read the board's answers through
-#        sign-off-axi, then for each:
+# check  One deterministic pass, no model. Two sources, in this order.
+#
+#        STORE FIRST. Every captain response recorded through
+#        bin/jg-chat.sh respond - the page's path - is a row in
+#        state/chat.jsonl carrying the element it is on, the response text and
+#        the agent assigned to answer it. A row still `sent` wakes that agent
+#        itself and moves to `read` on delivery, so no board path can silence a
+#        wake and the owner's own `reply` moves it on to `replied`. This is why
+#        the check watches the store, never one answers file.
+#
+#        BOARD SECOND, the transitional ingest for decisions raised through
+#        jg-question-card: read the board's answers through sign-off-axi, then
+#        for each:
 #          ROUTED: send the lead one marked answer line (card key, answer, time,
 #            card link) with bin/jg-send.sh, closing the lead's open decision
 #            key with --resolve-key (a squad_lead with no open key gets a
@@ -24,8 +35,11 @@
 #            board at the first pass are recorded, not reported.
 # arm    Write state/board-answers.check.sh, bind it with jg-check-register.sh,
 #        and run one pass. disarm removes the shim and its trust binding.
-# State: state/board-routes/<card-key>, state/.board-answers-seen. Unrouted keys
-# starting `jg-` belong to the captain-hold card adapter and are skipped.
+#        A board that cannot be read while the check is armed says so once, by
+#        naming the path it resolved, instead of returning quietly: a moved board
+#        is a reporting failure, not a quiet home.
+# State: state/board-routes/<card-key>, state/.board-answers-seen,
+#        state/.board-answers-unreadable (the last read failure already reported).
 set -u
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +47,10 @@ JG_HOME="${JG_HOME:-${JG_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
 STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 ROUTES="$STATE/board-routes"
 SEEN="$STATE/.board-answers-seen"
+BOARD_UNREADABLE="$STATE/.board-answers-unreadable"
 SHIM="$STATE/board-answers.check.sh"
+CHAT="$SCRIPT_DIR/jg-chat.sh"
+STORE="$STATE/chat.jsonl"
 # shellcheck source=bin/jg-compat.sh
 . "$SCRIPT_DIR/jg-compat.sh"
 # shellcheck source=bin/jg-question-lib.sh
@@ -67,11 +84,68 @@ deliver() {  # <key> <lead> <decision> <text> <delivery-id>; 0 = recorded in the
   JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-send.sh" "$lead" ${args[@]+"${args[@]}"} "$text" 2>&1
 }
 
+# One line per distinct condition, so a check pass does not repeat itself.
+board_note() { # <signature> <line>
+  local sig=$1 prev
+  prev=$(cat "$BOARD_UNREADABLE" 2>/dev/null)
+  [ "$prev" = "$sig" ] && return 0
+  mkdir -p "${BOARD_UNREADABLE%/*}" 2>/dev/null && printf '%s\n' "$sig" > "$BOARD_UNREADABLE"
+  say "$2"
+}
+
+board_readable() { rm -f -- "$BOARD_UNREADABLE" 2>/dev/null || true; }
+
+# The store is the source of truth for a response: a captain row that
+# is still `sent` wakes the agent it names, from the row, and moves to `read` on
+# delivery. The agent's own answer moves it on to `replied` (bin/jg-chat.sh).
+store_pass() {
+  local thread to at text on act owner link lead dk id msg out once='' report=''
+  [ -f "$STORE" ] || return 0
+  while IFS=$(printf '\t') read -r thread to at text on act owner link; do
+    [ -n "$on" ] || continue
+    lead=$(rget "$on" lead)
+    [ -n "$lead" ] || lead=$to
+    key_ok "$lead" || continue
+    [ -f "$STATE/$lead.meta" ] || continue
+    dk=$(rget "$on" decision)
+    id=$(printf '%s' "$on|$at" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-16)
+    msg="board-response [act=$act key=$on at=$at]: the captain ${act}ed \"$text\"${owner:+ (owner $owner)}${link:+ | $link}. Move this record to handled/ to acknowledge; no other reply is owed."
+    if out=$(deliver "$on" "$lead" "$dk" "$msg" "$id"); then
+      "$CHAT" mark-row "$thread" "$at" read >/dev/null 2>&1 ||
+        report="${report}$(say "the response on $on reached $lead but the store row could not be marked read")"$'\n'
+      report="${report}$(say "info: captain $act on $on went to $lead; nothing for Main to do")"$'\n'
+    elif [ "$(rget "$on" failed)" != "$at" ]; then
+      rput "$on" failed "$at"
+      report="${report}$(say "captain $act on $on could not reach $lead (retrying each pass): ${out//$'\n'/ }")"$'\n'
+    fi
+    once=1
+  done < <(JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$CHAT" log --view message 2>/dev/null |
+    jq -r 'select(.from == "captain" and .on != null and .status == "sent")
+      | [.thread, .to, (.at | tostring), .text, .on, .kind, (.owner // ""), (.link // "")] | map(tostring | gsub("[\n\r\t]"; " ")) | join("\u001f")' 2>/dev/null |
+    tr '\037' '\t')
+  [ -n "$once" ] || return 0
+  printf '%s' "$report"
+}
+
 cmd_check() {
   local json board key answer label note at lead dk link text id out first=0 report=''
-  jg_question_signoff_available || { say "board answers cannot be read: sign-off-axi is not on PATH"; return 0; }
+  local store_report
+  store_report=$(store_pass)
+  [ -z "$store_report" ] || printf '%s' "$store_report"
+  if ! jg_question_signoff_available; then
+    board_note no-tool "board answers cannot be read: sign-off-axi is not on PATH, so a board response recorded outside the store wakes nobody"
+    return 0
+  fi
   board=$(jg_question_board)
-  json=$(sign-off-axi answers ${board:+"$board"} --json 2>/dev/null) || { say "board answers cannot be read: sign-off-axi answers failed"; return 0; }
+  if [ -z "$board" ] || [ ! -f "$board" ]; then
+    board_note "no-board:${board:--}" "board answers cannot be read: no board at '${board:-<none>}', so a board response recorded outside the store wakes nobody"
+    return 0
+  fi
+  json=$(sign-off-axi answers "$board" --json 2>/dev/null) || {
+    board_note "read-failed:$board" "board answers cannot be read from '$board': sign-off-axi answers failed"
+    return 0
+  }
+  board_readable
   [ -f "$SEEN" ] || { first=1; : > "$SEEN"; }
   mkdir -p "$ROUTES"
   while IFS=$'\037' read -r key at answer label note; do
