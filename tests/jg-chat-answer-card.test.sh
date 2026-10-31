@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/jg-chat-answer-card.test.sh - a captain's chat answer is recorded on its board
-# card (jg-question-card.sh answer) and a turn that ends with the card still waiting
-# is flagged by the turn-end guard, in Main and lead homes alike. No model call.
+# card (jg-question-card.sh answer), and the turn-end guard prints no block for it, in
+# Main and lead homes alike. No model call.
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -90,32 +90,27 @@ test_answer_reaches_a_routed_lead_and_does_not_wake_main_for_an_unrouted_one() {
   pass "a chat answer is carried to the owning lead and does not wake Main for an unrouted card"
 }
 
-test_guard_flags_a_chat_answer_while_the_card_waits() {
+test_guard_prints_no_block_for_a_chat_answer() {
   local d t out status
   d=$(setup guard-main)
   t=$(transcript "$d")
   out=$(run_guard "$d" "$t"); status=$?
-  expect_code 2 "$status" "the guard let a turn end with the answered card still waiting"
-  assert_contains "$out" "HE ANSWERED IN CHAT" "the banner is missing"
-  assert_contains "$out" "jg-question-card.sh answer $KEY" "the banner names no path to the card"
+  expect_code 0 "$status" "the guard printed a block for a chat answer: $out"
+  assert_not_contains "$out" "HE ANSWERED IN CHAT" "the chat-answer banner is still printed"
   out=$(run_guard "$d" "$t"); status=$?
-  expect_code 0 "$status" "the same answer was flagged twice and would wedge the turn"
-  run_card "$d" answer "$KEY" --words "$WORDS" > /dev/null
-  rm -f "$d/state/.chat-answer-flagged"
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 0 "$status" "the guard flagged a card that is already answered"
-  pass "jg-turnend-guard: flags a turn ending after a chat answer while its card waits, once, and is silent once answered"
+  expect_code 0 "$status" "the second turn end was blocked: $out"
+  pass "jg-turnend-guard: a turn ending after a chat answer prints no block"
 }
 
-test_guard_flags_a_lead_home() {
+test_guard_prints_no_block_in_a_lead_home() {
   local d t out status
   d=$(setup guard-lead)
   printf 'sm-test-1\n' > "$d/.jg-squad-lead-home"
   t=$(transcript "$d")
   out=$(run_guard "$d" "$t"); status=$?
-  expect_code 2 "$status" "the guard skipped a lead home"
-  assert_contains "$out" "HE ANSWERED IN CHAT" "the lead home banner is missing"
-  pass "jg-turnend-guard: the chat-answer flag covers a lead home"
+  expect_code 0 "$status" "the guard printed a block in a lead home: $out"
+  assert_not_contains "$out" "HE ANSWERED IN CHAT" "the lead home banner is still printed"
+  pass "jg-turnend-guard: a lead home prints no block for a chat answer"
 }
 
 test_guard_ignores_a_card_he_was_never_asked() {
@@ -133,6 +128,6 @@ test_guard_ignores_a_card_he_was_never_asked() {
 
 test_answer_records_his_words_on_the_card
 test_answer_reaches_a_routed_lead_and_does_not_wake_main_for_an_unrouted_one
-test_guard_flags_a_chat_answer_while_the_card_waits
-test_guard_flags_a_lead_home
+test_guard_prints_no_block_for_a_chat_answer
+test_guard_prints_no_block_in_a_lead_home
 test_guard_ignores_a_card_he_was_never_asked
