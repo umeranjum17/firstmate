@@ -8,6 +8,7 @@ set -u
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 T=$(jg_test_tmproot proof-gate)
 mkdir -p "$T/bin" "$T/home/config" "$T/home/data/t1" "$T/home/state"
+# shellcheck disable=SC2016 # the stub script is meant to read its own arguments
 printf '#!/usr/bin/env bash\ncase "$1" in list) echo "{\\"decisions\\":[]}" ;; post) exit 0 ;; esac\n' > "$T/bin/sign-off-axi"
 chmod +x "$T/bin/sign-off-axi"
 H=$T/home
