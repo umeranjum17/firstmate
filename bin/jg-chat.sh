@@ -10,7 +10,7 @@
 #                                   record a response, deliver nothing
 #   jg-chat.sh read <lead-id|task-id|thread|->      print unread, then mark read
 #   jg-chat.sh mark <working|done> <lead-id|task-id|thread|->
-#   jg-chat.sh mark-row <thread> <at> <read|working|replied|done>
+#   jg-chat.sh mark-row <id|thread> <at> <read|working|replied|done>
 #                                                  move ONE message, by its time
 #   jg-chat.sh reply <lead-id|task-id|thread|-> <text...>
 #   jg-chat.sh log [<thread>] [--json] [--view message]
@@ -434,7 +434,7 @@ case "$verb" in
   mark-row)
     [ $# -eq 3 ] || usage
     case "$2" in '' | *[!0-9]*) die 'mark-row takes the time the message was recorded' ;; esac
-    chat_mark_row "$1" "$2" "$3" || die "cannot move the status to $3"
+    chat_mark_row "$(chat_thread "$1")" "$2" "$3" || die "cannot move the status to $3"
     ;;
   reply)
     [ $# -ge 2 ] || usage

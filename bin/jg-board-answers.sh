@@ -152,6 +152,23 @@ cmd_check() {
     key_ok "$key" && [ -n "$at" ] && [ -n "$answer" ] || continue
     link=$(JG_HOME="$JG_HOME" jg_board_link answered "$key" 2>/dev/null)
     lead=$(rget "$key" lead)
+    # The store holds the whole conversation, so a reader never has to read the
+    # board to know what the captain said. Delivery still belongs to this pass
+    # until the flip that moves it onto the store row; a row recorded here is
+    # therefore marked read at once, so the store pass does not send it twice.
+    if [ "$(rget "$key" ingested)" != "$at" ]; then
+      ep=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$at" +%s 2>/dev/null ||
+        date -u -d "$at" +%s 2>/dev/null) || ep=''
+      case "$ep" in '' | *[!0-9]*) ;; *)
+        if JG_CHAT_AT=$ep "$CHAT" respond --act answer --on "$key" ${link:+--link "$link"} \
+          ${lead:+--owner "$lead"} "${lead:--}" "$answer${label:+ ($label)}${note:+ - $note}" \
+          >/dev/null 2>&1; then
+          rput "$key" ingested "$at"
+          "$CHAT" mark-row "${lead:--}" "$ep" read >/dev/null 2>&1 || true
+        fi
+        ;;
+      esac
+    fi
     if [ -z "$lead" ]; then
       case "$key" in jg-*) continue ;; esac
       grep -qxF "$key"$'\t'"$at" "$SEEN" && continue

@@ -59,10 +59,21 @@ test_routed_answer_reaches_the_lead_and_closes_its_decision() {
   assert_contains "$(cat "$rec")" "board-answer [key=$KEY at=$AT]: the captain answered \"yes\"" "the marked answer line is wrong"
   assert_grep "resolved [key=$KEY]" "$d/home/state/muxr.status" "the lead decision key stayed open"
   assert_equals "info: board answer \"yes\" on $KEY went to muxr; nothing for Main to do" "$out" "Main did not get exactly one info line"
+  # The answer is also one event in the chat store, so a reader never has to read
+  # the board to know what the captain said.
+  assert_equals 1 "$(run "$d" "$ROOT/bin/jg-chat.sh" log --view message |
+    jq -r -s '[.[] | select(.on == "'"$KEY"'" and .kind == "answer")] | length')" \
+    "the board answer is not exactly one event in the store"
+  assert_equals read "$(run "$d" "$ROOT/bin/jg-chat.sh" log --view message |
+    jq -r -s '.[] | select(.on == "'"$KEY"'") | .status')" \
+    "the recorded answer was left waiting for a second delivery"
   out=$(run "$d" "$BA" check)
   [ -z "$out" ] || fail "a second pass repeated the delivery: $out"
   [ ! -f "$d/home/state/muxr.inbox/002.msg" ] || fail "a second pass wrote a second record"
-  pass "a routed answer lands in the lead's inbox, closes its decision key, and tells Main only by info"
+  assert_equals 1 "$(run "$d" "$ROOT/bin/jg-chat.sh" log --view message |
+    jq -r -s '[.[] | select(.on == "'"$KEY"'")] | length')" \
+    "a second pass recorded the answer twice"
+  pass "a routed answer lands in the lead's inbox, closes its decision key, tells Main only by info, and is one store event"
 }
 
 test_card_archives_after_the_lead_acknowledges() {
