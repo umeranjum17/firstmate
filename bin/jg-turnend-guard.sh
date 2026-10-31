@@ -172,8 +172,6 @@ trap record_parent_stop_state EXIT
 . "$SCRIPT_DIR/jg-primary-scope-lib.sh"
 # shellcheck source=bin/jg-hook-host-lib.sh
 . "$SCRIPT_DIR/jg-hook-host-lib.sh"
-# shellcheck source=bin/jg-question-lib.sh
-. "$SCRIPT_DIR/jg-question-lib.sh"
 
 # Read the whole turn-end hook payload once; never block on unreadable/absent
 # stdin.
@@ -220,63 +218,6 @@ fi
 # checkout has the two equal. Child worktrees never carry the gitignored marker,
 # so this exempts them while guarding every real squad_lead home.
 jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
-
-# --- the question rule ------------------------------------------------------
-# The owner's rule (data/owner-rules.md): "if you ask questions as well make
-# sure they are posted, posting questions will be stricter way of working", so a
-# reply that ends in a question while no open board card is cited is flagged at
-# this boundary. It is charged once per distinct trailing question (the record
-# in $STATE/.question-flagged), which keeps every harness bounded: the second
-# sighting of the same question, and every reply after it, ends normally.
-question_block() {  # <the trailing line>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  REPLY ENDS IN A QUESTION THAT IS NOT ON THE BOARD\n'
-    printf '●  He answers on the board, so a question asked only in chat is a violation.\n'
-    printf '●  Post the card first, then cite the key it prints:\n'
-    printf '●    %s/jg-question-card.sh post --ask-ref <ref> --title "<one question>" --why "<why now>" --outcome yes="<what happens next>" --outcome no="<what happens instead>" --recommend yes --default no\n' "$SCRIPT_DIR"
-    printf '●  Trailing line: %s\n' "$1"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
-}
-
-QUESTION_TEXT=$(jg_question_reply_text "$PAYLOAD")
-if [ -n "$QUESTION_TEXT" ] && jg_question_asks "$QUESTION_TEXT" \
-  && ! jg_question_filed "$QUESTION_TEXT" \
-  && jg_question_first_sighting "$STATE" "$QUESTION_TEXT"; then
-  question_block "$(jg_question_tail "$QUESTION_TEXT")"
-fi
-
-# --- the chat-answer rule ---------------------------------------------------
-# The opposite case: the captain answered a posted question in chat ("if I
-# answer you directly here you should reconcile the decisions instead of keep
-# stale data"). A turn that ends while that card still waits is flagged, once per
-# distinct answer, and the banner names the deterministic path that records his
-# words on the card. Main and lead homes pass this guard alike.
-chat_answer_block() {  # <keys, one per line> <his words>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  HE ANSWERED IN CHAT, BUT THE BOARD CARD IS STILL WAITING
-'
-    printf '●  Record his words on the card in the same turn, or the board keeps stale data:
-'
-    printf '%s\n' "$1" | while IFS= read -r key; do
-      printf '●    %s/jg-question-card.sh answer %s --words "<his exact words>"\n' "$SCRIPT_DIR" "$key"
-    done
-    printf '●  His words: %s\n' "${2:0:200}"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
-}
-
-CHAT_KEYS=$(jg_question_chat_answered_keys "$PAYLOAD")
-if [ -n "$CHAT_KEYS" ]; then
-  CHAT_WORDS=$(jg_question_chat_words "$PAYLOAD")
-  if jg_question_first_sighting "$STATE" "$(printf '%s|%s' "$CHAT_KEYS" "$CHAT_WORDS" | tr '\n' ' ')" .chat-answer-flagged; then
-    chat_answer_block "$CHAT_KEYS" "$CHAT_WORDS"
-  fi
-fi
 
 # --- the Overwatch KPI rule -------------------------------------------------
 # Every captain message is tagged in the turn it arrives; bin/jg-overwatch-kpi.sh

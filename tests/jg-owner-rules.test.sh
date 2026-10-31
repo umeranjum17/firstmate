@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavioral regressions for the shared owner-rules surface (data/owner-rules.md),
-# its audit for quotes trapped in a private note, and the question rule at the
-# turn boundary (a captain-facing question must cite an open board card).
+# its audit for quotes trapped in a private note, and the turn boundary printing
+# no block for a question while the card path still posts its key.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -130,7 +130,7 @@ reply_payload() {  # <dir> <reply text>
   printf '{"session_id":"s","transcript_path":"%s/reply.jsonl"}' "$1"
 }
 
-test_question_rule_blocks_until_a_card_is_cited() {
+test_turn_boundary_prints_no_block_for_a_question() {
   local home payload board rc
   home="$TMP_ROOT/question"
   board="$TMP_ROOT/question-board"
@@ -140,22 +140,18 @@ test_question_rule_blocks_until_a_card_is_cited() {
   payload=$(reply_payload "$home" "The blocker cleared and the fix is in. Should I merge it?")
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 2 "$rc" "a reply ending in an unfiled question ended the turn unflagged"
-
-  printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
-    SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 0 "$rc" "the same question was charged twice, which can wedge a harness"
+  assert_equals 0 "$rc" "a reply ending in an unfiled question was blocked at the turn boundary"
 
   payload=$(reply_payload "$home" "Merged and cleaned up. Nothing outstanding.")
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 0 "$rc" "a reply that asks nothing was flagged"
+  assert_equals 0 "$rc" "a reply that asks nothing was blocked"
 
   command -v sign-off-axi >/dev/null 2>&1 || {
-    pass "the question rule blocks an unfiled question once, then clears (board half skipped: no sign-off-axi)"
+    pass "the turn boundary prints no block for a question (card half skipped: no sign-off-axi)"
     return 0
   }
-  local key
+  local key again
   key=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 --must design-pick \
     --title "Should the fix merge now?" --why "The fix is green and in scope." \
     --outcome yes="It merges once the captain says so." --outcome no="It waits for his review." \
@@ -165,18 +161,17 @@ test_question_rule_blocks_until_a_card_is_cited() {
   payload=$(reply_payload "$home" "The fix is green. Card $key on the board covers it - your call there.")
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 0 "$rc" "a reply citing an open board card was still flagged"
+  assert_equals 0 "$rc" "a reply citing an open board card was blocked"
 
-  local again
   again=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 --must design-pick \
     --title "Should the fix merge now?" --why "The fix is green and in scope." \
     --outcome yes="It merges once the captain says so." --outcome no="It waits for his review." \
     --recommend yes --recommend-reason "His word is the merge call." --default no 2>/dev/null)
   assert_equals "$key" "$again" "re-posting the same open question did not return the existing key"
-  pass "an unfiled question is flagged once, and a cited open card clears it"
+  pass "the turn boundary prints no block for a question, and the card key still posts once"
 }
 
 test_add_refuses_an_entry_it_cannot_enforce
 test_seeded_surface_and_added_entry
 test_audit_flags_a_correction_left_in_a_private_note
-test_question_rule_blocks_until_a_card_is_cited
+test_turn_boundary_prints_no_block_for_a_question
