@@ -76,12 +76,11 @@ SH
 # While Main is absent the next cycle is the successor the arm path starts
 # over its unread wakes, which keeps supervising instead of re-announcing them.
 #
-# A cycle is bounded by the watcher's own work, not by a fixed delay: it ends
-# when the watcher exits on the wake it reported, or after the four scans the old
-# four-second budget covered on an idle runner (a quiet cycle can never report a
-# wake, and the watcher stamps its liveness beacon after each complete scan).
-# A loaded runner then waits for the scans it started instead of being cut short
-# inside one of them and losing the wake that scan was about to report.
+# A cycle keeps the four-second budget it always had, minus its one hard edge: it
+# never stops inside a scan. A scan that overruns the budget (a loaded runner) is
+# allowed to finish, so the wake it was about to report is not lost with it. The
+# watcher stamps its liveness beacon after each complete scan, so the wait ends at
+# a scan boundary instead of in the middle of one.
 cycle() {  # <home> [absent]
   local h=$1 rc=0 seq gen pid successor=0 mark
   [ "${2:-}" != absent ] || successor=1
@@ -95,7 +94,7 @@ cycle() {  # <home> [absent]
     JG_READY_STALL_POLL_SECS=0 JG_GREEN_PR_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
-  wait_for_scan "$pid" "$h/state" "$mark" "${CYCLE_SCANS:-4}" "${CYCLE_POLLS:-600}" || rc=$?
+  wait_for_scan "$pid" "$h/state" "$mark" "${CYCLE_POLLS:-40}" "${CYCLE_POLLS_MAX:-600}" || rc=$?
   case "$rc" in 0|124) ;; *) fail "watcher failed ($rc): $(cat "$h/err")" ;; esac
   cat "$h/out" >> "$h/events"
   [ "${2:-}" != absent ] || return 0
@@ -118,19 +117,16 @@ cycle_until() {  # <home> <extended-regex> [absent]
   return 0
 }
 
-# Wait for one owned watcher cycle: return its exit status when it reports a
-# wake, or 124 after stopping it once <scans> complete scans have stamped the
-# beacon or <limit> polls passed without them.
-wait_for_scan() {  # <pid> <state> <mark> <scans> <limit>
-  local pid=$1 state=$2 mark=$3 want=${4:-4} limit=${5:-600} i=0 seen=0
+# Wait for one owned watcher cycle. Return its exit status when the watcher
+# reports a wake. Otherwise stop it after <budget> hundred-millisecond polls, or
+# after <limit> polls when a scan that was already running crossed that budget:
+# that scan finishes and the cycle ends on its beacon, not inside it.
+wait_for_scan() {  # <pid> <state> <mark> <budget> <limit>
+  local pid=$1 state=$2 mark=$3 budget=${4:-40} limit=${5:-600} i=0
   while [ "$i" -lt "$limit" ]; do
     is_live_non_zombie "$pid" || break
-    if [ "$state/.last-watcher-beat" -nt "$mark" ]; then
-      seen=$((seen + 1))
-      [ "$seen" -lt "$want" ] || break
-      # Restamp the mark from the beacon so only a later scan counts again.
-      mark="$mark.$seen"
-      cp -p "$state/.last-watcher-beat" "$mark" 2>/dev/null || touch "$mark"
+    if [ "$i" -ge "$budget" ] && [ "$state/.last-watcher-beat" -nt "$mark" ]; then
+      break
     fi
     sleep 0.1
     i=$((i + 1))
@@ -138,7 +134,9 @@ wait_for_scan() {  # <pid> <state> <mark> <scans> <limit>
   if is_live_non_zombie "$pid"; then
     kill -TERM "$pid" 2>/dev/null || true
     i=0
-    while [ "$i" -lt 20 ] && is_live_non_zombie "$pid"; do
+    # A loaded runner takes a moment to run the watcher's own exit trap, and a
+    # KILL there leaves the next cycle on a lock nothing released.
+    while [ "$i" -lt 50 ] && is_live_non_zombie "$pid"; do
       sleep 0.1
       i=$((i + 1))
     done
@@ -300,15 +298,22 @@ test_lead_stuck_on_a_prompt_reaches_the_board() {
   PANES=1 cycle "$m"
   grep -q 'check: waiting-state lead1 (prompt, .*level=main' "$m/events" || fail "the lead's prompt did not reach Main's rung: $(cat "$m/events")"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card .*--title Unblock stuck lead? .*--guard security' "$m/cards" \
-    || fail "the lead's prompt did not become a guarded board card: $(cat "$m/cards" 2>&1)"
+  # A stuck worker is Main's to unblock, never a card for the captain
+  # (bin/jg-ask-gate-lib.sh rule 2): the chain records the ask for Main instead.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "a stuck lead's prompt reached the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the lead's prompt was neither a card nor recorded for Main: $(cat "$m/data/overwatch-decisions.md" 2>&1)"
   [ "$(grep -c "stale: fake:1 (permission prompt" "$m/events")" -eq 1 ] || fail "the gate re-alerted instead of the chain"
   printf 'all quiet\n> \n' > "$m/panes/1"
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q '^dismiss waiting-timer-.*-lead1-.*-prompt-card' "$m/cards" || fail "the card stayed after the prompt was answered"
+  [ ! -s "$m/cards" ] || ! grep -q '^raise ' "$m/cards" \
+    || fail "a card was raised for a stuck lead: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded prompt wait disappeared when the prompt was answered"
   [ ! -e "$m/state/.waiting-timers/lead1" ] || fail "the episode outlived the prompt"
-  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, then a board card that closes when it clears"
+  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, is recorded for Main's decision, and clears when it is answered"
 }
 
 test_dead_lead_still_reaches_the_board_and_relaunch_represents() {
@@ -405,12 +410,15 @@ test_two_hops_stuck_at_once() {
   backdate "$m" lead1 10
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" || fail "the stuck lead got no card: $(cat "$m/cards" 2>&1)"
+  # Neither hop is the captain's card: a stuck worker and a stuck lead are
+  # Main's to unblock, so both are recorded for Main's decision.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "the stuck lead reached the captain's board: $(cat "$m/cards" 2>&1)"
   ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
     || fail "its stuck worker's question reached the captain's board: $(cat "$m/cards" 2>&1)"
   grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
     || fail "its stuck worker's wait was not recorded for Main to decide"
-  pass "a lead stuck on a prompt reaches the board, and its worker's question goes to Main"
+  pass "a lead stuck on a prompt and its stuck worker both reach Main's decision, and neither reaches the captain's board"
 }
 
 test_main_absent_board_card_still_fires() {
@@ -797,7 +805,7 @@ test_a_slow_scan_reports_the_wake_it_found() {
 }
 
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
-  local m kind want pane
+  local m kind want pane n
   for kind in question quota errors; do
     m=$(home "chain-$kind")
     printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nharness=pi\n' > "$m/state/w1.meta"
@@ -822,7 +830,11 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
     grep -q "^- Ask: Unblock stuck" "$m/data/overwatch-decisions.md" 2>/dev/null \
       || fail "$kind was not recorded for Main to decide"
     printf 'working...\n> \n' > "$m/panes/1"
-    PANES=1 cycle "$m"; PANES=1 cycle "$m"
+    # The cause is gone; the episode clears on a later scan, and a cycle that was
+    # stopped at its budget edge can spend one of them, so wait for the condition.
+    for n in 1 2 3 4; do
+      if [ -e "$m/state/.wait-sources/w1.$kind" ] || [ -e "$m/state/.waiting-timers/w1" ]; then PANES=1 cycle "$m"; fi
+    done
     [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
   done
   pass "a question dialog, a provider quota wall and a repeating provider error climb owner and Main, are recorded for Main to decide, and clear with the cause"
