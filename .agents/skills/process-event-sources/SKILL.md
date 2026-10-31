@@ -26,21 +26,21 @@ Juggernaut registers a source, keeps working, and is woken when that process com
 ## Arming a source
 
 Use the adapter, not the generic runner, for a real source.
-Before either Lavish arm form below, open the artifact with `lavish-axi` so its saved session can route the listener; the [operating contract](../../../docs/configuration.md#process-to-event-sources-stateprocevent) owns the prerequisite and refusal boundary.
-For a Lavish review artifact Juggernaut owns:
+Captain answers on a sign-off board come in through this home's sign-off source:
 
 ```sh
-bin/jg-procevent-lavish.sh arm <artifact.html>
+bin/jg-procevent-signoff.sh arm
 ```
 
-A worker-owned board uses `bin/jg-procevent-lavish.sh arm <artifact.html> --for <task-id>` and re-arms with its reply after each nonterminal round; the existing handled marker is the acknowledgement.
+Arming is per home and dormant until it is done, and `addons/signoff/README.md` owns the card, answer, and read-mark contract.
+A worker-owned round re-arms with its reply after each nonterminal round; the existing handled marker is the acknowledgement.
 Arm it once, then re-arm only when a round is actually waiting: arming again with nothing to acknowledge is refused.
-A terminal round is never re-armed: the board stays yours until you acknowledge it with `bin/jg-procevent.sh handled <source-id> <sequence>`, which retires it, and until then `retire` refuses the board too.
-Never arm a board that a live task hosts; follow the [crew-hosted Lavish board contract](../../../docs/configuration.md#crew-hosted-lavish-review-boards) for reply acceptance and older-version limits.
+A terminal round is never re-armed: the round stays yours until you acknowledge it with `bin/jg-procevent.sh handled <source-id> <sequence>`, which retires it.
+Never arm a source that a live task hosts.
 
 Registering a source is not the same fact as listening to it.
-Lavish `arm` waits until this registration's listener is confirmed running and does not report ready without that evidence; other adapters still record the source for the watcher's next reconcile.
-When an earlier registration's listener still holds the board as the confirm window ends, Lavish `arm` prints `still-listening` instead of `armed`; that listener keeps serving the board, and the new registration takes effect only after you retire the source and arm it again.
+An adapter's `arm` waits until this registration's listener is confirmed running and does not report ready without that evidence; a plain registration still records the source for the watcher's next reconcile.
+When an earlier registration's listener still holds the source as the confirm window ends, `arm` prints `still-listening` instead of `armed`; that listener keeps serving it, and the new registration takes effect only after you retire the source and arm it again.
 After arming by hand, confirm `bin/jg-procevent.sh list` reports that source as `live`, and run `bin/jg-procevent.sh reconcile` when it does not.
 Reconcile reports every launch that did not prove it took its claim within the confirm window as `failed=` and exits non-zero, so a source that cannot be started says so instead of looking armed, and it wakes you once per failure episode about it because the watcher discards that count; `start` does not fix that - if the source stays unowned, run `start` attached to read the runner's refusal, then check the source command and adapter binary the registration names, and if a later reconcile finds the source owned the episode closes on its own.
 A source `list` reports as `orphaned` is one reconcile will not relaunch, because something may still be polling it; reconcile wakes you once about it, and that wake's payload says which of two recoveries applies.
@@ -83,7 +83,7 @@ Eligibility is a Juggernaut judgment made BEFORE arming, because the scripts can
 Never bind an action that is destructive, irreversible, or security-sensitive, an action needing captain approval or any gate decision, or an action whose right form depends on what the condition finds - those keep the existing check-fires-then-Overwatch-decides flow, for which a plain custom check or another adapter stays correct.
 When in doubt, arm only the condition half as an ordinary check and keep the action as a wake-time decision.
 
-`bin/jg-procevent.sh --help`, `bin/jg-procevent-lavish.sh --help`, `bin/jg-procevent-when.sh --help`, `bin/jg-procevent-quota.sh --help`, `bin/jg-procevent-signoff.sh --help`, and `bin/jg-procevent-remote-reply.sh --help` own the exact commands and flags.
+`bin/jg-procevent.sh --help`, `bin/jg-procevent-when.sh --help`, `bin/jg-procevent-quota.sh --help`, `bin/jg-procevent-signoff.sh --help`, and `bin/jg-procevent-remote-reply.sh --help` own the exact commands and flags.
 
 An explicitly enabled external adapter registers through `bin/jg-procevent.sh register-extension`, never through a package-discovered script or package-supplied argv.
 [`docs/configuration.md`](../../../docs/configuration.md#trusted-external-process-event-adapters-configextensionsd) owns setup and [`docs/extension-bindings.md`](../../../docs/extension-bindings.md) owns the narrow trusted-code and untrusted-evidence boundary.
@@ -113,17 +113,15 @@ Two rules the commands cannot enforce for you:
   ```
   This call is atomically deduplicated by the exact source and sequence: it prints `handled: <id> <seq>` only the first time and `already-handled: <id> <seq>` on every repeat, so a paired effect gated on that distinction is never authorized twice. Reading the event line or the result file is not handling - only this call durably retires the wake, so call it every time, including on a repeat wake for a sequence you already acted on.
 : Ask the adapter what the result means rather than parsing it yourself.
-  `bin/jg-procevent.sh classify <result-file>` routes through the immutable built-in or extension identity captured with that result; for Lavish, its existing direct command returns `feedback`, `ended`, `waiting`, `disconnected`, `missing`, or `unknown`.
-  Consume a Lavish capture with `bin/jg-procevent-lavish.sh read <result-file>` rather than grepping the raw file: that command reports declared and presented item counts plus a completeness verdict, enumerates every captured queued item while retaining supplied element identity, and surfaces a `tag=message` freeform message as its own field, labeling it as session-ending only when the session ended.
+  `bin/jg-procevent.sh classify <result-file>` routes through the immutable built-in or extension identity captured with that result, and asks that adapter for its lifecycle state.
+  When the adapter has a `read` command, consume the capture with it rather than grepping the raw file: it reports what the result actually carries, with counts and a completeness verdict, so a partial read is obvious.
   `answers` remains the keyed-choice extractor and never treats freeform prose as a decision key.
   A `feedback` result can still be the last one a review ever produces, so never assume another wake is coming just because the state is not `ended`.
-The crew-hosted recovery ordering and arm-and-acknowledge rule are owned by the [crew-hosted Lavish board contract](../../../docs/configuration.md#crew-hosted-lavish-review-boards); `bin/jg-brief.sh` emits its instruction at the point of use.
 : A routine no-op an adapter positively identifies never becomes a Juggernaut wake - it is recorded as handled and stays silent, so you never see it.
-  For an ordinary Juggernaut-owned Lavish source that is an ended session carrying nothing, or `browser_disconnected` (classified `disconnected`): a closed review window that still has an open session.
-  A task-owned empty terminal round instead reaches its owner's steering inbox for conclusion, as the crew-hosted contract requires.
-  A board close carrying a real answer, and every other result, still wakes its owner unchanged.
+  An adapter that can positively identify an empty close records it handled instead of waking you.
+  A task-owned empty terminal round instead reaches its owner's steering inbox for conclusion.
+  A close carrying a real answer, and every other result, still wakes its owner unchanged.
   Never read the absence of a wake as proof a review is still open; ask the source, not the queue.
-: A Lavish wake whose source id matches `bin/jg-procevent-lavish.sh source-id "$(bin/jg-bearings-board.sh path)"` is a bearings board result; load the `sitrep` skill's board-wake handling regardless of which answer kinds the result contains.
 : A `when` wake carries the watch's one terminal captured outcome and may be re-announced until handled: `bin/jg-procevent-when.sh classify <result-file>` returns `fired` (relay the success and its output); `action-failed` (relay the captured error and decide recovery); `condition-error`, `never-true`, or `rejected` (the watch stopped safely without acting - report why and decide whether to re-arm); or `ambiguous` (the action was claimed but its outcome was never captured - verify its effect manually before anything else). Every `when` outcome is terminal and the action is never retried automatically, so after handling and the generic acknowledgement above, run `bin/jg-procevent-when.sh retire <name>` to clean the watch's private records before any re-arm.
 : A `quota` wake carries one terminal quota-check outcome: `bin/jg-procevent-quota.sh classify <result-file>` returns `low`, `exhausted`, `error`, or `unknown`. Report the provider and captured quota state, decide whether the active work should continue or move, then use the generic acknowledgement above. Re-arm explicitly if continued monitoring is needed.
 : A `signoff` wake carries board answers the runner has already fed to the keyed-answer intake, the result file holds one JSON object per line with `key` (the task id), `answer`, `label`, `close`, and `at` (when the answer was saved). Reconcile each named hold the way `captain-hold-lifecycle` requires for any recorded answer, then use the generic acknowledgement above; the source keeps listening, so never retire or re-arm it per answer.
@@ -159,7 +157,7 @@ The `when` adapter's guarantees are part of the operating contract in [`docs/con
 **Not true, and never to be claimed:** at-least-once, no-loss, or lossless delivery, and no generic exactly-once effect either - the handled acknowledgement only stops re-announcement, it says nothing about whether a paired external effect performed before the acknowledgement call actually completed, so a crash between that effect and the call can still repeat the effect on the next replay.
 Also never claim that a source cannot refresh its owning home's lease: that rule is confused-agent-grade and a deliberately marker-stripping source is out of scope, per the operating contract in [`docs/configuration.md`](../../../docs/configuration.md#process-to-event-sources-stateprocevent).
 
-The currently published `lavish-axi poll` destructively clears feedback before returning it.
+An adapter's own poll may clear queued feedback destructively before returning it.
 A result lost after that clearing and before the runner reads the process output is unrecoverable, and no Juggernaut wrapper can close that source-side window.
 The remote-reply adapter removes that particular pre-capture window by never consuming its source, but it cannot recover bytes truly lost from the remote log itself.
 Say these boundaries plainly wherever the behavior is described.

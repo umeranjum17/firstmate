@@ -81,7 +81,6 @@ plan=(
   owner-rules:home
   pane-titles:home
   backlog-lock-reclaim:home
-  bearings-board:home
   parked-homes:verify
   sentinel:home
   supervisor-guard:home

@@ -3293,8 +3293,6 @@ post_merge_cleanup() {  # <id>
         "check: cleanup after the merge of $id was refused: ${line:-see $log}" \
         || triage_log "cleanup refusal for $id could not be queued"
     fi
-    env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/jg-bearings-board.sh" refresh >/dev/null 2>&1 || true
   ) </dev/null >/dev/null 2>&1 &
 }
 

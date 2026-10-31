@@ -54,7 +54,9 @@ With `config/owner-rules` present, `status-wait-check` checks squad lead report 
 A bare mention of the package name passes.
 It exits 1 and prints `owner-rules: Lavish publication refused; use the sign-off board (sign-off-axi) instead`.
 Other text, including clean sign-off links, passes; read errors retain their diagnostics and exit code.
-This covers squad lead notes and merge-card posts only: raw status appends, report files (including `--doc` contents), and `lavish-axi` commands are not intercepted.
+This add-on covers squad lead notes and merge-card posts.
+The Juggernaut core now refuses the same publication on the generated status line (`bin/jg-lavish-guard.sh` piped from the status command `bin/jg-brief.sh` scaffolds) and in a squad lead report note, with or without this add-on, so the add-on is defense in depth for card text rather than the only check.
+A `lavish-axi` command typed outside those channels is a text guard's limit, not an interception.
 Retiring existing registrations and removing old files remain outside this publication check.
 
 Existing homes need no reinstall when their add-on checkout is updated: the report hook and merge-card shims execute files from that checkout, and the existing owner-rules marker enables the checks.

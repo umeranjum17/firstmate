@@ -162,7 +162,6 @@ node --version
 bin/jg-test-run.sh tests/jg-extension-binding.test.sh
 JG_EXTENSION_BINDING_SEGMENT=lifecycle-invocation-cleanup bin/jg-test-run.sh tests/jg-extension-binding.test.sh
 bin/jg-test-run.sh tests/jg-procevent.test.sh
-JG_BEARINGS_LAVISH_LIVE=1 bin/jg-test-run.sh tests/jg-bearings-board-lavish-live-e2e.test.sh
 bin/jg-doc-audience-check.sh
 ```
 

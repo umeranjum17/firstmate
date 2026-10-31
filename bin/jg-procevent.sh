@@ -566,7 +566,7 @@ cmd_register() {
   if [ "$(source_kind "$id" 2>/dev/null || true)" = task-owned ]; then
     owner_task=$(source_owner_task "$id")
     jg_procevent_source_lock_release "$id"
-    die "cannot arm task-owned Lavish source $id owned by task $owner_task; steer that task to re-arm its board"
+    die "cannot arm task-owned source $id owned by task $owner_task; steer that task to re-arm its source"
   fi
   if ! extension_registration_replacement_safe_locked "$id"; then
     jg_procevent_source_lock_release "$id"
@@ -587,7 +587,6 @@ cmd_register_task() {
   local pending_rounds=0 delivered
   local -a argv=() kept=()
   shift 4 2>/dev/null || usage
-  [ "$adapter" = lavish ] || die "register-task is reserved for the Lavish adapter"
   jg_procevent_adapter_valid "$adapter" || die "adapter name must be lowercase alphanumeric or dash: $adapter"
   jg_procevent_source_id_valid "$id" || die "source id must be path-safe and at most 64 characters: $id"
   jg_pr_task_id_valid "$task" || die "task id is invalid: $task"
@@ -629,7 +628,7 @@ cmd_register_task() {
     pending_adapter=$(jg_procevent_result_adapter "$pending" 2>/dev/null || true)
     if [ -n "$pending_adapter" ] && adapter_result_is_terminal "$pending_adapter" "$pending"; then
       jg_procevent_source_lock_release "$id"
-      die "cannot re-arm terminal Lavish result $pending; stop and conclude the review"
+      die "cannot re-arm terminal result $pending; stop and conclude the round"
     fi
   done < <(source_pending "$id")
   if [ "$adopting" -eq 0 ] && [ "$pending_rounds" -eq 0 ]; then
@@ -851,7 +850,7 @@ publish_result() {  # <result-file>
   if ! jg_procevent_is_handled "$STATE" "$id" "$seq"; then
     if [ -n "$owner_task" ]; then
       if adapter_result_is_terminal "$adapter" "$result"; then
-        message="Lavish review result $id sequence $seq is terminal at $result. Read it with bin/jg-procevent-lavish.sh read $result, stop and conclude the review, and do not re-arm the board. The board stays yours until you acknowledge this round with bin/jg-procevent.sh handled $id $seq, which retires it."
+        message="Process-event result $id sequence $seq is terminal at $result. Read that captured file, stop and conclude the round, and do not re-arm the source. The round stays yours until you acknowledge it with bin/jg-procevent.sh handled $id $seq, which retires it."
       else
         export JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD=1
         if adapter_result_is_silent "$adapter" "$result"; then
@@ -865,7 +864,7 @@ publish_result() {  # <result-file>
           esac
         fi
         unset JG_PROCEVENT_CAPTURE_SOURCE_LOCK_HELD
-        message="Lavish review feedback is captured for task $owner_task at $result. Read it with bin/jg-procevent-lavish.sh read $result, apply the round, and re-arm the board with the reply."
+        message="Process-event feedback is captured for task $owner_task at $result. Read that captured file, apply the round, and re-arm the source with the reply."
       fi
       # Snapshot the records that already exist (active and handled) before
       # the idempotent write, so a dedup match - including one already

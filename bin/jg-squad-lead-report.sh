@@ -76,6 +76,15 @@ jg_squad_lead_report_status_blocked_wait() {  # <verb> <text>
   [ "$rc" -eq 0 ] || exit 2
 }
 
+# Lavish is retired. The core guard refuses a Lavish address or publication
+# command in a captain-facing note before anything reaches the parent channel,
+# and names the sign-off board that replaced it (bin/jg-lavish-guard.sh).
+jg_squad_lead_report_lavish_guard() {  # <text>
+  local guard=$SCRIPT_DIR/jg-lavish-guard.sh
+  [ -x "$guard" ] || return 0
+  printf '%s\n' "$1" | "$guard" || exit 2
+}
+
 # The fixed-means-live rule (bin/jg-live-claim.sh owns it) downgrades a claim
 # that a user-visible change is fixed when it carries no live evidence, so the
 # parent reads the plain position instead of a fix nobody can use yet.
@@ -159,6 +168,7 @@ if [ "$DOC_MODE" = 1 ]; then
   shift
   NOTE=$*
   jg_question_flag_reply "$NOTE"
+  jg_squad_lead_report_lavish_guard "$NOTE"
   jg_squad_lead_report_status_blocked_wait "$VERB" "$NOTE"
   NOTE=$(jg_squad_lead_report_live_claim "$VERB" "$NOTE")
   if [ -n "$NOTE" ]; then
@@ -169,6 +179,7 @@ if [ "$DOC_MODE" = 1 ]; then
 else
   NOTE=$*
   jg_question_flag_reply "$NOTE"
+  jg_squad_lead_report_lavish_guard "$NOTE"
   jg_squad_lead_report_status_blocked_wait "$VERB" "$NOTE"
   NOTE=$(jg_squad_lead_report_live_claim "$VERB" "$NOTE")
   printf -v line '%s [%s]: %s (via-helper)' "$VERB" "$token" "$NOTE"
