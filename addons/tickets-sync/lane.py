@@ -35,11 +35,17 @@ def evidence(source, item, row):
     return stage, terminal or bool(explicit), link
 
 
-def assignee(source, item, lead):
-    """Who owns a ticket, from this home's own records, never typed by hand: the owning lead alone while no worker runs
-    the ticket, and that worker's model and tool (its harness as the record names it) while one does. Work with no
-    owning lead says so plainly, so the board can tell no owner from a feed that never carried the field."""
-    if not lead: return {'lead': 'unassigned', 'live': False}
+NO_WORKER = 'no worker yet'
+
+
+def assignee(source, item, owner, ran=False):
+    """Who owns a ticket and what runs it, from this home's own records and never typed by hand.
+
+    The owner is never blank: the lead the record names when it names one, else the home that owns the item, so a
+    fleet-wide item with no owning lead still says who answers for it. The tool fields come from the lane meta whether
+    a worker is live or the last one has gone - its harness (the board draws this as the tool), its model, its effort
+    and the account it runs under - because a queued ticket still needs to show what ran it. An item no worker has ever
+    run says so in words instead of leaving the fields empty; ran says the caller already knows one did."""
     state = source / 'state'
     meta = state / (item + '.meta')
     props = dict(line.split('=', 1) for line in meta.read_text().splitlines() if '=' in line) if meta.exists() else {}
@@ -48,15 +54,29 @@ def assignee(source, item, lead):
     verb = re.match(r'^(?:\d+\s+)?([a-z-]+)\b', last)
     live = bool(props.get('window') or props.get('endpoint')) and not (state / (item + '.exit')).exists() \
         and (verb[1] if verb else '') not in ('done', 'failed')
-    who = {'lead': lead, 'live': live}
-    if live:
-        for field, key in (('model', 'model'), ('harness', 'tool')):
-            if props.get(field): who[key] = props[field]
+    who = {'lead': props.get('lead') or props.get('owner') or owner, 'live': live}
+    # A status file is the record that a worker ran; the meta that names it is removed at cleanup, so a gone record
+    # means "not recorded", never "no worker yet".
+    ran = ran or status.exists()
+    for field, key in (('model', 'model'), ('harness', 'tool'), ('effort', 'effort')):
+        if props.get(field): who[key] = props[field]; ran = True
+    # A record may name the account by its folder; the board shows the name, never a path on this machine.
+    account = props.get('account', '').rstrip('/').rsplit('/', 1)[-1]
+    if account:
+        who['account'] = who['worker'] = account
+        who['worker_id'] = props.get('endpoint_task_id') or item
+        ran = True
+    if not ran:
+        for key in ('worker', 'model', 'tool', 'effort'): who[key] = NO_WORKER
     return who
 
 
 def newest_event(source, item, row):
-    """Newest status [at=] stamp; else noon-UTC of backlog closed/created; None when unknown."""
+    """Newest status [at=] stamp; else the start of the backlog closed/created day (UTC); None when unknown.
+
+    A backlog record carries a date and no time, so the day's first hour is the only stamp it can honestly claim: any
+    later hour would put the update in the future and hold off the board's six-hour stall line by that much, which is
+    how a queued item with no worker showed nothing but 0% for fifteen hours."""
     status = source / 'state' / (item + '.status')
     if status.exists():
         stamps = [int(m) for m in re.findall(r'\[at=(\d+)\]', status.read_text())]
@@ -69,7 +89,7 @@ def newest_event(source, item, row):
             day = dt.date.fromisoformat(raw[:10])
         except ValueError:
             continue
-        stamps.append(int(dt.datetime(day.year, day.month, day.day, 12, tzinfo=dt.timezone.utc).timestamp()))
+        stamps.append(int(dt.datetime(day.year, day.month, day.day, tzinfo=dt.timezone.utc).timestamp()))
     return max(stamps) if stamps else None
 
 

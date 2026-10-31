@@ -13,7 +13,11 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work=$(mktemp -d "${JG_TICKETS_TEST_ROOT:-${TMPDIR:-/tmp}}/tickets-sync.XXXXXX")
 trap 'echo "retained fixture and normalized archives: $work"' EXIT
-fork=${JG_TEST_FORK:-$HOME/juggernaut}
+# The fixture home's bin, and the add-on's own installer's bin checks, come from the checkout this test lives in:
+# $HOME/juggernaut need not exist on a machine that only cloned this repository, and a fork that is not a Juggernaut
+# checkout leaves $JG_HOME/bin a dangling link that fails the install with an env 127 instead of a verdict.
+fork=${JG_TEST_FORK:-$(cd "$root/.." && pwd -P)}
+[ -f "$fork/bin/jg-tasks-axi.sh" ] || { echo "FAIL: $fork is not a Juggernaut checkout (no bin/jg-tasks-axi.sh); set JG_TEST_FORK"; exit 1; }
 export HOME=$work/user XDG_DATA_HOME=$work/xdg SIGN_OFF_HOME=$work/signoff
 export JG_HOME=$work/main
 mkdir -p "$HOME" "$JG_HOME"/{data,config,state} "$work/parked/data"
@@ -33,6 +37,7 @@ cp "$JG_HOME/.tasks.toml" "$work/parked/.tasks.toml"
  tasks-axi hold held --reason 'Umer parked this item' --kind parked >/dev/null
  tasks-axi add voice 'Umer voice practice' --repo ownvoice --priority 2 --body 'release: soon' >/dev/null
  tasks-axi add take 'Umer takes' --repo takeone --priority 2 >/dev/null
+ tasks-axi add gone 'Umer queued item whose worker has gone' --repo alpha --priority 2 >/dev/null
  tasks-axi add inferred 'Umer telescope focus regression' --repo alpha --priority 1 >/dev/null
  tasks-axi add internal 'Umer internal maintenance' --repo herdr --priority 2 --body 'parent: upkeep' >/dev/null
  tasks-axi add child '[captain-ask] P0 Umer settings' --repo alpha --priority 0 --body "$(printf 'Umer notes %.0s' {1..80})"$'\nrelease: v1\nparent: parent' >/dev/null)
@@ -41,8 +46,10 @@ sed -i "/^- \[x\] parent /s/$(date +%F)/2000-01-01/g" "$JG_HOME/data/backlog.md"
 printf '\n## Done\n- [x] recent - Umer shipped feature (repo: alpha) (done %s)\n- [x] old - Umer historical work (repo: alpha) (done 2000-01-01)\n' "$(date +%F)" >> "$JG_HOME/data/backlog.md"
 git init -q "$JG_HOME/projects/alpha"
 git -C "$JG_HOME/projects/alpha" remote add origin https://github.com/example/alpha-app.git
-printf 'window=default:w9:p1\nendpoint_task_id=long\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n' > "$JG_HOME/state/long.meta"
+printf 'window=default:w9:p1\nendpoint_task_id=long\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\neffort=high\naccount=found-claude\n' > "$JG_HOME/state/long.meta"
 printf 'working [at=1700000000]: building Umer release\n' > "$JG_HOME/state/long.status"
+printf 'harness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\neffort=high\naccount=found-claude\n' > "$JG_HOME/state/gone.meta"
+printf 'paused [at=1700000010]: ran once and stopped\n' > "$JG_HOME/state/gone.status"
 sign-off-axi ticket "$work/board.json" --id jg-legacy-fixture --title 'Needs a parent · alpha' --progress 17 --asked yes >/dev/null
 sign-off-axi ticket "$work/board.json" --id jg-history-fixture --title 'Umer historical maintenance' --project main --progress 100 --asked no >/dev/null
 source_before=$(sha256sum "$JG_HOME/data/backlog.md" "$work/parked/data/backlog.md")
@@ -81,17 +88,26 @@ jq -e --arg upkeep "$upkeep" '.tickets[] | select(.id == "jg-history-fixture") |
 jq -e --arg inferred "$(ticket_id main/inferred)" --arg parent "$parent" '.tickets[] | select(.id == $inferred) | .parent == $parent' "$work/first.json"
 # herdr is an internal home: no ticket project label and no icon wake line.
 jq -e --arg internal "$(ticket_id main/internal)" '.tickets[] | select(.id == $internal) | (.project // "") == ""' "$work/first.json"
-# The feed record carries the assignee the board shows: the owning lead with the live worker's model and tool, the lead
-# alone while no worker runs the ticket, and a plain unassigned for work no lead owns. Read from the feed sign-off keeps.
+# The feed record carries the assignee the board shows, and it is never blank: the owning lead with the live
+# worker's harness, model, effort and account, the last values a queued item's gone worker left, a plain
+# "no worker yet" for work no worker has run, and the home that publishes a fleet-wide row as its owner.
 feed_assignee() { jq -s --arg id "$1" 'map(select(.id == $id)) | last | .assignee' "$work/board.tickets.jsonl"; }
-feed_assignee "$(ticket_id main/long)" | jq -e '.lead == "main" and .live == true and .model == "ollama-cloud/deepseek-v4.1-flash" and .tool == "pi"'
-feed_assignee "$(ticket_id main/voice)" | jq -e '.lead == "main" and .live == false and .model == null and .tool == null'
-feed_assignee "$upkeep" | jq -e '.lead == "unassigned" and .live == false'
+feed_assignee "$(ticket_id main/long)" | jq -e '.lead == "main" and .live == true and .model == "ollama-cloud/deepseek-v4.1-flash" and .tool == "pi" and .effort == "high" and .account == "found-claude" and .worker == "found-claude" and .worker_id == "long"'
+feed_assignee "$(ticket_id main/gone)" | jq -e '.lead == "main" and .live == false and .model == "ollama-cloud/deepseek-v4.1-flash" and .tool == "pi" and .effort == "high" and .account == "found-claude"'
+feed_assignee "$(ticket_id main/voice)" | jq -e '.lead == "main" and .live == false and .model == "no worker yet" and .tool == "no worker yet" and .effort == "no worker yet" and .worker == "no worker yet" and (has("account") | not)'
+# A fleet-wide row matches no lead in the registry, so the home that publishes it owns it: never "unassigned".
+feed_assignee "$upkeep" | jq -e '.lead == "main" and .live == false and (.lead != "unassigned")'
 # The added field takes nothing away: the feed's newest line for the live ticket reads back as the same record.
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/long)" --json | jq -e \
   --slurpfile feed <(jq -s --arg id "$(ticket_id main/long)" 'map(select(.id == $id)) | last' "$work/board.tickets.jsonl") \
   '.ticket.title == $feed[0].title and .ticket.progress == $feed[0].progress and .ticket.stage == $feed[0].stage and .ticket.state == $feed[0].state and .ticket.last_event_at == $feed[0].last_event_at'
-echo 'PASS: the feed record carries the live lead, model and tool, the lead alone, and an explicit unassigned'
+echo 'PASS: the feed record carries a never-blank owner with the live or last worker, and no worker yet'
+# A backlog record carries a date and no time, so a ticket with no lane event is stamped with the start of that day:
+# a later hour would sit in the future and hold off the board's six-hour stall line, which is how a queued item came
+# to show nothing but 0% for fifteen hours. A ticket that never gets this field can never show as stalled at all.
+day=$(date -u -d "$(date -u +%F)" +%s)
+sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/voice)" --json | jq -e --argjson day "$day" '.ticket.last_event_at == $day and .ticket.stage == "queued"'
+echo 'PASS: a queued ticket with no lane event is stamped at the start of its day, so the stall line can fire'
 # Board wins over a drifted ledger that already recorded project cleared.
 sign-off-axi ticket "$work/board.json" --id "$(ticket_id main/internal)" --project herdr >/dev/null
 python3 - <<PY
@@ -236,3 +252,13 @@ sign-off-axi list "$work/board.json" --json > "$work/cards.json"
 jq -e '.decisions | (map(select(.key == "closed-source" and .dismissed)) | length == 1) and (map(select(.key == "open-source" and (.dismissed | not))) | length == 1) and (map(select(.key == "no-source" and (.dismissed | not))) | length == 1)' "$work/cards.json"
 grep -q 'dismissed closed-source (done-elsewhere): ticket .* is done' "$JG_HOME/state/tickets-sync/card-reconcile.log"
 echo 'PASS: the card reconcile archives a closed-source card, keeps an open-source one and lists an unjudged one'
+
+# A board that still shows the row the poll published before it re-keyed its ids (fm-<hash> beside jg-<hash>) is the
+# same work, so that row names the same owner: only the assignee moves, and its own fields stay as they were.
+(cd "$JG_HOME"; tasks-axi add legacy 'Umer legacy row item' --repo alpha --priority 2 >/dev/null)
+legacy="fm-$(ticket_id main/legacy | cut -c4-)"
+sign-off-axi ticket "$work/board.json" --id "$legacy" --title 'Umer legacy row item' --state queued >/dev/null
+"$JG_HOME/state/tickets-sync.check.sh" >/dev/null
+feed_assignee "$legacy" | jq -e '.lead == "main" and .live == false and .model == "no worker yet"'
+sign-off-axi ticket "$work/board.json" --id "$legacy" --json | jq -e '.ticket.title == "Umer legacy row item" and .ticket.state == "queued" and .ticket.progress == 0 and ((.ticket.last_event_at // "") == "") and ((.ticket.stage // "") == "")'
+echo 'PASS: the row from before the re-keyed ids names the same owner, and only that field moves'
