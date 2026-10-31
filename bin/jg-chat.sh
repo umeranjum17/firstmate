@@ -4,14 +4,16 @@
 #
 # Usage:
 #   jg-chat.sh send [--1on1] [--on <ref>] [--link <url>] [--owner <role>]
-#                   [--act <kind>] <lead-id|task-id> <text...>
+#                   [--subject <ref>] [--act <kind>] <lead-id|task-id> <text...>
 #   jg-chat.sh respond [--on <ref>] [--link <url>] [--owner <role>]
-#                   [--act <kind>] <lead-id|task-id> <text...>
+#                   [--subject <ref>] [--act <kind>] <lead-id|task-id> <text...>
 #                                   record a response, deliver nothing
 #   jg-chat.sh read <lead-id|task-id|thread|->      print unread, then mark read
 #   jg-chat.sh mark <working|done> <lead-id|task-id|thread|->
 #   jg-chat.sh reply <lead-id|task-id|thread|-> <text...>
-#   jg-chat.sh log [<thread>] [--json]             the reader
+#   jg-chat.sh log [<thread>] [--json] [--view message]
+#                                                  the reader; --view message is
+#                                                  the record the chat page reads
 #   jg-chat.sh nudge [--after <seconds>] [--send]  unread past a limit
 #   jg-chat.sh note <thread> <from|-> <to|-> <kind> <status|-> <text>
 #                                                  (the call sites' writer)
@@ -33,6 +35,8 @@
 #          role assigned to answer it
 #   act    only with on: what the captain did there - comment, approve, refine,
 #          reject, or answer
+#   subject  the owner record this message is about (its subject), so a reader can
+#          join a message to the thing it concerns; defaults to its element
 #   status_at        when each state was reached, {state: epoch}
 #   reply_at         the epoch of the agent row that answered it
 #
@@ -230,6 +234,22 @@ chat_print() { # [<thread>] [<jq-filter>] [<jq args>...]
 
 # A room as it was said, not as it landed: sorted by the recorded time and, on a
 # tie, by arrival, so a replayed or skewed-clock line still reads in place.
+# The message record the chat page reads: one row per message, with the response
+# kind named `kind` (the store's own `kind` says who spoke, which the page does
+# not need) and a subject that is never blank, so a reader can join a message to
+# the thing it is about without a second lookup.
+chat_message_view() { # <thread|''>
+  [ -f "$STORE" ] || return 0
+  jq -c -s --arg thread "${1:-}" 'to_entries
+    | map(select($thread == "" or .value.thread == $thread))
+    | sort_by([.value.at, .key])
+    | .[].value
+    | {at, thread, from, to,
+       kind: (.act // .kind),
+       subject: (.subject // .on // .thread),
+       text, status, on, link, owner}' "$STORE"
+}
+
 chat_log() { # <thread|''>
   [ -f "$STORE" ] || return 0
   jq -c -s --arg thread "${1:-}" 'to_entries
@@ -245,7 +265,7 @@ chat_log() { # <thread|''>
 # response here and wakes its owner from this row, so the store, not a board
 # path, is what a move can never silence.
 chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
-  local deliver=$1 one_on_one=0 on='' link='' owner='' act='' extra='{}' target text thread
+  local deliver=$1 one_on_one=0 on='' link='' owner='' act='' subject='' extra='{}' target text thread
   shift
   while :; do
     case "${1:-}" in
@@ -253,13 +273,14 @@ chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
         one_on_one=1
         shift
         ;;
-      --on | --link | --owner | --act)
+      --on | --link | --owner | --act | --subject)
         [ $# -ge 2 ] || usage
         case "$1" in
           --on) on=$2 ;;
           --link) link=$2 ;;
           --owner) owner=$2 ;;
           --act) act=$2 ;;
+          --subject) subject=$2 ;;
         esac
         shift 2
         ;;
@@ -280,9 +301,11 @@ chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
   thread=$(chat_thread "$target")
   if [ -n "$on" ]; then
     extra=$(jq -cn --arg on "$on" --arg act "$act" --arg link "$link" --arg owner "$owner" \
+      --arg subject "$subject" \
       '{on: $on} + (if $act == "" then {} else {act: $act} end)
          + (if $link == "" then {} else {link: $link} end)
-         + (if $owner == "" then {} else {owner: $owner} end)') ||
+         + (if $owner == "" then {} else {owner: $owner} end)
+         + (if $subject == "" then {} else {subject: $subject} end)') ||
       die 'cannot build the comment record'
   fi
   # The KPI tag stays automatic for what the captain wrote himself. A path that
@@ -391,11 +414,17 @@ case "$verb" in
   log)
     thread=''
     json=0
+    view=''
     while [ $# -gt 0 ]; do
       case "$1" in
         --json)
           json=1
           shift
+          ;;
+        --view)
+          [ $# -ge 2 ] || usage
+          view=$2
+          shift 2
           ;;
         -*)
           usage
@@ -406,6 +435,11 @@ case "$verb" in
           ;;
       esac
     done
+    case "$view" in
+      '') ;;
+      message) chat_message_view "$thread"; exit 0 ;;
+      *) usage ;;
+    esac
     if [ "$json" -eq 1 ]; then chat_log "$thread"; else chat_log "$thread" | chat_render; fi
     ;;
   nudge) cmd_nudge "$@" ;;
