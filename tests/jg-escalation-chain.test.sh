@@ -134,7 +134,9 @@ wait_for_scan() {  # <pid> <state> <mark> <budget> <limit>
   if is_live_non_zombie "$pid"; then
     kill -TERM "$pid" 2>/dev/null || true
     i=0
-    while [ "$i" -lt 20 ] && is_live_non_zombie "$pid"; do
+    # A loaded runner takes a moment to run the watcher's own exit trap, and a
+    # KILL there leaves the next cycle on a lock nothing released.
+    while [ "$i" -lt 50 ] && is_live_non_zombie "$pid"; do
       sleep 0.1
       i=$((i + 1))
     done
@@ -803,7 +805,7 @@ test_a_slow_scan_reports_the_wake_it_found() {
 }
 
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
-  local m kind want pane
+  local m kind want pane n
   for kind in question quota errors; do
     m=$(home "chain-$kind")
     printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nharness=pi\n' > "$m/state/w1.meta"
@@ -828,7 +830,11 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
     grep -q "^- Ask: Unblock stuck" "$m/data/overwatch-decisions.md" 2>/dev/null \
       || fail "$kind was not recorded for Main to decide"
     printf 'working...\n> \n' > "$m/panes/1"
-    PANES=1 cycle "$m"; PANES=1 cycle "$m"
+    # The cause is gone; the episode clears on a later scan, and a cycle that was
+    # stopped at its budget edge can spend one of them, so wait for the condition.
+    for n in 1 2 3 4; do
+      if [ -e "$m/state/.wait-sources/w1.$kind" ] || [ -e "$m/state/.waiting-timers/w1" ]; then PANES=1 cycle "$m"; fi
+    done
     [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
   done
   pass "a question dialog, a provider quota wall and a repeating provider error climb owner and Main, are recorded for Main to decide, and clear with the cause"
