@@ -35,6 +35,10 @@
 # the named record, which presentation-only consumers mirror (the Claude Code
 # Calm mod), while jg_operational_doorbell_kind also requires the record to sit in
 # the given home's own operational inbox, which the away-mode return check uses.
+# `doorbell-shaped` is the third, weakest strength and touches no filesystem: its
+# first line starts with the doorbell prefix. A counter that must never mistake a
+# doorbell for a typed captain message uses it, so a new doorbell wording that
+# stops matching the full line cannot slip a false record in.
 #
 # CLI:
 #   jg-operational-input.sh encode <kind>  # body on stdin, encoded input stdout
@@ -43,6 +47,7 @@
 #   jg-operational-input.sh body           # current generic input on stdin
 #   jg-operational-input.sh record <kind>  # body on stdin, doorbell stdout
 #   jg-operational-input.sh doorbell-kind  # doorbell on stdin, record kind stdout
+#   jg-operational-input.sh doorbell-shaped # doorbell line on stdin, exit 0
 #   jg-operational-input.sh open <path>    # this home's record body stdout
 #   jg-operational-input.sh --help
 #
@@ -342,6 +347,22 @@ jg_operational_record_kind() {  # <record-path> <result-var>
   jg_operational_generic_kind "${record_content%x}" "$result_var"
 }
 
+# Whether <message>'s first line starts with the doorbell prefix. No filesystem
+# access and no record check: shape alone.
+jg_operational_doorbell_shaped() {  # <message>
+  local message=${1-} first
+  case "$message" in
+    "$JG_OPERATIONAL_DOORBELL_PREFIX"*) return 0 ;;
+    *$'\n'*)
+      first=${message%%$'\n'*}
+      case "$first" in
+        "$JG_OPERATIONAL_DOORBELL_PREFIX"*) return 0 ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
 # A doorbell whose named record exists and holds a current generic envelope.
 jg_operational_doorbell_record_kind() {  # <message> <result-var>
   local named_record
@@ -387,11 +408,17 @@ Usage:
   bin/jg-operational-input.sh body           # current input on stdin
   bin/jg-operational-input.sh record <kind>  # body on stdin; prints the doorbell
   bin/jg-operational-input.sh doorbell-kind  # doorbell on stdin; record's kind
+  bin/jg-operational-input.sh doorbell-shaped # doorbell-shaped text on stdin; exit 0
   bin/jg-operational-input.sh open <path>    # this home's record; prints its body
 
 Current construction kinds:
   session-start watcher turn-end-guard away-supervisor from-juggernaut launch-brief
   branch-outcome
+
+`doorbell-shaped` reads shape only: the first line starts with the doorbell
+prefix. It proves nothing about a record, so use it only where a false positive
+costs nothing and a false negative is a bug - a counter that must not record a
+doorbell as a typed captain message.
 
 The from-juggernaut kind uses its established live-charter-compatible carrier.
 A record-backed doorbell counts as operational input only when the record it
@@ -442,6 +469,11 @@ jg_operational_main() {
       jg_operational_read_stdin input || return 2
       jg_operational_doorbell_record_kind "$input" output || return 1
       printf '%s\n' "$output"
+      ;;
+    doorbell-shaped)
+      [ "$#" -eq 1 ] || return 2
+      jg_operational_read_stdin input || return 2
+      jg_operational_doorbell_shaped "$input" || return 1
       ;;
     open)
       [ "$#" -eq 2 ] || return 2

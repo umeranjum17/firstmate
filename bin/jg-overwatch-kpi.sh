@@ -14,7 +14,10 @@
 # UserPromptSubmit and Cursor's beforeSubmitPrompt, the same surfaces that feed
 # bin/jg-host-mirror.sh. The hook is a silent no-op outside a genuine primary
 # checkout, and it drops a prompt the operational-input protocol classifies
-# (bin/jg-operational-input.sh) and a harness-started <task-notification> turn,
+# (bin/jg-operational-input.sh), a prompt whose first line is doorbell-shaped
+# (a record-backed doorbell carries no marker, so `classify` cannot see it; this
+# shape check keeps a reworded doorbell from ever counting as a captain message),
+# and a harness-started <task-notification> turn,
 # so only what the captain typed is counted. A primary with no prompt hook
 # records nothing, so nothing there is ever pending. A home whose
 # config/overwatch-kpi reads `off` records nothing either; that is for a lab
@@ -175,6 +178,7 @@ case "$1" in
       | (.prompt // "") | tostring' 2>/dev/null) || exit 0
     case "${TEXT#"${TEXT%%[![:space:]]*}"}" in ''|'<task-notification>'*) exit 0 ;; esac
     printf '%s' "$TEXT" | "$SCRIPT_DIR/jg-operational-input.sh" classify >/dev/null 2>&1 && exit 0
+    printf '%s' "$TEXT" | "$SCRIPT_DIR/jg-operational-input.sh" doorbell-shaped >/dev/null 2>&1 && exit 0
     mkdir -p "$DATA" 2>/dev/null || exit 0
     printf '%s' "$TEXT" | jq -cRs --argjson seq "$(( $(newest_seq) + 1 ))" --argjson epoch "$(date +%s)" \
       '{seq: $seq, epoch: $epoch, text: .[0:200]}' >> "$LEDGER" 2>/dev/null
