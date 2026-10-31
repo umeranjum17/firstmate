@@ -1185,6 +1185,7 @@ crew_dispatch_validate() {
       end;
     def configured_profiles:
       ([(.rules // [])[]? | profiles(.use?)[]?]
+        + [(.tiers // {})[]? | profiles(.)[]?]
         + (if has("default") then [profiles(.default)[]?] else [] end));
     def malformed_optional_fields($items):
       ($items | any(has("model") and (((.model | type) != "string") or (.model | length) == 0)))
@@ -1203,6 +1204,8 @@ crew_dispatch_validate() {
           end);
     def malformed_profile_floors($items):
       ($items | any(has("floor") and floor_bad(.floor; false)));
+    def tier_names: ["easy", "standard", "hard", "frontier"];
+    def tier_profiles: [((.tiers // {})[]? | profiles(.)[]?)];
     def bad_efforts:
       configured_profiles
       | map({h: .harness, m: .model, e: .effort})
@@ -1211,12 +1214,14 @@ crew_dispatch_validate() {
       | map(select(. as $p | effort_ok($p.h; $p.m; $p.e) | not))
       | map("\(.h):\(.e)")
       | unique;
+    (.tiers // {}) as $tier_map |
     if type != "object" then "top-level value must be an object"
     elif has("rules") and (.rules | type) != "array" then "rules must be an array"
     elif [(.rules // [])[]? | select(type != "object")] | length > 0 then "each rule must be an object"
     elif [(.rules // [])[]? | select((.when? | type) != "string" or (.when | length) == 0)] | length > 0 then "each rule needs non-empty when"
-    elif [(.rules // [])[]? | select((.use? | type) != "object" and (.use? | type) != "array")] | length > 0 then "each rule needs use"
-    elif [(.rules // [])[]? | select((.use? | type) == "array" and (.use | length) == 0)] | length > 0 then "each rule needs at least one use profile"
+    elif [(.rules // [])[]? | select((.use? | type) != "object" and (.use? | type) != "array" and (has("tier") | not))] | length > 0 then "each rule needs use or a tier"
+    elif [(.rules // [])[]? | select((.use? | type) == "array" and (.use | length) == 0 and (has("tier") | not))] | length > 0 then "each rule needs at least one use profile or a tier"
+    elif [(.rules // [])[]? | select(has("tier") and ((.tier? | type) != "string" or (.tier | length) == 0))] | length > 0 then "rule tier must be a non-empty string when present"
     elif [(.rules // [])[]? | profiles(.use?)[]? | select(type != "object")] | length > 0 then "each use profile must be an object"
     elif [(.rules // [])[]? | profiles(.use?)[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length > 0 then "each use profile needs harness"
     elif malformed_optional_fields([(.rules // [])[]? | profiles(.use?)[]?]) then
@@ -1232,6 +1237,19 @@ crew_dispatch_validate() {
       "unknown select: " + ([ (.rules // [])[]? | .select? // empty | select(. != "quota-balanced") ] | unique | join(", "))
     elif has("default") and ((.default | type) != "object" and (.default | type) != "array") then "default must be a profile object or non-empty profile array"
     elif has("default") and ((.default | type) == "array" and (.default | length) == 0) then "default needs at least one profile"
+    elif has("tiers") and (.tiers | type) != "object" then "tiers must be an object"
+    elif [$tier_map | keys[] | . as $t | select((tier_names | index($t)) == null)] | length > 0 then
+      "unknown tier: " + ([$tier_map | keys[] | . as $t | select((tier_names | index($t)) == null)] | unique | join(", ")) + " (tiers are easy, standard, hard, and frontier)"
+    elif [(.rules // [])[]? | select(has("tier")) | .tier as $t | select((($tier_map) | has($t)) | not) | $t] | length > 0 then
+      "each rule tier needs a tiers entry: " + ([(.rules // [])[]? | select(has("tier")) | .tier as $t | select((($tier_map) | has($t)) | not) | $t] | unique | join(", "))
+    elif [$tier_map[] | select((profiles(.) | length) == 0)] | length > 0 then "each tier needs at least one profile"
+    elif [tier_profiles[]? | select(type != "object")] | length > 0 then "each tier profile must be an object"
+    elif [tier_profiles[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length > 0 then "each tier profile needs harness"
+    elif malformed_optional_fields(tier_profiles) then
+      if $typed then "tier profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\\z when present"
+      else "tier profile model and effort must be non-empty strings when present"
+      end
+    elif $typed and malformed_profile_floors(tier_profiles) then "tier profile floor needs scope and min_percent 0..100"
     elif has("default") and ([profiles(.default)[]? | select(type != "object")] | length) > 0 then "each default profile must be an object"
     elif has("default") and ([profiles(.default)[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length) > 0 then "each default profile needs harness"
     elif has("default") and malformed_optional_fields([profiles(.default)[]?]) then
@@ -1268,8 +1286,13 @@ crew_dispatch_validate() {
         (($selector // "quota-balanced") + "[" + ([$value[] | profile(.)] | join(", ")) + "]")
       else profile($value)
       end;
+    def rule_route($r):
+      if $r | has("tier") then "tier " + ($r.tier | tostring)
+      else profile_set($r.use; $r.select?)
+      end;
     (["BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json"]
-      + [(.rules // [])[]? | "BOOTSTRAP_INFO: crew dispatch rule: " + (.when | tostring) + " -> " + profile_set(.use; .select?)]
+      + [(.rules // [])[]? | "BOOTSTRAP_INFO: crew dispatch rule: " + (.when | tostring) + " -> " + rule_route(.)]
+      + [(.tiers // {}) | to_entries[]? | "BOOTSTRAP_INFO: crew dispatch tier: " + .key + " -> " + profile_set(.value; null)]
       + (if has("default") then ["BOOTSTRAP_INFO: crew dispatch default: " + profile_set(.default; null)] else [] end))
     | .[]
   ' "$file"
