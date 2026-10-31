@@ -42,6 +42,8 @@ jobs:
         run: bash receipts/tests/receipts-hook-e2e.sh
       - name: Lead-wake hook journeys
         run: bash lead-wake/tests/lead-wake-e2e.sh
+      - name: Report actions replay
+        run: python3 report-actions/tests/test_report_actions.py
       # An add-on script is the catalog's own `install-all.sh`, or a shell script under a
       # top-level add-on directory, either one level down (`merge-card/merge-card`) or two
       # levels down in its `bin/` and `tests/`

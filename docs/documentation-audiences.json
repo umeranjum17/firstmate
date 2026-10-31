@@ -941,6 +941,14 @@
       "audience": "operator-current"
     },
     {
+      "path": "addons/report-actions/README.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "addons/report-actions/tests/fixtures/recorded-report.md",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "addons/sentinel/README.md",
       "audience": "operator-current"
     },
