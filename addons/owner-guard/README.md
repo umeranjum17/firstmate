@@ -41,10 +41,14 @@ pushing the owner's private details to a public repo, shaped like
   PATH. Install is idempotent, records a replaced global
   hooksPath instead of dropping it, and `--uninstall` restores it; a
   repo-local `core.hooksPath` is never touched. It also writes the home's
-  `config/merge-gate`: the merge scan first, then the home's previous gate
-  with the same args (moved aside to `config/merge-gate.pre-owner-guard`;
-  `--uninstall [<home>]` moves it back). Rerun it after writing another
-  gate shim over `config/merge-gate` to re-chain it.
+  `config/merge-gate`: one entry point where the merge scan runs first, then
+  the owner-rules proof gate, then the home's own gate with the same args
+  (`addons/lib/merge-gate-lib.sh` owns that file and keeps the home's gate at
+  `config/merge-gate.pre-chain`; `--uninstall [<home>]` drops the scan, and
+  the last add-on out gives the home's gate back). For one release
+  `config/merge-gate.pre-owner-guard` and `config/merge-gate.pre-owner-rules`
+  stay as symlinks to it. Rerun it after writing another gate shim over
+  `config/merge-gate`, so the scan runs in front of it again.
 - `doctor.sh <jg-home>` — exits nonzero with the missing guard path or incorrect
   global `core.hooksPath` and prints the install command to recover.
 - `tests/owner-guard.test.sh` — fixture-repo proof (throwaway HOME and repo,

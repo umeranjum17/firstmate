@@ -1231,6 +1231,7 @@ A nonzero exit refuses that merge and prints the gate's own reason; an absent fi
 `bin/jg-merge-gate-lib.sh` owns the hook, so the gate runs whether or not any add-on is installed; the merge-card add-on defines the same two hooks for homes that install it.
 `config/post-merge` is the matching after-the-fact hook and never changes a merge's outcome.
 The gate's content is home-local policy; `bin/jg-tool-wiring.sh` places done-done's gate only in a home that has none.
+Where the owner-guard and owner-rules add-ons are installed, their installers write one gate file holding both checks, and `addons/lib/merge-gate-lib.sh` owns that file, the steps it records, and the home's own gate kept at `config/merge-gate.pre-chain`.
 
 ## Worker launch environment (config/launch-env-allowlist)
 
@@ -1685,7 +1686,7 @@ A herdr, zellij, or cmux home is therefore never told `tmux` is missing, and the
 
 An install is not wiring: `bin/jg-tool-wiring.sh` runs on every locked session start and writes what the pinned packages carry, once per home.
 It links the skill each package ships, appends done-done's `integrations/juggernaut/brief-include.md` to `config/brief-include.md` as one managed block that a rerun replaces rather than appends, and places done-done's `integrations/juggernaut/merge-gate` as `config/merge-gate` with the executable bit set.
-A second run writes nothing, an absent package is a silent no-op, and an existing `config/merge-gate` is never replaced, so a home that chains another gate keeps its chain.
+A second run writes nothing, an absent package is a silent no-op, and an existing `config/merge-gate` is never replaced, so a home that already has a gate keeps that gate.
 Sign-off arming stays per home and is never done for the user; the first wiring of an unarmed home prints one line naming `bin/jg-procevent-signoff.sh arm`, and an already wired home stays silent.
 
 **Missing-tool diagnostics**
