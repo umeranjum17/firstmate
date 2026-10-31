@@ -2,6 +2,7 @@
 # jg-merge-alert.sh - one board alert for every proven merge, queued durably while the board is down.
 #
 # Usage: jg-merge-alert.sh post <task-id> --pr <url> [--authority <a>]
+#        jg-merge-alert.sh drain
 #
 # post    Called after a proven PR merge by bin/jg-merge-outcome-lib.sh. No model chooses
 #         anything. It files one text-only Evidence card (status Fixed) on the board
@@ -19,6 +20,8 @@
 #         one, else the card says it is not recorded.
 #         The alert is written to state/merge-alerts/pending/ before delivery (sent/ after),
 #         so a board that is down never blocks the merge. post exits 0 for a valid request.
+# drain   Retries every queued alert, at most 20 a run. bin/jg-watch.sh runs it each
+#         supervision cycle while state/merge-alerts/pending holds anything.
 set -u
 export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -170,7 +173,19 @@ sent_mark() {  # <pending-file>
   mv -f -- "$file" "$SENT/$base" || true
 }
 
+cmd_drain() {
+  local f n=0
+  command -v jq >/dev/null 2>&1 || return 0
+  for f in "$PENDING"/*.json; do
+    [ -f "$f" ] || continue
+    n=$((n + 1)); [ "$n" -le 20 ] || break
+    deliver "$f" || true
+  done
+  return 0
+}
+
 case "${1:-}" in
   post) shift; cmd_post "$@" ;;
+  drain) cmd_drain ;;
   *) die "unknown command: ${1:-}" 2 ;;
 esac

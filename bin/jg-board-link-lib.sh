@@ -11,7 +11,8 @@
 #                                    the section is unusable
 #   jg_board_merge_key <pr-url>      the key merge-card gives a PR's evidence card
 #   jg_board_file <home>             the board file merge cards go on ($JG_PROOF_BOARD, else
-#                                    the --board of <home>/config/post-merge), or return 1
+#                                    the --board of <home>/config/post-merge, else the parent
+#                                    home's when <home> is a Squad Lead), or return 1
 #
 # A caller prints the link on its own line and ignores the return code; a missing
 # board never fails a caller. The link carries the token, so callers send it only
@@ -40,8 +41,14 @@ jg_board_merge_key() {  # <pr-url>
 }
 
 jg_board_file() {  # <home>
-  local board=${JG_PROOF_BOARD:-}
-  [ -n "$board" ] || board=$(sed -n "s/.*--board[= ]'\{0,1\}\([^' ]*\).*/\1/p" "${JG_CONFIG_OVERRIDE:-${1:-}/config}/post-merge" 2>/dev/null | head -n 1)
+  local board=${JG_PROOF_BOARD:-} home=${1:-} cfg
+  cfg=${JG_CONFIG_OVERRIDE:-$home/config}
+  [ -n "$board" ] || board=$(sed -n "s/.*--board[= ]'\{0,1\}\([^' ]*\).*/\1/p" "$cfg/post-merge" 2>/dev/null | head -n 1)
+  # A Squad Lead home with no board of its own files on its parent's, so a lead's merge is not left off the board.
+  if [ -z "$board" ] && declare -F jg_compat_parent_marker >/dev/null && declare -F jg_squad_lead_parent_record_parse >/dev/null \
+    && jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$home")" && [ -n "$JG_SQUAD_LEAD_PARENT_HOME" ]; then
+    board=$(sed -n "s/.*--board[= ]'\{0,1\}\([^' ]*\).*/\1/p" "$JG_SQUAD_LEAD_PARENT_HOME/config/post-merge" 2>/dev/null | head -n 1)
+  fi
   [ -n "$board" ] || return 1
   printf '%s\n' "$board"
 }

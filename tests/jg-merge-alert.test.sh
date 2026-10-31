@@ -108,3 +108,21 @@ assert_equals "" "$(alert "$h" post t1 --pr "$PR")" "no board: post is silent an
 pass "no board"
 
 h=$(new_home bad); alert "$h" post t1 >/dev/null; assert_equals 2 "$?" "a bad request is a usage error"
+
+# A queued alert is posted by drain once the board is back, and a lead home with no board of its own files on its parent's.
+h=$(new_home drain); : > "$STUB_DOWN"
+alert "$h" post t1 --pr "$PR" >/dev/null
+alert "$h" drain >/dev/null
+assert_equals "" "$(card mergealert-acme-app-pull-7)" "drain posts nothing while the board is down"
+rm -f "$STUB_DOWN"
+alert "$h" drain >/dev/null
+assert_contains "$(card mergealert-acme-app-pull-7 | jq -r .title)" "Merged:" "drain posts the queued alert once the board is back"
+[ -e "$h/state/merge-alerts/sent/mergealert-acme-app-pull-7.json" ] && [ -z "$(ls "$h/state/merge-alerts/pending")" ] || fail "a drained alert moves to sent"
+pass "drain"
+h=$(new_home inherit none); parent=$T/parent-board; mkdir -p "$parent/config" "$parent/state"
+printf '#!/bin/sh\nexec x post --board %s "$@"\n' "$BOARD" > "$parent/config/post-merge"
+printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$h/.jg-squad-lead-parent"
+printf 'lead-b' > "$h/.jg-squad-lead-home"
+alert "$h" post t1 --pr "$PR" >/dev/null
+assert_contains "$(card mergealert-acme-app-pull-7 | jq -r .about)" "Squad Lead lead-b" "a lead without a board posts to its parent's board"
+pass "lead board inheritance"
