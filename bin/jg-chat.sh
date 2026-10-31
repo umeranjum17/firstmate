@@ -4,7 +4,10 @@
 #
 # Usage:
 #   jg-chat.sh send [--1on1] [--on <ref>] [--link <url>] [--owner <role>]
-#                   <lead-id|task-id> <text...>
+#                   [--act <kind>] <lead-id|task-id> <text...>
+#   jg-chat.sh respond [--on <ref>] [--link <url>] [--owner <role>]
+#                   [--act <kind>] <lead-id|task-id> <text...>
+#                                   record a response, deliver nothing
 #   jg-chat.sh read <lead-id|task-id|thread|->      print unread, then mark read
 #   jg-chat.sh mark <working|done> <lead-id|task-id|thread|->
 #   jg-chat.sh reply <lead-id|task-id|thread|-> <text...>
@@ -25,8 +28,11 @@
 #   text   what was said, one line, capped at 4000 characters
 #   status the state of a captain message: sent, read, working, replied, done;
 #          null on an agent, status or wake row, which nobody owes a reply to
-#   on, link, owner  only on a captain comment: the element it is on, that
-#          element's link, and the agent role assigned to answer it
+#   on, link, owner  only on a captain response (a comment or an answer on an
+#          element): the element it is on, that element's link, and the agent
+#          role assigned to answer it
+#   act    only with on: what the captain did there - comment, approve, refine,
+#          reject, or answer
 #   status_at        when each state was reached, {state: epoch}
 #   reply_at         the epoch of the agent row that answered it
 #
@@ -50,8 +56,10 @@
 # interrupts the agent's current turn through bin/jg-control.sh first, so the
 # message is read instead of waiting for the turn to end; the agent must be a
 # task in this home for that. --on makes the same message a comment on an
-# element: one record in the agent's thread carrying the element, its link and
-# the answering agent's role.
+# element: one record in the agent's thread carrying the element, its link, the
+# answering agent's role, and what he did there. `respond` writes that same
+# record and delivers nothing, so a path that owns its own delivery - the board
+# check - records the response once and wakes its owner from this row.
 #
 # STATUS MOVES are the agent path's, never a hand edit: `read` moves sent -> read
 # (stamped), `mark working` read -> working, `reply` -> replied with the reply
@@ -232,20 +240,26 @@ chat_log() { # <thread|''>
 # Captain path: record, count it as the captain's intervention, deliver through
 # the one send path. The record is written before delivery exactly as jg-send
 # writes its record before it rings: the message survives a failed delivery.
-cmd_send() {
-  local one_on_one=0 on='' link='' owner='' extra='{}' target text thread
+# The one recorder for a captain response. `send` delivers it; `respond` records
+# it alone, for a path that owns its own delivery - the board check records the
+# response here and wakes its owner from this row, so the store, not a board
+# path, is what a move can never silence.
+chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
+  local deliver=$1 one_on_one=0 on='' link='' owner='' act='' extra='{}' target text thread
+  shift
   while :; do
     case "${1:-}" in
       --1on1)
         one_on_one=1
         shift
         ;;
-      --on | --link | --owner)
+      --on | --link | --owner | --act)
         [ $# -ge 2 ] || usage
         case "$1" in
           --on) on=$2 ;;
           --link) link=$2 ;;
           --owner) owner=$2 ;;
+          --act) act=$2 ;;
         esac
         shift 2
         ;;
@@ -257,19 +271,27 @@ cmd_send() {
   shift
   text=$*
   [ -n "${text//[[:space:]]/}" ] || die 'a captain message needs text'
+  case "$act" in
+    '') [ -z "$on" ] || act=comment ;;
+    comment | approve | refine | reject | answer) ;;
+    *) die '--act takes comment, approve, refine, reject, or answer' ;;
+  esac
+  [ -z "$act" ] || [ -n "$on" ] || die '--act needs --on: a response is on an element'
   thread=$(chat_thread "$target")
   if [ -n "$on" ]; then
-    extra=$(jq -cn --arg on "$on" --arg link "$link" --arg owner "$owner" \
-      '{on: $on} + (if $link == "" then {} else {link: $link} end)
+    extra=$(jq -cn --arg on "$on" --arg act "$act" --arg link "$link" --arg owner "$owner" \
+      '{on: $on} + (if $act == "" then {} else {act: $act} end)
+         + (if $link == "" then {} else {link: $link} end)
          + (if $owner == "" then {} else {owner: $owner} end)') ||
       die 'cannot build the comment record'
   fi
-  # The KPI tag stays automatic: a board-typed or transcribed captain message is
-  # recorded exactly as the prompt hook records a typed one, so the turn-end
-  # guard asks for its tag the same way.
-  "$SCRIPT_DIR/jg-overwatch-kpi.sh" record "$text" >/dev/null 2>&1 || true
+  # The KPI tag stays automatic for what the captain wrote himself. A path that
+  # records a response already on the board must not count it again: it is one
+  # message, recorded where the board answer is ingested.
+  [ "$deliver" = 0 ] || "$SCRIPT_DIR/jg-overwatch-kpi.sh" record "$text" >/dev/null 2>&1 || true
   chat_append "$thread" captain "$target" captain sent "$text" "$extra" ||
     die 'cannot record the message; nothing was sent'
+  [ "$deliver" = 1 ] || return 0
   # Interrupt first: an Escape after the doorbell would cancel the turn that was
   # about to read the message.
   if [ "$one_on_one" = 1 ]; then
@@ -279,6 +301,9 @@ cmd_send() {
   JG_CHAT_FROM=captain "$SCRIPT_DIR/jg-send.sh" "$target" "$text" ||
     die 'recorded, but delivery to the agent failed; the record is kept, so steer the agent or resend'
 }
+
+cmd_send() { chat_captain_record 1 "$@"; }
+cmd_respond() { chat_captain_record 0 "$@"; }
 
 cmd_read() {
   local thread
@@ -346,6 +371,10 @@ case "$verb" in
   send)
     [ $# -ge 2 ] || usage
     cmd_send "$@"
+    ;;
+  respond)
+    [ $# -ge 2 ] || usage
+    cmd_respond "$@"
     ;;
   read)
     [ $# -eq 1 ] || usage
