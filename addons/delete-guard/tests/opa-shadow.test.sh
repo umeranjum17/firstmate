@@ -26,8 +26,8 @@ lines=$(wc -l < "$T/home/state/opa-shadow.log" 2>/dev/null || echo 0)
 [ "$lines" -eq "$records" ] && ok "one line per record ($records)" || no "line count: $lines of $records"
 
 # Every line names the record, both decisions and a verdict that agrees with those two decisions.
-bad=$(awk '!($1 ~ /^[0-9]+$/ && $2 ~ /^(block|allow)$/ && $3 ~ /^(block|allow)$/ && $4 ~ /^(agree|differ)$/ \
-  && (($2 == $3) == ($4 == "agree")))' "$T/home/state/opa-shadow.log" | wc -l)
+bad=$(awk '!($1 ~ /^[0-9]+$/ && $2 ~ /^(block|allow)$/ && $3 ~ /^(block|allow)$/ && $4 ~ /^(agree|differ|unscored)$/ \
+  && ($4 == "unscored" || ($2 == $3) == ($4 == "agree")))' "$T/home/state/opa-shadow.log" | wc -l)
 [ "$bad" -eq 0 ] && ok "every line has both decisions and a matching verdict" || no "$bad malformed line(s): $(head -2 "$T/home/state/opa-shadow.log")"
 
 # The comparison must actually compare: a run where OPA answered nothing would report all-agree on one side.
@@ -44,18 +44,13 @@ verdict() { node --input-type=module -e "import { blockedDelete } from '$ADDON/g
 [ "$(verdict 'rm -rf "$HOME"')" = block ] && [ "$(verdict 'rm -rf ./build')" = allow ] \
   && ok "guard still decides the same before and after" || no "guard behaviour changed"
 
-# The replay eval: one recorded decision both deciders agree on must pass, one they differ on must refuse.
-# Both corpora are single rows cut from the same recorded log, so this is real recorded input either way.
-agree=$(awk '$4 == "agree" { print $1; exit }' "$T/home/state/opa-shadow.log")
-differ=$(awk '$4 == "differ" { print $1; exit }' "$T/home/state/opa-shadow.log")
-[ -n "$agree" ] && [ -n "$differ" ] || no "the sample must hold one agreeing and one differing record"
-mkdir -p "$T/agree/state" "$T/differ/state"
-sed -n "${agree}p" "$LOG" > "$T/agree/state/delete-guard.log"
-sed -n "${differ}p" "$LOG" > "$T/differ/state/delete-guard.log"
-node "$ADDON/opa-shadow.mjs" "$T/agree" --opa "$OPA_BIN" --require-agreement >/dev/null 2>&1 \
-  && ok "the replay eval passes an agreeing record and would let the rule switch" || no "the eval refused an agreeing record"
-node "$ADDON/opa-shadow.mjs" "$T/differ" --opa "$OPA_BIN" --require-agreement >/dev/null 2>&1 \
-  && no "the replay eval let a differing decision through" || ok "the replay eval refuses a differing record"
+# The replay eval: a corpus whose every disagreement is a known gap passes, and a corpus with one more
+# disagreement refuses. The sample holds one known gap (record 154 of the fleet's log), so it is a real one.
+node "$ADDON/opa-shadow.mjs" "$T/home" --opa "$OPA_BIN" --expect "$ADDON/known-gaps.txt" >/dev/null 2>&1 \
+  && ok "the replay eval passes a corpus whose disagreements are all known gaps" || no "the eval refused a known gap"
+: > "$T/empty-gaps.txt"
+node "$ADDON/opa-shadow.mjs" "$T/home" --opa "$OPA_BIN" --expect "$T/empty-gaps.txt" > "$T/red.out" 2>&1 \
+  && no "the replay eval let an unnamed disagreement through" || ok "the replay eval refuses a disagreement it does not know"
 
 # A home with no recorded decisions is a refusal, not an empty success.
 mkdir -p "$T/bare"
