@@ -73,11 +73,13 @@ wait_for_file() {
 # the lock libraries sourced and $STATE set, and set HOLDER_PID to that child.
 # The pid travels in a variable, never on stdout: a command substitution would
 # wait on the child's inherited stdout until the child exits.
+# The prelude is written with escaped dollars so the child shell expands $1, $2,
+# and $3; the body arrives already literal from its here-document.
 HOLDER_PID=
 start_holder() {
   local state=$1 ready=$2 body=$3
   env JG_ROOT_OVERRIDE="${state%/state}" JG_STATE_OVERRIDE="$state" \
-    bash -c '. "$1"; . "$2"; STATE=$3; '"$body" \
+    bash -c ". \"\$1\"; . \"\$2\"; STATE=\$3; $body" \
     _ "$WAKE_LIB" "$ROOT/bin/jg-lease-lib.sh" "$state" "$ready" &
   HOLDER_PID=$!
   wait_for_file "$ready" || {
@@ -111,9 +113,12 @@ test_killed_holder_lets_the_next_send_deliver() {
   dir=$(setup_case killed-holder)
   state="$dir/home/state"
   start_holder "$state" "$dir/ready" \
-    'jg_lease_command_lock_acquire "$STATE/.jg-lease-command.lock" "holder" || exit 9
-     printf ready >"$4"
-     sleep 60'
+    "$(cat <<'EOS'
+jg_lease_command_lock_acquire "$STATE/.jg-lease-command.lock" "holder" || exit 9
+printf ready >"$4"
+sleep 60
+EOS
+)"
   pid=$HOLDER_PID
   kill -9 "$pid" 2>/dev/null
   wait "$pid" 2>/dev/null
@@ -189,9 +194,12 @@ test_no_steal_directory_survives_a_run() {
   # A signal must not strand the steal directory either: hold it exactly as the
   # acquire does, then kill the holder while it waits the way the acquire waits.
   start_holder "$state" "$dir/ready-steal" \
-    'jg_lock_steal_hold "$STATE/x.lock.steal" 5 || exit 9
-     printf ready >"$4"
-     while :; do sleep 0.1; done'
+    "$(cat <<'EOS'
+jg_lock_steal_hold "$STATE/x.lock.steal" 5 || exit 9
+printf ready >"$4"
+while :; do sleep 0.1; done
+EOS
+)"
   pid=$HOLDER_PID
   kill -TERM "$pid" 2>/dev/null
   wait "$pid" 2>/dev/null

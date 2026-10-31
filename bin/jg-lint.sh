@@ -12,7 +12,7 @@
 # local branch (changed-file mode, including the no-mistakes lint step) drops
 # --external-sources, keeps dataflow, and excludes SC1091, SC2034, SC2153,
 # and SC2329, the codes that need library context. CI checks those codes
-# on source-following attempts (see the memory fallback below). Explicit
+# on source-following attempts (see the memory failure handling below). Explicit
 # paths attempt --external-sources with the selected dataflow mode.
 # Tests stop source analysis at imported production modules because CI analyzes
 # every production shell separately as a canonical, source-aware root.
@@ -72,14 +72,14 @@
 # cannot apply the address-space limit at all) each root still runs in its
 # own ShellCheck process with identical diagnostics, just unbounded.
 #
-# If a source-following root exits with a memory failure, it is retried once
-# without --external-sources under the same memory limit and only the time
-# left in that root's original deadline; with under a second left, the
-# memory failure stands without a retry. A clean retry passes
-# with an explicit memory-fallback reason and warning; only the same
-# cross-file-dependent codes omitted in local no-source lint are excluded.
-# Other findings and failed retries still fail lint. The retry's diagnostics
-# replace the failed attempt's output; peak RSS is the maximum of both attempts.
+# If a source-following root exits with a memory failure under its bounds, it is
+# re-run once with the same --external-sources arguments under that root's own
+# measured address-space allowance (jg_lint_scoped_allowance below) and only the
+# time left in its original deadline. Cross-file codes are still checked: the
+# lint never buys a passing root by narrowing its analysis. A root with no
+# measured allowance, or with under a second of deadline left, fails on memory.
+# Findings and a failed re-run fail lint too. The re-run's diagnostics replace the
+# first attempt's output; peak RSS is the maximum of both attempts.
 #
 # Per-root evidence is incremental: workers append begin/end records (root,
 # mode, shard, start, end, duration, final exit status, reason, peak RSS when
@@ -89,7 +89,7 @@
 # log is retained at
 # <telemetry-without-.tsv>.roots.tsv (or <telemetry>.roots.tsv if there is no
 # .tsv suffix); otherwise it lives only in the
-# run's scratch dir. Reason values are ok, findings, memory-fallback,
+# run's scratch dir. Reason values are ok, findings,
 # timeout, memory, signal:<sig>, limit-unavailable, or error:<rc>.
 # Memory requires process-level evidence (a GHC exhaustion status or runtime
 # error on stderr), not an echoed source excerpt or an OOM phrase in a
@@ -107,7 +107,7 @@
 #   jg-lint.sh --fast [path]...       local lint with extended analysis disabled
 #   jg-lint.sh <path>...               lint explicit roots with the same config
 #   jg-lint.sh --jobs <1|2> [path]...  override concurrent worker count
-#   jg-lint.sh --partition <1of2|2of2> lint one canonical CI partition (see fallback above)
+#   jg-lint.sh --partition <1of2|2of2> lint one canonical CI partition (see memory handling above)
 #   jg-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   jg-lint.sh --required-version      print the ShellCheck pin
 #   jg-lint.sh --list-files            print the file set that would be linted
@@ -138,7 +138,7 @@ set -u
 
 REQUIRED_SHELLCHECK=0.11.0
 # Cross-file codes that need --external-sources. No-source checks (local
-# changed-file mode and memory fallback) cannot judge them.
+# changed-file mode) cannot judge them.
 LOCAL_NOX_EXCLUDE=SC1091,SC2034,SC2153,SC2329
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SELF="$SELF_DIR/jg-lint.sh"
@@ -256,11 +256,44 @@ jg_lint_classify_root() {  # <rc> <root-stderr-file>
   esac
 }
 
+# A scoped address-space allowance for a root measured to outgrow the default
+# envelope. Every number here is a measurement, never a guess: with --norc
+# --external-sources and full extended analysis, ShellCheck 0.11.0 on x86_64
+# Linux finished these roots only under a wider address-space limit, and failed
+# every one of them with GHC heap exhaustion (rc=251) at the 12 GiB default. The
+# pair recorded per root is the address-space peak that completed and the
+# resident peak that matters for runner capacity:
+#
+#   root                                     address space      resident
+#   bin/jg-spawn.sh                          16,781,220 KiB    13,499,424 KiB
+#   bin/jg-teardown.sh                       16,781,220 KiB    14,097,224 KiB
+#   bin/jg-watch.sh                          16,781,220 KiB     9,503,488 KiB
+#   tests/jg-launch-prompt-signals-live-e2e  16,781,220 KiB    13,014,784 KiB
+#
+# 24 GiB is the measured 16,781,220 KiB peak plus about 43% headroom, so the
+# allowance is still a real ceiling that bounds runaway growth instead of
+# accommodating it. A heavy root with no entry here keeps the default envelope
+# and fails loudly on memory rather than quietly analysing less.
+# JG_LINT_ROOT_ALLOWANCE_KIB, when set, is the allowance for every root in this
+# run, the same kind of explicit knob as JG_LINT_ROOT_MEMORY_KIB; the fast eval
+# uses it to exercise the scoped re-run on a fixture root.
+jg_lint_scoped_allowance() {  # <path>
+  if [ -n "${JG_LINT_ROOT_ALLOWANCE_KIB:-}" ]; then
+    printf '%s\n' "$JG_LINT_ROOT_ALLOWANCE_KIB"
+    return 0
+  fi
+  case "${1#./}" in
+    bin/jg-spawn.sh|bin/jg-teardown.sh|bin/jg-watch.sh|tests/jg-launch-prompt-signals-live-e2e.test.sh)
+      printf '%s\n' 25165824
+      ;;
+  esac
+}
+
 # Run one ShellCheck invocation under the given deadline and the per-root
 # address-space limit, returning its exit status in JG_LINT_LAST_RC.
-jg_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <args...>
-  local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0
-  shift 5
+jg_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <memory-kib> <args...>
+  local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 memory_kib=$6 invocation_rc=0
+  shift 6
   if [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
     # workers use), so the owner's TERM-then-KILL group sweep cannot kill it
@@ -272,7 +305,7 @@ jg_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     ( JG_EXEC_TIMED_OWNER_PID=$$ exec "${JG_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$seconds" "$JG_LINT_INTERNAL_GRACE" \
-        "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$JG_LINT_INTERNAL_MEMORY_KIB" \
+        "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$memory_kib" \
         "$JG_LINT_SHELLCHECK" "$@" -- "$path" ) > "$root_out" 2> "$root_err" &
     JG_LINT_WORKER_RUN_PID=$!
     wait "$JG_LINT_WORKER_RUN_PID" || invocation_rc=$?
@@ -293,13 +326,12 @@ jg_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   local root_out="$output_dir/root.$shard_index.$index.out"
   local root_err="$output_dir/root.$shard_index.$index.err"
   local rss_file="$output_dir/root.$shard_index.$index.rss"
-  local fallback_out="$output_dir/root.$shard_index.$index.fallback.out"
-  local fallback_err="$output_dir/root.$shard_index.$index.fallback.err"
-  local fallback_rss="$output_dir/root.$shard_index.$index.fallback.rss"
+  local scoped_out="$output_dir/root.$shard_index.$index.scoped.out"
+  local scoped_err="$output_dir/root.$shard_index.$index.scoped.err"
+  local scoped_rss="$output_dir/root.$shard_index.$index.scoped.rss"
   local start_ms end_ms duration_ms invocation_rc=0 reason rss_kib initial_rc initial_reason
-  local fallback_secs
+  local scoped_secs scoped_allowance
   local final_follow_sources=${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}
-  local -a fallback_args
   start_ms=$(jg_lint_now_ms)
   if [ -n "${JG_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'begin\t%s\t%s\t%s\t%s\t%s\n' \
@@ -311,49 +343,51 @@ jg_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$path" "$shard_index" "${JG_LINT_INTERNAL_MODE:-unknown}" >&2
   fi
   jg_lint_exec_root "$path" "$root_out" "$root_err" "$rss_file" \
-    "$JG_LINT_INTERNAL_ROOT_SECS" "${JG_LINT_WORKER_ARGS[@]}"
+    "$JG_LINT_INTERNAL_ROOT_SECS" "$JG_LINT_INTERNAL_MEMORY_KIB" "${JG_LINT_WORKER_ARGS[@]}"
   invocation_rc=$JG_LINT_LAST_RC
   reason=$(jg_lint_classify_root "$invocation_rc" "$root_err")
   initial_rc=$invocation_rc
   initial_reason=$reason
-  # The retry spends what is left of this root's one deadline rather than a
-  # fresh one, so both attempts together still fit the budget CI sized its job
-  # timeout around.
-  fallback_secs=$(( (start_ms + JG_LINT_INTERNAL_ROOT_SECS * 1000 - $(jg_lint_now_ms)) / 1000 ))
-  if [ "$reason" = memory ] \
-    && [ "${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
-    && [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ] \
-    && [ "$fallback_secs" -lt 1 ]; then
-    printf 'jg-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s); no time left in its %ss deadline to retry without it\n' \
-      "$path" "$initial_reason" "$initial_rc" "$JG_LINT_INTERNAL_ROOT_SECS" >> "$output_dir/shard.$shard_index.out"
+  # A root that outgrows the default envelope is re-run under its own measured
+  # allowance with the SAME source-following arguments, so its cross-file codes
+  # are still checked. Dropping --external-sources to fit is never an option: it
+  # traded a checked root for a narrower analysis that cannot report SC1091,
+  # SC2034, SC2153, or SC2329. The scoped attempt spends what is left of this
+  # root's one deadline rather than a fresh one, so both attempts together still
+  # fit the job timeout CI sized around it. A root with no measured allowance, or
+  # no time left, fails on memory and says so.
+  scoped_secs=$(( (start_ms + JG_LINT_INTERNAL_ROOT_SECS * 1000 - $(jg_lint_now_ms)) / 1000 ))
+  scoped_allowance=
+  if [ "$reason" = memory ] && [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
+    scoped_allowance=$(jg_lint_scoped_allowance "$path")
+  fi
+  if [ "$reason" = memory ] && [ -n "$scoped_allowance" ] && [ "$scoped_secs" -ge 1 ]; then
+    jg_lint_exec_root "$path" "$scoped_out" "$scoped_err" "$scoped_rss" \
+      "$scoped_secs" "$scoped_allowance" "${JG_LINT_WORKER_ARGS[@]}"
+    invocation_rc=$JG_LINT_LAST_RC
+    reason=$(jg_lint_classify_root "$invocation_rc" "$scoped_err")
+    rss_kib=$(jg_lint_max_root_rss \
+      "$(jg_lint_root_rss "$rss_file")" "$(jg_lint_root_rss "$scoped_rss")")
+    printf 'jg-lint: %s outgrew the %s KiB default address-space envelope (reason=%s rc=%s); re-ran the same source-following analysis under its measured %s KiB allowance\n' \
+      "$path" "$JG_LINT_INTERNAL_MEMORY_KIB" "$initial_reason" "$initial_rc" "$scoped_allowance" \
+      >> "$output_dir/shard.$shard_index.out"
+    if [ "$reason" != ok ] && [ "$reason" != findings ]; then
+      printf '; the scoped re-run did not finish (reason=%s rc=%s), so the memory failure stands\n' \
+        "$reason" "$invocation_rc" >> "$output_dir/shard.$shard_index.out"
+    else
+      printf '; cross-file codes were still checked\n' >> "$output_dir/shard.$shard_index.out"
+    fi
+    cat "$scoped_out" "$scoped_err" >> "$output_dir/shard.$shard_index.out"
+  elif [ "$reason" = memory ] && [ "${JG_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
+    if [ -z "$scoped_allowance" ]; then
+      printf 'jg-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s) and no measured scoped allowance covers it; the memory failure stands\n' \
+        "$path" "$initial_reason" "$initial_rc" >> "$output_dir/shard.$shard_index.out"
+    else
+      printf 'jg-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s); no time left in its %ss deadline for the scoped re-run, so the memory failure stands\n' \
+        "$path" "$initial_reason" "$initial_rc" "$JG_LINT_INTERNAL_ROOT_SECS" >> "$output_dir/shard.$shard_index.out"
+    fi
     rss_kib=$(jg_lint_root_rss "$rss_file")
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
-  elif [ "$reason" = memory ] \
-    && [ "${JG_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
-    fallback_args=()
-    for arg in "${JG_LINT_WORKER_ARGS[@]}"; do
-      [ "$arg" = --external-sources ] || fallback_args+=("$arg")
-    done
-    [ -z "$LOCAL_NOX_EXCLUDE" ] || fallback_args+=("--exclude=$LOCAL_NOX_EXCLUDE")
-    jg_lint_exec_root "$path" "$fallback_out" "$fallback_err" "$fallback_rss" \
-      "$fallback_secs" "${fallback_args[@]}"
-    final_follow_sources=0
-    invocation_rc=$JG_LINT_LAST_RC
-    reason=$(jg_lint_classify_root "$invocation_rc" "$fallback_err")
-    rss_kib=$(jg_lint_max_root_rss \
-      "$(jg_lint_root_rss "$rss_file")" "$(jg_lint_root_rss "$fallback_rss")")
-    printf 'jg-lint: %s hit the memory ceiling with --external-sources (reason=%s rc=%s); retried without it' \
-      "$path" "$initial_reason" "$initial_rc" >> "$output_dir/shard.$shard_index.out"
-    if [ "$reason" = ok ]; then
-      reason=memory-fallback
-      invocation_rc=0
-      printf '; fallback passed with cross-file codes excluded (%s)\n' "$LOCAL_NOX_EXCLUDE" \
-        >> "$output_dir/shard.$shard_index.out"
-    else
-      printf '; fallback reason=%s rc=%s\n' "$reason" "$invocation_rc" \
-        >> "$output_dir/shard.$shard_index.out"
-    fi
-    cat "$fallback_out" "$fallback_err" >> "$output_dir/shard.$shard_index.out"
   else
     rss_kib=$(jg_lint_root_rss "$rss_file")
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
@@ -366,7 +400,7 @@ jg_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" \
       >> "$JG_LINT_INTERNAL_ROOTS_LOG"
   fi
-  if [ "${JG_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
+  if [ "${JG_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ]; }; then
     printf 'jg-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
       "$path" "$reason" "$invocation_rc" "$duration_ms" "$rss_kib" >&2
   fi
@@ -979,21 +1013,18 @@ fi
 # ShellCheck process, unbounded, for local developer lint.
 ROOT_SECONDS=${JG_LINT_ROOT_SECONDS:-1200}
 ROOT_GRACE=${JG_LINT_ROOT_GRACE:-5}
-# 12 GiB of virtual address space per analysis process. ulimit -v caps
-# address space, not resident memory; ShellCheck's GHC runtime reserves about
-# a third of that space, leaving ~8 GiB usable heap per root. Measured x86_64
-# demand for the heaviest roots is near 5.5-6 GiB: the 8 GiB address-space
-# cap's ~5.33 GiB wall caught bin/jg-spawn.sh, bin/jg-teardown.sh,
-# tests/jg-pending-reply.test.sh, and
-# tests/jg-launch-prompt-signals-live-e2e.test.sh. CI runs one root per
-# lint job, so worst-case resident demand is ~8 GiB plus runner overhead,
-# inside the 16 GiB runner. Local lint defaults to two workers; two such
-# caps allow ~16 GiB resident plus host overhead, so use JG_LINT_JOBS=1 on
-# smaller local machines. A root that exceeds its cap fails by name.
-# Never disable, narrow, or redirect source-following to fit a root under
-# the cap. The roots sidecar records each root's peak RSS; roots peaking
-# above about 3 GiB resident are reduction candidates,
-# bin/jg-pending-reply-lib.sh first (its separate dedup fix is PR 5753).
+# 12 GiB of virtual address space per analysis process is the default envelope.
+# ulimit -v caps address space, not resident memory, and ShellCheck's GHC runtime
+# turns that cap into roughly two thirds of it usable heap. The roots measured
+# above this default are named in jg_lint_scoped_allowance, each with the
+# address-space and resident peak it recorded; they re-run under that measured
+# allowance instead of dropping source following. Every other root keeps this
+# default, and one that exceeds it fails by name. The resident peak is what
+# constrains the runner: the largest measured one is 14,097,224 KiB, inside the
+# 16 GiB CI runner with about 2 GiB for the runner itself, and CI runs one root
+# per lint job. Local lint defaults to two workers, so use JG_LINT_JOBS=1 on
+# smaller local machines. Never disable, narrow, or redirect source-following to
+# fit a root under an envelope. The roots sidecar records each root's peak RSS.
 ROOT_MEMORY_KIB=${JG_LINT_ROOT_MEMORY_KIB:-12582912}
 for bound_pair in \
   "JG_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
