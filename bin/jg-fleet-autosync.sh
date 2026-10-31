@@ -15,13 +15,13 @@
 #           never forcing, merging, or stashing, so unlanded work stays put. Leads
 #           whose advance changed the loaded instruction surface (AGENTS.md, bin/,
 #           .agents/skills/) then go to bin/jg-squad-lead-restart.sh, which persists
-#           the mate's open records first and queues behind its current turn, so no
-#           lead is restarted mid-write or while its lane is producing. A skipped
-#           home, or one whose advance touched no instruction file, keeps running.
-#           Single-flight: a second pass reports "busy" and exits 0.
-#   check   The backup path and the drift alarm for the watcher's check sweep:
-#           refresh origin once, run the pass when any local copy is behind (a merge
-#           the merge script never saw), and print one line per copy that stayed past
+#           their open records first and queues behind the current turn, so no lead
+#           restarts mid-write or mid-lane. A skipped home, or one whose advance
+#           touched no instruction file, keeps running. Single-flight: a second pass
+#           reports "busy" and exits 0.
+#   check   The backup path and drift alarm for the watcher's check sweep: refresh
+#           origin once, run the pass when any local copy is behind (a merge the merge
+#           script never saw), and print one line per copy that stayed past
 #           JG_AUTOSYNC_BEHIND_MAX merges behind for JG_AUTOSYNC_ALARM_SECS. Silent
 #           otherwise, and a reported distance does not repeat until it changes.
 #   digest  One line per local copy: "<copy>: current" or "<copy>: <n> behind";
@@ -29,8 +29,8 @@
 #   arm     Write and bind the check shim; disarm retires it. The check id is
 #           fleet-autosync and the watcher's sweep cadence sets how often it runs.
 #
-# Copy ids are "primary" for this home's checkout and "jg-<id>" per live Squad
-# Lead, and only local homes are converged: a remote home is reached by its own host.
+# Copy ids are "primary" and "jg-<id>"; only local homes are converged, because a
+# remote home is reached by its own host.
 #
 # Environment: JG_HOME, JG_ROOT_OVERRIDE, JG_STATE_OVERRIDE, JG_DATA_OVERRIDE,
 #   JG_AUTOSYNC_BEHIND_MAX (2) and JG_AUTOSYNC_ALARM_SECS (600).
