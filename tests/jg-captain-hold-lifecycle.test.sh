@@ -749,6 +749,64 @@ test_hold_fails_when_the_addon_signoff_raise_fails() {
   pass "a failing add-on sign-off raise fails the hold"
 }
 
+# A hold that is the captain's own instruction - his stop order, or a branch we
+# preserved instead of landing - records the hold and raises nothing: no card for
+# him and no ask for Main. The recorded card his phone showed him is the case; its
+# record number is a placeholder, because the repo's owner-details guard forbids
+# committing his own number to a public repository.
+hold_with_reason() {  # <home> <addons-dir> <log> <task-id> <reason>
+  local home=$1 addons=$2 log=$3 id=$4 reason=$5
+  env -u JG_CODE_ROOT PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_ADDONS_DIR="$addons" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    SIGNOFF_LOG="$log" SIGNOFF_STATUS=0 \
+    "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Route the card" --reason "$reason" --repo sample
+}
+
+test_a_hold_that_is_the_captains_own_instruction_raises_no_card() {
+  local home addons log out rc=0 id=stop-order-held real=stop-order-real-ask
+  home=$(make_home stop-order-held)
+  addons="$home/addons"
+  log="$home/signoff.log"
+  mkdir -p "$home/projects/sample" "$home/state/procevent"
+  : > "$home/state/procevent/signoff.source"
+  signoff_addon_stub "$addons"
+  out=$(hold_with_reason "$home" "$addons" "$log" "$id" \
+    "captain stop order Main42 holds this lane; branch preserved unmerged" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a stop-order hold was refused instead of recorded: $out"
+  assert_grep "$id" "$home/data/backlog.md" "the stop-order hold was not recorded"
+  assert_absent "$log" "a stop-order hold raised a card"
+  assert_absent "$home/data/overwatch-decisions.md" "a stop-order hold was recorded for Main as a board ask"
+  # The counter-case: a real product question still reaches the board.
+  hold_with_reason "$home" "$addons" "$log" "$real" \
+    "Ship the new sign-in screen this week?" >/dev/null 2>&1 || fail "a real captain ask was refused"
+  assert_grep "raise|$real|" "$log" "a real captain ask raised no card"
+  pass "a stop-order hold records the hold alone, and a real ask still raises its card"
+}
+
+test_a_parked_hold_raises_no_card() {
+  local home addons log out rc=0 id=parked-held
+  home=$(make_home parked-held)
+  addons="$home/addons"
+  log="$home/signoff.log"
+  mkdir -p "$home/projects/sample" "$home/state/procevent"
+  : > "$home/state/procevent/signoff.source"
+  signoff_addon_stub "$addons"
+  cat > "$home/data/backlog.md" <<EOF
+## In flight
+- [ ] $id - Route the card (repo: sample) (kind: ship) (hold: waiting on a parked lane) (hold-kind: parked)
+
+## Queued
+
+## Done
+EOF
+  out=$(hold_with_reason "$home" "$addons" "$log" "$id" "who signs off the release" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a parked hold was refused instead of recorded: $out"
+  assert_grep "(hold-kind: captain)" "$home/data/backlog.md" "the parked hold was not re-recorded for the captain"
+  assert_absent "$log" "a parked hold raised a card"
+  assert_absent "$home/data/overwatch-decisions.md" "a parked hold was recorded for Main as a board ask"
+  pass "a hold whose kind is parked records the hold alone and raises no card"
+}
+
 # A Beads workspace with due.required and no types.custom captain type is the
 # live fleet shape. hold must still create a fresh captain row there: waive
 # due rather than invent one, and map to native type task rather than register
@@ -4594,4 +4652,6 @@ test_hold_raises_its_signoff_card_through_the_armed_addon_script
 test_hold_skips_the_addon_signoff_card_while_unarmed
 test_hold_falls_back_to_the_fork_signoff_adapter_without_the_addon
 test_hold_fails_when_the_addon_signoff_raise_fails
+test_a_hold_that_is_the_captains_own_instruction_raises_no_card
+test_a_parked_hold_raises_no_card
 test_hold_create_honors_the_task_priority_check

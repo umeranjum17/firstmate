@@ -23,6 +23,15 @@ JG_ASK_MUST_CATEGORIES='money security public-release discard-unlanded design-pi
 #      file or card name, no path.
 #   4. A card that breaks one of these is refused with one line naming the rule.
 JG_ASK_CAPTAIN_STOP_MARK='captain stop order'
+# The words that make a hold the captain's own instruction rather than a question
+# back to him: a stop order, and a branch we preserved instead of landing. Matched
+# case-insensitively against the whole text, so a hold reason carrying them never
+# becomes a card on any path that shares this test.
+JG_ASK_OWN_INSTRUCTION_PATTERNS="$JG_ASK_CAPTAIN_STOP_MARK
+(^|[^a-z0-9])stop[ -]order([^a-z0-9]|$)
+branch[^a-z0-9]+preserved
+preserved[^a-z0-9]+(branch|unmerged|unlanded)
+(branch|unmerged|unlanded)[^a-z0-9]+preserved"
 # Our own vocabulary, which never reaches his eyes: the fleet's own words for
 # its work, and every kind of identifier we file a task, lane, card or merge under.
 JG_ASK_JUNK_PATTERNS='(jg|fm|ask|merge)-[a-z0-9][a-z0-9._-]+
@@ -65,6 +74,21 @@ jg_ask_card_category() {  # <detail text>
   return 0
 }
 
+# Rule 1's test, owned here so the hold path and every card path agree: the text
+# says the captain already gave this instruction, so nothing asks him again.
+jg_ask_own_instruction() {  # <text>
+  local t line
+  t=$(printf '%s' "${1-}" | tr '[:upper:]' '[:lower:]')
+  [ -n "$t" ] || return 1
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    printf '%s\n' "$t" | grep -Eq "$line" && return 0
+  done <<EOF
+$JG_ASK_OWN_INSTRUCTION_PATTERNS
+EOF
+  return 1
+}
+
 # Print the first internal name in a card's text, or nothing. Main's own name
 # and number are matched before the text is lowercased, so the ordinary English
 # word it shares its spelling with ("the main page") stays a plain word.
@@ -98,11 +122,10 @@ jg_ask_card_refusal() {  # <ask-ref> <options> <title> [<body>...]
   shift 2 || true
   shift || true
   text="$title ${*:-}"
-  case "$(printf '%s' "$text" | tr '[:upper:]' '[:lower:]')" in
-    *"$JG_ASK_CAPTAIN_STOP_MARK"*)
-      printf 'refused: rule 1, your own stop order is your instruction and never a card back to you\n'
-      return 1 ;;
-  esac
+  if jg_ask_own_instruction "$text"; then
+    printf 'refused: rule 1, your own stop order is your instruction and never a card back to you\n'
+    return 1
+  fi
   case "$ref" in
     waiting-*)
       printf "refused: rule 2, a stuck worker is Main's to unblock and never a card for you\n"

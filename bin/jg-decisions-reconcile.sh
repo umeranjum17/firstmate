@@ -16,6 +16,12 @@
 # check   One deterministic pass, no model. Read the open cards through
 #         sign-off-axi's own `list --json`, then decide each card from durable
 #         records only, in this order, first match wins:
+#           own-instruction
+#                     the card's hold is the captain's own instruction - its hold
+#                     kind is parked, or its reason names a stop order or a branch
+#                     we preserved instead of landing (bin/jg-ask-gate-lib.sh owns
+#                     the words). The hold path raises no card for such a hold, so
+#                     a card that exists is a leftover and is dismissed.
 #           answered  an answers log beside the board carries a line for the
 #                     card key. A board reached through a symlink keeps one log
 #                     beside the link and one beside its target; both are read,
@@ -99,6 +105,8 @@ unset _jg_d
 . "$SCRIPT_DIR/jg-tasks-axi-lib.sh"
 # shellcheck source=bin/jg-backlog-transition-lib.sh
 . "$SCRIPT_DIR/jg-backlog-transition-lib.sh"
+# shellcheck source=bin/jg-ask-gate-lib.sh
+. "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 
 die() { printf 'jg-decisions-reconcile: %s\n' "$1" >&2; exit "${2:-1}"; }
 usage() {
@@ -235,8 +243,23 @@ row_state() {  # <task-id>
     /^  / { t = $1; sub(/^ +/, "", t); if (t == id) { print $2; exit } }
   '
 }
+
+# 0 when the task's hold is the captain's own instruction rather than a question
+# back to him, so the card built from it cannot be his to answer. An unreadable
+# row answers "no" here, because a record this pass cannot read keeps its card.
+hold_own_instruction() {  # <task-id>
+  local id=$1 out kind reason
+  [ -n "${BACKLOG_DATA:-}" ] || return 1
+  out=$(jg_backlog_row_show "$BACKLOG_DATA" "$id") || return 1
+  kind=$(printf '%s\n' "$out" | sed -n 's/^  hold_kind: *//p' | sed -n '1p')
+  [ "$kind" != parked ] || return 0
+  reason=$(printf '%s\n' "$out" | sed -n 's/^  hold_reason: *//p' | sed -n '1p')
+  # The stored reason is encoded only for parentheses and line breaks, neither of
+  # which any of the words below are spelled with, so it matches as it stands.
+  jg_ask_own_instruction "$reason"
+}
 cmd_check() {
-  local dry=$1 json board key filer resolved backlog_data task row due_after
+  local dry=$1 json board key filer resolved backlog_data task row due_after BACKLOG_DATA
   local reason evidence rc cleared=0 open_before=0 keep_now='' report='' line logged
   local answer_keys answers answers_log answers_alt
   due_after=$(( INTERVAL - $(age_of "$STAMP") ))
@@ -273,7 +296,9 @@ cmd_check() {
   # One backlog read for the whole pass (jg_backlog_row_list is the single owner
   # of backlog reads, and row_state reads this one listing).
   ROWS=''
+  BACKLOG_DATA=''
   if backlog_data=$(jg_backlog_data_absolute "$DATA" 2>/dev/null); then
+    BACKLOG_DATA=$backlog_data
     ROWS=$(jg_backlog_row_list "$backlog_data" 2>/dev/null) || ROWS=''
   fi
   # Every task id this home knows, from a task record or a backlog row. A card
@@ -290,7 +315,12 @@ cmd_check() {
     key_ok "$key" || continue
     open_before=$(( open_before + 1 ))
     reason='' evidence=''
-    if [ -n "$answer_keys" ] && printf '%s\n' "$answer_keys" | grep -qxF -- "$key"; then
+    task=''
+    task=$(card_task "$key" "$filer") || task=''
+    if [ -n "$task" ] && hold_own_instruction "$task"; then
+      reason=own-instruction
+      evidence=$task
+    elif [ -n "$answer_keys" ] && printf '%s\n' "$answer_keys" | grep -qxF -- "$key"; then
       reason=answered
       evidence=$(printf '%s\n' "$answers" | awk -F'\t' -v k="$key" '$1 == k { print $2; exit }')
       [ -n "$evidence" ] || evidence=$answers_log
@@ -298,7 +328,7 @@ cmd_check() {
       && [ -n "$line" ]; then
       reason=resolved evidence=$line
     fi
-    if [ -z "$reason" ] && task=$(card_task "$key" "$filer"); then
+    if [ -z "$reason" ] && [ -n "$task" ]; then
       rc=0
       evidence=$(merge_record "$task") || rc=$?
       if [ "$rc" -eq 0 ]; then
