@@ -26,9 +26,12 @@
 #       this at generation activation so a replaced branch conversation's
 #       leases never outlive it.
 #   jg-lease.sh sweep
-#       Remove every provably stale lease in this home. Run at session start
-#       (a lease held by a dead actor is cleared at session start); safe to
-#       run any time - a live lease is never touched.
+#       Remove every provably stale lease in this home, then clear this home's
+#       abandoned lease-command lock scratch (owner directories of dead holders,
+#       and a steal mutex no live section can still own), printing each path it
+#       removed. Run at session start (a lease held by a dead actor is cleared at
+#       session start); safe to run any time - a live lease and a live lock
+#       holder are never touched.
 #
 # The default actor is $JG_SUPERVISION_ACTOR (else main); when --actor is
 # supplied for a mutation, it must name that calling actor. Exit codes: 0 ok,
@@ -207,5 +210,11 @@ case "$CMD" in
       jg_lease_valid_id "$TASK" || continue
       jg_lease_clear_stale "$TASK"
     done
+    LOCK_SCRATCH_REMOVED=$(jg_lock_sweep_stale_scratch "$LEASE_COMMAND_LOCK")
+    if [ -n "$LOCK_SCRATCH_REMOVED" ]; then
+      printf '%s\n' "$LOCK_SCRATCH_REMOVED"
+    fi
+    printf 'lease-command lock scratch removed: %s\n' \
+      "$(printf '%s' "$LOCK_SCRATCH_REMOVED" | grep -c . || true)"
     ;;
 esac

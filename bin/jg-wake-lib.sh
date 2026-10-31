@@ -584,6 +584,7 @@ jg_lock_clean_known_files() {
   local lockdir=$1
   rm -f \
     "$lockdir/pid" \
+    "$lockdir/task" \
     "$lockdir/jg-home" \
     "$lockdir/pid-identity" \
     "$lockdir/role" \
@@ -650,9 +651,17 @@ jg_lock_points_to_owner() {
 }
 
 jg_lock_discard_owner() {
-  local ownerdir=$1
+  local ownerdir=$1 stray
   [ -n "$ownerdir" ] || return 0
   jg_lock_clean_known_files "$ownerdir"
+  # An acquire a signal killed mid-section can leave a nested link behind (the
+  # shapes jg_lock_remove_stray_owner_link and every other path here no longer
+  # create). rmdir would then fail on a non-empty directory and leak it for
+  # good, so drop link entries too: an owner directory holds lock scratch only.
+  for stray in "$ownerdir"/* "$ownerdir"/.[!.]* "$ownerdir"/..?*; do
+    [ -L "$stray" ] || continue
+    rm -f -- "$stray" 2>/dev/null || true
+  done
   rmdir "$ownerdir" 2>/dev/null || true
 }
 
@@ -744,6 +753,56 @@ jg_lock_remove_path() {
   fi
   jg_lock_clean_known_files "$lockdir"
   rmdir "$lockdir" 2>/dev/null
+}
+
+# jg_lock_owner_dir_is_stale <owner-dir>: 0 iff an owner directory is provably
+# abandoned - a dead recorded pid, or no usable pid record at all while nothing
+# but link entries and known scratch remain inside, past the same
+# JG_LOCK_STALE_AFTER floor that protects a half-written owner. A live pid, an
+# unreadable age, or an unrecognized regular file answers "not stale".
+jg_lock_owner_dir_is_stale() {
+  local dir=$1 pid floor age
+  [ -d "$dir" ] && [ ! -L "$dir" ] || return 1
+  pid=$(cat "$dir/pid" 2>/dev/null || true)
+  case "$pid" in
+    '' | *[!0-9]*) ;;
+    *)
+      jg_pid_alive "$pid" && return 1
+      return 0
+      ;;
+  esac
+  if find "$dir" -mindepth 1 -maxdepth 1 -type f ! -name pid ! -name task 2>/dev/null | grep -q .; then
+    return 1
+  fi
+  floor=$JG_LOCK_STALE_AFTER
+  case "$floor" in '' | *[!0-9]* | 0 | 1) floor=2 ;; esac
+  age=$(jg_path_age "$dir")
+  case "$age" in '' | *[!0-9]*) return 1 ;; esac
+  [ "$age" -ge "$floor" ]
+}
+
+# jg_lock_sweep_stale_scratch <lockdir>: remove one lock's provably abandoned
+# owner directories and its abandoned steal mutex, printing each path removed.
+# Single owner of lock-scratch hygiene: the bounded lease-command acquire runs it
+# once past its wait bound and bin/jg-lease.sh sweep runs it on demand. A live
+# holder's directories are never touched.
+jg_lock_sweep_stale_scratch() {
+  local lockdir=$1 path owner
+  for path in "$lockdir".steal "$lockdir".steal.owner.* "$lockdir".owner.*; do
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    if [ -L "$path" ]; then
+      owner=$(jg_lock_link_owner "$path" 2>/dev/null || true)
+      [ -n "$owner" ] || continue
+      jg_lock_owner_dir_is_stale "$owner" || continue
+      rm -f -- "$path" 2>/dev/null || continue
+      jg_lock_discard_owner "$owner"
+    else
+      jg_lock_owner_dir_is_stale "$path" || continue
+      jg_lock_discard_owner "$path"
+    fi
+    [ -e "$path" ] || [ -L "$path" ] || printf '%s\n' "$path"
+  done
+  return 0
 }
 
 jg_lock_mid_acquire_is_fresh() {
@@ -1269,13 +1328,78 @@ jg_lock_reap_dead_link() {
   jg_lock_discard_owner "$tomb"
 }
 
+# The steal mutex serializes stale-owner reclamation for one lock and every
+# acquirer in the home contends for it, so scratch it leaves behind blocks that
+# lock for good. Two hazards are closed here. A signal that kills a holder
+# mid-section: jg_lock_steal_hold arms cleanup for the signals the caller does
+# not already handle - a caller with its own handler owns its cleanup, and
+# replacing it would strand whatever else it holds - and jg_lock_release restores
+# them. A directory whose recorded pid was recycled onto an unrelated live
+# process, which no liveness test can tell from a working holder: a caller may
+# name a max age as the abandonment proof instead, because a real steal section
+# is sub-second.
+JG_LOCK_STEAL_LOCK=
+JG_LOCK_STEAL_PREV_TERM=
+JG_LOCK_STEAL_PREV_INT=
+JG_LOCK_STEAL_PREV_HUP=
+
+jg_lock_steal_trap_restore() {
+  JG_LOCK_STEAL_LOCK=
+  [ -n "$JG_LOCK_STEAL_PREV_TERM" ] || trap - TERM
+  [ -n "$JG_LOCK_STEAL_PREV_INT" ] || trap - INT
+  [ -n "$JG_LOCK_STEAL_PREV_HUP" ] || trap - HUP
+  JG_LOCK_STEAL_PREV_TERM=
+  JG_LOCK_STEAL_PREV_INT=
+  JG_LOCK_STEAL_PREV_HUP=
+}
+
+jg_lock_steal_trap_install() {  # <steal-lock>
+  JG_LOCK_STEAL_LOCK=$1
+  JG_LOCK_STEAL_PREV_TERM=$(trap -p TERM)
+  JG_LOCK_STEAL_PREV_INT=$(trap -p INT)
+  JG_LOCK_STEAL_PREV_HUP=$(trap -p HUP)
+  [ -n "$JG_LOCK_STEAL_PREV_TERM" ] || trap 'jg_lock_steal_signal TERM 143' TERM
+  [ -n "$JG_LOCK_STEAL_PREV_INT" ] || trap 'jg_lock_steal_signal INT 130' INT
+  [ -n "$JG_LOCK_STEAL_PREV_HUP" ] || trap 'jg_lock_steal_signal HUP 129' HUP
+}
+
+# The trap body: drop this process's steal directory, then die the way the signal
+# would have. A trap cannot preempt a long foreground command, so the age proof
+# above is the backstop for a holder killed inside one.
+jg_lock_steal_signal() {  # <signal> <exit-code>
+  local lock=$JG_LOCK_STEAL_LOCK
+  jg_lock_steal_trap_restore
+  [ -z "$lock" ] || jg_lock_release "$lock" || true
+  exit "$2"
+}
+
+# jg_lock_steal_hold <steal-lock> [max-age-secs]: take the steal mutex and arm
+# its signal cleanup. jg_lock_release <steal-lock> is the matching drop for
+# every success and failure path.
+jg_lock_steal_hold() {
+  jg_lock_try_acquire_steal_mutex "$1" "${2:-}" || return 1
+  jg_lock_steal_trap_install "$1"
+}
+
+# _jg_lock_steal_reclaim_over_age <steal-lock> <max-age>: remove a steal mutex
+# that outlived <max-age> whatever its pid record claims. With no usable bound
+# the ordinary liveness proof stands and nothing is removed.
+_jg_lock_steal_reclaim_over_age() {
+  local lockdir=$1 max_age=$2 age
+  case "$max_age" in '' | *[!0-9]* | 0) return 1 ;; esac
+  age=$(jg_path_age "$lockdir")
+  case "$age" in '' | *[!0-9]*) return 1 ;; esac
+  [ "$age" -ge "$max_age" ] || return 1
+  jg_lock_remove_path "$lockdir" || return 1
+}
+
 # Acquire the short-lived steal mutex without recursively creating another
 # steal mutex. A dead holder is reaped once; a dead nested steal marker left by
 # the former recursive reclaim is reaped too so it cannot block the claim. A
 # hold abandoned by this very process (a trap interrupted its critical section)
 # is reclaimed like jg_lock_try_acquire's self-held branch.
-jg_lock_try_acquire_steal_mutex() {  # <steal-lock>
-  local lockdir=$1 current
+jg_lock_try_acquire_steal_mutex() {  # <steal-lock> [max-age-secs]
+  local lockdir=$1 max_age=${2:-} current
   JG_LOCK_OWNER_DIR=
   jg_lock_try_create "$lockdir" && return 0
   jg_current_pid current || return 1
@@ -1283,7 +1407,9 @@ jg_lock_try_acquire_steal_mutex() {  # <steal-lock>
   if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ]; then
     jg_lock_remove_path "$lockdir" || true
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
-    jg_lock_reap_dead_link "$lockdir" || return 1
+    jg_lock_reap_dead_link "$lockdir" \
+      || _jg_lock_steal_reclaim_over_age "$lockdir" "$max_age" \
+      || return 1
   fi
   jg_lock_try_create "$lockdir"
 }
@@ -1326,7 +1452,7 @@ jg_lock_try_acquire() {
   fi
 
   steal="$lockdir.steal"
-  if ! jg_lock_try_acquire_steal_mutex "$steal"; then
+  if ! jg_lock_steal_hold "$steal"; then
     JG_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     JG_LOCK_OWNER_DIR=
     return 1
@@ -1507,6 +1633,9 @@ jg_lock_acquire_wait_bounded() {
 
 jg_lock_release() {
   local lockdir=$1 pid current ownerdir
+  if [ -n "$JG_LOCK_STEAL_LOCK" ] && [ "$lockdir" = "$JG_LOCK_STEAL_LOCK" ]; then
+    jg_lock_steal_trap_restore
+  fi
   if [ -n "${STATE:-}" ] && [ "$lockdir" = "$STATE/.watch.lock" ] \
     && jg_lock_claim_blocked_by_steal "$lockdir"; then
     return 0

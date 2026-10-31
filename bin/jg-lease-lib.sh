@@ -123,16 +123,26 @@ jg_lease_lock_helpers() {
 
 # The lease-command lock serializes every lease inspection and mutation in the
 # home, so a holder that never releases it wedges the whole lease surface at
-# once - every steer, relaunch, teardown, claim, and sweep. The holder's pid
-# cannot decide that on its own: a post-reboot leftover whose pid has been
-# recycled onto an unrelated live process looks exactly like a working holder,
-# and a wedged holder is genuinely alive. The lock's own age is the abandonment
-# proof instead, so the wait is bounded by it: past this bound a live holder is
-# treated as abandoned and the lock is reclaimed, and a holder still inside the
-# bound is never preempted. 300s is the fleet's usual guard grace and sits far
-# above any real lease-command hold (claim, release, and steer are sub-second;
-# a relaunch or teardown is the longest and still finishes in seconds).
+# once - every steer, relaunch, teardown, claim, and sweep - and jg-send's guard
+# takes it before it may deliver anything. A send must therefore deliver or
+# refuse, never block: the wait is bounded by JG_LEASE_COMMAND_LOCK_WAIT_SECS,
+# and past that wait the acquire sweeps provably abandoned lock scratch once,
+# retries once, and otherwise refuses naming the holder.
+#
+# Two proofs of abandonment, in order of strength. Liveness is the ordinary one:
+# a recorded pid that is dead, or an owner directory that holds no pid record and
+# nothing but link scratch, is abandoned whatever its age. The lock's own age is
+# the fallback, because a holder's pid cannot decide a post-reboot leftover whose
+# pid was recycled onto an unrelated live process, and because a wedged holder is
+# genuinely alive. 300s sits far above any real lease-command hold (claim,
+# release, and steer are sub-second; a relaunch or teardown is the longest and
+# still finishes in seconds). A holder inside the age bound is never preempted.
 JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS=${JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS:-300}
+
+# Seconds one command waits for the lease-command lock before it refuses. Far
+# above any real hold and far below a hang, so a wedged holder costs a bounded
+# wait instead of every send in the home.
+JG_LEASE_COMMAND_LOCK_WAIT_SECS=${JG_LEASE_COMMAND_LOCK_WAIT_SECS:-20}
 
 # jg_lease_command_lock_max_age: echo the validated bound (invalid -> 300).
 # Read at call time because this is a sourced library serving many commands in
@@ -143,20 +153,30 @@ jg_lease_command_lock_max_age() {
   printf '%s\n' "$age"
 }
 
-# jg_lease_command_lock_reclaim <lock> <max-age>: remove <lock> when it is still
-# present and at least <max-age> seconds old. The age proof is re-verified while
-# holding the lock's steal mutex, the same election jg_lock_try_acquire uses for
-# stale-owner reclaim: while it is held no competing acquirer can publish a
-# fresh lock (jg_lock_claim_blocked_by_steal), so a reclaimer can never delete a
-# newer claim, and a lock younger than the bound is left untouched. Returns 0
-# only when an over-age lock was removed.
+# jg_lease_command_lock_wait: echo the validated wait bound (invalid -> 20).
+jg_lease_command_lock_wait() {
+  local wait=${JG_LEASE_COMMAND_LOCK_WAIT_SECS:-20}
+  case "$wait" in '' | *[!0-9]* | 0) wait=20 ;; esac
+  printf '%s\n' "$wait"
+}
+
+# jg_lease_command_lock_reclaim <lock> <max-age> <steal-max-age>: remove <lock>
+# when it is still present and at least <max-age> seconds old. The age proof is
+# re-verified while holding the lock's steal mutex, the same election
+# jg_lock_try_acquire uses for stale-owner reclaim: while it is held no competing
+# acquirer can publish a fresh lock (jg_lock_claim_blocked_by_steal), so a
+# reclaimer can never delete a newer claim, and a lock younger than the bound is
+# left untouched. Returns 0 only when an over-age lock was removed.
 #
-# A lock whose age cannot be read is never reclaimed: an unprovable age keeps
-# the ordinary wait rather than risking a live holder.
+# The steal mutex itself carries <steal-max-age>: a leaked steal directory whose
+# recorded pid was recycled onto a live process would otherwise refuse every
+# reclaimer forever, which is exactly the unbounded block this acquire exists to
+# remove. A lock whose age cannot be read is never reclaimed: an unprovable age
+# keeps the ordinary wait rather than risking a live holder.
 jg_lease_command_lock_reclaim() {
-  local lock=$1 max_age=$2 steal age
+  local lock=$1 max_age=$2 steal_max_age=${3:-} steal age
   steal="$lock.steal"
-  jg_lock_try_acquire_steal_mutex "$steal" || return 1
+  jg_lock_steal_hold "$steal" "$steal_max_age" || return 1
   if age=$(jg_lock_age "$lock") && [ "$age" -ge "$max_age" ]; then
     jg_lock_remove_path "$lock" || true
     jg_lock_release "$steal"
@@ -166,20 +186,61 @@ jg_lease_command_lock_reclaim() {
   return 1
 }
 
-# jg_lease_command_lock_acquire <lock>: the bounded replacement for a bare
-# jg_lock_acquire_wait on the lease-command lock (used by bin/jg-lease.sh and
-# jg_lease_guard). The ordinary stale-owner recovery still clears a provably
-# dead holder; beyond that the wait is bounded by the lock's age, so an alive
-# holder past JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS is reclaimed instead of
-# blocking forever. One stuck relaunch can therefore never wedge every relaunch
-# and steer in the home.
+# _jg_lease_command_lock_record_task <lock> <task>: name the task in the owner
+# record so a refusal can name the holder's work, not only its pid.
+_jg_lease_command_lock_record_task() {
+  local owner
+  [ -n "${2:-}" ] || return 0
+  owner=$(jg_lock_link_owner "$1" 2>/dev/null) || return 0
+  [ -n "$owner" ] || return 0
+  printf '%s\n' "$2" > "$owner/task" 2>/dev/null || true
+  return 0
+}
+
+# jg_lease_command_lock_owner_task <lock>: print the task the current holder
+# recorded, or nothing when it recorded none.
+jg_lease_command_lock_owner_task() {
+  local owner
+  owner=$(jg_lock_link_owner "${1:-}" 2>/dev/null) || return 0
+  [ -n "$owner" ] || return 0
+  cat "$owner/task" 2>/dev/null || true
+  return 0
+}
+
+# jg_lease_command_lock_acquire <lock> [task]: the bounded replacement for a
+# bare jg_lock_acquire_wait on the lease-command lock (used by bin/jg-lease.sh
+# and jg_lease_guard). The ordinary stale-owner recovery still clears a provably
+# dead holder; beyond that the wait is bounded by
+# JG_LEASE_COMMAND_LOCK_WAIT_SECS, after which one sweep clears abandoned lock
+# scratch, one retry runs, and a still-live holder turns into a refusal naming
+# its pid and task. One stuck relaunch can therefore never wedge every relaunch
+# and steer in the home. Returns non-zero on refusal; the message is on stderr.
 jg_lease_command_lock_acquire() {
-  local lock=$1 max_age
+  local lock=$1 task=${2:-} max_age wait deadline pid holder_task
   jg_lease_lock_helpers
   max_age=$(jg_lease_command_lock_max_age)
-  while ! jg_lock_try_acquire "$lock"; do
-    jg_lease_command_lock_reclaim "$lock" "$max_age" || sleep 0.1
+  wait=$(jg_lease_command_lock_wait)
+  deadline=$(( $(date +%s) + wait ))
+  while :; do
+    if jg_lock_try_acquire "$lock"; then
+      _jg_lease_command_lock_record_task "$lock" "$task"
+      return 0
+    fi
+    jg_lease_command_lock_reclaim "$lock" "$max_age" "$wait" || true
+    [ "$(date +%s)" -lt "$deadline" ] || break
+    sleep 0.1
   done
+  jg_lock_sweep_stale_scratch "$lock" >/dev/null 2>&1 || true
+  if jg_lock_try_acquire "$lock"; then
+    _jg_lease_command_lock_record_task "$lock" "$task"
+    return 0
+  fi
+  pid=${JG_LOCK_HELD_PID:-}
+  case "$pid" in '' | *[!0-9]*) pid=unknown ;; esac
+  holder_task=$(jg_lease_command_lock_owner_task "$lock")
+  [ -z "$holder_task" ] || holder_task=" for task $holder_task"
+  echo "error: refused after ${wait}s - the lease-command lock $lock is still held by pid $pid${holder_task}, so nothing was sent and nothing was changed. Retry once that process finishes; if pid $pid is gone, remove $lock and the $lock.owner.* and $lock.steal names beside it in ${STATE:-state}." >&2
+  return 1
 }
 
 # jg_lease_home_runs_host: 0 iff this home runs the supervision host
@@ -288,7 +349,10 @@ jg_lease_guard() {
   # A caller with more than one guarded phase already excludes claims until
   # its shared cleanup; do not recursively acquire the non-reentrant lock.
   if [ "$JG_LEASE_GUARD_LOCK" != "$lock" ]; then
-    jg_lease_command_lock_acquire "$lock"
+    # Refusing here is deliberate: a guard that could not serialize would let
+    # two supervision actors mutate one task at once, so the caller stops
+    # before it changes anything.
+    jg_lease_command_lock_acquire "$lock" "$task" || exit 1
     JG_LEASE_GUARD_LOCK=$lock
   fi
   if ! jg_lease_live "$task"; then
