@@ -13,7 +13,11 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work=$(mktemp -d "${JG_TICKETS_TEST_ROOT:-${TMPDIR:-/tmp}}/tickets-sync.XXXXXX")
 trap 'echo "retained fixture and normalized archives: $work"' EXIT
-fork=${JG_TEST_FORK:-$HOME/juggernaut}
+# The fixture home's bin, and the add-on's own installer's bin checks, come from the checkout this test lives in:
+# $HOME/juggernaut need not exist on a machine that only cloned this repository, and a fork that is not a Juggernaut
+# checkout leaves $JG_HOME/bin a dangling link that fails the install with an env 127 instead of a verdict.
+fork=${JG_TEST_FORK:-$(cd "$root/.." && pwd -P)}
+[ -f "$fork/bin/jg-tasks-axi.sh" ] || { echo "FAIL: $fork is not a Juggernaut checkout (no bin/jg-tasks-axi.sh); set JG_TEST_FORK"; exit 1; }
 export HOME=$work/user XDG_DATA_HOME=$work/xdg SIGN_OFF_HOME=$work/signoff
 export JG_HOME=$work/main
 mkdir -p "$HOME" "$JG_HOME"/{data,config,state} "$work/parked/data"
