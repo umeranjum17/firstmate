@@ -1329,7 +1329,13 @@ one-element array use is accepted^{"rules":[{"when":"focused feature","use":[{"h
 default array is accepted^{"default":[{"harness":"pi","model":"anthropic/claude-sonnet-5"},{"harness":"grok"}]}^empty^
 provider-less multi-provider profile remains accepted without opt-in^{"rules":[{"when":"cross-provider work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}^empty^
 one-element default array is accepted^{"default":[{"harness":"codex"}]}^empty^
-empty array use is flagged^{"rules":[{"when":"big feature","use":[]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs at least one use profile
+empty array use without a tier is flagged^{"rules":[{"when":"big feature","use":[]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs at least one use profile or a tier
+tier rule without use is accepted^{"tiers":{"hard":[{"harness":"codex","model":"gpt-5.6-sol"}]},"rules":[{"when":"hard work","tier":"hard"}]}^empty^
+unknown tier name is flagged^{"tiers":{"extreme":[{"harness":"codex"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - unknown tier: extreme (tiers are easy, standard, hard, and frontier)
+rule tier without a tiers entry is flagged^{"rules":[{"when":"hard work","tier":"hard"}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule tier needs a tiers entry: hard
+empty tier list is flagged^{"tiers":{"easy":[]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each tier needs at least one profile
+tier profile with unverified harness is flagged^{"tiers":{"easy":[{"harness":"spaceship"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+tier profile with unsupported effort is flagged^{"tiers":{"hard":[{"harness":"codex","model":"gpt-5.6-sol","effort":"ultra"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: codex:ultra
 array profile without harness is flagged^{"rules":[{"when":"big feature","use":[{"model":"gpt-5.5"}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each use profile needs harness
 array profile with malformed model is flagged^{"rules":[{"when":"big feature","use":[{"harness":"codex","model":5}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present
 resolve fields are accepted^{"rules":[{"when":"hard design","approval":"captain","floor":{"scope":"model:fable","min_percent":20,"provider":"claude"},"use":[{"harness":"pi","model":"openai-codex/gpt-5.6-sol","provider":"codex"},{"harness":"codex","model":"gpt-5.6-sol","floor":{"scope":"all_models","min_percent":50}}]}],"default":[{"harness":"pi","model":"kimi-code/k3","provider":"kimi","floor":{"scope":"all_models","min_percent":10}}]}^empty^

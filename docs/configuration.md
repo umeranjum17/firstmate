@@ -1408,10 +1408,38 @@ This section is the single owner of the canonical schema and its per-field seman
 | Field | Requirement |
 | --- | --- |
 | `rules` | May be absent or empty for a default-only configuration. |
-| Rule `when` and `use` | Required for each rule. |
-| `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
+| Rule `when` and `use` | `when` is required for each rule; a rule needs `use` or a `tier`. |
+| `use`, `tiers` lists, and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` and `effort`; rule `why` | Optional. |
+
+**Difficulty tiers**
+
+A rule can name a difficulty tier instead of naming models.
+The four tiers are `easy`, `standard`, `hard`, and `frontier`, and each one's ordered route list lives in the top-level `tiers` map, so a model change edits one tier list and no rule moves.
+
+```json
+{
+  "tiers": {
+    "easy":     [ { "harness": "claude", "model": "haiku", "effort": "low" } ],
+    "standard": [ { "harness": "codex", "model": "gpt-5.5", "effort": "medium" } ],
+    "hard":     [ { "harness": "claude", "model": "claude-sonnet-5", "effort": "high" } ],
+    "frontier": [
+      { "harness": "claude", "model": "claude-sonnet-5", "effort": "xhigh" },
+      { "harness": "codex", "model": "gpt-5.5", "effort": "xhigh" }
+    ]
+  },
+  "rules": [
+    { "when": "<natural-language condition describing a kind of task>", "tier": "hard" }
+  ]
+}
+```
+
+- A tier list holds the same profile objects as `use`, in the order the tier prefers, and resolution takes only that list's candidates.
+- A rule without a `tier` keeps its own `use` route exactly as before, so an existing file works unchanged until it is migrated.
+- When a rule names both, the tier is what routes the work.
+- A `tier` name outside the four levels, a rule tier with no `tiers` entry, or a malformed tier list is a configuration error.
+- Typed resolution names the tier in its `profile:` line and beside the model on its candidate lines.
 
 **Fields applied only by typed resolution**
 
@@ -1478,8 +1506,8 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 **Validation and diagnostics**
 
 - When the file exists, bootstrap validates it with `jq`.
-- Valid files stay silent by default; with `JG_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
-- Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
+- Valid files stay silent by default; with `JG_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, one per configured tier, and one fact for the optional default profile set.
+- Malformed JSON, malformed rules, an empty or malformed profile or tier list, an unknown or unconfigured tier name, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
 - While typed resolution is active, malformed `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no operator or Recon spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
@@ -1599,7 +1627,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 | Result | Meaning |
 | --- | --- |
-| `clear` | A `profile:` line ready for `jg-spawn.sh`. |
+| `clear` | A `profile:` line ready for `jg-spawn.sh`: its flags are the spawn arguments, and a trailing `(tier <name>)` names the difficulty tier that supplied them and is not a flag. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
 | `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, or a genuine tie. |
 | `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
