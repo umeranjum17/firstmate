@@ -38,6 +38,9 @@
 #        into the card's detail field as "must: <category>", and on the
 #        when-it-matters leash a post with none is refused and recorded for
 #        Overwatch (bin/jg-board-gate.sh route) instead of posted.
+#        --record <url> is the card's deep link to its full record, written into
+#        the detail field because raise has no link flag. The two-layer check is
+#        shadow-first: it names the failing rule, logs it, and posts the card.
 # answer Record the captain's chat answer on its card, in the same turn he gave
 #        it: sign-off-axi has no command for this, so the line sign-off-axi
 #        itself writes for a board answer is appended to the board's answers log
@@ -82,6 +85,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 # shellcheck source=bin/jg-board-link-lib.sh
 . "$SCRIPT_DIR/jg-board-link-lib.sh"
+# shellcheck source=bin/jg-captain-card-lib.sh
+. "$SCRIPT_DIR/jg-captain-card-lib.sh"
 
 usage() {
   awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
@@ -102,6 +107,7 @@ split_board() {
   ROUTE=''
   DECISION_KEY=''
   MUST=''
+  RECORD=''
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -109,6 +115,11 @@ split_board() {
         shift
         [ $# -gt 0 ] || die "--board needs a value"
         BOARD=$1
+        ;;
+      --record)
+        shift
+        [ $# -gt 0 ] || die "--record needs a link to the full record"
+        RECORD=$1
         ;;
       --route)
         shift
@@ -193,7 +204,7 @@ refuse() {  # <the refusal line>
 }
 
 cmd_post() {
-  local title ask_ref before after key board out link rc=0 refusal rec filer detail
+  local title ask_ref before after key board out link rc=0 refusal rec filer detail RECORD=''
   split_board "$@"
   require_signoff
   title=$(flag_value --title)
@@ -207,6 +218,13 @@ cmd_post() {
   refusal=$(jg_ask_card_refusal "$ask_ref" "$(option_count)" "$title" \
     "$(flag_value --why)" "$(flag_value --about)" "$(flag_value --detail)" "$(option_text)") || true
   [ -z "$refusal" ] || refuse "$refusal"
+
+  # The card's deep link to its record rides in its detail field, rule 4 of
+  # bin/jg-captain-card-lib.sh, because sign-off-axi's raise has no link flag.
+  if [ -n "$RECORD" ]; then
+    detail=$(flag_value --detail)
+    set_detail "${detail:+$detail }record: $RECORD"
+  fi
 
   # The board gate (bin/jg-ask-gate-lib.sh): the card's detail field carries its
   # must category, and under the when-it-matters leash no other ask is posted.
@@ -225,6 +243,12 @@ cmd_post() {
   # Check the lead first: a refused route must not leave an unrouted card behind.
   [ -z "$ROUTE" ] || [ -f "${JG_STATE_OVERRIDE:-${JG_HOME:-/nonexistent}/state}/$ROUTE.meta" ] \
     || die "refused: --route '$ROUTE' is not a task recorded in this home (is JG_HOME set?)"
+  # The two-layer check (bin/jg-captain-card-lib.sh): shadow-first, so a card that
+  # still falls short of the card layer is named and logged, then posted.
+  jg_captain_card_shadow card \
+    "$(printf '%s\n%s\n%s\n%s' "$title" "$(flag_value --why)" "$(flag_value --detail)" "$(option_text)")" \
+    "$(option_count)"
+
   before=$(jg_question_open_keys)
   if [ -n "$BOARD" ]; then
     out=$(sign-off-axi raise "$BOARD" ${ARGS[@]+"${ARGS[@]}"} 2>&1) || rc=$?
