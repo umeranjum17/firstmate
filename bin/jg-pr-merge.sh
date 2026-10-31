@@ -1189,7 +1189,6 @@ EOF
   JG_PR_MERGE_HEAD=$live_head
   JG_PR_GITHUB_BASE=$base
   JG_PR_GITHUB_LOCAL_SUITE=$local_suite_proven
-  JG_PR_GITHUB_LOCAL_SUITE_PROOF=$local_suite_proof
 }
 
 # Read one live GitHub pull request view after gh returns. The selected
@@ -1202,7 +1201,6 @@ JG_PR_GITHUB_MERGED=
 JG_PR_GITHUB_QUEUED=
 JG_PR_GITHUB_BASE=
 JG_PR_GITHUB_LOCAL_SUITE=false
-JG_PR_GITHUB_LOCAL_SUITE_PROOF=
 JG_PR_GITHUB_QUEUE_OBSERVED=false
 github_read_outcome_with_gh() {
   local fields line
