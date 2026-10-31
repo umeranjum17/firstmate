@@ -1,12 +1,8 @@
 # Shadow policy for the delete guard's clearest rule: a recursive delete aimed at the home folder, a folder
-# directly in it, `/`, `/home`, or a bare `.` `..` `*` `$VAR` target is refused.
-#
-# Nothing is enforced from this file. guard.mjs stays the decider; opa-shadow.mjs asks this policy the same
-# question on each recorded decision and appends an agree/differ line to state/opa-shadow.log.
-#
-# Not ported, so the shadow log measures the gap instead of hiding it: a `sh -c` body is not re-entered (Rego
-# forbids recursion), a heredoc body is judged as commands either way, and an assignment counts wherever it
-# appears in the command rather than only as an unguarded statement.
+# directly in it, `/`, `/home`, or a bare `.` `..` `*` `$VAR` target is refused. Nothing is enforced from this
+# file: guard.mjs stays the decider, and opa-shadow.mjs asks this policy the same question per recorded
+# decision. Not ported, so the replay measures the gap: a `sh -c` body is not re-entered (Rego forbids
+# recursion), and "the last assignment" means the last in the command, not the last one before it.
 package juggernaut.guards.delete
 
 import rego.v1
@@ -37,8 +33,8 @@ unquote(word) := word if not regex.match(`^(".*"|'.*')$`, word)
 
 flag(t) if regex.match(`^[-(!]`, t)
 
-# rm is recursive with any -r flag, rimraf always, and find only with -delete, whose start paths end at the
-# first flag. The operand list is everything a recursive delete could act on, exactly as the guard reads it.
+# rm is recursive with any -r flag, rimraf always, and find only with -delete, whose start paths end at the first
+# flag. The operand list is everything a recursive delete could act on, exactly as the guard reads it.
 operands(words) := [unquote(t) | some t in array.slice(words, i + 1, count(words)); not flag(unquote(t))] if {
 	i := min({j | some j, t in words; regex.match(`(^|/|\\)(rm|rimraf)$`, unquote(t))})
 	rm_recursive(words, i)
@@ -70,7 +66,7 @@ shell_var(name) if regex.match(`^(HOME|PWD|OLDPWD|TMPDIR|TMP|TEMP|USER|LOGNAME|S
 # The last value the command assigns to the variable. The guard judges that value, so a value it cannot read
 # - a command substitution, a nested variable, a glob - stays unknown, and an unknown target is refused.
 assignment(name) := unquote(v) if {
-	re := sprintf(`(?:^|[\s;({])(?:export |local |readonly |typeset |declare(?: -[rxg]+)* )?%s\+?=("[^"]*"|'[^']*'|\$\([^()]*\)|[^\s;&|)]*)`, [name])
+	re := sprintf(`(?:^|[;\n])\s*(?:export |local |readonly |typeset |declare(?: -[rxg]+)* )?%s\+?=("[^"]*"|'[^']*'|\$\([^()]*\)|[^\s;&|)]*)`, [name])
 	m := regex.find_all_string_submatch_n(re, input.command, -1)
 	some i, a in m
 	i == count(m) - 1

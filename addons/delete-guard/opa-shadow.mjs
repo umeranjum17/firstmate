@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 // Shadow comparison for the fleet delete guard: replay every recorded decision through the shell guard and the
-// OPA policy side by side and append one line per record to <home>/state/opa-shadow.log.
+// OPA policy side by side and append one line per record to <home>/state/opa-shadow.log. Nothing is enforced
+// from OPA: this file asks guard.mjs's pure decider and the policy the same question about the same recorded
+// command, and it never calls guard(), so no block is logged and no wake is queued.
 //
-// Nothing is enforced from OPA. This file reads state/delete-guard.log, asks guard.mjs's pure decider and the
-// policy the same question about the same recorded command, and writes its own log. It never calls guard(),
-// so no block is logged, no wake is queued and no guard behaviour changes.
-//
-// Usage: node opa-shadow.mjs <jg-home> [--opa <path>]
-// OPA comes from --opa, then $OPA, then PATH. Its version and install path are recorded in the task report.
+// Usage: node opa-shadow.mjs <jg-home> [--opa <path>] [--require-agreement]. OPA comes from --opa, then $OPA,
+// then PATH. --require-agreement is the per-rule replay eval: it exits 1 when any decision differs.
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
@@ -80,4 +78,7 @@ console.log(`agree: ${agree}`);
 console.log(`differ: ${differ}`);
 console.log(`mean wall-clock per OPA decision: ${(nanos / 1e6 / (total || 1)).toFixed(1)} ms`);
 for (const d of diffs) console.log(`differ line ${d.line}: shell=${d.shell} opa=${d.policy} command=${JSON.stringify(d.command)}`);
-console.log(`wrote ${out}`);
+if (rest.includes("--require-agreement") && differ > 0) {
+	console.error(`opa-shadow: this rule may not switch to OPA: ${differ} of ${total} recorded decisions differ`);
+	process.exit(1);
+}

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # OPA shadow replay: run the shadow comparison over recorded delete-guard decisions in a throwaway home and check
 # that it appends exactly one line per record and leaves every guard behaviour alone.
-# Usage: opa-shadow.test.sh [recorded-log]   (default: a 12-row sample of the fleet's recorded decisions)
+# It also proves the replay eval (`--require-agreement`), the gate that says whether a rule may switch to OPA.
+# Usage: opa-shadow.test.sh [recorded-log]   (default: a 13-row sample of the fleet's recorded decisions)
 # OPA is taken from $OPA, then PATH. Its version and install path are recorded in the task report.
 # shellcheck disable=SC2016 # the cases are literal commands, never expanded here
 set -euo pipefail
@@ -42,6 +43,19 @@ after=$(sha256sum "$T/home/state/delete-guard.log" | cut -d' ' -f1)
 verdict() { node --input-type=module -e "import { blockedDelete } from '$ADDON/guard.mjs'; process.stdout.write(blockedDelete(process.argv[1]) === null ? 'allow' : 'block')" "$1"; }
 [ "$(verdict 'rm -rf "$HOME"')" = block ] && [ "$(verdict 'rm -rf ./build')" = allow ] \
   && ok "guard still decides the same before and after" || no "guard behaviour changed"
+
+# The replay eval: one recorded decision both deciders agree on must pass, one they differ on must refuse.
+# Both corpora are single rows cut from the same recorded log, so this is real recorded input either way.
+agree=$(awk '$4 == "agree" { print $1; exit }' "$T/home/state/opa-shadow.log")
+differ=$(awk '$4 == "differ" { print $1; exit }' "$T/home/state/opa-shadow.log")
+[ -n "$agree" ] && [ -n "$differ" ] || no "the sample must hold one agreeing and one differing record"
+mkdir -p "$T/agree/state" "$T/differ/state"
+sed -n "${agree}p" "$LOG" > "$T/agree/state/delete-guard.log"
+sed -n "${differ}p" "$LOG" > "$T/differ/state/delete-guard.log"
+node "$ADDON/opa-shadow.mjs" "$T/agree" --opa "$OPA_BIN" --require-agreement >/dev/null 2>&1 \
+  && ok "the replay eval passes an agreeing record and would let the rule switch" || no "the eval refused an agreeing record"
+node "$ADDON/opa-shadow.mjs" "$T/differ" --opa "$OPA_BIN" --require-agreement >/dev/null 2>&1 \
+  && no "the replay eval let a differing decision through" || ok "the replay eval refuses a differing record"
 
 # A home with no recorded decisions is a refusal, not an empty success.
 mkdir -p "$T/bare"
