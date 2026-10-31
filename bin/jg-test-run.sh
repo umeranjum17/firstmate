@@ -305,7 +305,7 @@ cpu_count() {
 # lands in `unclassified` and stays serial until someone proves it.
 family_for_basename() {
   case "$1" in
-    jg-bearings-board.test.sh|jg-brief.test.sh|jg-crew-state.test.sh|\
+    jg-brief.test.sh|jg-crew-state.test.sh|\
     jg-captain-hold-lifecycle.test.sh)
       printf '%s\n' pure-contract-unit
       ;;
@@ -329,7 +329,7 @@ family_for_basename() {
     jg-session-start.test.sh|jg-tangle-guard.test.sh|jg-update.test.sh)
       printf '%s\n' session-bootstrap
       ;;
-    jg-bearings-board-lavish-live-e2e.test.sh|jg-claude-stop-autoarm-live-e2e.test.sh|\
+    jg-claude-stop-autoarm-live-e2e.test.sh|\
     jg-composer-matrix-live-e2e.test.sh|jg-codex-continuity-live-e2e.test.sh|\
     jg-codex-hook-layer-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
     jg-cursor-primary-live-e2e.test.sh|jg-harness-adapter-instructions-live-e2e.test.sh|\
@@ -554,8 +554,6 @@ tests/jg-agents-md-floor.test.sh 423
 tests/jg-agy-signals-live-e2e.test.sh 61
 tests/jg-backend-tmux-smoke.test.sh 320
 tests/jg-backlog-handoff.test.sh 74166
-tests/jg-bearings-board-lavish-live-e2e.test.sh 61
-tests/jg-bearings-board.test.sh 50015
 tests/jg-board-answers.test.sh 2206
 tests/jg-board-gate.test.sh 437
 tests/jg-bootstrap.test.sh 83933

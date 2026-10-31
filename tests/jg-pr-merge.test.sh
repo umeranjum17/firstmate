@@ -889,10 +889,10 @@ test_github_open_unqueued_outcome_refuses() {
 }
 
 # The merge path owns its own cleanup: teardown runs without --force so its
-# gates stay in charge, a refusal becomes one queued wake, and an armed board is
-# rebuilt from the payload it serves. The wrapper is exercised through the same
-# sourced functions the watcher runs, with the two child scripts recorded.
-test_post_merge_cleanup_tears_down_then_rebuilds_the_board() {
+# gates stay in charge, and a refusal becomes one queued wake. The wrapper is
+# exercised through the same sourced functions the watcher runs, with the child
+# script recorded.
+test_post_merge_cleanup_tears_down_once() {
   local case_dir fork log
   case_dir=$(make_case post-merge)
   fork="$case_dir/fork"
@@ -907,10 +907,6 @@ if [ "${POST_MERGE_TEARDOWN_RC:-0}" -ne 0 ]; then
   exit 1
 fi
 SH
-  cat > "$fork/bin/jg-bearings-board.sh" <<'SH'
-#!/usr/bin/env bash
-printf 'board %s\n' "$*" >> "$POST_MERGE_LOG"
-SH
   chmod +x "$fork/bin/"*
   : > "$log"
   post_merge() {  # <teardown-rc>
@@ -918,16 +914,22 @@ SH
       JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
       JG_CONFIG_OVERRIDE="$case_dir/home/config" \
       bash -c '. "$1"; post_merge_cleanup task-x1' _ "$fork/bin/jg-watch.sh"
+    # The cleanup wrapper runs detached; wait for the durable effect this
+    # assertion needs instead of for a fixed window. A refused teardown queues
+    # one wake, and a successful one leaves its teardown record.
     for _ in $(seq 1 100); do
-      grep -q 'board refresh' "$log" 2>/dev/null && break
+      if [ "$1" != 0 ]; then
+        grep -q 'cleanup after the merge of task-x1 was refused' \
+          "$case_dir/state/.wake-queue" 2>/dev/null && break
+      else
+        grep -q 'teardown task-x1' "$log" 2>/dev/null && break
+      fi
       sleep 0.05
     done
   }
   post_merge 1 || fail "post-merge cleanup must not block the watcher cycle"
   assert_grep 'teardown task-x1' "$log" \
     "a confirmed merge must run teardown without --force: $(cat "$log")"
-  assert_grep 'board refresh' "$log" \
-    "the board must be rebuilt after the cleanup attempt: $(cat "$log")"
   [ "$(grep -c 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" 2>/dev/null || true)" = 1 ] \
     || fail "a refused cleanup must become exactly one wake: $(cat "$case_dir/state/.wake-queue" 2>&1)"
   grep 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" \
@@ -937,7 +939,7 @@ SH
   post_merge 1 || fail "a second cleanup call must not block either"
   assert_no_grep 'teardown task-x1' "$log" \
     "a second cleanup call started a second teardown: $(cat "$log")"
-  pass "a confirmed merge runs teardown, turns a refusal into one wake, and rebuilds the board"
+  pass "a confirmed merge runs teardown once and turns a refusal into one wake"
 }
 
 test_pr_check_from_status_records_only_the_ready_report() {
@@ -4654,4 +4656,4 @@ test_required_partial_reads_report_all_failures
 test_allow_red_refused_on_forgejo
 test_allow_missing_refused_on_forgejo
 test_pr_check_from_status_records_only_the_ready_report
-test_post_merge_cleanup_tears_down_then_rebuilds_the_board
+test_post_merge_cleanup_tears_down_once

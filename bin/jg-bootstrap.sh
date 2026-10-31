@@ -6,7 +6,6 @@
 #          exits 0.
 #          Silent = all good.
 #          Lines: "MISSING: <tool> (install: <command>)",
-#                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)",
 #                 "NEEDS_GH_AUTH" (skipped when every registered project is
 #                 local-only with a clone and no clone is unregistered),
@@ -60,12 +59,9 @@
 #          "treehouse get --lease" support.
 #          no-mistakes is also MISSING when its installed version is older than
 #          1.46.0 (structured pipeline attestation floor; see CONTRIBUTING.md).
-#          The AXI-family floor policy is owned beside GH_AXI_MIN and
-#          LAVISH_AXI_MIN below; the per-tool owners point there. An installed
-#          essential build below its floor reports MISSING like no-mistakes.
-#          Missing or incompatible lavish-axi reports PRESENTATION_UNAVAILABLE without an install command;
-#          a compatible older build keeps legacy boards and reports a BOOTSTRAP_INFO
-#          upgrade recommendation for synchronous reply acceptance.
+#          The AXI-family floor policy is owned beside GH_AXI_MIN below; the
+#          per-tool owners point there. An installed essential build below its
+#          floor reports MISSING like no-mistakes.
 #          tasks-axi feature probes remain a separate defense-in-depth check.
 #          tasks-axi and quota-axi are essential bootstrap tools.
 #          A compatible tasks-axi default backend is silent.
@@ -162,15 +158,6 @@
 #          keeps detect-only meaning unlocked, exactly as before.
 #        jg-bootstrap.sh install <tool>...
 #          Install the named tools (only ones the captain approved).
-#        jg-bootstrap.sh lavish-compatible
-#          Exit 0 when lavish-axi meets LAVISH_AXI_BOARD_MIN, 1 otherwise,
-#          printing nothing; bin/jg-brief.sh uses it to gate scout Lavish hosting.
-#        jg-bootstrap.sh lavish-reply-compatible
-#          Exit 0 when lavish-axi meets LAVISH_AXI_MIN and supports synchronous
-#          reply acceptance, 1 when one version probe confirms an older release
-#          meeting LAVISH_AXI_BOARD_MIN, and 2 when lavish-axi is absent, its
-#          version cannot be read, or it is below LAVISH_AXI_BOARD_MIN, printing
-#          nothing.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -926,8 +913,7 @@ if ! BACKEND_TOOLS=$(jg_backend_required_tools "$BACKEND"); then
 fi
 TOOLS="$BACKEND_TOOLS $COMMON_TOOLS"
 # Every floor below is read from its toolchain.versions row, so a bump moves installation, detection and
-# this diagnostic together. The one floor not read from that table is LAVISH_AXI_BOARD_MIN: it accepts an
-# older build for legacy boards, which is a compatibility fact rather than a version we install.
+# this diagnostic together.
 NO_MISTAKES_MIN=$(jg_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # AXI-FAMILY FLOOR POLICY. Every axi-family floor is the CURRENT LATEST published
 # version of that tool, captain-bumped periodically to keep the whole fleet on the
@@ -938,8 +924,6 @@ NO_MISTAKES_MIN=$(jg_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # of its floor.
 GH_AXI_MIN=$(jg_pin_version gh-axi) || GH_AXI_MIN=0.0.0
 LEARN_FROM_MISTAKES_AXI_MIN=$(jg_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
-LAVISH_AXI_MIN=0.1.80
-LAVISH_AXI_BOARD_MIN=0.1.77
 # The proof and decision tools Juggernaut publishes install at the exact build
 # their toolchain.versions rows name, and that row is their floor too, so one bump
 # moves installation, detection and this diagnostic together.
@@ -1432,18 +1416,6 @@ companion_tool_wiring() {
   done
 }
 
-if [ "${1:-}" = "lavish-compatible" ]; then
-  tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"
-  exit
-fi
-
-if [ "${1:-}" = "lavish-reply-compatible" ]; then
-  lavish_parts=$(tool_version_parts lavish-axi) || exit 2
-  version_parts_at_least "$lavish_parts" "$LAVISH_AXI_MIN" && exit 0
-  version_parts_at_least "$lavish_parts" "$LAVISH_AXI_BOARD_MIN" && exit 1
-  exit 2
-fi
-
 if [ "${1:-}" = "version" ]; then
   # The one owner of version parsing, so the installer never carries its own copy.
   parts=$(tool_version_parts "${2:?usage: jg-bootstrap.sh version <tool>}") || exit 1
@@ -1570,11 +1542,6 @@ detect_local_tools() {
   fi
   if command -v sign-off-axi >/dev/null 2>&1 && ! tool_version_at_least sign-off-axi "$SIGN_OFF_AXI_MIN"; then
     echo "MISSING: sign-off-axi (install: $(install_cmd sign-off-axi))"
-  fi
-  if ! tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"; then
-    echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports"
-  elif ! tool_version_at_least lavish-axi "$LAVISH_AXI_MIN"; then
-    echo "BOOTSTRAP_INFO: lavish-axi >=$LAVISH_AXI_MIN enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
   fi
   if command -v quota-axi >/dev/null 2>&1 && ! jg_quota_axi_compatible; then
     echo "MISSING: quota-axi (install: $(install_cmd quota-axi))"

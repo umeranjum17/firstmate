@@ -837,10 +837,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "addons/bearings-board/README.md",
-      "audience": "operator-current"
-    },
-    {
       "path": "addons/brief-inherit/README.md",
       "audience": "operator-current"
     },

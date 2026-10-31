@@ -12,7 +12,6 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 
 - `account-pool` — new workers start on the pool account with the most room (`config/account-pool`), and `relaunch --account <id|next>` moves a running worker to another account with no key or token in the launch. Wire in: hook lines in the fork's `bin/jg-spawn.sh` and `bin/jg-control.sh`; check with `account-pool/install.sh <home>`; see `account-pool/README.md`.
 - `alerts` — groups tasks stopped by a provider outage into one alert per scan. Dormant copy: the fork still runs its own.
-- `bearings-board` — runs the Bearings board from the Juggernaut checkout as a thin wrapper, with no copied upstream code. Wire in: `bearings-board/install.sh <home>`.
 - `ask-default` — owns owner-only ask authoring (`python3 ask-default/bin/jg-captain-ask.py --help`; after merge, `install <home>` wires the config shim) and an unanswered ask falls back to its pre-declared safe default instead of blocking the home. Needs a fork hook (FORK-EXIT.md).
 - `backlog-lock-reclaim` — reclaims a 0-byte `<home>/data/backlog.md.lock` left by a dead tasks-axi writer, once it is older than 60 s and no process has it open; until then every backlog write fails LOCKED. Wire in: `backlog-lock-reclaim/install.sh <home>`.
 - `claude-accounts` — one quota view of every signed-in Claude account (5-hour and 7-day left), written for dispatch; new Claude workers start on the account with the most runway. Wire in: `claude-accounts/install.sh <home>` plus the reader on a timer; see `claude-accounts/README.md`.
@@ -36,7 +35,8 @@ One line per add-on, with how it wires in. `<home>` is your home folder for the 
 - `merge-on-green` — merges a PR you allowed to auto-merge once its checks are green and its proof receipt passes. Wire in: `merge-on-green/install.sh <home>`.
 - `model-gate` — one allow-list per provider: a model the list does not carry cannot be picked, spawned or paid for. Wire in: `JG_HOME=<home> model-gate/install.sh`; see `model-gate/README.md`.
 - `nm-drain` — updates the shared pipeline service through a planned drain, never over live runs. Wire in: `nm-drain/install.sh <home>`.
-- `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [Lavish refusals for squad lead notes and merge-card posts](../owner-rules/README.md#lavish-refusal-squad-lead-notes-and-merge-card-posts).
+- `owner-rules` - enforces owner asks, backlog hierarchy and risk reasons at brief creation, plus [retired-review refusals for squad lead notes and merge-card posts](../owner-rules/README.md#lavish-refusal-squad-lead-notes-and-merge-card-posts).
+  The Juggernaut core refuses the same publication on the generated status line and in a squad lead report note, with or without this add-on.
   Wire in: `owner-rules/install.sh <home>`; brief checks need the brief-inherit seam.
 - `pane-titles` — gives worker and lead panes a stable readable terminal title and matching Herdr tab label. Wire in: `pane-titles/install.sh <home>`; remove: `pane-titles/uninstall.sh <home>`.
 - `owner-guard` — refuses commits, pushes and PR merges that add the owner's private details, and scans public repos for them once a day. Wire in: `owner-guard/install.sh <home>` and `owner-guard/install-scan.sh`; remove with `owner-guard/uninstall.sh <home>`. Installation reversal covers both hook guards and the daily scan.

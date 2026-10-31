@@ -842,7 +842,7 @@ test_squad_lead_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_HOME changed charter bytes compared with the same absolute home"
-  assert_grep ">> '$home/state/relative-home.status'" "$brief" \
+  assert_grep "--append '$home/state/relative-home.status'" "$brief" \
     "relative JG_HOME did not render an absolute squad_lead status path"
 
   brief="$home/data/relative-state/brief.md"
@@ -858,7 +858,7 @@ test_squad_lead_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_STATE_OVERRIDE changed charter bytes compared with the same absolute state directory"
-  assert_grep ">> '$state_override/relative-state.status'" "$brief" \
+  assert_grep "--append '$state_override/relative-state.status'" "$brief" \
     "relative JG_STATE_OVERRIDE did not render an absolute squad_lead status path"
 
   brief="$data_override/relative-data/brief.md"
@@ -874,7 +874,7 @@ test_squad_lead_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative JG_DATA_OVERRIDE changed charter bytes compared with the same absolute data directory"
-  assert_grep ">> '$home/state/relative-data.status'" "$brief" \
+  assert_grep "--append '$home/state/relative-data.status'" "$brief" \
     "relative JG_DATA_OVERRIDE changed the absolute default status path"
 
   err="$root/unresolved.err"
@@ -1068,40 +1068,23 @@ test_scout_and_squad_lead_load_decision_hold_policy() {
   pass "jg-brief.sh: investigation and visual-review completions load the shared decision policy"
 }
 
-# A scout brief offers the Lavish review loop for every compatible board version,
-# including older builds that use the legacy reply path.
-test_scout_lavish_line_follows_presentation_floor() {
-  local base label version expect case_dir fakebin brief n=0
-  local hosting='use the lavish-axi rule'
-  local text_only='deliver your findings as a text report without Lavish'
-  base=$(jg_test_base_path_sans "${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" lavish-axi)
-  while IFS='^' read -r label version expect; do
-    [ -n "$label" ] || continue
-    n=$((n + 1))
-    case_dir="$TMP_ROOT/scout-lavish-$n"
-    mkdir -p "$case_dir/home/data"
-    fakebin=$(jg_fakebin "$case_dir")
-    [ "$version" = absent ] || jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION "$version"
-    PATH="$fakebin:$base" JG_HOME="$case_dir/home" \
-      "$ROOT/bin/jg-brief.sh" scout-lavish alpha --scout >/dev/null \
-      || fail "$label: scout scaffold failed"
-    brief="$case_dir/home/data/scout-lavish/brief.md"
-    if [ "$expect" = hosting ]; then
-      assert_grep "$hosting" "$brief" "$label: scout brief did not offer the Lavish review loop"
-      assert_no_grep "$text_only" "$brief" "$label: scout brief withheld Lavish from a compatible build"
-    else
-      assert_grep "$text_only" "$brief" "$label: scout brief did not ask for a text report"
-      assert_no_grep "$hosting" "$brief" "$label: scout brief offered a below-floor Lavish"
-    fi
-  done <<'ROWS'
-lavish-axi at the board compatibility floor^0.1.77^hosting
-lavish-axi below the reply feature floor^0.1.79^hosting
-lavish-axi at the reply feature floor^0.1.80^hosting
-lavish-axi above the reply feature floor^0.2.0^hosting
-lavish-axi below the board compatibility floor^0.1.76^text
-absent lavish-axi^absent^text
-ROWS
-  pass "jg-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor"
+# A scout brief sends a visual deliverable to a sign-off board report and never
+# to a retired review surface.
+test_scout_brief_names_sign_off_only() {
+  local home="$TMP_ROOT/scout-signoff" fakebin brief
+  mkdir -p "$home/data"
+  fakebin=$(jg_fakebin "$TMP_ROOT/scout-signoff-bin")
+  PATH="$fakebin:${JG_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" JG_HOME="$home" \
+    "$ROOT/bin/jg-brief.sh" scout-signoff alpha --scout >/dev/null \
+    || fail 'scout scaffold failed'
+  brief="$home/data/scout-signoff/brief.md"
+  assert_grep 'sign-off board report' "$brief" \
+    'scout brief did not send a visual deliverable to a sign-off board report'
+  assert_grep 'return the sign-off report link only' "$brief" \
+    'scout brief did not ask for the sign-off report link only'
+  assert_no_grep 'Lavish' "$brief" 'scout brief still named the retired review surface'
+  assert_no_grep 'lavish-axi' "$brief" 'scout brief still named the retired tool'
+  pass 'jg-brief.sh: a scout brief names the sign-off board and no retired review surface'
 }
 
 # Scout and squad_lead paths still scaffold well-formed briefs.
@@ -1782,7 +1765,7 @@ test_pause_verb_override_renders_all_brief_scaffolds
 test_ship_and_scout_teach_validation_round_pause
 test_scout_and_squad_lead_load_decision_hold_policy
 test_scout_and_squad_lead_scaffold
-test_scout_lavish_line_follows_presentation_floor
+test_scout_brief_names_sign_off_only
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
