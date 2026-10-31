@@ -6,6 +6,15 @@ from pathlib import Path
 from hierarchy import field, title as request_title
 
 STALE_DAYS = 14
+DETAIL_MAX = 1000  # sign-off-axi refuses a --detail longer than this
+
+
+def cap_detail(lines, limit=DETAIL_MAX):
+    """The leading lines that fit under limit, then one '... and N more' line, so the count of what was found never shrinks."""
+    for keep in range(len(lines), -1, -1):
+        rest = len(lines) - keep
+        text = '\n'.join(lines[:keep] + ([f'... and {rest} more'] if rest else []))
+        if len(text) <= limit: return text
 
 
 def captain_origin(row):
@@ -73,15 +82,19 @@ def daily(items, today, state, board, home, run, carded, cards=None):
     kinds = {}
     for kind, *_ in found: kinds[kind] = kinds.get(kind, 0) + 1
     summary = ', '.join(f'{n} {k}' for k, n in sorted(kinds.items())) or 'none'
-    card = ''
+    card, listed = '', ''
     if found:
+        lines = [f'{k}: {l} - {d}' for k, l, d in found]
+        report = state / f'cleanup-{today.isoformat()}.txt'
+        report.write_text(f'{len(found)} flagged tickets, {today.isoformat()}\n' + '\n'.join(lines) + '\n')
+        listed = f'; full list {report}'
         card = f'ticket-cleanup-{today.isoformat()}'
         run(['sign-off-axi', 'raise', str(board), '--key', card, '--ask-ref', card, '--title', f'Keep or remove {len(found)} flagged tickets?',
              '--why', f'The daily clean-up flagged tickets: {summary}. Every captain quote stays on the survivor.'[:200],
-             '--detail', '\n'.join(f'{k}: {l} - {d}' for k, l, d in found),
+             '--detail', cap_detail(lines),
              '--option', 'keep=Keep them', '--option', 'remove=Remove them',
              '--outcome', 'keep=They stay as they are and show again tomorrow only if still flagged.',
              '--outcome', 'remove=Main closes the flagged tickets on the board and keeps their quotes.',
              '--recommend', 'keep', '--recommend-reason', 'Nothing is lost if they stay.', '--default', 'keep'])
     day.write_text(today.isoformat())
-    return f'tickets-cleanup: flagged {summary}; {filled} quotes back-filled' + (f'; card {card}' if card else '') + (cards() if cards else '')
+    return f'tickets-cleanup: flagged {summary}; {filled} quotes back-filled' + (f'; card {card}' if card else '') + listed + (cards() if cards else '')

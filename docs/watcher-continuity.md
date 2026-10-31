@@ -68,7 +68,7 @@ So a running Pi process whose replacement did not load this extension is reporte
 
 A main follow-up counts as delivered once Pi accepts it, never once the model reads it.
 The reason is that a follow-up queued while main is streaming joins the running run without a `before_agent_start`.
-The extension header owns how consumption is observed and why it only decides what a replacement replays.
+The extension header owns how consumption is observed and what follows from it, including that this process never delivers the same finished wake reason twice.
 
 ### omp session replacement
 
@@ -470,7 +470,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - Interrupted handling replay.
 - Generation-bound acknowledgement.
 - A persistent live successor after recovery.
-- An idle live Lavish source that stays quiet until its real result wakes promptly.
+- An idle live source that stays quiet until its real result wakes promptly.
 - An append that reopens an announced empty recovery.
 - A watcher close inside the handling window that must leave the printed acknowledgement valid.
 - A re-arm whose recovery cycle is slowed after confirmation and must still surface rather than read as a watcher that stayed live.

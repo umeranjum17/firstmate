@@ -562,6 +562,10 @@ EOF
       return 1 ;;
   esac
   if declare -F jg_receipts_brief >/dev/null; then jg_receipts_brief "$id"; fi
+  printf '\n'
+  cat <<'EOF'
+A report that a user-visible change is fixed or done carries the released version that is running and where it is observable, or it says plainly that the change is merged but not released; `bin/jg-live-claim.sh` decides that from your report and the release record, and your lead or juggernaut applies it.
+EOF
 }
 
 # 0 when <sha> is contained in a ref under <namespace> in <repo>.

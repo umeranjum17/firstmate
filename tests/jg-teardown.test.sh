@@ -2692,6 +2692,34 @@ test_squad_lead_pr_registration_publishes_ready_line() {
   pass "jg-pr-check publishes the PR-ready line on a squad_lead's parent channel once"
 }
 
+# A behavior script must see the same environment under a live home as in CI.
+# A squad_lead launch exports the whole home-override set into every process it
+# starts (bin/jg-spawn.sh), so a runner that leaves JG_PUBLIC_FOLLOWUP_PRIMARY_HOME
+# in place hands a fixture teardown a foreign "live" parent to compare against
+# that fixture's own durable binding, and the teardown then refuses a cleanup
+# that has to succeed - a false red that depends only on who started the run.
+# This guards the clearance itself, in the runner that owns what a script inherits.
+test_runner_clears_the_lead_launch_parent_prefix() {
+  local probe_dir probe out rc
+  probe_dir="$TMP_ROOT/runner-env"
+  mkdir -p "$probe_dir/foreign-primary-home"
+  probe="$probe_dir/probe.test.sh"
+  cat > "$probe" <<'SH'
+#!/usr/bin/env bash
+printf 'seen=%s home=%s\n' "${JG_PUBLIC_FOLLOWUP_PRIMARY_HOME:-}" "${JG_HOME:-}"
+SH
+  out="$probe_dir/runner.out"
+  rc=0
+  JG_HOME="$probe_dir/live-home" \
+  JG_PUBLIC_FOLLOWUP_PRIMARY_HOME="$probe_dir/foreign-primary-home" \
+  JG_STATE_OVERRIDE="$probe_dir/live-state" \
+    "$ROOT/bin/jg-test-run.sh" "$probe" > "$out" 2>&1 || rc=$?
+  expect_code 0 "$rc" "runner-env: the runner should still report a green probe: $(cat "$out")"
+  assert_grep "seen= home=" "$out" \
+    "runner-env: the lead-launch parent prefix reached the test script"
+  pass "the test runner clears a squad_lead launch's parent-home prefix"
+}
+
 # Tearing a child down inside a squad_lead home delivers the child's final
 # ledger line to the parent before the record goes, and refuses (retaining
 # every record) while the parent channel cannot be written; a rerun after the
@@ -5523,6 +5551,7 @@ test_pushed_branch_needs_forge_merge_proof
 test_no_mistakes_truly_unpushed_refuses
 test_local_only_force_overrides_unpushed
 test_squad_lead_pr_registration_publishes_ready_line
+test_runner_clears_the_lead_launch_parent_prefix
 test_squad_lead_home_teardown_delivers_final_line_or_refuses
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker

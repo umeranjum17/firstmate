@@ -21,6 +21,12 @@
 #        --option, --silent-by, --filer, ...), then print the card key alone on
 #        stdout. Everything sign-off-axi prints goes to stderr. It refuses
 #        without --title and --ask-ref, because a new Decide card needs both.
+#        His board is his decisions alone, and bin/jg-ask-gate-lib.sh owns the
+#        rules applied here: one plain question about the product or about
+#        money, two clear options, and nothing internal in the words - no Main
+#        number, no task, lane, hook, card or file name, no path. A stop-order
+#        hold and a stuck worker are never cards. A card a rule refuses is
+#        printed as one line naming the rule, recorded for Main, and not posted.
 #        When the identical question is already open under a key, that key is
 #        printed instead of posting a second card.
 #        --route <lead> names the lead (a task id in this home) that owns the
@@ -28,6 +34,13 @@
 #        the answer straight to that lead and closes its decision <slug>
 #        (default: the card key). Cards Main files for a lead name it. Neither
 #        flag reaches sign-off-axi.
+#        --must <category> is the gate (bin/jg-ask-gate-lib.sh): it is written
+#        into the card's detail field as "must: <category>", and on the
+#        when-it-matters leash a post with none is refused and recorded for
+#        Overwatch (bin/jg-board-gate.sh route) instead of posted.
+#        --record <url> is the card's deep link to its full record, written into
+#        the detail field because raise has no link flag. The two-layer check is
+#        shadow-first: it names the failing rule, logs it, and posts the card.
 # answer Record the captain's chat answer on its card, in the same turn he gave
 #        it: sign-off-axi has no command for this, so the line sign-off-axi
 #        itself writes for a board answer is appended to the board's answers log
@@ -68,8 +81,12 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/jg-question-lib.sh
 . "$SCRIPT_DIR/jg-question-lib.sh"
+# shellcheck source=bin/jg-ask-gate-lib.sh
+. "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 # shellcheck source=bin/jg-board-link-lib.sh
 . "$SCRIPT_DIR/jg-board-link-lib.sh"
+# shellcheck source=bin/jg-captain-card-lib.sh
+. "$SCRIPT_DIR/jg-captain-card-lib.sh"
 
 usage() {
   awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
@@ -89,6 +106,8 @@ split_board() {
   BOARD=''
   ROUTE=''
   DECISION_KEY=''
+  MUST=''
+  RECORD=''
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -96,6 +115,11 @@ split_board() {
         shift
         [ $# -gt 0 ] || die "--board needs a value"
         BOARD=$1
+        ;;
+      --record)
+        shift
+        [ $# -gt 0 ] || die "--record needs a link to the full record"
+        RECORD=$1
         ;;
       --route)
         shift
@@ -106,6 +130,11 @@ split_board() {
         shift
         [ $# -gt 0 ] || die "--decision-key needs a key"
         DECISION_KEY=$1
+        ;;
+      --must)
+        shift
+        [ $# -gt 0 ] || die "--must needs a category ($(jg_ask_categories_words))"
+        MUST=$1
         ;;
       *) ARGS+=("$1") ;;
     esac
@@ -121,6 +150,16 @@ has_flag() {  # <flag>  -> 0 when the remaining arguments carry it
   return 1
 }
 
+set_detail() {  # <value>: keep exactly one --detail pair in ARGS
+  local out=() i=0
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    if [ "${ARGS[$i]}" = --detail ]; then i=$((i + 2)); continue; fi
+    out+=("${ARGS[$i]}")
+    i=$((i + 1))
+  done
+  ARGS=(${out[@]+"${out[@]}"} --detail "$1")
+}
+
 flag_value() {  # <flag> -> the value that follows it
   local want=$1 i=0
   while [ "$i" -lt "${#ARGS[@]}" ]; do
@@ -133,8 +172,39 @@ flag_value() {  # <flag> -> the value that follows it
   return 0
 }
 
+option_count() {  # -> how many --outcome/--option entries ARGS carries
+  local i=0 n=0
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    case "${ARGS[$i]}" in --outcome|--option) n=$((n + 1)) ;; esac
+    i=$((i + 1))
+  done
+  printf '%s
+' "$n"
+}
+
+option_text() {  # -> every option's label and outcome, as one line of card text
+  local i=0 words=''
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    case "${ARGS[$i]}" in --outcome|--option) words="$words ${ARGS[$((i + 1))]:-}" ;; esac
+    i=$((i + 1))
+  done
+  printf '%s\n' "$words"
+}
+
+# A card the gate refuses is still an ask this home owes an answer to, so it is
+# recorded for Overwatch (bin/jg-board-gate.sh route) and never posted.
+refuse() {  # <the refusal line>
+  local filer rec
+  filer=$(flag_value --filer)
+  rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$(flag_value --title)" --filer "${filer:-${SIGN_OFF_FILER:-unknown}}" --ref "$(flag_value --ask-ref)" 2>&1) \
+    || rec=''
+  printf '%s\n' "$1" >&2
+  [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
+  exit 1
+}
+
 cmd_post() {
-  local title ask_ref before after key board out link rc=0
+  local title ask_ref before after key board out link rc=0 refusal rec filer detail RECORD=''
   split_board "$@"
   require_signoff
   title=$(flag_value --title)
@@ -142,10 +212,43 @@ cmd_post() {
   [ -n "$title" ] || die "refused: post needs --title \"<the one question>\"; it is the card's title"
   [ -n "$ask_ref" ] || die "refused: post needs --ask-ref <the owner message or hold this question answers>; sign-off-axi requires it for a new Decide card"
 
+  # The card rules (bin/jg-ask-gate-lib.sh): his board carries his decisions
+  # only, so a stop-order hold, a stuck worker, an internal name or a card with
+  # no two clear options is refused here, by rule, before sign-off-axi sees it.
+  refusal=$(jg_ask_card_refusal "$ask_ref" "$(option_count)" "$title" \
+    "$(flag_value --why)" "$(flag_value --about)" "$(flag_value --detail)" "$(option_text)") || true
+  [ -z "$refusal" ] || refuse "$refusal"
+
+  # The card's deep link to its record rides in its detail field, rule 4 of
+  # bin/jg-captain-card-lib.sh, because sign-off-axi's raise has no link flag.
+  if [ -n "$RECORD" ]; then
+    detail=$(flag_value --detail)
+    set_detail "${detail:+$detail }record: $RECORD"
+  fi
+
+  # The board gate (bin/jg-ask-gate-lib.sh): the card's detail field carries its
+  # must category, and under the when-it-matters leash no other ask is posted.
+  if [ -n "$MUST" ]; then
+    detail=$(flag_value --detail)
+    [ "$(jg_ask_card_category "$detail")" = "$MUST" ] || detail="${detail:+$detail }must: $MUST"
+    set_detail "$detail"
+  else
+    MUST=$(jg_ask_card_category "$(flag_value --detail)")
+  fi
+  if ! refusal=$(jg_ask_gate_refusal "$MUST" "$BOARD"); then
+    refuse "$refusal"
+  fi
+
   [ -z "$DECISION_KEY" ] || [ -n "$ROUTE" ] || die "refused: --decision-key only closes a lead's decision, so it needs --route <lead>"
   # Check the lead first: a refused route must not leave an unrouted card behind.
   [ -z "$ROUTE" ] || [ -f "${JG_STATE_OVERRIDE:-${JG_HOME:-/nonexistent}/state}/$ROUTE.meta" ] \
     || die "refused: --route '$ROUTE' is not a task recorded in this home (is JG_HOME set?)"
+  # The two-layer check (bin/jg-captain-card-lib.sh): shadow-first, so a card that
+  # still falls short of the card layer is named and logged, then posted.
+  jg_captain_card_shadow card \
+    "$(printf '%s\n%s\n%s\n%s' "$title" "$(flag_value --why)" "$(flag_value --detail)" "$(option_text)")" \
+    "$(option_count)"
+
   before=$(jg_question_open_keys)
   if [ -n "$BOARD" ]; then
     out=$(sign-off-axi raise "$BOARD" ${ARGS[@]+"${ARGS[@]}"} 2>&1) || rc=$?

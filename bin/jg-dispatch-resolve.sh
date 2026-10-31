@@ -35,6 +35,13 @@
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
 #   "Typed dispatch resolution" owns this tool's operator contract.
 #
+# Difficulty tiers: a rule may name `tier` (easy, standard, hard, or frontier)
+#   instead of `use`, and the candidates then come from that tier's own ordered
+#   list in the top-level `tiers` map. The tier is the only thing a rule or a
+#   caller states, so a model change edits the tier list and no rule moves. A
+#   rule without a tier resolves its own `use` exactly as before. The chosen
+#   and candidate lines name the tier beside the model.
+#
 # Never-send check: when the optional $JG_HOME/config/dispatch-never-send list
 #   exists, every string value of the built request is checked against it
 #   before the POST. Each non-blank, non-# line is a literal matched
@@ -198,11 +205,25 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   def duplicate_profiles($items):
     ($items | map([.harness, (.model // null), (.effort // null)] | @json)) as $keys
     | ($keys | length) != ($keys | unique | length);
+  def tier_names: ["easy", "standard", "hard", "frontier"];
+  def unknown_tiers($map): [$map | keys[] | . as $t | select((tier_names | index($t)) == null)] | unique;
+  def unconfigured_rule_tiers($map):
+    [(.rules // [])[] | select(has("tier")) | .tier as $t | select(($map | has($t)) | not) | $t] | unique;
+  (.tiers // {}) as $tier_map |
   if type != "object" then "top-level value must be an object"
   elif has("rules") and (.rules | type) != "array" then "rules must be an array"
   elif any((.rules // [])[]; type != "object") then "each rule must be an object"
   elif any((.rules // [])[]; (.when | type) != "string" or (.when | length) == 0) then "each rule needs non-empty when"
-  elif any((.rules // [])[]; (profiles(.use) | length) == 0) then "each rule needs at least one use profile"
+  elif any((.rules // [])[]; (profiles(.use) | length) == 0 and (has("tier") | not)) then "each rule needs at least one use profile or a tier"
+  elif any((.rules // [])[]; has("tier") and ((.tier | type) != "string" or (.tier | length) == 0)) then "rule tier must be a non-empty string when present"
+  elif has("tiers") and (.tiers | type) != "object" then "tiers must be an object"
+  elif (unknown_tiers($tier_map) | length) > 0 then "unknown tier: " + (unknown_tiers($tier_map) | join(", ")) + " (tiers are easy, standard, hard, and frontier)"
+  elif (unconfigured_rule_tiers($tier_map) | length) > 0 then "each rule tier needs a tiers entry: " + (unconfigured_rule_tiers($tier_map) | join(", "))
+  elif any($tier_map[]; (profiles(.) | length) == 0) then "each tier needs at least one profile"
+  elif any($tier_map[] | profiles(.)[]; profile_bad(.)) then "each tier profile needs harness; model, effort, and floor must be well formed, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\\z when present"
+  elif any($tier_map[]; duplicate_profiles(profiles(.))) then "each tier must not contain duplicate harness, model, and effort profiles"
+  elif any($tier_map[] | profiles(.)[]; (verified(.harness) | not)) then "each tier profile must name a verified harness"
+  elif any($tier_map[] | profiles(.)[]; (effort_ok(.harness; .model; .effort) | not)) then "each tier profile effort must be supported by its harness and model"
   elif any((.rules // [])[]; has("approval") and .approval != "captain") then "approval must be \"captain\" when present"
   elif any((.rules // [])[]; has("min_confidence") and ((.min_confidence | type) != "number" or .min_confidence < 0 or .min_confidence > 1)) then "min_confidence must be a number from 0 through 1 when present"
   elif any((.rules // [])[]; has("select") and ((.select | type) != "string" or (.select | length) == 0)) then "select must be a non-empty string"
@@ -225,6 +246,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   ((.rules // [])[] | profiles(.use)[] | select(has("provider") | not) | "use\t\(.harness)"),
+  ((.tiers // {})[] | profiles(.)[] | select(has("provider") | not) | "tier\t\(.harness)"),
   (profiles(.default // null)[] | select(has("provider") | not) | "default\t\(.harness)")
 ' "$RULES" | while IFS=$'\t' read -r location harness; do
   if ! jg_quota_single_provider_for_harness "$harness" >/dev/null; then
@@ -247,7 +269,7 @@ while IFS= read -r h; do
   PMAP=$(jq -c --arg h "$h" --arg p "$p" '. + {($h): (if $p == "" then null else $p end)}' <<<"$PMAP")
 done < <(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
-  ([((.rules // [])[]) | profiles(.use)[]] + profiles(.default // null))
+  ([((.rules // [])[]) | profiles(.use)[]] + [(.tiers // {})[] | profiles(.)[]] + profiles(.default // null))
   | map(.harness) | unique | .[]' "$RULES")
 
 RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
@@ -471,17 +493,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
    end) as $fb |
   (if $fb.to then $fb.to else $picked end) as $choice |
   (rule_at($choice)) as $rule |
+  (if $rule == null or ($rule | has("tier") | not) then null else $rule.tier end) as $rule_tier |
   (if $rule == null then "none" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
   (if $choice != "default" and $rule == null then []
    elif $rule == null then profiles($cfg.default // null)
+   elif $rule_tier != null then profiles(($cfg.tiers // {})[$rule_tier])
    else profiles($rule.use)
    end) as $answer_use |
   (if $choice != "default" and $rule == null then {invalid: "rule \($choice) is not in the rules file"}
    elif $rule == null then {source: "default", use: profiles($cfg.default // null), note: "no rule matched"}
-   elif ($rule.approval // "") == "captain" then {source: $choice, escalate: "rule requires the captain'"'"'s explicit approval before dispatch"}
-   elif $rule_floor_state == "unknown" then {source: $choice, escalate: "rule \($choice) floor \($rule.floor.provider)/\($rule.floor.scope) is unverifiable"}
+   elif ($rule.approval // "") == "captain" then {source: $choice, tier: $rule_tier, escalate: "rule requires the captain'"'"'s explicit approval before dispatch"}
+   elif $rule_floor_state == "unknown" then {source: $choice, tier: $rule_tier, escalate: "rule \($choice) floor \($rule.floor.provider)/\($rule.floor.scope) is unverifiable"}
    elif $rule_floor_state == "below"
      then {source: "default", use: profiles($cfg.default // null), note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
+   elif $rule_tier != null then {source: $choice, tier: $rule_tier, use: profiles(($cfg.tiers // {})[$rule_tier]), note: "rule matched tier \($rule_tier)"}
    else {source: $choice, use: profiles($rule.use), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
@@ -491,6 +516,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     confidence: $a.confidence, probabilities: $a.probabilities
   }
   + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) probability \($a.probabilities[$picked]) is below its floor \($picked_floor)"} else {} end)
+  + (if $sel.tier then {tier: $sel.tier} else {} end)
   as $ev |
   if $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
   elif $fb.below and $fb.global then
@@ -521,22 +547,26 @@ TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");
   def show($value): ($value // "-") | flat;
   def shell_arg: flat | @sh;
+  (.tier // null) as $tier |
   "dispatch-resolve:",
   "  status: \(.status | flat)",
   "  model: \(show(.model))   latency_ms: \(show(.latency_ms))   tokens: \(show(.tokens.input_tokens))/\(show(.tokens.output_tokens))",
   "  rule: \(.rule | flat) (\(.rule_when | flat))   confidence: \(.confidence | flat)",
+  (if .tier then "  tier: \(.tier | flat)" else empty end),
   "  probabilities: \([.probabilities | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
   (if .fallback then "  fallback: \(.fallback | flat)" else empty end),
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
   (if .unranked_note then "  note: \(.unranked_note | flat)" else empty end),
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
+      + (if $tier then "  tier=\($tier | flat)" else "" end)
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
       + "  -> " + (if .unranked then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
-      + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
+      + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end)
+      + (if $tier then "  (tier \($tier | flat))" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
 exit 0

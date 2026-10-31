@@ -37,18 +37,6 @@ EOF
   printf '%s\n' "$home"
 }
 
-# The Lavish review adapter, run against this suite's isolated home. The
-# machine-wide process-event claim root is redirected into the fixture so arming
-# a review here can never contend with a real one on this machine.
-run_lavish() {  # <home> <command args...>
-  local home=$1
-  shift
-  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
-    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
-    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
-    "$ROOT/bin/jg-procevent-lavish.sh" "$@"
-}
-
 # The generic process-event runner, run against this suite's isolated home and
 # its own claim root, so a review armed here can never contend with a real one.
 run_procevent() {  # <home> <command args...>
@@ -662,7 +650,7 @@ signoff_hold() {  # <home> <task-id> <addons-dir> <log> <stub-status>
     JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
     SIGNOFF_LOG="$log" SIGNOFF_STATUS="$status" \
     "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Route the card" \
-    --reason "captain must decide" --repo sample
+    --must design-pick --reason "captain must decide" --repo sample
 }
 
 # A hold that creates a task runs the task-priority add-on check when installed:
@@ -759,6 +747,64 @@ test_hold_fails_when_the_addon_signoff_raise_fails() {
   assert_contains "$out" "no sign-off card was raised" "a failing add-on raise did not fail the hold"
   assert_grep "raise|$id" "$log" "the failing add-on raise never reached the add-on script"
   pass "a failing add-on sign-off raise fails the hold"
+}
+
+# A hold that is the captain's own instruction - his stop order, or a branch we
+# preserved instead of landing - records the hold and raises nothing: no card for
+# him and no ask for Main. The recorded card his phone showed him is the case; its
+# record number is a placeholder, because the repo's owner-details guard forbids
+# committing his own number to a public repository.
+hold_with_reason() {  # <home> <addons-dir> <log> <task-id> <reason>
+  local home=$1 addons=$2 log=$3 id=$4 reason=$5
+  env -u JG_CODE_ROOT PATH="$home/fakebin:$PATH" JG_HOME="$home" JG_ADDONS_DIR="$addons" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" JG_CONFIG_OVERRIDE="$home/config" \
+    SIGNOFF_LOG="$log" SIGNOFF_STATUS=0 \
+    "$ROOT/bin/jg-captain-hold.sh" hold "$id" --title "Route the card" --reason "$reason" --repo sample
+}
+
+test_a_hold_that_is_the_captains_own_instruction_raises_no_card() {
+  local home addons log out rc=0 id=stop-order-held real=stop-order-real-ask
+  home=$(make_home stop-order-held)
+  addons="$home/addons"
+  log="$home/signoff.log"
+  mkdir -p "$home/projects/sample" "$home/state/procevent"
+  : > "$home/state/procevent/signoff.source"
+  signoff_addon_stub "$addons"
+  out=$(hold_with_reason "$home" "$addons" "$log" "$id" \
+    "captain stop order Main42 holds this lane; branch preserved unmerged" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a stop-order hold was refused instead of recorded: $out"
+  assert_grep "$id" "$home/data/backlog.md" "the stop-order hold was not recorded"
+  assert_absent "$log" "a stop-order hold raised a card"
+  assert_absent "$home/data/overwatch-decisions.md" "a stop-order hold was recorded for Main as a board ask"
+  # The counter-case: a real product question still reaches the board.
+  hold_with_reason "$home" "$addons" "$log" "$real" \
+    "Ship the new sign-in screen this week?" >/dev/null 2>&1 || fail "a real captain ask was refused"
+  assert_grep "raise|$real|" "$log" "a real captain ask raised no card"
+  pass "a stop-order hold records the hold alone, and a real ask still raises its card"
+}
+
+test_a_parked_hold_raises_no_card() {
+  local home addons log out rc=0 id=parked-held
+  home=$(make_home parked-held)
+  addons="$home/addons"
+  log="$home/signoff.log"
+  mkdir -p "$home/projects/sample" "$home/state/procevent"
+  : > "$home/state/procevent/signoff.source"
+  signoff_addon_stub "$addons"
+  cat > "$home/data/backlog.md" <<EOF
+## In flight
+- [ ] $id - Route the card (repo: sample) (kind: ship) (hold: waiting on a parked lane) (hold-kind: parked)
+
+## Queued
+
+## Done
+EOF
+  out=$(hold_with_reason "$home" "$addons" "$log" "$id" "who signs off the release" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a parked hold was refused instead of recorded: $out"
+  assert_grep "(hold-kind: captain)" "$home/data/backlog.md" "the parked hold was not re-recorded for the captain"
+  assert_absent "$log" "a parked hold raised a card"
+  assert_absent "$home/data/overwatch-decisions.md" "a parked hold was recorded for Main as a board ask"
+  pass "a hold whose kind is parked records the hold alone and raises no card"
 }
 
 # A Beads workspace with due.required and no types.custom captain type is the
@@ -1366,8 +1412,8 @@ test_visual_review_uses_shared_completion_owner() {
     || fail "completed investigation teardown failed: $(cat "$home/visual-teardown.err")"
   tasks_in "$home" "done" "$id" --report "data/$id/report.md" --keep 0 >/dev/null
 
-  mkdir -p "$home/.lavish"
-  printf '<html><body>Synthetic sample board</body></html>\n' > "$home/.lavish/sample-board.html"
+  mkdir -p "$home/data/review"
+  printf '<html><body>Synthetic sample board</body></html>\n' > "$home/data/review/sample-board.html"
   run_captain "$home" hold sample-layout-call --title "Choose the sample layout" \
     --reason "captain layout choice pending" --repo sample --origin "$id" >/dev/null \
     || fail "post-teardown visual review could not use the shared hold owner"
@@ -1697,204 +1743,6 @@ test_squad_lead_reconcile_publishes_before_request_retirement() {
     <(sed -E 's/ \[at=[0-9]+\]//' "$channel"))" -eq 1 ] \
     || fail "the normal-answer retry duplicated its parent resolution: $(cat "$channel")"
   pass "squad_lead resolutions publish before retiring durable retry triggers"
-}
-
-# The one keyed-answer intake, fed through the real process-event runner by a
-# fixture channel that knows nothing about captain holds: task-id keys close at
-# answer time, a card-declared release mode frees held work, freeform prose can
-# forge nothing, and a replayed capture is idempotent.
-test_bound_channel_answers_close_at_answer_time() {
-  local home id sid artifact result out show rc
-  home=$(make_home channel-answer-closure)
-  id=sample-eval-proposal
-  mkdir -p "$home/data/$id"
-  tasks_in "$home" add "$id" "Propose sample eval changes" --kind scout --repo sample --start >/dev/null \
-    || fail "could not create the review origin"
-  write_origin_meta "$home" "$id"
-  printf 'done: proposal deck ready for the captain\n' > "$home/state/$id.status"
-  printf '# Sample eval proposal\n\nThree captain choices remain.\n' > "$home/data/$id/report.md"
-  run_captain "$home" hold sample-membership-call --title "Captain call: membership" \
-    --reason "captain membership choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-headline-call --title "Captain call: headline" \
-    --reason "captain headline choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-forged-call --title "Captain call: forged" \
-    --reason "captain forged choice pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-invalid-close-call --title "Captain call: invalid close" \
-    --reason "captain close mode validation pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-source-reconcile --title "Captain call: reconcile" \
-    --reason "captain re-check pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-bare-reconcile --title "Captain call: bare reconcile" \
-    --reason "captain bare re-check pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-shape --title "Captain call: old board shape" \
-    --reason "captain old board pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-reconcile --title "Captain call: old bare reconcile" \
-    --reason "captain old bare reconcile pending" --repo sample --origin "$id" >/dev/null
-  run_captain "$home" hold sample-old-reconcile-note --title "Captain call: old annotated reconcile" \
-    --reason "captain old annotated reconcile pending" --repo sample --origin "$id" >/dev/null
-  tasks_in "$home" add sample-gated-work "Gated sample work" --kind ship --repo sample \
-    --body 'Gated work plan.' >/dev/null
-  run_captain "$home" hold sample-gated-work --reason "captain go needed" >/dev/null
-  run_captain "$home" complete "$id" \
-    sample-membership-call sample-headline-call sample-forged-call sample-invalid-close-call \
-    sample-source-reconcile sample-bare-reconcile sample-old-shape sample-old-reconcile \
-    sample-old-reconcile-note sample-gated-work >/dev/null \
-    || fail "completion failed for the deck's inventoried calls"
-
-  artifact="$home/data/$id/review.html"
-  printf '<h1>Sample eval proposal</h1>\n' > "$artifact"
-  jg_fake_exit0 "$home/fakebin" lavish-axi
-  sid=$(run_lavish "$home" source-id "$artifact") || fail "could not derive the review source id"
-  run_captain "$home" bind "$sid" >/dev/null \
-    || fail "could not bind the review source to the keyed-answer intake"
-  [ "$(run_captain "$home" binding "$sid")" = "(any)" ] \
-    || fail "the recorded binding did not resolve to the collapsed marker"
-  run_lavish "$home" arm "$artifact" >/dev/null || fail "could not arm the review deck"
-
-  result="$home/state/procevent-inbox/$sid.1.result"
-  mkdir -p "$home/state/procevent-inbox"
-  cat > "$result" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[13]{uid,prompt,selector,tag,text}:
-  "1","Reconcile first\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-source-reconcile\",\n  \"selection\": \"reconcile\",\n  \"note\": \"\"\n}","section#call > form:nth-of-type(6)",choice,"Reconcile"
-  "2","Membership: gold-only - captain detail\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-membership-call\",\n  \"selection\": \"gold-only\",\n  \"note\": \"captain detail\"\n}","section#call > form:nth-of-type(1)",choice,"Membership: gold-only - captain detail"
-  "3","Headline: f1-when-fp-gold\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-headline-call\",\n  \"selection\": \"f1-when-fp-gold\",\n  \"note\": \"\"\n}","section#call > form:nth-of-type(2)",choice,"Headline: f1-when-fp-gold"
-  "4","Gated work: go\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-gated-work\",\n  \"selection\": \"go\",\n  \"note\": \"\",\n  \"close\": \"release\"\n}","section#call > form:nth-of-type(3)",choice,"Gated work: go"
-  "5","Absent call: yes\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-nonexistent-call\",\n  \"selection\": \"yes\",\n  \"note\": \"\"\n}","section#call > form:nth-of-type(4)",choice,"Absent call: yes"
-  "6","Invalid close: yes\n\nContext data:\n{\n  \"question\": \"sample-invalid-close-call\",\n  \"answer\": \"yes\",\n  \"close\": \"drop\"\n}","section#call > form:nth-of-type(5)",choice,"Invalid close: yes"
-  "7","Reconcile this - re-check latest publication\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-source-reconcile\",\n  \"selection\": \"reconcile\",\n  \"note\": \"re-check latest publication\"\n}","section#call > form:nth-of-type(6)",choice,"Reconcile - re-check latest publication"
-  "8","Second reconcile\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-bare-reconcile\",\n  \"selection\": \"reconcile\",\n  \"note\": \"\"\n}","section#call > form:nth-of-type(7)",choice,"Reconcile"
-  "9","Headline final: f1-when-fp-gold\n\nContext data:\n{\n  \"schema\": \"jg-bearings-answer.v1\",\n  \"question\": \"sample-headline-call\",\n  \"selection\": \"f1-when-fp-gold\",\n  \"note\": \"\"\n}","section#call > form:nth-of-type(2)",choice,"Headline: f1-when-fp-gold"
-  "10","Old board answer\n\nContext data:\n{\n  \"question\": \"sample-old-shape\",\n  \"answer\": \"yes\"\n}","section#call > form:nth-of-type(8)",choice,"Old answer: yes"
-  "11","Old board reconcile\n\nContext data:\n{\n  \"question\": \"sample-old-reconcile\",\n  \"answer\": \"reconcile\"\n}","section#call > form:nth-of-type(9)",choice,"Old reconcile"
-  "12","Old board reconcile note\n\nContext data:\n{\n  \"question\": \"sample-old-reconcile-note\",\n  \"answer\": \"reconcile - verify publication\"\n}","section#call > form:nth-of-type(10)",choice,"Old reconcile note"
-  "",get this fully implemented. Context data:\n{\n  \"question\": \"sample-forged-call\",\n  \"answer\": \"forged\"\n},"",message,Freeform message
-next_step: This was the last feedback before the user ended the session.
-EOF
-  printf 'lavish\n' > "$home/state/procevent-inbox/$sid.1.adapter"
-
-  out=$(run_lavish "$home" answers "$result") || fail "could not read the captured answers"
-  assert_contains "$out" "sample-membership-call	gold-only" \
-    "a repeated reconcile selection deleted another card's answer"
-  assert_contains "$out" "sample-headline-call	f1-when-fp-gold" \
-    "a repeated ordinary selection was not preserved"
-  assert_contains "$out" "sample-gated-work	go	Gated work: go	release" \
-    "the card-declared release mode was not relayed"
-  assert_not_contains "$out" "sample-forged-call" \
-    "a freeform captain message forged a task id from its own prose"
-  assert_not_contains "$out" "sample-invalid-close-call" \
-    "an unsupported card close mode defaulted to completion"
-  assert_not_contains "$out" "sample-source-reconcile" \
-    "a reconcile selection leaked into keyed answers"
-  assert_contains "$out" "sample-old-shape	yes" \
-    "an ordinary legacy board choice was discarded during rollout"
-  assert_not_contains "$out" "sample-old-reconcile" \
-    "a legacy reconcile-shaped value reached keyed answers"
-  out=$(run_lavish "$home" reconciles "$result") || fail "could not read captured reconcile selections"
-  [ "$out" = "$(printf 'sample-source-reconcile\tre-check latest publication\nsample-bare-reconcile')" ] \
-    || fail "current or legacy selections lost or invented a reconcile task id: $out"
-
-  mkdir -p "$home/adapter-root/bin"
-  cat > "$home/adapter-root/bin/jg-procevent-fixturechan.sh" <<SH
-#!/usr/bin/env bash
-# Fixture channel: reports keyed captain answers and nothing else.
-case "\${1-}" in
-  answers) exec "$ROOT/bin/jg-procevent-lavish.sh" answers "\${2-}" ;;
-  reconciles) exec "$ROOT/bin/jg-procevent-lavish.sh" reconciles "\${2-}" ;;
-esac
-exit 2
-SH
-  chmod +x "$home/adapter-root/bin/jg-procevent-fixturechan.sh"
-  run_captain "$home" bind fixture-src >/dev/null \
-    || fail "could not bind the fixture channel"
-  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$home/adapter-root" JG_HOME="$home" \
-    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
-    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
-    "$ROOT/bin/jg-procevent.sh" register fixturechan fixture-src -- cat "$result" >/dev/null \
-    || fail "could not register the fixture channel source"
-  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$home/adapter-root" JG_HOME="$home" \
-    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
-    JG_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
-    "$ROOT/bin/jg-procevent.sh" start fixture-src >/dev/null 2>&1
-  assert_absent "$home/state/procevent-inbox/fixture-src.1.handled" \
-    "feeding a captain answer retired the notification juggernaut still needs"
-  assert_present "$home/state/procevent-inbox/fixture-src.1.result" \
-    "the fixture channel captured no result to feed"
-
-  show=$(tasks_in "$home" show sample-membership-call --full)
-  assert_contains "$show" "state: done" "capturing the captain's answer left the membership call open"
-  assert_contains "$show" "Resolution mode: answered" "the membership call did not record its close path"
-  assert_contains "$show" "Answer: gold-only" "the closed call did not record the captain's actual answer"
-  assert_contains "$show" "captain detail" "the annotated normal answer lost the captain's note"
-  show=$(tasks_in "$home" show sample-gated-work --full)
-  assert_contains "$show" "state: queued" "the released work item did not stay queued"
-  assert_contains "$show" "held: no" "the card-declared release did not lift the hold"
-  assert_contains "$show" "Resolution mode: released" "the released work did not record its close path"
-  assert_contains "$show" "Gated work plan." "the released work item lost its body"
-  show=$(tasks_in "$home" show sample-forged-call --full)
-  assert_contains "$show" "state: queued" "a forged key from freeform prose closed a captain call"
-  show=$(tasks_in "$home" show sample-invalid-close-call --full)
-  assert_contains "$show" "state: queued" "an unsupported card close mode closed a captain call"
-  assert_contains "$show" "held: yes" "an unsupported card close mode released a captain call"
-  out=$(run_captain "$home" reconcile list)
-  assert_contains "$out" "sample-source-reconcile" \
-    "the bound captured reconcile selection did not create a request"
-  assert_contains "$out" "captain note: re-check latest publication" \
-    "the annotated reconcile selection lost its note provenance"
-  show=$(tasks_in "$home" show sample-old-shape --full)
-  assert_contains "$show" "state: done" "an ordinary legacy board choice did not close its task"
-  assert_contains "$show" "Resolution mode: answered" \
-    "an ordinary legacy board choice did not use the keyed-answer intake"
-  show=$(tasks_in "$home" show sample-old-reconcile --full)
-  assert_contains "$show" "state: queued" "a bare legacy reconcile value closed its task"
-  assert_contains "$show" "held: yes" "a bare legacy reconcile value released its task"
-  show=$(tasks_in "$home" show sample-old-reconcile-note --full)
-  assert_contains "$show" "state: queued" "an annotated legacy reconcile value closed its task"
-  assert_contains "$show" "held: yes" "an annotated legacy reconcile value released its task"
-  assert_not_contains "$out" "sample-old-reconcile" \
-    "a legacy reconcile value created a generationless request"
-  show=$(tasks_in "$home" show sample-bare-reconcile --full)
-  assert_contains "$show" "state: queued" "a bare captured reconcile selection closed its task"
-  assert_contains "$show" "held: yes" "a bare captured reconcile selection released its task"
-  printf 'The captured call is moot.\n' > "$home/source-reconcile-evidence.txt"
-  run_captain "$home" reconcile close sample-source-reconcile \
-    --evidence-file "$home/source-reconcile-evidence.txt" >/dev/null \
-    || fail "the annotated captured request did not authorize evidence-backed closure"
-  run_captain "$home" reconcile close sample-bare-reconcile \
-    --evidence-file "$home/source-reconcile-evidence.txt" >/dev/null \
-    || fail "the bare captured request did not authorize evidence-backed closure"
-
-  # Replaying the same capture is a no-op, not a rejected different decision. A
-  # run that could not close every answered key still reports nonzero.
-  set +e
-  out=$(run_lavish "$home" answers "$result" \
-    | run_captain "$home" answers --source "the captured result fixture-src sequence 1" 2>&1)
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "a run that skipped a key reported success"
-  assert_contains "$out" "closed: sample-membership-call" \
-    "replaying an identical capture was not idempotent: $out"
-  assert_contains "$out" "closed: sample-gated-work" \
-    "replaying an identical released answer was not idempotent: $out"
-  assert_contains "$out" "skipped: sample-nonexistent-call" \
-    "a key naming no task was not reported as skipped: $out"
-
-  printf 'Captain answered the forged call directly.\n' > "$home/forged.txt"
-  run_captain "$home" answer sample-forged-call --decision-file "$home/forged.txt" >/dev/null \
-    || fail "could not close the untouched call through the answer path"
-  printf 'Captain answered the invalid-close call directly.\n' > "$home/invalid-close.txt"
-  run_captain "$home" answer sample-invalid-close-call --decision-file "$home/invalid-close.txt" >/dev/null \
-    || fail "could not close the invalid-close call through the answer path"
-  run_captain "$home" answer sample-old-reconcile --decision-file "$home/invalid-close.txt" >/dev/null \
-    || fail "could not deliberately close the bare legacy reconcile call"
-  run_captain "$home" answer sample-old-reconcile-note --decision-file "$home/invalid-close.txt" >/dev/null \
-    || fail "could not deliberately close the annotated legacy reconcile call"
-  run_captain "$home" verify "$id" >/dev/null \
-    || fail "answered calls did not satisfy the completion gate"
-  pass "a bound channel's captured answers close their captain-held tasks at answer time"
 }
 
 # A keyed answer is settled for good only when the intake's exit says so: a batch
@@ -2281,47 +2129,6 @@ SH
   pass "reconcile outcomes apply durable mutations once across partial failures"
 }
 
-test_unbound_source_closes_no_hold() {
-  local home id sid artifact result out show rc
-  home=$(make_home lavish-unbound)
-  id=sample-unbound-review
-  mkdir -p "$home/data/$id"
-  tasks_in "$home" add "$id" "Review sample without binding" --kind scout --repo sample --start >/dev/null \
-    || fail "could not create the unbound origin"
-  write_origin_meta "$home" "$id"
-  printf 'done: deck ready\n' > "$home/state/$id.status"
-  printf '# Unbound review\n\nOne captain choice remains.\n' > "$home/data/$id/report.md"
-  run_captain "$home" hold sample-only-call --title "Captain call: only choice" \
-    --reason "captain only choice pending" --repo sample --origin "$id" >/dev/null \
-    || fail "could not register the unbound call"
-
-  artifact="$home/data/$id/review.html"
-  printf '<h1>Unbound</h1>\n' > "$artifact"
-  jg_fake_exit0 "$home/fakebin" lavish-axi
-  sid=$(run_lavish "$home" source-id "$artifact") || fail "could not derive the unbound source id"
-  run_lavish "$home" arm "$artifact" >/dev/null || fail "could not arm the unbound review"
-
-  result="$home/state/procevent-inbox/$sid.1.result"
-  mkdir -p "$home/state/procevent-inbox"
-  cat > "$result" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-prompts[1]{uid,prompt,selector,tag,text}:
-  "2","Only choice: yes\n\nContext data:\n{\n  \"question\": \"sample-only-call\",\n  \"answer\": \"yes\"\n}","form",choice,"Only choice: yes"
-EOF
-  set +e
-  out=$(run_captain "$home" binding "$sid" 2>&1)
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "an unbound source reported a binding"
-  [ -z "$out" ] || fail "an unbound source printed a binding: $out"
-  show=$(tasks_in "$home" show sample-only-call --full)
-  assert_contains "$show" "state: queued" "an unbound review closed a captain call"
-  assert_contains "$show" "held: yes" "an unbound review released a captain call"
-  pass "a channel source with no decision binding closes nothing"
-}
-
 # Everything a pre-collapse install already has keeps working: composed
 # identities through the shim, short decision keys in recorded metadata, a
 # concrete-origin binding, and the chat fallback for old rows.
@@ -2447,63 +2254,6 @@ test_legacy_identities_keep_working() {
   assert_contains "$out" "closed: $id-decision-fourth-choice" \
     "the origin-free legacy replay digest was treated as drift"
   pass "legacy identities, metadata, bindings, and the shim keep working"
-}
-
-# A board answer must reach the keyed-answer intake through the RUNNER, not just
-# through a hand-fed `answers` call. The captain answered ten calls on a bearings
-# board, the board accepted them, and nothing collected them: the source that
-# collects a board is a supervised process, and while it was not running the
-# board went on presenting as armed. Everything between the captured result and
-# the closed task is asserted here end to end - capture, the wake that tells
-# juggernaut to look, and the recorded answer - because each of those was intact
-# on its own while the chain as a whole delivered nothing.
-test_board_answer_reaches_the_keyed_answer_intake() {
-  local home sid stub out queue show
-  home=$(make_home board-channel)
-  sid=lavish-b0a4d0000000f1e2
-  jg_test_track_procevent_home "$home" "$home/procevent-claims"
-
-  run_captain "$home" hold sample-board-call --title "Choose the sample board route" \
-    --reason "captain board route choice pending" --repo sample >/dev/null \
-    || fail "could not register the board call"
-
-  # One published Lavish poll response carrying the captain's structured answer,
-  # in the shape the adapter's own reader parses: a declared field order, an
-  # indented CSV row, and the versioned answer context inside its prompt.
-  stub="$home/board-source.sh"
-  cat > "$stub" <<'SH'
-#!/usr/bin/env bash
-cat <<'OUT'
-session:
-  status: feedback
-  session_ended: false
-prompts[1]{tag,text,prompt}:
-  "choice","Take the north route","Context data: {\"schema\":\"jg-bearings-answer.v1\",\"question\":\"sample-board-call\",\"selection\":\"north\",\"note\":\"\"}"
-OUT
-SH
-  chmod +x "$stub"
-
-  run_procevent "$home" register lavish "$sid" -- "$stub" >/dev/null \
-    || fail "could not register the board source"
-  run_captain "$home" bind "$sid" >/dev/null \
-    || fail "could not bind the board source to the keyed-answer intake"
-
-  out=$(run_procevent "$home" start "$sid" 2>&1) \
-    || fail "the board source runner did not complete: $out"
-  assert_contains "$out" "$sid.1.result" "the board answer was never durably captured: $out"
-  assert_contains "$out" "answers-fed: $sid" \
-    "the captured board answer never reached the keyed-answer intake: $out"
-
-  queue=$(cat "$home/state/.wake-queue" 2>/dev/null || true)
-  assert_contains "$queue" "check: procevent lavish $sid 1" \
-    "the captured board answer produced no wake: $queue"
-
-  show=$(tasks_in "$home" show sample-board-call --full)
-  assert_contains "$show" "state: done" "the board answer did not close the captain call"
-  assert_contains "$show" "north" "the board answer lost the captain's selection"
-  assert_contains "$show" "the captured result $sid sequence 1" \
-    "the recorded answer did not name the board result that carried it"
-  pass "a board answer reaches the keyed-answer intake and wakes juggernaut"
 }
 
 # The intake is channel-agnostic, so chat must reach it the same way a captured
@@ -4861,15 +4611,12 @@ test_squad_lead_hold_stays_in_authoritative_home
 test_squad_lead_home_publishes_holds_and_answers
 test_squad_lead_reconcile_publishes_before_request_retirement
 test_reconcile_retry_after_completed_close_of_a_merged_captain_ask
-test_bound_channel_answers_close_at_answer_time
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_keyed_answer_exit_status_separates_settled_from_retried
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open
 test_reconcile_outcomes_retry_partial_failures_once
-test_unbound_source_closes_no_hold
 test_legacy_identities_keep_working
-test_board_answer_reaches_the_keyed_answer_intake
 test_chat_channel_feeds_the_same_keyed_answer_intake
 test_origin_slug_validation_precedes_path_construction
 test_status_resolution_over_an_open_hold_is_signalled
@@ -4905,4 +4652,6 @@ test_hold_raises_its_signoff_card_through_the_armed_addon_script
 test_hold_skips_the_addon_signoff_card_while_unarmed
 test_hold_falls_back_to_the_fork_signoff_adapter_without_the_addon
 test_hold_fails_when_the_addon_signoff_raise_fails
+test_a_hold_that_is_the_captains_own_instruction_raises_no_card
+test_a_parked_hold_raises_no_card
 test_hold_create_honors_the_task_priority_check

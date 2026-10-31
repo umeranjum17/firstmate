@@ -27,7 +27,6 @@ bin/fm-backend.sh  # alias for bin/jg-backend.sh; called by live homes, panes an
 bin/fm-backlog-handoff.sh  # alias for bin/jg-backlog-handoff.sh; called by live homes, panes and per-lane records
 bin/fm-backlog-receive.sh  # alias for bin/jg-backlog-receive.sh; called by live homes, panes and per-lane records
 bin/fm-backlog-transition-lib.sh  # alias for bin/jg-backlog-transition-lib.sh; called by live homes, panes and per-lane records
-bin/fm-bearings-board.sh  # alias for bin/jg-bearings-board.sh; called by live homes, panes and per-lane records
 bin/fm-bearings-snapshot.sh  # alias for bin/jg-bearings-snapshot.sh; called by live homes, panes and per-lane records
 bin/fm-bootstrap.sh  # alias for bin/jg-bootstrap.sh; called by live homes, panes and per-lane records
 bin/fm-branch-outcome.sh  # alias for bin/jg-branch-outcome.sh; called by live homes, panes and per-lane records
@@ -126,7 +125,6 @@ bin/fm-pr-poll.sh  # alias for bin/jg-pr-poll.sh; called by live homes, panes an
 bin/fm-pr-reviewers.sh  # alias for bin/jg-pr-reviewers.sh; called by live homes, panes and per-lane records
 bin/fm-pr-state.sh  # alias for bin/jg-pr-state.sh; called by live homes, panes and per-lane records
 bin/fm-primary-scope-lib.sh  # alias for bin/jg-primary-scope-lib.sh; called by live homes, panes and per-lane records
-bin/fm-procevent-lavish.sh  # alias for bin/jg-procevent-lavish.sh; called by live homes, panes and per-lane records
 bin/fm-procevent-lib.sh  # alias for bin/jg-procevent-lib.sh; called by live homes, panes and per-lane records
 bin/fm-procevent-quota.sh  # alias for bin/jg-procevent-quota.sh; called by live homes, panes and per-lane records
 bin/fm-procevent-remote-reply.sh  # alias for bin/jg-procevent-remote-reply.sh; called by live homes, panes and per-lane records
@@ -262,9 +260,6 @@ addons/ask-default/tests-owner-ask.test.sh  # inline jg-compat env alias
 addons/backlog-lock-reclaim/backlog-lock-reclaim.check.sh  # inline jg-compat env alias
 addons/backlog-lock-reclaim/install.sh  # inline jg-compat env alias
 addons/backlog-lock-reclaim/uninstall.sh  # inline jg-compat env alias
-addons/bearings-board/bin/jg-bearings-board.sh  # inline jg-compat env alias
-addons/bearings-board/install.sh  # inline jg-compat env alias
-addons/bearings-board/tests/bearings-board.test.sh  # inline jg-compat env alias
 addons/brief-inherit/bin/jg-brief-inherit-lib.sh  # inline jg-compat env alias
 addons/brief-inherit/tests/brief-inherit-e2e.sh  # inline jg-compat env alias
 addons/claude-accounts/bin/claude-accounts-quota.sh  # inline jg-compat env alias

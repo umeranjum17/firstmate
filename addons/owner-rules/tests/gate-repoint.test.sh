@@ -18,6 +18,7 @@ chmod 755 "$home/config/merge-gate.pre-owner-rules"
 } > "$home/config/merge-gate"
 chmod 755 "$home/config/merge-gate"
 fail() { echo "not ok - $*"; exit 1; }
+cp "$home/config/merge-gate.pre-owner-rules" "$work/prev"
 bash "$inst" "$home" >/dev/null || fail "install.sh refused the gate written for the retired clone"
 gate=$home/config/merge-gate
 ! grep -q 'firstmate-addons' "$gate" || fail "the gate still names the retired clone"
@@ -25,7 +26,7 @@ resolved=$(sed -n 's/^\(.*jg-owner-rules-gate.sh\) "\$@".*/\1/p' "$gate" | head 
 resolved=$(eval "printf '%s' $resolved")
 [ -x "$resolved" ] || fail "the gate resolves $resolved, which is not an executable"
 case $resolved in "$(cd "$here/.." && pwd -P)"/bin/*) ;; *) fail "the gate resolves $resolved, not this checkout's owner-rules" ;; esac
-grep -qxF "prev=$home/config/merge-gate.pre-owner-rules" "$gate" || fail "the previous gate is no longer chained"
+cmp -s "$home/config/merge-gate.pre-chain" "$work/prev" || fail "the previous gate is no longer chained"
 cp "$gate" "$work/first"
 bash "$inst" "$home" >/dev/null || fail "a second install failed"
 cmp -s "$gate" "$work/first" || fail "a second install changed the gate"

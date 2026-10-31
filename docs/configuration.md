@@ -78,6 +78,7 @@ Each effective `JG_HOME` contains private operational directories.
 - Project and Squad Lead registries.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, Recon reports, and the optional per-task no-mistakes pipeline-spend ledger.
+- The release record that [`bin/jg-live-claim.sh`](../bin/jg-live-claim.sh) reads to decide whether a claimed fix is released.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
 
 `state/` holds runtime records:
@@ -1175,17 +1176,6 @@ A remote Squad Lead is launched on its host from its own home's configuration, s
 [`bin/jg-worker-account-lib.sh`](../bin/jg-worker-account-lib.sh) owns parsing, the sign-in check, and the full list of credentials a Claude launch unsets; [runtime backend verification](verification/runtime-backends.md#worker-account-pin-sign-in-check) records the check against the real runners.
 The worker account pool (`config/account-pool` and `relaunch --account`) is owned by the `account-pool` add-on, not this fork.
 
-## Lavish server address (config/lavish-axi-host)
-
-The optional local, gitignored `config/lavish-axi-host` contains one non-empty address without whitespace for the per-machine Lavish server.
-`jg-spawn.sh` exports that address into every new worker and relaunch for opening boards, and the file is inherited into Squad Lead homes through the primary-authoritative configuration contract.
-
-Once a board exists, the process-event adapter derives the polling address from that board's own saved Lavish session instead; its header owns the lookup contract.
-When the file is absent, worker launches do not add a board address and retain the existing ambient-environment behavior.
-
-Malformed or unreadable values refuse the launch before the worker starts.
-The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
-
 ## Lane floor (config/lane-target)
 
 The optional local, gitignored `config/lane-target` holds one positive integer: the number of open lanes this home keeps working while ready backlog work exists.
@@ -1230,6 +1220,7 @@ A nonzero exit refuses that merge and prints the gate's own reason; an absent fi
 `bin/jg-merge-gate-lib.sh` owns the hook, so the gate runs whether or not any add-on is installed; the merge-card add-on defines the same two hooks for homes that install it.
 `config/post-merge` is the matching after-the-fact hook and never changes a merge's outcome.
 The gate's content is home-local policy; `bin/jg-tool-wiring.sh` places done-done's gate only in a home that has none.
+Where the owner-guard and owner-rules add-ons are installed, their installers write one gate file holding both checks, and `addons/lib/merge-gate-lib.sh` owns that file, the steps it records, and the home's own gate kept at `config/merge-gate.pre-chain`.
 
 ## Worker launch environment (config/launch-env-allowlist)
 
@@ -1406,10 +1397,38 @@ This section is the single owner of the canonical schema and its per-field seman
 | Field | Requirement |
 | --- | --- |
 | `rules` | May be absent or empty for a default-only configuration. |
-| Rule `when` and `use` | Required for each rule. |
-| `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
+| Rule `when` and `use` | `when` is required for each rule; a rule needs `use` or a `tier`. |
+| `use`, `tiers` lists, and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` and `effort`; rule `why` | Optional. |
+
+**Difficulty tiers**
+
+A rule can name a difficulty tier instead of naming models.
+The four tiers are `easy`, `standard`, `hard`, and `frontier`, and each one's ordered route list lives in the top-level `tiers` map, so a model change edits one tier list and no rule moves.
+
+```json
+{
+  "tiers": {
+    "easy":     [ { "harness": "claude", "model": "haiku", "effort": "low" } ],
+    "standard": [ { "harness": "codex", "model": "gpt-5.5", "effort": "medium" } ],
+    "hard":     [ { "harness": "claude", "model": "claude-sonnet-5", "effort": "high" } ],
+    "frontier": [
+      { "harness": "claude", "model": "claude-sonnet-5", "effort": "xhigh" },
+      { "harness": "codex", "model": "gpt-5.5", "effort": "xhigh" }
+    ]
+  },
+  "rules": [
+    { "when": "<natural-language condition describing a kind of task>", "tier": "hard" }
+  ]
+}
+```
+
+- A tier list holds the same profile objects as `use`, in the order the tier prefers, and resolution takes only that list's candidates.
+- A rule without a `tier` keeps its own `use` route exactly as before, so an existing file works unchanged until it is migrated.
+- When a rule names both, the tier is what routes the work.
+- A `tier` name outside the four levels, a rule tier with no `tiers` entry, or a malformed tier list is a configuration error.
+- Typed resolution names the tier in its `profile:` line and beside the model on its candidate lines.
 
 **Fields applied only by typed resolution**
 
@@ -1476,8 +1495,8 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 **Validation and diagnostics**
 
 - When the file exists, bootstrap validates it with `jq`.
-- Valid files stay silent by default; with `JG_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
-- Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
+- Valid files stay silent by default; with `JG_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, one per configured tier, and one fact for the optional default profile set.
+- Malformed JSON, malformed rules, an empty or malformed profile or tier list, an unknown or unconfigured tier name, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
 - While typed resolution is active, malformed `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no operator or Recon spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
@@ -1597,7 +1616,7 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 
 | Result | Meaning |
 | --- | --- |
-| `clear` | A `profile:` line ready for `jg-spawn.sh`. |
+| `clear` | A `profile:` line ready for `jg-spawn.sh`: its flags are the spawn arguments, and a trailing `(tier <name>)` names the difficulty tier that supplied them and is not a flag. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
 | `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, or a genuine tie. |
 | `error` | API, network, malformed response metadata, rendering, or quota-axi failure. |
@@ -1651,7 +1670,7 @@ This section is the single owner of that universal toolchain list; backend guide
 [`install.sh`](../install.sh) is the one command for a clean machine: it clones this repo into a home, writes [`defaults/`](../defaults) into the home once without overwriting an existing file, merges the shared account picker into `~/.learn-from-mistakes/config.yaml` only when that key is missing, and installs those pins into `~/.local/bin`, the same prefix [`bin/jg-bootstrap.sh`](../bin/jg-bootstrap.sh) installs into, so no install needs sudo and no tool ends up installed twice in two directories.
 
 In that list, no-mistakes runs the validation pipeline, gh-axi and chrome-devtools-axi cover GitHub and browser operations, and tasks-axi plus quota-axi back backlog mutations and quota-aware array dispatch.
-Lavish remains an optional presentation tool for visual decisions and reports, but Juggernaut does not install it; nonvisual work can proceed with plain text when it is unavailable.
+A visual report or decision surface is a sign-off board report, published with sign-off-axi; nothing in this list provides a separate review server.
 
 **Backend requirements**
 
@@ -1684,7 +1703,7 @@ A herdr, zellij, or cmux home is therefore never told `tmux` is missing, and the
 
 An install is not wiring: `bin/jg-tool-wiring.sh` runs on every locked session start and writes what the pinned packages carry, once per home.
 It links the skill each package ships, appends done-done's `integrations/juggernaut/brief-include.md` to `config/brief-include.md` as one managed block that a rerun replaces rather than appends, and places done-done's `integrations/juggernaut/merge-gate` as `config/merge-gate` with the executable bit set.
-A second run writes nothing, an absent package is a silent no-op, and an existing `config/merge-gate` is never replaced, so a home that chains another gate keeps its chain.
+A second run writes nothing, an absent package is a silent no-op, and an existing `config/merge-gate` is never replaced, so a home that already has a gate keeps that gate.
 Sign-off arming stays per home and is never done for the user; the first wiring of an unarmed home prints one line naming `bin/jg-procevent-signoff.sh arm`, and an already wired home stays silent.
 
 **Missing-tool diagnostics**
@@ -1693,7 +1712,6 @@ Sign-off arming stays per home and is never done for the user; the first wiring 
 
 - An absent or incompatible `tasks-axi` reports `MISSING: tasks-axi (install: npm install -g tasks-axi)`; when `config/backlog-backend` is not `manual`, a home with a configured non-markdown adapter or a markdown backlog refuses lifecycle mutation until compatible `tasks-axi` is on `PATH`, while a manual-backend home keeps its backlog hand-edited.
 - An absent or incompatible `gh-axi` reports `MISSING: gh-axi (install: npm install -g gh-axi && gh-axi setup hooks)`.
-- An absent or board-incompatible `lavish-axi` reports `PRESENTATION_UNAVAILABLE` with the 0.1.77 compatibility floor and explicit text fallback; Juggernaut does not provide an install command for this optional tool, while [`bootstrap-diagnostics`](../.agents/skills/bootstrap-diagnostics/SKILL.md) owns diagnostic handling.
 - An absent or too-old `quota-axi` reports `MISSING: quota-axi (install: npm install -g quota-axi)`; Juggernaut cannot resolve a profile array without a compatible binary.
 
 **Checkout diagnostics**
@@ -2276,74 +2294,11 @@ Never run the registered blocking source command directly in a conversational tu
 A long-polling external process is registered as a *source* through its adapter, whose header and `--help` own the commands and flags.
 `bin/jg-procevent.sh` owns the generic contract; built-in adapters retain their tracked `bin/jg-procevent-<adapter>.sh` commands, while an explicitly bound external adapter routes through the trusted host contract above.
 
-`bin/jg-procevent-lavish.sh` is the first built-in adapter and wraps the published `lavish-axi poll` interface plus `lavish-axi reply` when the installed version supports synchronous reply acceptance.
+`bin/jg-procevent-signoff.sh` is the built-in adapter for captain answers on a sign-off board; its header and `addons/signoff/README.md` own the card, answer, read-mark, and delivery contract.
+A home opts in with `bin/jg-procevent-signoff.sh arm` and stays exactly as it was until it does.
+`bin/jg-procevent-when.sh`, `bin/jg-procevent-quota.sh`, and `bin/jg-procevent-remote-reply.sh` are the other built-in adapters, each owning its own lifecycle rules.
 
-**Open the Lavish artifact first**
-
-Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse missing or invalid session evidence before posting or consuming a staged worker reply.
-
-**Retry interrupted Lavish polls**
-
-That adapter, and only that adapter, retries the one exact transient response a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
-This start-to-start governor is a no-op after a normally blocking poll but caps an immediately returning poll under the shipped defaults independently of the owner lease and registration launch pacing.
-
-Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `JG_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
-An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
-
-### Crew-hosted Lavish review boards
-
-**Arm and confirm a listener**
-
-A live task that hosts a Lavish board owns its listener, so Juggernaut must never arm that board.
-After opening the artifact as required above, the worker arms it with `bin/jg-procevent-lavish.sh arm <artifact.html> --for <task-id>` and never runs `lavish-axi poll` itself.
-
-`arm` prints `armed` only after the process-event owner confirms this registration generation's listener is running, and otherwise returns nonzero without that line.
-
-- The confirmation is the same live claim or launch-stamp evidence `reconcile` already uses, bounded by `JG_PROCEVENT_LAUNCH_CONFIRM_SECONDS`, and a failed confirmation retires a source that never started unless `retire` refuses because something may still own it, in which case the registration stays for `reconcile` or a human.
-- An earlier registration's listener that releases the board inside the confirm window lets the new registration start, and `arm` then reports `armed` as usual.
-- When a live listener from an earlier registration of the same board still holds it when the window ends, `arm` exits zero with `still-listening` instead of `armed`, because that earlier listener keeps serving the board and the new registration takes effect only after the source is retired and armed again.
-- The arm is refused unless that task id has valid, identity-matching endpoint metadata, because a board whose owner has no endpoint would collect feedback nobody can be told about.
-
-**Acknowledge a round by re-arming**
-
-The registration persists as one task-owned source record, while each captured nonterminal round remains open until the worker re-arms and the existing handled marker acknowledges that round.
-Re-arm acknowledges that round and registers the next listener: the board is armed once while no record exists, and a further arm by the same owner is refused unless an unacknowledged nonterminal round is waiting, so an open round is never replaced before its owner acknowledges it.
-
-**Post an agent reply**
-
-Re-arm never acquires, releases, or hands off the source claim.
-It may carry `--agent-reply-file <path>`.
-With lavish-axi 0.1.80 or newer, the reply is posted through `lavish-axi reply` under the source lock only after the arm passes its endpoint, ownership, and pending-round checks, and the server's acceptance is awaited before the listener is registered or armed.
-An arm refused for endpoint, ownership, or pending-round eligibility never posts the reply, and a failed or timed-out reply stops the arm before it registers a listener or acknowledges the round, so the worker cannot hand the board back as ready and can retry the same arm.
-If Lavish accepts the reply but the local registration then fails, retrying the arm posts that reply again; this rare duplicate is a known, benign limitation.
-
-Older compatible Lavish versions keep the prior behavior: the reply is staged into the listener and sent through `poll --agent-reply`, which cannot confirm acceptance before its long-poll returns.
-That compatibility path does not provide the synchronous handoff guarantee: a crash after the listener consumes its staged reply but before its poll posts it can lose that round's reply.
-Only a version probe that confirms an older compatible release selects that path.
-When `lavish-axi` is missing, its version cannot be read, or it is below the board floor, a reply-carrying arm fails without posting or registering a new listener; the worker's original reply file remains available for retry.
-The Lavish version floors and feature probe are owned by `bin/jg-bootstrap.sh`.
-
-**Deliver feedback to the worker**
-
-- The captured result is stored with immutable task-owner routing evidence and delivered directly to that task's steering inbox, without a Juggernaut `check` wake for the captain's words.
-- The doorbell rings only when that idempotent write creates a fresh inbox record; filing the note into `handled/` is the worker's own acknowledgement of the delivery, so a later reconcile never moves an already-filed note back into the active inbox or re-rings its owner, and re-delivery of a note still open in the inbox is left to the steering inbox's own re-ring ladder.
-- A task-owned source with an unhandled capture is not relaunched, so delivery failure cannot consume a round and start another poll.
-- That record is the only ownership evidence there is, so while any captured round of it is unacknowledged every retirement path refuses - the runner's own terminal retirement and an explicit `retire` alike - and the refusal names the acknowledgement that releases it.
-
-**Conclude a terminal round**
-
-- A terminal result, including `session_ended`, an empty End, or missing, is delivered to the owner with an explicit stop-and-conclude instruction and is never auto-rearmed.
-- That round keeps the board with its owner: the source record is not retired while the terminal capture is unacknowledged, so no second armer can take the board, and acknowledging it with `bin/jg-procevent.sh handled <source-id> <sequence>` is what concludes and retires it.
-- That conclude retains the registration it is retiring, removes it, then records the acknowledgement and restores the registration if that record cannot be written, so a failed conclude never leaves the round open with its owner gone.
-- An interruption between those two durable steps leaves the board unregistered with its terminal round still open, which nothing relaunches and the same `handled` call finishes.
-- It concludes only a round that is still open, so a repeated acknowledgement of an already-closed round reports `already-handled` and never touches whatever registration holds the board by then.
-
-**Ownership and recovery**
-
-- A second armer is refused with the current owner named, and the source list derives `listening`, `round-open`, or `dead` from the claim and handled captures without a second ownership record.
-- If the hosting worker cannot be recovered, relaunch a worker to re-host first; guarded Juggernaut adoption is an explicit last resort only after the old claim is proved dead.
-- The cross-home gap between worker rounds remains an accepted residual until lavish-axi's exclusive listener lands.
-- The interim crew instruction emitted by `bin/jg-brief.sh` points workers at this arm-and-acknowledge contract.
+A task-owned round is still part of the generic contract for any built-in adapter that uses it, but no shipped adapter hosts a review board: a worker publishes a visual report with `sign-off-axi` and returns that sign-off report link, and Juggernaut never arms or polls a review surface on the captain's behalf.
 
 **Register deterministic condition and action watches**
 
@@ -2403,15 +2358,9 @@ In supported steady state, a home with no registered source runs nothing, genera
 Whether a captured result is a routine no-op is adapter knowledge too, and the runner names no adapter-specific condition for it either.
 
 - Before publishing, the runner asks the immutable captured owner through the built-in `silent` command or external `result.silent` operation and treats exit 0 as the only silence verdict: the result is recorded as durably handled and never announced, so it neither wakes a handler now nor returns on a later reconcile.
-- The task-owned terminal exception is evaluated first, so an empty terminal board round goes to its owner's steering inbox for the required conclusion instead of entering this generic silence path.
+- The task-owned terminal exception is evaluated first, so an empty terminal round goes to its owner's steering inbox for the required conclusion instead of entering this generic silence path.
 - A missing command, an error, any other exit, or a silence the runner cannot durably record all publish the `check` wake exactly as before, so an adapter with no notion of a no-op needs no change and an unknown or degraded result always reaches its handler.
 - For built-ins, silence remains independent of the keyed-answer feed below: suppressing an announcement never suppresses the captain's own answer.
-
-**Lavish silence rules**
-
-- For Lavish that verdict covers two shapes - a session the adapter classifies `ended` that carries no queued content block at all, which is a review surface closed with nothing said, and `browser_disconnected` (classified `disconnected`), which carries no answer while the session remains open.
-- Any recognized top-level `prompts` or `feedback` block counts as content regardless of its declared count, and a malformed header makes the result indeterminate rather than empty.
-- A `Send & End` close carrying the captain's answer arrives as `status: feedback` with `session_ended`, so it classifies `feedback` and is announced unchanged, as is any `ended` result that still carries content, and every `waiting`, `missing`, `unknown`, or unreadable result.
 
 **Retire terminal sources**
 
@@ -2430,8 +2379,7 @@ Under the default ordering, this happens after the initial `check` publication.
 - A failed terminal removal stays durably terminal and is completed by ordinary reconciliation without restarting its poll, while a concurrently replaced registration survives and becomes independently runnable after the old claim releases.
 - Any registration refuses to replace an external registration while its prior runner claim is live, uncertain, orphaned, or terminal-pending; replacement becomes eligible only after that generation is proved gone or its terminal retirement completes.
 - A source that has ended therefore captures at most one terminal result, is never restarted, and leaves no recurring poll work.
-- For ordinary sources, explicit `retire` stays the supported and idempotent path afterwards; a task-owned board instead refuses `retire` until its owner concludes the open terminal round with `handled`.
-- For Lavish that verdict covers an ended session, a missing session, and the final feedback of a `Send & End` review, which the published poll marks with `session_ended` before it returns only empty ended sessions.
+- For ordinary sources, explicit `retire` stays the supported and idempotent path afterwards; a task-owned source instead refuses `retire` until its owner concludes the open terminal round with `handled`.
 
 **Apply built-in results automatically**
 
@@ -2654,7 +2602,7 @@ The runner proves exactly one durability boundary: output that reached the runne
 - `bin/jg-procevent.sh handled <source-id> <sequence>` is the only thing that stops re-announcement: a generation-keyed, private, path-safe, durable, and idempotent acknowledgement that atomically checks and deduplicates by the exact source and sequence, so a paired effect gated on its first-time-vs-repeat report is never authorized twice.
 - Default and fallback `check` publication is still best-effort, so the same source and sequence can repeat even before any restart; handlers deduplicate that identity rather than assuming a wake is unique.
 - The runner proves nothing about the source side, and the handled acknowledgement proves nothing about a paired external effect performed before it: a crash between that effect and the acknowledgement call can still repeat the effect on replay, so this is never a generic exactly-once guarantee.
-- The published `lavish-axi poll` clears feedback destructively before returning it, so a result lost between that clearing and the runner reading process output is unrecoverable.
+- An adapter's own poll may clear queued feedback destructively before returning it, so a result lost between that clearing and the runner reading process output is unrecoverable.
 - Never describe this path as at-least-once, no-loss, or lossless.
 
 `docs/verification/process-event-sources.md` holds the measurements and `.agents/skills/process-event-sources/SKILL.md` owns the handling procedure.
@@ -2841,7 +2789,8 @@ JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=3        # fetch retries after jg-fleet-s
 JG_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=1 # seconds jg-fleet-sync.sh waits before each of those retries
 JG_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30       # min mtime age before jg-fleet-sync.sh treats a leftover packed-refs.lock as provably stale
 JG_FF_STALE_INDEX_LOCK_AGE_SECS=30       # min mtime age before the squad lead tracked-file fast-forward treats a leftover index.lock as provably stale
-JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS=300   # max seconds a live .jg-lease-command.lock holder may serialize lease commands before bin/jg-lease-lib.sh reclaims it; a holder inside the bound is never preempted and an unreadable age keeps the ordinary wait; non-numeric or zero values use 300
+JG_LEASE_COMMAND_LOCK_WAIT_SECS=20      # seconds one command waits for .jg-lease-command.lock before bin/jg-lease-lib.sh refuses with the holder's pid and task instead of blocking; past the wait the acquire sweeps provably abandoned lock scratch once and retries once; a value that is not a positive integer falls back to 20
+JG_LEASE_COMMAND_LOCK_MAX_AGE_SECS=300   # max seconds a live .jg-lease-command.lock holder may serialize lease commands before bin/jg-lease-lib.sh reclaims it during that wait; a holder inside the bound is never preempted and an unreadable age keeps the ordinary wait; non-numeric or zero values use 300
 JG_BUSY_REGEX=          # optional override for rendered delivery guards and Grok's isolated task-state fallback; converted worker state ignores it
 JG_COMPOSER_IDLE_RE=    # optional fleet-wide idle-placeholder regex override (bin/jg-composer-lib.sh); a match alone does not prove emptiness because shape-specific position and ANSI de-emphasis safety gates still apply
 JG_COMPOSER_CAPTURE_LINES=20   # fleet-wide bound for tail-capture composer reads; it no longer bounds the adapter composer state/content reads on tmux or herdr, which supply their bounded visible pane instead, while the cmux, orca, and Zellij adapters use this small window so stale scrollback banners stay out of the candidate set; it still bounds the shared inbox composer read (bin/jg-task-inbox-lib.sh) on every backend, and on herdr it also floors how many Ctrl+U presses a refused leftover may take

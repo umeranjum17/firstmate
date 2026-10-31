@@ -308,6 +308,11 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-supervision-lib.sh"
 # shellcheck source=bin/jg-project-capacity-lib.sh
 . "$SCRIPT_DIR/jg-project-capacity-lib.sh"
+# Stale test-browser reaper and machine load alarm: on by default, no add-on to
+# install, and it stops only a browser in a fleet temp or scratch profile root whose
+# owning worker is gone and whose age is past the limit.
+# shellcheck source=bin/jg-reaper-lib.sh
+. "$SCRIPT_DIR/jg-reaper-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -3293,8 +3298,6 @@ post_merge_cleanup() {  # <id>
         "check: cleanup after the merge of $id was refused: ${line:-see $log}" \
         || triage_log "cleanup refusal for $id could not be queued"
     fi
-    env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
-      "$SCRIPT_DIR/jg-bearings-board.sh" refresh >/dev/null 2>&1 || true
   ) </dev/null >/dev/null 2>&1 &
 }
 
@@ -3869,6 +3872,8 @@ while :; do
 
   if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure || triage_log "host memory sampler failed to restart"; fi
   host_memory_surface_queued
+  # Stale test-browser reaper and load alarm; its own cadence file gates it.
+  jg_reaper_tick || triage_log "browser reaper failed"
   if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi
   # Remove confirmed orphan endpoints before replaying their old queue rows.
   phantom_pane_prune
@@ -3973,6 +3978,22 @@ while :; do
     done <<EOF
 $pending
 EOF
+    # #fleet: each status line change, in plain words. Read here because this is
+    # the loop that already surfaced the span, so the channel costs no second
+    # poll; the tail keeps the newest line, which is the change itself.
+    if [ -x "$SCRIPT_DIR/jg-chat.sh" ]; then
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$f" in *.status) ;; *) continue ;; esac
+        reportable_signal_path "$f" || continue
+        JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-chat.sh" note '#fleet' \
+          "$(basename "$f" .status)" - status - \
+          "$(awk 'NF { line = $0 } END { print line }' "$f" 2>/dev/null)" \
+          >/dev/null 2>&1 || true
+      done <<EOF
+$pending
+EOF
+    fi
     reason="signal:$files"
     # Triage: a signal is ACTIONABLE when any of these holds (cheapest first):
     #   - the away-mode daemon owns triage (afk) and wants every wake;

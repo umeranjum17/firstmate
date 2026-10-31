@@ -53,6 +53,26 @@ test_hook_records_only_typed_captain_messages() {
   pass "the hook records a typed captain message and drops fleet machinery and opted-out homes"
 }
 
+test_a_doorbell_is_not_a_captain_message() {
+  local home="$TMP_ROOT/doorbell" doorbell
+  make_home "$home"
+  # The doorbell the Claude record carrier types into the prompt box. It carries
+  # no operational marker, so only its shape tells it apart from typed text.
+  doorbell=$(in_home "$home" "$ROOT/bin/jg-operational-input.sh" record turn-end-guard \
+    <<<'signal: demo.status') || fail "the operational-input protocol produced no doorbell"
+  assert_equals 1 "$(printf '%s' "$doorbell" | grep -c '^: Juggernaut operational input waiting: read ')" \
+    "the doorbell does not carry its documented prefix: $doorbell"
+  submit "$home" "$doorbell"
+  [ ! -e "$home/data/overwatch-kpi.jsonl" ] || fail "the hook counted a doorbell as a captain message"
+  # A reworded doorbell must not leak through the exact-line check either.
+  submit "$home" ": Juggernaut operational input waiting: read '/tmp/x/operational-inbox/1-aa.msg' now."
+  [ ! -e "$home/data/overwatch-kpi.jsonl" ] || fail "a reworded doorbell was counted as a captain message"
+  submit "$home" "why is the export PR still not open?"
+  assert_equals "$(printf '1\twhy is the export PR still not open?')" "$(in_home "$home" "$KPI" pending)" \
+    "the real captain message is not the pending one"
+  pass "a doorbell is skipped while the captain message beside it is counted"
+}
+
 test_guard_refuses_an_untagged_message_once() {
   local home="$TMP_ROOT/guard" rc
   make_home "$home"
@@ -159,6 +179,7 @@ test_landed_asks_the_forge_and_the_backlog() {
 }
 
 test_hook_records_only_typed_captain_messages
+test_a_doorbell_is_not_a_captain_message
 test_guard_refuses_an_untagged_message_once
 test_a_miss_needs_a_link_to_code_work
 test_scorecard_counts_misses_and_excludes_the_old_ones

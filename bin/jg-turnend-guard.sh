@@ -172,8 +172,6 @@ trap record_parent_stop_state EXIT
 . "$SCRIPT_DIR/jg-primary-scope-lib.sh"
 # shellcheck source=bin/jg-hook-host-lib.sh
 . "$SCRIPT_DIR/jg-hook-host-lib.sh"
-# shellcheck source=bin/jg-question-lib.sh
-. "$SCRIPT_DIR/jg-question-lib.sh"
 
 # Read the whole turn-end hook payload once; never block on unreadable/absent
 # stdin.
@@ -221,63 +219,6 @@ fi
 # so this exempts them while guarding every real squad_lead home.
 jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
-# --- the question rule ------------------------------------------------------
-# The owner's rule (data/owner-rules.md): "if you ask questions as well make
-# sure they are posted, posting questions will be stricter way of working", so a
-# reply that ends in a question while no open board card is cited is flagged at
-# this boundary. It is charged once per distinct trailing question (the record
-# in $STATE/.question-flagged), which keeps every harness bounded: the second
-# sighting of the same question, and every reply after it, ends normally.
-question_block() {  # <the trailing line>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  REPLY ENDS IN A QUESTION THAT IS NOT ON THE BOARD\n'
-    printf '●  He answers on the board, so a question asked only in chat is a violation.\n'
-    printf '●  Post the card first, then cite the key it prints:\n'
-    printf '●    %s/jg-question-card.sh post --ask-ref <ref> --title "<one question>" --why "<why now>" --outcome yes="<what happens next>" --outcome no="<what happens instead>" --recommend yes --default no\n' "$SCRIPT_DIR"
-    printf '●  Trailing line: %s\n' "$1"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
-}
-
-QUESTION_TEXT=$(jg_question_reply_text "$PAYLOAD")
-if [ -n "$QUESTION_TEXT" ] && jg_question_asks "$QUESTION_TEXT" \
-  && ! jg_question_filed "$QUESTION_TEXT" \
-  && jg_question_first_sighting "$STATE" "$QUESTION_TEXT"; then
-  question_block "$(jg_question_tail "$QUESTION_TEXT")"
-fi
-
-# --- the chat-answer rule ---------------------------------------------------
-# The opposite case: the captain answered a posted question in chat ("if I
-# answer you directly here you should reconcile the decisions instead of keep
-# stale data"). A turn that ends while that card still waits is flagged, once per
-# distinct answer, and the banner names the deterministic path that records his
-# words on the card. Main and lead homes pass this guard alike.
-chat_answer_block() {  # <keys, one per line> <his words>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  HE ANSWERED IN CHAT, BUT THE BOARD CARD IS STILL WAITING
-'
-    printf '●  Record his words on the card in the same turn, or the board keeps stale data:
-'
-    printf '%s\n' "$1" | while IFS= read -r key; do
-      printf '●    %s/jg-question-card.sh answer %s --words "<his exact words>"\n' "$SCRIPT_DIR" "$key"
-    done
-    printf '●  His words: %s\n' "${2:0:200}"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
-}
-
-CHAT_KEYS=$(jg_question_chat_answered_keys "$PAYLOAD")
-if [ -n "$CHAT_KEYS" ]; then
-  CHAT_WORDS=$(jg_question_chat_words "$PAYLOAD")
-  if jg_question_first_sighting "$STATE" "$(printf '%s|%s' "$CHAT_KEYS" "$CHAT_WORDS" | tr '\n' ' ')" .chat-answer-flagged; then
-    chat_answer_block "$CHAT_KEYS" "$CHAT_WORDS"
-  fi
-fi
-
 # --- the Overwatch KPI rule -------------------------------------------------
 # Every captain message is tagged in the turn it arrives; bin/jg-overwatch-kpi.sh
 # owns the ledger, the kinds, and the link a miss needs. The block is charged
@@ -298,6 +239,64 @@ if [ -n "$KPI_PENDING" ] && [ "$KPI_SEQ" != "$(cat "$STATE/.overwatch-kpi-flagge
   } >&2
   exit 2
 fi
+
+# --- the owner-correction capture rule --------------------------------------
+# The owner's standing rule (data/owner-rules.md): "I don't want these feedbacks
+# as one time fix". A captain message that told the fleet to work differently
+# must leave something the whole system reads - an owner rule
+# (bin/jg-owner-rules.sh add) or, when it cannot be a rule yet, an enforcement
+# ticket (bin/jg-tasks-axi.sh add) - in the turn it lands, or the correction dies
+# in one conversation and the next session repeats it. bin/jg-owner-correction.sh
+# owns the record and the predicate; the KPI rule above has already required the
+# tag that record reads. A helper that is missing or cannot answer is never read
+# as "nothing pending": this home has not picked the shared check up and says so
+# once.
+owner_correction_unavailable() {  # <why>
+  [ ! -e "$STATE/.owner-correction-unavailable" ] || return 0
+  : > "$STATE/.owner-correction-unavailable" 2>/dev/null || true
+  {
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    printf '●  THIS HOME HAS NOT PICKED UP OWNER-CORRECTION CAPTURE\n'
+    printf '●  %s. No turn is checked for an uncaptured owner correction until the shared check is here.\n' "$1"
+    printf '●  Update this home to the shared code, then end the turn again: /resupply\n'
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  } >&2
+  exit 2
+}
+
+owner_correction_block() {  # <seq> <kind> <text>
+  printf '%s\n' "$1" > "$STATE/.owner-correction-flagged" 2>/dev/null || true
+  {
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+    printf '●  HE CORRECTED THE FLEET, AND NOTHING CAPTURED IT\n'
+    printf '●  A correction that stays in this conversation is repeated in the next session.\n'
+    printf '●  Write the rule the whole system reads, in his own words:\n'
+    printf '●    %s/jg-owner-rules.sh add --words "<his exact words>" --scope "<where it applies>" --enforce "<script or contract that enforces it>"\n' "$SCRIPT_DIR"
+    printf '●  When it cannot be a rule yet, file the enforcement ticket instead:\n'
+    printf '●    %s/jg-tasks-axi.sh add <id> "[feature] <what changes>" --body "<summary of what changes and why>"\n' "$SCRIPT_DIR"
+    printf '●  His message (%s): %.160s\n' "$2" "$3"
+    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  } >&2
+  exit 2
+}
+
+if [ ! -x "$SCRIPT_DIR/jg-owner-correction.sh" ]; then
+  owner_correction_unavailable 'bin/jg-owner-correction.sh is missing beside bin/jg-turnend-guard.sh'
+fi
+OWNER_CORRECTION=$("$SCRIPT_DIR/jg-owner-correction.sh" pending 2>/dev/null)
+OWNER_CORRECTION_STATUS=$?
+case "$OWNER_CORRECTION_STATUS" in
+  1) : ;;
+  # 0 is a pending correction; anything else means the shared check could not answer.
+  0) OWNER_CORRECTION_SEQ=${OWNER_CORRECTION%%$'\t'*}
+     if [ "$OWNER_CORRECTION_SEQ" != "$(cat "$STATE/.owner-correction-flagged" 2>/dev/null)" ]; then
+       OWNER_CORRECTION_REST=${OWNER_CORRECTION#*$'\t'}
+       OWNER_CORRECTION_REST=${OWNER_CORRECTION_REST#*$'\t'}
+       owner_correction_block "$OWNER_CORRECTION_SEQ" \
+         "${OWNER_CORRECTION_REST%%$'\t'*}" "${OWNER_CORRECTION_REST#*$'\t'}"
+     fi ;;
+  *) owner_correction_unavailable "bin/jg-owner-correction.sh could not answer (exit $OWNER_CORRECTION_STATUS)" ;;
+esac
 
 # --- the actual predicate ----------------------------------------------------
 # shellcheck source=bin/jg-wake-lib.sh

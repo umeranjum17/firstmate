@@ -6,7 +6,6 @@
 #          exits 0.
 #          Silent = all good.
 #          Lines: "MISSING: <tool> (install: <command>)",
-#                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)",
 #                 "NEEDS_GH_AUTH" (skipped when every registered project is
 #                 local-only with a clone and no clone is unregistered),
@@ -60,12 +59,9 @@
 #          "treehouse get --lease" support.
 #          no-mistakes is also MISSING when its installed version is older than
 #          1.46.0 (structured pipeline attestation floor; see CONTRIBUTING.md).
-#          The AXI-family floor policy is owned beside GH_AXI_MIN and
-#          LAVISH_AXI_MIN below; the per-tool owners point there. An installed
-#          essential build below its floor reports MISSING like no-mistakes.
-#          Missing or incompatible lavish-axi reports PRESENTATION_UNAVAILABLE without an install command;
-#          a compatible older build keeps legacy boards and reports a BOOTSTRAP_INFO
-#          upgrade recommendation for synchronous reply acceptance.
+#          The AXI-family floor policy is owned beside GH_AXI_MIN below; the
+#          per-tool owners point there. An installed essential build below its
+#          floor reports MISSING like no-mistakes.
 #          tasks-axi feature probes remain a separate defense-in-depth check.
 #          tasks-axi and quota-axi are essential bootstrap tools.
 #          A compatible tasks-axi default backend is silent.
@@ -162,15 +158,6 @@
 #          keeps detect-only meaning unlocked, exactly as before.
 #        jg-bootstrap.sh install <tool>...
 #          Install the named tools (only ones the captain approved).
-#        jg-bootstrap.sh lavish-compatible
-#          Exit 0 when lavish-axi meets LAVISH_AXI_BOARD_MIN, 1 otherwise,
-#          printing nothing; bin/jg-brief.sh uses it to gate scout Lavish hosting.
-#        jg-bootstrap.sh lavish-reply-compatible
-#          Exit 0 when lavish-axi meets LAVISH_AXI_MIN and supports synchronous
-#          reply acceptance, 1 when one version probe confirms an older release
-#          meeting LAVISH_AXI_BOARD_MIN, and 2 when lavish-axi is absent, its
-#          version cannot be read, or it is below LAVISH_AXI_BOARD_MIN, printing
-#          nothing.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -926,8 +913,7 @@ if ! BACKEND_TOOLS=$(jg_backend_required_tools "$BACKEND"); then
 fi
 TOOLS="$BACKEND_TOOLS $COMMON_TOOLS"
 # Every floor below is read from its toolchain.versions row, so a bump moves installation, detection and
-# this diagnostic together. The one floor not read from that table is LAVISH_AXI_BOARD_MIN: it accepts an
-# older build for legacy boards, which is a compatibility fact rather than a version we install.
+# this diagnostic together.
 NO_MISTAKES_MIN=$(jg_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # AXI-FAMILY FLOOR POLICY. Every axi-family floor is the CURRENT LATEST published
 # version of that tool, captain-bumped periodically to keep the whole fleet on the
@@ -938,8 +924,6 @@ NO_MISTAKES_MIN=$(jg_pin_version no-mistakes) || NO_MISTAKES_MIN=0.0.0
 # of its floor.
 GH_AXI_MIN=$(jg_pin_version gh-axi) || GH_AXI_MIN=0.0.0
 LEARN_FROM_MISTAKES_AXI_MIN=$(jg_pin_version learn-from-mistakes) || LEARN_FROM_MISTAKES_AXI_MIN=0.0.0
-LAVISH_AXI_MIN=0.1.80
-LAVISH_AXI_BOARD_MIN=0.1.77
 # The proof and decision tools Juggernaut publishes install at the exact build
 # their toolchain.versions rows name, and that row is their floor too, so one bump
 # moves installation, detection and this diagnostic together.
@@ -1185,6 +1169,7 @@ crew_dispatch_validate() {
       end;
     def configured_profiles:
       ([(.rules // [])[]? | profiles(.use?)[]?]
+        + [(.tiers // {})[]? | profiles(.)[]?]
         + (if has("default") then [profiles(.default)[]?] else [] end));
     def malformed_optional_fields($items):
       ($items | any(has("model") and (((.model | type) != "string") or (.model | length) == 0)))
@@ -1203,6 +1188,8 @@ crew_dispatch_validate() {
           end);
     def malformed_profile_floors($items):
       ($items | any(has("floor") and floor_bad(.floor; false)));
+    def tier_names: ["easy", "standard", "hard", "frontier"];
+    def tier_profiles: [((.tiers // {})[]? | profiles(.)[]?)];
     def bad_efforts:
       configured_profiles
       | map({h: .harness, m: .model, e: .effort})
@@ -1211,12 +1198,14 @@ crew_dispatch_validate() {
       | map(select(. as $p | effort_ok($p.h; $p.m; $p.e) | not))
       | map("\(.h):\(.e)")
       | unique;
+    (.tiers // {}) as $tier_map |
     if type != "object" then "top-level value must be an object"
     elif has("rules") and (.rules | type) != "array" then "rules must be an array"
     elif [(.rules // [])[]? | select(type != "object")] | length > 0 then "each rule must be an object"
     elif [(.rules // [])[]? | select((.when? | type) != "string" or (.when | length) == 0)] | length > 0 then "each rule needs non-empty when"
-    elif [(.rules // [])[]? | select((.use? | type) != "object" and (.use? | type) != "array")] | length > 0 then "each rule needs use"
-    elif [(.rules // [])[]? | select((.use? | type) == "array" and (.use | length) == 0)] | length > 0 then "each rule needs at least one use profile"
+    elif [(.rules // [])[]? | select((.use? | type) != "object" and (.use? | type) != "array" and (has("tier") | not))] | length > 0 then "each rule needs use or a tier"
+    elif [(.rules // [])[]? | select((.use? | type) == "array" and (.use | length) == 0 and (has("tier") | not))] | length > 0 then "each rule needs at least one use profile or a tier"
+    elif [(.rules // [])[]? | select(has("tier") and ((.tier? | type) != "string" or (.tier | length) == 0))] | length > 0 then "rule tier must be a non-empty string when present"
     elif [(.rules // [])[]? | profiles(.use?)[]? | select(type != "object")] | length > 0 then "each use profile must be an object"
     elif [(.rules // [])[]? | profiles(.use?)[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length > 0 then "each use profile needs harness"
     elif malformed_optional_fields([(.rules // [])[]? | profiles(.use?)[]?]) then
@@ -1232,6 +1221,19 @@ crew_dispatch_validate() {
       "unknown select: " + ([ (.rules // [])[]? | .select? // empty | select(. != "quota-balanced") ] | unique | join(", "))
     elif has("default") and ((.default | type) != "object" and (.default | type) != "array") then "default must be a profile object or non-empty profile array"
     elif has("default") and ((.default | type) == "array" and (.default | length) == 0) then "default needs at least one profile"
+    elif has("tiers") and (.tiers | type) != "object" then "tiers must be an object"
+    elif [$tier_map | keys[] | . as $t | select((tier_names | index($t)) == null)] | length > 0 then
+      "unknown tier: " + ([$tier_map | keys[] | . as $t | select((tier_names | index($t)) == null)] | unique | join(", ")) + " (tiers are easy, standard, hard, and frontier)"
+    elif [(.rules // [])[]? | select(has("tier")) | .tier as $t | select((($tier_map) | has($t)) | not) | $t] | length > 0 then
+      "each rule tier needs a tiers entry: " + ([(.rules // [])[]? | select(has("tier")) | .tier as $t | select((($tier_map) | has($t)) | not) | $t] | unique | join(", "))
+    elif [$tier_map[] | select((profiles(.) | length) == 0)] | length > 0 then "each tier needs at least one profile"
+    elif [tier_profiles[]? | select(type != "object")] | length > 0 then "each tier profile must be an object"
+    elif [tier_profiles[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length > 0 then "each tier profile needs harness"
+    elif malformed_optional_fields(tier_profiles) then
+      if $typed then "tier profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\\z when present"
+      else "tier profile model and effort must be non-empty strings when present"
+      end
+    elif $typed and malformed_profile_floors(tier_profiles) then "tier profile floor needs scope and min_percent 0..100"
     elif has("default") and ([profiles(.default)[]? | select(type != "object")] | length) > 0 then "each default profile must be an object"
     elif has("default") and ([profiles(.default)[]? | select((.harness? | type) != "string" or (.harness | length) == 0)] | length) > 0 then "each default profile needs harness"
     elif has("default") and malformed_optional_fields([profiles(.default)[]?]) then
@@ -1268,8 +1270,13 @@ crew_dispatch_validate() {
         (($selector // "quota-balanced") + "[" + ([$value[] | profile(.)] | join(", ")) + "]")
       else profile($value)
       end;
+    def rule_route($r):
+      if $r | has("tier") then "tier " + ($r.tier | tostring)
+      else profile_set($r.use; $r.select?)
+      end;
     (["BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json"]
-      + [(.rules // [])[]? | "BOOTSTRAP_INFO: crew dispatch rule: " + (.when | tostring) + " -> " + profile_set(.use; .select?)]
+      + [(.rules // [])[]? | "BOOTSTRAP_INFO: crew dispatch rule: " + (.when | tostring) + " -> " + rule_route(.)]
+      + [(.tiers // {}) | to_entries[]? | "BOOTSTRAP_INFO: crew dispatch tier: " + .key + " -> " + profile_set(.value; null)]
       + (if has("default") then ["BOOTSTRAP_INFO: crew dispatch default: " + profile_set(.default; null)] else [] end))
     | .[]
   ' "$file"
@@ -1432,18 +1439,6 @@ companion_tool_wiring() {
   done
 }
 
-if [ "${1:-}" = "lavish-compatible" ]; then
-  tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"
-  exit
-fi
-
-if [ "${1:-}" = "lavish-reply-compatible" ]; then
-  lavish_parts=$(tool_version_parts lavish-axi) || exit 2
-  version_parts_at_least "$lavish_parts" "$LAVISH_AXI_MIN" && exit 0
-  version_parts_at_least "$lavish_parts" "$LAVISH_AXI_BOARD_MIN" && exit 1
-  exit 2
-fi
-
 if [ "${1:-}" = "version" ]; then
   # The one owner of version parsing, so the installer never carries its own copy.
   parts=$(tool_version_parts "${2:?usage: jg-bootstrap.sh version <tool>}") || exit 1
@@ -1570,11 +1565,6 @@ detect_local_tools() {
   fi
   if command -v sign-off-axi >/dev/null 2>&1 && ! tool_version_at_least sign-off-axi "$SIGN_OFF_AXI_MIN"; then
     echo "MISSING: sign-off-axi (install: $(install_cmd sign-off-axi))"
-  fi
-  if ! tool_version_at_least lavish-axi "$LAVISH_AXI_BOARD_MIN"; then
-    echo "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=$LAVISH_AXI_BOARD_MIN; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports"
-  elif ! tool_version_at_least lavish-axi "$LAVISH_AXI_MIN"; then
-    echo "BOOTSTRAP_INFO: lavish-axi >=$LAVISH_AXI_MIN enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
   fi
   if command -v quota-axi >/dev/null 2>&1 && ! jg_quota_axi_compatible; then
     echo "MISSING: quota-axi (install: $(install_cmd quota-axi))"
@@ -1776,6 +1766,13 @@ if [ "${JG_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     && [ ! -e "$CONFIG/fleet-heartbeat-off" ] && [ "$STATE" = "$JG_HOME/state" ] && [ -d "$STATE" ]; then
     JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-fleet-heartbeat.sh" arm >/dev/null 2>&1 \
       || echo "MISSING: the fleet heartbeat could not be armed; idle or stalled homes will not wake Main"
+  fi
+  # The board gate: only a must ask reaches the captain's board, and a merge
+  # lands with its Evidence card. Same primary-home guard as the fleet heartbeat.
+  if local_phase && [ ! -e "$(jg_compat_marker "$JG_HOME")" ] \
+    && [ "$STATE" = "$JG_HOME/state" ] && [ -d "$STATE" ]; then
+    JG_HOME="$JG_HOME" "$SCRIPT_DIR/jg-board-gate.sh" arm >/dev/null 2>&1 \
+      || echo "MISSING: the board gate could not be armed; non-must asks stay on the board and merges go unproven"
   fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true

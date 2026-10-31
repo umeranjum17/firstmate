@@ -22,8 +22,9 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
 - Seam: `brief-inherit`'s `jg_brief_inherit_shared` (already called by the fork's `jg-brief.sh`) calls it when
   `config/owner-rules` exists. Without that file the check is a no-op, so an unmodified upstream Juggernaut is
   unaffected. A marker whose lib is missing stops the scaffold. Needs the brief-inherit seam.
-- `install.sh [--dry-run] <jg-home>` writes `config/owner-rules` and makes `config/merge-gate` run the merge gate below first, then the
-  home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
+- `install.sh [--dry-run] <jg-home>` writes `config/owner-rules` and wires the merge gate below into the home's single `config/merge-gate`
+  entry point, after the owner-details scan and before the home's own previous gate (`addons/lib/merge-gate-lib.sh` owns that file and keeps
+  the home's gate at `config/merge-gate.pre-chain`); `uninstall.sh` removes the marker, drops the proof gate, and leaves the other steps running.
 - Design flag: a backlog body line `design: required` or `design: none`. `required` adds `Design discovery: required` to the brief; a design-like line with any other value is refused (`owner-rules: design: must be required or none (backlog item for <id>)`); no line on design-sounding work only prints a stderr note. Nothing blocks at merge time. Test: `tests/design-flag.test.sh [<juggernaut-checkout>]` (the checkout adds the real `jg-brief.sh` journey).
 - Test: `tests/owner-rules.test.sh <juggernaut-checkout>` drives the checkout's real `jg-brief.sh`.
 - Done-done proof: `JG_TEST_FORK=<juggernaut-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
@@ -53,7 +54,9 @@ With `config/owner-rules` present, `status-wait-check` checks squad lead report 
 A bare mention of the package name passes.
 It exits 1 and prints `owner-rules: Lavish publication refused; use the sign-off board (sign-off-axi) instead`.
 Other text, including clean sign-off links, passes; read errors retain their diagnostics and exit code.
-This covers squad lead notes and merge-card posts only: raw status appends, report files (including `--doc` contents), and `lavish-axi` commands are not intercepted.
+This add-on covers squad lead notes and merge-card posts.
+The Juggernaut core now refuses the same publication on the generated status line (`bin/jg-lavish-guard.sh` piped from the status command `bin/jg-brief.sh` scaffolds) and in a squad lead report note, with or without this add-on, so the add-on is defense in depth for card text rather than the only check.
+A `lavish-axi` command typed outside those channels is a text guard's limit, not an interception.
 Retiring existing registrations and removing old files remain outside this publication check.
 
 Existing homes need no reinstall when their add-on checkout is updated: the report hook and merge-card shims execute files from that checkout, and the existing owner-rules marker enables the checks.

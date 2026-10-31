@@ -163,6 +163,8 @@ SCRIPT_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-classify-lib.sh
 . "$SCRIPT_DIR/jg-classify-lib.sh"
+# shellcheck source=bin/jg-captain-card-lib.sh
+. "$SCRIPT_DIR/jg-captain-card-lib.sh"
 
 STORE="$STATE/branch-outcomes.jsonl"
 CURSOR="$STATE/.branch-outcomes-cursor"
@@ -543,6 +545,11 @@ case "$CMD" in
     if [ "$SILENT" = true ] && [ "$VERDICT" != routine ]; then
       echo "error: silent outcomes must have the routine verdict" >&2
       exit 2
+    fi
+    # A captain verdict IS the captain-facing chat message, so the shadow check
+    # measures its summary here and logs the failing rule, refusing nothing.
+    if [ "$VERDICT" = captain ] && [ "$SILENT" = false ]; then
+      jg_captain_card_shadow message "$SUMMARY" 0
     fi
     jg_lock_acquire_wait "$LOCK"
     if ! LAST_SEQ=$(last_seq); then

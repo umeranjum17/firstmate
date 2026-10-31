@@ -12,9 +12,15 @@
 #
 # WRITERS. The prompt-submit hooks append each captain message: Claude's
 # UserPromptSubmit and Cursor's beforeSubmitPrompt, the same surfaces that feed
-# bin/jg-host-mirror.sh. The hook is a silent no-op outside a genuine primary
+# bin/jg-host-mirror.sh. A captain message typed at the board's chat has no
+# prompt hook to catch it, so bin/jg-chat.sh records it with `record`, through
+# the same appender: either way it is one captain message and its tag is asked
+# for the same way. The hook is a silent no-op outside a genuine primary
 # checkout, and it drops a prompt the operational-input protocol classifies
-# (bin/jg-operational-input.sh) and a harness-started <task-notification> turn,
+# (bin/jg-operational-input.sh), a prompt whose first line is doorbell-shaped
+# (a record-backed doorbell carries no marker, so `classify` cannot see it; this
+# shape check keeps a reworded doorbell from ever counting as a captain message),
+# and a harness-started <task-notification> turn,
 # so only what the captain typed is counted. A primary with no prompt hook
 # records nothing, so nothing there is ever pending. A home whose
 # config/overwatch-kpi reads `off` records nothing either; that is for a lab
@@ -40,6 +46,8 @@
 # Usage:
 #   jg-overwatch-kpi.sh hook <claude|cursor>   a prompt-submit hook payload on stdin
 #   jg-overwatch-kpi.sh tag <kind> [<link>]    tag the newest captain message
+#   jg-overwatch-kpi.sh record <text>          record a captain message typed
+#                                             outside a harness prompt hook
 #   jg-overwatch-kpi.sh pending                print "<seq>\t<text>" when the newest message is untagged
 #   jg-overwatch-kpi.sh scorecard [--json] [--landed]
 #                                              misses per day and per week, target zero
@@ -129,6 +137,15 @@ newest_seq() {
   jq -Rn '[inputs | fromjson? | select(type == "object") | .seq | numbers] | max // 0' "$LEDGER" 2>/dev/null
 }
 
+# Append one captain message. The prompt hook and a captain message typed at the
+# board's chat (bin/jg-chat.sh send) share this writer, so the KPI counts the
+# captain's intervention the same way whichever route it took.
+record_message() { # <text>
+  mkdir -p "$DATA" 2>/dev/null || return 1
+  printf '%s' "$1" | jq -cRs --argjson seq "$(( $(newest_seq) + 1 ))" --argjson epoch "$(date +%s)" \
+    '{seq: $seq, epoch: $epoch, text: .[0:200]}' >> "$LEDGER" 2>/dev/null
+}
+
 # A link counts only when it names code work on this Juggernaut repository.
 link_ok() {  # <link>
   local link=$1 repo
@@ -146,7 +163,7 @@ link_ok() {  # <link>
 }
 
 case "${1:-}" in
-  hook|tag|pending|scorecard) ;;
+  hook|tag|pending|scorecard|record) ;;
   -h|--help) sed -n '2,/^set -u/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) usage ;;
 esac
@@ -175,10 +192,16 @@ case "$1" in
       | (.prompt // "") | tostring' 2>/dev/null) || exit 0
     case "${TEXT#"${TEXT%%[![:space:]]*}"}" in ''|'<task-notification>'*) exit 0 ;; esac
     printf '%s' "$TEXT" | "$SCRIPT_DIR/jg-operational-input.sh" classify >/dev/null 2>&1 && exit 0
-    mkdir -p "$DATA" 2>/dev/null || exit 0
-    printf '%s' "$TEXT" | jq -cRs --argjson seq "$(( $(newest_seq) + 1 ))" --argjson epoch "$(date +%s)" \
-      '{seq: $seq, epoch: $epoch, text: .[0:200]}' >> "$LEDGER" 2>/dev/null
+    printf '%s' "$TEXT" | "$SCRIPT_DIR/jg-operational-input.sh" doorbell-shaped >/dev/null 2>&1 && exit 0
+    record_message "$TEXT" || true
     exit 0
+    ;;
+  record)
+    [ "$#" -ge 2 ] || usage
+    shift
+    [ -n "${*//[[:space:]]/}" ] || usage
+    [ "$(cat "$CONFIG/overwatch-kpi" 2>/dev/null)" != off ] || exit 0
+    record_message "$*" || { printf 'jg-overwatch-kpi: cannot record the message\n' >&2; exit 1; }
     ;;
   pending)
     [ "$#" -eq 1 ] || usage

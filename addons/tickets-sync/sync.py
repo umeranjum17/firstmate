@@ -37,8 +37,11 @@ def run(args, env=None, cwd=None, missing=False):
         raise RuntimeError(f'{args[0]}: {r.stderr.strip() or r.stdout.strip()}')
     return '{}' if r.returncode else r.stdout
 
+# What one ticket's publish can fail with; a bad record is skipped, never fatal to the pass.
+TICKET_ERRORS = (OSError, ValueError, KeyError, RuntimeError, sp.TimeoutExpired)
+
 def rows(args, env, cwd=None):
-    text = run(args + ['--limit', '100000', '--fields', 'held,hold_kind,closed,created,priority,body,links'], env, cwd)
+    text = run(args + ['--limit', '100000', '--fields', 'held,hold_kind,hold_reason,closed,created,priority,body,links'], env, cwd)
     result = toon_rows(text)
     if result is None or re.search(r'count: \d+ of (?!0\b)\d+ total', text) and len(result) >= 100000:
         raise RuntimeError('tasks-axi returned an unreadable or capped task list')
@@ -74,8 +77,6 @@ def register_icon(board, project, registry):
     registry[project.lower()] = digest
     return None
 
-UNOWNED = dict(lead='unassigned', live=False)
-
 def ticket_id(home, item):
     return "jg-" + hashlib.sha256(f"{home}/{item}".encode()).hexdigest()[:32]
 
@@ -92,13 +93,14 @@ def feed_records(text):
         if record and record.get('id'): records[record['id']] = record
     return records
 
-def write_assignee(path, tid, record, desired, ends_with_newline):
+def write_assignee(path, tid, record, desired, ends_with_newline, reason='', assignee_only=False):
     """Append the ticket's own record again, its fields as this pass sets them, carrying the assignee the board shows.
     sign-off's writer takes no assignee field and its format lets another program append lines in the same shape, one
-    JSON object and a newline per write, so the newest line is the whole record and every other field reads as before."""
+    JSON object and a newline per write, so the newest line is the whole record and every other field reads as before.
+    assignee_only writes that one field onto a record this pass does not otherwise publish, so nothing else moves."""
     line = dict(record)
     for key, value in desired.items():
-        if key == 'assignee': continue
+        if assignee_only or key == 'assignee': continue
         if key == 'pr':
             if value: line['prs'] = [value]
             else: line.pop('prs', None)
@@ -106,6 +108,10 @@ def write_assignee(path, tid, record, desired, ends_with_newline):
         elif key == 'last-event-at': line['last_event_at'] = int(value)
         elif value == '': line.pop(key, None)
         else: line[key] = value
+    # The newest line is the whole record, so a hold's reason travels with it and a release drops it.
+    if not assignee_only:
+        if desired.get('hold') == 'yes' and reason: line['hold_reason'] = reason
+        else: line.pop('hold_reason', None)
     line.update(id=tid, assignee=desired['assignee'], at=dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(fd, 'w') as feed:
@@ -180,7 +186,28 @@ def sync():
         def save(path, value):
             temp = path.with_suffix('.tmp'); temp.write_text(json.dumps(value)); temp.replace(path)
         seen = set()
-        def publish(tid, desired, derived=()):
+        skipped_ids = set()
+        def publish(tid, desired, derived=(), where='', reason=''):
+            # One bad record never stops the pass: name it and the home and item behind it once, then go on.
+            try: _publish(tid, desired, derived, reason)
+            except TICKET_ERRORS as error:
+                if tid in skipped_ids: return
+                skipped_ids.add(tid)
+                print(f"tickets-sync: skipped {tid}: {where + ': ' if where else ''}{error}")
+        def owner_line(tid, desired):
+            """Write just the owner onto a row this pass does not otherwise publish, leaving every other field as the board
+            has it. Two rows need it: one whose work another ticket already covers, and the row the board still shows for
+            that work from before the poll re-keyed its ids. The ids are a hash of the home and item, so the legacy row is
+            this one with its old prefix: the same work, the same home answering for it."""
+            nonlocal feed_ends
+            if 'assignee' not in desired or tid not in existing or existing[tid].get('assignee') == desired['assignee']:
+                return
+            feed[tid] = write_assignee(feed_file, tid, feed.get(tid, {}), {'assignee': desired['assignee']}, feed_ends, assignee_only=True)
+            feed_ends = True
+            existing[tid]['assignee'] = desired['assignee']
+        def legacy_owner(tid, desired):
+            if tid.startswith('jg-'): owner_line('fm-' + tid[3:], desired)
+        def _publish(tid, desired, derived=(), reason=''):
             nonlocal changed, feed_ends
             seen.add(tid)
             if options.check:
@@ -204,16 +231,20 @@ def sync():
             matched = all(settled(k, v) for k, v in desired.items())
             if not matched and any(o != tid for o in tracked.get(work_key(desired), [])):
                 ledger[tid] = digest; save(ledger_file, ledger)
+                # Another ticket already covers this work, so no field of it is published: it still names its owner.
+                owner_line(tid, desired); legacy_owner(tid, desired)
                 return
+            legacy_owner(tid, desired)
             if matched:
                 if ledger.get(tid) != digest: ledger[tid] = digest; save(ledger_file, ledger)
                 return
             args = ['sign-off-axi', 'ticket', str(board), '--id', tid]
             for key, value in desired.items():
                 if key != 'assignee': args += ['--' + key, str(value)]
+            if desired.get('hold') == 'yes': args += ['--hold-reason', reason]
             run(args); changed += 1
             if 'assignee' in desired:
-                feed[tid] = write_assignee(feed_file, tid, feed.get(tid, {}), desired, feed_ends)
+                feed[tid] = write_assignee(feed_file, tid, feed.get(tid, {}), desired, feed_ends, reason)
                 feed_ends = True
             updated = dict(old)
             for key, value in desired.items():
@@ -228,12 +259,15 @@ def sync():
             if name not in homes or not sep or not item: raise RuntimeError('--close requires a registered HOME/ITEM')
 
         upkeep_id = ticket_id('fleet', ':upkeep')
-        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued', assignee=UNOWNED), ('progress',))
+        # A fleet-wide row owns nothing in the registry, so it names the home that publishes it rather than going blank,
+        # and it is no lane's work: no worker words on a grouping row.
+        fleet_assignee = lane_assignee(home, ':upkeep', 'main', ran=True)
+        publish(upkeep_id, dict(title=UPKEEP, progress=0, project='', parent='', hold='no', asked='no', state='queued', assignee=fleet_assignee), ('progress',), 'fleet/:upkeep')
         for tid, old in existing.items():
             if tid.startswith('jg-') and old['title'].startswith(('Needs a parent', 'Upkeep ·', 'Earlier task grouping')):
-                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done', assignee=UNOWNED), ('progress',))
+                publish(tid, dict(title='Earlier task grouping', progress=0, project='', parent=upkeep_id, hold='no', asked='no', state='done', assignee=fleet_assignee), ('progress',), f'board/{tid}')
             elif tid.startswith('jg-') and tid != upkeep_id and (old.get('project', '').lower() in INTERNAL or not old.get('asked') and not old.get('parent')):
-                publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)))
+                publish(tid, dict(project='' if old.get('project', '').lower() in INTERNAL else old.get('project', ''), parent=old.get('parent') or ('' if old.get('asked') else upkeep_id)), where=f'board/{tid}')
         for name, source in ordered:
             env = {k: v for k, v in os.environ.items() if k not in ('JG_DATA_OVERRIDE', 'JG_ROOT_OVERRIDE', 'TASKS_AXI_FILE', 'TASKS_AXI_BACKEND')}
             env['JG_HOME'] = str(source)
@@ -299,6 +333,15 @@ def sync():
                     m = re.search(r'^\s*' + key + r':\s*(.+)$', body, re.M | re.I)
                     return m[1].strip() if m else ''
                 held = name in parked or r.get('held') == 'yes' or r.get('hold_kind') == 'parked'
+                # A hold always carries its reason: the source item's own words, or the parking that holds a whole home.
+                # The board caps a reason as it caps a title, so a long note is shortened and the source record keeps it whole.
+                stored_reason = r.get('hold_reason') or ''
+                hold_reason = '' if stored_reason in ('-', 'none') else ' '.join(stored_reason.split())
+                if len(hold_reason) > 160: hold_reason = hold_reason[:159].rstrip() + '…'
+                if held and not hold_reason: hold_reason = f'{name} home is parked' if name in parked else ''
+                if held and not hold_reason:
+                    held = False
+                    print(f'tickets-sync: {name}/{item} is held with no reason; publishing it unheld')
                 # A release names what ships. A body word about timing (or "none") is not a release: send none, so a board
                 # rule that refuses a when-word never fails a pass and no placeholder is stored on a ticket.
                 release_value = field('release')
@@ -323,12 +366,12 @@ def sync():
                 if parent in tasks and ticket_id(name, parent) not in ledger:
                     required.add(parent); ids.append(parent)
                 parent_id = ticket_id(name, parent) if parent in tasks else '' if root_ask else upkeep_id
-                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=release_value[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no', assignee=lane_assignee(source, item, name))
+                desired = dict(title=title, progress=0 if item in parents else progress, state='' if item in parents else 'done' if done else 'on hold' if held else 'queued' if progress == 0 else 'in progress', pr=pr, release=release_value[:40], parent=parent_id, priority=f"P{r['priority']}" if str(r.get('priority')) in ('0', '1', '2', '3') else '', project=project, hold='yes' if held and not done else 'no', asked='yes' if root_ask else 'no', assignee=lane_assignee(source, item, name, ran=done or progress > 0 or stage != 'queued'))
                 if item not in parents:
                     desired['stage'] = stage
                     if event is not None: desired['last-event-at'] = event
                 if all(i['name'] != name or i['row']['id'] != item for i in items): items.append(dict(tid=tid, name=name, row=r, event=event, parked=name in parked, source=source))
-                publish(tid, desired, ('progress',) if item in parents else ())
+                publish(tid, desired, ('progress',) if item in parents else (), f'{name}/{item}', hold_reason)
         if options.cleanup:
             carded = {d['ticket'] for d in json.loads(run(['sign-off-axi', 'list', str(board), '--json'])).get('decisions', []) if d.get('ticket')}
             def cards():
@@ -351,10 +394,10 @@ def sync():
                     print(f"tickets-check: {str(old.get('title'))[:70]} ticket says {old.get('state') or 'no state'}, but no home's work accounts for it")
             return
         save(cursor, {})
-        if changed: print(f'tickets-sync: {len(homes)} homes read; {changed} tickets changed')
+        if changed or skipped_ids: print(f'tickets-sync: {len(homes)} homes read; {changed} tickets changed')
 
 if __name__ == '__main__':
     try: sync()
-    except (OSError, ValueError, KeyError, RuntimeError, sp.TimeoutExpired) as error:
+    except TICKET_ERRORS as error:
         print(f'tickets-sync: {error}', file=sys.stderr)
         sys.exit(1)
