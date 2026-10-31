@@ -203,9 +203,15 @@ cmd_raise() {
   [ "${#args[@]}" -eq 4 ] || usage
   set -- "${args[@]}"
   cmd_enabled || return 0
-  # The board gate (bin/jg-ask-gate-lib.sh): a card carries its must category in
-  # its detail field, and under the when-it-matters leash nothing else is raised.
-  if ! refusal=$(jg_ask_gate_refusal "$must"); then
+  # The card rules (bin/jg-ask-gate-lib.sh) come first, because a hold his own
+  # stop order created, or one worded in our own vocabulary, is not a question
+  # for him at all. Then the must gate: a card carries its category in its
+  # detail field, and under the when-it-matters leash nothing else is raised.
+  title=$(card_title "$3")
+  [ -n "$title" ] || title=$(built_title "$2")
+  refusal=$(jg_ask_card_refusal "$1" 2 "$title" "$3") || true
+  [ -n "$refusal" ] || refusal=$(jg_ask_gate_refusal "$must") || true
+  if [ -n "$refusal" ]; then
     rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$3" --filer signoff --ref "$1" 2>&1) || rec=''
     printf '%s\n' "$refusal" >&2
     [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
@@ -216,8 +222,6 @@ cmd_raise() {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
-  title=$(card_title "$3")
-  [ -n "$title" ] || title=$(built_title "$2")
   # Name the ticket the board shows, so the reason this hold records renders
   # beside that ticket's On hold row (bin/jg-ticket.sh owns the ticket id).
   ticket=$("$SCRIPT_DIR/jg-ticket.sh" id "$1" 2>/dev/null) || ticket=''

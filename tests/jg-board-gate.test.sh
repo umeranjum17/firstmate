@@ -80,7 +80,7 @@ test_non_must_ask_is_refused_and_routed() {
   d=$(setup refuse)
   out=$(ask "$d") && fail "a non-must ask posted under the when-it-matters leash: $out"
   assert_contains "$out" "needs a must category" "the refusal did not name the requirement"
-  assert_contains "$out" "money, credential-login, physical-device" "the refusal did not name the category list"
+  assert_contains "$out" "money, security, public-release" "the refusal did not name the category list"
   assert_contains "$out" "recorded for Overwatch: owd-" "the refusal did not name its Overwatch record"
   assert_equals "0" "$(open_cards "$d")" "a refused ask still reached the captain's board"
   assert_grep "- Ask: Rename the fleet word?" "$d/home/data/overwatch-decisions.md" "no Overwatch record for the refused ask"

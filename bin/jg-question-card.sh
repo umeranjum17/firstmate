@@ -21,6 +21,12 @@
 #        --option, --silent-by, --filer, ...), then print the card key alone on
 #        stdout. Everything sign-off-axi prints goes to stderr. It refuses
 #        without --title and --ask-ref, because a new Decide card needs both.
+#        His board is his decisions alone, and bin/jg-ask-gate-lib.sh owns the
+#        rules applied here: one plain question about the product or about
+#        money, two clear options, and nothing internal in the words - no Main
+#        number, no task, lane, hook, card or file name, no path. A stop-order
+#        hold and a stuck worker are never cards. A card a rule refuses is
+#        printed as one line naming the rule, recorded for Main, and not posted.
 #        When the identical question is already open under a key, that key is
 #        printed instead of posting a second card.
 #        --route <lead> names the lead (a task id in this home) that owns the
@@ -155,6 +161,37 @@ flag_value() {  # <flag> -> the value that follows it
   return 0
 }
 
+option_count() {  # -> how many --outcome/--option entries ARGS carries
+  local i=0 n=0
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    case "${ARGS[$i]}" in --outcome|--option) n=$((n + 1)) ;; esac
+    i=$((i + 1))
+  done
+  printf '%s
+' "$n"
+}
+
+option_text() {  # -> every option's label and outcome, as one line of card text
+  local i=0 words=''
+  while [ "$i" -lt "${#ARGS[@]}" ]; do
+    case "${ARGS[$i]}" in --outcome|--option) words="$words ${ARGS[$((i + 1))]:-}" ;; esac
+    i=$((i + 1))
+  done
+  printf '%s\n' "$words"
+}
+
+# A card the gate refuses is still an ask this home owes an answer to, so it is
+# recorded for Overwatch (bin/jg-board-gate.sh route) and never posted.
+refuse() {  # <the refusal line>
+  local filer rec
+  filer=$(flag_value --filer)
+  rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$(flag_value --title)" --filer "${filer:-${SIGN_OFF_FILER:-unknown}}" --ref "$(flag_value --ask-ref)" 2>&1) \
+    || rec=''
+  printf '%s\n' "$1" >&2
+  [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
+  exit 1
+}
+
 cmd_post() {
   local title ask_ref before after key board out link rc=0 refusal rec filer detail
   split_board "$@"
@@ -163,6 +200,13 @@ cmd_post() {
   ask_ref=$(flag_value --ask-ref)
   [ -n "$title" ] || die "refused: post needs --title \"<the one question>\"; it is the card's title"
   [ -n "$ask_ref" ] || die "refused: post needs --ask-ref <the owner message or hold this question answers>; sign-off-axi requires it for a new Decide card"
+
+  # The card rules (bin/jg-ask-gate-lib.sh): his board carries his decisions
+  # only, so a stop-order hold, a stuck worker, an internal name or a card with
+  # no two clear options is refused here, by rule, before sign-off-axi sees it.
+  refusal=$(jg_ask_card_refusal "$ask_ref" "$(option_count)" "$title" \
+    "$(flag_value --why)" "$(flag_value --about)" "$(flag_value --detail)" "$(option_text)") || true
+  [ -z "$refusal" ] || refuse "$refusal"
 
   # The board gate (bin/jg-ask-gate-lib.sh): the card's detail field carries its
   # must category, and under the when-it-matters leash no other ask is posted.
@@ -174,12 +218,7 @@ cmd_post() {
     MUST=$(jg_ask_card_category "$(flag_value --detail)")
   fi
   if ! refusal=$(jg_ask_gate_refusal "$MUST" "$BOARD"); then
-    filer=$(flag_value --filer)
-    rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$title" --filer "${filer:-${SIGN_OFF_FILER:-unknown}}" --ref "$ask_ref" 2>&1) \
-      || rec=''
-    printf '%s\n' "$refusal" >&2
-    [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
-    exit 1
+    refuse "$refusal"
   fi
 
   [ -z "$DECISION_KEY" ] || [ -n "$ROUTE" ] || die "refused: --decision-key only closes a lead's decision, so it needs --route <lead>"
