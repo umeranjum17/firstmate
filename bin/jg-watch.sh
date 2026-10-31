@@ -3094,29 +3094,24 @@ admission_retry_waits_memory() {
 # because lanes that only wait on a merge or a cleanup must not hide an idle
 # lead. An item could start now unless its project's declared capacity is
 # already held (bin/jg-project-capacity-lib.sh). Sets READY_STALL_IDS (startable
-# ids, P0 first), READY_STALL_OPEN, READY_STALL_TARGET, READY_STALL_MODE
-# (free-lanes or no-worker), and READY_STALL_LANES (the open lane ids,
-# comma-joined, so the chain can see a start). When ready work exists but the
-# condition does not hold, READY_STALL_WHY names the reason (lanes-working or
-# project-capacity). Returns 0 when the condition holds, 1 when it does not,
-# and 2 when the backlog cannot be read, so an unknown poll never clears or
-# fires an episode.
+# ids, P0 first), READY_STALL_OPEN, READY_STALL_TARGET, and READY_STALL_LANES
+# (the open lane ids, comma-joined, so the chain can see a start). Returns 0 when
+# the condition holds, 1 when it does not, and 2 when the backlog cannot be read,
+# so an unknown poll never clears or fires an episode.
 ready_backlog_stall_state() {
   local rows rc id repo proj cfg seen='|' full='|' meta kind
-  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES='' READY_STALL_MODE='' READY_STALL_WHY=''
+  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES=''
   [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
   rows=$(jg_ready_work_rows "$JG_HOME"); rc=$?
   [ "$rc" -eq 0 ] || return 2
   [ -n "$rows" ] || return 1
   READY_STALL_TARGET=$(lane_target_value) || READY_STALL_TARGET=4
   READY_STALL_OPEN=$(open_lane_count) || return 2
-  READY_STALL_MODE=free-lanes
   if [ "$READY_STALL_OPEN" -ge "$READY_STALL_TARGET" ]; then
-    READY_STALL_MODE=no-worker
     for meta in "$STATE"/*.meta; do
       [ -f "$meta" ] || continue
       id=${meta##*/}
-      if crew_is_provably_working "${id%.meta}"; then READY_STALL_WHY=lanes-working; return 1; fi
+      if crew_is_provably_working "${id%.meta}"; then return 1; fi
     done
   fi
   cfg=$(jg_project_capacity_config_dir "$JG_HOME" "$CONFIG" 2>/dev/null) || cfg=
@@ -3143,7 +3138,7 @@ ready_backlog_stall_state() {
   done <<EOF
 $rows
 EOF
-  [ -n "$READY_STALL_IDS" ] || { READY_STALL_WHY=project-capacity; return 1; }
+  [ -n "$READY_STALL_IDS" ] || return 1
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
     kind=$(jg_meta_get "$meta" kind 2>/dev/null || true)
