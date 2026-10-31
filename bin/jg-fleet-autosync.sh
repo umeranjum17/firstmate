@@ -85,18 +85,13 @@ acquire() {
   printf '%s\n' "$$" > "$lock/pid" 2>/dev/null || return 1
 }
 
-release() {
-  rm -f "$DIR/.run.lock/pid" 2>/dev/null || true
-  rmdir "$DIR/.run.lock" 2>/dev/null || true
-}
-
 cmd_run() {
   local out ids=''
   if ! acquire; then
     echo "busy: a convergence pass is already running"
     return 0
   fi
-  trap release EXIT HUP INT TERM
+  trap 'rm -f "$DIR/.run.lock/pid" 2>/dev/null; rmdir "$DIR/.run.lock" 2>/dev/null' EXIT HUP INT TERM
   # The check is the backup path, so the first pass arms it.
   if [ ! -f "$STATE/fleet-autosync.check.sh" ]; then
     cmd_arm > /dev/null || echo "actionable: the fleet drift check could not be armed; only the merge start carries updates until it is"
