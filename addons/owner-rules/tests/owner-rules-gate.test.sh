@@ -56,7 +56,8 @@ seal() { printf '{"schema":1,"exit":0,"dirty":false,"commit":"%s","files":["a.pn
 JG_HOME=$home "$addons/owner-rules/bin/jg-owner-rules-gate.sh" init-key >/dev/null
 cp "$home/config/owner-rules-proof.pub" "$main/config/owner-rules-proof.pub"
 sign_receipt() { JG_HOME=$home "$addons/owner-rules/bin/jg-owner-rules-gate.sh" sign lane "$head" "$pr" >/dev/null; }
-is "installed: previous gate moved aside" "$([ -x "$home/config/merge-gate.pre-owner-rules" ] && echo yes)" yes
+is "installed: the home previous gate is kept at config/merge-gate.pre-chain" "$([ -x "$home/config/merge-gate.pre-chain" ] && echo yes)" yes
+is "installed: one gate file holds both steps" "$(readlink -f "$home/config/merge-gate.pre-owner-rules")" "$(readlink -f "$home/config/merge-gate")"
 "$addons/owner-rules/install.sh" "$home" >/dev/null && ok "install is idempotent" || no "second install failed"
 
 REFUSAL="owner-rules: no passed-proof receipt for $pr: seal a clean done-done run at $head with: done-done run -- <the command that proves it> in the copy at $head"

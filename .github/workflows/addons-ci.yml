@@ -150,6 +150,10 @@ jobs:
       # that share a hook file install three times over and must settle instead of refusing.
       - name: Install-all re-install journey
         run: bash tests/install-all.test.sh
+      # One temp home, a local bare repo standing in for GitHub and a stub gh: the installers write one
+      # merge gate that refuses and allows the same cases as the old chain, and the two symlinks resolve.
+      - name: One merge gate test
+        run: bash tests/merge-gate-one-entry.test.sh
       # Fixture origin, shared clone, lane worktree and a throwaway HOME and home: nothing real is touched.
       - name: Git identity test
         run: bash git-identity/tests/git-identity.test.sh

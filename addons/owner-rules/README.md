@@ -22,8 +22,9 @@ A refusal exits 1 before `jg-brief.sh` writes `data/<id>/brief.md`, with a one-l
 - Seam: `brief-inherit`'s `jg_brief_inherit_shared` (already called by the fork's `jg-brief.sh`) calls it when
   `config/owner-rules` exists. Without that file the check is a no-op, so an unmodified upstream Juggernaut is
   unaffected. A marker whose lib is missing stops the scaffold. Needs the brief-inherit seam.
-- `install.sh [--dry-run] <jg-home>` writes `config/owner-rules` and makes `config/merge-gate` run the merge gate below first, then the
-  home's previous gate (moved to `config/merge-gate.pre-owner-rules`); `uninstall.sh` removes the marker and gives the gate back.
+- `install.sh [--dry-run] <jg-home>` writes `config/owner-rules` and wires the merge gate below into the home's single `config/merge-gate`
+  entry point, after the owner-details scan and before the home's own previous gate (`addons/lib/merge-gate-lib.sh` owns that file and keeps
+  the home's gate at `config/merge-gate.pre-chain`); `uninstall.sh` removes the marker, drops the proof gate, and leaves the other steps running.
 - Design flag: a backlog body line `design: required` or `design: none`. `required` adds `Design discovery: required` to the brief; a design-like line with any other value is refused (`owner-rules: design: must be required or none (backlog item for <id>)`); no line on design-sounding work only prints a stderr note. Nothing blocks at merge time. Test: `tests/design-flag.test.sh [<juggernaut-checkout>]` (the checkout adds the real `jg-brief.sh` journey).
 - Test: `tests/owner-rules.test.sh <juggernaut-checkout>` drives the checkout's real `jg-brief.sh`.
 - Done-done proof: `JG_TEST_FORK=<juggernaut-checkout> done-done run owner-rules-hierarchy` records the real brief journey and hierarchy report.
