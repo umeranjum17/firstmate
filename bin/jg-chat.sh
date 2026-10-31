@@ -16,6 +16,7 @@
 #   jg-chat.sh log [<thread>] [--json] [--view message]
 #                                                  the reader; --view message is
 #                                                  the record the chat page reads
+#   jg-chat.sh channels [--json]                    the one history, by room
 #   jg-chat.sh nudge [--after <seconds>] [--send]  unread past a limit
 #   jg-chat.sh note <thread> <from|-> <to|-> <kind> <status|-> <text>
 #                                                  (the call sites' writer)
@@ -39,6 +40,7 @@
 #          reject, or answer
 #   subject  the owner record this message is about (its subject), so a reader can
 #          join a message to the thing it concerns; defaults to its element
+#   part     the part of that element a response is on, when the board names one
 #   status_at        when each state was reached, {state: epoch}
 #   reply_at         the epoch of the agent row that answered it
 #
@@ -274,6 +276,18 @@ chat_message_view() { # <thread|''>
        text, status, on, link, owner}' "$STORE"
 }
 
+# The one history, by room. GET /api/channels is this projection of the same file
+# the #fleet thread lives in, never a second store: one line per thread with what
+# it holds and how much of it is still waiting for its agent.
+chat_channels() { # [--json]
+  [ -f "$STORE" ] || return 0
+  jq -c -s 'group_by(.thread)
+    | map({channel: .[0].thread, messages: length,
+           unread: ([.[] | select(.status == "sent")] | length),
+           last_at: (map(.at) | max)})
+    | sort_by((if .channel == "#fleet" then "" else .channel end))' "$STORE"
+}
+
 chat_log() { # <thread|''>
   [ -f "$STORE" ] || return 0
   jq -c -s --arg thread "${1:-}" 'to_entries
@@ -289,7 +303,7 @@ chat_log() { # <thread|''>
 # response here and wakes its owner from this row, so the store, not a board
 # path, is what a move can never silence.
 chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
-  local deliver=$1 one_on_one=0 on='' link='' owner='' act='' subject='' extra='{}' target text thread
+  local deliver=$1 one_on_one=0 on='' link='' owner='' act='' subject='' part='' extra='{}' target text thread
   shift
   while :; do
     case "${1:-}" in
@@ -297,7 +311,7 @@ chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
         one_on_one=1
         shift
         ;;
-      --on | --link | --owner | --act | --subject)
+      --on | --link | --owner | --act | --subject | --part)
         [ $# -ge 2 ] || usage
         case "$1" in
           --on) on=$2 ;;
@@ -305,6 +319,7 @@ chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
           --owner) owner=$2 ;;
           --act) act=$2 ;;
           --subject) subject=$2 ;;
+          --part) part=$2 ;;
         esac
         shift 2
         ;;
@@ -325,11 +340,12 @@ chat_captain_record() { # <deliver 0|1> [flags] <lead-id|task-id> <text...>
   thread=$(chat_thread "$target")
   if [ -n "$on" ]; then
     extra=$(jq -cn --arg on "$on" --arg act "$act" --arg link "$link" --arg owner "$owner" \
-      --arg subject "$subject" \
+      --arg subject "$subject" --arg part "$part" \
       '{on: $on} + (if $act == "" then {} else {act: $act} end)
          + (if $link == "" then {} else {link: $link} end)
          + (if $owner == "" then {} else {owner: $owner} end)
-         + (if $subject == "" then {} else {subject: $subject} end)') ||
+         + (if $subject == "" then {} else {subject: $subject} end)
+         + (if $part == "" then {} else {part: $part} end)') ||
       die 'cannot build the comment record'
   fi
   # The KPI tag stays automatic for what the captain wrote himself. A path that
@@ -371,8 +387,11 @@ cmd_reply() {
   chat_mark "$thread" replied "$now" || die 'cannot attach the reply to the message it answers'
 }
 
+# Three levels, each fired once, on one clock: the owner at the limit, the owner's
+# lead at twice it, Main at three times it. A row that is already at a level is
+# never asked again for that level, so a nudge cannot repeat itself.
 cmd_nudge() {
-  local after=3600 send=0 now key lead thread to at text due rc=0
+  local after=600 send=0 now key lead target level last elapsed thread to at text due rc=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --after)
@@ -392,19 +411,38 @@ cmd_nudge() {
   now=$(date +%s)
   lead=$(chat_lead)
   # shellcheck disable=SC2016  # $now/$after are jq variables, not shell ones
-  due=$(chat_rows '' 'select(.kind == "captain" and .status == "sent" and .at <= ($now - $after))
-    | [.thread, .to, (.at | tostring), .text] | @tsv' \
-    --argjson now "$now" --argjson after "$after" 2>/dev/null || true)
+  # shellcheck disable=SC2016  # $now/$after are jq variables, not shell ones
+  due=$(jq -r -s --argjson now "$now" --argjson after "$after" '
+    .[] | select(.kind == "captain" and .status == "sent" and .at <= ($now - $after))
+    | [.thread, .to, (.at | tostring), .text] | @tsv' "$STORE" 2>/dev/null || true)
   while IFS=$'\t' read -r thread to at text; do
     [ -n "$thread" ] || continue
     key="$at:$thread"
     if [ -f "$NUDGED" ] && grep -qxF -- "$key" "$NUDGED" 2>/dev/null; then continue; fi
-    printf 'unread %ss  %s  captain>%s  %s\n' "$((now - at))" "$thread" "$to" "$text"
+    elapsed=$((now - at))
+    # Once past the limit, each further limit is one level up: the owner at the
+    # first, the owner's lead at the second, Main at the third.
+    level=$((elapsed / after))
+    [ "$level" -ge 1 ] || level=1
+    [ "$level" -le 3 ] || level=3
+    last=$(awk -F'\t' -v k="$key" '$1 == k { v = $2 } END { print v }' "$NUDGED" 2>/dev/null)
+    case "$last" in '' | *[!0-9]*) last=0 ;; esac
+    printf 'unread %ss level %s  %s  captain>%s  %s\n' "$elapsed" "$level" "$thread" "$to" "$text"
     [ "$send" -eq 1 ] || continue
-    if "$SCRIPT_DIR/jg-send.sh" "$lead" \
-      "chat nudge [ticket=$to]: the captain wrote in $thread $((now - at))s ago and it is still unread: $text" \
+    [ "$level" -gt "$last" ] || continue
+    case "$level" in
+      1) target=$to ;;
+      2) target=$lead ;;
+      *) target=main ;;
+    esac
+    [ "$target" != "$lead" ] || [ "$level" -gt 2 ] ||
+      target=$lead
+    if "$SCRIPT_DIR/jg-send.sh" "$target" \
+      "chat nudge [level=$level ticket=$to]: the captain wrote in $thread ${elapsed}s ago and it is still unread: $text" \
       >/dev/null 2>&1; then
-      if mkdir -p "${NUDGED%/*}" 2>/dev/null; then printf '%s\n' "$key" >> "$NUDGED"; fi
+      if mkdir -p "${NUDGED%/*}" 2>/dev/null; then
+        printf '%s\t%s\n' "$key" "$level" >> "$NUDGED"
+      fi
     else
       rc=1
     fi
@@ -470,6 +508,13 @@ case "$verb" in
       *) usage ;;
     esac
     if [ "$json" -eq 1 ]; then chat_log "$thread"; else chat_log "$thread" | chat_render; fi
+    ;;
+  channels)
+    [ $# -le 1 ] || usage
+    case "${1:-}" in
+      '' | --json) chat_channels ;;
+      *) usage ;;
+    esac
     ;;
   nudge) cmd_nudge "$@" ;;
   note)

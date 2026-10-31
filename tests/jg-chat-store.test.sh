@@ -6,9 +6,12 @@
 # The replay rows are real. tests/fixtures/chat-replay.tsv is ten steer and
 # status records copied verbatim from this home's state/comms-feed.jsonl on
 # 31 Oct 2026 (at, room, from, to, kind, recorded state, text), and
-# tests/fixtures/chat-comments.tsv is the two comments the captain really filed:
-# his Prometheus metric words on the tools-stack-six-report card, and his Luna
-# review words recorded at data/pipeline-minimax-route/answer.md.
+# tests/fixtures/chat-comments.tsv is the two comments that stayed "Sent, Not
+# read": board annotation ids c2bd088bd42e (part 'understood') and b1c505a43f57
+# (part 'open-questions'), both on card key tools-stack-six-report at
+# 2026-10-31T02:10Z, with the card's recorded captain words. The annotation ids,
+# parts, card key and time are the board's own; the words are the only captain
+# text this home holds for that card, and the fixture names both.
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -112,18 +115,20 @@ test_a_captain_message_moves_sent_read_replied() {
 }
 
 test_the_two_real_captain_comments_carry_their_element_and_run_to_done() {
-  local d at on link owner target text row
+  local d at on part subject link owner target text row
   d=$(setup comments)
-  while IFS=$(printf '\t') read -r at on link owner target text; do
+  while IFS=$(printf '\t') read -r at on part subject link owner target text; do
     # The board path records the response once and delivers nothing itself.
-    JG_CHAT_AT=$at run "$d" "$CHAT" respond --on "$on" --link "$link" --owner "$owner" \
-      "$target" "$text" >/dev/null || fail "the board path could not record the response on $on"
+    JG_CHAT_AT=$at run "$d" "$CHAT" respond --on "$on" --part "$part" --subject "$subject" \
+      --link "$link" --owner "$owner" "$target" "$text" >/dev/null ||
+      fail "the board path could not record the response on $on"
     row=$(store "$d" "[.[] | select(.on == \"$on\")] | first")
     assert_contains "$row" "\"text\":\"$text\"" "the captain's words on $on are not recorded verbatim"
     assert_contains "$row" "\"link\":\"$link\"" "the comment on $on lost the element's link"
     assert_contains "$row" "\"owner\":\"$owner\"" "the comment on $on lost the agent assigned to it"
     assert_equals sent "$(printf '%s' "$row" | jq -r '.status')" "the comment on $on does not start unread"
     assert_equals comment "$(printf '%s' "$row" | jq -r '.act')" "a plain comment is not recorded as one"
+    assert_equals "$part" "$(printf '%s' "$row" | jq -r '.part')" "the comment on $on lost the part it is on"
     assert_equals 1 "$(field "$d" "[.[] | select(.on == \"$on\")] | length")" \
       "the element $on produced more than one event"
     run "$d" "$CHAT" read task:"$target" >/dev/null
@@ -181,17 +186,26 @@ test_the_page_reads_one_message_record_per_response() {
   pass "the page reads one message record per response, with its kind and a subject that is never blank"
 }
 
-test_the_nudge_reports_an_unread_message_and_asks_the_lead_once() {
-  local d out
+test_the_nudge_climbs_three_levels_on_one_clock() {
+  local d out now
   d=$(setup nudge)
-  JG_CHAT_AT=1793400000 run "$d" "$CHAT" send task:w1 "read me" >/dev/null
-  out=$(run "$d" "$CHAT" nudge --after 60)
-  assert_contains "$out" 'unread ' "an unread message past the limit is not reported"
-  assert_contains "$out" 'read me' "the nudge does not name the message"
-  out=$(run "$d" "$CHAT" nudge --after 60 --send) &&
-    fail "the nudge escalated without a lead endpoint to reach"
-  assert_equals 1 "$(field "$d" 'length')" "the nudge changed the message it reports"
-  pass "an unread captain message is reported past the limit and escalation is attempted once"
+  now=$(date +%s)
+  # Ten minutes unread is level 1 (the owner); twenty is its lead; thirty is Main.
+  JG_CHAT_AT=$((now - 60)) run "$d" "$CHAT" respond --on card - "just now" >/dev/null
+  JG_CHAT_AT=$((now - 700)) run "$d" "$CHAT" respond --on card-a owner-a "ten minutes" >/dev/null
+  JG_CHAT_AT=$((now - 1300)) run "$d" "$CHAT" respond --on card-b owner-b "twenty minutes" >/dev/null
+  JG_CHAT_AT=$((now - 1900)) run "$d" "$CHAT" respond --on card-c owner-c "thirty minutes" >/dev/null
+  out=$(run "$d" "$CHAT" nudge)
+  assert_equals 3 "$(printf '%s\n' "$out" | grep -c '^unread ')" "the nudge does not hold to the ten-minute limit"
+  assert_contains "$out" 'level 1  task:owner-a' "a ten-minute response is not with its owner"
+  assert_contains "$out" 'level 2  task:owner-b' "a twenty-minute response is not with the owner's lead"
+  assert_contains "$out" 'level 3  task:owner-c' "a thirty-minute response is not with Main"
+  assert_not_contains "$out" 'just now' "a fresh response was nudged"
+  out=$(run "$d" "$CHAT" nudge --send) &&
+    fail "the nudge escalated without a live endpoint to reach"
+  assert_equals sent "$(field "$d" '[.[] | select(.text == "just now")] | first | .status')" \
+    "the nudge changed a message it only reports"
+  pass "unread captain responses climb owner, then lead, then Main on one ten-minute clock"
 }
 
 test_a_lead_speaks_in_its_own_room_not_a_worker_room() {
@@ -282,7 +296,7 @@ test_the_page_reads_one_message_record_per_response() {
   pass "the page reads one message record per response, with its kind and a subject that is never blank"
 }
 
-test_the_nudge_reports_an_unread_message_and_asks_the_lead_once
+test_the_nudge_climbs_three_levels_on_one_clock
 test_the_page_reads_one_message_record_per_response
 test_each_response_kind_is_recorded_with_what_he_did_there
 test_a_lead_speaks_in_its_own_room_not_a_worker_room
