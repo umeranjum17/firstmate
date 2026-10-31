@@ -557,6 +557,7 @@ tests/jg-backlog-handoff.test.sh 74166
 tests/jg-board-answers.test.sh 2206
 tests/jg-board-gate.test.sh 437
 tests/jg-bootstrap.test.sh 83933
+tests/jg-browser-reaper.test.sh 8000
 tests/jg-calm-home-links.test.sh 381
 tests/jg-chat-answer-card.test.sh 1030
 tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
@@ -1826,7 +1827,11 @@ if [ "$LIST_LANES" -eq 1 ]; then
 fi
 
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
-  run_coverage_guard
+  # LC_ALL=C for this call only: the guard writes byte-ordered lists and compares them
+  # with comm, whose collation is the ambient locale's, so the two must agree here and
+  # nowhere else - the locale must never leak into a suite, where a test that counts
+  # characters instead of bytes would start failing.
+  LC_ALL=C run_coverage_guard
   exit $?
 fi
 

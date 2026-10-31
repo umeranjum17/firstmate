@@ -308,6 +308,11 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-supervision-lib.sh"
 # shellcheck source=bin/jg-project-capacity-lib.sh
 . "$SCRIPT_DIR/jg-project-capacity-lib.sh"
+# Stale test-browser reaper and machine load alarm: on by default, no add-on to
+# install, and it stops only a browser in a fleet temp or scratch profile root whose
+# owning worker is gone and whose age is past the limit.
+# shellcheck source=bin/jg-reaper-lib.sh
+. "$SCRIPT_DIR/jg-reaper-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -3867,6 +3872,8 @@ while :; do
 
   if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure || triage_log "host memory sampler failed to restart"; fi
   host_memory_surface_queued
+  # Stale test-browser reaper and load alarm; its own cadence file gates it.
+  jg_reaper_tick || triage_log "browser reaper failed"
   if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi
   # Remove confirmed orphan endpoints before replaying their old queue rows.
   phantom_pane_prune

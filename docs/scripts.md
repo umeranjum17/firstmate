@@ -172,6 +172,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `jg-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `jg-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `jg-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome |
+| `jg-reaper-lib.sh` | Stop a browser left behind by a dead worker when its profile is a fleet temp or scratch folder and it is past the age limit; raise the machine load alarm |
 | `jg-merge-authority-lib.sh` | Resolve merge authority at the gate, persist it against the accepted canonical PR, and identity-check its later poll consumption |
 | `jg-role.sh`             | Report this home's Juggernaut role and check the self-repository publication gate ([configuration.md](configuration.md#juggernaut-role-configjuggernaut-role)) |
 | `jg-role-lib.sh`         | Own the role parser, self-repository detection, and the publication gate the dispatch surfaces share |
