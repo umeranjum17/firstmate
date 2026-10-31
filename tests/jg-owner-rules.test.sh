@@ -130,29 +130,35 @@ reply_payload() {  # <dir> <reply text>
   printf '{"session_id":"s","transcript_path":"%s/reply.jsonl"}' "$1"
 }
 
-test_question_rule_blocks_until_a_card_is_cited() {
-  local home payload board rc
+# The rule is advisory: the boundary leaves one quiet line and never blocks a
+# turn, because "did he mean to ask" is a judgement call (see docs/turnend-guard.md).
+test_question_rule_advises_once_until_a_card_is_cited() {
+  local home payload board rc lines
   home="$TMP_ROOT/question"
   board="$TMP_ROOT/question-board"
   make_guard_home "$home"
   mkdir -p "$board"
+  lines() { [ -f "$home/state/.guard-advisories" ] && grep -c . "$home/state/.guard-advisories" || printf '0\n'; }
 
   payload=$(reply_payload "$home" "The blocker cleared and the fix is in. Should I merge it?")
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 2 "$rc" "a reply ending in an unfiled question ended the turn unflagged"
+  assert_equals 0 "$rc" "a reply ending in an unfiled question blocked the turn"
+  assert_equals 1 "$(lines)" "the unfiled question left no advisory line"
 
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 0 "$rc" "the same question was charged twice, which can wedge a harness"
+  assert_equals 1 "$(lines)" "the same question was advised twice"
 
   payload=$(reply_payload "$home" "Merged and cleaned up. Nothing outstanding.")
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
-  assert_equals 0 "$rc" "a reply that asks nothing was flagged"
+  assert_equals 0 "$rc" "a reply that asks nothing blocked the turn"
+  assert_equals 1 "$(lines)" "a reply that asks nothing left an advisory line"
 
   command -v sign-off-axi >/dev/null 2>&1 || {
-    pass "the question rule blocks an unfiled question once, then clears (board half skipped: no sign-off-axi)"
+    pass "the question rule advises on an unfiled question once, then clears (board half skipped: no sign-off-axi)"
     return 0
   }
   local key
@@ -166,6 +172,7 @@ test_question_rule_blocks_until_a_card_is_cited() {
   printf '%s' "$payload" | JG_ROOT_OVERRIDE="$home" JG_HOME="$home" JG_STATE_OVERRIDE="$home/state" \
     SIGN_OFF_HOME="$board" "$GUARD" >/dev/null 2>&1; rc=$?
   assert_equals 0 "$rc" "a reply citing an open board card was still flagged"
+  assert_equals 1 "$(lines)" "a reply citing an open board card left an advisory line"
 
   local again
   again=$(SIGN_OFF_HOME="$board" "$CARD" post --ask-ref chat-1 --must design-pick \
@@ -173,10 +180,10 @@ test_question_rule_blocks_until_a_card_is_cited() {
     --outcome yes="It merges once the captain says so." --outcome no="It waits for his review." \
     --recommend yes --recommend-reason "His word is the merge call." --default no 2>/dev/null)
   assert_equals "$key" "$again" "re-posting the same open question did not return the existing key"
-  pass "an unfiled question is flagged once, and a cited open card clears it"
+  pass "an unfiled question leaves one advisory line, is never advised twice, and a cited open card clears it"
 }
 
 test_add_refuses_an_entry_it_cannot_enforce
 test_seeded_surface_and_added_entry
 test_audit_flags_a_correction_left_in_a_private_note
-test_question_rule_blocks_until_a_card_is_cited
+test_question_rule_advises_once_until_a_card_is_cited

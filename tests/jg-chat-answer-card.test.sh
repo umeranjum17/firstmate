@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # tests/jg-chat-answer-card.test.sh - a captain's chat answer is recorded on its board
-# card (jg-question-card.sh answer) and a turn that ends with the card still waiting
-# is flagged by the turn-end guard, in Main and lead homes alike. No model call.
+# card (jg-question-card.sh answer) and carried to the lead that owns the card.
+#
+# The turn-end guard no longer reads a captain message for an answer (captain
+# 2026-10-31: the chat-reading answer guard is gone), so nothing here drives it.
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -37,26 +39,10 @@ SH
   printf '%s\n' "$d"
 }
 
-transcript() {  # <case-dir> -> a transcript where the captain answered the posted question in chat
-  local t=$1/transcript.jsonl
-  {
-    printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Use the repo card? Card: %s"}]}}\n' "$KEY"
-    printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$WORDS"
-    printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done, moving on."}]}}\n'
-  } > "$t"
-  printf '%s\n' "$t"
-}
-
 run_card() {  # <case-dir> args...
   local d=$1
   shift
   env PATH="$d/fakebin:$PATH" JG_HOME="$d" SIGN_OFF_HOME="$d/so" HOME="$d/home" "$d/bin/jg-question-card.sh" "$@" 2>&1
-}
-
-run_guard() {  # <case-dir> <transcript>
-  local d=$1
-  printf '{"stop_hook_active":false,"transcript_path":"%s"}' "$2" \
-    | env PATH="$d/fakebin:$PATH" CLAUDECODE=1 JG_HOME="$d" SIGN_OFF_HOME="$d/so" bash "$d/bin/jg-turnend-guard.sh" 2>&1
 }
 
 test_answer_records_his_words_on_the_card() {
@@ -90,49 +76,7 @@ test_answer_reaches_a_routed_lead_and_does_not_wake_main_for_an_unrouted_one() {
   pass "a chat answer is carried to the owning lead and does not wake Main for an unrouted card"
 }
 
-test_guard_flags_a_chat_answer_while_the_card_waits() {
-  local d t out status
-  d=$(setup guard-main)
-  t=$(transcript "$d")
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 2 "$status" "the guard let a turn end with the answered card still waiting"
-  assert_contains "$out" "HE ANSWERED IN CHAT" "the banner is missing"
-  assert_contains "$out" "jg-question-card.sh answer $KEY" "the banner names no path to the card"
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 0 "$status" "the same answer was flagged twice and would wedge the turn"
-  run_card "$d" answer "$KEY" --words "$WORDS" > /dev/null
-  rm -f "$d/state/.chat-answer-flagged"
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 0 "$status" "the guard flagged a card that is already answered"
-  pass "jg-turnend-guard: flags a turn ending after a chat answer while its card waits, once, and is silent once answered"
-}
 
-test_guard_flags_a_lead_home() {
-  local d t out status
-  d=$(setup guard-lead)
-  printf 'sm-test-1\n' > "$d/.jg-squad-lead-home"
-  t=$(transcript "$d")
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 2 "$status" "the guard skipped a lead home"
-  assert_contains "$out" "HE ANSWERED IN CHAT" "the lead home banner is missing"
-  pass "jg-turnend-guard: the chat-answer flag covers a lead home"
-}
-
-test_guard_ignores_a_card_he_was_never_asked() {
-  local d t out status
-  d=$(setup guard-unrelated)
-  t=$d/transcript.jsonl
-  {
-    printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Working on it."}]}}\n'
-    printf '{"type":"user","message":{"role":"user","content":"ok thanks"}}\n'
-  } > "$t"
-  out=$(run_guard "$d" "$t"); status=$?
-  expect_code 0 "$status" "the guard flagged a message that answers no posted card: $out"
-  pass "jg-turnend-guard: a human message after a reply that cites no open card is not flagged"
-}
 
 test_answer_records_his_words_on_the_card
 test_answer_reaches_a_routed_lead_and_does_not_wake_main_for_an_unrouted_one
-test_guard_flags_a_chat_answer_while_the_card_waits
-test_guard_flags_a_lead_home
-test_guard_ignores_a_card_he_was_never_asked

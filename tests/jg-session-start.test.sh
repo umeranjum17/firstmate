@@ -771,6 +771,36 @@ write_omp_loaded_markers() {
 
 # --- context digest: absent vs empty vs present -----------------------------
 
+test_guard_advisories_print_once() {
+  local rec root home fakebin out
+  rec=$(new_world guard-advisories)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  jq -cn --argjson seq 1 --argjson epoch 1 '{seq: $seq, epoch: $epoch, check: "chat-answer",
+    key: "use-the-repo-card", line: "he answered board card use-the-repo-card in chat"}' \
+    > "$home/state/.guard-advisories"
+  jq -cn --argjson seq 2 --argjson epoch 2 '{seq: $seq, epoch: $epoch, check: "question",
+    key: "open the PR?", line: "a reply ended in a question no card covers"}' \
+    >> "$home/state/.guard-advisories"
+
+  out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  assert_contains "$out" "GUARD ADVISORIES" "the digest has no guard advisory section"
+  assert_contains "$out" "ADVISORY chat-answer: he answered board card use-the-repo-card in chat" \
+    "the chat-answer advisory never reached the digest"
+  assert_contains "$out" "ADVISORY question: a reply ended in a question no card covers" \
+    "the question advisory never reached the digest"
+
+  # Shown once: the next digest reports none, and nothing was lost from the record.
+  out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  assert_not_contains "$out" "ADVISORY chat-answer:" "an advisory was printed a second time"
+  assert_contains "$out" "GUARD ADVISORIES" "the digest section vanished once its lines were shown"
+  assert_equals 2 "$(grep -c . "$home/state/.guard-advisories")" "printing the advisories consumed the record"
+  pass "guard advisories print in the digest exactly once"
+}
+
 test_context_digest_absent_empty_present() {
   local rec root home fakebin out
   rec=$(new_world context-digest)
@@ -3016,6 +3046,7 @@ EOF
   pass "session start rejects Pi loaded markers from previous sessions"
 }
 
+test_guard_advisories_print_once
 test_context_digest_absent_empty_present
 test_lock_refusal_read_only_path
 test_lock_write_failure_read_only_path

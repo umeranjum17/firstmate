@@ -221,61 +221,48 @@ fi
 # so this exempts them while guarding every real squad_lead home.
 jg_primary_scope_matches "$JG_ROOT" "$STATE" || exit 0
 
-# --- the question rule ------------------------------------------------------
-# The owner's rule (data/owner-rules.md): "if you ask questions as well make
-# sure they are posted, posting questions will be stricter way of working", so a
-# reply that ends in a question while no open board card is cited is flagged at
-# this boundary. It is charged once per distinct trailing question (the record
-# in $STATE/.question-flagged), which keeps every harness bounded: the second
-# sighting of the same question, and every reply after it, ends normally.
-question_block() {  # <the trailing line>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  REPLY ENDS IN A QUESTION THAT IS NOT ON THE BOARD\n'
-    printf '●  He answers on the board, so a question asked only in chat is a violation.\n'
-    printf '●  Post the card first, then cite the key it prints:\n'
-    printf '●    %s/jg-question-card.sh post --ask-ref <ref> --title "<one question>" --why "<why now>" --outcome yes="<what happens next>" --outcome no="<what happens instead>" --recommend yes --default no\n' "$SCRIPT_DIR"
-    printf '●  Trailing line: %s\n' "$1"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
+# --- the advisory question check --------------------------------------------
+# One check here needs judgement about what he meant: whether a reply that ends
+# in a question should have posted a card. It may not block a turn. The captain's
+# call (2026-10-30: "don't force something that is super hard to get right
+# deterministically and will raise a lot of alarms") is that it leaves ONE quiet
+# line in the durable advisory record instead, which bin/jg-session-start.sh
+# prints once in its digest. Only what needs no judgement still blocks: the KPI
+# tag below, and the supervision predicate after it.
+#
+# Nothing here reads a captain message for an answer, so he can no longer trigger
+# a block in chat from this path at all (captain 2026-10-31: the chat-reading
+# answer guard is gone; reconciling a chat answer onto its card belongs to
+# another lane).
+#
+# A line is charged once per distinct trailing question (the record in
+# $STATE/.question-flagged), and the record is bounded.
+ADVISORY_FILE="$STATE/.guard-advisories"
+advisory() {  # <check> <key> <line>
+  local seq last
+  last=$(tail -n 1 "$ADVISORY_FILE" 2>/dev/null | jq -r '.seq // 0' 2>/dev/null)
+  case "$last" in ''|*[!0-9]*) last=0 ;; esac
+  seq=$((last + 1))
+  mkdir -p "$STATE" 2>/dev/null || return 0
+  jq -cn --argjson seq "$seq" --argjson epoch "$(date +%s)" --arg check "$1" --arg key "$2" --arg line "$3" \
+    '{seq: $seq, epoch: $epoch, check: $check, key: $key, line: $line}' >> "$ADVISORY_FILE" 2>/dev/null || return 0
+  # Keep the record bounded; the cursor file says which lines were printed.
+  if [ "$seq" -gt 200 ]; then
+    tail -n 200 "$ADVISORY_FILE" > "$ADVISORY_FILE.tmp" 2>/dev/null &&
+      mv -f "$ADVISORY_FILE.tmp" "$ADVISORY_FILE" 2>/dev/null
+  fi
+  return 0
 }
 
+# The owner's rule (data/owner-rules.md): "if you ask questions as well make sure
+# they are posted, posting questions will be stricter way of working". A reply
+# that ends in a question while no open board card is cited leaves one line.
 QUESTION_TEXT=$(jg_question_reply_text "$PAYLOAD")
 if [ -n "$QUESTION_TEXT" ] && jg_question_asks "$QUESTION_TEXT" \
   && ! jg_question_filed "$QUESTION_TEXT" \
   && jg_question_first_sighting "$STATE" "$QUESTION_TEXT"; then
-  question_block "$(jg_question_tail "$QUESTION_TEXT")"
-fi
-
-# --- the chat-answer rule ---------------------------------------------------
-# The opposite case: the captain answered a posted question in chat ("if I
-# answer you directly here you should reconcile the decisions instead of keep
-# stale data"). A turn that ends while that card still waits is flagged, once per
-# distinct answer, and the banner names the deterministic path that records his
-# words on the card. Main and lead homes pass this guard alike.
-chat_answer_block() {  # <keys, one per line> <his words>
-  {
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '●  HE ANSWERED IN CHAT, BUT THE BOARD CARD IS STILL WAITING
-'
-    printf '●  Record his words on the card in the same turn, or the board keeps stale data:
-'
-    printf '%s\n' "$1" | while IFS= read -r key; do
-      printf '●    %s/jg-question-card.sh answer %s --words "<his exact words>"\n' "$SCRIPT_DIR" "$key"
-    done
-    printf '●  His words: %s\n' "${2:0:200}"
-    printf '●%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  } >&2
-  exit 2
-}
-
-CHAT_KEYS=$(jg_question_chat_answered_keys "$PAYLOAD")
-if [ -n "$CHAT_KEYS" ]; then
-  CHAT_WORDS=$(jg_question_chat_words "$PAYLOAD")
-  if jg_question_first_sighting "$STATE" "$(printf '%s|%s' "$CHAT_KEYS" "$CHAT_WORDS" | tr '\n' ' ')" .chat-answer-flagged; then
-    chat_answer_block "$CHAT_KEYS" "$CHAT_WORDS"
-  fi
+  advisory question "$(jg_question_tail "$QUESTION_TEXT")" \
+    "a reply ended in a question that no open board card covers; post it with $SCRIPT_DIR/jg-question-card.sh post and cite its key: $(jg_question_tail "$QUESTION_TEXT")"
 fi
 
 # --- the Overwatch KPI rule -------------------------------------------------

@@ -795,6 +795,35 @@ else
   printf '(silent - all good)\n'
 fi
 
+# --- 2b. guard advisories --------------------------------------------------
+# The turn-end guard's two judgement checks never block a turn; each leaves one
+# quiet line in $STATE/.guard-advisories instead (bin/jg-turnend-guard.sh owns
+# the record). Every line is printed here exactly once, tracked by the highest
+# seq in $STATE/.guard-advisories-seen, so an advisory is seen without ever
+# stopping work and is never re-printed on a later session start.
+subsection "GUARD ADVISORIES"
+GUARD_ADVISORY_FILE="$STATE/.guard-advisories"
+GUARD_ADVISORY_SEEN="$STATE/.guard-advisories-seen"
+GUARD_SHOWN=0
+if [ -s "$GUARD_ADVISORY_FILE" ] && command -v jq >/dev/null 2>&1; then
+  GUARD_SINCE=$(cat "$GUARD_ADVISORY_SEEN" 2>/dev/null)
+  case "$GUARD_SINCE" in ''|*[!0-9]*) GUARD_SINCE=0 ;; esac
+  GUARD_NEW=$(jq -Rrs --argjson since "$GUARD_SINCE" '
+    [split("\n")[] | fromjson? | select(type == "object" and ((.seq | numbers) > $since))]
+    | sort_by(.seq) | .[] | "ADVISORY \(.check): \(.line)"' "$GUARD_ADVISORY_FILE" 2>/dev/null) || GUARD_NEW=
+  if [ -n "$GUARD_NEW" ]; then
+    printf '%s\n' "$GUARD_NEW"
+    GUARD_SHOWN=$(jq -Rrs 'split("\n") | map(fromjson? // empty | .seq | numbers) | max // 0' "$GUARD_ADVISORY_FILE" 2>/dev/null)
+    case "$GUARD_SHOWN" in ''|*[!0-9]*) GUARD_SHOWN=$GUARD_SINCE ;; esac
+    # An advisory is shown once. A read-only session lacks mutation authority, so
+    # it prints the lines and leaves the cursor for the next locked session.
+    if [ "$READ_ONLY" -eq 0 ]; then
+      printf '%s\n' "$GUARD_SHOWN" > "$GUARD_ADVISORY_SEEN" 2>/dev/null || true
+    fi
+  fi
+fi
+[ "$GUARD_SHOWN" -gt 0 ] || printf '(none)\n'
+
 # --- 3. wake-drain ---------------------------------------------------------
 # The inactive-outcome startup scan runs in the deferred worker launched above,
 # where its potentially slow current-state reads cannot block this digest. It

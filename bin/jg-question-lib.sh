@@ -106,8 +106,13 @@ jg_question_reply_text() {  # <turn-end payload json>
   path=$(printf '%s' "$1" | jq -r '.transcript_path // empty' 2>/dev/null) || return 0
   [ -n "$path" ] && [ -f "$path" ] && [ -r "$path" ] || return 0
   tail -n 400 "$path" 2>/dev/null | jq -Rrs '
+    def says($who):
+      ((.type? // "") == $who)
+      or ((.message.role? // "") == $who)
+      or ((.payload.role? // "") == $who);
     split("\n")
     | map(fromjson? // empty)
+    | map(select(says("assistant")))
     | map(
         if ((.message.content? | type) == "array") then
           (.message.content[]? | if type == "object" and (.type == "text") then .text else empty end)
@@ -124,57 +129,6 @@ jg_question_reply_text() {  # <turn-end payload json>
 jg_question_answers_log() {  # <board file>
   [ -n "${1-}" ] || return 0
   printf '%s\n' "${1%.json}.answers.jsonl"
-}
-
-# Print, one per line, the open board cards the captain just answered in chat:
-# the cards cited by the assistant text that came right before the transcript's
-# last human message, when they are still open now. The opposite case of
-# jg_question_filed: the question was posted, the answer came in chat, and the
-# card still waits. A guard-generated continuation (U+2063) is not a human message.
-jg_question_chat_answered_keys() {  # <turn-end payload json>
-  local path pair prior human key
-  command -v jq >/dev/null 2>&1 || return 0
-  path=$(printf '%s' "$1" | jq -r '.transcript_path // empty' 2>/dev/null) || return 0
-  [ -n "$path" ] && [ -f "$path" ] && [ -r "$path" ] || return 0
-  pair=$(tail -n 400 "$path" 2>/dev/null | jq -Rrs '
-    def texts: if (.message.content? | type) == "string" then [.message.content]
-      elif (.message.content? | type) == "array" then [.message.content[]? | select(type == "object" and .type == "text") | .text]
-      else [] end;
-    def human: [.message.content? | if type == "array" then .[]? else empty end | select(type == "object" and .type == "tool_result")] | length == 0;
-    split("\n") | map(fromjson? // empty) | map(select(type == "object")) as $l
-    | ($l | map(.type // .message.role // "") ) as $roles
-    | [range(0; $l | length) | select($roles[.] == "user" and ($l[.] | human) and (($l[.] | texts | join("\n")) != "")
-        and (($l[.] | texts | join("\n"))[0:1] != "\u2063"))] as $us
-    | if ($us | length) == 0 then empty else
-        $us[-1] as $u
-        | [range(0; $u) | select($roles[.] == "assistant" and (($l[.] | texts | join("\n")) != ""))] as $as
-        | if ($as | length) == 0 then empty else
-            {prior: ($l[$as[-1]] | texts | join("\n")), human: ($l[$u] | texts | join("\n"))} | @base64 end
-      end' 2>/dev/null) || return 0
-  [ -n "$pair" ] || return 0
-  pair=$(printf '%s' "$pair" | base64 -d 2>/dev/null) || return 0
-  prior=$(printf '%s' "$pair" | jq -r '.prior' 2>/dev/null)
-  human=$(printf '%s' "$pair" | jq -r '.human' 2>/dev/null)
-  [ -n "$human" ] || return 0
-  while IFS= read -r key; do
-    [ -n "$key" ] || continue
-    case "$prior" in *"$key"*) printf '%s\n' "$key" ;; esac
-  done < <(jg_question_open_keys)
-  return 0
-}
-
-# Print the chat answer's words (the last human message), for the banner.
-jg_question_chat_words() {  # <turn-end payload json>
-  local path
-  path=$(printf '%s' "$1" | jq -r '.transcript_path // empty' 2>/dev/null) || return 0
-  [ -f "$path" ] || return 0
-  tail -n 400 "$path" 2>/dev/null | jq -Rrs '
-    split("\n") | map(fromjson? // empty) | map(select(type == "object" and (.type // .message.role) == "user"))
-    | map(if (.message.content? | type) == "string" then .message.content
-        elif (.message.content? | type) == "array" then ([.message.content[]? | select(type == "object" and .type == "text") | .text] | join("\n"))
-        else "" end)
-    | map(select(. != "" and .[0:1] != "\u2063")) | last // empty' 2>/dev/null
-  return 0
 }
 
 # Flag a captain-facing text that ends in a question no open card covers.

@@ -17,7 +17,8 @@ Do not infer this guard's scope, loop safety, or compatibility tradeoffs for tho
 | Question | Start here |
 | --- | --- |
 | What the guard enforces | [Current invariant](#current-invariant) |
-| The question rule, and a correction no rule or ticket captured | [Question rule](#question-rule) and [Owner-correction capture rule](#owner-correction-capture-rule) |
+| The question check that advises rather than blocks | [Advisory question check](#advisory-question-check) |
+| A correction no rule or ticket captured | [Owner-correction capture rule](#owner-correction-capture-rule) |
 | Which sessions are in scope and what counts as supervision need | [Primary scope](#primary-scope) and [supervision need](#supervision-need) |
 | How the turn-end check and the mid-turn pull warning judge watcher health | [Strict watcher check at the turn boundary](#strict-watcher-check-at-the-turn-boundary) and [pull-warning verdict by supervision model](#pull-warning-verdict-by-supervision-model) |
 | Away and quiet mode | [Away and quiet mode daemon ownership](#away-and-quiet-mode-daemon-ownership) |
@@ -53,23 +54,23 @@ A live identity-matched daemon with a fresh beacon then satisfies that boundary 
 The guard remains a backstop.
 [`watcher-continuity.md`](watcher-continuity.md) owns normal continuity.
 
-## Question rule
+## Advisory question check
 
-The owner's standing rule (`data/owner-rules.md`) is that a question to him must exist as a board card, so a chat-only question is a violation.
-At the same boundary, and before the supervision predicate, the guard reads the turn's last assistant text from the hook payload's `transcript_path` and flags it when that text ends in a question while no open card is cited.
-The flag is one exit-2 banner naming `bin/jg-question-card.sh post`, which posts the card through sign-off-axi and prints the key the reply then cites.
-Every open board key comes from sign-off-axi's own `list --json` (`bin/jg-question-lib.sh`), never from a private copy of the board.
-It is charged once per distinct trailing question, recorded in `state/.question-flagged`, so a harness is never wedged in a loop; a payload without a readable transcript is not flagged at all.
+One check at this boundary needs judgement about what the captain meant: whether a reply that ends in a question should have posted a board card.
+The owner's call (2026-10-30: "don't force something that is super hard to get right deterministically and will raise a lot of alarms") is that it leaves one quiet line instead of blocking a turn, in the durable record `state/.guard-advisories`, which `bin/jg-session-start.sh` prints once in its `GUARD ADVISORIES` digest section and marks shown in `state/.guard-advisories-seen`.
+It is charged once per distinct trailing question through `state/.question-flagged`, so it never repeats.
 
-The opposite case is the chat answer: the captain answers a posted question directly in chat while its card still waits on the board.
-The guard finds the transcript's last human message, takes the open cards cited by the assistant text just before it, and flags the turn when any is still open.
-The banner names `bin/jg-question-card.sh answer <key> --words "<his words>"`, which appends his exact words to the board's answers log so the card reads as answered; the board-answers check then carries a routed card's answer to its lead.
-It is charged once per distinct answer, recorded in `state/.chat-answer-flagged`, and covers Main and lead homes alike.
+It reads the turn's last **assistant** text from the hook payload's `transcript_path`, never the captain's own message, and leaves a line when that text ends in a question while no open card is cited.
+Every open board key comes from sign-off-axi's own `list --json` (`bin/jg-question-lib.sh`), never from a private copy of the board, and the line names `bin/jg-question-card.sh post`, which posts the card through sign-off-axi and prints the key the reply then cites.
+A reply that asks nothing leaves no line at all, and this check never emits an exit-2 block.
+
+Nothing at the turn boundary reads a captain message for an answer.
+The chat-reading answer check is gone (captain 2026-10-31), so no message of his can block, interrupt, or add a line to his chat from that path; reconciling a chat answer onto its card belongs to the board's own reconcile job, not this guard.
 
 ## Overwatch KPI rule
 
 The captain should come only for a major decision only he can take or to file new work, so every captain message is tagged in the turn it arrives.
-At the same boundary, after the question rule, the guard blocks while the newest captain message `bin/jg-overwatch-kpi.sh` recorded is untagged, with one exit-2 banner naming its `tag` command.
+At the same boundary, after the advisory checks, the guard blocks while the newest captain message `bin/jg-overwatch-kpi.sh` recorded is untagged, with one exit-2 banner naming its `tag` command. This check needs no judgement, so it still blocks.
 It is charged once per message, recorded in `state/.overwatch-kpi-flagged`, and a primary whose harness has no prompt hook records nothing, so it is never blocked.
 
 ## Owner-correction capture rule
