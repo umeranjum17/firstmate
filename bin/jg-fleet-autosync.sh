@@ -24,13 +24,13 @@
 #           the merge script never saw), and print one line per copy that stayed past
 #           JG_AUTOSYNC_BEHIND_MAX merges behind for JG_AUTOSYNC_ALARM_SECS. Silent
 #           otherwise, and a reported distance does not repeat until it changes.
-#   digest  One line per local copy: "<copy>: current" or "<copy>: <n> behind".
-#           Read-only, reads no network.
+#   digest  One line per local copy: "<copy>: current" or "<copy>: <n> behind";
+#           read-only, reads no network.
 #   arm     Write and bind the check shim; disarm retires it. The check id is
 #           fleet-autosync and the watcher's sweep cadence sets how often it runs.
 #
 # Copy ids are "primary" for this home's checkout and "jg-<id>" per live Squad
-# Lead. Only local homes are converged; a remote home is reached by its own host.
+# Lead, and only local homes are converged: a remote home is reached by its own host.
 #
 # Environment: JG_HOME, JG_ROOT_OVERRIDE, JG_STATE_OVERRIDE, JG_DATA_OVERRIDE,
 #   JG_AUTOSYNC_BEHIND_MAX (2) and JG_AUTOSYNC_ALARM_SECS (600).
@@ -71,8 +71,8 @@ behind() {  # <dir>
   git -C "$1" rev-list --count "HEAD..origin/$default" 2>/dev/null
 }
 
-# Single-flight marker for a pass. A holder whose process is gone is reclaimed, and
-# the only thing removed is this script's own pid file and its directory.
+# Single-flight marker for a pass. A dead holder is reclaimed, and the only thing
+# removed is this script's own pid file and its directory.
 acquire() {
   local lock="$DIR/.run.lock" pid
   mkdir -p "$DIR" 2>/dev/null || return 1
@@ -97,6 +97,10 @@ cmd_run() {
     return 0
   fi
   trap release EXIT HUP INT TERM
+  # The check is the backup path, so the first pass arms it.
+  if [ ! -f "$STATE/fleet-autosync.check.sh" ]; then
+    cmd_arm > /dev/null || echo "actionable: the fleet drift check could not be armed; only the merge start carries updates until it is"
+  fi
   out=$("$SCRIPT_DIR/jg-update.sh" 2>&1) || true
   printf '%s\n' "$out"
   # A merge restarts only a lead whose loaded instruction surface moved; the update

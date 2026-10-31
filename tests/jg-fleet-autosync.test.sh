@@ -13,7 +13,6 @@ set -u
 
 AUTOSYNC="$ROOT/bin/jg-fleet-autosync.sh"
 
-# Deterministic, isolated git identity for fixture commits.
 jg_git_identity fmtest fmtest@example.com
 
 TMP_ROOT=$(jg_test_tmproot jg-fleet-autosync-tests)
@@ -38,8 +37,7 @@ new_world() {
 }
 
 # One more merged pull request on the default branch. The copy has fetched, so the
-# merge is visible in its origin refs while its own HEAD stays behind: exactly a home
-# whose merge the merge script never carried.
+# merge is visible in its origin refs while its own HEAD stays behind.
 merge_once() {
   local w=$1
   printf 'm-%s\n' "$RANDOM$RANDOM" >> "$w/seed/README.md"
