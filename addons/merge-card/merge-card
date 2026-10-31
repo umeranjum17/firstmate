@@ -39,8 +39,8 @@
 #     another home posting it, adds nothing, and a post at a new head archives the PR's live card and posts the new one.
 #     After each filed card, `one-card-per-pr --apply` keeps one live card per PR on the board across
 #     filers: the newest valid proof stays and the rest are archived, never deleted.
-#     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
-#     task folder or done-done's evidence root has a sealed clean receipt; the same key makes repeated posts no-ops.
+#     A PR whose Checks block says `screen: none` gets a text-only Evidence card when done-done answers for its
+#     head, or the task folder or done-done's evidence root holds a sealed clean run there; the same key makes repeated posts no-ops.
 #     No capture is demanded of it, and the gate says so in one line at the top of its own output.
 #     A claim that cites an evidence file the sealed run does not hold is not refused whole: one
 #     line names the run's own capture, and the claim is checked against that file instead (the
@@ -56,8 +56,11 @@
 #     The title a card gets for a PR (its own title, else its claim, trimmed; nothing when neither reads),
 #     and the refusal retitle-old-cards and the tests use: exit 0 when <title> is the generic sentence.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>, merge-card receipt-json <task-id> <head>
-#     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
-#     done-done run at <head>, there or in done-done's own evidence root. receipt-json prints the normalized receipt used by owner-rules' local signature check.
+#     Exit 0 when the merge declares `screen: none`, or when done-done answers for <head>: its own
+#     `done-done receipt --verify <head>`, asked in the task's lane worktree when the task's record names
+#     one, else here. While a merge head may carry no receipt, a sealed clean done-done run at <head> in the
+#     task folder or done-done's own evidence root is the fallback, and it goes once done-done records a
+#     receipt at every merge head. receipt-json prints the normalized receipt used by owner-rules' local signature check.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # The done-done check runs as the pool's claude account when the home has one
 # (config/account-pool): the check's env carries that account's profile folder in
@@ -399,11 +402,40 @@ dd_root() {
   printf '%s' "${root/#\~/$HOME}"
 }
 
-# receipt_run <task-id> <head> <record>: the newest sealed clean done-done run at <head>, from the task folder or
-# done-done's default evidence root, else nothing.
+# dd_receipt <task-id> <head> <claim> <evidence> <root>: done-done's own answer to "is there a receipt at
+# <head>", asked in the task's lane worktree when the task's record names one, else here, printed as the card's
+# receipt. Nothing when done-done is absent, refuses, or names no run the card can carry: the caller then scans
+# the sealed run records itself. done-done's verdict is the check; the run id and files come from the record it
+# passed, because `receipt --verify` reports how many files it passed rather than their names.
+dd_receipt() {
+  local meta=$JG_HOME/state/$1.meta dir=. out head file
+  command -v done-done >/dev/null 2>&1 || return 0
+  if [ -f "$meta" ]; then dir=$(sed -n 's/^worktree=\(..*\)$/\1/p' "$meta" | head -n 1); fi
+  [ -n "$dir" ] && [ -d "$dir" ] || dir=.
+  out=$(cd "$dir" 2>/dev/null && done-done receipt --verify "$2" --json 2>/dev/null) || return 0
+  head=$(printf '%s' "$out" | jq -r 'select(.result == "pass") | .head // empty' 2>/dev/null)
+  [ -n "$head" ] && [ -n "$5" ] || return 0
+  for file in "$5"/*/.done-done/receipts/"$head".json; do
+    [ -f "$file" ] || continue
+    jq -c --arg head "$2" --arg claim "$3" --arg ev "$4" '
+      ([.runs[]?.run_id] | last // empty) as $run
+      | select($run != "")
+      | {run_id: $run, commit: $head,
+         files: ([.judge.verdicts[]?.path | split("/") | last] | unique),
+         outcome: $claim, repro: "see the merge note", proof: "done-done run \($run)", evidence: $ev}' "$file" 2>/dev/null
+    return 0
+  done
+}
+
+# receipt_run <task-id> <head> <record>: done-done's own receipt at <head>, else a sealed clean done-done run
+# there, from the task folder or done-done's default evidence root, else nothing.
 receipt_run() {
-  local claim evidence root file records=()
+  local claim evidence root file records=() dd
   root=$(dd_root)
+  claim=$(jq -r '.check.claim // empty' "$3" 2>/dev/null)
+  evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3" 2>/dev/null)
+  dd=$(dd_receipt "$1" "$2" "$claim" "$evidence" "$root")
+  [ -z "$dd" ] || { printf '%s\n' "$dd"; return 0; }
   for file in "$JG_HOME"/data/"$1"/.done-done/runs/*.json; do
     [ -f "$file" ] && records+=("$file")
   done
@@ -413,8 +445,6 @@ receipt_run() {
     done
   fi
   [ "${#records[@]}" -gt 0 ] || return 0
-  claim=$(jq -r '.check.claim // empty' "$3" 2>/dev/null)
-  evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3" 2>/dev/null)
   jq -cs --arg head "$2" --arg claim "$claim" --arg ev "$evidence" '
     map(select(.schema == 1 and .exit == 0 and .dirty == false and
       ((.commit == $head) or ((try (.run_id | capture("^[0-9]{8}T[0-9]{6}Z-(?<commit>[0-9a-f]{8})-[0-9a-f]+$").commit) catch "") == $head[0:8])) and
