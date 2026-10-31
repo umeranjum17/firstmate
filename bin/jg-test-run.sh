@@ -2180,6 +2180,16 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc
   : "$id"
+  # ONE owner of what a behavior script inherits, for the serial and the
+  # concurrent path alike: a script must see the same environment in CI and
+  # under a live home. A squad_lead launch prefixes every process it starts
+  # with the whole home-override set (bin/jg-spawn.sh), so an unsanitized
+  # runner runs a fixture against the live home - a fixture teardown then
+  # compares that ambient live parent with its own durable parent record,
+  # finds them disagreeing, and refuses cleanup that had to succeed.
+  unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
+    JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND \
+    JG_PUBLIC_FOLLOWUP_PRIMARY_HOME 2>/dev/null || true
   set +e
   if [ "$stream" -eq 1 ]; then
     if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
@@ -2340,8 +2350,6 @@ else
       set +e
       export TMPDIR="$work/tmp"
       export TMP="$work/tmp"
-      unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
-        JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
       begin_ms=$(now_ms)
       set +e
