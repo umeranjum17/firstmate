@@ -61,11 +61,27 @@
 #     no longer closes a ticket the captain asked for, because a rejected option is a reason to redo
 #     it, never to cancel. The quote or card is recorded in the ticket note (`done`) and in
 #     data/captain-closures.md; both flags are consumed here and never reach tasks-axi.
+#   - `add` (or `create`) whose item does not say what kind of work it is and
+#     why: the title must start with a type tag, one of [captain-ask],
+#     [feature], [design-ux], [security] or [blocker], and the first line of
+#     --body or --body-file must be a one-line summary (the captain's own
+#     words for [captain-ask]), followed by short Captain, Ask, Why and Done when
+#     lines. Anything else - refactors, extra proof, tooling,
+#     follow-ups - belongs in a report, not the backlog. The local presence flag
+#     config/backlog-intake-loose in this home turns the check off;
+#   - `add`/`create` of a [captain-ask] item with a --priority other than 0, or
+#     `update`/`edit` that would set one on a [captain-ask] row (or retitle a
+#     row to [captain-ask] with one): an owner ask is top priority. Such an add
+#     or retitle without --priority gets --priority 0 added;
 #   - `add` (or `create`) that the optional task-priority add-on check refuses,
 #     e.g. no `--priority 0-3`; its message and exit status are returned and
 #     nothing runs. The check is ${XDG_DATA_HOME:-~/.local/share}/jg-task-priority/check.sh
 #     (JG_TASK_PRIORITY_CHECK overrides the path); when it is not installed this
 #     does nothing.
+# Ticket keys (bin/jg-ticket-key.sh owns the contract): a key such as JG-101 given where a
+# task id goes is resolved to its slug before tasks-axi runs, `show` prints the key under
+# the id, `list --keys` puts each row's key first, and a successful `add` keys the new
+# ticket when the home has a registered prefix.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
@@ -179,6 +195,24 @@ for arg in "$@"; do
 done
 
 [ -z "$cap_next" ] || fail "--captain-quote and --confirm-card each need a value"
+
+# A ticket key names its slug wherever a task id goes; a title or any other value is left alone.
+TICKET_KEY="$SCRIPT_DIR/jg-ticket-key.sh"
+LIST_KEYS=0
+_jg_keyed=()
+for _jg_arg in ${ARGS[@]+"${ARGS[@]}"}; do
+  case "$_jg_arg" in
+    --keys) [ "${1:-}" = list ] && { LIST_KEYS=1; continue; } ;;
+    [A-Z][A-Z]-[0-9]*|[A-Z][A-Z][A-Z]-[0-9]*|[A-Z][A-Z][A-Z][A-Z]-[0-9]*)
+      case "${1:-}" in add|create) ;; *)
+        _jg_slug=$(JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$TICKET_KEY" resolve "$_jg_arg" 2>/dev/null) && _jg_arg=$_jg_slug ;;
+      esac ;;
+  esac
+  _jg_keyed+=("$_jg_arg")
+done
+ARGS=(${_jg_keyed[@]+"${_jg_keyed[@]}"})
+unset _jg_keyed _jg_arg _jg_slug
+key_tool() { JG_HOME="$JG_HOME" JG_DATA_OVERRIDE="$DATA" "$TICKET_KEY" "$@"; }
 command -v tasks-axi >/dev/null 2>&1 || fail "tasks-axi is not on PATH; run bin/jg-bootstrap.sh for the install command"
 
 JG_BACKLOG_TRANSITION_ERROR=
@@ -212,6 +246,7 @@ jg_taxi_stream_from_wire() {
 captain_guard() {  # <tasks-axi args>
   local prune_state="done" no_prune=0 keep_arg='' keep_next=0 sub=''
   local verb id='' value=0 title_next=0 state_next=0 has_title=0 new_title='' arg
+  local reason='' reason_next=0 reason_given=0
   [ "${1:-}" = task ] && shift
   verb=${1:-}
   [ "$#" -gt 0 ] && shift
@@ -219,18 +254,21 @@ captain_guard() {  # <tasks-axi args>
   for arg in "$@"; do
     if [ "$arg" = --json ]; then continue; fi
     if [ "$value" = 1 ]; then value=0; continue; fi
+    if [ "$reason_next" = 1 ]; then reason_next=0; reason=$arg; reason_given=1; continue; fi
     if [ "$title_next" = 1 ]; then title_next=0; new_title=$arg; continue; fi
     if [ "$state_next" = 1 ]; then state_next=0; prune_state=$arg; continue; fi
     if [ "$keep_next" = 1 ]; then keep_next=0; keep_arg=$arg; continue; fi
     case "$arg" in
       --no-prune) no_prune=1 ;;
+      --reason) reason_next=1 ;;
+      --reason=*) reason=${arg#--reason=}; reason_given=1 ;;
       --keep) keep_next=1 ;;
       --keep=*) keep_arg=${arg#--keep=} ;;
       --state) state_next=1 ;;
       --state=*) prune_state=${arg#--state=} ;;
       --title) title_next=1; has_title=1 ;;
       --title=*) has_title=1; new_title=${arg#--title=} ;;
-      --pr|--report|--note|--reason|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
+      --pr|--report|--note|--until|--kind|--repo|--priority|--body|--body-file) value=1 ;;
       -*) ;;
       *) id=${id:-$arg} ;;
     esac
@@ -247,7 +285,13 @@ captain_guard() {  # <tasks-axi args>
       esac
       ;;
     rm|delete) guard_captain_ask_close "$id" ;;
-    hold) guard_captain_ask_hold "$id" ;;
+    hold)
+      # A hold without a reason is a hold nobody can read: refuse it here so the
+      # ticket the board renders never shows one with nothing beside it.
+      if [ "$reason_given" = 1 ] && [ -z "${reason//[[:space:]]/}" ]; then
+        fail "a hold needs a non-blank --reason \"<why this waits>\"; nothing was held"
+      fi
+      guard_captain_ask_hold "$id" ;;
     update|edit)
       if [ "$has_title" = 1 ]; then
         case "$new_title" in
@@ -258,13 +302,78 @@ captain_guard() {  # <tasks-axi args>
       ;;
   esac
 }
-# Optional task-priority add-on: a new task must carry a priority. No-op when not installed.
+# Reads an add/update argument list: ITEM_TITLE (add's title, or update's --title),
+# ITEM_BODY, ITEM_PRIORITY, and ITEM_ID (update's id).
+item_args() {  # <tasks-axi add|update args...>
+  local verb=$1 mint=0 positional=()
+  ITEM_TITLE='' ITEM_BODY='' ITEM_PRIORITY='' ITEM_ID=''
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --body) ITEM_BODY=${2-}; shift ;;
+      --body=*) ITEM_BODY=${1#--body=} ;;
+      --body-file) ITEM_BODY=$(cat -- "${2-}" 2>/dev/null); shift ;;
+      --body-file=*) ITEM_BODY=$(cat -- "${1#--body-file=}" 2>/dev/null) ;;
+      --title) ITEM_TITLE=${2-}; shift ;;
+      --title=*) ITEM_TITLE=${1#--title=} ;;
+      --priority) ITEM_PRIORITY=${2-}; shift ;;
+      --priority=*) ITEM_PRIORITY=${1#--priority=} ;;
+      --mint) mint=1 ;;
+      --kind|--repo|--blocked-by|--pr|--report|--prefix) shift ;;
+      -*) ;;
+      *) positional+=("$1") ;;
+    esac
+    shift
+  done
+  case "$verb" in
+    add|create) if [ "$mint" = 1 ]; then ITEM_TITLE=${positional[0]-}; else ITEM_TITLE=${positional[1]-}; fi ;;
+    *) ITEM_ID=${positional[0]-} ;;
+  esac
+}
+# Strict intake: a new item names its type and why it is worth doing (see the
+# header), so the backlog holds asked-for or user-facing work, not busy work.
+intake_check() {
+  local body
+  [ ! -e "$JG_HOME/config/backlog-intake-loose" ] || return 0
+  case "$ITEM_TITLE" in
+    '[captain-ask]'*|'[feature]'*|'[design-ux]'*|'[security]'*|'[blocker]'*) ;;
+    *) fail "a new item needs a type: start the title with [captain-ask], [feature], [design-ux], [security] or [blocker]; other work goes in a report, not the backlog" ;;
+  esac
+  body=${ITEM_BODY%%$'\n'*}
+  [ -n "${body//[[:space:]]/}" ] \
+    || fail "a new item needs a justification: make the first line of --body say why it is worth doing (the captain's words for [captain-ask])"
+}
+# Owner asks come first: a [captain-ask] item sits at priority 0, so `ready`
+# offers it before any other work, and nothing lowers it (see the header).
+captain_ask_first() {
+  local ask=0
+  case "$ITEM_TITLE" in '[captain-ask]'*) ask=1 ;; esac
+  if [ "$ask" = 0 ] && [ -n "$ITEM_ID" ] && [ -n "$ITEM_PRIORITY" ] && [ "$ITEM_PRIORITY" != 0 ]; then
+    captain_ask_row "$ITEM_ID"
+    [ -z "$CAPTAIN_ASK_SHOW" ] || ask=1
+  fi
+  [ "$ask" = 1 ] || return 0
+  case "$ITEM_PRIORITY" in
+    '') ARGS+=(--priority 0) ;;
+    0) ;;
+    *) fail "a [captain-ask] item is top priority and stays at 0; drop --priority $ITEM_PRIORITY" ;;
+  esac
+}
+# New and edited items: strict intake and owner asks first, then the optional
+# task-priority add-on (a new task must carry a priority; no-op when not installed).
 case "${1:-}" in
   add|create)
+    item_args ${ARGS[@]+"${ARGS[@]}"}
+    intake_check
+    captain_ask_first
     PRIORITY_CHECK="${JG_TASK_PRIORITY_CHECK:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/jg-task-priority/check.sh}"
     if [ -x "$PRIORITY_CHECK" ]; then
       "$PRIORITY_CHECK" ${ARGS[@]+"${ARGS[@]}"} >/dev/null || exit $?
     fi
+    ;;
+  update|edit)
+    item_args ${ARGS[@]+"${ARGS[@]}"}
+    captain_ask_first
     ;;
 esac
 # Public-followup values cross into tasks-axi's own schema; everything else passes
@@ -294,8 +403,20 @@ fi
 case "${1:-}" in
   show|view|list)
     set -o pipefail
-    tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
+    if [ "${1:-}" = list ] && [ "$LIST_KEYS" = 1 ]; then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire | key_tool annotate
+    elif [ "${1:-}" = list ]; then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire
+    else
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} | jg_hold_reason_decode_stream | jg_taxi_stream_from_wire | key_tool annotate-show
+    fi
     exit $?
+    ;;
+  add|create)
+    tasks-axi ${ARGS[@]+"${ARGS[@]}"}
+    _jg_rc=$?
+    [ "$_jg_rc" -ne 0 ] || key_tool sync >&2 || true
+    exit "$_jg_rc"
     ;;
 esac
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

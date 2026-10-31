@@ -277,6 +277,9 @@ SH
 jg_test_spawn_home() {
   local home=$1 harness=${2-}
   mkdir -p "$home/data" "$home/projects" "$home/state" "$home/config"
+  # These fixtures scaffold no-mistakes briefs to exercise spawn behavior, so the
+  # home opts out of the delivery-risk question (docs/configuration.md).
+  : > "$home/config/delivery-risk-loose"
   touch "$home/state/.last-watcher-beat"
   if [ -n "$harness" ]; then
     printf '%s\n' "$harness" > "$home/config/crew-harness"

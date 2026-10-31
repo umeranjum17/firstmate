@@ -1,6 +1,6 @@
 # quota-axi-pool
 
-PATH wrapper so dispatch's `quota-axi --json` Claude runway matches `jg-model-pool`'s account reading (same `claude-accounts.json` pick, floors, usage-credit refusal). Upstream quota-axi is unchanged. Non-JSON calls exec upstream with `CLAUDE_CONFIG_DIR` from a Claude pick.
+PATH wrapper so dispatch's `quota-axi --json` reports every registered Claude and Codex account, not the ambient login alone. It reads `claude-accounts/bin/jg-quota-view` (the one quota view the quota wake and the Lookout dashboard read too) and emits schema 6: `accountKey default` is the worker account with the most room (exhausted when none has any), `<id>` is each worker, and `main` is Main's own login, reserved and never counted toward `default`. A provider with no registered workers keeps the upstream row. Upstream quota-axi is unchanged. The quota wake judges a provider on its `default` row only. Non-JSON calls exec upstream with `CLAUDE_CONFIG_DIR` from a Claude pick.
 
 One trip through the pool per call: a call that is already inside a delegation carries `JG_QUOTA_AXI_POOL_DEPTH` above 0 and execs the upstream directly, so a tool the pick runs cannot recurse back through this wrapper.
 

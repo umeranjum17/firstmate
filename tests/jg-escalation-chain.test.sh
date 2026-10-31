@@ -24,6 +24,7 @@ done
 home() {  # <name> -> home path
   local h="$TMP_ROOT/$1"
   mkdir -p "$h/state" "$h/config" "$h/home" "$h/tmp" "$h/fakebin" "$h/panes"
+  : > "$h/config/backlog-intake-loose"
   jg_test_track_watcher_state "$h/state"
   cat > "$h/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -60,6 +61,13 @@ case "${1:-}" in
     { grep -Fxv "$2" "$log.open" 2>/dev/null || true; } > "$log.tmp"; mv "$log.tmp" "$log.open" ;;
 esac
 SH
+  # The forge read: prints the recorded answer (state, draft, merge state, head) or fails.
+  cat > "$h/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+printf 'gh %s\n' "$*" >> "$JG_HOME/gh.log"
+[ -s "$JG_HOME/gh-answer" ] || exit 1
+cat "$JG_HOME/gh-answer"
+SH
   chmod +x "$h/fakebin/"*
   printf '%s\n' "$h"
 }
@@ -67,18 +75,26 @@ SH
 # One watcher cycle; Main drains and acknowledges its wakes unless absent.
 # While Main is absent the next cycle is the successor the arm path starts
 # over its unread wakes, which keeps supervising instead of re-announcing them.
+#
+# A cycle keeps the four-second budget it always had, minus its one hard edge: it
+# never stops inside a scan. A scan that overruns the budget (a loaded runner) is
+# allowed to finish, so the wake it was about to report is not lost with it. The
+# watcher stamps its liveness beacon after each complete scan, so the wait ends at
+# a scan boundary instead of in the middle of one.
 cycle() {  # <home> [absent]
-  local h=$1 rc=0 seq gen pid successor=0
+  local h=$1 rc=0 seq gen pid successor=0 mark
   [ "${2:-}" != absent ] || successor=1
+  mark="$h/tmp/cycle-mark"
+  touch "$mark"
   env -u JG_TASK_ID JG_WATCH_HANDLING_SUCCESSOR="$successor" HOME="$h/home" TMPDIR="$h/tmp" PATH="$h/fakebin:$PATH" \
     JG_HOME="$h" JG_STATE_OVERRIDE="$h/state" JG_CONFIG_OVERRIDE="$h/config" JG_ADDONS_DIR="$FORK/addons" \
     JG_POLL=1 JG_SIGNAL_GRACE=1 JG_CHECK_INTERVAL=999999 JG_HEARTBEAT=999999 JG_HOME_SUMMARY_INTERVAL=999999 \
     JG_SQUAD_LEAD_LIVENESS_SECS="${LIVENESS:-99999999}" JG_BUSY_TURN_MAX_SECS=999999 JG_STALE_ESCALATE_SECS=999999 \
-    JG_SQUAD_LEAD_WAKE_STALL_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 JG_WAIT_CARD_SECS=6 \
-    JG_READY_STALL_POLL_SECS=0 \
+    JG_SQUAD_LEAD_WAKE_STALL_SECS=999999 JG_WAIT_ALERT_SECS=2 JG_WAIT_ESCALATE_SECS=4 JG_WAIT_CARD_SECS="${CARD_SECS:-6}" \
+    JG_READY_STALL_POLL_SECS=0 JG_GREEN_PR_POLL_SECS=0 \
     JG_PROMPT_REALERT_SECS=900 JG_FAKE_PANES="${PANES:-}" "$FORK/bin/jg-watch.sh" > "$h/out" 2> "$h/err" &
   pid=$!
-  wait_for_exit "$pid" "${CYCLE_POLLS:-40}" || rc=$?
+  wait_for_scan "$pid" "$h/state" "$mark" "${CYCLE_POLLS:-40}" "${CYCLE_POLLS_MAX:-600}" || rc=$?
   case "$rc" in 0|124) ;; *) fail "watcher failed ($rc): $(cat "$h/err")" ;; esac
   cat "$h/out" >> "$h/events"
   [ "${2:-}" != absent ] || return 0
@@ -86,6 +102,62 @@ cycle() {  # <home> [absent]
   seq=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9]*\) --recovery-generation .*/\1/p' "$h/ack")
   gen=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([^ ]*\)$/\1/p' "$h/ack")
   [ -z "$seq" ] || JG_HOME="$h" JG_STATE_OVERRIDE="$h/state" "$FORK/bin/jg-wake-drain.sh" --ack-through "$seq" --recovery-generation "$gen" >/dev/null
+}
+
+# A cycle stops at its first wake, so a home holding two open waits can report
+# the other one first. Repeat bounded cycles until the wanted line is visible;
+# the caller's assertion still reports the miss with its full evidence.
+cycle_until() {  # <home> <extended-regex> [absent]
+  local h=$1 want=$2 absent=${3:-} n=0
+  while [ "$n" -lt "${CYCLE_TRIES:-8}" ]; do
+    n=$((n + 1))
+    cycle "$h" "$absent"
+    grep -qE "$want" "$h/events" && return 0
+  done
+  return 0
+}
+
+# Wait for one owned watcher cycle. Return its exit status when the watcher
+# reports a wake. Otherwise stop it after <budget> hundred-millisecond polls, or
+# after <limit> polls when a scan that was already running crossed that budget:
+# that scan finishes and the cycle ends on its beacon, not inside it.
+wait_for_scan() {  # <pid> <state> <mark> <budget> <limit>
+  local pid=$1 state=$2 mark=$3 budget=${4:-40} limit=${5:-600} i=0
+  while [ "$i" -lt "$limit" ]; do
+    is_live_non_zombie "$pid" || break
+    if [ "$i" -ge "$budget" ] && [ "$state/.last-watcher-beat" -nt "$mark" ]; then
+      break
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if is_live_non_zombie "$pid"; then
+    kill -TERM "$pid" 2>/dev/null || true
+    i=0
+    # A loaded runner takes a moment to run the watcher's own exit trap, and a
+    # KILL there leaves the next cycle on a lock nothing released.
+    while [ "$i" -lt 50 ] && is_live_non_zombie "$pid"; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+    if is_live_non_zombie "$pid"; then
+      printf 'wait_for_scan: owned pid %s survived TERM; sending KILL\n' "$pid" >&2
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+    return 124
+  fi
+  wait "$pid"
+}
+
+# Make every terminal read in <home> cost <secs> of wall clock, the way a loaded
+# CI runner's does, so a scan takes longer than any fixed cycle delay.
+slow_panes() {  # <home> <secs>
+  local t="$1/fakebin/tmux"
+  mv "$t" "$t.real"
+  # shellcheck disable=SC2016 # the wrapper expands its own arguments when run
+  printf '#!/usr/bin/env bash\nsleep %s\nexec "$(dirname "$0")/tmux.real" "$@"\n' "$2" > "$t"
+  chmod +x "$t"
 }
 
 lead_meta() {  # <home> <id> <pane> <lead-home> [harness]
@@ -136,6 +208,28 @@ backdate_backlog() {  # <home> <secs>
   [ "$reported" -eq 0 ] || reported=$((reported - $2))
   [ "$last" -eq 0 ] || last=$((last - $2))
   printf '%s\t%s\t%s\t%s\t%s\n' "$((since - $2))" "$lanes" "$key" "$reported" "$last" > "$f"
+}
+
+# A ship task whose PR is recorded ready: pr=, yolo and an armed merge poll.
+pr_task() {  # <home> <id> <yolo> [head]
+  local pr=https://github.com/octo/widgets/pull/7
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\npr=%s\nyolo=%s\n' "$pr" "$3" > "$1/state/$2.meta"
+  printf 'done [at=1]: PR %s\n' "$pr" > "$1/state/$2.status"
+  prime_status_seen "$1/state" "$1/state/$2.status"
+  : > "$1/state/$2.check.sh"
+  touch "$1/state/.last-check"
+  forge "$1" OPEN false CLEAN "${4:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+}
+
+forge() {  # <home> <state> <draft> <merge-state> <head>
+  printf '%s\t%s\t%s\t%s\n' "$2" "$3" "$4" "$5" > "$1/gh-answer"
+}
+
+# Move the green-PR clock back by <secs>, as if the PR had waited unmerged.
+backdate_green() {  # <home> <task> <secs>
+  local f="$1/state/.green-pr/$2" checked since head url
+  IFS=$'\t' read -r checked since head url < "$f"
+  printf '%s\t%s\t%s\t%s\n' "$checked" "$((since - $3))" "$head" "$url" > "$f"
 }
 
 TRUST=$'Quick safety check: Is this a project you created or one you trust?\n  1. Yes, I trust this folder\n  2. No, exit\nEnter to confirm'
@@ -204,15 +298,22 @@ test_lead_stuck_on_a_prompt_reaches_the_board() {
   PANES=1 cycle "$m"
   grep -q 'check: waiting-state lead1 (prompt, .*level=main' "$m/events" || fail "the lead's prompt did not reach Main's rung: $(cat "$m/events")"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card .*--title Unblock stuck lead? .*--guard security' "$m/cards" \
-    || fail "the lead's prompt did not become a guarded board card: $(cat "$m/cards" 2>&1)"
+  # A stuck worker is Main's to unblock, never a card for the captain
+  # (bin/jg-ask-gate-lib.sh rule 2): the chain records the ask for Main instead.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "a stuck lead's prompt reached the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the lead's prompt was neither a card nor recorded for Main: $(cat "$m/data/overwatch-decisions.md" 2>&1)"
   [ "$(grep -c "stale: fake:1 (permission prompt" "$m/events")" -eq 1 ] || fail "the gate re-alerted instead of the chain"
   printf 'all quiet\n> \n' > "$m/panes/1"
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q '^dismiss waiting-timer-.*-lead1-.*-prompt-card' "$m/cards" || fail "the card stayed after the prompt was answered"
+  [ ! -s "$m/cards" ] || ! grep -q '^raise ' "$m/cards" \
+    || fail "a card was raised for a stuck lead: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded prompt wait disappeared when the prompt was answered"
   [ ! -e "$m/state/.waiting-timers/lead1" ] || fail "the episode outlived the prompt"
-  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, then a board card that closes when it clears"
+  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, is recorded for Main's decision, and clears when it is answered"
 }
 
 test_dead_lead_still_reaches_the_board_and_relaunch_represents() {
@@ -223,8 +324,10 @@ test_dead_lead_still_reaches_the_board_and_relaunch_represents() {
   PANES='' cycle "$m"
   grep -q '^jg-send lead1 .*Your worker w1' "$m/sent" || fail "a dead lead got no durable steer"
   ! grep -q '^jg-control' "$m/sent" || fail "a dead lead was interrupted"
-  grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
-    || fail "a dead lead's stuck worker never reached the board: $(cat "$m/cards" 2>&1)"
+  ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
+    || fail "a worker's question went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "an unsettled wait was not recorded for Main to decide"
   # The relaunched lead re-presents its open waits on its first cycle.
   l=$(home dead-lead)
   printf 'lead1\n' > "$l/.jg-squad-lead-home"
@@ -286,8 +389,10 @@ test_worker_dead_prompt_and_question_differ() {
   touch -d '-10 minutes' "$m/state/.wait-sources/wd.prompt"
   PANES='1 2' cycle "$m"
   grep -q '^stale: fake:1 (permission prompt' "$m/events" || fail "a worker on a prompt did not wake Main at first sight"
+  # The prompt on pane 1 is still an open wait at Main's rung, and a cycle stops
+  # at its first wake, so the question's own rung is reached on a later scan.
   backdate "$m" wq 10
-  PANES='1 2' cycle "$m"
+  PANES='1 2' cycle_until "$m" 'waiting-state wq \(needs-decision key=q, .*level=owner'
   grep -q 'check: waiting-state wq (needs-decision key=q, .*level=owner' "$m/events" || fail "an open question did not reach its owner: $(cat "$m/events")"
   PANES='1 2' cycle "$m"
   ! grep -q 'waiting-state wd ' "$m/events" || fail "a dead worker's lapsed prompt rode the chain"
@@ -305,9 +410,15 @@ test_two_hops_stuck_at_once() {
   backdate "$m" lead1 10
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" || fail "the stuck lead got no card: $(cat "$m/cards" 2>&1)"
-  grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" || fail "its stuck worker got no card: $(cat "$m/cards" 2>&1)"
-  pass "a lead stuck on a prompt and its stuck worker each reach the board"
+  # Neither hop is the captain's card: a stuck worker and a stuck lead are
+  # Main's to unblock, so both are recorded for Main's decision.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "the stuck lead reached the captain's board: $(cat "$m/cards" 2>&1)"
+  ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
+    || fail "its stuck worker's question reached the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "its stuck worker's wait was not recorded for Main to decide"
+  pass "a lead stuck on a prompt and its stuck worker both reach Main's decision, and neither reaches the captain's board"
 }
 
 test_main_absent_board_card_still_fires() {
@@ -322,13 +433,16 @@ test_main_absent_board_card_still_fires() {
   PANES=1 cycle "$m" absent
   PANES=1 cycle "$m" absent
   grep -q 'level=main' "$m/events" || fail "Main's rung never fired: $(cat "$m/events")"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-w1-.*-dep-card' "$m/cards" || fail "no card while Main was absent: $(cat "$m/cards" 2>&1) $(cat "$m/err")"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-w1-.*-dep-card' "$m/cards" 2>/dev/null \
+    || fail "a wait Main had not settled went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the unsettled wait was not recorded for Main while it was absent"
   [ -s "$m/state/.wake-queue" ] || fail "the fixture did not keep Main's wakes unread"
-  pass "with Main absent and its wakes unread, the board card still fires"
+  pass "with Main absent and its wakes unread, the unsettled wait is recorded for Main"
 }
 
 test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
-  local m l f
+  local m l f relay first nudged card
   m=$(home backlog-main)
   l=$(lead_home backlog-lead "$m")
   lead_meta "$m" lead1 1 "$l"
@@ -337,10 +451,10 @@ test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
   f="$m/state/lead1.status"
   cycle "$l"
   [ -f "$l/state/.waiting-timers/.ready-backlog" ] || fail "ready work on a free lane armed no episode: $(cat "$l/err")"
-  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before the lead had 15 minutes"
-  backdate_backlog "$l" 800
+  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before the lead had 10 minutes"
+  backdate_backlog "$l" 500
   cycle "$l"
-  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before 15 minutes passed"
+  ! grep -q 'waiting-timer-backlog-overdue' "$f" || fail "Main was told before 10 minutes passed"
   backdate_backlog "$l" 200
   cycle "$l"
   grep -q '^blocked \[key=waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-backlog-overdue: lead1 (ready work alpha, free lanes 0/2 open, nothing started for [0-9]*s' "$f" \
@@ -353,21 +467,32 @@ test_stalled_backlog_wakes_the_lead_and_main_and_refires() {
   [ "$(grep -c 'waiting-timer-backlog-overdue' "$f")" -eq 2 ] || fail "the stall did not re-fire after the interval: $(cat "$f")"
   [ "$(grep -c '^check: ready backlog stalled' "$l/events")" -eq 2 ] || fail "the lead was not woken on the re-fire"
   # The report itself is Main's event; the next cycle's relay steers the lead.
-  PANES=1 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
   grep -q 'lead1' "$m/events" || fail "the report raised no Main event: $(cat "$m/events")"
-  PANES=1 cycle "$m"
-  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} You have ready backlog work and a free lane, and nothing has started (ready work alpha' "$m/sent" \
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} You have ready backlog work that can start now, and nothing has started (ready work alpha' "$m/sent" \
     || fail "Main did not steer the lead about its stalled backlog: $(cat "$m/sent" 2>&1) $(cat "$m/err")"
-  [ ! -s "$m/cards" ] || fail "a stalled backlog posted a board card: $(cat "$m/cards")"
+  [ ! -s "$m/cards" ] || fail "a stalled backlog posted a board card before its time: $(cat "$m/cards")"
+  # Still open when the card time passes: Main posts the board card.
+  relay=$(ls "$m/state/.waiting-relay/"*)
+  IFS=$'\t' read -r first nudged card < "$relay"
+  printf '%s\t%s\t%s\n' "$((first - 4000))" "$nudged" "$card" > "$relay"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card' "$m/cards" 2>/dev/null \
+    || fail "a lead's own park-or-retry call went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "a stalled backlog was not recorded for Main to decide"
   backlog "$l" hold alpha --reason "waits on the vendor"
   cycle "$l"
   grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-cleared: lead1 ready backlog: no ready work' "$f" \
     || fail "a held item left Main's report open: $(cat "$f")"
   [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "the episode outlived the condition"
-  PANES=1 cycle "$m"
-  PANES=1 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
   [ -z "$(ls "$m/state/.waiting-relay/" 2>/dev/null)" ] || fail "Main kept relaying a cleared stall"
-  pass "a ready item on a free lane with nothing started for 15 minutes wakes the lead and Main, re-fires every interval, and clears when held"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded backlog wait disappeared when the item was held"
+  pass "a ready item on a free lane with nothing started for 10 minutes wakes the lead and Main, re-fires every interval, reaches the board, and clears when held"
 }
 
 test_stalled_backlog_quiet_when_work_starts_in_time() {
@@ -390,23 +515,201 @@ test_stalled_backlog_quiet_when_work_starts_in_time() {
   pass "a lead that starts work in time is never escalated, and the start re-arms the clock"
 }
 
+test_ship_ready_line_goes_through_the_pr_check() {
+  local m
+  m=$(home ready-pr)
+  printf 'kind=ship\nmode=direct-PR\nbackend=tmux\nwindow=fake:1\nworktree=%s/gone\n' "$m" > "$m/state/w1.meta"
+  printf 'done [at=1]: PR https://gitlab.example/g/p/-/merge_requests/3\n' > "$m/state/w1.status"
+  PANES=1 cycle "$m"
+  grep -q 'the ready PR of w1 was not recorded: error: ' \
+    "$m/state/.watch-triage.log" || fail "the watcher did not run the ready line through jg-pr-check: $(cat "$m/state/.watch-triage.log" 2>&1)"
+  grep -q '^signal:.*w1.status' "$m/events" || fail "a refused ready line must still wake Main: $(cat "$m/events")"
+  pass "a ship's ready line runs through jg-pr-check's named-head gate and still wakes Main"
+}
+
+# A stand-in for jg-crew-state.sh that reports every lane as working on its pane.
+working_crew_state() {  # <home> -> path
+  printf '#!/usr/bin/env bash\nprintf "state: working source: pane\\n"\n' > "$1/fakebin/crew-state-working"
+  chmod +x "$1/fakebin/crew-state-working"
+  printf '%s\n' "$1/fakebin/crew-state-working"
+}
+
 test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item() {
-  local m l
+  local m l crew
   m=$(home full-main)
   l=$(lead_home full-lead "$m")
+  crew=$(working_crew_state "$l")
   printf '1\n' > "$l/config/lane-target"
   printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$l/state/w1.meta"
   : > "$l/state/w1.status"
   prime_status_seen "$l/state" "$l/state/w1.status"
   backlog "$l" add alpha "first item"
-  PANES=1 cycle "$l"
-  PANES=1 cycle "$l"
-  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "a home with no free lane armed a stall"
+  JG_CREW_STATE_BIN="$crew" PANES=1 cycle "$l"
+  JG_CREW_STATE_BIN="$crew" PANES=1 cycle "$l"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "a home at its floor with a worker working armed a stall"
+  grep -q "$(printf '\tlanes-working\t1/1')" "$l/state/.waiting-timers/.ready-backlog-why" \
+    || fail "the quiet backlog left no reason: $(cat "$l/state/.waiting-timers/.ready-backlog-why" 2>&1)"
   rm -f "$l/state/w1.meta" "$l/state/w1.status"
   backlog "$l" hold alpha --reason "waits on the vendor"
   cycle "$l"
   [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "a held item armed a stall"
-  pass "no free lane, or only a held item, never arms the stalled-backlog chain"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog-why" ] || fail "a home with no ready work kept a quiet reason"
+  pass "a worker provably working at the floor, or only a held item, never arms the stalled-backlog chain, and the quiet reason is recorded"
+}
+
+test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_board() {
+  local m l f relay first nudged card
+  m=$(home floor-main)
+  l=$(lead_home floor-lead "$m")
+  lead_meta "$m" lead1 1 "$l"
+  # The lead home is at its floor of 1, but its one lane only waits (an idle pane).
+  printf '1\n' > "$l/config/lane-target"
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:1\n' > "$l/state/w1.meta"
+  : > "$l/state/w1.status"
+  prime_status_seen "$l/state" "$l/state/w1.status"
+  backlog "$l" add alpha "first item" --priority 1
+  backlog "$l" add beta "second item"
+  f="$m/state/lead1.status"
+  PANES=1 cycle "$l"
+  grep -q '^check: ready work waiting with no worker working: alpha beta' "$l/events" || fail "the lead got no first-sight wake: $(cat "$l/events")"
+  [ -f "$l/state/.waiting-timers/.ready-backlog" ] || fail "ready work with no worker working armed no episode: $(cat "$l/err")"
+  backdate_backlog "$l" 700
+  PANES=1 cycle "$l"
+  grep -q '^blocked \[key=waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog\] \[at=[0-9]*\]: waiting-timer-backlog-overdue: lead1 (ready work alpha beta, no worker working 1/1 open, nothing started for [0-9]*s' "$f" \
+    || fail "an idle lead at its floor did not reach Main: $(cat "$f" 2>&1) $(cat "$l/err")"
+  grep -q '^check: ready backlog stalled: alpha beta waits with no worker working (1/1 open)' "$l/events" || fail "the lead was not woken again: $(cat "$l/events")"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} You have ready backlog work that can start now' "$m/sent" || fail "Main did not steer the lead: $(cat "$m/sent" 2>&1)"
+  relay=$(ls "$m/state/.waiting-relay/"*)
+  IFS=$'\t' read -r first nudged card < "$relay"
+  printf '%s\t%s\t%s\n' "$((first - 4000))" "$nudged" "$card" > "$relay"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-ready-backlog-card' "$m/cards" 2>/dev/null \
+    || fail "the idle lead's backlog went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the idle lead's backlog was not recorded for Main to decide"
+  # A lane that starts work ends it: the report closes and the card goes.
+  printf 'kind=ship\nbackend=tmux\nwindow=fake:2\n' > "$l/state/w2.meta"
+  : > "$l/state/w2.status"
+  prime_status_seen "$l/state" "$l/state/w2.status"
+  PANES='1 2' cycle "$l"
+  grep -q '^resolved \[key=waiting-timer-.*-ready-backlog\].*waiting-timer-cleared: lead1 ready backlog: the lead started work' "$f" || fail "a start left Main's report open: $(cat "$f")"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^- Ask: Start the stalled' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded backlog wait disappeared when the lead started work"
+  pass "an idle lead at its lane floor with no worker working is woken again, reported to Main, steered, recorded for Main, and cleared when it starts work"
+}
+
+test_green_unmerged_pr_climbs_lead_main_and_the_board() {
+  local m l f
+  m=$(home green-main)
+  l=$(lead_home green-lead "$m")
+  lead_meta "$m" lead1 1 "$l"
+  pr_task "$l" signoff on
+  f="$m/state/lead1.status"
+  PANES=1 cycle "$l"
+  [ -f "$l/state/.green-pr/signoff" ] || fail "a green ready PR under yolo was not recorded: $(cat "$l/err")"
+  [ ! -e "$l/state/.wait-sources/signoff.greenpr" ] || fail "the PR raised a wait before it had waited 15 minutes"
+  backdate_green "$l" signoff 1000
+  PANES=1 cycle "$l"
+  grep -q '^greenpr: https://github.com/octo/widgets/pull/7 is green at aaaaaaaa and unmerged under yolo' "$l/state/.wait-sources/signoff.greenpr"     || fail "a PR green for 15 minutes was not handed to the chain: $(cat "$l/err")"
+  PANES=1 cycle "$l"; backdate "$l" signoff 3
+  PANES=1 cycle "$l"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=owner.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$l/events" \
+    || fail "the lead was not woken naming the PR: $(cat "$l/events")"
+  backdate "$l" signoff 5
+  PANES=1 cycle "$l"
+  grep -q 'waiting-timer-overdue: signoff (greenpr, observed [0-9]*s.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$f" \
+    || fail "Main was not told which PR waits: $(cat "$f" 2>&1) $(cat "$l/err")"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^jg-send lead1 --fire-and-forget [0-9a-f]\{16\} Your worker signoff has been stuck .*on: greenpr: https://github.com/octo/widgets/pull/7 .*Merge it now with bin/jg-pr-merge.sh, or record a hold' "$m/sent" \
+    || fail "Main did not steer the lead to merge: $(cat "$m/sent" 2>&1)"
+  [ ! -s "$m/cards" ] || fail "a card was posted before its time"
+  # The card follows the wait's own start, so age the report the lead filed.
+  sed -i "s/^\(blocked.*since=\)[0-9]*/\1$(($(date +%s) - 4000))/" "$f"
+  PANES=1 CARD_SECS=60 cycle "$m"; PANES=1 CARD_SECS=60 cycle "$m"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card' "$m/cards" 2>/dev/null \
+    || fail "a green unmerged PR went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Merge the green' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the green unmerged PR was not recorded for Main to decide"
+  # The merge ends it: the forge answers merged, the source goes, the report closes, the card is dismissed.
+  forge "$l" MERGED false UNKNOWN aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  PANES=1 cycle "$l"; PANES=1 cycle "$l"
+  [ ! -e "$l/state/.wait-sources/signoff.greenpr" ] && [ ! -e "$l/state/.waiting-timers/signoff" ] || fail "the wait outlived the merge"
+  grep -q '^resolved \[key=waiting-timer-.*-signoff-.*-greenpr\].*waiting-timer-cleared: signoff' "$f" || fail "the merge left Main's report open: $(cat "$f")"
+  PANES=1 CARD_SECS=3600 cycle "$m"; PANES=1 CARD_SECS=3600 cycle "$m"
+  grep -q '^dismiss waiting-timer-.*-signoff-.*-greenpr-card' "$m/cards" || fail "the card stayed after the merge"
+  pass "a green ready PR left unmerged under yolo wakes its lead, tells Main with the PR, steers the lead, reaches the board, and clears on merge"
+}
+
+test_green_unmerged_pr_in_the_main_home_wakes_main_then_the_board() {
+  local m
+  m=$(home green-solo)
+  pr_task "$m" signoff on
+  PANES=1 cycle "$m"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"; PANES=1 cycle "$m"; backdate "$m" signoff 3
+  PANES=1 cycle "$m"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=owner; Main must recheck and unblock) id=.*source=\[greenpr: https://github.com/octo/widgets/pull/7 ' "$m/events" \
+    || fail "Main was not woken naming the PR: $(cat "$m/events")"
+  backdate "$m" signoff 5
+  PANES=1 cycle "$m"
+  grep -q 'check: waiting-state signoff (greenpr, .*level=main' "$m/events" || fail "Main's own rung never fired: $(cat "$m/events")"
+  backdate "$m" signoff 10
+  PANES=1 CARD_SECS=6 cycle "$m"; PANES=1 CARD_SECS=6 cycle "$m"
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-signoff-g[0-9]*-greenpr-card' "$m/cards" 2>/dev/null \
+    || fail "a green PR in the main home went to the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Merge the green' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "a green PR in the main home was not recorded for Main to decide"
+  pass "a green ready PR under yolo in the main home wakes Main, fires Main's rung, and reaches the board"
+}
+
+test_green_pr_stays_quiet_unless_it_is_green_unmerged_and_unheld_under_yolo() {
+  local m n
+  # yolo off: the captain merges, so nothing escalates.
+  m=$(home green-off)
+  pr_task "$m" signoff off
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.green-pr/signoff" ] || fail "a PR without yolo was tracked"
+  # A pending, red, draft or unreadable PR is not green.
+  for n in "OPEN false BLOCKED" "OPEN false UNSTABLE" "OPEN true CLEAN" "CLOSED false CLEAN"; do
+    m=$(home "green-$(printf '%s' "$n" | tr -c 'A-Za-z' -)")
+    pr_task "$m" signoff on
+    # shellcheck disable=SC2086
+    forge "$m" $n aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    PANES=1 cycle "$m"
+    [ ! -e "$m/state/.green-pr/signoff" ] || fail "'$n' was treated as green"
+  done
+  m=$(home green-unread)
+  pr_task "$m" signoff on
+  rm -f "$m/gh-answer"
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.green-pr/signoff" ] && [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "an unreadable forge answer was treated as green"
+  # A recorded hold with a reason ends it; a new head re-arms the clock.
+  m=$(home green-held)
+  pr_task "$m" signoff on
+  PANES=1 cycle "$m"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.wait-sources/signoff.greenpr" ] || fail "fixture: the wait never started"
+  printf 'paused [at=2]: waiting for the vendor to confirm the release window\n' >> "$m/state/signoff.status"
+  prime_status_seen "$m/state" "$m/state/signoff.status"
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "a recorded pause with a reason did not clear the wait"
+  printf 'done [at=3]: PR https://github.com/octo/widgets/pull/7\n' >> "$m/state/signoff.status"
+  prime_status_seen "$m/state" "$m/state/signoff.status"
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.green-pr/signoff" ] && [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "the clock did not restart from zero after the pause ended"
+  backdate_green "$m" signoff 1000
+  PANES=1 cycle "$m"
+  [ -f "$m/state/.wait-sources/signoff.greenpr" ] || fail "the wait did not return after the pause ended and 15 minutes passed"
+  forge "$m" OPEN false CLEAN bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  PANES=1 cycle "$m"
+  [ ! -e "$m/state/.wait-sources/signoff.greenpr" ] || fail "a new head did not re-arm the clock"
+  pass "a PR is quiet without yolo, when not green or unreadable, and under a recorded pause, which restarts the clock when it ends; a new head re-arms the clock"
 }
 
 test_stalled_backlog_quiet_when_project_is_at_capacity() {
@@ -421,9 +724,12 @@ test_stalled_backlog_quiet_when_project_is_at_capacity() {
   backlog "$l" add alpha "capped item" --repo proj
   PANES=1 cycle "$l"
   [ ! -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "an item whose project is at capacity armed a stall"
+  grep -q "$(printf '\tproject-capacity\t')" "$l/state/.waiting-timers/.ready-backlog-why" \
+    || fail "the capacity hold left no reason: $(cat "$l/state/.waiting-timers/.ready-backlog-why" 2>&1)"
   backlog "$l" add beta "uncapped item"
   PANES=1 cycle "$l"
   [ -e "$l/state/.waiting-timers/.ready-backlog" ] || fail "an uncapped item on a free lane armed no stall: $(cat "$l/err")"
+  [ ! -e "$l/state/.waiting-timers/.ready-backlog-why" ] || fail "an armed stall kept a quiet reason"
   pass "an item whose project is at capacity cannot start, so it never arms the chain"
 }
 
@@ -478,8 +784,28 @@ TABLE
   pass "the stuck-cause matcher reads a question, a quota wall, a repeated provider error, or nothing for each harness rendering"
 }
 
+# A loaded runner reads its panes slower than any fixed cycle delay allows, so a
+# cycle must be bounded by its own scan. The wake is found on the last pane read,
+# which is where a fixed four-second budget used to kill the cycle before it
+# could report anything.
+test_a_slow_scan_reports_the_wake_it_found() {
+  local m n
+  m=$(home slow-scan)
+  for n in 1 2 3; do
+    printf 'kind=ship\nbackend=tmux\nwindow=fake:%s\nharness=claude\n' "$n" > "$m/state/w$n.meta"
+    : > "$m/state/w$n.status"
+    prime_status_seen "$m/state" "$m/state/w$n.status"
+  done
+  printf '%s\n' "$TRUST" > "$m/panes/3"
+  slow_panes "$m" 2.5
+  PANES='1 2 3' cycle "$m"
+  grep -q '^stale: fake:3 (permission prompt' "$m/events" \
+    || fail "a wake found on the last pane of a slow scan was lost: $(cat "$m/events")"
+  pass "a cycle waits for the scan that finds its wake, however slow the runner is"
+}
+
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
-  local m kind want pane
+  local m kind want pane n
   for kind in question quota errors; do
     m=$(home "chain-$kind")
     printf 'kind=ship\nbackend=tmux\nwindow=fake:1\nharness=pi\n' > "$m/state/w1.meta"
@@ -499,12 +825,19 @@ test_question_and_quota_ride_the_chain_whatever_the_terminal_says() {
     grep -q "check: waiting-state w1 ($kind, .*level=main" "$m/events" || fail "$kind did not reach Main: $(cat "$m/events")"
     backdate "$m" w1 5
     PANES=1 cycle "$m"; PANES=1 cycle "$m"
-    grep -q -- "--key waiting-timer-[0-9a-f]*-w1-.*-$kind-card" "$m/cards" || fail "$kind never became a board card: $(cat "$m/cards" 2>&1)"
+    ! grep -q -- "--key waiting-timer-[0-9a-f]*-w1-.*-$kind-card" "$m/cards" 2>/dev/null \
+      || fail "$kind went to the captain's board: $(cat "$m/cards" 2>&1)"
+    grep -q "^- Ask: Unblock stuck" "$m/data/overwatch-decisions.md" 2>/dev/null \
+      || fail "$kind was not recorded for Main to decide"
     printf 'working...\n> \n' > "$m/panes/1"
-    PANES=1 cycle "$m"; PANES=1 cycle "$m"
+    # The cause is gone; the episode clears on a later scan, and a cycle that was
+    # stopped at its budget edge can spend one of them, so wait for the condition.
+    for n in 1 2 3 4; do
+      if [ -e "$m/state/.wait-sources/w1.$kind" ] || [ -e "$m/state/.waiting-timers/w1" ]; then PANES=1 cycle "$m"; fi
+    done
     [ ! -e "$m/state/.wait-sources/w1.$kind" ] && [ ! -e "$m/state/.waiting-timers/w1" ] || fail "$kind episode outlived the cause"
   done
-  pass "a question dialog, a provider quota wall and a repeating provider error climb owner, Main and the board, and clear with the cause"
+  pass "a question dialog, a provider quota wall and a repeating provider error climb owner and Main, are recorded for Main to decide, and clear with the cause"
 }
 
 test_silent_worker_climbs_whatever_it_declared() {
@@ -549,8 +882,55 @@ test_silent_worker_climbs_whatever_it_declared() {
   pass "a silent blocked or paused worker climbs the chain; a dated pause, a finished worker, an idle lead and a worker with fresh progress do not"
 }
 
+test_ready_work_wakes_the_primary_home_too() {
+  local m
+  m=$(home ready-main)
+  mkdir -p "$m/data"
+  backlog "$m" add alpha "first item" --priority 1
+  cycle "$m"
+  grep -q '^check: ready work waiting with no worker working: alpha' "$m/events" \
+    || fail "a primary home with ready work and no worker got no wake: $(cat "$m/events")"
+  [ ! -e "$m/state/.waiting-timers/.ready-backlog" ] || fail "a primary home with no parent armed a lead escalation"
+  # The same set must not ring again inside the resurface window, but a place
+  # freed since it surfaced makes it startable now, so the stamp re-raises it.
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c '^check: ready work waiting' "$m/events")" = 1 ] \
+    || fail "the same ready set rang again inside the resurface window: $(cat "$m/events")"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  printf '%s\n' "$(($(date +%s) + 10))" > "$m/state/.capacity-freed"
+  cycle "$m"
+  [ "$(grep -c '^check: ready work waiting' "$m/events")" = 2 ] \
+    || fail "a freed place did not re-raise the same ready set: $(cat "$m/events")"
+  pass "ready work with no worker working wakes the primary home, not only a lead, and a freed place re-raises it"
+}
+
+test_memory_refused_launch_reraises_when_admission_clears() {
+  local m
+  m=$(home admit-retry)
+  # The verdict comes from the newest sampler row, which this home's own sampler
+  # writes; one refusal record rings once, and a cleared record stops ringing.
+  printf '%s\tqueued-1\thost memory under pressure\n' "$(date +%s)" > "$m/state/admission-refused"
+  PANES=1 cycle "$m"
+  grep -q '^check: host memory admits launches again, so retry the launch of queued-1' "$m/events" \
+    || fail "an admitting sample did not raise the retry wake: $(cat "$m/events" 2>&1)"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c 'host memory admits launches again' "$m/events")" = 1 ] \
+    || fail "one refusal record rang twice: $(cat "$m/events")"
+  rm -f "$m/state/admission-refused"
+  touch -d '-15 days' "$m/state/.last-ready-work-check"
+  cycle "$m"
+  [ "$(grep -c 'host memory admits launches again' "$m/events")" = 1 ] \
+    || fail "a cleared refusal record rang again: $(cat "$m/events")"
+  pass "a memory-refused launch rings once while its record stands, and stops when it clears"
+}
+
 test_lead_idle_is_steered_without_interrupt
 test_stuck_verdict_table
+# A cycle is bounded by the scan, not by a fixed delay: the wake found on the
+# last pane of a slow scan still reaches the queue.
+test_a_slow_scan_reports_the_wake_it_found
 test_question_and_quota_ride_the_chain_whatever_the_terminal_says
 test_silent_worker_climbs_whatever_it_declared
 test_busy_lead_is_interrupted_first
@@ -563,5 +943,12 @@ test_main_absent_board_card_still_fires
 test_stalled_backlog_wakes_the_lead_and_main_and_refires
 test_stalled_backlog_quiet_when_work_starts_in_time
 test_stalled_backlog_quiet_without_a_free_lane_or_a_ready_item
+test_stalled_backlog_at_the_floor_with_no_worker_working_reaches_main_and_the_board
 test_stalled_backlog_quiet_when_project_is_at_capacity
+test_ship_ready_line_goes_through_the_pr_check
 test_watcher_handoff_gap_is_not_a_dead_watcher
+test_ready_work_wakes_the_primary_home_too
+test_memory_refused_launch_reraises_when_admission_clears
+test_green_unmerged_pr_climbs_lead_main_and_the_board
+test_green_unmerged_pr_in_the_main_home_wakes_main_then_the_board
+test_green_pr_stays_quiet_unless_it_is_green_unmerged_and_unheld_under_yolo

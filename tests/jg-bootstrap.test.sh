@@ -12,8 +12,7 @@
 # tasks-axi update advertises --archive-body, whether its mv help advertises
 # multi-ID moves, whether quota-axi is on PATH,
 # whether the local backend config opts out of tasks-axi backlog mutations,
-# which no-mistakes version is on PATH, which gh-axi version is on PATH, and
-# which lavish-axi version is on PATH.
+# which no-mistakes version is on PATH, and which gh-axi version is on PATH.
 # Dedicated fleet-sync cases pin the computed bootstrap timeout, explicit
 # override, blank-env defaulting, partial-output relay, and pre-launch timeout
 # scan.
@@ -37,7 +36,6 @@ export JG_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 . "$ROOT/bin/jg-pin-lib.sh"
 export JG_FAKE_GH_AXI_VERSION=${JG_FAKE_GH_AXI_VERSION:-$(jg_pin_version gh-axi)}
 export JG_FAKE_QUOTA_AXI_VERSION=${JG_FAKE_QUOTA_AXI_VERSION:-$(jg_pin_version quota-axi)}
-export JG_FAKE_LAVISH_AXI_VERSION=${JG_FAKE_LAVISH_AXI_VERSION:-0.1.80}
 export JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION=${JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION:-$(jg_pin_version learn-from-mistakes)}
 export JG_FAKE_DONE_DONE_AXI_VERSION=${JG_FAKE_DONE_DONE_AXI_VERSION:-$(jg_pin_version done-done)}
 export JG_FAKE_SIGN_OFF_AXI_VERSION=${JG_FAKE_SIGN_OFF_AXI_VERSION:-$(jg_pin_version sign-off-axi)}
@@ -70,7 +68,6 @@ make_fake_toolchain() {
 exit 0
 SH
   chmod +x "$fakebin/systemctl"
-  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION "$JG_FAKE_LAVISH_AXI_VERSION"
   jg_fake_version_tool "$fakebin" learn-from-mistakes JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION "$JG_FAKE_LEARN_FROM_MISTAKES_AXI_VERSION"
   jg_fake_version_tool "$fakebin" done-done JG_FAKE_DONE_DONE_AXI_VERSION "$JG_FAKE_DONE_DONE_AXI_VERSION"
   jg_fake_version_tool "$fakebin" sign-off-axi JG_FAKE_SIGN_OFF_AXI_VERSION "$JG_FAKE_SIGN_OFF_AXI_VERSION"
@@ -409,49 +406,6 @@ ROWS
   pass "bootstrap enforces gh-axi minimum version"
 }
 
-test_lavish_axi_min_version() {
-  local label version mode case_dir fakebin out unavailable upgrade n
-  unavailable="PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; not installed by Juggernaut) - nonvisual work may proceed with plain-text decisions and reports"
-  local lavish_min lavish_below
-  lavish_min=0.1.80
-  lavish_below=$(just_below "$lavish_min")
-  upgrade="BOOTSTRAP_INFO: lavish-axi >=$lavish_min enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted"
-  n=0
-  while IFS='^' read -r label version mode; do
-    [ -n "$label" ] || continue
-    n=$((n + 1))
-    case_dir="$TMP_ROOT/lavish-axi-$n"
-    mkdir -p "$case_dir/home/config"
-    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
-    fakebin=$(make_fake_toolchain "$case_dir")
-    [ "$version" != absent ] || rm -f "$fakebin/lavish-axi"
-    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
-      JG_FAKE_TREEHOUSE_LEASE_HELP=1 JG_FAKE_LAVISH_AXI_VERSION="$version" "$ROOT/bin/jg-bootstrap.sh") \
-      || fail "$label: optional presentation must not fail bootstrap"
-    assert_not_contains "$out" 'MISSING:' "$label: optional presentation must not block nonvisual dispatch"
-    case "$mode" in
-      empty)
-        [ -z "$out" ] || fail "$label: expected silence, got: $out" ;;
-      upgrade)
-        [ "$out" = "$upgrade" ] || fail "$label: expected '$upgrade', got: $out" ;;
-      unavailable)
-        [ "$out" = "$unavailable" ] || fail "$label: expected '$unavailable', got: $out" ;;
-    esac
-  done <<ROWS
-absent lavish-axi permits text fallback^absent^unavailable
-synchronous-reply minimum is accepted^$lavish_min^empty
-older compatible lavish-axi retains boards and recommends upgrade^$lavish_below^upgrade
-minimum legacy board version is accepted with upgrade advice^0.1.77^upgrade
-newer lavish-axi patch is accepted^0.2.0^empty
-newer lavish-axi minor is accepted^0.2.0^empty
-newer lavish-axi major is accepted^1.0.0^empty
-the patch just below the board compatibility floor permits text fallback^0.1.76^unavailable
-much older lavish-axi minor permits text fallback^0.0.9^unavailable
-unparseable lavish-axi version permits text fallback^lavish-axi development build^unavailable
-ROWS
-  pass "bootstrap preserves legacy Lavish boards while recommending synchronous reply support"
-}
-
 test_tasks_axi_min_version() {
   local label version mode case_dir fakebin out missing n archive_body multi_id
   missing=$MISS_TASKS_AXI
@@ -560,6 +514,28 @@ SH
   expected="MISSING: git (install: brew install git  # or the platform's package manager)"
   [ "$out" = "$expected" ] || fail "missing git should report the supported install instruction, got: $out"
   pass "bootstrap requires git with an install instruction"
+}
+
+test_bootstrap_arms_the_fleet_heartbeat_on_a_primary_home() {
+  local case_dir fakebin out
+  for case_dir in primary opted-out lead; do
+    case_dir="$TMP_ROOT/fleet-heartbeat-$case_dir"
+    mkdir -p "$case_dir/home/config" "$case_dir/home/state"
+    printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  done
+  : > "$TMP_ROOT/fleet-heartbeat-opted-out/home/config/fleet-heartbeat-off"
+  printf 'lead1\n' > "$TMP_ROOT/fleet-heartbeat-lead/home/.jg-squad-lead-home"
+  for case_dir in primary opted-out lead; do
+    case_dir="$TMP_ROOT/fleet-heartbeat-$case_dir"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$case_dir/home" JG_ROOT_OVERRIDE="$case_dir/home" \
+      JG_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/jg-bootstrap.sh")
+    assert_not_contains "$out" "fleet heartbeat could not be armed" "arming the fleet heartbeat failed: $out"
+  done
+  assert_present "$TMP_ROOT/fleet-heartbeat-primary/home/state/fleet-heartbeat.check.sh" "bootstrap left a primary home without the fleet heartbeat"
+  assert_absent "$TMP_ROOT/fleet-heartbeat-opted-out/home/state/fleet-heartbeat.check.sh" "config/fleet-heartbeat-off did not opt out"
+  assert_absent "$TMP_ROOT/fleet-heartbeat-lead/home/state/fleet-heartbeat.check.sh" "a Squad Lead home armed the primary's fleet heartbeat"
+  pass "bootstrap arms the fleet heartbeat on a primary home unless it opts out"
 }
 
 test_orca_backend_gates_orca_tool_only_when_selected() {
@@ -1307,7 +1283,13 @@ one-element array use is accepted^{"rules":[{"when":"focused feature","use":[{"h
 default array is accepted^{"default":[{"harness":"pi","model":"anthropic/claude-sonnet-5"},{"harness":"grok"}]}^empty^
 provider-less multi-provider profile remains accepted without opt-in^{"rules":[{"when":"cross-provider work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}^empty^
 one-element default array is accepted^{"default":[{"harness":"codex"}]}^empty^
-empty array use is flagged^{"rules":[{"when":"big feature","use":[]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs at least one use profile
+empty array use without a tier is flagged^{"rules":[{"when":"big feature","use":[]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs at least one use profile or a tier
+tier rule without use is accepted^{"tiers":{"hard":[{"harness":"codex","model":"gpt-5.6-sol"}]},"rules":[{"when":"hard work","tier":"hard"}]}^empty^
+unknown tier name is flagged^{"tiers":{"extreme":[{"harness":"codex"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - unknown tier: extreme (tiers are easy, standard, hard, and frontier)
+rule tier without a tiers entry is flagged^{"rules":[{"when":"hard work","tier":"hard"}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule tier needs a tiers entry: hard
+empty tier list is flagged^{"tiers":{"easy":[]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each tier needs at least one profile
+tier profile with unverified harness is flagged^{"tiers":{"easy":[{"harness":"spaceship"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
+tier profile with unsupported effort is flagged^{"tiers":{"hard":[{"harness":"codex","model":"gpt-5.6-sol","effort":"ultra"}]}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: codex:ultra
 array profile without harness is flagged^{"rules":[{"when":"big feature","use":[{"model":"gpt-5.5"}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each use profile needs harness
 array profile with malformed model is flagged^{"rules":[{"when":"big feature","use":[{"harness":"codex","model":5}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present
 resolve fields are accepted^{"rules":[{"when":"hard design","approval":"captain","floor":{"scope":"model:fable","min_percent":20,"provider":"claude"},"use":[{"harness":"pi","model":"openai-codex/gpt-5.6-sol","provider":"codex"},{"harness":"codex","model":"gpt-5.6-sol","floor":{"scope":"all_models","min_percent":50}}]}],"default":[{"harness":"pi","model":"kimi-code/k3","provider":"kimi","floor":{"scope":"all_models","min_percent":10}}]}^empty^
@@ -1395,7 +1377,6 @@ fi
 test_bootstrap_reporting
 test_no_mistakes_min_version
 test_gh_axi_min_version
-test_lavish_axi_min_version
 test_tasks_axi_min_version
 test_quota_axi_min_version
 test_git_is_required_with_supported_install_instruction
@@ -1423,3 +1404,4 @@ test_network_phases_record_per_step_elapsed_times
 test_tasks_axi_verdict_handoff_is_consumed_once
 test_crew_dispatch_active_rules_are_verbose_bootstrap_info
 test_crew_dispatch_validation
+test_bootstrap_arms_the_fleet_heartbeat_on_a_primary_home

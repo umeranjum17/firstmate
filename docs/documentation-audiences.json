@@ -837,10 +837,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "addons/bearings-board/README.md",
-      "audience": "operator-current"
-    },
-    {
       "path": "addons/brief-inherit/README.md",
       "audience": "operator-current"
     },
@@ -943,6 +939,14 @@
     {
       "path": "addons/receipts/README.md",
       "audience": "operator-current"
+    },
+    {
+      "path": "addons/report-actions/README.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "addons/report-actions/tests/fixtures/recorded-report.md",
+      "audience": "maintainer-verification"
     },
     {
       "path": "addons/sentinel/README.md",

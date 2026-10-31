@@ -127,6 +127,34 @@ private_artifact_file() {
 
 # ---------------------------------------------------------------------------
 
+test_poll_raises_a_held_followup_once() {
+  local home fakebin out rc
+  home="$TMP_ROOT/poll-held"; mkdir -p "$home/state"
+  fakebin=$(make_fake_curl "$home")
+  printf 'FMX_PAIRING_TOKEN=tok-held\n' > "$home/.env"
+  mk_linked_task "$home" task-h req-h 1700000000
+  if PATH="$fakebin:$BASE_PATH" JG_HOME="$home" FMX_RELAY_URL="https://relay.test" \
+      FMX_NOW_OVERRIDE=1700003600 FAKE_FOLLOWUP_CODE=500 \
+      "$ROOT/bin/jg-x-followup.sh" task-h - <<<"retry me" >/dev/null 2>&1; then
+    fail "the held follow-up setup must fail the post"
+  fi
+  assert_present "$home/state/x-followup-held/task-h" "a failed post must record a retryable hold"
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$home" FMX_RELAY_URL="https://relay.test" \
+    FAKE_POLL_CODE=204 "$ROOT/bin/jg-x-poll.sh"); rc=$?
+  expect_code 0 "$rc" "poll held-followup exit"
+  [ "$out" = "x-followup-held task-h" ] || fail "the poll must raise the held follow-up once (got: $out)"
+  assert_absent "$home/state/x-followup-held/task-h" "the raised hold must be dropped after the wake"
+  out=$(PATH="$fakebin:$BASE_PATH" JG_HOME="$home" FMX_RELAY_URL="https://relay.test" \
+    FAKE_POLL_CODE=204 "$ROOT/bin/jg-x-poll.sh"); rc=$?
+  [ -z "$out" ] || fail "an already raised hold must not ring twice (got: $out)"
+  PATH="$fakebin:$BASE_PATH" JG_HOME="$home" FMX_RELAY_URL="https://relay.test" \
+    FMX_NOW_OVERRIDE=1700003600 FAKE_FOLLOWUP_CODE=200 \
+    "$ROOT/bin/jg-x-followup.sh" task-h - <<<"retry me" >/dev/null 2>&1 || \
+    fail "the retried follow-up must post"
+  assert_absent "$home/state/x-followup-held/task-h" "a successful retry must clear the hold"
+  pass "jg-x-poll raises a held follow-up once so the retry does not wait on a memory"
+}
+
 test_poll_no_token_is_hard_noop() {
   local home fakebin out rc
   home="$TMP_ROOT/poll-noop"; mkdir -p "$home"
@@ -873,7 +901,6 @@ test_bootstrap_reports_missing_x_dependency() {
   home="$TMP_ROOT/boot-missing-x"; mkdir -p "$home"
   fakebin=$(jg_fakebin "$home")
   jg_fake_exit0 "$fakebin" tmux node no-mistakes chrome-devtools-axi curl
-  jg_fake_version_tool "$fakebin" lavish-axi JG_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -3190,6 +3217,7 @@ test_poll_inbox_commit_failure_reports_error
 test_poll_inbox_private_publication_rejects_unsafe_paths
 test_poll_empty_text_is_silent
 test_poll_rejects_unsafe_request_id
+test_poll_raises_a_held_followup_once
 test_reply_success_posts_request_bound_only
 test_reply_text_file_and_stdin
 test_reply_non_2xx_fails

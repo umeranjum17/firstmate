@@ -183,6 +183,10 @@ condition_status() {
       else "healthy"
       end;
     .providers |= map(select($provider == "" or .provider == $provider)) |
+    # A provider with a default row (the multi-account view: the account with the most room) is judged on that
+    # row alone, so one drained account or Main'"'"'s reserved login never reads as the provider being low.
+    . as $all | .providers |= map(. as $r | select((.accountKey // "default") == "default" or
+      ([$all.providers[] | select(.provider == $r.provider and (.accountKey // "") == "default")] | length) == 0)) |
     if (.providers | length) == 0 and $provider != "" then "error"
     elif ([.providers[]?.quotaSemantics.effectiveAvailability[]?] | length) == 0 then "healthy"
     else classify([.providers[]?.quotaSemantics.effectiveAvailability[]?])

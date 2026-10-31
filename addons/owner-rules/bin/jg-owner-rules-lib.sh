@@ -5,6 +5,8 @@
 #   jg_owner_rules_check <data-dir> <task-id> <mode> <kind>
 # when owner-rules/install.sh wrote config/owner-rules. It reads the home's backlog entry whose id
 # is the task id and exits 1, before jg-brief.sh writes anything, when the lane breaks a rule.
+# The no-mistakes risk reason is not checked here: bin/jg-brief.sh owns it with --risk, so one
+# rule has one owner.
 
 # Design flag: a body line "design: required|none" on the backlog entry. required adds the brief record to
 # BRIEF_INCLUDE_BODY (jg-brief.sh prints it under "Home brief additions"); a design-like line that is not exact
@@ -28,7 +30,9 @@ jg_owner_rules_design() {
 }
 
 jg_owner_rules_check() {
-  local data=$1 id=$2 mode=$3 kind=$4 entry title risks parent exists
+  # $3 (the delivery mode) is part of the caller contract; the risk reason it
+  # used to read is bin/jg-brief.sh --risk now, so this check never needs it.
+  local data=$1 id=$2 kind=$4 entry title parent exists
   [ "$kind" != squad_lead ] || return 0
   # Entry = the "- [.] <id> - <title>" line and its indented body, up to the next item or heading.
   entry=$(awk -v id="$id" '
@@ -54,10 +58,4 @@ jg_owner_rules_check() {
     fi
   fi
   jg_owner_rules_design "$id" "$entry"
-  [ "$kind" = ship ] && [ "$mode" = no-mistakes ] || return 0
-  risks=$(printf '%s\n' "$entry" | tail -n +2 | grep -Ec '^[[:space:]]*risk:[[:space:]]*(release|security|migration|large-change|shared-protocol|fork-repo)[[:space:]]*$') || true
-  if [ "$risks" -ne 1 ]; then
-    echo "owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for $id; use direct-PR plus a done-done check" >&2
-    exit 1
-  fi
 }

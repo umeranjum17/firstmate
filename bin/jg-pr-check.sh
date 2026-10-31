@@ -23,8 +23,15 @@
 # bin/jg-pr-merge.sh records through this script with JG_PR_CHECK_MERGE=1 and
 # skips this refusal, because its own merge-time draft refusal is authoritative.
 # The recorded pr= also frees the task's place in a declared project capacity
-# (bin/jg-project-capacity-lib.sh).
+# (bin/jg-project-capacity-lib.sh), and a new review-ready PR moves the task's
+# ticket to the review stage (bin/jg-ticket.sh).
+# --from-status is the watcher's call on every status change: it records the PR
+# named by the task's newest status line only when that line is the ship ready
+# report its mode gives (jg_dod_should_gate_ship_done) and that PR is not
+# already recorded, and otherwise exits 0 having done nothing. The named-head
+# gate below still decides, so a refusal records nothing.
 # Usage: jg-pr-check.sh <task-id> <pr-url>
+#        jg-pr-check.sh --from-status <task-id>
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -66,6 +73,17 @@ STATE="${JG_STATE_OVERRIDE:-$JG_HOME/state}"
 if [ "$#" -ne 2 ]; then
   echo "error: invalid PR check request" >&2
   exit 2
+fi
+if [ "$1" = --from-status ]; then
+  jg_pr_task_id_valid "$2" || { echo "error: invalid PR check request" >&2; exit 2; }
+  [ -f "$STATE/$2.meta" ] || exit 0
+  FROM_LINE=$(awk 'NF { l = $0 } END { print l }' "$STATE/$2.status" 2>/dev/null) || exit 0
+  FROM_KIND=$(jg_dod_meta_value "$STATE/$2.meta" kind)
+  jg_dod_should_gate_ship_done "${FROM_KIND:-ship}" "$(jg_dod_meta_value "$STATE/$2.meta" mode)" "$FROM_LINE" || exit 0
+  FROM_URL=$(jg_dod_pr_url_from_done_note "$(status_line_note "$FROM_LINE")") || exit 0
+  jg_pr_url_parse "$FROM_URL" || exit 0
+  [ "$(jg_dod_meta_value "$STATE/$2.meta" pr)" != "$JG_PR_URL" ] || exit 0
+  set -- "$2" "$FROM_URL"
 fi
 ID=$1
 RAW_URL=$2
@@ -314,6 +332,9 @@ case "$READY_RC" in
   0|1) ;;
   *) printf 'actionable: PR %s is registered but its ready line did not reach the parent channel (rc=%s)\n' "$URL" "$READY_RC" >&2 ;;
 esac
+# A new review-ready PR moves the ticket to review; the merge-time re-record does not.
+[ "${JG_PR_CHECK_MERGE:-}" = 1 ] \
+  || JG_HOME=$JG_HOME JG_STATE_OVERRIDE=$STATE "$SCRIPT_DIR/jg-ticket.sh" "$ID" --stage review --pr "$URL" >/dev/null || true
 # The ready card carries the task's proof media and receipt, or this says what is missing
 # (bin/jg-proof-attach.sh). Homes with no board hook (config/post-merge) skip it.
 if [ "${JG_PR_CHECK_MERGE:-}" != 1 ] && { [ -e "${JG_CONFIG_OVERRIDE:-$JG_HOME/config}/post-merge" ] || [ -n "${JG_PROOF_BOARD:-}" ]; }; then

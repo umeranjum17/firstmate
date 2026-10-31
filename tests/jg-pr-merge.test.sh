@@ -888,6 +888,81 @@ test_github_open_unqueued_outcome_refuses() {
   pass "jg-pr-merge refuses a GitHub merge call that leaves the PR open and unqueued"
 }
 
+# The merge path owns its own cleanup: teardown runs without --force so its
+# gates stay in charge, and a refusal becomes one queued wake. The wrapper is
+# exercised through the same sourced functions the watcher runs, with the child
+# script recorded.
+test_post_merge_cleanup_tears_down_once() {
+  local case_dir fork log
+  case_dir=$(make_case post-merge)
+  fork="$case_dir/fork"
+  log="$case_dir/post-merge.log"
+  mkdir -p "$fork"
+  cp -a "$ROOT/bin" "$fork/"
+  cat > "$fork/bin/jg-teardown.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'teardown %s\n' "$*" >> "$POST_MERGE_LOG"
+if [ "${POST_MERGE_TEARDOWN_RC:-0}" -ne 0 ]; then
+  echo "REFUSED: task $1 still carries an uncleared Relay request link (req-1)." >&2
+  exit 1
+fi
+SH
+  chmod +x "$fork/bin/"*
+  : > "$log"
+  post_merge() {  # <teardown-rc>
+    POST_MERGE_LOG="$log" POST_MERGE_TEARDOWN_RC="$1" \
+      JG_HOME="$case_dir/home" JG_STATE_OVERRIDE="$case_dir/state" \
+      JG_CONFIG_OVERRIDE="$case_dir/home/config" \
+      bash -c '. "$1"; post_merge_cleanup task-x1' _ "$fork/bin/jg-watch.sh"
+    # The cleanup wrapper runs detached; wait for the durable effect this
+    # assertion needs instead of for a fixed window. A refused teardown queues
+    # one wake, and a successful one leaves its teardown record.
+    for _ in $(seq 1 100); do
+      if [ "$1" != 0 ]; then
+        grep -q 'cleanup after the merge of task-x1 was refused' \
+          "$case_dir/state/.wake-queue" 2>/dev/null && break
+      else
+        grep -q 'teardown task-x1' "$log" 2>/dev/null && break
+      fi
+      sleep 0.05
+    done
+  }
+  post_merge 1 || fail "post-merge cleanup must not block the watcher cycle"
+  assert_grep 'teardown task-x1' "$log" \
+    "a confirmed merge must run teardown without --force: $(cat "$log")"
+  [ "$(grep -c 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" 2>/dev/null || true)" = 1 ] \
+    || fail "a refused cleanup must become exactly one wake: $(cat "$case_dir/state/.wake-queue" 2>&1)"
+  grep 'cleanup after the merge of task-x1 was refused' "$case_dir/state/.wake-queue" \
+    | grep -q 'uncleared Relay request link' \
+    || fail "the cleanup wake must carry the refusal's own reason"
+  : > "$log"
+  post_merge 1 || fail "a second cleanup call must not block either"
+  assert_no_grep 'teardown task-x1' "$log" \
+    "a second cleanup call started a second teardown: $(cat "$log")"
+  pass "a confirmed merge runs teardown once and turns a refusal into one wake"
+}
+
+test_pr_check_from_status_records_only_the_ready_report() {
+  local case_dir out
+  case_dir=$(make_case from-status)
+  add_glab_mock "$case_dir"
+  from_status() {
+    PATH="$case_dir/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$case_dir/home" \
+      JG_STATE_OVERRIDE="$case_dir/state" "$ROOT/bin/jg-pr-check.sh" --from-status task-x1 2>&1
+  }
+  printf 'done [at=1]: PR %s\n' "$MR_URL" > "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: a no-mistakes handoff line must be a quiet no-op: $out"
+  [ -z "$out" ] && assert_no_grep 'pr=' "$case_dir/state/task-x1.meta" \
+    "from-status: a line without checks green recorded a PR in no-mistakes mode"
+  printf 'done [at=2]: PR %s checks green\n' "$MR_URL" >> "$case_dir/state/task-x1.status"
+  out=$(from_status) || fail "from-status: the ready report was refused: $out"
+  assert_grep "pr=$MR_URL" "$case_dir/state/task-x1.meta" "from-status: the ready report recorded no PR: $out"
+  assert_present "$case_dir/state/task-x1.check.sh" "from-status: the ready report armed no merge poll"
+  out=$(from_status) || fail "from-status: a recorded PR must be a no-op: $out"
+  [ -z "$out" ] || fail "from-status: an already recorded PR was recorded again: $out"
+  pass "jg-pr-check --from-status records the mode's ready report once and ignores other lines"
+}
+
 # GitHub reports mergeable=UNKNOWN for a short while after a push or a base
 # branch change while it recomputes mergeability. When that is the only
 # failing condition, the gate re-reads and re-checks every live condition on
@@ -2956,10 +3031,116 @@ test_squad_lead_without_parent_binding_is_loud() {
   pass "a squad_lead home that cannot report upward says so instead of merging in silence"
 }
 
+# A sealed local suite receipt is the proof this gate accepts instead of
+# GitHub's check queue, so these cases use real receipt files in the fixture
+# home's state directory, written exactly the way bin/jg-local-suite.sh writes
+# them. Nothing about the run itself is mocked: the file, its seal, and the
+# merge command it drives are all real.
+write_local_suite_receipt() {
+  local case_dir=$1 id=$2 head=$3 rc=$4 file digest
+  file="$case_dir/state/$id.local-suite"
+  {
+    printf 'schema=1\n'
+    printf 'task=%s\n' "$id"
+    printf 'head=%s\n' "$head"
+    printf 'suite=jg-test-run --all + jg-lint\n'
+    printf 'exit=%s\n' "$rc"
+    printf 'started_at=1700000000\n'
+    printf 'ended_at=1700000042\n'
+    printf 'wall_seconds=42\n'
+    printf 'shards=1\n'
+    printf 'log=%s\n' "$case_dir/run.log"
+  } > "$file"
+  if command -v shasum >/dev/null 2>&1; then
+    digest=$(sed '/^seal=/d' "$file" | shasum -a 256 | awk '{print $1}')
+  else
+    digest=$(sed '/^seal=/d' "$file" | sha256sum | awk '{print $1}')
+  fi
+  printf 'seal=sha256:%s\n' "$digest" >> "$file"
+}
+
+test_local_suite_receipt_for_a_different_head_refuses() {
+  local case_dir rc live=9191919191919191919191919191919191919191
+  case_dir=$(make_case local-suite-wrong-head)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" "$live"
+  write_local_suite_receipt "$case_dir" task-x1 \
+    8181818181818181818181818181818181818181 0
+  : > "$case_dir/gh-axi.log"
+  : > "$case_dir/gh.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/70 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "local-suite-wrong-head: a receipt for another head must refuse"
+  assert_grep 'proves head 8181818181818181818181818181818181818181, not the pull request head 9191919191919191919191919191919191919191' \
+    "$case_dir/stderr" "local-suite-wrong-head: the refusal did not name the head mismatch"
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" \
+    "local-suite-wrong-head: the merge ran on a receipt that proved a different head"
+  pass "jg-pr-merge refuses a local suite receipt whose head is not the pull request head"
+}
+
+test_local_suite_receipt_with_a_failed_run_refuses() {
+  local case_dir rc head=9292929292929292929292929292929292929292
+  case_dir=$(make_case local-suite-failed-run)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" "$head"
+  write_local_suite_receipt "$case_dir" task-x1 "$head" 1
+  : > "$case_dir/gh-axi.log"
+  : > "$case_dir/gh.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/71 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "local-suite-failed-run: a receipt with exit 1 must refuse"
+  assert_grep 'exited 1, not 0' "$case_dir/stderr" \
+    "local-suite-failed-run: the refusal did not name the nonzero exit"
+  assert_no_grep 'pr merge ' "$case_dir/gh.log" \
+    "local-suite-failed-run: the merge ran on a receipt recording a failed suite"
+  pass "jg-pr-merge refuses a local suite receipt whose run exited nonzero"
+}
+
+# The point of the slice: the receipt replaces the queue. This fixture's live
+# check rollup is red, so the ordinary gate refuses it; only the matching sealed
+# receipt can merge this head.
+test_local_suite_receipt_for_the_pr_head_merges_over_red_checks() {
+  local case_dir rc head=9393939393939393939393939393939393939393
+  case_dir=$(make_case local-suite-matching-head)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" "$(check_run ci COMPLETED FAILURE)"
+  write_local_suite_receipt "$case_dir" task-x1 "$head" 0
+  : > "$case_dir/gh-axi.log"
+  : > "$case_dir/gh.log"
+
+  set +e
+  JG_POST_MERGE_CI_DEADLINE=0 run_pr_merge "$case_dir" task-x1 \
+    https://github.com/example/repo/pull/72 > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "local-suite-matching-head: a matching sealed receipt must merge"
+  assert_grep 'sealed local suite receipt proves head 9393939393939393939393939393939393939393' \
+    "$case_dir/stderr" "local-suite-matching-head: the proof was not named on the verified line"
+  assert_logged_gh_merge "$case_dir" 72 example/repo --squash
+  assert_grep 'post-merge CI alarm armed for head 9393939393939393939393939393939393939393' \
+    "$case_dir/stdout" "local-suite-matching-head: the post-merge CI alarm was not armed"
+  pass "jg-pr-merge merges a head proven by a matching sealed local suite receipt, over red checks"
+}
+
 test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
 test_github_agreeing_queue_rules_keep_retry_guidance
 test_github_conflicting_queue_rules_report_ambiguity
+test_local_suite_receipt_for_a_different_head_refuses
+test_local_suite_receipt_with_a_failed_run_refuses
+test_local_suite_receipt_for_the_pr_head_merges_over_red_checks
 test_verified_merge_records_pr_and_head
 test_pr_metadata_is_recorded_before_the_forge_call
 test_merge_failure_propagates_after_recording
@@ -4580,3 +4761,5 @@ test_required_partial_reads_report_all_failures
 
 test_allow_red_refused_on_forgejo
 test_allow_missing_refused_on_forgejo
+test_pr_check_from_status_records_only_the_ready_report
+test_post_merge_cleanup_tears_down_once

@@ -2,13 +2,13 @@
 name: juggernaut-addons-owner-rules
 description: >-
   Use before writing a lane brief or merging a lane, and when a brief or merge is refused with an "owner-rules:" line.
-  States the brief-time owner, hierarchy and risk rules and the one-step fix for each refusal.
+  States the brief-time owner and hierarchy rules and the one-step fix for each refusal.
 user-invocable: false
 ---
 
 # Owner rules
 
-Brief-time owner, hierarchy and risk rules are enforced by the fleet, not by prose. A refusal prints one `owner-rules:` line; fix it as below.
+Brief-time owner and hierarchy rules are enforced by the fleet, not by prose. A refusal prints one `owner-rules:` line; fix it as below.
 
 ## Rule 00: every lane names the owner ask it serves
 
@@ -41,13 +41,7 @@ Run `bin/jg-owner-rules-tree.sh <backlog-file>` to inspect parent chains and inv
 
 `--mode no-mistakes` is only for an npm/store release, sign-in/keys/payment/security code, a data migration, a large change (new subsystem or about 400+ changed lines), shared protocol/crypto, or any PR to the Juggernaut fork (umeranjum17/juggernaut), whose required check "PR must be raised via no-mistakes" demands it. Everything else ships direct-PR, and the real user journey is checked (the done-done check) with its evidence on the sign-off Evidence tab.
 
-Refusal at brief time for `--mode no-mistakes`:
-
-```
-owner-rules: mode no-mistakes needs one listed risk reason (release, security, migration, large-change, shared-protocol, fork-repo) in the backlog item for $id; use direct-PR plus a done-done check
-```
-
-Fix: if the lane truly is one of those, add exactly one body line `risk: <reason>` to the item (reason is one of the six listed). Otherwise brief with `--mode direct-PR`.
+The risk reason is a core brief rule, not this add-on's: `bin/jg-brief.sh --mode no-mistakes` needs `--risk <reason>`, and a lane with no such risk briefs `--mode direct-PR` (docs/configuration.md "Delivery risk").
 
 Refusal at merge time (`$what` is the PR URL, or `local merge <head>` with no PR, `$2` the worktree, `$3` the merge head):
 

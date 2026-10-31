@@ -44,6 +44,8 @@ make_split() {  # <name>; prints the case directory
   jg_test_tasks_toml "$dir/code/.tasks.toml"
   empty_backlog "$dir/home/data/backlog.md"
   ln -s "$dir/home/data/backlog.md" "$dir/code/data/backlog.md"
+  # Strict intake has its own case; the others add bare fixture items.
+  : > "$dir/home/config/backlog-intake-loose"
   printf '%s\n' "$dir"
 }
 
@@ -232,7 +234,8 @@ test_wrapper_refuses_add_start() {
 test_wrapper_single_home() {
   local dir
   dir="$TMP_ROOT/single-wrapper"
-  mkdir -p "$dir/data"
+  mkdir -p "$dir/data" "$dir/config"
+  : > "$dir/config/backlog-intake-loose"
   jg_test_tasks_toml "$dir/.tasks.toml"
   empty_backlog "$dir/data/backlog.md"
   (cd "$dir" && JG_ROOT_OVERRIDE="$dir" "$WRAPPER" add solo-1 "single home" >/dev/null) \
@@ -457,6 +460,62 @@ SH
   pass "jg-tasks-axi.sh add honors the installed task-priority check and ignores its absence"
 }
 
+# Strict intake: a new item without a type tag or a justification line is refused
+# before tasks-axi runs; the loose flag turns the check off.
+test_wrapper_refuses_untyped_or_unjustified_items() {
+  local dir out rc
+  dir=$(make_split strict-intake)
+  rm "$dir/home/config/backlog-intake-loose"
+  rc=0
+  out=$(wrapper_from_code "$dir" add in-1 "tidy the helpers" --body "why: cleaner" 2>&1) || rc=$?
+  expect_code 2 "$rc" "add with no type tag"
+  assert_contains "$out" "[feature]" "the type refusal did not name the tags"
+  rc=0
+  out=$(wrapper_from_code "$dir" add in-2 "[feature] export a report" 2>&1) || rc=$?
+  expect_code 2 "$rc" "add with no justification"
+  assert_contains "$out" "justification" "the justification refusal did not say what is missing"
+  rc=0
+  out=$(wrapper_from_code "$dir" add --mint "export a report" --body "users ask for it" 2>&1) || rc=$?
+  expect_code 2 "$rc" "minted add with no type tag"
+  ! grep -q "in-1\|in-2\|export a report" "$dir/home/data/backlog.md" || fail "a refused add still reached the backlog"
+  printf '\nusers lose work without it\n' > "$dir/why.md"
+  rc=0
+  wrapper_from_code "$dir" add in-3 "[security] lock the token file" --body-file "$dir/why.md" >/dev/null 2>&1 || rc=$?
+  expect_code 2 "$rc" "add whose body starts with a blank line"
+  wrapper_from_code "$dir" add in-4 "[feature] export a report" --kind ship --priority 1 --body "users ask for it weekly" >/dev/null \
+    || fail "a typed and justified add was refused"
+  wrapper_from_code "$dir" add "[captain-ask] pick a name" --mint --body "[captain-ask] pick a name" >/dev/null \
+    || fail "a minted captain ask in his words was refused"
+  assert_grep "in-4" "$dir/home/data/backlog.md" "a typed and justified add did not reach the backlog"
+  assert_grep "pick a name" "$dir/home/data/backlog.md" "a minted captain ask did not reach the backlog"
+  : > "$dir/home/config/backlog-intake-loose"
+  wrapper_from_code "$dir" add in-5 "bare item" >/dev/null || fail "config/backlog-intake-loose did not turn the check off"
+  pass "jg-tasks-axi.sh add refuses an item without a type tag or a justification, unless the home opts out"
+}
+
+# Owner asks come first: a [captain-ask] item is filed at priority 0 and nothing lowers it.
+test_wrapper_keeps_captain_asks_at_top_priority() {
+  local dir out rc
+  dir=$(make_split ask-first)
+  wrapper_from_code "$dir" add ask-1 "[captain-ask] rename the board" >/dev/null || fail "a captain ask was refused"
+  grep -q "ask-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "a captain ask with no priority was not filed at 0"
+  rc=0
+  out=$(wrapper_from_code "$dir" add ask-2 "[captain-ask] later please" --priority 2 2>&1) || rc=$?
+  expect_code 2 "$rc" "captain ask filed below priority 0"
+  assert_contains "$out" "top priority" "the refusal did not say why"
+  assert_no_grep "ask-2" "$dir/home/data/backlog.md" "a refused captain ask still reached the backlog"
+  rc=0
+  wrapper_from_code "$dir" update ask-1 --priority 3 >/dev/null 2>&1 || rc=$?
+  expect_code 2 "$rc" "lowering a captain ask"
+  grep -q "ask-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "a refused update still lowered the captain ask"
+  wrapper_from_code "$dir" add side-1 "side work" --priority 3 >/dev/null || fail "ordinary add failed"
+  wrapper_from_code "$dir" update side-1 --priority 2 >/dev/null || fail "an ordinary item could not be reprioritized"
+  wrapper_from_code "$dir" update side-1 --title "[captain-ask] side work he asked for" >/dev/null \
+    || fail "retitling an item into a captain ask failed"
+  grep -q "side-1 - .*(priority: 0)" "$dir/home/data/backlog.md" || fail "an item retitled into a captain ask kept its lower priority"
+  pass "jg-tasks-axi.sh files a captain ask at priority 0 and refuses to lower it"
+}
+
 test_guard_reports_regular_code_root_backlog
 test_guard_reports_foreign_link_and_archive
 test_guard_silent_for_single_home
@@ -466,6 +525,8 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_overrides_ambient_file
   test_wrapper_refusals
   test_wrapper_refuses_add_start
+  test_wrapper_refuses_untyped_or_unjustified_items
+  test_wrapper_keeps_captain_asks_at_top_priority
   test_wrapper_single_home
   test_wrapper_captain_ask_guard
   test_captain_ask_guard_gaps

@@ -14,13 +14,16 @@
 # charters still use a single `{TASK}` charter fill. Juggernaut may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab]
+# Usage: jg-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--branch-prefix <prefix>] [--base-branch <branch>] [--forge <none|gerrit|forgejo> [--shape squash]] [--design-call <yes|no> --design-reason <text>] [--demo-call <yes|no> --demo-reason <text>] [--herdr-lab] [--medium <mobile|web|desktop|cli|backend>]
 #        jg-brief.sh <task-id> <repo-name> --scout [--base-branch <branch>] [--herdr-lab]
 #        jg-brief.sh <task-id> --squad-lead {<project>...|--no-projects}
+#   --medium names the project's medium at intake, so the brief can carry this
+#   home's stack advice from config/preferred-stack.json. It is a recommendation,
+#   never a gate, and is optional.
 #   --scout writes the scout contract instead: the deliverable is a report at
 #   data/<task-id>/report.md (no branch, no push, no PR) and the worktree is scratch.
-#   It offers the Lavish review loop only when `jg-bootstrap.sh lavish-compatible`
-#   confirms the legacy board-compatibility floor; otherwise it asks for a text report.
+#   A visual deliverable goes on a sign-off board report, never a retired review
+#   surface, and the report carries the sign-off report link only.
 #   --squad-lead writes a persistent squad_lead charter. The project list
 #   is cloned into the squad_lead home, while the natural-language scope
 #   tells the main juggernaut when to route work there; routine churn stays in its own home;
@@ -55,6 +58,12 @@
 # pair is accepted and the brief carries no demo line. bin/jg-spawn.sh records demo_call=,
 # and bin/jg-merge-gate-lib.sh's jg_dod_demo_gate refuses to merge a yes-task whose
 # completion receipt evidence carries no `takeone receipt: <ref>` line.
+# --risk <reason> states why this task needs the no-mistakes pipeline, as one of
+# release, security, migration, large-change, shared-protocol or fork-repo. It is
+# required on a no-mistakes ship brief and refused elsewhere: no-mistakes is for
+# real risk, and a task with no such risk ships as direct-PR with a done-done
+# check. The local presence flag config/delivery-risk-loose turns the check off
+# (docs/configuration.md "Delivery risk").
 # --ui-change <yes|no> records on a ship brief whether the task changes the UI, as
 # `UI change (nav-check): <yes|no>`. A yes brief carries the no-silent-removal rule:
 # the PR body lists `Nav before:` and `Nav after:` and any removed screen is named.
@@ -214,6 +223,8 @@ esac
 . "$SCRIPT_DIR/jg-dod-lib.sh"
 # shellcheck source=bin/jg-role-lib.sh
 . "$SCRIPT_DIR/jg-role-lib.sh"
+# shellcheck source=bin/jg-preferred-stack-lib.sh
+. "$SCRIPT_DIR/jg-preferred-stack-lib.sh"
 PAUSED_VERB=${JG_CLASSIFY_PAUSED_VERB:-$JG_CLASSIFY_PAUSED_VERB_DEFAULT}
 IFS= read -r -d '' OPERATOR_PAUSE_INSTRUCTIONS <<EOF || true
    Use \`$PAUSED_VERB: {why}\` - never \`blocked:\` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
@@ -272,8 +283,11 @@ DESIGN_REASON=
 DEMO_CALL=
 DEMO_REASON=
 UI_CHANGE=
+RISK=
+RISK_SET=0
 PROJECT_DIR=
 PROJECT_DIR_SET=0
+MEDIUM=
 POS=()
 want_value=
 for a in "$@"; do
@@ -289,11 +303,13 @@ for a in "$@"; do
       shape) SHAPE=$a; SHAPE_SET=1 ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
       project) PROJECT_DIR=$a; PROJECT_DIR_SET=1 ;;
+      medium) MEDIUM=$a ;;
       design-call) DESIGN_CALL=$a ;;
       design-reason) DESIGN_REASON=$a ;;
       demo-call) DEMO_CALL=$a ;;
       demo-reason) DEMO_REASON=$a ;;
       ui-change) UI_CHANGE=$a ;;
+      risk) RISK=$a; RISK_SET=1 ;;
       *) echo "error: internal parser state for --$want_value" >&2; exit 1 ;;
     esac
     want_value=
@@ -318,6 +334,8 @@ for a in "$@"; do
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
     --project) want_value="project" ;;
     --project=*) PROJECT_DIR=${a#--project=}; PROJECT_DIR_SET=1 ;;
+    --medium) want_value=medium ;;
+    --medium=*) MEDIUM=${a#--medium=} ;;
     --design-call) want_value="design-call" ;;
     --design-call=*) DESIGN_CALL=${a#--design-call=} ;;
     --design-reason) want_value="design-reason" ;;
@@ -328,6 +346,8 @@ for a in "$@"; do
     --demo-reason=*) DEMO_REASON=${a#--demo-reason=} ;;
     --ui-change) want_value="ui-change" ;;
     --ui-change=*) UI_CHANGE=${a#--ui-change=} ;;
+    --risk) want_value=risk ;;
+    --risk=*) RISK=${a#--risk=}; RISK_SET=1 ;;
     # yolo never reaches the worker: it is juggernaut's merge authority, not a
     # brief input. Refuse it loudly so it is never silently dropped here and then
     # believed to have been recorded.
@@ -353,6 +373,25 @@ if [ "$KIND" = ship ]; then
   esac
 elif [ "$MODE_SET" -eq 1 ]; then
   echo "error: --mode applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
+  exit 1
+fi
+
+# No-mistakes is for real risk, so a no-mistakes ship brief states that risk with
+# --risk; a task that names none takes the direct-PR route with a done-done check
+# instead. The local presence flag config/delivery-risk-loose turns the check off.
+if [ "$KIND" = ship ]; then
+  if [ "$RISK_SET" -eq 1 ]; then
+    case "$RISK" in
+      release|security|migration|large-change|shared-protocol|fork-repo) ;;
+      *) echo "error: --risk must be one of release, security, migration, large-change, shared-protocol, fork-repo (got '$RISK')" >&2; exit 1 ;;
+    esac
+  fi
+  if [ "$MODE" = no-mistakes ] && [ "$RISK_SET" -eq 0 ] && [ ! -e "$CONFIG/delivery-risk-loose" ]; then
+    echo "error: a no-mistakes ship brief states its risk with --risk <release|security|migration|large-change|shared-protocol|fork-repo>; a task with no such risk ships as --mode direct-PR with a done-done check" >&2
+    exit 1
+  fi
+elif [ "$RISK_SET" -eq 1 ]; then
+  echo "error: --risk applies only to ship briefs; a scout delivers a report and a squad_lead charter is not a delivery contract" >&2
   exit 1
 fi
 
@@ -536,11 +575,13 @@ shell_quote() {
 }
 
 STATUS_FILE=$(shell_quote "$STATE/$ID.status")
-# The worker's status command: the plain append always carries the line, then
-# the opt-in fleet ledger (docs/fleet-ledger.md) records it at once, costing one
-# file test when the flag is absent. A host without that flag, such as a remote
-# squad lead's, runs only the append; the watcher capture is the backstop.
-STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" >> $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$JG_ROOT/bin/jg-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
+# The worker's status command: the line is piped through bin/jg-lavish-guard.sh,
+# which refuses a retired Lavish address or publication command and names the
+# sign-off board instead, then appends the accepted line. The opt-in fleet
+# ledger (docs/fleet-ledger.md) records it at once, costing one file test when
+# the flag is absent. A host without that flag, such as a remote squad lead's,
+# runs only the append; the watcher capture is the backstop.
+STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" | $(shell_quote "$JG_ROOT/bin/jg-lavish-guard.sh") --append $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$JG_ROOT/bin/jg-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
 INBOX_DIR=$(shell_quote "$STATE/$ID.inbox")
 
 # The receive-and-ack half of the steering-inbox contract, included in every
@@ -771,11 +812,7 @@ else
 fi
 
 if [ "$KIND" = scout ]; then
-if "$SCRIPT_DIR/jg-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
-  LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/jg-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/jg-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
-else
-  LAVISH_LINE='Lavish is unavailable (lavish-axi is missing or below its supported version floor), so deliver your findings as a text report without Lavish, even for a visual deliverable.'
-fi
+SIGNOFF_LINE='A visual deliverable goes on a sign-off board report, never a retired review surface: publish or update it with sign-off-axi and return the sign-off report link only, in the report and in your done line.'
 cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
@@ -817,7 +854,7 @@ $WAIT_BLOCK$INBOX_SECTION
 # Definition of done
 Write your findings to \`$DATA/$ID/report.md\`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
-$LAVISH_LINE
+$SIGNOFF_LINE
 Before reporting done, read and follow \`$JG_ROOT/.agents/skills/captain-hold-lifecycle/SKILL.md\` and pass its shared completion gate for the report and any visual review.
 When the report is complete, append \`done [at=<epoch>]: {one-line conclusion}\` to the status file and stop.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report; juggernaut may promote this task in place, and you would then receive mode-specific ship instructions as a follow-up message.
@@ -852,9 +889,14 @@ if [ -n "$DESIGN_CALL" ]; then
 Design call (first-draft): $DESIGN_CALL - $DESIGN_REASON"
   if [ "$DESIGN_CALL" = yes ]; then
     DESIGN_SECTION="$DESIGN_SECTION
-Produce every design for this task with first-draft (\`first-draft-axi\`); do not hand-draw a separate design path.
-Put one line \`first-draft receipt: <reference>\` in the evidence file of your completion receipt.
-The merge is refused without that line."
+Make every design option for this task with first-draft (\`first-draft-axi make\` or \`refine\`); never hand-write option HTML.
+Save the JSON run record that \`make\` or \`refine\` prints, and put one line \`first-draft receipt: <the run record file>\` in the evidence file of your completion receipt; the gate resolves that reference and reads the record. Name several records comma-separated when more than one run made the options.
+A \`first-draft-axi judge\` run is not a receipt: it scores a page and makes none, so a judge-only record, a reference that does not resolve, and an option the record does not list are all refused.
+Done is refused while any option you present has no make or refine record (\`bin/jg-merge-gate-lib.sh\`'s jg_design_done_gate), and so is a board post: post design options only after \`bin/jg-design-gate.sh board <run record> <options folder or file>\` passes."
+  else
+    DESIGN_SECTION="$DESIGN_SECTION
+A hand-rolled change stays a small tweak only while its UI files change at most 40 lines and it adds no new UI file; past that, or once it presents design options, every option must be made or refined by first-draft and named by a \`first-draft receipt: <run record file>\` line, exactly as on a yes task (\`bin/jg-design-gate.sh\`).
+A small tweak that touches UI files merges only after your lead or Main approves the hand-roll; you never approve it yourself."
   fi
   DESIGN_SECTION="$DESIGN_SECTION
 "
@@ -889,15 +931,31 @@ The merge is refused without the two lines, or with a dropped item and no quote.
   UI_SECTION="$UI_SECTION
 "
 fi
+# The home's stack and layout advice (config/preferred-stack.json and
+# config/architecture.json) is a recommendation the brief carries and the worker
+# may override; a project that already has its own stack or layout wins. The
+# medium comes from intake because a manifest cannot reveal it reliably; the
+# language is read from an existing project's manifest.
+STACK_SECTION=$(jg_stack_section "$CONFIG" "$MEDIUM" "$PROJECT_DIR")
+STACK_BLOCK=
+[ -z "$STACK_SECTION" ] || STACK_BLOCK="$STACK_SECTION"$'\n'
+
 RULE1=$(jg_ship_rule_one "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH") || exit 1
+RISK_SECTION=
+if [ -n "$RISK" ]; then
+  RISK_SECTION="
+# Delivery risk
+Delivery risk (no-mistakes): $RISK"
+fi
 DOD=$(jg_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT") || exit 1
 
 cat > "$BRIEF" <<EOF
 You are a operator: an autonomous worker agent managed by juggernaut. Work on your own; do not wait for a human.
 
 $TASK_SECTION
-$DESIGN_SECTION$DEMO_SECTION$UI_SECTION
+$DESIGN_SECTION$DEMO_SECTION$UI_SECTION$RISK_SECTION
 $HERDR_SECTION
+$STACK_BLOCK
 
 # Setup
 $SETUP_BASE

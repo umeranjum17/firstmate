@@ -21,7 +21,8 @@
 #
 # Usage:
 #   jg-captain-hold.sh hold <task-id> --reason <reason> \
-#     [--title <title>] [--repo <repo>] [--priority 0-3] [--origin <origin-id>] [--until YYYY-MM-DD]
+#     [--title <title>] [--repo <repo>] [--priority 0-3] [--origin <origin-id>] [--until YYYY-MM-DD] \
+#     [--must <category>]
 #   jg-captain-hold.sh answer <task-id> --decision-file <path> [--release]
 #   jg-captain-hold.sh answers [<legacy-origin> | --any-origin] --source <provenance>   (keyed answers on stdin)
 #   jg-captain-hold.sh reconcile-requests --source-id <source-id> --source <provenance>   (task ids on stdin)
@@ -41,7 +42,10 @@
 # task first when no work item exists to hold (--title required to create; the
 # optional --origin records provenance in the new task's body and supplies the
 # default repo from that origin's metadata). Prefer holding the work item the
-# question gates over minting a new row. Creating a missing row uses
+# question gates over minting a new row. `--must <category>` is the board gate
+# (bin/jg-ask-gate-lib.sh): on the when-it-matters leash an armed sign-off card
+# needs a must category, and a hold with none is refused and recorded for
+# Overwatch (bin/jg-board-gate.sh route) instead of held. Creating a missing row uses
 # `tasks-axi add --kind captain`: that kind is backlog metadata, and the Beads
 # adapter maps it to native issue type `task`. Captain holds have no due
 # semantics (`--until` is the optional hold deferral), so the create waives
@@ -65,6 +69,11 @@
 # stamp; that adapter owns the card (the juggernaut-addons signoff script when
 # it is installed, else bin/jg-procevent-signoff.sh),
 # and a card it cannot raise fails the command (the hold stays recorded).
+# A hold that is the captain's own instruction raises nothing at all: one whose
+# hold kind is `parked`, or whose reason names a stop order or a branch we
+# preserved instead of landing. Those records are his words, not a question back
+# to him, so the hold is the whole result and no card and no Overwatch record are
+# created for it (bin/jg-ask-gate-lib.sh owns the words).
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -280,6 +289,9 @@ DATA="${JG_DATA_OVERRIDE:-$JG_HOME/data}"
 # shellcheck source=bin/jg-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/jg-parent-channel-lib.sh"
+# shellcheck source=bin/jg-ask-gate-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -956,7 +968,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} priority='' priority_check title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local signoff_script addon_signoff existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release
+  local signoff_script addon_signoff existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release must='' refusal rec own_instruction=''
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -967,12 +979,17 @@ command_hold() {
       --priority) shift; priority=${1:-} ;;
       --origin) shift; origin=${1:-} ;;
       --until) shift; until=${1:-} ;;
+      --must) shift; must=${1:-} ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
   done
   validate_slug task-id "$id"
-  [ -n "$reason" ] || fail "reason must not be empty"
+  # A hold carries a reason, in words a reader can act on: the board renders it
+  # beside the ticket, so a blank one is refused before anything is recorded.
+  if [ -z "${reason//[[:space:]]/}" ]; then
+    fail 'hold needs --reason "<what the captain has to decide>"; nothing was recorded'
+  fi
   # bin/jg-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(jg_hold_reason_encode "$reason") || fail "could not encode the hold reason"
   if [ -n "$origin" ]; then
@@ -985,6 +1002,31 @@ command_hold() {
     esac
   fi
   hold_set=${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+  # A hold that is our own parked work, his own stop order, or a branch we
+  # preserved instead of landing is his instruction, so it records the hold and
+  # raises nothing: no card reaches him and no ask goes to Overwatch either
+  # (bin/jg-ask-gate-lib.sh owns the words that say so).
+  own_instruction=''
+  if jg_ask_own_instruction "$reason"; then
+    own_instruction=1
+  elif jg_backlog_row_probe "$DATA" "$id" && [ "$JG_BACKLOG_ROW_HOLD_KIND" = parked ]; then
+    own_instruction=1
+  fi
+  # The board gate before anything is recorded: an ask that is not a must never
+  # becomes a captain hold card while the leash is when-it-matters; it becomes an
+  # Overwatch record Main answers (bin/jg-ask-gate-lib.sh owns the list and words).
+  # The add-ons signoff script authors its own owner-must class, so only the
+  # legacy raise path here needs --must.
+  signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
+  addon_signoff=$(jg_addon_path "$JG_HOME" signoff/bin/jg-procevent-signoff.sh)
+  [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
+  if [ -z "$own_instruction" ] && [ "$signoff_script" = "$SCRIPT_DIR/jg-procevent-signoff.sh" ] && [ -z "$until" ] \
+    && [ -f "$STATE/procevent/signoff.source" ] && ! refusal=$(jg_ask_gate_refusal "$must"); then
+    rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "${title:-$reason}" --filer captain-hold --ref "$id" 2>&1) || rec=''
+    printf '%s\n' "$refusal" >&2
+    [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
+    exit 1
+  fi
   case "$hold_set" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) : ;;
     *) fail "JG_CAPTAIN_HOLD_NOW must be a UTC YYYY-MM-DDTHH:MM:SSZ timestamp" ;;
@@ -1077,11 +1119,10 @@ command_hold() {
   # (the hold stays recorded).
   if [ -z "$until" ]; then
     release_task_control_lock
+  fi
+  if [ -z "$until" ] && [ -z "$own_instruction" ]; then
     if [ -f "$STATE/procevent/signoff.source" ]; then
-      signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
-      addon_signoff=$(jg_addon_path "$JG_HOME" signoff/bin/jg-procevent-signoff.sh)
-      [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
-      JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" \
+      JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" ${must:+--must "$must"} \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }
     fi
   fi

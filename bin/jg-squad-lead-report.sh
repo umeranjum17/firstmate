@@ -26,6 +26,10 @@
 # addons/ first, then the pre-fold clone at <home>/projects/juggernaut-addons)
 # receives <verb> <note> before the append and owns the wait rules. Its output is shown and a nonzero
 # exit refuses the report with exit 2; an absent add-on is a no-op.
+# bin/jg-live-claim.sh then owns the fixed-means-live rule: a note that reports a
+# user-visible fix as done is written as `merged-not-released: ...` unless it
+# carries the released ref and where it is observable, or states the truth itself,
+# and the reporter sees that note on stderr.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 _jg_d=${BASH_SOURCE[0]%/*}
 [ "$_jg_d" != "${BASH_SOURCE[0]}" ] || _jg_d=.
@@ -70,6 +74,34 @@ jg_squad_lead_report_status_blocked_wait() {  # <verb> <text>
   out=$("$hook" "$1" "$2" 2>&1) || rc=$?
   [ -z "$out" ] || printf '%s\n' "$out" >&2
   [ "$rc" -eq 0 ] || exit 2
+}
+
+# Lavish is retired. The core guard refuses a Lavish address or publication
+# command in a captain-facing note before anything reaches the parent channel,
+# and names the sign-off board that replaced it (bin/jg-lavish-guard.sh).
+jg_squad_lead_report_lavish_guard() {  # <text>
+  local guard=$SCRIPT_DIR/jg-lavish-guard.sh
+  [ -x "$guard" ] || return 0
+  printf '%s\n' "$1" | "$guard" || exit 2
+}
+
+# The fixed-means-live rule (bin/jg-live-claim.sh owns it) downgrades a claim
+# that a user-visible change is fixed when it carries no live evidence, so the
+# parent reads the plain position instead of a fix nobody can use yet.
+jg_squad_lead_report_live_claim() {  # <verb> <text> -> the note to write
+  local check=$SCRIPT_DIR/jg-live-claim.sh text=$2 out rc=0
+  if [ ! -x "$check" ]; then
+    printf '%s\n' "$text"
+    return 0
+  fi
+  out=$("$check" "$1" "$text") || rc=$?
+  case "$rc" in
+    0|3)
+      if [ -n "$out" ]; then printf '%s\n' "$out"; else printf '%s\n' "$text"; fi
+      ;;
+    *) printf '%s\n' "$text" ;;
+  esac
+  return 0
 }
 
 usage() {
@@ -136,7 +168,9 @@ if [ "$DOC_MODE" = 1 ]; then
   shift
   NOTE=$*
   jg_question_flag_reply "$NOTE"
+  jg_squad_lead_report_lavish_guard "$NOTE"
   jg_squad_lead_report_status_blocked_wait "$VERB" "$NOTE"
+  NOTE=$(jg_squad_lead_report_live_claim "$VERB" "$NOTE")
   if [ -n "$NOTE" ]; then
     printf -v line '%s [%s]: %s (%s via-helper)' "$VERB" "$token" "$NOTE" "$DOC_PATH"
   else
@@ -145,7 +179,9 @@ if [ "$DOC_MODE" = 1 ]; then
 else
   NOTE=$*
   jg_question_flag_reply "$NOTE"
+  jg_squad_lead_report_lavish_guard "$NOTE"
   jg_squad_lead_report_status_blocked_wait "$VERB" "$NOTE"
+  NOTE=$(jg_squad_lead_report_live_claim "$VERB" "$NOTE")
   printf -v line '%s [%s]: %s (via-helper)' "$VERB" "$token" "$NOTE"
 fi
 printf '%s\n' "$(status_stamp_line "$line")" >> "$DESTINATION"

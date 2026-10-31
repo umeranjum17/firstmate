@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# bin/jg-design-gate.sh end to end: the small-tweak size rule on a real git repo, and
+# the hand-roll approval for a small UI change (lead or Main, never the asking worker)
+# that the merge gate reads.
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+root=$(jg_test_tmproot design-gate) || fail "no fixture root"
+main=$root/main lead=$root/lead repo=$root/repo
+mkdir -p "$main/state" "$lead/state" "$repo"
+printf 'schema=jg-squad-lead-parent.v1\nroute=local\nparent_home=%s\n' "$main" > "$lead/.jg-squad-lead-parent"
+: > "$lead/.jg-squad-lead-home"
+unset JG_TASK_ID
+gate() { JG_HOME=$1 "$ROOT/bin/jg-design-gate.sh" "${@:2}" 2>&1; }
+
+# Size rule on a real repo: 40 UI lines is a tweak, 41 or a new UI file is design.
+git -C "$repo" init -q -b main && git -C "$repo" config user.email t@t && git -C "$repo" config user.name t
+seq 1 100 > "$repo/app.css" && seq 1 500 > "$repo/notes.md"
+git -C "$repo" add -A && git -C "$repo" commit -qm base
+sizeof() {  # <branch> <edit command>: commit the edit on a branch and print the verdict
+  git -C "$repo" checkout -q -b "$1" main && (cd "$repo" && eval "$2") && git -C "$repo" add -A && git -C "$repo" commit -qm "$1"
+  gate "$main" size "$repo" main "$(git -C "$repo" rev-parse HEAD)"
+}
+assert_equals "tweak 40 0" "$(sizeof t40 'sed -i "1,20s/\$/x/" app.css')" "40 changed UI lines is a tweak"
+assert_equals "design 42 0" "$(sizeof t42 'sed -i "1,21s/\$/x/" app.css')" "42 changed UI lines is design"
+assert_equals "design 1 1" "$(sizeof tnew 'echo "<p>" > new.html')" "a new UI file is design"
+assert_equals "tweak 0 0" "$(sizeof tdoc 'seq 1 400 > notes.md')" "non-UI lines never count"
+pass "size rule: 40 UI lines and no new UI file is the tweak bar"
+
+# A merge past the size rule needs the first-draft receipt even when briefed design_call=no.
+head=$(git -C "$repo" rev-parse t42)
+jg_dod_meta_value() { sed -n "s/^$2=//p" "$1" | tail -1; }
+# shellcheck source=bin/jg-merge-gate-lib.sh
+. "$ROOT/bin/jg-merge-gate-lib.sh"
+printf 'worktree=%s\nbase_branch=main\ndesign_call=no\n' "$repo" > "$lead/state/w1.meta"
+out=$(JG_HOME=$lead jg_dod_design_gate "$lead/state" w1 "$lead/state/w1.meta" "$head" 2>&1) && fail "oversize hand-rolled work merged: $out"
+assert_contains "$out" "past the small-tweak size" "oversize merge refusal"
+# The receipt is resolved: a make run record that lists the generated page, never a
+# bare reference the gate cannot read.
+jq -n --arg f "$repo/designs/option-1.html" '{made:{command:"make",files:[{file:$f}]}}' > "$lead/state/w1-fd.json"
+jq -n --arg h "$head" --arg e "first-draft receipt: $lead/state/w1-fd.json" \
+  '{schema:1,task:"w1",head:$h,verdict:"PASS",evidence:$e,at:1}' > "$lead/state/w1.run-receipt.json"
+JG_HOME=$lead jg_dod_design_gate "$lead/state" w1 "$lead/state/w1.meta" "$head" >/dev/null 2>&1 || fail "oversize work with a first-draft receipt was refused"
+pass "a change past the size rule needs first-draft whatever its design call"
+
+# Hand-roll: a small UI change merges only with the lead's or Main's approval, never
+# the asker's, and a hand-roll approval never covers a change past the size rule.
+git -C "$repo" checkout -q t40
+small=$(git -C "$repo" rev-parse t40)
+printf 'worktree=%s\nbase_branch=main\ndesign_call=no\n' "$repo" > "$lead/state/h1.meta"
+mg() { JG_HOME=$lead jg_dod_design_gate "$lead/state" "$1" "$lead/state/$1.meta" "$2" 2>&1; }
+out=$(mg h1 "$small") && fail "an unapproved hand-roll merged"
+assert_contains "$out" "no hand-roll approval" "hand-roll merge refusal"
+out=$(JG_TASK_ID=h1 gate "$lead" handroll h1) && fail "the asking worker approved its own hand-roll"
+assert_contains "$out" "never approves" "asker hand-roll refusal"
+[ ! -e "$lead/state/design-approvals/h1.handroll.json" ] || fail "a refused hand-roll wrote an approval"
+out=$(gate "$lead" handroll h1) || fail "the lead could not approve a small hand-roll: $out"
+mg h1 "$small" >/dev/null || fail "an approved small hand-roll was refused"
+pass "a small hand-roll merges with the lead's approval, never the asker's"
+
+git -C "$repo" checkout -q t42
+printf 'worktree=%s\nbase_branch=main\ndesign_call=no\n' "$repo" > "$lead/state/h2.meta"
+out=$(gate "$main" handroll h2 --task-home "$lead") && fail "Main approved a hand-roll past the size rule"
+assert_contains "$out" "past the small-tweak size" "oversize hand-roll refusal"
+git -C "$repo" checkout -q t40
+gate "$main" handroll h2 --task-home "$lead" >/dev/null || fail "Main could not approve a lead's small hand-roll"
+out=$(mg h2 "$head") && fail "a hand-roll approval covered a change past the size rule"
+assert_contains "$out" "past the small-tweak size" "oversize merge needs first-draft"
+mg h2 "$(git -C "$repo" rev-parse tdoc)" >/dev/null || fail "a change with no UI lines needed an approval"
+pass "a hand-roll approval never covers a change past the size rule"

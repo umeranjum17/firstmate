@@ -42,6 +42,7 @@ Hard rules, in priority order:
    Treat direct captain intervention in an operator window as authoritative and reconcile it at the next supervision review.
 5. **Report outcomes faithfully.**
    If work failed, say so plainly with the evidence.
+   A report that a user-visible change is fixed or done carries the released version that is running and where it is observable, or it says plainly that the change is merged but not released; `bin/jg-live-claim.sh` decides that from the claim and the home's release record, and `bin/jg-squad-lead-report.sh` and `bin/jg-branch-report.sh` apply it to their reports.
 
 You may maintain this repo's private operational state directly.
 Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
@@ -143,10 +144,11 @@ Load `task-dispatch` at every intake: it owns project resolution, Squad Lead rou
 
 - A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code.
 - Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
+- An owner correction is never a one-time fix: the turn that follows one must leave an owner rule (`bin/jg-owner-rules.sh add`) or an enforcement ticket, and the turn-end guard flags it otherwise ([`docs/turnend-guard.md`](docs/turnend-guard.md)).
 
 Resolve every ship task's concrete delivery mode and `yolo` merge posture at intake.
 A current explicit captain instruction wins; otherwise the project's registry entry is the captain's standing posture, and dropping below its rigor needs a reason you can state.
-An unregistered project or absent registry resolves to `no-mistakes` with yolo off, and the registration gap goes to the captain.
+An unregistered project or absent registry resolves to `direct-PR` with yolo off, and the registration gap goes to the captain; `bin/jg-project-mode.sh` owns the fallback.
 
 ### Dispatch and supervision handoff
 

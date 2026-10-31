@@ -305,12 +305,13 @@ cpu_count() {
 # lands in `unclassified` and stays serial until someone proves it.
 family_for_basename() {
   case "$1" in
-    jg-bearings-board.test.sh|jg-brief.test.sh|jg-crew-state.test.sh|\
+    jg-brief.test.sh|jg-crew-state.test.sh|\
     jg-captain-hold-lifecycle.test.sh)
       printf '%s\n' pure-contract-unit
       ;;
     jg-turnend-guard.test.sh|jg-wake-daemon-lifecycle-e2e.test.sh|\
-    jg-mail.test.sh|jg-watcher-lock.test.sh)
+    jg-mail.test.sh|jg-watcher-lock.test.sh|jg-watch-handoff.test.sh|\
+    jg-pi-wake-replay.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     jg-afk-inject-herdr-e2e.test.sh|jg-backend-herdr-presentation-e2e.test.sh|\
@@ -328,7 +329,7 @@ family_for_basename() {
     jg-session-start.test.sh|jg-tangle-guard.test.sh|jg-update.test.sh)
       printf '%s\n' session-bootstrap
       ;;
-    jg-bearings-board-lavish-live-e2e.test.sh|jg-claude-stop-autoarm-live-e2e.test.sh|\
+    jg-claude-stop-autoarm-live-e2e.test.sh|\
     jg-composer-matrix-live-e2e.test.sh|jg-codex-continuity-live-e2e.test.sh|\
     jg-codex-hook-layer-live-e2e.test.sh|jg-grok-continuity-live-e2e.test.sh|\
     jg-cursor-primary-live-e2e.test.sh|jg-harness-adapter-instructions-live-e2e.test.sh|\
@@ -553,26 +554,35 @@ tests/jg-agents-md-floor.test.sh 423
 tests/jg-agy-signals-live-e2e.test.sh 61
 tests/jg-backend-tmux-smoke.test.sh 320
 tests/jg-backlog-handoff.test.sh 74166
-tests/jg-bearings-board-lavish-live-e2e.test.sh 61
-tests/jg-bearings-board.test.sh 50015
+tests/jg-board-answers.test.sh 2206
+tests/jg-board-gate.test.sh 437
 tests/jg-bootstrap.test.sh 83933
+tests/jg-browser-reaper.test.sh 8000
 tests/jg-calm-home-links.test.sh 381
+tests/jg-chat-answer-card.test.sh 1030
 tests/jg-claude-stop-autoarm-live-e2e.test.sh 58
 tests/jg-codex-continuity-live-e2e.test.sh 57
 tests/jg-codex-hook-layer-live-e2e.test.sh 68
+tests/jg-comms-feed.test.sh 518
 tests/jg-compat-old-records.test.sh 2167
 tests/jg-composer-matrix-live-e2e.test.sh 59
 tests/jg-control.test.sh 91759
 tests/jg-cursor-primary-live-e2e.test.sh 57
+tests/jg-decisions-reconcile.test.sh 3240
+tests/jg-design-gate-first-draft.test.sh 680
+tests/jg-design-gate.test.sh 467
 tests/jg-devin-signals-live-e2e.test.sh 65
 tests/jg-escalation-chain.test.sh 120130
+tests/jg-fleet-heartbeat.test.sh 1186
 tests/jg-fleet-sync.test.sh 42151
 tests/jg-flow.test.sh 919
 tests/jg-gate-refuse.test.sh 14876
 tests/jg-grok-continuity-live-e2e.test.sh 53
 tests/jg-harness-adapter-instructions-live-e2e.test.sh 57
 tests/jg-herdr-lead-label.test.sh 99
+tests/jg-herdr-names.test.sh 1061
 tests/jg-herdr-version-floor-live-e2e.test.sh 61
+tests/jg-hold-reason-gate.test.sh 1608
 tests/jg-hometag-lead-label.test.sh 393
 tests/jg-inbox.test.sh 8757
 tests/jg-launch-prompt-signals-live-e2e.test.sh 56
@@ -582,39 +592,50 @@ tests/jg-muse-signals-live-e2e.test.sh 61
 tests/jg-omp-primary-live-e2e.test.sh 58
 tests/jg-on.test.sh 18857
 tests/jg-opencode-primary-live-e2e.test.sh 56
+tests/jg-overwatch-kpi.test.sh 1388
+tests/jg-owner-correction.test.sh 1388
 tests/jg-owner-rules.test.sh 3036
 tests/jg-pi-branch-live-e2e.test.sh 56
 tests/jg-pi-primary-live-e2e.test.sh 58
 tests/jg-pi-seeded-home-trust-live-e2e.test.sh 85
+tests/jg-pi-wake-replay.test.sh 1500
 tests/jg-pr-state-live-e2e.test.sh 59
 tests/jg-procevent.test.sh 351871
+tests/jg-project-mode.test.sh 164
 tests/jg-prompt-gate-live-e2e.test.sh 56
 tests/jg-prompt-gate.test.sh 59264
+tests/jg-proof-attach.test.sh 1545
 tests/jg-public-followup.test.sh 474556
 tests/jg-quota-array-dispatch-live-e2e.test.sh 54
 tests/jg-remote-reply.test.sh 240899
 tests/jg-remote-squad-lead-lifecycle-e2e.test.sh 567728
 tests/jg-rovo-signals-live-e2e.test.sh 57
 tests/jg-self-repo-role.test.sh 9033
+tests/jg-send-dormant-lead.test.sh 1692
 tests/jg-send-inbox-doorbell-live-e2e.test.sh 55
 tests/jg-send-inbox.test.sh 51917
 tests/jg-session-start.test.sh 347046
 tests/jg-sessionstart-hook-live-e2e.test.sh 61
 tests/jg-spawn-dispatch-profile.test.sh 506834
+tests/jg-squad-lead-dormant.test.sh 1091
 tests/jg-squad-lead-lifecycle-e2e.test.sh 15675
 tests/jg-supervision-host-live-e2e.test.sh 58
 tests/jg-supervision-host.test.sh 1162449
 tests/jg-tangle-guard.test.sh 12088
 tests/jg-tasks-axi.test.sh 42685
 tests/jg-teardown.test.sh 479995
+tests/jg-ticket-key.test.sh 20000
+tests/jg-tmp-sweep.test.sh 14071
 tests/jg-tokens-retro.test.sh 407
 tests/jg-turnend-guard.test.sh 42968
 tests/jg-update.test.sh 13448
 tests/jg-wake-daemon-lifecycle-e2e.test.sh 10177
 tests/jg-wake-drain-open-decisions-cursor.test.sh 57982
+tests/jg-watch-handoff.test.sh 11741
 tests/jg-watcher-lock.test.sh 1059731
 tests/jg-worker-account-live-e2e.test.sh 70
 tests/juggernaut-axi-serve.test.sh 1635
+tests/merge-card-title.test.sh 701
 EOF
 }
 
@@ -1806,7 +1827,11 @@ if [ "$LIST_LANES" -eq 1 ]; then
 fi
 
 if [ "$CHECK_COVERAGE" -eq 1 ]; then
-  run_coverage_guard
+  # LC_ALL=C for this call only: the guard writes byte-ordered lists and compares them
+  # with comm, whose collation is the ambient locale's, so the two must agree here and
+  # nowhere else - the locale must never leak into a suite, where a test that counts
+  # characters instead of bytes would start failing.
+  LC_ALL=C run_coverage_guard
   exit $?
 fi
 
@@ -2158,6 +2183,16 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc
   : "$id"
+  # ONE owner of what a behavior script inherits, for the serial and the
+  # concurrent path alike: a script must see the same environment in CI and
+  # under a live home. A squad_lead launch prefixes every process it starts
+  # with the whole home-override set (bin/jg-spawn.sh), so an unsanitized
+  # runner runs a fixture against the live home - a fixture teardown then
+  # compares that ambient live parent with its own durable parent record,
+  # finds them disagreeing, and refuses cleanup that had to succeed.
+  unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
+    JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND \
+    JG_PUBLIC_FOLLOWUP_PRIMARY_HOME 2>/dev/null || true
   set +e
   if [ "$stream" -eq 1 ]; then
     if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
@@ -2318,8 +2353,6 @@ else
       set +e
       export TMPDIR="$work/tmp"
       export TMP="$work/tmp"
-      unset JG_HOME JG_STATE_OVERRIDE JG_DATA_OVERRIDE JG_ROOT_OVERRIDE \
-        JG_PROJECTS_OVERRIDE JG_CONFIG_OVERRIDE JG_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
       begin_ms=$(now_ms)
       set +e

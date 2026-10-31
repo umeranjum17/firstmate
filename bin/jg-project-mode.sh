@@ -82,9 +82,13 @@
 # tell a conditional policy apart from a flat mode sees "no-mistakes-prod-only"
 # itself. Not combined with --branch-prefix, which has no conditional-policy leg.
 #
-# An unknown/missing project or unknown mode falls back to "no-mistakes off" (or
-# "fm/" under --branch-prefix) and warns to stderr, so a typo never silently
-# drops the gate. Other annotation tokens are ignored, as they always were, keyed
+# A project with no registry entry, or a home with no registry at all, falls
+# back to "direct-PR off" (or "fm/" under --branch-prefix) and warns to stderr:
+# a direct pull request with done-done proof is the default delivery route, and
+# no-mistakes is chosen per project for real risk. An unknown mode in a
+# registered line, and a legacy bracket-less line, still resolve to
+# "no-mistakes off", so a typo or an older registry never silently drops a gate
+# its owner registered. Other annotation tokens are ignored, as they always were, keyed
 # ones included: a `<key>=<value>` token whose key is neither exactly `forge` nor
 # `branch` resolves as it did before the forge existed, and in the mode slot it
 # is read as an unknown mode. A key one or two edits from `forge` (such as
@@ -141,10 +145,10 @@ esac
 NAME=${1:?usage: jg-project-mode.sh [--raw|--branch-prefix|--forge] <project-name>}
 
 if [ ! -f "$REG" ]; then
-  echo "warn: no registry at $REG; defaulting $NAME to no-mistakes off" >&2
+  echo "warn: no registry at $REG; defaulting $NAME to direct-PR off" >&2
   if [ "$BRANCH_PREFIX_QUERY" -eq 1 ]; then
     echo "fm/"
-  elif [ "$WANT_FORGE" -eq 1 ]; then echo none; else echo "no-mistakes off"; fi
+  elif [ "$WANT_FORGE" -eq 1 ]; then echo none; else echo "direct-PR off"; fi
   exit 0
 fi
 
@@ -211,10 +215,10 @@ parsed=$(awk -v n="$NAME" '
 ' "$REG")
 
 if [ -z "$parsed" ]; then
-  echo "warn: project \"$NAME\" not in registry; defaulting to no-mistakes off" >&2
+  echo "warn: project \"$NAME\" not in registry; defaulting to direct-PR off" >&2
   if [ "$BRANCH_PREFIX_QUERY" -eq 1 ]; then
     echo "fm/"
-  elif [ "$WANT_FORGE" -eq 1 ]; then echo none; else echo "no-mistakes off"; fi
+  elif [ "$WANT_FORGE" -eq 1 ]; then echo none; else echo "direct-PR off"; fi
   exit 0
 fi
 

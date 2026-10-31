@@ -24,7 +24,11 @@
 #     only when the proof is real and passed: done-done's recorded verdict is pass,
 #     the check names its claim (what a user can now do), and at least one proof
 #     media file was copied, or a done-done verify run at the merged head brought
-#     its own sign-off run. The card title is the claim; its media is the Checks
+#     its own sign-off run. The card title is the outcome sentence a reader can act on: the pull
+#     request's own title, else the claim (what a user can now do), trimmed of a leading bracket tag,
+#     a conventional-commit prefix, a trailing (repo:)/(kind:) suffix and a trailing full stop; the
+#     generic "internal change passed its checks" stays only for a genuinely claimless change and is
+#     then qualified by the repo and pull request. Its media is the Checks
 #     evidence screenshots and recordings (at most 12), or those of the verify run
 #     through `done-done signoff`. The card carries the passed-test receipt (its `run`,
 #     which sign-off's board checks against the run record to file it under Evidence): the
@@ -35,8 +39,8 @@
 #     another home posting it, adds nothing, and a post at a new head archives the PR's live card and posts the new one.
 #     After each filed card, `one-card-per-pr --apply` keeps one live card per PR on the board across
 #     filers: the newest valid proof stays and the rest are archived, never deleted.
-#     A PR whose Checks block says `screen: none` gets a text-only Evidence card when its
-#     task folder or done-done's evidence root has a sealed clean receipt; the same key makes repeated posts no-ops.
+#     A PR whose Checks block says `screen: none` gets a text-only Evidence card when done-done answers for its
+#     head, or the task folder or done-done's evidence root holds a sealed clean run there; the same key makes repeated posts no-ops.
 #     No capture is demanded of it, and the gate says so in one line at the top of its own output.
 #     A claim that cites an evidence file the sealed run does not hold is not refused whole: one
 #     line names the run's own capture, and the claim is checked against that file instead (the
@@ -48,9 +52,15 @@
 #     line `sign-off reply: <text>` gives the lead's outcome), once per card and PR, whatever happens to
 #     the evidence card. NOT_FOUND (nothing sent on the card) is done; a sign-off-axi older than 0.6.1
 #     skips with one line; any other failure is printed and the post goes on.
+#   merge-card title <pr-url|->, merge-card generic-title <title>
+#     The title a card gets for a PR (its own title, else its claim, trimmed; nothing when neither reads),
+#     and the refusal retitle-old-cards and the tests use: exit 0 when <title> is the generic sentence.
 #   merge-card screen-none <task-id> <pr-url|->, merge-card receipt <task-id> <head>, merge-card receipt-json <task-id> <head>
-#     Exit 0 when the merge declares `screen: none`, or when the task folder holds a sealed clean
-#     done-done run at <head>, there or in done-done's own evidence root. receipt-json prints the normalized receipt used by owner-rules' local signature check.
+#     Exit 0 when the merge declares `screen: none`, or when done-done answers for <head>: its own
+#     `done-done receipt --verify <head>`, asked in the task's lane worktree when the task's record names
+#     one, else here. While a merge head may carry no receipt, a sealed clean done-done run at <head> in the
+#     task folder or done-done's own evidence root is the fallback, and it goes once done-done records a
+#     receipt at every merge head. receipt-json prints the normalized receipt used by owner-rules' local signature check.
 #     sign-off-axi writes the board under its lock: it appends and never rewrites other cards.
 # The done-done check runs as the pool's claude account when the home has one
 # (config/account-pool): the check's env carries that account's profile folder in
@@ -93,6 +103,66 @@ resolve_evidence() {
 checks_claim() {
   { [ "$2" != - ] && gh pr view "$2" --json body --jq .body 2>/dev/null || cat -- "$JG_HOME/data/$1/checks.md" 2>/dev/null; } |
     sed -n 's/^outcome: *//p' | head -n 1
+}
+
+# pr_title <pr-url|->: the pull request's own title, as the forge prints it; nothing when it cannot be read.
+pr_title() {
+  [ "$1" != - ] || return 0
+  gh pr view "$1" --json title --jq .title 2>/dev/null | head -n 1
+}
+
+# title_sentence <text>: <text> as a card title. Only the scaffolding is trimmed, never a word of
+# meaning: a leading bracket tag ([design-ux], [feature]), a conventional-commit prefix (feat(ui):),
+# a trailing (repo: x) or (kind: y) suffix, and a trailing full stop.
+title_sentence() {
+  printf '%s' "$1" | sed -E '
+    s/^[[:space:]]+//
+    s/[[:space:]]+$//
+    :tag
+    s/^\[[^]]*\][[:space:]]*//
+    t tag
+    s/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?!?:[[:space:]]*//
+    s/[[:space:]]*\((repo|kind):[^)]*\)[[:space:]]*\.?[[:space:]]*$//
+    s/\.+[[:space:]]*$//
+    s/^[[:space:]]+//
+    s/[[:space:]]+$//'
+}
+
+# sentence_title <pr-url|-> <claim>: the outcome sentence a card is titled with, the pull request's
+# own title first and the declared claim second; nothing when neither can be read, so a caller never
+# mistakes the generic sentence for an outcome.
+sentence_title() {
+  local t
+  t=$(title_sentence "$(pr_title "$1")")
+  [ -n "$t" ] || t=$(title_sentence "${2:-}")
+  printf '%s' "$t"
+}
+
+# generic_title <pr-url|->: the last-resort sentence for a genuinely claimless change. It is always
+# qualified by the repo and pull request, never bare.
+generic_title() {
+  local label=''
+  [ "$1" = - ] || label=$(printf '%s' "${1#*://}" | awk -F/ 'NF >= 5 { printf "%s #%s", $3, $5 }')
+  printf '%s' "${label:+$label: }internal change passed its checks"
+}
+
+# outcome_title <pr-url|-> <claim>: what the card says a reader can now do - the pull request's own
+# title, else its declared claim, else the repo/PR-qualified generic sentence.
+outcome_title() {
+  local t
+  t=$(sentence_title "$1" "${2:-}")
+  [ -n "$t" ] || t=$(generic_title "$1")
+  printf '%s' "$t"
+}
+
+# generic_card_title <title>: the title is the generic sentence "internal change passed its checks",
+# bare or carrying only a repo/PR prefix. That is the last-resort sentence, never an outcome, and the
+# check merge-card's tests and retitle-old-cards refuse it with.
+generic_card_title() {
+  local t
+  t=$(printf '%s' "$1" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/\.+$//')
+  t=$(printf '%s' "$t" | sed -E 's/^[A-Za-z0-9._-]+( #[0-9]+)?: //')
+  [ "$(printf '%s' "$t" | tr '[:upper:]' '[:lower:]')" = 'internal change passed its checks' ]
 }
 
 # verdict_of <exit-code> <output> <done-done version>: done-done's result in plain words. An exit 2 is a
@@ -332,11 +402,40 @@ dd_root() {
   printf '%s' "${root/#\~/$HOME}"
 }
 
-# receipt_run <task-id> <head> <record>: the newest sealed clean done-done run at <head>, from the task folder or
-# done-done's default evidence root, else nothing.
+# dd_receipt <task-id> <head> <claim> <evidence> <root>: done-done's own answer to "is there a receipt at
+# <head>", asked in the task's lane worktree when the task's record names one, else here, printed as the card's
+# receipt. Nothing when done-done is absent, refuses, or names no run the card can carry: the caller then scans
+# the sealed run records itself. done-done's verdict is the check; the run id and files come from the record it
+# passed, because `receipt --verify` reports how many files it passed rather than their names.
+dd_receipt() {
+  local meta=$JG_HOME/state/$1.meta dir=. out head file
+  command -v done-done >/dev/null 2>&1 || return 0
+  if [ -f "$meta" ]; then dir=$(sed -n 's/^worktree=\(..*\)$/\1/p' "$meta" | head -n 1); fi
+  [ -n "$dir" ] && [ -d "$dir" ] || dir=.
+  out=$(cd "$dir" 2>/dev/null && done-done receipt --verify "$2" --json 2>/dev/null) || return 0
+  head=$(printf '%s' "$out" | jq -r 'select(.result == "pass") | .head // empty' 2>/dev/null)
+  [ -n "$head" ] && [ -n "$5" ] || return 0
+  for file in "$5"/*/.done-done/receipts/"$head".json; do
+    [ -f "$file" ] || continue
+    jq -c --arg head "$2" --arg claim "$3" --arg ev "$4" '
+      ([.runs[]?.run_id] | last // empty) as $run
+      | select($run != "")
+      | {run_id: $run, commit: $head,
+         files: ([.judge.verdicts[]?.path | split("/") | last] | unique),
+         outcome: $claim, repro: "see the merge note", proof: "done-done run \($run)", evidence: $ev}' "$file" 2>/dev/null
+    return 0
+  done
+}
+
+# receipt_run <task-id> <head> <record>: done-done's own receipt at <head>, else a sealed clean done-done run
+# there, from the task folder or done-done's default evidence root, else nothing.
 receipt_run() {
-  local claim evidence root file records=()
+  local claim evidence root file records=() dd
   root=$(dd_root)
+  claim=$(jq -r '.check.claim // empty' "$3" 2>/dev/null)
+  evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3" 2>/dev/null)
+  dd=$(dd_receipt "$1" "$2" "$claim" "$evidence" "$root")
+  [ -z "$dd" ] || { printf '%s\n' "$dd"; return 0; }
   for file in "$JG_HOME"/data/"$1"/.done-done/runs/*.json; do
     [ -f "$file" ] && records+=("$file")
   done
@@ -346,8 +445,6 @@ receipt_run() {
     done
   fi
   [ "${#records[@]}" -gt 0 ] || return 0
-  claim=$(jq -r '.check.claim // empty' "$3" 2>/dev/null)
-  evidence=$(jq -r '[.check.evidence[]? | split("/") | last] | join(", ")' "$3" 2>/dev/null)
   jq -cs --arg head "$2" --arg claim "$claim" --arg ev "$evidence" '
     map(select(.schema == 1 and .exit == 0 and .dirty == false and
       ((.commit == $head) or ((try (.run_id | capture("^[0-9]{8}T[0-9]{6}Z-(?<commit>[0-9a-f]{8})-[0-9a-f]+$").commit) catch "") == $head[0:8])) and
@@ -502,9 +599,8 @@ post() {
     fi
     media_dir=$JG_HOME/data/$id/merge-card-media
     mkdir -p "$media_dir" || die "cannot create the task's persistent media folder"
-    local label='' card_title='Internal change passed its checks'
-    [ "$pr" = - ] || label=$(printf '%s' "${pr#*://}" | awk -F/ 'NF >= 5 { printf "%s #%s", $3, $5 }')
-    [ -z "$label" ] || card_title="$label: internal change passed its checks"
+    local card_title
+    card_title=$(outcome_title "$pr" "$outcome")
     jq -n --arg key "$card_key" --arg link "$link" --arg about "$about" --arg title "$card_title" --argjson run "$text_run" \
       '{contract:1,kind:"evidence",schema:1,key:$key,title:$title,about:$about,link:$link,run:$run}' > "$media_dir/card.json" || die "cannot write the card"
     out=$(file_card "$board" "$media_dir/card.json" evidence 2>&1) || die "sign-off-axi could not post $key: $out"
@@ -533,7 +629,7 @@ post() {
     echo "merge-card: no evidence card for $key: the passed check names no claim; the lane owner must fix the proof (a Checks \"outcome: <what a user can now do>\" line) and re-post it with: JG_HOME=$JG_HOME $self post --board $board $id $wt $head $pr"
     return 0
   fi
-  title=$claim
+  title=$(title_sentence "$claim")
   # done-done's verdict in plain words, then its first finding (or the judge's reason on a pass)
   # with the file named without its folder, so the card shows no local paths.
   about=$(jq -r '
@@ -597,6 +693,11 @@ case ${1:-} in
   gate) shift; gate "$@"; exit $? ;;
   check) shift; check "$@"; exit 0 ;;
   post) shift; post "$@" ;;
+  # The title a card gets for a PR: its own title, else its declared claim, trimmed. Prints nothing
+  # when neither can be read, so the caller can tell no outcome from the generic sentence.
+  title) sentence_title "${2:--}" ''; echo ;;
+  # The refusal check: exit 0 when <title> is the generic sentence, bare or only repo/PR-prefixed.
+  generic-title) generic_card_title "${2:-}" ;;
   # For owner-rules' merge gate: exit 0 when the merge is exempt / has a sealed clean run at <head>.
   screen-none) [ -n "${JG_HOME:-}" ] && screen_none "${2:-}" "${3:--}"; exit $? ;;
   receipt) [ -n "${JG_HOME:-}" ] && [ -n "$(receipt_run "${2:-}" "${3:-}" /dev/null)" ]; exit $? ;;
@@ -606,5 +707,5 @@ case ${1:-} in
     [ -n "$receipt" ] || exit 1
     printf '%s\n' "$receipt"
     ;;
-  *) die "usage: merge-card gate|check|post|receipt|receipt-json ... (see the header of $0)" ;;
+  *) die "usage: merge-card gate|check|post|title|generic-title|receipt|receipt-json ... (see the header of $0)" ;;
 esac

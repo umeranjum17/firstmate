@@ -59,7 +59,10 @@ out=$(gate) && fail "yes task without a receipt must be refused"
 assert_contains "$out" "merge refused" "no-receipt refusal"
 receipt PASS "$head" "ran tests"
 out=$(gate) && fail "yes task without a first-draft line must be refused"
-receipt PASS "$head" $'notes\nfirst-draft receipt: fd-123'
+# The receipt line names a first-draft make run record the gate resolves and reads.
+jq -n --arg f "$root/designs/option-1.html" '{made:{command:"make",files:[{file:$f}]}}' > "$home/state/fd-123"
+receipt PASS "$head" "notes
+first-draft receipt: $home/state/fd-123"
 gate >/dev/null || fail "yes task with a first-draft receipt line must pass"
 receipt FAIL "$head" $'first-draft receipt: fd-123'
 gate >/dev/null && fail "a FAIL receipt must be refused"
@@ -115,7 +118,8 @@ assert_contains "$out" "counting it as demo_call=no" "missing demo call did not 
 mkmeta 'demo_call=yes\n'
 out=$(dgate) && fail "yes task without a receipt must be refused"
 assert_contains "$out" "merge refused" "no-receipt refusal"
-receipt PASS "$head" $'notes\nfirst-draft receipt: fd-123'
+receipt PASS "$head" "notes
+first-draft receipt: $home/state/fd-123"
 dgate >/dev/null && fail "a first-draft line must not satisfy the TakeOne gate"
 receipt PASS "$head" $'notes\ntakeone receipt: to-123'
 dgate >/dev/null || fail "yes task with a takeone receipt line must pass"

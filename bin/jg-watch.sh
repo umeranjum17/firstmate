@@ -137,7 +137,7 @@
 #                          status, unless afk is active
 #   check: ready work waiting with free lane slots: (<open>/<target> open): <ids> - dispatch them now, P0 first, up to project capacity
 #   check: ready work waiting with no worker working: <ids> - dispatch them now, P0 first, up to project capacity
-#                          a squad_lead home's base-cadence scan found dispatchable
+#                          a primary or squad_lead home's base-cadence scan found dispatchable
 #                          queued work (jg-tasks-axi.sh ready) while the home sits
 #                          below its lane floor: with config/lane-target naming a
 #                          positive integer, fewer open lanes than that target;
@@ -146,13 +146,15 @@
 #                          Re-raised while the condition holds, once per
 #                          new ready set and then every READY_WORK_RESURFACE_SECS;
 #                          intake uses HEARTBEAT's base interval, never its backoff
-#   check: ready backlog stalled: <ids> waits with free lanes (<open>/<target> open) and nothing started for <n>s - dispatch them now, P0 first, up to project capacity, or hold each with why it waits; Main was told id=<key>
+#   check: ready backlog stalled: <ids> waits with free lanes|no worker working (<open>/<target> open) and nothing started for <n>s - dispatch them now, P0 first, up to project capacity, or hold each with why it waits; Main was told id=<key>
 #                          the wait-timers chain's stalled-backlog backstop: a
 #                          squad_lead home's ready, startable work sat on a free
-#                          lane with no lane started for JG_READY_STALL_SECS, so
-#                          the lead is woken again and Main gets the same report,
-#                          both re-fired every JG_PROMPT_REALERT_SECS while it
-#                          holds (ready_backlog_stall_state owns the condition;
+#                          lane (or with no worker provably working) with no lane
+#                          started for JG_READY_STALL_SECS, so the lead is woken
+#                          again and Main gets the same report, both re-fired
+#                          every JG_PROMPT_REALERT_SECS while it holds, and Main
+#                          posts a board card if it is still open
+#                          (ready_backlog_stall_state owns the condition;
 #                          addons/wait-timers/README.md owns the rungs)
 #   check: ask-default safe default applied while the captain was unreachable: <ids> ...
 #                          the juggernaut-addons ask-default add-on, when installed,
@@ -306,6 +308,11 @@ WATCH_HOME_EXISTED=0
 . "$SCRIPT_DIR/jg-supervision-lib.sh"
 # shellcheck source=bin/jg-project-capacity-lib.sh
 . "$SCRIPT_DIR/jg-project-capacity-lib.sh"
+# Stale test-browser reaper and machine load alarm: on by default, no add-on to
+# install, and it stops only a browser in a fleet temp or scratch profile root whose
+# owning worker is gone and whose age is past the limit.
+# shellcheck source=bin/jg-reaper-lib.sh
+. "$SCRIPT_DIR/jg-reaper-lib.sh"
 # Where this checkout's add-ons live (in-repo addons/ first, then the pre-fold clone).
 # shellcheck source=bin/jg-addons-dir-lib.sh
 . "$SCRIPT_DIR/jg-addons-dir-lib.sh"
@@ -340,6 +347,9 @@ _jg_alerts_lib=$(jg_addon_path "$JG_HOME" alerts/bin/jg-model-outage-lib.sh)
 _jg_wait_timers_lib=$(jg_addon_path "$JG_HOME" wait-timers/bin/jg-wait-timers-lib.sh)
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/jg-squad-lead-liveness-lib.sh"
+# Dormant-lead record reader: this tick skips a lead bin/jg-squad-lead-dormant.sh stopped.
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=/dev/null # Canonical lint root with its own parent-channel graph.
 [ ! -r "$_jg_wait_timers_lib" ] || . "$_jg_wait_timers_lib"
 
@@ -1310,15 +1320,41 @@ host_memory_surface_queued() {
 # excludes declared external waits, and defers rows a live branch is handling.
 # The ordinary arm owner delivers the reason, never a synthetic keyboard ring.
 own_queue_resurface() {
-  local row epoch seq kind key reason now previous observed_at observed_key row_key idle
-  row=$(squad_lead_oldest_queue_row "$JG_WAKE_QUEUE")
-  if [ -z "$row" ]; then
-    rm -f "$STATE/.own-wake-progress"
-    return 0
-  fi
-  IFS=$'\t' read -r epoch seq kind key reason <<EOF
+  local row epoch seq kind key reason now previous observed_at observed_key row_key idle task file
+  while :; do
+    row=$(squad_lead_oldest_queue_row "$JG_WAKE_QUEUE")
+    if [ -z "$row" ]; then
+      rm -f "$STATE/.own-wake-progress"
+      return 0
+    fi
+    IFS=$'\t' read -r epoch seq kind key reason <<EOF
 $row
 EOF
+    # Cleanup can race a scan's queue append. A removed log is not a new
+    # signal; retain any row whose task still has a record (including links).
+    case "$kind:$key" in
+      signal:*.status|signal:*.turn-ended)
+        file=${key##*/}; task=${file%.*}
+        if [ ! -e "$STATE/$file" ] && [ ! -L "$STATE/$file" ] \
+          && [ ! -e "$STATE/$task.meta" ] && [ ! -L "$STATE/$task.meta" ] \
+          && [ ! -e "$STATE/$task.status" ] && [ ! -L "$STATE/$task.status" ] \
+          && [ ! -e "$STATE/$task.inbox" ] && [ ! -L "$STATE/$task.inbox" ]; then
+          jg_wake_withdraw signal "$key" || return 1
+          continue
+        fi
+        ;;
+      stale:*)
+        # Retire legacy prune notices too. A current owner retains its alarm.
+        task=$(window_key "$key")
+        if pruned_panes_seen "$task" && [ ! -e "$STATE/.tracked-$task" ] \
+          && ! jg_backend_meta_for_window "$key" "$STATE" >/dev/null 2>&1; then
+          jg_wake_withdraw stale "$key" || return 1
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
   row_key="$epoch-$seq"
   jg_epoch_seconds_to now
   previous=$(cat "$STATE/.own-wake-progress" 2>/dev/null) || previous=
@@ -1369,6 +1405,11 @@ squad_lead_liveness_tick() {
   local tick_marker="$STATE/.squad-lead-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SQUAD_LEAD_LIVENESS_SECS" ] || return 0
   touch "$tick_marker" || return 1
+  # Dormant rule first: settle the leads with no open work, then probe. A lead
+  # stopped in this same tick is skipped as dormant by the loop below rather
+  # than being relaunched straight back.
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-squad-lead-dormant.sh" sweep >/dev/null 2>&1 \
+    || triage_log "squad_lead dormant sweep reported a failure; the liveness tick continues"
   local now=$(( $(date +%s) )) meta id kind
   local bound_marker attempts notify_key reason queued err first_reason='' failed=0
   for meta in "$STATE"/*.meta; do
@@ -1378,6 +1419,10 @@ squad_lead_liveness_tick() {
     id=${meta##*/}
     id=${id%.meta}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
+    if squad_lead_dormant "$STATE" "$id"; then
+      triage_log "squad_lead $id liveness skipped: dormant with no open work (bin/jg-squad-lead-dormant.sh)"
+      continue
+    fi
     # Parked-home guard (juggernaut-addons/parked-homes): a parked home gets no
     # liveness probe and no auto-relaunch - one triage line names the skip.
     # No-op without the add-on checkout.
@@ -2077,18 +2122,10 @@ clear_pause_tracking() {  # <window-key>
 # A window any meta references is never pruned here regardless of liveness:
 # the record's fate belongs to juggernaut's record reconciliation, and its gone
 # agent already has wedge_dead_record's bounded once-only report. The prune
-# removes every marker the key owns, including the sidecar itself, and emits
-# at most one final notice for that key.
-#
-# Removing the sidecar is not enough to make the notice once-only: a later poll
-# can write the same .tracked- sidecar again for a record race (the poll still
-# saw a record this sweep did not), and a re-armed watcher then prunes and
-# announces the same vanished window over and over (observed live: one pane
-# announced three times). state/.pruned-panes is the durable memory of keys
-# whose notice was already emitted. It is written before the notice, never
-# cleared by clear_pause_tracking, and bounded by key count so it cannot grow
-# without limit. A later prune of a remembered key still clears any re-created
-# markers but stays silent; a different window key gets its own notice.
+# removes every marker the key owns, including the sidecar itself.
+# state/.pruned-panes remembers confirmed absences so old queued prune notices
+# can be retired even after their sidecar is gone. It is bounded by key count.
+# Pruning is silent: an absent endpoint with no owner is not a task alarm.
 pruned_panes_seen() {  # <key>
   [ -s "$STATE/.pruned-panes" ] && grep -qxF -- "$1" "$STATE/.pruned-panes"
 }
@@ -2101,7 +2138,7 @@ pruned_panes_record() {  # <key>
 }
 
 phantom_pane_prune() {
-  local tracked key w backend verdict reason
+  local tracked key w backend verdict
   for tracked in "$STATE"/.tracked-*; do
     [ -e "$tracked" ] || continue
     key=${tracked##*/.tracked-}
@@ -2110,6 +2147,8 @@ phantom_pane_prune() {
     jg_backend_meta_for_window "$w" "$STATE" >/dev/null 2>&1 && continue
     [ "$(jg_backend_target_absent "$backend" "$w")" = absent ] || continue
     clear_pause_tracking "$key"
+    # Withdraw before removing the sidecar, so a failed queue write is retried.
+    jg_wake_withdraw stale "$w" || exit 1
     # The sidecar is removed LAST: a failed marker removal leaves it behind so
     # the next cycle retries the whole prune, while a removed sidecar with
     # markers left behind would strand the orphans unfindable.
@@ -2117,13 +2156,8 @@ phantom_pane_prune() {
       "$STATE/.dead-reported-$key" "$STATE/.truth-read-$key" "$STATE/.truth-raised-$key" \
       "$STATE/.activity-$key" "$STATE/.activity-observed-$key" "$STATE/.activity-observed-$key.next" || continue
     rm -f "$tracked" || continue
-    # A sidecar re-created after this key's notice (a later poll, a record race,
-    # a re-armed watcher) was pruned silently above; never announce it twice.
-    pruned_panes_seen "$key" && continue
     pruned_panes_record "$key" || true
-    reason="stale: $w (pane vanished, state pruned: no task record owns it and the backend confirms it is gone)"
-    jg_wake_append stale "$w" "$reason" || exit 1
-    wake "$reason"
+    triage_log "pruned absent unowned pane: $w"
   done
 }
 
@@ -2962,8 +2996,9 @@ warn_invalid_lane_target_once() {
   triage_log "lane-target is not a positive integer; using the no-worker-working rule instead"
 }
 
-# Base-cadence idle-lead check: 0 when this is a squad_lead home, its backlog has
-# dispatchable queued work, and the home sits below its lane floor. With
+# Base-cadence idle-home check: 0 when this home (primary or squad_lead) has
+# dispatchable queued work and sits below its lane floor, so ready work is
+# started without anyone asking. With
 # config/lane-target naming a positive integer N, the floor is fewer than N open
 # lanes, and a home with working workers but free slots is exactly the 5 Oct
 # stall that the no-worker-working rule missed. Otherwise (no usable target, or
@@ -2977,10 +3012,9 @@ warn_invalid_lane_target_once() {
 # held or in flight) cannot reset the re-raise window. Intake is independent of
 # the heartbeat's idle backoff and runs before an away heartbeat can exit.
 ready_work_waits_idle() {
-  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc
+  local meta task target open now surfaced surfaced_at surfaced_ids ready_rc freed
   READY_WORK_IDS=
   READY_WORK_REASON=
-  [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
   READY_WORK_IDS=$(jg_ready_work_ids "$JG_HOME")
   ready_rc=$?
   if [ -z "$READY_WORK_IDS" ]; then
@@ -3021,29 +3055,70 @@ ready_work_waits_idle() {
   esac
   [ "$surfaced_ids" != "$READY_WORK_IDS" ] && return 0
   case "$surfaced_at" in ''|*[!0-9]*) surfaced_at=0 ;; esac
+  # A place freed since this set was surfaced makes the wake actionable now, so
+  # the resurface window does not hold it back. bin/jg-teardown.sh and
+  # bin/jg-pr-check.sh write state/.capacity-freed; this read is the contract.
+  freed=$(cat "$STATE/.capacity-freed" 2>/dev/null) || freed=
+  case "$freed" in ''|*[!0-9]*) freed=0 ;; esac
+  [ "$freed" -gt "$surfaced_at" ] && return 0
   [ "$(( now - surfaced_at ))" -ge "$READY_WORK_RESURFACE_SECS" ]
+}
+
+# A launch refused for host memory leaves state/admission-refused and nothing
+# retries it. The newest sampler verdict is the measurement admission reads, so
+# fire once per record the moment it admits launches again; a home with no
+# sampler stays silent rather than inventing one. bin/jg-jev-mem-guard.sh owns
+# the verdict and the record.
+admission_retry_waits_memory() {
+  local record epoch task verdict seen
+  record=$(cat "$STATE/admission-refused" 2>/dev/null) || return 1
+  [ -n "$record" ] || return 1
+  epoch=$(printf '%s\n' "$record" | cut -f1)
+  task=$(printf '%s\n' "$record" | cut -f2)
+  verdict=$(awk -F '\t' 'NF >= 5 && $5 != "" { v = $5 } END { print v }' \
+    "$STATE/host-memory.tsv" 2>/dev/null) || verdict=
+  case "$verdict" in OK|UNKNOWN) ;; *) return 1 ;; esac
+  ADMISSION_RETRY_KEY="$epoch:$task"
+  seen=$(cat "$STATE/.admission-retry-surfaced" 2>/dev/null) || seen=
+  [ "$seen" != "$ADMISSION_RETRY_KEY" ] || return 1
+  ADMISSION_RETRY_REASON="check: host memory admits launches again, so retry the launch of ${task:-a queued task} refused at ${epoch} (bin/jg-spawn.sh clears the refusal record on success)"
+  return 0
 }
 
 # The stalled-backlog condition the wait-timers chain escalates
 # (addons/wait-timers/README.md "Stalled ready backlog"): this squad_lead home
-# has a ready item that could start now and a free lane. A free lane is fewer
-# open lanes than config/lane-target, or than 4 without a usable one; an item
-# could start now unless its project's declared capacity is already held
-# (bin/jg-project-capacity-lib.sh). Sets READY_STALL_IDS (startable ids, P0
-# first), READY_STALL_OPEN, READY_STALL_TARGET, and READY_STALL_LANES (the open
-# lane ids, comma-joined, so the chain can see a start). Returns 0 when the
-# condition holds, 1 when it does not, and 2 when the backlog cannot be read,
-# so an unknown poll never clears or fires an episode.
+# has a ready item that could start now, and either a free lane or no worker
+# provably working. A free lane is fewer open lanes than config/lane-target, or
+# than 4 without a usable one. A home at its floor is still stalled when no
+# worker is provably working (the ready-work wake's "no worker working" case),
+# because lanes that only wait on a merge or a cleanup must not hide an idle
+# lead. An item could start now unless its project's declared capacity is
+# already held (bin/jg-project-capacity-lib.sh). Sets READY_STALL_IDS (startable
+# ids, P0 first), READY_STALL_OPEN, READY_STALL_TARGET, READY_STALL_MODE
+# (free-lanes or no-worker), and READY_STALL_LANES (the open lane ids,
+# comma-joined, so the chain can see a start). When ready work exists but the
+# condition does not hold, READY_STALL_WHY names the reason (lanes-working or
+# project-capacity). Returns 0 when the condition holds, 1 when it does not,
+# and 2 when the backlog cannot be read, so an unknown poll never clears or
+# fires an episode.
 ready_backlog_stall_state() {
   local rows rc id repo proj cfg seen='|' full='|' meta kind
-  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES=''
+  READY_STALL_IDS='' READY_STALL_OPEN='' READY_STALL_TARGET='' READY_STALL_LANES='' READY_STALL_MODE='' READY_STALL_WHY=''
   [ -f "$(jg_compat_marker "$JG_HOME")" ] && [ ! -L "$(jg_compat_marker "$JG_HOME")" ] || return 1
   rows=$(jg_ready_work_rows "$JG_HOME"); rc=$?
   [ "$rc" -eq 0 ] || return 2
   [ -n "$rows" ] || return 1
   READY_STALL_TARGET=$(lane_target_value) || READY_STALL_TARGET=4
   READY_STALL_OPEN=$(open_lane_count) || return 2
-  [ "$READY_STALL_OPEN" -lt "$READY_STALL_TARGET" ] || return 1
+  READY_STALL_MODE=free-lanes
+  if [ "$READY_STALL_OPEN" -ge "$READY_STALL_TARGET" ]; then
+    READY_STALL_MODE=no-worker
+    for meta in "$STATE"/*.meta; do
+      [ -f "$meta" ] || continue
+      id=${meta##*/}
+      if crew_is_provably_working "${id%.meta}"; then READY_STALL_WHY=lanes-working; return 1; fi
+    done
+  fi
   cfg=$(jg_project_capacity_config_dir "$JG_HOME" "$CONFIG" 2>/dev/null) || cfg=
   while read -r id repo; do
     [ -n "$id" ] || continue
@@ -3068,7 +3143,7 @@ ready_backlog_stall_state() {
   done <<EOF
 $rows
 EOF
-  [ -n "$READY_STALL_IDS" ] || return 1
+  [ -n "$READY_STALL_IDS" ] || { READY_STALL_WHY=project-capacity; return 1; }
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
     kind=$(jg_meta_get "$meta" kind 2>/dev/null || true)
@@ -3203,6 +3278,27 @@ event_wait_or_sleep() {
       _event_cap_fails=0
       ;;
   esac
+}
+
+# A confirmed merge owns its own cleanup. bin/jg-teardown.sh runs without
+# --force, so its own gates (unlanded work, an incomplete captain-call
+# inventory, an owed public reply, an uncleared Relay link) stay in charge; a
+# refusal becomes one wake naming it rather than leaving the task half landed.
+# Both steps run detached so this cycle keeps supervising. The board is rebuilt
+# from the payload it already carries, which drops the cards that just landed.
+post_merge_cleanup() {  # <id>
+  local id=$1 started="$STATE/.post-merge-cleanup-$1.started" log="$STATE/.post-merge-cleanup-$1.log"
+  ( set -C; : > "$started" ) 2>/dev/null || return 0
+  (
+    local line
+    if ! env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+        "$SCRIPT_DIR/jg-teardown.sh" "$id" > "$log" 2>&1; then
+      line=$(grep -m1 '^REFUSED' "$log" 2>/dev/null) || line=
+      jg_wake_append check "post-merge-cleanup-$id" \
+        "check: cleanup after the merge of $id was refused: ${line:-see $log}" \
+        || triage_log "cleanup refusal for $id could not be queued"
+    fi
+  ) </dev/null >/dev/null 2>&1 &
 }
 
 # --- Main entry: the runtime below runs only when this file is executed as a
@@ -3412,6 +3508,22 @@ home_summary_refresh_detached() {
   HOME_SUMMARY_PID=$!
 }
 
+# A ship's ready report records its PR without waiting on Main: jg-pr-check.sh
+# --from-status owns which line counts and runs the named-head gate, then arms
+# the merge poll, posts the ready card, and moves the ticket to review. A line
+# it refuses or skips records nothing and still wakes Main as before.
+ready_pr_record() {  # <status-file>
+  local id=${1##*/} out
+  case "$id" in *.status) id=${id%.status} ;; *) return 0 ;; esac
+  [ -f "$STATE/$id.meta" ] || return 0
+  if out=$(jg_run_timed "$CHECK_TIMEOUT" env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/jg-pr-check.sh" --from-status "$id" 2>&1); then
+    [ -z "$out" ] || triage_log "recorded the ready PR of $id"
+  else
+    triage_log "the ready PR of $id was not recorded: $(printf '%s\n' "$out" | tail -n 1)"
+  fi
+}
+
 RECONCILE_REQUEST_PID=
 reconcile_requests_pending() {
   local request
@@ -3483,13 +3595,10 @@ watcher_cleanup() {
     echo "watcher: recovery state could not be persisted; retaining stale lock evidence" >&2
     cleanup_status=1
   fi
-  # A cycle that delivered an actionable wake proved a live watcher scanned up
-  # to it, but this cycle cleared the predecessor's beacon at start and exits
-  # before the end-of-scan touch. Without this stamp a busy home never has a
-  # beacon, so every reader calls it unsupervised. Written only after the lock
-  # is released, so an arm never sees a dying holder with a fresh beacon, and
-  # only on a delivered wake, so a killed or evicted watcher leaves none. The
-  # replacement still clears it at start and republishes after its full scan.
+  # A delivered wake proves scan progress even though it exits before the
+  # end-of-scan touch. Stamp only after releasing the lock, so an arm cannot
+  # attach to a dying holder. Killed/evicted cycles never renew the beacon;
+  # their predecessor's timestamp ages normally and PID checks still apply.
   if [ "$owns_lock" -eq 1 ] && [ -n "${JG_WATCH_DELIVERED_REASON:-}" ]; then
     touch "$STATE/.last-watcher-beat" 2>/dev/null || true
   fi
@@ -3501,7 +3610,8 @@ watcher_stop_signals
 # ${BASHPID:-$$} from this same main shell). Read directly, never via a command
 # substitution, so it matches the stored holder pid for the self-eviction check.
 WATCHER_PID=${BASHPID:-$$}
-rm -f "$STATE/.last-watcher-beat" || exit 1
+# Retain the last proven scan through handoff. Do not renew it until this
+# cycle makes progress: a stalled successor must still age past grace.
 printf '%s\n' "$JG_HOME" > "$WATCH_LOCK/jg-home" || true
 printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
@@ -3703,6 +3813,7 @@ EOF
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
           fi
+          [ "$(jg_meta_get "$STATE/$id.meta" kind)" = scout ] || post_merge_cleanup "$id"
           wake "$reason"
         fi
         pr_poll_control_release || exit 1
@@ -3761,7 +3872,11 @@ while :; do
 
   if declare -F jg_memory_sampler_ensure >/dev/null; then jg_memory_sampler_ensure || triage_log "host memory sampler failed to restart"; fi
   host_memory_surface_queued
+  # Stale test-browser reaper and load alarm; its own cadence file gates it.
+  jg_reaper_tick || triage_log "browser reaper failed"
   if declare -F jg_model_outage_tick >/dev/null; then jg_model_outage_tick || triage_log "model-error observation failed"; fi
+  # Remove confirmed orphan endpoints before replaying their old queue rows.
+  phantom_pane_prune
   own_queue_resurface || { echo "watcher: own wake-queue observation failed" >&2; exit 1; }
 
   # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
@@ -3863,6 +3978,22 @@ while :; do
     done <<EOF
 $pending
 EOF
+    # #fleet: each status line change, in plain words. Read here because this is
+    # the loop that already surfaced the span, so the channel costs no second
+    # poll; the tail keeps the newest line, which is the change itself.
+    if [ -x "$SCRIPT_DIR/jg-chat.sh" ]; then
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$f" in *.status) ;; *) continue ;; esac
+        reportable_signal_path "$f" || continue
+        JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-chat.sh" note '#fleet' \
+          "$(basename "$f" .status)" - status - \
+          "$(awk 'NF { line = $0 } END { print line }' "$f" 2>/dev/null)" \
+          >/dev/null 2>&1 || true
+      done <<EOF
+$pending
+EOF
+    fi
     reason="signal:$files"
     # Triage: a signal is ACTIONABLE when any of these holds (cheapest first):
     #   - the away-mode daemon owns triage (afk) and wants every wake;
@@ -3908,6 +4039,7 @@ EOF
       while IFS=$(printf '\t') read -r sf sig f; do
         [ -n "$sf" ] || continue
         reportable_signal_path "$f" || continue
+        ready_pr_record "$f"
         file_reason="$reason"
         case " $JG_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
         jg_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
@@ -3969,6 +4101,14 @@ EOF
         triage_log "absorbed benign $reason"
       fi
     fi
+  fi
+
+  # Keep the fleet comms feed current, on for every install with no flag to set.
+  # The exporter owns its own cursor and lock and returns at once when nothing
+  # moved, so a cycle pays one cheap process here; its failure is absorbed so a
+  # feed problem can never stall supervision.
+  if [ -f "$SCRIPT_DIR/jg-comms-feed.sh" ] && [ ! -L "$SCRIPT_DIR/jg-comms-feed.sh" ]; then
+    "$SCRIPT_DIR/jg-comms-feed.sh" sync >/dev/null 2>&1 || true
   fi
 
   run_due_checks
@@ -4238,12 +4378,6 @@ EOF
     fi
   done < <(recorded_windows)
 
-  # Phantom-pane prune: a pane the backend confirms gone, whose window no task
-  # record references, has its per-pane markers pruned (see phantom_pane_prune)
-  # instead of lingering until a reused key inherits them or a vanished pane's
-  # classification escalates forever.
-  phantom_pane_prune
-
   # Ready intake must not inherit idle heartbeat backoff (up to two hours),
   # nor be starved by away-mode heartbeats. Keep its base cadence independent.
   if [ "$(age_of "$STATE/.last-ready-work-check")" -ge "$HEARTBEAT" ]; then
@@ -4252,6 +4386,13 @@ EOF
       reason=$READY_WORK_REASON
       jg_wake_append check ready-work "$reason" || exit 1
       record_ready_work_surfaced
+      wake "$reason"
+    fi
+    # A refused launch becomes retryable on the same base-cadence clock.
+    if admission_retry_waits_memory; then
+      reason=$ADMISSION_RETRY_REASON
+      jg_wake_append check admission-retry "$reason" || exit 1
+      printf '%s' "$ADMISSION_RETRY_KEY" > "$STATE/.admission-retry-surfaced" || true
       wake "$reason"
     fi
   fi
@@ -4301,10 +4442,9 @@ EOF
     fi
   fi
 
-  # Confirm liveness only after a complete supervision scan. In particular a
-  # replacement must not inherit its predecessor's beacon or announce recovery
-  # while its task checks are still blocked. Actionable wakes exit above and
-  # leave their own beacon in watcher_cleanup, after the lock is released.
+  # Renew liveness only after a complete supervision scan. The predecessor's
+  # beacon stays readable during handoff but keeps its original age while
+  # checks block. Actionable wakes stamp in watcher_cleanup after lock release.
   touch "$STATE/.last-watcher-beat" || exit 1
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),

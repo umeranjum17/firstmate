@@ -2315,7 +2315,7 @@ test_prechange_registration_is_open_and_unrechainable() {
   pass "pre-change registrations are open loops and un-rechainable, never a crash"
 }
 
-test_x_request_teardown_warns_when_final_unposted() {
+test_x_request_teardown_refuses_when_final_unposted() {
   local home rc
   home=$(make_home xreq-warn)
   tasks_in "$home" add linked-task "ship with a legacy Relay request link" --kind ship >/dev/null \
@@ -2335,12 +2335,20 @@ test_x_request_teardown_warns_when_final_unposted() {
     JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
     JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" linked-task \
     > "$home/td.out" 2> "$home/td.err" || rc=$?
-  [ "$rc" -eq 0 ] || fail "legacy-link warning must not block teardown (rc=$rc)"
-  assert_grep "still carries an unreconciled Relay request link (req-legacy-final) on its task record" "$home/td.err" \
-    "teardown must report the remaining link without claiming the post failed"
+  [ "$rc" -ne 0 ] || fail "an uncleared legacy Relay link must refuse teardown (rc=$rc)"
+  assert_grep "REFUSED: task linked-task still carries an uncleared Relay request link (req-legacy-final)" "$home/td.err" \
+    "teardown must name the link it refuses to leave behind"
+  assert_grep "bin/jg-x-followup.sh --clear linked-task" "$home/td.err" \
+    "the refusal must name the clear-only recovery command"
   assert_no_grep "never posted" "$home/td.err" \
     "a remaining legacy link must not be treated as proof that no post landed"
-  pass "teardown reports an unreconciled legacy Relay link"
+  rc=0
+  PATH="$home/fakebin:$PATH" JG_ROOT_OVERRIDE="$ROOT" JG_HOME="$home" \
+    JG_STATE_OVERRIDE="$home/state" JG_DATA_OVERRIDE="$home/data" \
+    JG_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" linked-task --force \
+    > "$home/td-force.out" 2> "$home/td-force.err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "--force must still clean up past an uncleared link (rc=$rc)"
+  pass "teardown refuses an unreconciled legacy Relay link"
 }
 
 test_squad_lead_promotion_uses_teardown_parent_resolution() {
@@ -3983,7 +3991,7 @@ test_retention_creates_no_false_teardown_refusal
 test_expiry_escalation_uses_now_override
 test_brief_fails_without_typed_deliverable_keys
 test_prechange_registration_is_open_and_unrechainable
-test_x_request_teardown_warns_when_final_unposted
+test_x_request_teardown_refuses_when_final_unposted
 test_squad_lead_promotion_uses_teardown_parent_resolution
 test_remote_squad_lead_loop_delivers_and_retires
 test_delivered_remote_registration_skips_offline_route

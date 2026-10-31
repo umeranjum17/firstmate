@@ -36,9 +36,43 @@ upstream=$(find_upstream) || { echo "quota-axi-pool: upstream quota-axi not foun
 depth=${JG_QUOTA_AXI_POOL_DEPTH:-0}
 case "$depth" in '' | *[!0-9]*) depth=0 ;; esac
 pool_config=${JG_HOME:+$JG_HOME/config/account-pool}
-if [ "$passthru" = 1 ] || [ -z "${JG_HOME:-}" ] || [ ! -f "${pool_config:-}" ] || [ ! -x "$model_pool" ] || [ "$depth" -gt 0 ]; then
+if [ "$passthru" = 1 ] || [ -z "${JG_HOME:-}" ] || [ "$depth" -gt 0 ]; then
   exec "$upstream" "$@"
 fi
+# --json: every registered Claude and Codex account from the one quota view (claude-accounts/bin/jg-quota-view),
+# not the ambient login alone. Per provider with registered workers: accountKey default = the worker with the most
+# room (an exhausted one when none has any), accountKey <id> = each worker, accountKey main = Main's own reserved
+# login. A provider with no registered workers keeps the upstream row as its default.
+quota_view=${JG_QUOTA_VIEW:-${JG_ADDONS_DIR:-$addons}/claude-accounts/bin/jg-quota-view}
+if [ "$want_json" = 1 ] && [ -x "$quota_view" ]; then
+  view=$("$quota_view" 2>/dev/null) || view=''
+  if jq -e '[.providers[]? | .workers[]?, (.reserved // empty)] | length > 0' <<<"${view:-}" >/dev/null 2>&1; then
+    base=$("$upstream" "$@" 2>/dev/null) || base=''
+    jq -e 'type=="object" and (.providers|type)=="array"' <<<"${base:-}" >/dev/null 2>&1 \
+      || base=$(jq -nc --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{generatedAt:$at,schemaVersion:5,providers:[]}')
+    jq -c --argjson view "$view" '
+      def win($id; $label; $kind; $left; $reset):
+        if $left == null then empty else {id:$id,label:$label,kind:$kind,percentRemaining:$left} + (if $reset != null then {resetsAt:$reset} else {} end) end;
+      def qrow($p; $key; $a; $reserved):
+        {provider:$p, accountKey:$key, account:{id:$a.id,name:$a.name,reserved:$reserved}, state:{status:"fresh",stale:$a.stale},
+         windows:[win("five_hour";"session";"session";$a.five_hour;$a.five_hour_resets_at), win("seven_day";"week";"weekly";$a.seven_day;$a.resets_at)]}
+        + (if $a.left == null then {quotaSemantics:{status:"unknown",effectiveAvailability:[]}}
+           else {quotaSemantics:{status:"known",effectiveAvailability:[{scope:"all_models",status:"known",effectivePercentRemaining:$a.left,
+             runway:(if $a.left <= 0 then {status:"exhausted_now",usableRunwaySeconds:0} else {status:"through_reset"} end),
+             selection:{status:"known",spendPriority:($a.left/100)}}]}} end);
+      ([$view.providers | to_entries[] | select(.value.workers | length > 0) | .key]) as $multi
+      | .schemaVersion = 6
+      | .providers = (
+          [.providers[]? | select(.provider as $p | $multi | index($p) | not) | . + {accountKey: (.accountKey // "default")}]
+          + [$view.providers | to_entries[] | .key as $p | .value as $v
+             | ([$v.workers[] | select(.left != null)] | sort_by(-.left) | first) as $top
+             | (if $top != null then qrow($p; "default"; $top; false) else empty end),
+               ($v.workers[] | qrow($p; .id; .; false)),
+               ($v.reserved | select(. != null) | qrow($p; "main"; .; true))])' <<<"$base"
+    exit 0
+  fi
+fi
+[ -f "${pool_config:-}" ] && [ -x "$model_pool" ] || exec "$upstream" "$@"
 JG_QUOTA_AXI_POOL_DEPTH=$((depth + 1))
 export JG_QUOTA_AXI_POOL_DEPTH
 

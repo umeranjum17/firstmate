@@ -79,6 +79,8 @@ provenance table now records history, not the current bytes.
   finished worker, an idle lead and a running validation are exempt), from
   `bin/jg-stuck-gate-lib.sh`. They are fresh-bounded like the prompt source and
   ride the same rungs, so a worker that ignores its own question still climbs.
+  The library itself writes `<task>.greenpr` for a green PR left unmerged under
+  yolo (see "Green PR left unmerged").
 - Episode record: one tab-separated line per lane at
   `state/.waiting-timers/<task>` holding signature, first-observed time,
   owner-delivery time, Main-rung time (0 before it fires), report key, miss
@@ -107,7 +109,7 @@ Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
 | secrets-path prompt (`.env`, `~/.config`, a home's `data/` or `config/`) | at once | the watcher rejects it and tells the worker why |
 | any other prompt, question, decision, or blocker | first sight, then `JG_WAIT_ALERT_SECS` | the owning home is woken |
 | still open | `JG_WAIT_ESCALATE_SECS` | a lead home reports `waiting-timer-overdue` to Main; Main steers the lead at once, interrupting it first when it is busy mid-turn, naming the worker and its wait |
-| still open | `JG_WAIT_CARD_SECS` | the main home posts a guarded board card, and dismisses it when the wait ends |
+| still open | `JG_WAIT_CARD_SECS` | the main home posts a guarded board card, and dismisses it when the wait ends; a wait that is not a credential or login ask is recorded for Main to decide instead, because the board takes only a must ask (`bin/jg-ask-gate-lib.sh`) |
 
 - A lead's own supervision not running is a Main wait from lead liveness, so a
   dead hop never goes silent; a dead lead rides its relaunch.
@@ -118,24 +120,40 @@ Every rung fires again every `JG_PROMPT_REALERT_SECS` while the wait stays open.
 - The board card is raised from the main home only, even when Main has not
   read its wakes, so it still fires with Main absent.
 
+## Green PR left unmerged
+
+A recorded ready PR that is green and unmerged under yolo is one more wait source on the same per-task ladder, with the lead (or Main, in the main home) as the owner.
+`jg_wait_timers_green_pr` runs every tick for each ship task whose metadata holds `pr=` and `yolo=on` and whose merge poll is armed.
+It reads the PR from the forge at most every `JG_GREEN_PR_POLL_SECS` (default 120).
+Green means the forge reports the PR open, not a draft, with merge state `CLEAN`, which is the state `bin/jg-pr-merge.sh` merges on.
+Only GitHub is read; any other forge, a missing `gh`, or an unreadable answer stays quiet, and an answer not refreshed for three reads lapses.
+After the PR has stayed green at one head for `JG_GREEN_PR_SECS` (default 900), `state/.wait-sources/<task>.greenpr` is rewritten on every tick and the rungs above run unchanged: the owner is woken naming the PR, Main hears of it, a lead is steered to merge it, and the board card follows.
+The card reads "Merge the green ... PR?" and the steer tells the lead to merge with `bin/jg-pr-merge.sh` or record a hold with the reason it waits.
+- The source clears when the PR merges or closes, goes red or draft, gets a new head (the 15-minute clock re-arms), or yolo is off.
+- A recorded hold also clears it: a `paused:` or captain-held status line that is still the task's declared wait, or an open captain hold on the task.
+- Merge authority is untouched: this ladder only asks; the owner still merges through `bin/jg-pr-merge.sh`.
+- Record: `state/.green-pr/<task>`, one tab-separated line holding last forge read time, first-green time at this head, head, and PR URL.
+
 ## Stalled ready backlog
 
 A lead that ignores its ready-work wake (`bin/jg-watch.sh` `ready_work_waits_idle`) is the same ladder with the lead as the stuck party.
 `jg_wait_timers_backlog` runs from a lead home's tick at most every `JG_READY_STALL_POLL_SECS` (default 60), and the watcher's `ready_backlog_stall_state` owns the condition.
-The condition holds while a ready, unheld item could start now and the home has a free lane.
+The condition holds while a ready, unheld item could start now and either the home has a free lane or no worker is provably working.
 A free lane is fewer open lanes than `config/lane-target`, or than 4 without a usable one.
+A home at its floor still counts as stalled when no worker is provably working (the ready-work wake's "no worker working" case), so lanes that only wait on a merge or a cleanup never hide an idle lead.
 An item whose project's declared capacity is already held cannot start now, so it does not count (`bin/jg-project-capacity-lib.sh`).
 
 | rung | when | who acts |
 |---|---|---|
-| ready work on a free lane | first sight | the existing ready-work wake asks the lead to dispatch |
-| nothing started | `JG_READY_STALL_SECS` (default 900) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
+| ready work that could start | first sight | the existing ready-work wake asks the lead to dispatch |
+| nothing started | `JG_READY_STALL_SECS` (default 600) | the lead is woken again, and it reports `waiting-timer-backlog-overdue` to Main naming the lead and the ready task ids, which is Main's event; Main's relay steers the lead, interrupting it first when it is busy mid-turn |
 | still nothing started | every `JG_PROMPT_REALERT_SECS` | both fire again |
+| still open | `JG_WAIT_CARD_SECS` after Main's watcher first saw the report | the stalled backlog is recorded for Main to decide, not posted: a lead's own park-or-retry call is never the captain's |
 
 - A start is a lane id that was not open before; it ends the episode and re-arms the clock.
-- The condition clearing (no startable ready item, or no free lane) ends the episode, and a reported one is closed with `waiting-timer-cleared`.
+- The condition clearing (no startable ready item, a worker provably working at the floor, or a free lane gone) ends the episode, and a reported one is closed with `waiting-timer-cleared`.
 - An unreadable backlog leaves the episode untouched for that poll.
-- There is no board card rung for a stalled backlog.
+- While ready work waits but the condition does not hold, `state/.waiting-timers/.ready-backlog-why` holds one tab-separated line: when that reason began, the reason (`lanes-working` or `project-capacity`), and the open/target lane counts. It is the on-disk answer to why a waiting backlog raised no escalation, and it is removed when the condition holds or no ready work waits.
 - Episode record: `state/.waiting-timers/.ready-backlog`, one tab-separated line holding first-observed time, open lane ids (comma-joined, `-` for none), report key (`waiting-timer-<home>-<lead>-g<generation>-ready-backlog`), first report time (0 before it), and last fire time.
 
 ## Provenance: byte-identical to the fork at the move

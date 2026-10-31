@@ -222,6 +222,7 @@ install_guard_scripts() {
   cp "$ROOT/bin/jg-path-lib.sh" "$dir/bin/jg-path-lib.sh"
   cp "$ROOT/bin/jg-hook-host-lib.sh" "$dir/bin/jg-hook-host-lib.sh"
   cp "$ROOT/bin/jg-question-lib.sh" "$dir/bin/jg-question-lib.sh"
+  cp "$ROOT/bin/jg-owner-correction.sh" "$dir/bin/jg-owner-correction.sh"
   cp "$ROOT/bin/jg-session-lock-lib.sh" "$dir/bin/jg-session-lock-lib.sh"
   cp "$ROOT/bin/jg-cursor-lib.sh" "$dir/bin/jg-cursor-lib.sh"
   mkdir -p "$dir/docs"
@@ -587,6 +588,7 @@ test_hook_blocks_idle_squad_lead_with_ready_backlog() {
   local dir out status ids
   dir=$(make_squad_lead_dir "$TMP_ROOT/hook-squad-lead-ready")
   mkdir -p "$dir/data" "$dir/config"
+  : > "$dir/config/backlog-intake-loose"  # bare fixture items for the ready-work case
   cp "$ROOT"/bin/jg-*-lib.sh "$ROOT/bin/jg-tasks-axi.sh" "$dir/bin/"
   tasks() { JG_HOME="$dir" "$dir/bin/jg-tasks-axi.sh" "$@" >/dev/null || fail "fixture: tasks $*"; }
   tasks add held-one "held item"; tasks hold held-one --reason "waiting for approval"
@@ -943,7 +945,7 @@ test_tracked_claude_entries_inert_under_grok() {
   mkdir -p "$dir/bin"
   for script in jg-turnend-guard.sh jg-claude-stop-autoarm.sh jg-sessionstart-run.sh \
     jg-arm-pretool-check.sh jg-cd-pretool-check.sh jg-subagent-pretool-check.sh \
-    jg-host-mirror.sh; do
+    jg-host-mirror.sh jg-overwatch-kpi.sh; do
     printf '#!/usr/bin/env bash\nprintf ran >> %q\n' "$dir/invoked" > "$dir/bin/$script"
     chmod +x "$dir/bin/$script"
   done
@@ -984,7 +986,7 @@ test_tracked_claude_entries_inert_under_grok() {
       || fail "tracked entry for $target ran under a legacy GROK_AGENT environment"
   done < <(jq -r '.hooks[][].hooks[].command' "$ROOT/.claude/settings.json")
 
-  [ "$guarded" -eq 7 ] || fail "expected 7 grok-guarded tracked entries, saw $guarded"
+  [ "$guarded" -eq 8 ] || fail "expected 8 grok-guarded tracked entries, saw $guarded"
   [ "$unguarded" -eq 1 ] || fail "expected 1 documented unguarded tracked entry, saw $unguarded"
   pass "tracked .claude/settings.json entries: $guarded inert under grok, the documented subagent exception still armed, all live under Claude"
 }
@@ -1373,6 +1375,7 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/jg-path-lib.sh" "$dir/bin/jg-path-lib.sh"
   cp "$ROOT/bin/jg-hook-host-lib.sh" "$dir/bin/jg-hook-host-lib.sh"
   cp "$ROOT/bin/jg-question-lib.sh" "$dir/bin/jg-question-lib.sh"
+  cp "$ROOT/bin/jg-owner-correction.sh" "$dir/bin/jg-owner-correction.sh"
   cp "$ROOT/bin/jg-session-lock-lib.sh" "$dir/bin/jg-session-lock-lib.sh"
   cp "$ROOT/bin/jg-cursor-lib.sh" "$dir/bin/jg-cursor-lib.sh"
   cp "$ROOT/bin/jg-lock.sh" "$dir/bin/jg-lock.sh"

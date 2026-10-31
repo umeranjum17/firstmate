@@ -5,7 +5,7 @@
 # Usage:
 #   jg-procevent-signoff.sh arm
 #   jg-procevent-signoff.sh retire
-#   jg-procevent-signoff.sh raise <task-id> <title> <reason> <done|release>
+#   jg-procevent-signoff.sh raise <task-id> <title> <reason> <done|release> [--must <category>]
 #   jg-procevent-signoff.sh poll
 #   jg-procevent-signoff.sh answers <result-file>
 #   jg-procevent-signoff.sh ack <result-file>
@@ -24,6 +24,10 @@
 #            mode; otherwise it is a silent no-op. A failure, including a missing
 #            sign-off-axi, exits nonzero with sign-off's own output; the caller
 #            fails the hold command with that output (the hold stays recorded).
+#            --must <category> is the board gate (bin/jg-ask-gate-lib.sh): the
+#            category goes into the card's detail field, and under the
+#            when-it-matters leash a raise with none is refused and recorded for
+#            Overwatch (bin/jg-board-gate.sh route) instead of being posted.
 # poll       The blocking child the runner executes; never run it in a
 #            conversational turn. It prints one JSON object per line for each
 #            deliverable answer, `{"key","answer","label","close","at"}` with the
@@ -103,6 +107,8 @@ export JG_HOME
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-procevent-lib.sh
 . "$SCRIPT_DIR/jg-procevent-lib.sh"
+# shellcheck source=bin/jg-ask-gate-lib.sh
+. "$SCRIPT_DIR/jg-ask-gate-lib.sh"
 
 SOURCE_ID=signoff
 DELIVERED="$STATE/signoff-delivered"
@@ -186,17 +192,43 @@ built_title() {  # <task-title>
 }
 
 cmd_raise() {
-  [ "$#" -eq 4 ] || usage
-  local out identity title rc=0
+  local out identity title rc=0 must='' refusal rec args=() detail=() ticket=''
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --must) shift; must=${1-}; [ -n "$must" ] || usage ;;
+      *) args+=("$1") ;;
+    esac
+    shift
+  done
+  [ "${#args[@]}" -eq 4 ] || usage
+  set -- "${args[@]}"
   cmd_enabled || return 0
+  # The card rules (bin/jg-ask-gate-lib.sh) come first, because a hold his own
+  # stop order created, or one worded in our own vocabulary, is not a question
+  # for him at all. Then the must gate: a card carries its category in its
+  # detail field, and under the when-it-matters leash nothing else is raised.
+  title=$(card_title "$3")
+  [ -n "$title" ] || title=$(built_title "$2")
+  refusal=$(jg_ask_card_refusal "$1" 2 "$title" "$3") || true
+  [ -n "$refusal" ] || refusal=$(jg_ask_gate_refusal "$must") || true
+  if [ -n "$refusal" ]; then
+    rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "$3" --filer signoff --ref "$1" 2>&1) || rec=''
+    printf '%s\n' "$refusal" >&2
+    [ -z "$rec" ] || printf 'recorded for Overwatch: %s\n' "${rec#overwatch: }" >&2
+    return 1
+  fi
+  [ -z "$must" ] || detail=(--detail "must: $must")
   identity=$("$SCRIPT_DIR/jg-captain-hold.sh" open "$1" --identity 2>/dev/null) || {
     printf 'sign-off card not raised: the hold identity of %s could not be read\n' "$1" >&2
     return 1
   }
-  title=$(card_title "$3")
-  [ -n "$title" ] || title=$(built_title "$2")
+  # Name the ticket the board shows, so the reason this hold records renders
+  # beside that ticket's On hold row (bin/jg-ticket.sh owns the ticket id).
+  ticket=$("$SCRIPT_DIR/jg-ticket.sh" id "$1" 2>/dev/null) || ticket=''
+  [ -z "$ticket" ] || detail+=(--ticket "$ticket")
   out=$(signoff raise --key "$(home_key_prefix)$1-$(stamp_token "${identity%%#*}")" \
     --title "$title" --ask-ref "$1" --about "$3" --why "$(card_why "$3")" \
+    ${detail[@]+"${detail[@]}"} \
     --outcome yes="Answer recorded: yes." \
     --outcome no="Answer recorded: no." \
     --recommend yes --recommend-reason "The hold records no recommendation." \

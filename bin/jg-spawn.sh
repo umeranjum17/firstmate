@@ -672,25 +672,6 @@ case "$CLAUDE_PERMISSION_MODE" in
 auto) CLAUDE_PERM_FLAG='--permission-mode auto' ;;
 *) CLAUDE_PERM_FLAG='--dangerously-skip-permissions' ;;
 esac
-# config/lavish-axi-host is the primary-owned per-machine address for the
-# shared Lavish server. Read it once per launch and refuse malformed values so
-# every worker reaches the same server instead of starting a second one.
-if ! LAVISH_AXI_HOST_CONFIG_PRESENT=$(jg_config_source_present "$CONFIG/lavish-axi-host"); then
-  exit 1
-fi
-if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
-  if [ ! -f "$CONFIG/lavish-axi-host" ] || [ ! -r "$CONFIG/lavish-axi-host" ]; then
-    echo "error: config/lavish-axi-host must be a readable regular file" >&2
-    exit 1
-  fi
-  LAVISH_AXI_HOST=$(cat "$CONFIG/lavish-axi-host") || exit 1
-  case "$LAVISH_AXI_HOST" in
-    ''|*[[:space:][:cntrl:]]*)
-      echo "error: config/lavish-axi-host must contain one non-empty address without whitespace" >&2
-      exit 1
-      ;;
-  esac
-fi
 if ! KEEP_AI_TRAILERS=$(jg_config_source_present "$CONFIG/keep-ai-trailers"); then
   exit 1
 fi
@@ -3614,10 +3595,12 @@ if [ "$KIND" = ship ]; then
   # disagrees with it would tell the worker to open a pull request a Gerrit
   # server does not have, or to publish a change to a forge that is not Gerrit.
   if [ "$BRIEF_FORGE" != "$STANDING_FORGE" ]; then
+    risk_scaffold=
+    [ "$MODE" != no-mistakes ] || risk_scaffold=" --risk <release|security|migration|large-change|shared-protocol|fork-repo>"
     if [ "$STANDING_FORGE" = none ]; then
-      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE"
+      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE$risk_scaffold"
     else
-      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE --forge $STANDING_FORGE"
+      forge_scaffold="jg-brief.sh $ID $PROJ_NAME --mode $MODE --forge $STANDING_FORGE$risk_scaffold"
     fi
     echo "error: forge mismatch for $ID: $PROJ_NAME is registered forge=$STANDING_FORGE but $SOURCE_BRIEF records forge=$BRIEF_FORGE; keep the filled ## Captain's intent and ## Juggernaut spec bodies, remove $SOURCE_BRIEF, re-scaffold it with $forge_scaffold, then re-fill those two subsections, so the worker's publication matches the project's forge" >&2
     exit 1
@@ -3978,7 +3961,7 @@ if jg_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
   if jg_backlog_row_probe "$DATA" "$ID"; then
     BACKLOG_ROW_STATE=$JG_BACKLOG_ROW_STATE
   elif [ "$JG_BACKLOG_ROW_RESULT" = not_found ]; then
-    echo "error: task $ID has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/jg-tasks-axi.sh add $ID '<title>' --kind $KIND) and re-run" >&2
+    echo "error: task $ID has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/jg-tasks-axi.sh add $ID '[<type>] <title>' --kind $KIND --body '<why>') and re-run" >&2
     exit 1
   else
     echo "error: task $ID's backlog item could not be read before dispatch ($JG_BACKLOG_ROW_ERROR)" >&2
@@ -6019,9 +6002,6 @@ fi
 # LAUNCH_ENV_PREFIX construction below sets it again at the `env -i` boundary,
 # so under an enabled allowlist the switch is established before the wrapping
 # `/bin/sh` starts rather than only inside the command that shell runs.
-if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
-  LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
-fi
 # Every launch also exports the absolute path of this task's steering inbox, so
 # the constant doorbell line (bin/jg-task-inbox-lib.sh) can name
 # "$JG_TASK_INBOX" instead of a path that grows with the home's depth. Like the
@@ -6081,9 +6061,6 @@ spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
 spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=1"
-if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
-  spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
-fi
 # Mark the pane as a task worker so bin/jg-test-run.sh can refuse to run the
 # suite in the repository's primary checkout. Ship and scout workers are the
 # ones assigned an isolated worktree; a squad_lead runs its own home instead.
@@ -6118,7 +6095,7 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
     HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
     CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID JG_ZELLIJ_SESSION \
-    JG_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
+    JG_TASK_ID COMPACT_ADVISER_DISABLE \
     $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
     # the pane shell and never become source text or spawn-process snapshots.

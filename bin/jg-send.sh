@@ -50,6 +50,12 @@
 # ordinary record by the worker's acknowledgement move into handled/.
 # bin/jg-task-inbox-lib.sh owns the record format, doorbell line, and retry and
 # escalation policy for ordinary and fire-and-forget records.
+# Ordering on this plane is the contract: the record is written BEFORE anything
+# tries to reach the agent at all, so the message survives a slow, refused, or
+# impossible delivery. Waking a dormant squad_lead is therefore asynchronous
+# (jg_send_wake_dormant_lead): a relaunch waits for the replacement agent to
+# come up, and a send that waited with it would hold the caller for minutes and,
+# if the caller gave up first, leave the message unrecorded.
 # The composer pre-check before the ring is ADVISORY only: when
 # the composer visibly holds pending text the ring is skipped with a notice and
 # the watcher re-rings an ordinary record later; no composer verdict is
@@ -276,6 +282,8 @@ fi
 . "$SCRIPT_DIR/jg-wake-lib.sh"
 # shellcheck source=bin/jg-task-inbox-lib.sh
 . "$SCRIPT_DIR/jg-task-inbox-lib.sh"
+# shellcheck source=bin/jg-squad-lead-registry-lib.sh
+. "$SCRIPT_DIR/jg-squad-lead-registry-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$SCRIPT_DIR/jg-timeout-lib.sh"
 
@@ -285,6 +293,24 @@ jg_send_id_from_meta() { # <meta-file>
   local base
   base=${1##*/}
   printf '%s' "${base%.meta}"
+}
+
+# #fleet: the steer is also a message on the fleet chat channel, written here
+# because this is the call site that already records the send (bin/jg-chat.sh).
+# Best-effort by contract: a chat problem never changes the outcome of a send.
+# JG_CHAT_FROM names the sender; bin/jg-chat.sh send sets it to "captain".
+jg_send_chat_steer() {
+  [ -x "$SCRIPT_DIR/jg-chat.sh" ] || return 0
+  # The agent the record reached: the task id this selector resolved to, never
+  # the backend's own target name, so the chat row names the agent, not the pane.
+  local to=${TARGET_TASK_ID:-}
+  if [ -z "$to" ] && [ -n "${TARGET_META:-}" ] && [ -f "$TARGET_META" ]; then
+    to=$(jg_send_id_from_meta "$TARGET_META")
+  fi
+  [ -n "$to" ] || to=${TARGET_REMOTE_ID:-$T}
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/jg-chat.sh" note '#fleet' "${JG_CHAT_FROM:--}" "$to" agent - "$MESSAGE" \
+    >/dev/null 2>&1 || true
 }
 
 # jg_send_clear_after_interrupt: muse RESTORES the interrupted prompt back into
@@ -551,6 +577,22 @@ MARK_FROM_JUGGERNAUT=0
 PENDING_REPLY_CORR=
 PENDING_REPLY_CREATED=0
 TARGET_TASK_ID=
+# jg_send_wake_dormant_lead: relaunch a dormant squad_lead whose work this send
+# carries (bin/jg-squad-lead-dormant.sh). Waking is ASYNCHRONOUS on purpose: the
+# relaunch waits for the replacement agent to come up, so a send that waited with
+# it would hold the caller for minutes - and a caller that gives up first would
+# leave the message unrecorded, which is the one outcome this plane forbids. The
+# inbox record written before this call IS the delivery, so the wake only shortens
+# the time until the lead reads it; a wake that never lands is covered by the
+# dormant sweep, which relaunches a lead that gained work by any route. Detached
+# the same way bin/jg-session-start.sh detaches its sentinel.
+jg_send_wake_dormant_lead() { # <task-id>
+  ( set -m
+    JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+      nohup "$SCRIPT_DIR/jg-squad-lead-dormant.sh" wake "$1" >/dev/null 2>&1 </dev/null &
+  ) || true
+}
+
 jg_send_known_undelivered_cleanup() {
   [ -n "$PENDING_REPLY_CORR" ] || return 0
   if [ "$PENDING_REPLY_CREATED" = 1 ]; then
@@ -1037,6 +1079,8 @@ else
       jg_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       jg_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
     fi
+    # The remote record is durable delivery, so the steer is a fact on #fleet too.
+    jg_send_chat_steer
     exit 0
   fi
   if [ "$INBOX_PLANE" = 1 ]; then
@@ -1085,6 +1129,9 @@ else
       exit 1
     fi
     jg_lock_release "$INBOX_META_LOCK"
+    # The record is durable, so the steer is a fact: it also lands on the fleet
+    # chat channel, from the call site that already recorded it.
+    jg_send_chat_steer
     # Enqueue IS durable delivery to the task's record: mark the pending
     # expectation delivered now, without resolving it - only a correlated
     # parent report acknowledges the request.
@@ -1114,6 +1161,12 @@ else
       jg_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       jg_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
     fi
+    # The record is durable: now wake a dormant lead, without waiting for it.
+    WAKE_STARTED=0
+    if [ -n "$TARGET_TASK_ID" ] && squad_lead_dormant "$STATE" "$TARGET_TASK_ID"; then
+      jg_send_wake_dormant_lead "$TARGET_TASK_ID"
+      WAKE_STARTED=1
+    fi
     # Ring the doorbell, best-effort: no ring outcome changes the exit status,
     # because the watcher owns loss detection from here, either through its
     # bounded re-ring ladder or direct unavailable-endpoint recovery.
@@ -1135,7 +1188,7 @@ else
     case "$ring_rc" in
     1) echo "jg-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry. To ring now, submit the pending text with 'jg-send.sh $INBOX_TASK_ID --key Enter' (or clear the composer); the next ring then lands." >&2 ;;
     2) echo "jg-send: doorbell did not reach $T${JG_TASK_INBOX_RING_REASON:+ ($JG_TASK_INBOX_RING_REASON)}; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
-    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-operator-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
+    3) echo "jg-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-operator-recovery), and the watcher will not re-ring a dead pane${WAKE_STARTED:+ - its squad lead was woken and drains the inbox when it comes up}" >&2 ;;
     esac
     exit 0
   fi
@@ -1218,6 +1271,8 @@ else
     exit 1
     ;;
   esac
+  # Delivery confirmed: the steer also lands on the fleet chat channel.
+  jg_send_chat_steer
   # Delivery confirmed. Mark the pending expectation delivered without resolving
   # it: only a correlated parent report acknowledges the request.
   if [ -n "$PENDING_REPLY_CORR" ]; then

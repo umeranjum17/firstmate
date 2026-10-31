@@ -167,11 +167,12 @@ printf '%s\n' "$*" >>"$DD_POOL_LOG"
 jq -n --arg id "${POOL_ID:-acct1}" --arg f "$POOL_FOLDER" '{ok: true, id: $id, set: {CLAUDE_CONFIG_DIR: $f}, unset: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]}'
 STUB
 
-# The stub gh: a PR's Checks body and branch, as `gh pr view --json body,headRefName` gives them.
+# The stub gh: a PR's Checks body, own title and branch, as `gh pr view --json ...` gives them.
 cat > "$work/bin/gh" <<'STUB' || exit 1
 #!/usr/bin/env bash
 case " $* " in *" --jq .headRefOid "*) printf '%s\n' "${GH_HEAD:-}"; exit 0 ;; esac
 case " $* " in *" --jq .body "*) cat "$GH_BODY"; exit 0 ;; esac
+case " $* " in *" --jq .title "*) if [ -n "${GH_TITLE:-}" ]; then cat "$GH_TITLE"; fi; exit 0 ;; esac
 jq -n --rawfile body "$GH_BODY" '{body: $body, headRefName: "fm/older"}'
 STUB
 
@@ -671,17 +672,22 @@ is "new head: repeat post dedupes" "$(wc -l < "$SO_LOG")" "$so_before"
 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" follows "$wt" "$head_c" https://github.com/o/r/pull/13 >/dev/null
 is "two PRs: two live cards" "$(jq -r '[.items[] | select(.dismissed != true) | .key | sub("-[0-9a-f]{12}$"; "")] | sort | join(",")' "$work/board.json")" "merge-o-r-pull-12,merge-o-r-pull-13"
 
-# A screen-free PR's card is titled with its repo and PR number.
+# A screen-free PR's card is titled with the PR's own outcome sentence, trailing scaffolding trimmed.
 GH_BODY=$work/titled-body.md
-export GH_BODY
+GH_TITLE=$work/titled-title.txt
+printf '[design-ux] Retire the old sign-off card\n' >"$GH_TITLE"
+export GH_BODY GH_TITLE
 checks titled shot.png && printf 'screen: none\n' >> "$home/data/titled/checks.md" && cp "$shot" "$home/data/titled/shot.png" && cp "$home/data/titled/checks.md" "$GH_BODY"
 mk_run titled 20261020T000000Z-titled0001 0
 jq '.items=[]' "$work/board.json" > "$work/board.tmp" && mv "$work/board.tmp" "$work/board.json"
 SO_CAPTURE=$work/card-titled
 export SO_CAPTURE
 PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" post --board "$work/board.json" titled "$wt" "$head_c" https://github.com/o/muxr/pull/1012 >/dev/null
-is "internal title names repo and PR" "$(jq -r .title "$work/card-titled/card.json")" "muxr #1012: internal change passed its checks"
+is "internal title is the PR's outcome sentence" "$(jq -r .title "$work/card-titled/card.json")" "Retire the old sign-off card"
+bash "$here/../merge-card" generic-title "$(jq -r .title "$work/card-titled/card.json")" && no "internal title passes the generic-title refusal" || ok "internal title passes the generic-title refusal"
 GH_BODY=$work/pr-body.md
+GH_TITLE=
+export GH_BODY GH_TITLE
 
 # A merge hook passes head `-` for a PR: a screen-free PR still finds its sealed run at the PR head, from gh.
 GH_BODY=$work/headdash-body.md
@@ -785,6 +791,63 @@ for c in "$work"/card-*/card.json; do
   if [ "$(jq -r .kind "$c")" = report ]; then no "never any report kind: $c"; else ok "never any report kind: $(basename "$(dirname "$c")")"; fi
   if jq -e 'has("filed")' "$c" >/dev/null; then no "no filed field: $c"; else ok "no filed field: $(basename "$(dirname "$c")")"; fi
 done
+
+# The receipt question, both sides, with temp data folders and no mocks: a head with a sealed clean run
+# passes, and a head with no run refuses. A fake head has no done-done receipt, so the run scan decides.
+sealed_pass=20261031T000000Z-sealed0001
+mkdir -p "$home/data/receipt-pass/.done-done/runs" "$home/data/receipt-none"
+jq -n --arg c "$head_c" --arg id "$sealed_pass" \
+  '{schema:1, run_id:$id, commit:$c, dirty:false, exit:0, started_at:"2026-10-31T00:00:00.000Z", files:[{path:"\($id)/shot.png"}]}' \
+  >"$home/data/receipt-pass/.done-done/runs/$sealed_pass.json"
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt receipt-pass "$head_c"
+is "receipt: a sealed clean run at the head passes" "$?" 0
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt-json receipt-pass "$head_c" >"$work/receipt-pass.json" 2>/dev/null
+is "receipt: the pass carries the sealed run" "$?" 0
+is "receipt: the pass names the sealed run" "$(jq -r .run_id "$work/receipt-pass.json")" "$sealed_pass"
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt receipt-none "$head_c"
+is "receipt: a head with no run refuses" "$?" 1
+PATH="$work/bin:$PATH" JG_HOME=$home "$here/../merge-card" receipt-json receipt-none "$head_c" >"$work/receipt-none.out" 2>/dev/null
+is "receipt: a head with no run prints no receipt" "$?" 1
+is "receipt: a refusing head prints nothing" "$(cat "$work/receipt-none.out")" ""
+
+# done-done's own receipt answers first: when it holds one at the head, no run record is needed at all.
+# The real done-done reads a temp evidence root holding a real receipt, in a temp lane worktree at that head.
+if command -v done-done >/dev/null; then
+  ddstore=$work/ddone
+  dd_ev=$ddstore/e2e
+  ddlane=$work/ddlane
+  mkdir -p "$dd_ev/.done-done/receipts" "$ddlane" "$home/state"
+  [ -d "$home/.git" ] || git init -q "$home"
+  printf 'app: e2e\nevidence:\n  root: %s\n' "$dd_ev" >"$home/.done-done.yaml"
+  cp "$home/.done-done.yaml" "$ddlane/.done-done.yaml"
+  git init -q "$ddlane"
+  git -C "$ddlane" -c user.email=e2e@example.invalid -c user.name=e2e commit -q --allow-empty -m 'the merge head'
+  dd_head=$(git -C "$ddlane" rev-parse HEAD)
+  dd_tree=$(git -C "$ddlane" rev-parse "$dd_head^{tree}")
+  printf 'the proof the judge read\n' >"$ddlane/proof.log"
+  dd_sha=$(if command -v sha256sum >/dev/null; then sha256sum "$ddlane/proof.log" | awk '{print $1}'; else shasum -a 256 "$ddlane/proof.log" | awk '{print $1}'; fi)
+  jq -n --arg head "$dd_head" --arg tree "$dd_tree" --arg p "$ddlane/proof.log" --arg sha "$dd_sha" '
+    {schema:2, repo:"e2e", head:$head, tree:$tree, claim:"a stopped worker moves to the next live route",
+     result:"pass", at:"2026-10-31T00:00:00.000Z", files:[{path:$p, sha256:$sha}],
+     runs:[{run_id:"20261031T000000Z-ddreceipt01-abcdef", commit:$head, journey:null, command:"bash drive.sh", tool:"0.6.24",
+            steps:{target:{version:"e2e 1"}, start:"a stopped worker", steps:["the worker stops", "the next live route starts"], result:"the next live route runs"}}],
+     judge:{route:"claude-code", model:"claude-haiku-5-5", independence:"session-only",
+            verdicts:[{path:$p, sha256:$sha, verdict:"pass"}]}}' >"$dd_ev/.done-done/receipts/$dd_head.json"
+  printf 'worktree=%s\n' "$ddlane" >"$home/state/receipt-ddone.meta"
+  mkdir -p "$home/data/receipt-ddone"
+  JG_HOME=$home "$here/../merge-card" receipt-json receipt-ddone "$dd_head" >"$work/receipt-ddone.json" 2>"$work/receipt-ddone.err"
+  is "done-done receipt: the head passes without a run record" "$?" 0
+  is "done-done receipt: no run record is needed" "$(ls -d "$home/data/receipt-ddone/.done-done" 2>/dev/null)" ""
+  is "done-done receipt: the receipt names its run" "$(jq -r .run_id "$work/receipt-ddone.json")" 20261031T000000Z-ddreceipt01-abcdef
+  is "done-done receipt: the receipt covers the head" "$(jq -r .commit "$work/receipt-ddone.json")" "$dd_head"
+  is "done-done receipt: the receipt names its evidence" "$(jq -c .files "$work/receipt-ddone.json")" '["proof.log"]'
+  JG_HOME=$home "$here/../merge-card" receipt receipt-ddone "$dd_head"
+  is "done-done receipt: receipt agrees" "$?" 0
+  JG_HOME=$home "$here/../merge-card" receipt receipt-ddone "b18d2598a4852810412964192ec0713c5914b961"
+  is "done-done receipt: another head still refuses" "$?" 1
+else
+  ok "done-done receipt: skipped, no done-done on PATH"
+fi
 
 if [ "$fails" -eq 0 ]; then
   echo "merge-card e2e: all assertions held"

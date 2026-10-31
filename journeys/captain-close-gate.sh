@@ -23,10 +23,10 @@ step() {  # <label> <want rc> <args...>
   expect "$label" "$want" "$rc"
 }
 {
-  for id in rejected quoted carded plain; do jg add "$id" "$([ $id = plain ] && echo ordinary || echo "[captain-ask] $id")" >/dev/null; done
+  for id in rejected quoted carded plain; do jg add "$id" "$([ $id = plain ] && echo "[feature] ordinary" || echo "[captain-ask] $id")" --body "asked: $id" >/dev/null; done
   printf 'Yes.\n' > "$T/answer.txt"
-  jg add card-1 "[captain-ask] confirm closing carded" >/dev/null
-  jg add card-2 "[captain-ask] confirm closing rejected" >/dev/null
+  jg add card-1 "[captain-ask] confirm closing carded" --body "asked: close carded" >/dev/null
+  jg add card-2 "[captain-ask] confirm closing rejected" --body "asked: close rejected" >/dev/null
   hold hold card-2 --reason "confirm" >/dev/null
   hold hold card-1 --reason "confirm" >/dev/null && hold answer card-1 --decision-file "$T/answer.txt" >/dev/null
   step "cancel a captain-asked ticket, no words" 2 rm rejected

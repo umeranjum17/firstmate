@@ -15,7 +15,12 @@
 # its completion receipt (state/<id>.run-receipt.json, the receipts add-on's record)
 # binds the candidate head with verdict PASS and its evidence carries a
 # `first-draft receipt: <ref>` line. design_call=no passes; a record with no
-# design_call (an older task) warns and counts as no. jg_dod_demo_gate is the same
+# design_call (an older task) warns and counts as no. A task past the small-tweak size
+# rule is design work whatever its call, and a smaller UI change needs the lead's or
+# Main's hand-roll approval; bin/jg-design-gate.sh owns that contract. The receipt line
+# is resolved, never believed: its run record must prove a make or refine and list every
+# .html page the change adds, so a judge-only record and hand-authored option HTML are
+# refused by name. jg_design_done_gate applies the same rule at done. jg_dod_demo_gate is the same
 # check for TakeOne demo videos, behind the config/takeone-demo switch.
 # jg-compat (shim, slice S1; deleted by S10): old names still resolve.
 # The hooks also get FM_HOME (the pre-rename name) because installed add-on hooks and done-done's merge-gate still read it; delete with the S10 shim.
@@ -41,6 +46,8 @@ else
 fi
 set -u
 
+# shellcheck source=bin/jg-squad-lead-parent-lib.sh
+[ ! -r "$_jg_d/jg-squad-lead-parent-lib.sh" ] || . "$_jg_d/jg-squad-lead-parent-lib.sh"
 # shellcheck source=bin/jg-timeout-lib.sh
 . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/jg-timeout-lib.sh"
 
@@ -86,18 +93,177 @@ _jg_dod_receipt_line() {  # <state> <id> <head> <label>
     ' "$receipt" >/dev/null 2>&1
 }
 
+# The size rule (bin/jg-design-gate.sh owns it): UI files are matched by name, and a
+# change is a small tweak when they change at most 40 lines and none is new.
+JG_DESIGN_UI_RE='[.](html?|css|scss|sass|less|svg|jsx|tsx|vue|svelte|astro)$'
+JG_DESIGN_TWEAK_LINES=40
+
+# The captain's rule (30 Oct 2026): a design option first-draft did not make or refine is
+# not a design option. `make` and `refine` print one run record naming the page they made, a
+# `judge` record names only what it scored, and hand-authored HTML has none, so the receipt
+# line is resolved and read. A reference is absolute or worktree-relative.
+JG_DESIGN_RECEIPT_LABEL='first-draft receipt'
+
+# A path in absolute form without realpath: a known directory resolves with pwd -P.
+jg_design_path_key() {  # <path>
+  local p=$1 d b
+  case $p in /*) ;; *) p=$PWD/$p ;; esac
+  d=${p%/*}; b=${p##*/}
+  [ -n "$d" ] || d=/
+  printf '%s/%s\n' "$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")" "$b"
+}
+
+# Refuse a design option first-draft did not make or refine, one line per refusal.
+# --ref <ref>[,<ref>...] --root <dir> -- <option>...
+jg_design_fd_check() {
+  local ref='' root=$PWD rest one rec files keys='' key o rc=0 generated=0 seen=
+  local -a OPTS=()
+  while [ "$#" -gt 0 ]; do
+    case $1 in
+      --ref) shift; ref=${1:-} ;;
+      --root) shift; root=${1:-$PWD} ;;
+      --) shift; while [ "$#" -gt 0 ]; do OPTS+=("$1"); shift; done; break ;;
+      *) printf 'jg-design-gate: unknown argument %s\n' "$1" >&2; return 2 ;;
+    esac
+    shift
+  done
+  if [ -z "$ref" ]; then
+    echo "refused: no first-draft receipt was named, so first-draft made no design option"
+    return 1
+  fi
+  rest=$ref
+  while [ -n "$rest" ]; do
+    one=${rest%%,*}
+    case $rest in *,*) rest=${rest#*,} ;; *) rest='' ;; esac
+    [ -n "$one" ] || continue
+    rec=$one
+    case $rec in /*) ;; *) rec=$root/$rec ;; esac
+    [ -f "$rec" ] && [ ! -L "$rec" ] || continue
+    seen=1
+    files=$(jq -r 'if ((.made.files // []) | length) > 0 or ((.refined.file // "") | length) > 0 then
+        ([(.made.files // [])[]? | .file] + [.refined.file // empty])[] | select(type == "string" and length > 0)
+      else empty end' "$rec" 2>/dev/null) || continue
+    [ -n "$files" ] || continue
+    generated=1
+    keys="$keys
+$(printf '%s\n' "$files" | while IFS= read -r key; do jg_design_path_key "$key"; done)"
+  done
+  if [ "$generated" != 1 ]; then
+    if [ -n "$seen" ]; then
+      echo "refused: first-draft receipt '$ref' is a judge-only run: it scored pages and made none, so it proves no design option"
+    else
+      echo "refused: first-draft receipt '$ref' does not resolve to a run record, so no design option has a make or refine receipt"
+    fi
+    rc=1
+  fi
+  for o in ${OPTS[@]+"${OPTS[@]}"}; do
+    [ -n "$o" ] || continue
+    printf '%s\n' "$keys" | grep -Fxq -- "$(jg_design_path_key "$o")" && continue
+    echo "refused: option $o has no first-draft make or refine receipt, so first-draft did not make or refine it"
+    rc=1
+  done
+  return "$rc"
+}
+
+# The `<label>: <value>` values of a completion receipt bound to <head> with PASS,
+# comma-joined; empty otherwise. bin/jg-design-gate.sh board takes the same list.
+jg_design_receipt_value() {  # <state> <id> <head> <label>
+  _jg_dod_receipt_line "$1" "$2" "$3" "$4" || return 1
+  jq -r '.evidence // ""' "$1/$2.run-receipt.json" \
+    | sed -n -E "s/^$4: ([^[:space:]].*[^[:space:]])[[:space:]]*\$/\1/p" | paste -sd, -
+}
+
+# The .html pages a change adds: the options it presents.
+# ponytail: added pages only, so a design task that rewrites an existing page stays under
+# the size rule; widen this if a rewritten option ever needs the receipt too.
+jg_design_added_pages() {  # <worktree> <base-branch> <head>
+  local wt=$1 base=${2:-main} head=$3 ref mb
+  [ -d "$wt" ] && git -C "$wt" cat-file -e "$head^{commit}" 2>/dev/null || return 1
+  ref=origin/$base
+  git -C "$wt" rev-parse -q --verify "$ref^{commit}" >/dev/null || ref=$base
+  mb=$(git -C "$wt" merge-base "$ref" "$head" 2>/dev/null) || return 1
+  git -C "$wt" diff --name-only --no-renames --diff-filter=A "$mb" "$head" | grep -iE '[.]html?$'
+}
+
+# 0 when a design task's receipt names a record that made or refined every page it adds.
+jg_design_first_draft_ok() {  # <state> <id> <meta> <head>
+  local state=$1 id=$2 meta=$3 head=$4 ref wt page
+  local -a OPTS=()
+  wt=$(jg_dod_meta_value "$meta" worktree)
+  ref=$(jg_design_receipt_value "$state" "$id" "$head" "$JG_DESIGN_RECEIPT_LABEL") || ref=''
+  if [ -n "$wt" ] && [ -d "$wt" ]; then
+    while IFS= read -r page; do [ -n "$page" ] && OPTS+=("$wt/$page"); done \
+      < <(jg_design_added_pages "$wt" "$(jg_dod_meta_value "$meta" base_branch)" "$head")
+  fi
+  jg_design_fd_check --ref "$ref" --root "${wt:-$PWD}" -- ${OPTS[@]+"${OPTS[@]}"}
+}
+
+# 0 for a task that is not design work, and for design work proved by first-draft; 1
+# with the refusal printed when an option it presents has no make or refine record.
+jg_design_done_gate() {  # <state> <id> <meta> <head>
+  local state=$1 id=$2 meta=$3 head=$4 call size
+  [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
+  call=$(jg_dod_meta_value "$meta" design_call)
+  size=$(jg_design_size "$(jg_dod_meta_value "$meta" worktree)" "$(jg_dod_meta_value "$meta" base_branch)" "$head") || size=''
+  [ "$call" = yes ] || [ "${size%% *}" = design ] || return 0
+  jg_design_first_draft_ok "$state" "$id" "$meta" "$head"
+}
+
+jg_design_size() {  # <worktree> <base-branch> <head>: prints `design|tweak <ui-lines> <new-ui-files>`
+  local wt=$1 base=${2:-main} head=$3 ref mb lines new
+  [ -d "$wt" ] && git -C "$wt" cat-file -e "$head^{commit}" 2>/dev/null || return 2
+  ref=origin/$base
+  git -C "$wt" rev-parse -q --verify "$ref^{commit}" >/dev/null || ref=$base
+  mb=$(git -C "$wt" merge-base "$ref" "$head" 2>/dev/null) || return 2
+  lines=$(git -C "$wt" diff --numstat --no-renames "$mb" "$head" \
+    | awk -F'\t' -v re="$JG_DESIGN_UI_RE" 'tolower($3) ~ re && $1 != "-" { n += $1 + $2 } END { print n + 0 }')
+  new=$(git -C "$wt" diff --name-only --no-renames --diff-filter=A "$mb" "$head" | grep -ciE "$JG_DESIGN_UI_RE")
+  if [ "$new" -gt 0 ] || [ "$lines" -gt "$JG_DESIGN_TWEAK_LINES" ]; then echo "design $lines $new"; else echo "tweak $lines $new"; fi
+}
+
+jg_design_main_home() {  # <home>: the main home it reports to, following local squad lead parents
+  local h=$1 depth=0
+  while [ "$depth" -lt 8 ]; do
+    [ -e "$(jg_compat_marker "$h")" ] || { printf '%s\n' "$h"; return 0; }
+    declare -F jg_squad_lead_parent_record_parse >/dev/null || return 1
+    jg_squad_lead_parent_record_parse "$(jg_compat_parent_marker "$h")" && [ "$JG_SQUAD_LEAD_PARENT_ROUTE" = local ] || return 1
+    h=$JG_SQUAD_LEAD_PARENT_HOME
+    depth=$((depth + 1))
+  done
+  return 1
+}
+
+jg_design_handroll_ok() {  # <state> <id>: the lead or Main approved hand-rolling this small UI change
+  local f=$1/design-approvals/$2.handroll.json
+  [ -f "$f" ] && [ ! -L "$f" ] && jq -e --arg id "$2" '.schema == 1 and .task == $id and (.by | type == "string" and length > 0)' "$f" >/dev/null 2>&1
+}
+
 jg_dod_design_gate() {  # <state> <id> <meta> <candidate-head>
-  local state=$1 id=$2 meta=$3 head=$4 call
+  local state=$1 id=$2 meta=$3 head=$4 call size
   [ -n "$state" ] && [ -n "$id" ] && [ -f "$meta" ] || return 0
   call=$(jg_dod_meta_value "$meta" design_call)
   case $call in
-    no) return 0 ;;
-    '') echo "warning: $id has no design call recorded (an older brief); counting it as design_call=no" >&2; return 0 ;;
-    yes) ;;
+    no|yes) ;;
+    '') echo "warning: $id has no design call recorded (an older brief); counting it as design_call=no" >&2 ;;
     *) echo "merge refused: design call for $id is malformed ('$call'); expected yes or no"; return 1 ;;
   esac
-  _jg_dod_receipt_line "$state" "$id" "$head" "first-draft receipt" && return 0
-  echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  size=$(jg_design_size "$(jg_dod_meta_value "$meta" worktree)" "$(jg_dod_meta_value "$meta" base_branch)" "$head") \
+    || { [ "$call" = yes ] || echo "warning: cannot measure the UI change of $id at $head; using its design call" >&2; }
+  if [ "$call" != yes ] && [ "${size%% *}" != design ]; then
+    case $size in ''|'tweak 0 0') return 0 ;; esac
+    jg_design_handroll_ok "$state" "$id" && return 0
+    echo "merge refused: $id hand-rolls a small UI change (${size#tweak }: UI lines, new UI files) with no hand-roll approval; its lead or Main runs bin/jg-design-gate.sh handroll $id"
+    return 1
+  fi
+  if _jg_dod_receipt_line "$state" "$id" "$head" "$JG_DESIGN_RECEIPT_LABEL"; then
+    jg_design_first_draft_ok "$state" "$id" "$meta" "$head" && return 0
+    return 1
+  fi
+  if [ "$call" = yes ]; then
+    echo "merge refused: $id is a design task (first-draft: yes) and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  else
+    echo "merge refused: $id changes ${size#design } (UI lines, new UI files), past the small-tweak size, and its completion receipt for this head has no 'first-draft receipt: <ref>' evidence line; produce the design with first-draft and republish the receipt"
+  fi
   return 1
 }
 

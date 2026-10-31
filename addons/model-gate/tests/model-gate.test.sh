@@ -111,4 +111,19 @@ inst --remove
 is "remove takes its whitelist and check away" "$(jq -r '.provider["ollama-cloud"].whitelist // "absent"' "$w/oc.json") $(find "$w/home" -name 'model-gate*' | wc -l)" 'absent 0'
 is "remove keeps the models, other providers and the allow-list" "$(jq -r '(.provider["ollama-cloud"].models|length|tostring) + (.provider.openrouter.models|length|tostring)' "$w/oc.json") $([ -e "$list" ] && echo kept)" '21 kept'
 
+# The shared config survives concurrent runs and a truncated write: always valid, non-empty JSON, never replaced by garbage.
+jq 'del(.provider["ollama-cloud"].whitelist)' "$w/oc.json" >"$w/oc.tmp" && mv "$w/oc.tmp" "$w/oc.json"
+for _ in 1 2 3 4 5 6; do "$gate" opencode >/dev/null 2>&1 & done; wait
+is "concurrent runs leave valid JSON with the whitelist" "$(jq -c '.provider["ollama-cloud"].whitelist' "$w/oc.json" 2>&1)" '["deepseek-v4.1-flash"]'
+is "concurrent runs leave no lock or temp file" "$(find "$w" -maxdepth 1 \( -name 'oc.json.lock' -o -name 'oc.json.tmp.*' \) | wc -l)" 0
+mkdir "$w/trunc"
+# shellcheck disable=SC2016 # the stub script body is meant literal
+printf '#!/bin/sh\n[ "$1" = --arg ] && { printf "{\\"provi"; exit 0; }\nexec /usr/bin/jq "$@"\n' >"$w/trunc/jq"; chmod +x "$w/trunc/jq"
+jq 'del(.provider["ollama-cloud"].whitelist)' "$w/oc.json" >"$w/oc.tmp" && mv "$w/oc.tmp" "$w/oc.json"
+before=$(cksum <"$w/oc.json")
+PATH=$w/trunc:$PATH "$gate" opencode >/dev/null 2>"$w/log/trunc.err"; rc=$?
+is "a truncated write is refused, non-zero" "$rc" 2
+is "a truncated write leaves the original byte for byte" "$(cksum <"$w/oc.json")" "$before"
+is "the refusal says why" "$(grep -c 'refusing to write' "$w/log/trunc.err")" 1
+
 [ "$fails" -eq 0 ] && echo PASS || { echo "FAIL: $fails"; exit 1; }

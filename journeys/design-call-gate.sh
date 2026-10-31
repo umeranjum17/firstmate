@@ -37,8 +37,9 @@ gate() { jg_dod_design_gate "$T/home/state" "$1" "$T/home/state/$1.meta" "$HEAD_
   echo "--- yes, no receipt";            out=$(gate t-yes); echo "$out"; expect yes-no-receipt "exit=1" "$(echo "$out" | tail -1)"
   receipt t-yes "ran tests only"
   echo "--- yes, receipt without line";  out=$(gate t-yes); echo "$out"; expect yes-no-line "exit=1" "$(echo "$out" | tail -1)"
+  jq -n '{made:{command:"make",files:[{file:"designs/option-1.html"}]}}' > "$T/fd-0001"
   receipt t-yes $'ran tests\nfirst-draft receipt: fd-0001'
-  echo "--- yes, receipt with line";     out=$(gate t-yes); echo "$out"; expect yes-with-line "exit=0" "$(echo "$out" | tail -1)"
+  echo "--- yes, receipt with a first-draft make record"; out=$(gate t-yes); echo "$out"; expect yes-with-line "exit=0" "$(echo "$out" | tail -1)"
   echo "--- no";                         out=$(gate t-no);  echo "$out"; expect no "exit=0" "$(echo "$out" | tail -1)"
   echo "--- missing (older brief)";      out=$(gate t-old); echo "$out"; expect missing "exit=0" "$(echo "$out" | tail -1)"
   case $out in *"counting it as design_call=no"*) ;; *) echo "FAIL missing: no warning"; : > "$T/fails" ;; esac
@@ -46,8 +47,8 @@ gate() { jg_dod_design_gate "$T/home/state" "$1" "$T/home/state/$1.meta" "$HEAD_
 cat > "$OUT/steps.json" <<'J'
 {"target":{"version":"juggernaut bin/jg-brief.sh and bin/jg-merge-gate-lib.sh at this commit"},
  "start":"a disposable juggernaut home",
- "steps":["scaffold ship briefs with design call yes, no and none","run the design gate on a yes task with no receipt, a receipt without the first-draft line, and a receipt with it","run the gate on a no task and on a task with no recorded call"],
- "result":"the yes task is refused until its receipt carries a first-draft receipt line; the no task passes; the older task warns and passes"}
+ "steps":["scaffold ship briefs with design call yes, no and none","run the design gate on a yes task with no receipt, a receipt without the first-draft line, and a receipt whose line names a first-draft make record","run the gate on a no task and on a task with no recorded call"],
+ "result":"the yes task is refused until its receipt carries a first-draft receipt line that names a make record; the no task passes; the older task warns and passes"}
 J
 status=0
 [ -e "$T/fails" ] && status=1

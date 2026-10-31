@@ -1616,8 +1616,8 @@ SH
 
 # A cycle that ends on an actionable wake leaves a fresh beacon: the arm
 # restarts it, and until the next scan finishes no other process proves a
-# watcher ran. The replacement still starts with no beacon and publishes one
-# only after a full scan, so it never announces recovery while checks block.
+# watcher ran. The replacement retains that timestamp through its first scan
+# without renewing it while checks block.
 test_actionable_exit_leaves_a_fresh_beacon() (
   local dir state fakebin beat seeded exited stamp arm='' i
   dir=$(make_case actionable-exit-beacon)
@@ -1643,7 +1643,7 @@ test_actionable_exit_leaves_a_fresh_beacon() (
   exited=$(jg_path_age "$beat")
   [ "$exited" -lt 60 ] || fail "the beacon an actionable exit left is stale (${exited}s)"
   printf '# beacon age: seeded %ss -> after actionable exit %ss\n' "$seeded" "$exited"
-  # The replacement clears it and publishes again only once its scan finishes.
+  # The replacement retains it and renews it only once its scan finishes.
   cat > "$state/hold.check.sh" <<SH
 #!/usr/bin/env bash
 : > "$dir/holding"
@@ -1660,15 +1660,16 @@ SH
     sleep 0.1
   done
   [ -e "$dir/holding" ] || fail "the replacement never reached its blocked check: $(cat "$dir/replace.out")"
-  [ ! -e "$beat" ] || fail "the replacement inherited the exit beacon while its checks blocked"
+  [ -e "$beat" ] || fail "the replacement deleted the exit beacon while its checks blocked"
+  touch -t 200001010000 "$beat"
   : > "$dir/release"
   for ((i=0; i<100; i++)); do
-    [ -e "$beat" ] && break
+    [ "$(jg_path_age "$beat")" -lt 60 ] && break
     sleep 0.1
   done
-  [ -e "$beat" ] || fail "the replacement never published a beacon after its scan"
-  printf '# beacon age: replacement blocked absent -> after scan %ss\n' "$(jg_path_age "$beat")"
-  pass "an actionable exit leaves a fresh beacon and the replacement still publishes only after its scan"
+  [ "$(jg_path_age "$beat")" -lt 60 ] || fail "the replacement never renewed its beacon after the scan"
+  printf '# beacon age: replacement retained -> after scan %ss\n' "$(jg_path_age "$beat")"
+  pass "an actionable exit leaves a fresh beacon and the replacement renews it only after its scan"
 )
 
 test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
