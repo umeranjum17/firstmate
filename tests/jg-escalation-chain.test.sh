@@ -296,15 +296,22 @@ test_lead_stuck_on_a_prompt_reaches_the_board() {
   PANES=1 cycle "$m"
   grep -q 'check: waiting-state lead1 (prompt, .*level=main' "$m/events" || fail "the lead's prompt did not reach Main's rung: $(cat "$m/events")"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card .*--title Unblock stuck lead? .*--guard security' "$m/cards" \
-    || fail "the lead's prompt did not become a guarded board card: $(cat "$m/cards" 2>&1)"
+  # A stuck worker is Main's to unblock, never a card for the captain
+  # (bin/jg-ask-gate-lib.sh rule 2): the chain records the ask for Main instead.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-g[0-9]*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "a stuck lead's prompt reached the captain's board: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the lead's prompt was neither a card nor recorded for Main: $(cat "$m/data/overwatch-decisions.md" 2>&1)"
   [ "$(grep -c "stale: fake:1 (permission prompt" "$m/events")" -eq 1 ] || fail "the gate re-alerted instead of the chain"
   printf 'all quiet\n> \n' > "$m/panes/1"
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q '^dismiss waiting-timer-.*-lead1-.*-prompt-card' "$m/cards" || fail "the card stayed after the prompt was answered"
+  [ ! -s "$m/cards" ] || ! grep -q '^raise ' "$m/cards" \
+    || fail "a card was raised for a stuck lead: $(cat "$m/cards" 2>&1)"
+  grep -q '^- Ask: Unblock stuck lead?' "$m/data/overwatch-decisions.md" 2>/dev/null \
+    || fail "the recorded prompt wait disappeared when the prompt was answered"
   [ ! -e "$m/state/.waiting-timers/lead1" ] || fail "the episode outlived the prompt"
-  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, then a board card that closes when it clears"
+  pass "a lead stuck on a prompt wakes Main at once, reaches Main's rung, is recorded for Main's decision, and clears when it is answered"
 }
 
 test_dead_lead_still_reaches_the_board_and_relaunch_represents() {
@@ -401,12 +408,15 @@ test_two_hops_stuck_at_once() {
   backdate "$m" lead1 10
   PANES=1 cycle "$m"
   PANES=1 cycle "$m"
-  grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" || fail "the stuck lead got no card: $(cat "$m/cards" 2>&1)"
+  # Neither hop is the captain's card: a stuck worker and a stuck lead are
+  # Main's to unblock, so both are recorded for Main's decision.
+  ! grep -q -- '--key waiting-timer-[0-9a-f]*-lead1-.*-prompt-card' "$m/cards" 2>/dev/null \
+    || fail "the stuck lead reached the captain's board: $(cat "$m/cards" 2>&1)"
   ! grep -q -- '--key waiting-timer-0000aaaa-w1-.*-q-card' "$m/cards" 2>/dev/null \
     || fail "its stuck worker's question reached the captain's board: $(cat "$m/cards" 2>&1)"
   grep -q '^- Ask: ' "$m/data/overwatch-decisions.md" 2>/dev/null \
     || fail "its stuck worker's wait was not recorded for Main to decide"
-  pass "a lead stuck on a prompt reaches the board, and its worker's question goes to Main"
+  pass "a lead stuck on a prompt and its stuck worker both reach Main's decision, and neither reaches the captain's board"
 }
 
 test_main_absent_board_card_still_fires() {
