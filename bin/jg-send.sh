@@ -295,6 +295,24 @@ jg_send_id_from_meta() { # <meta-file>
   printf '%s' "${base%.meta}"
 }
 
+# #fleet: the steer is also a message on the fleet chat channel, written here
+# because this is the call site that already records the send (bin/jg-chat.sh).
+# Best-effort by contract: a chat problem never changes the outcome of a send.
+# JG_CHAT_FROM names the sender; bin/jg-chat.sh send sets it to "captain".
+jg_send_chat_steer() {
+  [ -x "$SCRIPT_DIR/jg-chat.sh" ] || return 0
+  # The agent the record reached: the task id this selector resolved to, never
+  # the backend's own target name, so the chat row names the agent, not the pane.
+  local to=${TARGET_TASK_ID:-}
+  if [ -z "$to" ] && [ -n "${TARGET_META:-}" ] && [ -f "$TARGET_META" ]; then
+    to=$(jg_send_id_from_meta "$TARGET_META")
+  fi
+  [ -n "$to" ] || to=${TARGET_REMOTE_ID:-$T}
+  JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/jg-chat.sh" note '#fleet' "${JG_CHAT_FROM:--}" "$to" agent - "$MESSAGE" \
+    >/dev/null 2>&1 || true
+}
+
 # jg_send_clear_after_interrupt: muse RESTORES the interrupted prompt back into
 # the composer when Escape cancels a turn, as real bright text (verified: fg
 # 38;2;204;211;219, luminance ~210, muse 0.1.0-R708.1), not de-emphasised ghost
@@ -1061,6 +1079,8 @@ else
       jg_send_close_resolved_keys "$RESOLVE_ANSWER_TEXT" || exit 1
       jg_send_feed_resolved_holds "$RESOLVE_ANSWER_TEXT" || exit 1
     fi
+    # The remote record is durable delivery, so the steer is a fact on #fleet too.
+    jg_send_chat_steer
     exit 0
   fi
   if [ "$INBOX_PLANE" = 1 ]; then
@@ -1109,6 +1129,9 @@ else
       exit 1
     fi
     jg_lock_release "$INBOX_META_LOCK"
+    # The record is durable, so the steer is a fact: it also lands on the fleet
+    # chat channel, from the call site that already recorded it.
+    jg_send_chat_steer
     # Enqueue IS durable delivery to the task's record: mark the pending
     # expectation delivered now, without resolving it - only a correlated
     # parent report acknowledges the request.
@@ -1248,6 +1271,8 @@ else
     exit 1
     ;;
   esac
+  # Delivery confirmed: the steer also lands on the fleet chat channel.
+  jg_send_chat_steer
   # Delivery confirmed. Mark the pending expectation delivered without resolving
   # it: only a correlated parent report acknowledges the request.
   if [ -n "$PENDING_REPLY_CORR" ]; then

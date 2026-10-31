@@ -3973,6 +3973,22 @@ while :; do
     done <<EOF
 $pending
 EOF
+    # #fleet: each status line change, in plain words. Read here because this is
+    # the loop that already surfaced the span, so the channel costs no second
+    # poll; the tail keeps the newest line, which is the change itself.
+    if [ -x "$SCRIPT_DIR/jg-chat.sh" ]; then
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$f" in *.status) ;; *) continue ;; esac
+        reportable_signal_path "$f" || continue
+        JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/jg-chat.sh" note '#fleet' \
+          "$(basename "$f" .status)" - status - \
+          "$(awk 'NF { line = $0 } END { print line }' "$f" 2>/dev/null)" \
+          >/dev/null 2>&1 || true
+      done <<EOF
+$pending
+EOF
+    fi
     reason="signal:$files"
     # Triage: a signal is ACTIONABLE when any of these holds (cheapest first):
     #   - the away-mode daemon owns triage (afk) and wants every wake;
