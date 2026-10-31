@@ -69,6 +69,11 @@
 # stamp; that adapter owns the card (the juggernaut-addons signoff script when
 # it is installed, else bin/jg-procevent-signoff.sh),
 # and a card it cannot raise fails the command (the hold stays recorded).
+# A hold that is the captain's own instruction raises nothing at all: one whose
+# hold kind is `parked`, or whose reason names a stop order or a branch we
+# preserved instead of landing. Those records are his words, not a question back
+# to him, so the hold is the whole result and no card and no Overwatch record are
+# created for it (bin/jg-ask-gate-lib.sh owns the words).
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -963,7 +968,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} priority='' priority_check title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local signoff_script addon_signoff existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release must='' refusal rec
+  local signoff_script addon_signoff existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 card_close=release must='' refusal rec own_instruction=''
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -997,6 +1002,16 @@ command_hold() {
     esac
   fi
   hold_set=${JG_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+  # A hold that is our own parked work, his own stop order, or a branch we
+  # preserved instead of landing is his instruction, so it records the hold and
+  # raises nothing: no card reaches him and no ask goes to Overwatch either
+  # (bin/jg-ask-gate-lib.sh owns the words that say so).
+  own_instruction=''
+  if jg_ask_own_instruction "$reason"; then
+    own_instruction=1
+  elif jg_backlog_row_probe "$DATA" "$id" && [ "$JG_BACKLOG_ROW_HOLD_KIND" = parked ]; then
+    own_instruction=1
+  fi
   # The board gate before anything is recorded: an ask that is not a must never
   # becomes a captain hold card while the leash is when-it-matters; it becomes an
   # Overwatch record Main answers (bin/jg-ask-gate-lib.sh owns the list and words).
@@ -1005,7 +1020,7 @@ command_hold() {
   signoff_script=$SCRIPT_DIR/jg-procevent-signoff.sh
   addon_signoff=$(jg_addon_path "$JG_HOME" signoff/bin/jg-procevent-signoff.sh)
   [ ! -f "$addon_signoff" ] || signoff_script=$addon_signoff
-  if [ "$signoff_script" = "$SCRIPT_DIR/jg-procevent-signoff.sh" ] && [ -z "$until" ] \
+  if [ -z "$own_instruction" ] && [ "$signoff_script" = "$SCRIPT_DIR/jg-procevent-signoff.sh" ] && [ -z "$until" ] \
     && [ -f "$STATE/procevent/signoff.source" ] && ! refusal=$(jg_ask_gate_refusal "$must"); then
     rec=$("$SCRIPT_DIR/jg-board-gate.sh" route --title "${title:-$reason}" --filer captain-hold --ref "$id" 2>&1) || rec=''
     printf '%s\n' "$refusal" >&2
@@ -1104,6 +1119,8 @@ command_hold() {
   # (the hold stays recorded).
   if [ -z "$until" ]; then
     release_task_control_lock
+  fi
+  if [ -z "$until" ] && [ -z "$own_instruction" ]; then
     if [ -f "$STATE/procevent/signoff.source" ]; then
       JG_HOME=$JG_HOME JG_CODE_ROOT=${JG_CODE_ROOT:-$SCRIPT_DIR/..} "$signoff_script" raise "$id" "$(show_field_value "$show" title)" "$reason" "$card_close" ${must:+--must "$must"} \
         || { printf 'error: task %s is held, but no sign-off card was raised for it\n' "$id" >&2; exit 1; }
