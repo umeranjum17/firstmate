@@ -42,6 +42,17 @@
 # github_branch_rules_unavailable_on_plan owns the narrow plan-unavailable
 # exception; every other unreadable required source refuses.
 # Every failing condition is reported, not just the first.
+# One substitution outranks that check reading: a sealed local suite receipt
+# from bin/jg-local-suite.sh that proves this exact head with exit 0. When it
+# verifies, the pull request still has to be open, not a draft, mergeable and
+# conflict-free - mergeability is not a queue wait - but the check rollup and the
+# required-check set are not consulted at all, because the same suite already ran
+# here at that commit. A receipt that exists and does not prove this head, whether
+# it names another head, records a nonzero exit, or no longer matches its own
+# seal, refuses the merge by name rather than falling back to the queue. No
+# receipt at all keeps the ordinary gate. A merge landed on that proof arms
+# bin/jg-post-merge-ci.sh, which files exactly one fix item naming the run id if
+# GitHub's later run goes red: an alarm, never a gate.
 # The verified head is then passed to gh as
 # --match-head-commit, so a push that lands between that read and the merge
 # fails the merge instead of landing commits nothing verified. Reading that
@@ -1010,6 +1021,7 @@ github_required_checks_missing() {
 github_verify_mergeable() {
   local json fields line red name covered missing unreported producers runs
   local total=0 named=0 refusals='' mergeable_refusal=''
+  local local_suite_proven=false local_suite_proof='' local_suite_verify_rc=0
   local state='' draft='' mergeable='' merge_state='' live_head='' base=''
 
   if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName,statusCheckRollup 2>/dev/null) \
@@ -1054,7 +1066,24 @@ FIELDS
     echo "error: could not read the GitHub pull request head commit before merging" >&2
     return 1
   fi
-  if ! red=$(github_checks_not_green "$json"); then
+  # Proof before queue: a sealed local suite receipt naming this exact live head
+  # stands in for the forge's check queue, which is the wait this proof replaces.
+  # The receipt is bound to the head read just above, so a push that moved the
+  # head leaves it unusable, and a receipt that exists but does not prove this
+  # head refuses by name instead of quietly turning back into a CI wait.
+  local_suite_proof=$("$SCRIPT_DIR/jg-local-suite.sh" verify "$STATE" "$ID" "$live_head" 2>&1) \
+    || local_suite_verify_rc=$?
+  case "$local_suite_verify_rc" in
+    0) local_suite_proven=true ;;
+    3) local_suite_proof='' ;;
+    *)
+      refusals="$refusals  - $local_suite_proof
+"
+      local_suite_proof=''
+      ;;
+  esac
+  red=''
+  if [ "$local_suite_proven" = false ] && ! red=$(github_checks_not_green "$json"); then
     echo "error: could not read the GitHub pull request state before merging" >&2
     return 1
   fi
@@ -1095,7 +1124,12 @@ $red
 EOF
 
   unreported=''
-  if ! github_read_required_contexts "$base"; then
+  if [ "$local_suite_proven" = true ]; then
+    # A head the local suite proved needs no forge check to report for it.
+    JG_PR_GITHUB_REQUIRED='[]'
+    JG_PR_GITHUB_REQUIRED_ERROR=
+  fi
+  if [ "$local_suite_proven" = false ] && ! github_read_required_contexts "$base"; then
     while IFS= read -r line; do
       refusals="$refusals  - $line, so a required check that has not reported cannot be ruled out
 "
@@ -1145,10 +1179,17 @@ EOF
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
     return 1
   fi
-  printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
-    "$URL" "$live_head" >&2
+  if [ "$local_suite_proven" = true ]; then
+    printf 'verified: %s is open and mergeable, and the sealed local suite receipt proves head %s (%s)\n' \
+      "$URL" "$live_head" "$local_suite_proof" >&2
+  else
+    printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
+      "$URL" "$live_head" >&2
+  fi
   JG_PR_MERGE_HEAD=$live_head
   JG_PR_GITHUB_BASE=$base
+  JG_PR_GITHUB_LOCAL_SUITE=$local_suite_proven
+  JG_PR_GITHUB_LOCAL_SUITE_PROOF=$local_suite_proof
 }
 
 # Read one live GitHub pull request view after gh returns. The selected
@@ -1160,6 +1201,8 @@ JG_PR_GITHUB_STATE=
 JG_PR_GITHUB_MERGED=
 JG_PR_GITHUB_QUEUED=
 JG_PR_GITHUB_BASE=
+JG_PR_GITHUB_LOCAL_SUITE=false
+JG_PR_GITHUB_LOCAL_SUITE_PROOF=
 JG_PR_GITHUB_QUEUE_OBSERVED=false
 github_read_outcome_with_gh() {
   local fields line
@@ -1733,6 +1776,23 @@ case "$PROVIDER" in
     if [ "$JG_PR_GITHUB_MERGED" = true ]; then
       printf 'verified: %s is merged (state=%s, merged=%s, isInMergeQueue=%s)\n' \
         "$URL" "$JG_PR_GITHUB_STATE" "$JG_PR_GITHUB_MERGED" "$JG_PR_GITHUB_QUEUED"
+      # This merge landed before GitHub finished, so its run result arrives as an
+      # alarm and never as a gate: one detached watch files one fix item naming
+      # the run id if that run goes red. A host that cannot start the watch says
+      # so, and the merge stands either way because nothing it does un-merges.
+      if [ "$JG_PR_GITHUB_LOCAL_SUITE" = true ]; then
+        alarm_dir="${JG_DATA_OVERRIDE:-$JG_HOME/data}/jg-post-merge-ci"
+        if mkdir -p "$alarm_dir" 2>/dev/null; then
+          nohup env JG_HOME="$JG_HOME" JG_STATE_OVERRIDE="$STATE" \
+            JG_DATA_OVERRIDE="${JG_DATA_OVERRIDE:-$JG_HOME/data}" \
+            "$SCRIPT_DIR/jg-post-merge-ci.sh" "$ID" "$URL" "$JG_PR_MERGE_HEAD" \
+            >>"$alarm_dir/$ID.log" 2>&1 </dev/null &
+          printf 'local-suite: post-merge CI alarm armed for head %s; a red run files one fix item naming its run id\n' \
+            "$JG_PR_MERGE_HEAD"
+        else
+          printf 'local-suite: merged on the local suite proof, but the post-merge CI alarm could not be started\n' >&2
+        fi
+      fi
     elif [ "$JG_PR_GITHUB_QUEUED" = true ]; then
       printf 'verified: %s is queued (state=%s, merged=%s, isInMergeQueue=%s)\n' \
         "$URL" "$JG_PR_GITHUB_STATE" "$JG_PR_GITHUB_MERGED" "$JG_PR_GITHUB_QUEUED"
