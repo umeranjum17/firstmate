@@ -258,44 +258,6 @@ SH
 test_a_replay_reads_in_the_recorded_order_with_its_threads_and_statuses
 test_a_captain_message_moves_sent_read_replied
 test_the_two_real_captain_comments_carry_their_element_and_run_to_done
-test_each_response_kind_is_recorded_with_what_he_did_there() {
-  local d act out
-  d=$(setup acts)
-  for act in approve refine reject answer; do
-    run "$d" "$CHAT" respond --act "$act" --on "card-$act" main "his words" >/dev/null ||
-      fail "the store refused an $act response"
-    assert_equals "$act" "$(field "$d" "[.[] | select(.on == \"card-$act\")] | first | .act")" \
-      "an $act response lost what the captain did"
-  done
-  out=$(run "$d" "$CHAT" respond --act invented --on card main "no") &&
-    fail "an unknown response kind was accepted"
-  assert_contains "$out" '--act takes comment, approve, refine, reject, or answer' \
-    "an unknown response kind is not refused by name"
-  out=$(run "$d" "$CHAT" respond --act approve main "no element") &&
-    fail "a response kind without an element was accepted"
-  assert_contains "$out" '--act needs --on' "a response kind without an element is not refused"
-  pass "approve, refine, reject and answer each land as one event with what he did there"
-}
-
-test_the_page_reads_one_message_record_per_response() {
-  local d out
-  d=$(setup view)
-  run "$d" "$CHAT" respond --act approve --on card-a --owner muxr --subject "Ship the chat backend" \
-    muxr "yes, ship it" >/dev/null || fail "the store refused a response with a subject"
-  run "$d" "$CHAT" respond --act comment --on card-b main "no subject on this one" >/dev/null
-  out=$(run "$d" "$CHAT" log --view message)
-  assert_equals 2 "$(printf '%s' "$out" | jq -s 'length')" "the message view is not one record per message"
-  assert_equals approve "$(printf '%s' "$out" | jq -r -s '.[0].kind')" \
-    "the message view does not name what the captain did as its kind"
-  assert_equals "Ship the chat backend" "$(printf '%s' "$out" | jq -r -s '.[0].subject')" \
-    "the message view lost the subject the response is about"
-  assert_equals card-b "$(printf '%s' "$out" | jq -r -s '.[1].subject')" \
-    "a response with no subject does not fall back to its element"
-  assert_equals 0 "$(printf '%s' "$out" | jq -s '[.[] | select(.subject == null or .subject == "")] | length')" \
-    "a message record left its subject blank"
-  pass "the page reads one message record per response, with its kind and a subject that is never blank"
-}
-
 test_the_nudge_climbs_three_levels_on_one_clock
 test_the_page_reads_one_message_record_per_response
 test_each_response_kind_is_recorded_with_what_he_did_there
